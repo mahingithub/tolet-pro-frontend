@@ -32,6 +32,7 @@ import callProvider from '../services/callProvider';
 import { getCurrentToken } from '../services/authService';
 import callService from '../services/callService';
 import CallHistory from './CallHistory';
+import CallQualityOverlay from './CallQualityOverlay';
 
 // ─── Cross-system storage keys (mirrored on HostDashboard / TenantDashboard) ─
 const CHAT_HISTORY_KEY        = 'tolet_chat_history';
@@ -1248,6 +1249,13 @@ const ChatSystem = () => {
                     className="absolute top-4 right-4 w-28 h-40 sm:w-36 sm:h-52 object-cover rounded-2xl border-2 border-white/30 shadow-2xl bg-gray-800"
                   />
                 </div>
+              )}
+
+              {/* Phase Call-3: network-quality bars, reconnect banner, camera switch.
+                  Self-contained; subscribes to callProvider quality/reconnect callbacks.
+                  Renders nothing useful under the native provider (callbacks never fire). */}
+              {callState?.status === 'accepted' && (
+                <CallQualityOverlay callType={callType} />
               )}
 
               <div className={`relative mb-6 ${callType === 'video' && callState?.status === 'accepted' ? 'hidden' : ''}`}>
