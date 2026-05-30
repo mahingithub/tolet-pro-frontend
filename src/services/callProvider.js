@@ -137,17 +137,36 @@ function connect(token) {
 
   _socket = io(SOCKET_URL, {
     auth: { token },
-    transports: ['websocket', 'polling'],
+    // Must mirror the server: polling FIRST. On Render's free tier a
+    // websocket-first client loops (WS fail → poll → WS fail …), which shows
+    // up as constant connect/disconnect churn and stops call signaling from
+    // ever completing. Start on polling (always works through the proxy);
+    // Socket.IO silently upgrades to WS only if the connection truly holds.
+    transports: ['polling', 'websocket'],
+    // Let Socket.IO keep retrying essentially forever — a free dyno can take
+    // ~50s to wake from sleep, and we want the client still trying when it does
+    // rather than giving up after 10 tries.
     reconnection: true,
-    reconnectionAttempts: 10,
+    reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
-    reconnectionDelayMax: 10000,
-    timeout: 15000,
+    reconnectionDelayMax: 8000,
+    // Wait long enough for a cold/sleeping server to answer the first handshake.
+    timeout: 60000,
   });
 
   _socket.on('connect', () => {
     console.log('[callProvider] socket connected:', _socket.id);
     _reconnectAttempt = 0;
+  });
+
+  // On every (re)connection attempt, refresh the auth token from storage so a
+  // socket that comes back AFTER the server's recovery window still
+  // authenticates cleanly instead of being rejected as an unauthenticated
+  // brand-new connection. Cheap, and prevents a whole class of "socket
+  // reconnects but server doesn't know who it is" bugs on flaky hosting.
+  _socket.io.on('reconnect_attempt', () => {
+    const fresh = window.localStorage.getItem('auth:token');
+    if (fresh) _socket.auth = { token: fresh };
   });
 
   _socket.on('disconnect', (reason) => {
