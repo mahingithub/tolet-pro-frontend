@@ -4,6 +4,7 @@ import { LanguageProvider } from "./context/LanguageContext";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import callProvider from "./services/callProvider";
 import { getCurrentToken } from "./services/authService";
+import fcmService from "./services/fcmService";
 
 // Existing Imports
 import Navbar from "./components/Navbar";
@@ -57,8 +58,16 @@ const GlobalCallSocket = () => {
 		const token = getCurrentToken();
 		if (!token) return;
 		callProvider.connect(token);
-		// No cleanup — we want the socket to persist across navigations.
+		// Phase Call-6: register this device for incoming-call push so the user
+		// is alerted even when the PWA is closed. Runs once per login; no-ops if
+		// the browser can't do push or the user denies permission. We delay a
+		// touch so it doesn't fight the initial render / socket handshake.
+		const fcmTimer = setTimeout(() => {
+			fcmService.enableCallNotifications().catch(() => {});
+		}, 1500);
+		// No socket cleanup — we want it to persist across navigations.
 		// It only tears down on logout (handled by the !isAuthenticated branch).
+		return () => clearTimeout(fcmTimer);
 	}, [isAuthenticated, user?.id, user?._id]);
 
 	return null;
