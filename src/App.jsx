@@ -27,6 +27,9 @@ import SubscriptionPage from "./components/SubscriptionPage";
 // --- Mobile Shell ---
 import MobileBottomNav from "./components/mobile/MobileBottomNav";
 
+// --- PWA install banner (Phase Call-5) ---
+import InstallPrompt from "./components/InstallPrompt";
+
 // --- Admin Imports ---
 import AdminLayout from "./components/AdminLayout";
 import AdminOverview from "./components/AdminOverview";
@@ -161,6 +164,7 @@ const AppLayout = () => {
 
 			{!isAuthOrAdminPage && <GlobalAIAssistant />}
 			<MobileBottomNav />
+			<InstallPrompt />
 		</div>
 	);
 };
