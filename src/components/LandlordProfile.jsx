@@ -205,10 +205,14 @@ const LandlordProfile = () => {
               </div>
 
               <div className="hidden md:flex gap-3">
-                <button className="bg-gray-100 text-gray-800 py-3 px-6 rounded-2xl font-black text-sm hover:bg-green-50 hover:text-green-600 transition-all flex items-center gap-2">
+                <button
+                  onClick={() => navigate('/messages', { state: { peerUserId: landlord.id || landlord._id || id, peerName: landlord.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } })}
+                  className="bg-gray-100 text-gray-800 py-3 px-6 rounded-2xl font-black text-sm hover:bg-green-50 hover:text-green-600 transition-all flex items-center gap-2">
                   <Phone size={16} /> Call
                 </button>
-                <button className="bg-[#ba0036] text-white py-3 px-6 rounded-2xl font-black text-sm shadow-lg hover:bg-[#90002a] active:scale-95 transition-all flex items-center gap-2">
+                <button
+                  onClick={() => navigate('/messages', { state: { peerUserId: landlord.id || landlord._id || id, peerName: landlord.name, peerAvatar: avatar } })}
+                  className="bg-[#ba0036] text-white py-3 px-6 rounded-2xl font-black text-sm shadow-lg hover:bg-[#90002a] active:scale-95 transition-all flex items-center gap-2">
                   <MessageCircle size={16} /> Send Message
                 </button>
               </div>
@@ -253,10 +257,14 @@ const LandlordProfile = () => {
               </div>
 
               <div className="flex md:hidden gap-3 w-full">
-                <button className="flex-1 bg-gray-50 border border-gray-200 text-gray-800 py-3.5 rounded-2xl font-black text-sm active:scale-95 transition-all flex items-center justify-center gap-2">
+                <button
+                  onClick={() => navigate('/messages', { state: { peerUserId: landlord.id || landlord._id || id, peerName: landlord.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } })}
+                  className="flex-1 bg-gray-50 border border-gray-200 text-gray-800 py-3.5 rounded-2xl font-black text-sm active:scale-95 transition-all flex items-center justify-center gap-2">
                   <Phone size={16} /> Call
                 </button>
-                <button className="flex-1 bg-[#ba0036] text-white py-3.5 rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+                <button
+                  onClick={() => navigate('/messages', { state: { peerUserId: landlord.id || landlord._id || id, peerName: landlord.name, peerAvatar: avatar } })}
+                  className="flex-1 bg-[#ba0036] text-white py-3.5 rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
                   <MessageCircle size={16} /> Message
                 </button>
               </div>

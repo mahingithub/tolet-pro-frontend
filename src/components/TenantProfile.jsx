@@ -235,6 +235,7 @@ const TenantProfile = () => {
               <div className="hidden md:flex gap-3">
                 <button
                   disabled={!phone}
+                  onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } })}
                   className={`py-3 px-6 rounded-2xl font-black text-sm transition-all flex items-center gap-2 ${
                     phone
                       ? 'bg-gray-100 text-gray-800 hover:bg-green-50 hover:text-green-600'
@@ -244,7 +245,9 @@ const TenantProfile = () => {
                   {phone ? <Phone size={16} /> : <Lock size={16} />}
                   {phone ? 'Call' : 'Locked'}
                 </button>
-                <button className="bg-blue-500 text-white py-3 px-6 rounded-2xl font-black text-sm shadow-lg hover:bg-blue-600 active:scale-95 transition-all flex items-center gap-2">
+                <button
+                  onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar } })}
+                  className="bg-blue-500 text-white py-3 px-6 rounded-2xl font-black text-sm shadow-lg hover:bg-blue-600 active:scale-95 transition-all flex items-center gap-2">
                   <MessageCircle size={16} /> Send Message
                 </button>
               </div>
@@ -281,6 +284,7 @@ const TenantProfile = () => {
               <div className="flex md:hidden gap-3 w-full">
                 <button
                   disabled={!phone}
+                  onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } })}
                   className={`flex-1 py-3.5 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 ${
                     phone
                       ? 'bg-gray-50 border border-gray-200 text-gray-800 active:scale-95'
@@ -289,7 +293,9 @@ const TenantProfile = () => {
                 >
                   {phone ? <Phone size={16} /> : <Lock size={16} />} {phone ? 'Call' : 'Locked'}
                 </button>
-                <button className="flex-1 bg-blue-500 text-white py-3.5 rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+                <button
+                  onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar } })}
+                  className="flex-1 bg-blue-500 text-white py-3.5 rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
                   <MessageCircle size={16} /> Message
                 </button>
               </div>

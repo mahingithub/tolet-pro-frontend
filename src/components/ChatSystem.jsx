@@ -16,7 +16,7 @@
 //   navigate('/messages', { state: { chatId, source: 'tenant-receipt', receiptId, propertyTitle, monthKey, prefillMessage }}) → tenant CTA.
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Send, Bot, Search, MoreVertical, Paperclip, Sparkles,
   CheckCheck, Check, Phone, Video, ArrowLeft, Smile, X, Mic, PhoneOff,
@@ -33,6 +33,7 @@ import { getCurrentToken } from '../services/authService';
 import callService from '../services/callService';
 import CallHistory from './CallHistory';
 import CallQualityOverlay from './CallQualityOverlay';
+import CallDetailModal from './CallDetailModal';
 
 // ─── Cross-system storage keys (mirrored on HostDashboard / TenantDashboard) ─
 const CHAT_HISTORY_KEY        = 'tolet_chat_history';
@@ -341,6 +342,7 @@ const ChatRow = ({ chat, lastMsg, isActive, onClick, isMobile }) => {
 // ─── Main ChatSystem component ──────────────────────────────────────────────
 const ChatSystem = () => {
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Chat list = AI bot (local-only) + real backend conversations (polled).
   // We no longer hydrate from localStorage — conversations live in Mongo.
@@ -371,6 +373,7 @@ const ChatSystem = () => {
   // Recent call history (polled). Items are pre-described via callService.describeCall.
   const [callHistory, setCallHistory] = useState([]);
   const [callHistoryLoading, setCallHistoryLoading] = useState(false);
+  const [selectedCall, setSelectedCall] = useState(null); // Phase Call-4: detail modal
   // Live duration timer for an active accepted call (seconds since accept).
   const [liveCallDuration, setLiveCallDuration] = useState(0);
   // Local UI toggles for media controls (kept in sync with callProvider).
@@ -738,6 +741,17 @@ const ChatSystem = () => {
     prevIsCallingRef.current = isCalling;
   }, [isCalling, refreshCallHistory]);
 
+  // Phase Call-4: when the Calls tab opens, mark missed calls as seen so the
+  // red badge clears. Optimistically flip local `seen`, then tell the backend.
+  useEffect(() => {
+    if (sidebarTab !== 'calls') return;
+    const hasUnseen = callHistory.some(c => c.status === 'missed' && !c.seen);
+    if (!hasUnseen) return;
+    setCallHistory((list) => list.map(c => (c.status === 'missed' ? { ...c, seen: true } : c)));
+    callService.markSeen().catch(() => { /* non-fatal; a later refresh corrects */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sidebarTab]);
+
   // ─── Call-end toast bridge ──────────────────────────────────────────────
   // We hook into the same call-state stream the overlay uses, but only
   // surface a toast for terminal states the user should be aware of.
@@ -810,6 +824,71 @@ const ChatSystem = () => {
       type: call.type === 'video' ? 'video' : 'voice',
     });
   }, [chats, placeCall]);
+
+  // ─── Phase Call-4: call-detail modal actions ─────────────────────────────
+  // Call the peer from the modal with an explicit type (voice/video).
+  const callPeerFromDetail = useCallback((peer, type) => {
+    if (!peer?.id) return;
+    setSelectedCall(null);
+    const matchingChat = chats.find(c => String(c.peerUserId || '') === String(peer.id));
+    if (matchingChat) {
+      setSidebarTab('messages');
+      setActiveChatId(matchingChat.id);
+      if (isMobile) setShowSidebarMobile(false);
+    }
+    placeCall({
+      peerUserId: peer.id,
+      peerName: peer.name,
+      peerAvatar: peer.profilePicture,
+      type: type === 'video' ? 'video' : 'voice',
+    });
+  }, [chats, placeCall, isMobile]);
+
+  // Open (or find) the chat thread with this peer from the modal.
+  const messagePeer = useCallback(async (peer) => {
+    if (!peer?.id) return;
+    setSelectedCall(null);
+    setSidebarTab('messages');
+    const matchingChat = chats.find(c => String(c.peerUserId || '') === String(peer.id));
+    if (matchingChat) {
+      setActiveChatId(matchingChat.id);
+      if (isMobile) setShowSidebarMobile(false);
+      return;
+    }
+    // No existing thread — open a backend conversation, then activate it.
+    try {
+      const convo = await chatService.openConversation({ peerUserId: peer.id });
+      if (convo?.id) {
+        try { mergeBackendConversations(await chatService.listConversations()); } catch { /* ignore */ }
+        setActiveChatId(convo.id);
+        if (isMobile) setShowSidebarMobile(false);
+      }
+    } catch (err) {
+      console.warn('[chat] messagePeer failed:', err?.message);
+    }
+  }, [chats, isMobile]);
+
+  // View the peer's profile. Route by role; param is the peer's user id.
+  // NOTE: verify these two route paths match your router (see PHASE4 guide).
+  const viewPeerProfile = useCallback((peer) => {
+    if (!peer?.id) return;
+    setSelectedCall(null);
+    const base = peer.role === 'tenant' ? '/tenant' : '/landlord';
+    navigate(`${base}/${peer.id}`);
+  }, [navigate]);
+
+  // Soft-delete a call from history (optimistic — also hits the backend).
+  const handleDeleteCall = useCallback(async (call) => {
+    if (!call?.id) return;
+    setSelectedCall((cur) => (cur && cur.id === call.id ? null : cur));
+    setCallHistory((list) => list.filter((c) => c.id !== call.id)); // optimistic
+    try {
+      await callService.deleteCall(call.id);
+    } catch (err) {
+      console.warn('[calls] delete failed, refreshing:', err?.message);
+      refreshCallHistory(); // restore truth on failure
+    }
+  }, [refreshCallHistory]);
 
   // Send message — AI bot stays local, real chats POST to /api/conversations/:id/messages.
   const sendMessageTo = useCallback(async (chatId, text) => {
@@ -966,8 +1045,15 @@ const ChatSystem = () => {
           setActiveChatId(convo.id);
           if (isMobile) setShowSidebarMobile(false);
           if (s.mode === 'call') {
-            setCallType('voice');
-            setIsCalling(true);
+            // Phase Call-4 fix: actually start the call (this used to only open
+            // the empty call UI without ringing). Peer details come from the
+            // navigation state (profile pages pass them); placeCall fills gaps.
+            placeCall({
+              peerUserId: s.peerUserId,
+              peerName: s.peerName,
+              peerAvatar: s.peerAvatar,
+              type: s.callType === 'video' ? 'video' : 'voice',
+            });
           }
           if (s.prefillMessage) {
             setInputText(s.prefillMessage);
@@ -1399,7 +1485,7 @@ const ChatSystem = () => {
                 <Phone size={13}/>
                 Calls
                 {(() => {
-                  const missedCount = callHistory.filter(c => c.status === 'missed').length;
+                  const missedCount = callHistory.filter(c => c.status === 'missed' && !c.seen).length;
                   if (missedCount === 0) return null;
                   return (
                     <span className={`text-[9px] font-black rounded-full min-w-[18px] h-[16px] px-1.5 inline-flex items-center justify-center ${
@@ -1473,6 +1559,8 @@ const ChatSystem = () => {
                 isLoading={callHistoryLoading}
                 searchQuery={searchQuery}
                 onCallBack={handleCallBack}
+                onSelectCall={setSelectedCall}
+                onDelete={handleDeleteCall}
               />
             )}
           </div>
@@ -1931,6 +2019,18 @@ const ChatSystem = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Phase Call-4: call detail modal (tap a row in the Calls tab) */}
+      {selectedCall && (
+        <CallDetailModal
+          call={selectedCall}
+          calls={callHistory}
+          onClose={() => setSelectedCall(null)}
+          onCall={(type) => callPeerFromDetail(selectedCall.peer, type)}
+          onMessage={() => messagePeer(selectedCall.peer)}
+          onViewProfile={selectedCall.peer?.id ? () => viewPeerProfile(selectedCall.peer) : undefined}
+        />
+      )}
     </div>
   );
 };
