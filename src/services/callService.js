@@ -46,7 +46,7 @@ async function api(path = '', { method = 'GET', body } = {}) {
  * (name, profilePicture) so the UI can render rows without extra round-trips.
  */
 export async function listCallHistory({ limit = 50 } = {}) {
-  const { calls } = await api(`?limit=${encodeURIComponent(limit)}`);
+  const { calls } = await api(`/history?limit=${encodeURIComponent(limit)}`);
   return Array.isArray(calls) ? calls : [];
 }
 
