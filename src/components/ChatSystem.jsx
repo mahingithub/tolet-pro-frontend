@@ -411,6 +411,20 @@ const ChatSystem = () => {
       if (status === 'ended' || status === 'rejected' || status === 'missed') {
         setIsCalling(false);
         setCallState(null);
+        // Surface a terminal-state toast (merged from the old second handler;
+        // callProvider only keeps ONE state callback, so a second
+        // onCallStateChange registration was silently overwriting this one —
+        // which left calls stuck on 'ringing' and video never mounting).
+        let msg = null;
+        if (status === 'ended')         msg = 'Call ended';
+        else if (status === 'rejected') msg = 'Call declined';
+        else if (status === 'missed')   msg = 'No answer';
+        if (msg) {
+          setCallEndToast({ msg, ts: Date.now() });
+          setTimeout(() => {
+            setCallEndToast((cur) => (cur && Date.now() - cur.ts >= 2800) ? null : cur);
+          }, 3000);
+        }
       } else if (status === 'accepted') {
         setCallState((prev) => prev ? { ...prev, status: 'accepted' } : null);
       }
@@ -591,6 +605,7 @@ const ChatSystem = () => {
   const remoteAudioRef = useRef(null);
   const localVideoRef  = useRef(null);
   const [localStream, setLocalStream] = useState(null);
+  const [remoteStream, setRemoteStream] = useState(null);
   const ringtoneRef = useRef({ ctx: null, osc: null, gain: null, timer: null });
 
   // ─── Ringtone helpers (Web Audio API — no MP3 asset needed) ───────────────
@@ -659,18 +674,31 @@ const ChatSystem = () => {
   }, [callState, startRingtone, stopRingtone]);
 
   // ─── Remote stream → media element wiring ─────────────────────────────────
+  // The stream can arrive BEFORE the <video> element exists (it only mounts
+  // once callState==='accepted'). So we just capture the stream into state
+  // here, and a separate effect attaches it whenever the element is present.
   useEffect(() => {
     callProvider.onRemoteStream((stream) => {
       if (!stream) return;
-      const hasVideo = stream.getVideoTracks().length > 0;
-      if (hasVideo && remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = stream;
-      }
+      setRemoteStream(stream);
+      // Audio element exists for the whole call, so it's safe to attach now.
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
       }
     });
   }, []);
+
+  // Attach remote stream to the video element once BOTH exist. Re-runs when the
+  // video element mounts (status flips to 'accepted') or the stream changes.
+  useEffect(() => {
+    if (remoteStream && remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.play?.().catch(() => {});
+    }
+    if (remoteStream && remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream, callType, callState?.status]);
 
   // ─── Local preview wiring (when our own stream is acquired) ───────────────
   // We poll callProvider.getLocalStream() shortly after accepting/initiating
@@ -682,13 +710,19 @@ const ChatSystem = () => {
       const s = callProvider.getLocalStream();
       if (s && s !== localStream) {
         setLocalStream(s);
-        if (localVideoRef.current && s.getVideoTracks().length > 0) {
-          localVideoRef.current.srcObject = s;
-        }
       }
     }, 300);
     return () => clearInterval(t);
   }, [isCalling, localStream]);
+
+  // Attach local stream to its preview element once both exist (same timing
+  // fix as the remote stream — the PiP <video> only mounts when accepted).
+  useEffect(() => {
+    if (localStream && localVideoRef.current && localStream.getVideoTracks().length > 0) {
+      localVideoRef.current.srcObject = localStream;
+      localVideoRef.current.play?.().catch(() => {});
+    }
+  }, [localStream, callType, callState?.status]);
 
   // ─── Live call duration counter ─────────────────────────────────────────
   // Counts up every second while a call is in the 'accepted' state. Reset
@@ -753,22 +787,10 @@ const ChatSystem = () => {
   }, [sidebarTab]);
 
   // ─── Call-end toast bridge ──────────────────────────────────────────────
-  // We hook into the same call-state stream the overlay uses, but only
-  // surface a toast for terminal states the user should be aware of.
-  useEffect(() => {
-    callProvider.onCallStateChange((status, data) => {
-      let msg = null;
-      if (status === 'ended')    msg = 'Call ended';
-      else if (status === 'rejected') msg = 'Call declined';
-      else if (status === 'missed')   msg = 'No answer';
-      if (msg) {
-        setCallEndToast({ msg, ts: Date.now() });
-        setTimeout(() => {
-          setCallEndToast((cur) => (cur && Date.now() - cur.ts >= 2800) ? null : cur);
-        }, 3000);
-      }
-    });
-  }, []);
+  // NOTE: toast handling now lives inside the PRIMARY onCallStateChange handler
+  // above. callProvider keeps only one state callback, so registering a second
+  // one here used to overwrite the primary handler — which broke ring-stop and
+  // video. Intentionally left empty/removed.
 
   // ─── Centralised call-placement helper ─────────────────────────────────
   // Used by the chat header voice/video buttons, the Calls-tab "call back"
