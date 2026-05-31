@@ -36,6 +36,9 @@ import PrivacyPolicy from "./components/legal/PrivacyPolicy";
 import TermsOfService from "./components/legal/TermsOfService";
 import RefundPolicy from "./components/legal/RefundPolicy";
 
+// --- Beta feedback button (Phase 7) ---
+import FeedbackButton from "./components/FeedbackButton";
+
 // --- Admin Imports ---
 import AdminLayout from "./components/AdminLayout";
 import AdminOverview from "./components/AdminOverview";
@@ -184,6 +187,7 @@ const AppLayout = () => {
 			{!isAuthOrAdminPage && <GlobalAIAssistant />}
 			<MobileBottomNav />
 			<InstallPrompt />
+			<FeedbackButton />
 		</div>
 	);
 };
