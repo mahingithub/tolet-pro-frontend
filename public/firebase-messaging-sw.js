@@ -4,14 +4,10 @@
  * requires a worker at this exact path (/firebase-messaging-sw.js) to receive
  * push messages when the app/tab is closed or in the background.
  *
- * ► YOU MUST FILL IN firebaseConfig BELOW with your real Firebase web config.
- *   These values are PUBLIC (they ship in every Firebase web app and are safe
- *   to commit) — they are NOT secrets. Service workers can't read
- *   import.meta.env, so they must be hardcoded here.
- *
- *   Get them from: Firebase Console → Project settings → General →
- *   "Your apps" → Web app → SDK setup and configuration → Config.
- *   They're the same values as your VITE_FIREBASE_* env vars.
+ * ► firebaseConfig below holds your real Firebase web config. These values are
+ *   PUBLIC (they ship in every Firebase web app and are safe to commit) — they
+ *   are NOT secrets. Service workers can't read import.meta.env, so they're
+ *   hardcoded here. They match your VITE_FIREBASE_* env vars.
  *
  * ► The compat scripts below are the supported way to use Firebase inside a
  *   service worker. Keep the version in sync with your app's firebase package
@@ -21,14 +17,14 @@
 importScripts('https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/11.0.2/firebase-messaging-compat.js');
 
-// ⚠️ REPLACE these placeholder values with your real Firebase web config.
+// Real Firebase web config (public values).
 const firebaseConfig = {
-  apiKey: 'REPLACE_WITH_VITE_FIREBASE_API_KEY',
+  apiKey: 'AIzaSyBHArOG7EPDBVVbtnt9J8YKdkb5MN9SV08',
   authDomain: 'to-let-pro-14e09.firebaseapp.com',
   projectId: 'to-let-pro-14e09',
-  storageBucket: 'to-let-pro-14e09.appspot.com',
-  messagingSenderId: 'REPLACE_WITH_VITE_FIREBASE_MESSAGING_SENDER_ID',
-  appId: 'REPLACE_WITH_VITE_FIREBASE_APP_ID',
+  storageBucket: 'to-let-pro-14e09.firebasestorage.app',
+  messagingSenderId: '100291826945',
+  appId: '1:100291826945:web:78671cae8a8eb831a27700',
 };
 
 firebase.initializeApp(firebaseConfig);
