@@ -31,6 +31,11 @@ import MobileBottomNav from "./components/mobile/MobileBottomNav";
 // --- PWA install banner (Phase Call-5) ---
 import InstallPrompt from "./components/InstallPrompt";
 
+// --- Legal pages (Phase 7) ---
+import PrivacyPolicy from "./components/legal/PrivacyPolicy";
+import TermsOfService from "./components/legal/TermsOfService";
+import RefundPolicy from "./components/legal/RefundPolicy";
+
 // --- Admin Imports ---
 import AdminLayout from "./components/AdminLayout";
 import AdminOverview from "./components/AdminOverview";
@@ -106,6 +111,11 @@ const AppLayout = () => {
 				<Route path="/property/:id" element={<PropertyDetails />} />
 				<Route path="/inquire/:id" element={<InquiryPage />} />
 				<Route path="/login" element={<LoginPage />} />
+
+				{/* Legal pages — public, no auth required (Phase 7) */}
+				<Route path="/privacy-policy" element={<PrivacyPolicy />} />
+				<Route path="/terms" element={<TermsOfService />} />
+				<Route path="/refund" element={<RefundPolicy />} />
 
 				<Route
 					path="/host-dashboard"
