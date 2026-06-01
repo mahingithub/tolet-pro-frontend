@@ -23,6 +23,7 @@ import {
   UserPlus, Pin, Receipt, FileText, Hourglass, Info, ChevronRight,
   Download, MessageCircle, VolumeX, MessageSquare,
   PhoneIncoming, PhoneOutgoing, PhoneMissed, VideoOff,
+  BellOff, Ban, Flag,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import chatService from '../services/chatService';
@@ -317,6 +318,7 @@ const ChatRow = ({ chat, lastMsg, isActive, onClick, isMobile }) => {
           <h4 className="font-black text-gray-900 text-[13px] truncate flex items-center gap-1.5">
             {chat.name}
             {chat.pinned && <Pin size={10} className="text-gray-400 shrink-0" />}
+            {chat.muted && <BellOff size={10} className="text-gray-400 shrink-0" />}
           </h4>
           <span className="text-[9px] font-black text-gray-400 shrink-0 tabular-nums">
             {lastMsg?.iso ? formatTime(lastMsg.iso) : chat.time}
@@ -363,6 +365,13 @@ const ChatSystem = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSidebarMobile, setShowSidebarMobile] = useState(true);
   const [showInfoPane, setShowInfoPane] = useState(false);
+  // Info-pane sub-states + auto-reset whenever the pane closes.
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  const [reportOpen, setReportOpen]     = useState(false);
+  const [reportSent, setReportSent]     = useState(false);
+  useEffect(() => {
+    if (!showInfoPane) { setConfirmBlock(false); setReportOpen(false); setReportSent(false); }
+  }, [showInfoPane]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [contextBanner, setContextBanner] = useState(null);
   const [activeReceipt, setActiveReceipt] = useState(null);
@@ -601,6 +610,10 @@ const ChatSystem = () => {
   }, []);
   const isMobile  = viewport < 768;
   const isDesktop = viewport >= 1280;
+  // True only when a real conversation is open on a phone. Drives the
+  // full-screen "clean chat" layer that covers the app's top navbar +
+  // bottom tab bar so the thread feels like a native messenger.
+  const mobileChatOpen = isMobile && !showSidebarMobile;
 
   const scrollRef = useRef(null);
   const inputRef  = useRef(null);
@@ -1286,9 +1299,10 @@ const ChatSystem = () => {
   // Filter & sort the sidebar chat list.
   const visibleChats = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    const base = chats.filter(c => !c.blocked);
     const filtered = q
-      ? chats.filter(c => c.name.toLowerCase().includes(q) || (c.role || '').toLowerCase().includes(q))
-      : chats;
+      ? base.filter(c => c.name.toLowerCase().includes(q) || (c.role || '').toLowerCase().includes(q))
+      : base;
     return [...filtered].sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
@@ -1299,6 +1313,24 @@ const ChatSystem = () => {
   }, [chats, searchQuery, messages]);
 
   const activeChat = chats.find(c => c.id === activeChatId) || initialChats[0];
+
+  // ── Info-pane actions. The optional-chained chatService calls auto-persist
+  //    to the backend once those methods exist; until then they're safe
+  //    no-ops and the UI updates optimistically. ───────────────────────────
+  const toggleMuteChat = () => {
+    const next = !activeChat.muted;
+    setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, muted: next } : c));
+    try { chatService.muteConversation?.(activeChatId, next); } catch (e) { console.warn('mute failed', e); }
+  };
+  const blockChat = async () => {
+    setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, blocked: true } : c));
+    setConfirmBlock(false); setShowInfoPane(false); setShowSidebarMobile(true);
+    try { await chatService.blockConversation?.(activeChatId); } catch (e) { console.warn('block failed', e); }
+  };
+  const submitReport = async (reason) => {
+    try { await chatService.reportConversation?.(activeChatId, reason); } catch (e) { console.warn('report failed', e); }
+    setReportSent(true);
+  };
 
   // Build the rendered message stream for the active chat — merge text/bot
   // messages with inline ReceiptCards from `paymentReceipts` AND inline
@@ -1483,9 +1515,13 @@ const ChatSystem = () => {
         <div className="absolute -bottom-40 -right-32 w-[480px] h-[480px] bg-blue-500/10 rounded-full blur-3xl"></div>
       </div>
 
-      <div className={`flex flex-col md:flex-row ${
-        isMobile ? 'h-[100dvh]' : 'h-[calc(100dvh-2rem)] my-4 max-w-[1400px] mx-auto rounded-[2rem]'
-      } bg-white/60 backdrop-blur-2xl border border-white/70 shadow-[0_30px_80px_rgba(0,0,0,0.08)] overflow-hidden relative`}>
+      <div className={`flex flex-col md:flex-row overflow-hidden ${
+        mobileChatOpen
+          ? 'fixed inset-0 z-[80] h-[100dvh] bg-white'
+          : isMobile
+            ? 'relative h-[100dvh] bg-white/60 backdrop-blur-2xl border border-white/70 shadow-[0_30px_80px_rgba(0,0,0,0.08)]'
+            : 'relative h-[calc(100dvh-2rem)] my-4 max-w-[1400px] mx-auto rounded-[2rem] bg-white/60 backdrop-blur-2xl border border-white/70 shadow-[0_30px_80px_rgba(0,0,0,0.08)]'
+      }`}>
 
         {/* CALL OVERLAY */}
         <AnimatePresence>
@@ -1755,11 +1791,14 @@ const ChatSystem = () => {
 
         {/* MAIN CHAT PANE */}
         <main className={`${isMobile && showSidebarMobile ? 'hidden' : 'flex'} flex-1 flex-col min-w-0 bg-white/30`}>
-          <header className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/60 bg-white/40 backdrop-blur-md flex justify-between items-center gap-3">
+          <header
+            className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/60 bg-white/40 backdrop-blur-md flex justify-between items-center gap-3"
+            style={mobileChatOpen ? { paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' } : undefined}
+          >
             <div className="flex items-center gap-3 min-w-0">
               {isMobile && (
                 <button
-                  onClick={() => setShowSidebarMobile(true)}
+                  onClick={() => { setShowInfoPane(false); setShowSidebarMobile(true); }}
                   className="p-2 -ml-1 rounded-xl hover:bg-white/70 transition-all"
                   aria-label="Back to chats"
                 >
@@ -1830,8 +1869,11 @@ const ChatSystem = () => {
                 </button>
               )}
               <button
-                className="p-2.5 sm:p-3 bg-white hover:bg-red-50 rounded-2xl text-gray-500 hover:text-[#ba0036] transition-all shadow-sm"
-                aria-label="More"
+                onClick={() => setShowInfoPane(s => !s)}
+                className={`p-2.5 sm:p-3 rounded-2xl transition-all shadow-sm ${
+                  showInfoPane ? 'bg-[#ba0036] text-white' : 'bg-white hover:bg-red-50 text-gray-500 hover:text-[#ba0036]'
+                }`}
+                aria-label="Contact info"
               >
                 <MoreVertical size={18}/>
               </button>
@@ -1979,7 +2021,10 @@ const ChatSystem = () => {
           )}
 
           {/* Composer */}
-          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-2 relative">
+          <div
+            className="px-4 sm:px-6 pb-4 sm:pb-6 pt-2 relative"
+            style={mobileChatOpen ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' } : undefined}
+          >
             <AnimatePresence>
               {showEmojiPicker && (
                 <motion.div
@@ -2116,9 +2161,27 @@ const ChatSystem = () => {
           </div>
         </main>
 
-        {/* INFO PANE (desktop only) */}
-        {isDesktop && showInfoPane && (
-          <aside className="w-[300px] border-l border-white/60 bg-white/30 backdrop-blur-md p-5 overflow-y-auto shrink-0">
+        {/* CONTACT INFO — desktop: inline right rail · mobile/tablet: slide-up sheet */}
+        {showInfoPane && (
+          <>
+            {!isDesktop && (
+              <div
+                className="fixed inset-0 z-[85] bg-gray-900/40 backdrop-blur-sm"
+                onClick={() => setShowInfoPane(false)}
+              />
+            )}
+            <motion.aside
+              initial={isDesktop ? false : { y: 28, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.26, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className={
+                isDesktop
+                  ? 'w-[300px] border-l border-white/60 bg-white/30 backdrop-blur-md p-5 overflow-y-auto shrink-0'
+                  : 'fixed inset-x-0 bottom-0 z-[90] max-h-[88vh] overflow-y-auto rounded-t-[2rem] bg-white shadow-[0_-20px_60px_rgba(0,0,0,0.25)] p-5'
+              }
+              style={!isDesktop ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.5rem)' } : undefined}
+            >
+              {!isDesktop && <div className="w-10 h-1.5 bg-gray-300 rounded-full mx-auto mb-4" />}
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-sm font-black text-gray-900">Conversation</h4>
               <button onClick={() => setShowInfoPane(false)} className="p-1.5 hover:bg-white rounded-full text-gray-400">
@@ -2156,6 +2219,40 @@ const ChatSystem = () => {
               )}
             </div>
 
+            {/* Shared media — photos + voice from this conversation */}
+            <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 px-1 mt-5">Shared media</h5>
+            {(() => {
+              const msgs = messages[activeChatId] || [];
+              const photos = msgs.filter(m => m.type === 'image' && m.mediaUrl);
+              const voices = msgs.filter(m => m.type === 'audio' && m.mediaUrl);
+              if (photos.length === 0 && voices.length === 0) {
+                return <p className="text-[11px] font-bold text-gray-400 text-center py-5">No photos or voice messages yet.</p>;
+              }
+              return (
+                <div className="space-y-3">
+                  {photos.length > 0 && (
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {photos.slice(-9).reverse().map((m, i) => (
+                        <a key={m.id || i} href={m.mediaUrl} target="_blank" rel="noopener noreferrer" className="block aspect-square rounded-xl overflow-hidden bg-gray-100 ring-1 ring-gray-100 hover:ring-2 hover:ring-[#ba0036]/30 transition-all">
+                          <img src={m.mediaUrl} alt="" loading="lazy" className="w-full h-full object-cover" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {voices.length > 0 && (
+                    <div className="space-y-1.5">
+                      {voices.slice(-4).reverse().map((m, i) => (
+                        <div key={m.id || i} className="flex items-center gap-2 bg-white border border-gray-100 rounded-xl px-2.5 py-2">
+                          <Mic size={13} className="text-[#ba0036] shrink-0" />
+                          <audio controls src={m.mediaUrl} className="h-8 w-full" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 px-1 mt-5">Quick actions</h5>
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => { setCallType('voice'); setIsCalling(true); }} className="bg-white hover:bg-red-50 border border-gray-100 hover:border-[#ba0036]/20 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-700 hover:text-[#ba0036] transition-all flex items-center justify-center gap-1.5">
@@ -2165,13 +2262,69 @@ const ChatSystem = () => {
                 <Video size={12}/> Video
               </button>
               <button
-                onClick={() => setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, pinned: !c.pinned } : c))}
-                className="col-span-2 bg-white hover:bg-amber-50 border border-gray-100 hover:border-amber-200 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-700 hover:text-amber-700 transition-all flex items-center justify-center gap-1.5"
+                onClick={toggleMuteChat}
+                className={`rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 border ${
+                  activeChat.muted
+                    ? 'bg-amber-50 border-amber-200 text-amber-700'
+                    : 'bg-white border-gray-100 hover:border-amber-200 text-gray-700 hover:text-amber-700 hover:bg-amber-50'
+                }`}
               >
-                <Pin size={12}/> {activeChat.pinned ? 'Unpin chat' : 'Pin to top'}
+                <BellOff size={12}/> {activeChat.muted ? 'Unmute' : 'Mute'}
+              </button>
+              <button
+                onClick={() => setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, pinned: !c.pinned } : c))}
+                className={`rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 border ${
+                  activeChat.pinned
+                    ? 'bg-[#ba0036]/10 border-[#ba0036]/20 text-[#ba0036]'
+                    : 'bg-white border-gray-100 hover:border-amber-200 text-gray-700 hover:text-amber-700 hover:bg-amber-50'
+                }`}
+              >
+                <Pin size={12}/> {activeChat.pinned ? 'Unpin' : 'Pin'}
               </button>
             </div>
-          </aside>
+
+            {/* Danger zone — Report + Block (hidden for the AI assistant) */}
+            {!activeChat.isAI && (
+              <div className="mt-5 pt-4 border-t border-gray-100 space-y-2">
+                {reportSent ? (
+                  <div className="rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold px-3 py-2.5 text-center">
+                    Report পাঠানো হয়েছে। ধন্যবাদ।
+                  </div>
+                ) : reportOpen ? (
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-2">Report reason</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {['Spam', 'Harassment', 'Scam / Fraud', 'Inappropriate'].map(r => (
+                        <button key={r} onClick={() => submitReport(r)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-full bg-white border border-amber-200 text-amber-800 hover:bg-amber-100 transition-all">
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                    <button onClick={() => setReportOpen(false)} className="mt-2 text-[10px] font-bold text-gray-400 hover:text-gray-600">Cancel</button>
+                  </div>
+                ) : (
+                  <button onClick={() => setReportOpen(true)} className="w-full bg-white hover:bg-amber-50 border border-gray-100 hover:border-amber-200 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-600 hover:text-amber-700 transition-all flex items-center justify-center gap-1.5">
+                    <Flag size={12}/> Report
+                  </button>
+                )}
+
+                {confirmBlock ? (
+                  <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-center">
+                    <p className="text-[11px] font-bold text-red-700 mb-2.5">Block <b>{activeChat.name}</b>?</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => setConfirmBlock(false)} className="flex-1 bg-white border border-gray-200 rounded-xl py-2 text-[10px] font-black uppercase tracking-widest text-gray-600">Cancel</button>
+                      <button onClick={blockChat} className="flex-1 bg-[#ba0036] text-white rounded-xl py-2 text-[10px] font-black uppercase tracking-widest">Block</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setConfirmBlock(true)} className="w-full bg-white hover:bg-red-50 border border-gray-100 hover:border-red-200 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-700 transition-all flex items-center justify-center gap-1.5">
+                    <Ban size={12}/> Block
+                  </button>
+                )}
+              </div>
+            )}
+            </motion.aside>
+          </>
         )}
       </div>
 
