@@ -319,6 +319,7 @@ const ChatRow = ({ chat, lastMsg, isActive, onClick, isMobile }) => {
             {chat.name}
             {chat.pinned && <Pin size={10} className="text-gray-400 shrink-0" />}
             {chat.muted && <BellOff size={10} className="text-gray-400 shrink-0" />}
+            {chat.blocked && <Ban size={10} className="text-red-400 shrink-0" />}
           </h4>
           <span className="text-[9px] font-black text-gray-400 shrink-0 tabular-nums">
             {lastMsg?.iso ? formatTime(lastMsg.iso) : chat.time}
@@ -1299,10 +1300,9 @@ const ChatSystem = () => {
   // Filter & sort the sidebar chat list.
   const visibleChats = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const base = chats.filter(c => !c.blocked);
     const filtered = q
-      ? base.filter(c => c.name.toLowerCase().includes(q) || (c.role || '').toLowerCase().includes(q))
-      : base;
+      ? chats.filter(c => c.name.toLowerCase().includes(q) || (c.role || '').toLowerCase().includes(q))
+      : chats;
     return [...filtered].sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
@@ -1324,8 +1324,12 @@ const ChatSystem = () => {
   };
   const blockChat = async () => {
     setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, blocked: true } : c));
-    setConfirmBlock(false); setShowInfoPane(false); setShowSidebarMobile(true);
+    setConfirmBlock(false);
     try { await chatService.blockConversation?.(activeChatId); } catch (e) { console.warn('block failed', e); }
+  };
+  const unblockChat = async () => {
+    setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, blocked: false } : c));
+    try { await chatService.unblockConversation?.(activeChatId); } catch (e) { console.warn('unblock failed', e); }
   };
   const submitReport = async (reason) => {
     try { await chatService.reportConversation?.(activeChatId, reason); } catch (e) { console.warn('report failed', e); }
@@ -2025,6 +2029,14 @@ const ChatSystem = () => {
             className="px-4 sm:px-6 pb-4 sm:pb-6 pt-2 relative"
             style={mobileChatOpen ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' } : undefined}
           >
+            {activeChat.blocked ? (
+              <div className="flex items-center justify-center gap-3 bg-gray-50 border border-gray-200 rounded-[1.6rem] px-4 py-3.5">
+                <Ban size={16} className="text-gray-400 shrink-0" />
+                <span className="text-[12px] font-bold text-gray-500">You blocked {activeChat.name}</span>
+                <button onClick={unblockChat} className="text-[11px] font-black uppercase tracking-widest text-[#ba0036] hover:underline">Unblock</button>
+              </div>
+            ) : (
+              <>
             <AnimatePresence>
               {showEmojiPicker && (
                 <motion.div
@@ -2157,6 +2169,8 @@ const ChatSystem = () => {
               <p className="text-center text-[9px] font-black text-gray-300 uppercase tracking-[0.18em] mt-2.5">
                 Enter to send · Shift + Enter for new line · Esc to close call
               </p>
+            )}
+              </>
             )}
           </div>
         </main>
@@ -2316,6 +2330,10 @@ const ChatSystem = () => {
                       <button onClick={blockChat} className="flex-1 bg-[#ba0036] text-white rounded-xl py-2 text-[10px] font-black uppercase tracking-widest">Block</button>
                     </div>
                   </div>
+                ) : activeChat.blocked ? (
+                  <button onClick={unblockChat} className="w-full bg-white hover:bg-emerald-50 border border-gray-100 hover:border-emerald-200 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-emerald-700 hover:text-emerald-800 transition-all flex items-center justify-center gap-1.5">
+                    <Ban size={12}/> Unblock {activeChat.name}
+                  </button>
                 ) : (
                   <button onClick={() => setConfirmBlock(true)} className="w-full bg-white hover:bg-red-50 border border-gray-100 hover:border-red-200 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-700 transition-all flex items-center justify-center gap-1.5">
                     <Ban size={12}/> Block
