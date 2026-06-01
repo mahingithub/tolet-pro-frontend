@@ -97,10 +97,12 @@ const AppLayout = () => {
 		location.pathname.startsWith(route),
 	);
 
-	// The AI Assistant lives globally but is hidden on auth + admin pages
-	// (admins have their own ticket workspace, not the floating widget).
-	const isAuthOrAdminPage =
-		location.pathname === "/login" || location.pathname.startsWith("/admin");
+	// Hide the AI Assistant on auth, admin, and the messages page
+	// (the chat page has its own interface — the floating widget is redundant there).
+	const shouldHideAIAssistant =
+		location.pathname === "/login" ||
+		location.pathname.startsWith("/admin") ||
+		location.pathname === "/messages";
 
 	return (
 		<div className="min-h-screen bg-white">
@@ -184,7 +186,7 @@ const AppLayout = () => {
 				<Route path="*" element={<Navigate to="/" replace />} />
 			</Routes>
 
-			{!isAuthOrAdminPage && <GlobalAIAssistant />}
+			{!shouldHideAIAssistant && <GlobalAIAssistant />}
 			<MobileBottomNav />
 			<InstallPrompt />
 			<FeedbackButton />
