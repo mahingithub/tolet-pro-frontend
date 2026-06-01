@@ -1900,8 +1900,39 @@ const PropertyDetails = () => {
                     <p className="text-lg md:text-xl font-black text-slate-900" style={{ fontFamily: 'Oxanium, sans-serif' }}>{stat.value}</p>
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">{stat.label}</p>
                   </div>
+                  </div>
                 ))}
               </div>
+
+              {(landlord?.preferredTenants?.length > 0 || landlord?.houseRules?.length > 0) && (
+                <div className="mt-5 pt-5" style={{ borderTop: '1px solid rgba(15,23,42,0.06)' }}>
+                  {landlord.preferredTenants?.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Preferred Tenants</p>
+                      <div className="flex flex-wrap gap-2">
+                        {landlord.preferredTenants.map((pt, i) => (
+                          <span key={i} className="bg-blue-50 text-blue-700 border border-blue-100 px-2.5 py-1 rounded-lg text-[10px] font-bold capitalize">
+                            {pt.replace('_', ' ')}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {landlord.houseRules?.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">House Rules</p>
+                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {landlord.houseRules.map((hr, i) => (
+                          <li key={i} className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                            <CheckCircle2 size={12} className="text-[#ba0036]" />
+                            <span className="capitalize">{hr.replace(/_/g, ' ')}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
               <Link to={`/landlord/${landlord.id}`}
                 className="cyber-btn mt-4 w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm transition-all active:scale-95 text-slate-700"
                 style={{ background: '#fafbfc', border: '1px solid rgba(15,23,42,0.08)' }}>
@@ -2017,6 +2048,11 @@ const PropertyDetails = () => {
                     ৳{Number(property.price).toLocaleString('en-IN')}
                     {priceLabel && <span className="text-sm font-bold text-slate-500">{priceLabel}</span>}
                   </h2>
+                  {landlord?.serviceCharge > 0 && (
+                    <p className="text-xs font-bold text-slate-500 mt-1">
+                      + ৳{Number(landlord.serviceCharge).toLocaleString('en-IN')} Service Charge
+                    </p>
+                  )}
                   <div className="flex flex-wrap gap-2 mt-2">
                     <IntentBadge intent={property.intent} />
                     <CategoryBadge category={property.category} />
@@ -2148,6 +2184,9 @@ const PropertyDetails = () => {
               ৳{Number(property.price).toLocaleString('en-IN')}
               {priceLabel && <span className="text-[10px] text-slate-500 font-bold ml-0.5">{priceLabel}</span>}
             </p>
+            {landlord?.serviceCharge > 0 && (
+              <p className="text-[9px] font-bold text-slate-500 mt-0.5">+ ৳{Number(landlord.serviceCharge).toLocaleString('en-IN')} SC</p>
+            )}
           </div>
           <motion.button disabled={isUnavailable}
             whileTap={{ scale: 0.9 }}

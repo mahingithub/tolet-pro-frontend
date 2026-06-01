@@ -187,7 +187,8 @@ const TenantProfile = () => {
   const isUnlocked = tenant.unlocked === true;
   const phone = isUnlocked ? (tenant.phone || '') : '';
   const email = isUnlocked ? (tenant.email || '') : '';
-  const employment = isUnlocked ? (tenant.employment || null) : null;
+  const professionDetails = isUnlocked ? (tenant.professionDetails || {}) : {};
+  const emergencyContact  = isUnlocked ? (tenant.emergencyContact || {}) : {};
 
   return (
     <div className="w-full bg-[#f4f7fb] min-h-screen font-sans relative pb-20">
@@ -356,14 +357,88 @@ const TenantProfile = () => {
               </div>
             )}
 
-            {employment && (
+            {tenant.professionType && (
               <div className="mt-8">
                 <h3 className="text-lg font-black text-gray-900 mb-3 flex items-center gap-2">
-                  <Briefcase size={18} /> Employment
+                  <Briefcase size={18} /> Professional Details
                 </h3>
-                <p className="text-gray-600 font-medium leading-relaxed text-sm md:text-base">
-                  {employment.title || '—'}{employment.company ? ` @ ${employment.company}` : ''}
-                </p>
+                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-2 items-start">
+                      <span className="w-24 text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0">Status</span>
+                      <span className="text-sm font-medium text-gray-900 capitalize">{tenant.professionType}</span>
+                    </div>
+                    {isUnlocked && tenant.professionType === 'student' && (
+                      <>
+                        <div className="flex gap-2 items-start">
+                          <span className="w-24 text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0">Institution</span>
+                          <span className="text-sm font-medium text-gray-900">{professionDetails.institution || '—'}</span>
+                        </div>
+                        <div className="flex gap-2 items-start">
+                          <span className="w-24 text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0">Student ID</span>
+                          <span className="text-sm font-medium text-gray-900">{professionDetails.studentId || '—'}</span>
+                        </div>
+                      </>
+                    )}
+                    {isUnlocked && tenant.professionType === 'job' && (
+                      <>
+                        <div className="flex gap-2 items-start">
+                          <span className="w-24 text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0">Company</span>
+                          <span className="text-sm font-medium text-gray-900">{professionDetails.company || '—'}</span>
+                        </div>
+                        <div className="flex gap-2 items-start">
+                          <span className="w-24 text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0">Designation</span>
+                          <span className="text-sm font-medium text-gray-900">{professionDetails.designation || '—'}</span>
+                        </div>
+                        <div className="flex gap-2 items-start">
+                          <span className="w-24 text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0">Office ID</span>
+                          <span className="text-sm font-medium text-gray-900">{professionDetails.officeId || '—'}</span>
+                        </div>
+                      </>
+                    )}
+                    {isUnlocked && tenant.professionType === 'businessman' && (
+                      <>
+                        <div className="flex gap-2 items-start">
+                          <span className="w-24 text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0">Business</span>
+                          <span className="text-sm font-medium text-gray-900">{professionDetails.company || '—'}</span>
+                        </div>
+                      </>
+                    )}
+                    {!isUnlocked && (
+                      <div className="mt-2 p-3 bg-blue-50 border border-blue-100 rounded-xl flex gap-2 items-center text-xs font-bold text-blue-700">
+                        <Lock size={14} /> Full professional details are locked
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isUnlocked && emergencyContact.name && (
+              <div className="mt-8">
+                <h3 className="text-lg font-black text-gray-900 mb-3 flex items-center gap-2">
+                  <ShieldCheck size={18} /> Emergency Contact
+                </h3>
+                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Name</span>
+                      <span className="text-sm font-medium text-gray-900">{emergencyContact.name}</span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Relation</span>
+                      <span className="text-sm font-medium text-gray-900">{emergencyContact.relation || '—'}</span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Phone</span>
+                      <span className="text-sm font-medium text-gray-900">{emergencyContact.phone || '—'}</span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Address</span>
+                      <span className="text-sm font-medium text-gray-900">{emergencyContact.address || '—'}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 

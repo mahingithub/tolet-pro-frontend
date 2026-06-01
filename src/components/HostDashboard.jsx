@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Building, MessageSquare, Calendar,
+  LayoutDashboard, Building, Building2, MessageSquare, Calendar,
   Settings, HelpCircle, Plus, Search, Bell, Filter, ArrowUpDown,
   Edit3, PauseCircle, PlayCircle, FileText, MapPin, Globe, CheckCircle2,
   X, CreditCard, MoreVertical, Download, Trash2, MessageCircle, Archive,
-  Send, Paperclip, Smile, Mail, Shield, LogOut, BadgeCheck, Camera, Check,
-  Hourglass, Upload, User, Image as ImageIcon, CheckCircle, ScanFace, Zap,
+  Send, Paperclip, Smile, Mail, Shield, ShieldCheck, LogOut, BadgeCheck, Camera, Check,
+  Hourglass, Upload, User, UserCircle, Image as ImageIcon, CheckCircle, ScanFace, Zap,
   BellRing, Folder, Scale, ClipboardCheck, Receipt, UploadCloud, ArrowLeft,
   File, Eye, FileEdit, Megaphone, FileSpreadsheet, Phone, Bot, CheckCheck, Video,
   Activity, TrendingUp, Crown, Lock, Sparkles, DollarSign, Wallet,
@@ -22,6 +22,9 @@ import { subscriptionService } from '../services/subscriptionService';
 import { listHostInquiries, updateInquiryStatus } from "../services/inquiryService.js";
 import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi } from "../services/bookingService.js";
 import { listNotifications, getUnreadCount, markRead, markAllRead } from "../services/notificationService.js";
+import { uploadAvatar } from "../services/authService";
+import ProfileSection from './shared/ProfileSection';
+import VerificationModal from './VerificationModal';
 
 /**
  * Adapt a property record returned by propertyService (used by the public
@@ -432,6 +435,66 @@ const HostDashboard = () => {
   }));
   const [tempUserData, setTempUserData] = useState(userData);
 
+  const landlordProfileKey = (uid) => `tolet_landlord_profile:${uid || 'anon'}`;
+  const DEFAULT_LANDLORD_PROFILE = {
+    fullName:         userData.fullName || '',
+    city:             userData.city || '',
+    address:          userData.address || '',
+    preferredTenants: [],
+    communication:    [],
+    serviceCharge:    '',
+    houseRules:       [],
+  };
+
+  const [landlordProfile, setLandlordProfile] = useState(() => {
+    try {
+      const raw = localStorage.getItem(landlordProfileKey(authUser?.id));
+      if (raw) return { ...DEFAULT_LANDLORD_PROFILE, ...JSON.parse(raw) };
+    } catch { /* ignore parse errors */ }
+    return DEFAULT_LANDLORD_PROFILE;
+  });
+
+  useEffect(() => {
+    setLandlordProfile((prev) => ({
+      ...prev,
+      fullName: userData.fullName || prev.fullName,
+      city:     userData.city     || prev.city,
+      address:  userData.address  || prev.address,
+    }));
+  }, [userData.fullName, userData.city, userData.address]);
+
+  const applyLandlordPatch = (profile, patch) => {
+    const next = { ...profile };
+    for (const [key, value] of Object.entries(patch || {})) {
+      if (!key.includes('.')) { next[key] = value; continue; }
+      const parts = key.split('.');
+      let cursor = next;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const k = parts[i];
+        cursor[k] = { ...(cursor[k] || {}) };
+        cursor = cursor[k];
+      }
+      cursor[parts[parts.length - 1]] = value;
+    }
+    return next;
+  };
+
+  const persistLandlordProfile = async (next) => {
+    setLandlordProfile(next);
+    try {
+      localStorage.setItem(landlordProfileKey(authUser?.id), JSON.stringify(next));
+    } catch {}
+    setUserData((prev) => ({
+      ...prev,
+      fullName: next.fullName || prev.fullName,
+      city:     next.city     || prev.city,
+      address:  next.address  || prev.address,
+    }));
+    if (authUpdateMe) {
+      await authUpdateMe({ landlordProfile: next });
+    }
+  };
+
   // Whenever the auth user changes (login, logout, profile update from
   // another tab) re-seed the dashboard profile so we never fall back to a
   // stale demo placeholder.
@@ -462,6 +525,47 @@ const HostDashboard = () => {
     faceVerified: false,
     underReview: false
   });
+
+  const landlordTrustScore = (() => {
+    const lp = landlordProfile || {};
+    const v  = verificationStatus || {};
+    const items = [
+        { key: 'phone', labelEn: 'Phone OTP verified', labelBn: 'ফোন OTP ভেরিফাইড', pts: 20, done: !!userData?.phone },
+        { key: 'avatar', labelEn: 'Profile picture', labelBn: 'প্রোফাইল ছবি', pts: 10, done: !!userData?.avatar },
+        { key: 'preferences', labelEn: 'Tenant preferences', labelBn: 'ভাড়াটিয়ার পছন্দ', pts: 5, done: (lp.preferredTenants || []).length > 0 },
+        { key: 'comm', labelEn: 'Communication channels', labelBn: 'যোগাযোগ মাধ্যম', pts: 5, done: (lp.communication || []).length > 0 },
+        { key: 'charge', labelEn: 'Service charge', labelBn: 'সার্ভিস চার্জ', pts: 5, done: lp.serviceCharge !== '' && lp.serviceCharge != null },
+        { key: 'rules', labelEn: 'House rules', labelBn: 'বাড়ির নিয়ম', pts: 10, done: (lp.houseRules || []).length > 0 },
+        { key: 'photo', labelEn: 'Selfie verification', labelBn: 'সেলফি ভেরিফিকেশন', pts: 20, done: !!v.faceVerified },
+        { key: 'nid', labelEn: 'NID uploaded', labelBn: 'NID আপলোড', pts: 25, done: !!v.nidUploaded },
+    ];
+    const score = items.filter(i => i.done).reduce((sum, i) => sum + i.pts, 0);
+    let tier = 'bronze';
+    if (score >= 90)      tier = 'platinum';
+    else if (score >= 70) tier = 'gold';
+    else if (score >= 40) tier = 'silver';
+    return { score, tier, breakdown: items };
+  })();
+
+  const [verifModalOpen, setVerifModalOpen] = useState(false);
+
+  const handleHostWizardSubmit = async (picks) => {
+    setVerificationStatus((prev) => ({
+      ...prev,
+      profileCompleted: true,
+      nidUploaded: !!(picks.nidFront?.dataUrl && picks.nidBack?.dataUrl),
+      faceVerified: !!picks.photo?.dataUrl,
+      underReview: true,
+    }));
+    setUploadedDocs((prev) => ({
+      ...prev,
+      nidFront: !!picks.nidFront?.dataUrl,
+      nidBack: !!picks.nidBack?.dataUrl,
+      selfie: !!picks.photo?.dataUrl,
+      utilityBill: !!picks.ownershipProof?.dataUrl,
+    }));
+    setVerifModalOpen(false);
+  };
 
   // 🟢 REFS
   const nidFrontRef = useRef(null);
@@ -1280,9 +1384,15 @@ const HostDashboard = () => {
         <header className="mx-4 md:mx-8 mt-4 bg-white/60 backdrop-blur-3xl border border-white/80 rounded-[2rem] px-4 md:px-8 py-3.5 flex items-center justify-between shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
           <Link to="/" className="flex items-center gap-3 z-10 group">
             <div className="bg-gradient-to-br from-[#ba0036] to-[#ff004c] p-2.5 rounded-xl shadow-[0_4px_15px_rgba(186,0,54,0.3)] group-hover:scale-105 transition-transform">
-              <Building className="text-white" size={20} />
+              <Building2 className="text-white w-4 h-4 md:w-[18px] md:h-[18px]" />
             </div>
-            <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tighter hidden sm:block">TO-LET <span className="text-[#ba0036]">PRO</span></h1>
+            <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tighter hidden sm:block">
+              TO-LET <span className="text-[#ba0036]">PRO</span>
+            </h1>
+            {/* Beta badge (Phase 7) — signals the app is in beta testing. */}
+            <span className="ml-1 px-1.5 py-0.5 text-[9px] md:text-[10px] font-black uppercase tracking-wider text-[#ba0036] bg-red-50 border border-[#ba0036]/30 rounded-md leading-none self-center hidden sm:block">
+              Beta
+            </span>
           </Link>
           
           {/* Header trimmed to match the public homepage navbar: logo +
@@ -1475,355 +1585,127 @@ const HostDashboard = () => {
         {activeTab === 'profile' && (
           <div className="w-full mb-10 animate-in fade-in zoom-in-95 duration-500">
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 md:gap-8">
-              
+
+              {/* === LEFT (2 cols on xl): Header + Personal Info + Verification Center === */}
               <div className="xl:col-span-2 space-y-6 md:space-y-8">
-                 <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] p-6 md:p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] relative overflow-hidden transition-all duration-300">
-                    <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-red-50/50 rounded-l-full -z-0 hidden md:block"></div>
-                    <div className="relative z-10 shrink-0">
-                       {userData.avatar ? (
-                         <img src={userData.avatar} alt={userData.fullName} className="w-24 h-24 rounded-full object-cover shadow-md ring-2 ring-white" />
-                       ) : (
-                         <div className="w-24 h-24 rounded-full bg-[#ba0036] text-white flex items-center justify-center font-black text-4xl shadow-md">{userData.fullName.charAt(0)}{userData.fullName.split(' ')[1]?.charAt(0)}</div>
-                       )}
-                       {/* Camera badge — always visible like Instagram/WhatsApp
-                           so the host doesn't have to enter edit-mode just to
-                           swap their picture. The label wraps a hidden file
-                           input; the FileReader inlines the base64 data: URL
-                           so the preview survives a reload. Replace with a
-                           POST /api/uploads call once the backend ships. */}
-                       <label htmlFor="profile-avatar-input" className="absolute bottom-0 right-0 p-2 bg-white rounded-full shadow-md border border-gray-100 hover:bg-gray-50 text-gray-600 cursor-pointer transition-transform hover:scale-110" title={language === 'বাংলা' ? 'প্রোফাইল ছবি বদলান' : 'Change profile photo'}>
-                         <Camera size={14}/>
-                         <input
-                           id="profile-avatar-input"
-                           type="file"
-                           accept="image/*"
-                           className="hidden"
-                           onChange={(e) => {
-                             const file = e.target.files?.[0];
-                             if (!file) return;
-                             const reader = new FileReader();
-                             reader.onload = () => {
-                               const url = String(reader.result || '');
-                               setUserData(prev => ({ ...prev, avatar: url }));
-                               setTempUserData(prev => ({ ...prev, avatar: url }));
-                               showToast(language === 'বাংলা' ? 'প্রোফাইল ছবি আপডেট হয়েছে!' : 'Profile photo updated!');
-                             };
-                             reader.readAsDataURL(file);
-                             e.target.value = '';
-                           }}
-                         />
-                       </label>
-                    </div>
-                    <div className="flex-1 text-center sm:text-left relative z-10">
-                       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-2 justify-center sm:justify-start">
-                          <h3 className="text-2xl md:text-3xl font-black text-gray-900">{userData.fullName}</h3>
-                          {(verificationStatus.nidUploaded && verificationStatus.faceVerified) ? (
-                             <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 w-max mx-auto sm:mx-0"><BadgeCheck size={12}/> Verified</span>
-                          ) : (
-                             <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 w-max mx-auto sm:mx-0"><Hourglass size={12}/> Pending</span>
-                          )}
-                       </div>
-                       <p className="text-gray-500 font-medium text-sm">{userData.email}</p>
-                       <p className="text-gray-500 font-medium text-sm">{userData.phone}</p>
-                    </div>
-                    
-                    {!isEditingProfile ? (
-                      <button onClick={handleEditToggle} className="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-xl font-bold text-xs transition-all relative z-10 flex items-center justify-center gap-2">
-                         <Edit3 size={14} /> Edit Profile
-                      </button>
-                    ) : (
-                      <div className="flex gap-2 w-full sm:w-auto z-10">
-                         <button onClick={handleEditToggle} className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-3 rounded-xl font-bold text-xs transition-all">Cancel</button>
-                         <button onClick={handleProfileSave} className="flex-1 sm:flex-none bg-[#ba0036] hover:bg-[#90002a] text-white px-6 py-3 rounded-xl font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2">
-                            <Check size={14} /> Save Changes
-                         </button>
-                      </div>
-                    )}
-                 </div>
-
-                 <div className={`bg-white rounded-[1.5rem] md:rounded-[2rem] p-6 md:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border ${isEditingProfile ? 'border-[#ba0036]/30' : 'border-transparent'} transition-all duration-500`}>
-                    <div className="flex items-center gap-3 mb-8">
-                       <User className="text-[#ba0036]" size={20} />
-                       <h4 className="text-lg font-black text-gray-900">Personal Information</h4>
-                       {isEditingProfile && <span className="ml-auto text-[10px] font-bold text-[#ba0036] animate-pulse">Editing Mode</span>}
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-8">
-                       <div>
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Full Name</label>
-                          <input type="text" disabled={!isEditingProfile} value={isEditingProfile ? tempUserData.fullName : userData.fullName} onChange={(e) => setTempUserData({...tempUserData, fullName: e.target.value})} className={`w-full border-b pb-2 outline-none bg-transparent font-medium transition-all ${isEditingProfile ? 'border-gray-300 text-gray-900 focus:border-[#ba0036]' : 'border-gray-100 text-gray-600'}`} />
-                       </div>
-                       <div>
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Phone Number</label>
-                          <input type="text" disabled={!isEditingProfile} value={isEditingProfile ? tempUserData.phone : userData.phone} onChange={(e) => setTempUserData({...tempUserData, phone: e.target.value})} className={`w-full border-b pb-2 outline-none bg-transparent font-medium transition-all ${isEditingProfile ? 'border-gray-300 text-gray-900 focus:border-[#ba0036]' : 'border-gray-100 text-gray-600'}`} />
-                       </div>
-                       <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Email Address</label>
-                          <input type="email" disabled={!isEditingProfile} value={isEditingProfile ? tempUserData.email : userData.email} onChange={(e) => setTempUserData({...tempUserData, email: e.target.value})} className={`w-full border-b pb-2 outline-none bg-transparent font-medium transition-all ${isEditingProfile ? 'border-gray-300 text-gray-900 focus:border-[#ba0036]' : 'border-gray-100 text-gray-600'}`} />
-                       </div>
-                       <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Street Address</label>
-                          <input type="text" disabled={!isEditingProfile} value={isEditingProfile ? tempUserData.address : userData.address} onChange={(e) => setTempUserData({...tempUserData, address: e.target.value})} className={`w-full border-b pb-2 outline-none bg-transparent font-medium transition-all ${isEditingProfile ? 'border-gray-300 text-gray-900 focus:border-[#ba0036]' : 'border-gray-100 text-gray-600'}`} />
-                       </div>
-                       <div>
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">City</label>
-                          {isEditingProfile ? (
-                            <select value={tempUserData.city} onChange={(e) => setTempUserData({...tempUserData, city: e.target.value})} className="w-full border-b border-gray-300 pb-2 outline-none focus:border-[#ba0036] bg-transparent text-gray-900 font-medium transition-colors cursor-pointer">
-                               <option>Dhaka</option>
-                               <option>Chittagong</option>
-                               <option>Sylhet</option>
-                            </select>
-                          ) : (
-                             <div className="w-full border-b border-gray-100 pb-2 font-medium text-gray-600">{userData.city}</div>
-                          )}
-                       </div>
-                    </div>
-                 </div>
-
-                 {/* Identity Verification — simplified, picture-driven flow.
-                     The upload tiles are always tappable (no edit-mode gate)
-                     so a less tech-savvy host can verify in a single tap.
-                     Each tile carries a big icon, a bilingual title, and
-                     plain-language helper text. The card layout is identical
-                     on mobile + desktop so support staff can walk people
-                     through it over the phone. */}
-                 <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] p-6 md:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-transparent transition-all duration-500">
-                    <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
-                       <div className="flex items-center gap-3">
-                          <Shield className="text-[#ba0036]" size={20} />
-                          <h4 className="text-lg font-black text-gray-900">{language === 'বাংলা' ? 'পরিচয় যাচাইকরণ' : 'Identity Verification'}</h4>
-                       </div>
-                       {(() => {
-                         const done = (uploadedDocs.nidFront ? 1 : 0) + (uploadedDocs.nidBack ? 1 : 0) + (uploadedDocs.selfie ? 1 : 0);
-                         return (
-                           <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${done === 3 ? 'bg-green-100 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
-                             {language === 'বাংলা' ? `${done}/3 সম্পন্ন` : `${done}/3 done`}
-                           </span>
-                         );
-                       })()}
-                    </div>
-                    <p className="text-xs font-bold text-gray-500 mb-6">{language === 'বাংলা' ? 'মাত্র ৩টি ধাপ — শুধু ছবি তুলুন বা গ্যালারি থেকে বেছে নিন।' : 'Just 3 steps — take a photo or pick from your gallery.'}</p>
-
-                    {/* Progress dots */}
-                    <div className="flex items-center gap-1.5 mb-7">
-                      {['nidFront', 'nidBack', 'selfie'].map((k) => (
-                        <div key={k} className={`flex-1 h-1.5 rounded-full transition-colors ${uploadedDocs[k] ? 'bg-green-500' : 'bg-gray-100'}`} />
-                      ))}
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-                      {/* Step 1 — NID Front */}
-                      <div
-                        onClick={() => nidFrontRef.current?.click()}
-                        className={`relative rounded-2xl p-5 flex flex-col items-center text-center cursor-pointer transition-all border-2 ${uploadedDocs.nidFront ? 'border-green-500 bg-green-50/40' : 'border-dashed border-gray-200 hover:border-[#ba0036] hover:bg-red-50/30 active:scale-[0.98]'}`}
-                      >
-                        <input type="file" ref={nidFrontRef} className="hidden" onChange={() => handleFileUpload('nidFront')} accept="image/*" capture="environment" />
-                        <span className={`absolute top-3 left-3 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${uploadedDocs.nidFront ? 'bg-green-500 text-white' : 'bg-[#ba0036] text-white'}`}>1</span>
-                        <div className={`w-14 h-14 rounded-2xl mt-2 flex items-center justify-center ${uploadedDocs.nidFront ? 'bg-green-100 text-green-600' : 'bg-[#ba0036]/8 text-[#ba0036]'}`}>
-                          {uploadedDocs.nidFront ? <CheckCircle size={26} /> : <ImageIcon size={26} />}
-                        </div>
-                        <p className="mt-3 text-sm font-black text-gray-900">{language === 'বাংলা' ? 'NID — সামনের দিক' : 'NID — Front side'}</p>
-                        <p className="mt-1 text-[11px] font-bold text-gray-500 leading-snug">{uploadedDocs.nidFront
-                          ? (language === 'বাংলা' ? 'আপলোড হয়েছে। বদলাতে ট্যাপ করুন।' : 'Uploaded. Tap to replace.')
-                          : (language === 'বাংলা' ? 'NID কার্ডের সামনের ছবি তুলুন' : 'Take a photo of the front of your NID')}
-                        </p>
-                      </div>
-
-                      {/* Step 2 — NID Back */}
-                      <div
-                        onClick={() => nidBackRef.current?.click()}
-                        className={`relative rounded-2xl p-5 flex flex-col items-center text-center cursor-pointer transition-all border-2 ${uploadedDocs.nidBack ? 'border-green-500 bg-green-50/40' : 'border-dashed border-gray-200 hover:border-[#ba0036] hover:bg-red-50/30 active:scale-[0.98]'}`}
-                      >
-                        <input type="file" ref={nidBackRef} className="hidden" onChange={() => handleFileUpload('nidBack')} accept="image/*" capture="environment" />
-                        <span className={`absolute top-3 left-3 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${uploadedDocs.nidBack ? 'bg-green-500 text-white' : 'bg-[#ba0036] text-white'}`}>2</span>
-                        <div className={`w-14 h-14 rounded-2xl mt-2 flex items-center justify-center ${uploadedDocs.nidBack ? 'bg-green-100 text-green-600' : 'bg-[#ba0036]/8 text-[#ba0036]'}`}>
-                          {uploadedDocs.nidBack ? <CheckCircle size={26} /> : <ImageIcon size={26} />}
-                        </div>
-                        <p className="mt-3 text-sm font-black text-gray-900">{language === 'বাংলা' ? 'NID — পিছনের দিক' : 'NID — Back side'}</p>
-                        <p className="mt-1 text-[11px] font-bold text-gray-500 leading-snug">{uploadedDocs.nidBack
-                          ? (language === 'বাংলা' ? 'আপলোড হয়েছে। বদলাতে ট্যাপ করুন।' : 'Uploaded. Tap to replace.')
-                          : (language === 'বাংলা' ? 'NID কার্ডের পিছনের ছবি তুলুন' : 'Take a photo of the back of your NID')}
-                        </p>
-                      </div>
-
-                      {/* Step 3 — Live selfie. Unlocks after the two NID
-                          sides are uploaded; the dim state still shows
-                          big copy explaining what's next so the host is
-                          never left guessing. */}
-                      <div
-                        onClick={() => (uploadedDocs.nidFront && uploadedDocs.nidBack) && handleSelfieCapture()}
-                        className={`relative rounded-2xl p-5 flex flex-col items-center text-center transition-all border-2 ${uploadedDocs.selfie ? 'border-green-500 bg-green-50/40' : (uploadedDocs.nidFront && uploadedDocs.nidBack) ? 'border-dashed border-gray-200 hover:border-[#ba0036] hover:bg-red-50/30 active:scale-[0.98] cursor-pointer' : 'border-dashed border-gray-100 bg-gray-50/60'}`}
-                      >
-                        <span className={`absolute top-3 left-3 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${uploadedDocs.selfie ? 'bg-green-500 text-white' : (uploadedDocs.nidFront && uploadedDocs.nidBack) ? 'bg-[#ba0036] text-white' : 'bg-gray-200 text-gray-500'}`}>3</span>
-                        <div className={`w-14 h-14 rounded-2xl mt-2 flex items-center justify-center ${uploadedDocs.selfie ? 'bg-green-100 text-green-600' : (uploadedDocs.nidFront && uploadedDocs.nidBack) ? 'bg-[#ba0036]/8 text-[#ba0036]' : 'bg-gray-100 text-gray-400'}`}>
-                          {uploadedDocs.selfie ? <CheckCircle size={26} /> : <ScanFace size={26} />}
-                        </div>
-                        <p className="mt-3 text-sm font-black text-gray-900">{language === 'বাংলা' ? 'লাইভ সেলফি' : 'Live selfie'}</p>
-                        <p className="mt-1 text-[11px] font-bold text-gray-500 leading-snug">{uploadedDocs.selfie
-                          ? (language === 'বাংলা' ? 'সফলভাবে মিলেছে।' : 'Matched successfully.')
-                          : (uploadedDocs.nidFront && uploadedDocs.nidBack)
-                            ? (language === 'বাংলা' ? 'এখন একটি সেলফি তুলুন' : 'Now take a quick selfie')
-                            : (language === 'বাংলা' ? 'NID আপলোডের পর সক্রিয় হবে' : 'Unlocks after NID upload')}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* When everything's done, a single friendly confirmation
-                        replaces the "in progress" copy. */}
-                    {(uploadedDocs.nidFront && uploadedDocs.nidBack && uploadedDocs.selfie) && (
-                      <div className="mt-5 p-4 rounded-2xl bg-green-50 border border-green-100 flex items-center gap-3">
-                        <BadgeCheck className="text-green-600" size={20} />
-                        <div>
-                          <p className="text-sm font-black text-green-700">{language === 'বাংলা' ? 'আপনার ভেরিফিকেশন সম্পন্ন!' : "You're verified!"}</p>
-                          <p className="text-[11px] font-bold text-green-700/80">{language === 'বাংলা' ? 'ভাড়াটিয়ারা এখন একটি সবুজ ব্যাজ দেখবে।' : 'Tenants will now see a green verified badge.'}</p>
-                        </div>
-                      </div>
-                    )}
-                 </div>
+                <ProfileSection
+                  role="landlord"
+                  user={userData}
+                  profile={landlordProfile}
+                  trustScore={landlordTrustScore}
+                  verificationStatus={verificationStatus}
+                  language={language}
+                  onUpdate={async (patch) => {
+                    const next = applyLandlordPatch(landlordProfile, patch);
+                    await persistLandlordProfile(next);
+                    showToast(language === 'বাংলা' ? 'প্রোফাইল আপডেট হয়েছে' : 'Profile updated');
+                  }}
+                  onAvatarUpload={async (file, _source, onProgress) => {
+                    try {
+                      const res = await uploadAvatar(file, { onProgress });
+                      setUserData(prev => ({ ...prev, avatar: res?.user?.avatar || res?.avatar || prev.avatar }));
+                      showToast(language === 'বাংলা' ? 'প্রোফাইল ছবি আপডেট হয়েছে!' : 'Profile photo updated!');
+                    } catch (err) {
+                      console.error('[AvatarUpload] failed:', err?.message || err);
+                      showToast(language === 'বাংলা' ? 'ছবি আপলোড ব্যর্থ হয়েছে' : 'Photo upload failed');
+                      throw err;
+                    }
+                  }}
+                  onOpenVerification={() => setVerifModalOpen(true)}
+                />
               </div>
 
-              <div className="space-y-6 md:space-y-8">
-                 <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] p-6 md:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
-                    <h4 className="text-lg font-black text-gray-900 mb-3 text-center">Verification Status</h4>
+              {/* === RIGHT (1 col on xl): Trust Score + Timeline + Quick Wins === */}
+              <div className="xl:col-span-1 space-y-6 md:space-y-8">
 
-                    {/* Overall status banner + progress bar — mirrors the
-                        TenantDashboard verification UX so hosts and
-                        tenants both see the same status language. The
-                        pill colour reflects backend state (verified /
-                        pending / unverified), the bar shows how many of
-                        the 4 timeline steps are done. */}
-                    {(() => {
-                      const stepsDone =
-                        (verificationStatus.profileCompleted ? 1 : 0) +
-                        (verificationStatus.nidUploaded      ? 1 : 0) +
-                        (verificationStatus.faceVerified     ? 1 : 0) +
-                        (verificationStatus.underReview      ? 1 : 0);
-                      const stepsTotal = 4;
-                      const fullyVerified =
-                        verificationStatus.nidUploaded &&
-                        verificationStatus.faceVerified &&
-                        !verificationStatus.underReview;
-                      // The host backend status block (idVerified +
-                      // addressVerified) is not wired into this dashboard
-                      // yet, so we derive the pill purely from the four
-                      // local timeline flags. When the wiring lands the
-                      // same map can read user.verification.status.
-                      const overallStatus = fullyVerified ? 'verified'
-                        : verificationStatus.underReview ? 'pending'
-                        : 'unverified';
-                      const pill = {
-                        verified:   { label: language === 'বাংলা' ? 'ভেরিফাইড'      : 'Verified',          cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', bar: 'bg-emerald-500', Icon: BadgeCheck },
-                        pending:    { label: language === 'বাংলা' ? 'রিভিউ চলছে'    : 'Pending Review',    cls: 'bg-amber-50    text-amber-700    border-amber-200',    bar: 'bg-amber-500',   Icon: Hourglass },
-                        unverified: { label: language === 'বাংলা' ? 'অভেরিফাইড'    : 'Not Verified',      cls: 'bg-slate-50    text-slate-600    border-slate-200',    bar: 'bg-slate-400',   Icon: Shield },
-                      }[overallStatus];
-                      const PillIcon = pill.Icon;
-                      const pct = Math.round((stepsDone / stepsTotal) * 100);
-                      return (
-                        <div className="mb-8">
-                          <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
-                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${pill.cls}`}>
-                              <PillIcon size={12} /> {pill.label}
-                            </span>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 tabular-nums">
-                              {stepsDone}/{stepsTotal} {language === 'বাংলা' ? 'স্টেপ' : 'steps'}
-                            </span>
-                          </div>
-                          <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                            <div className={`h-full transition-[width] duration-500 ease-out rounded-full ${pill.bar}`}
-                              style={{ width: `${pct}%` }} />
-                          </div>
-                        </div>
-                      );
-                    })()}
+                <TrustGauge
+                  score={landlordTrustScore.score}
+                  tier={landlordTrustScore.tier}
+                  breakdown={landlordTrustScore.breakdown}
+                  language={language}
+                />
 
-                    <div className="relative flex flex-col justify-center py-4">
-                       <div className="absolute top-0 bottom-0 left-6 md:left-1/2 w-px bg-gray-100 md:-translate-x-1/2"></div>
-                       
-                       <div className="w-full flex md:justify-between items-center mb-8 relative z-10">
-                          <div className="hidden md:block w-1/2 pr-6"></div>
-                          <div className={`absolute left-6 md:relative md:left-auto -translate-x-1/2 md:translate-x-0 w-8 h-8 rounded-full border-2 bg-white flex items-center justify-center shrink-0 shadow-sm transition-colors ${verificationStatus.profileCompleted ? 'border-green-500' : 'border-gray-200'}`}>
-                             {verificationStatus.profileCompleted && <Check size={14} className="text-green-500"/>}
-                          </div>
-                          <div className="w-full md:w-1/2 pl-14 md:pl-6">
-                             <div className={`p-4 rounded-xl w-max border transition-colors ${verificationStatus.profileCompleted ? 'bg-green-50/50 border-green-100' : 'bg-gray-50 border-gray-100'}`}>
-                                <p className="font-bold text-sm text-gray-900">Profile Completed</p>
-                                <p className="text-[10px] text-gray-500 mt-1">Basic info provided.</p>
-                             </div>
-                          </div>
-                       </div>
+                <QuickWinsCard
+                  breakdown={landlordTrustScore.breakdown}
+                  language={language}
+                  onJump={() => {
+                    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                />
 
-                       <div className="w-full flex md:justify-between items-center mb-8 relative z-10">
-                          <div className="hidden md:flex w-1/2 pr-6 justify-end">
-                             <div className={`p-4 rounded-xl w-max border text-right transition-colors ${verificationStatus.nidUploaded ? 'bg-green-50/50 border-green-100' : 'bg-gray-50 border-gray-100 opacity-50'}`}>
-                                <p className="font-bold text-sm text-gray-900">NID Uploaded</p>
-                                <p className="text-[10px] text-gray-500 mt-1">Front & Back received.</p>
-                             </div>
-                          </div>
-                          <div className={`absolute left-6 md:relative md:left-auto -translate-x-1/2 md:translate-x-0 w-8 h-8 rounded-full border-2 bg-white flex items-center justify-center shrink-0 shadow-sm transition-colors ${verificationStatus.nidUploaded ? 'border-green-500' : 'border-gray-200'}`}>
-                             {verificationStatus.nidUploaded && <Check size={14} className="text-green-500"/>}
-                          </div>
-                          <div className="w-full md:hidden pl-14">
-                             <div className={`p-4 rounded-xl w-max border transition-colors ${verificationStatus.nidUploaded ? 'bg-green-50/50 border-green-100' : 'bg-gray-50 border-gray-100 opacity-50'}`}>
-                                <p className="font-bold text-sm text-gray-900">NID Uploaded</p>
-                                <p className="text-[10px] text-gray-500 mt-1">Front & Back received.</p>
-                             </div>
-                          </div>
-                          <div className="hidden md:block w-1/2 pl-6"></div>
-                       </div>
-
-                       <div className="w-full flex md:justify-between items-center mb-8 relative z-10">
-                          <div className="hidden md:block w-1/2 pr-6"></div>
-                          <div className={`absolute left-6 md:relative md:left-auto -translate-x-1/2 md:translate-x-0 w-8 h-8 rounded-full border-2 bg-white flex items-center justify-center shrink-0 shadow-sm transition-colors ${verificationStatus.faceVerified ? 'border-green-500' : 'border-gray-200'}`}>
-                             {verificationStatus.faceVerified && <Check size={14} className="text-green-500"/>}
-                          </div>
-                          <div className="w-full md:w-1/2 pl-14 md:pl-6">
-                             <div className={`p-4 rounded-xl w-max border transition-colors ${verificationStatus.faceVerified ? 'bg-green-50/50 border-green-100' : 'bg-gray-50 border-gray-100 opacity-50'}`}>
-                                <p className="font-bold text-sm text-gray-900">Face Verified</p>
-                                <p className="text-[10px] text-gray-500 mt-1">Selfie matched.</p>
-                             </div>
-                          </div>
-                       </div>
-
-                       <div className="w-full flex md:justify-between items-center relative z-10">
-                          <div className="hidden md:flex w-1/2 pr-6 justify-end">
-                             <div className={`p-4 rounded-xl w-max border text-right transition-colors ${verificationStatus.underReview ? 'bg-orange-50/50 border-orange-200' : 'bg-gray-50 border-gray-100 opacity-50'}`}>
-                                <p className={`font-bold text-sm ${verificationStatus.underReview ? 'text-orange-700' : 'text-gray-500'}`}>Under Review</p>
-                                <p className="text-[10px] text-gray-500 mt-1">Admin verification pending.</p>
-                             </div>
-                          </div>
-                          <div className={`absolute left-6 md:relative md:left-auto -translate-x-1/2 md:translate-x-0 w-8 h-8 rounded-full border-2 bg-white flex items-center justify-center shrink-0 shadow-sm transition-colors ${verificationStatus.underReview ? 'border-orange-400 animate-pulse' : 'border-gray-200'}`}>
-                             {verificationStatus.underReview && <Hourglass size={14} className="text-orange-500"/>}
-                          </div>
-                          <div className="w-full md:hidden pl-14">
-                             <div className={`p-4 rounded-xl w-max border transition-colors ${verificationStatus.underReview ? 'bg-orange-50/50 border-orange-200' : 'bg-gray-50 border-gray-100 opacity-50'}`}>
-                                <p className={`font-bold text-sm ${verificationStatus.underReview ? 'text-orange-700' : 'text-gray-500'}`}>Under Review</p>
-                                <p className="text-[10px] text-gray-500 mt-1">Admin verification pending.</p>
-                             </div>
-                          </div>
-                          <div className="hidden md:block w-1/2 pl-6"></div>
-                       </div>
+                <div className="bg-white rounded-[2rem] border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-6 md:p-8">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+                      <CheckCheck className="text-green-600" size={18} />
                     </div>
-                 </div>
-
-                 <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] p-6 md:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
-                    <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4">Additional Documents</h4>
-                    <input type="file" ref={utilityRef} className="hidden" onChange={() => handleFileUpload('utilityBill')} accept="image/*,application/pdf" />
-                    <div onClick={() => utilityRef.current.click()} className={`border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all group ${uploadedDocs.utilityBill ? 'bg-green-50/50 border-green-200' : 'border-gray-200 hover:bg-gray-50'}`}>
-                       <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${uploadedDocs.utilityBill ? 'bg-green-100 text-green-600' : 'bg-gray-200/50 text-gray-600'}`}>
-                            {uploadedDocs.utilityBill ? <CheckCircle size={18}/> : <FileText size={18}/>}
-                          </div>
-                          <div>
-                             <p className="font-bold text-sm text-gray-900">{uploadedDocs.utilityBill ? 'Utility Bill Uploaded' : 'Utility Bill'}</p>
-                             <p className="text-[10px] text-gray-500 mt-0.5">Recent gas/electric bill</p>
-                          </div>
-                       </div>
-                       {!uploadedDocs.utilityBill && <button className="p-2 text-[#ba0036] group-hover:scale-110 transition-transform"><Upload size={18}/></button>}
+                    <div>
+                      <h3 className="text-base md:text-lg font-black text-gray-900">
+                        {language === 'বাংলা' ? 'ভেরিফিকেশন স্ট্যাটাস' : 'Verification Status'}
+                      </h3>
+                      <p className="text-xs font-bold text-gray-500">
+                        {language === 'বাংলা' ? 'কোন ধাপে আছেন এক নজরে দেখুন।' : 'Track your verification progress at a glance.'}
+                      </p>
                     </div>
-                 </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <TimelineRow
+                      done
+                      icon={UserCircle}
+                      textEn="Account created"
+                      textBn="অ্যাকাউন্ট তৈরি"
+                      language={language}
+                    />
+                    <TimelineRow
+                      done={!!userData.phone}
+                      icon={Phone}
+                      textEn="Phone OTP verified"
+                      textBn="ফোন OTP ভেরিফাইড"
+                      language={language}
+                    />
+                    <TimelineRow
+                      done={!!userData.avatar}
+                      icon={Camera}
+                      textEn="Profile photo uploaded"
+                      textBn="প্রোফাইল ছবি আপলোড"
+                      language={language}
+                    />
+                    <TimelineRow
+                      done={verificationStatus.nidUploaded}
+                      icon={ScanFace}
+                      textEn="National ID uploaded"
+                      textBn="NID আপলোড"
+                      language={language}
+                    />
+                    <TimelineRow
+                      done={verificationStatus.underReview || (verificationStatus.faceVerified && verificationStatus.nidUploaded)}
+                      icon={Hourglass}
+                      textEn="Submitted for admin review"
+                      textBn="অ্যাডমিন রিভিউয়ের জন্য সাবমিট"
+                      language={language}
+                    />
+                    <TimelineRow
+                      done={verificationStatus.faceVerified && verificationStatus.nidUploaded && !verificationStatus.underReview}
+                      icon={BadgeCheck}
+                      textEn="Verified by To-Let Pro"
+                      textBn="To-Let Pro দ্বারা ভেরিফাইড"
+                      language={language}
+                      isFinal
+                    />
+                  </div>
+                </div>
 
               </div>
             </div>
+            
+            {verifModalOpen && (
+              <VerificationModal
+                isOpen={verifModalOpen}
+                onClose={() => setVerifModalOpen(false)}
+                onSubmit={handleHostWizardSubmit}
+                language={language}
+              />
+            )}
           </div>
         )}
 
@@ -5242,3 +5124,162 @@ const HostDashboard = () => {
 };
 
 export default HostDashboard;
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  TimelineRow — Single timeline row for the "Verification Status"     ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+const TimelineRow = ({ done, icon: Icon, textEn, textBn, language, isFinal = false }) => (
+  <div className="flex items-center gap-3">
+    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+      done
+        ? (isFinal ? 'bg-blue-500 text-white' : 'bg-green-500 text-white')
+        : 'bg-gray-100 text-gray-400'
+    }`}>
+      {done ? (isFinal ? <BadgeCheck size={16} /> : <Check size={14} />) : <Icon size={14} />}
+    </div>
+    <p className={`text-sm font-black ${done ? 'text-gray-900' : 'text-gray-400'}`}>
+      {language === 'বাংলা' ? textBn : textEn}
+    </p>
+  </div>
+);
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  TrustGauge — circular 0-100 score with tier (Bronze/Silver/Gold/   ║
+// ║  Platinum) + breakdown list. Lives in the right sidebar of the      ║
+// ║  Profile tab. The headline metric landlords + tenants both see.     ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+const TrustGauge = ({ score, tier, breakdown, language }) => {
+  const r = 52;
+  const c = 2 * Math.PI * r;
+  const dash = (score / 100) * c;
+  const tierMeta = {
+    bronze:   { label: language === 'বাংলা' ? 'ব্রোঞ্জ' : 'Bronze',     color: '#a1764e', glow: 'rgba(161,118,78,0.20)' },
+    silver:   { label: language === 'বাংলা' ? 'সিলভার' : 'Silver',     color: '#9ca3af', glow: 'rgba(156,163,175,0.20)' },
+    gold:     { label: language === 'বাংলা' ? 'গোল্ড' : 'Gold',         color: '#d4a017', glow: 'rgba(212,160,23,0.25)' },
+    platinum: { label: language === 'বাংলা' ? 'প্ল্যাটিনাম' : 'Platinum', color: '#3b82f6', glow: 'rgba(59,130,246,0.30)' },
+  }[tier] || { label: 'Bronze', color: '#a1764e', glow: 'rgba(0,0,0,0.05)' };
+
+  return (
+    <div className="relative bg-gradient-to-br from-white to-gray-50/40 rounded-[2rem] border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-6 md:p-8 overflow-hidden">
+      {/* Tier-tinted halo for futuristic feel */}
+      <div
+        className="absolute -top-16 -right-16 w-48 h-48 rounded-full blur-3xl pointer-events-none"
+        style={{ background: tierMeta.glow }}
+      />
+      <div className="relative z-10 flex items-center gap-3 mb-5">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: `${tierMeta.color}18` }}>
+          <ShieldCheck size={18} style={{ color: tierMeta.color }} />
+        </div>
+        <div>
+          <h3 className="text-sm font-black text-gray-900">
+            {language === 'বাংলা' ? 'ট্রাস্ট স্কোর' : 'Trust Score'}
+          </h3>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            {language === 'বাংলা' ? 'ভাড়াটিয়ারা যা দেখে' : 'What tenants see'}
+          </p>
+        </div>
+      </div>
+
+      {/* Circular gauge */}
+      <div className="relative z-10 flex flex-col items-center mb-6">
+        <div className="relative" style={{ filter: `drop-shadow(0 8px 24px ${tierMeta.glow})` }}>
+          <svg width="160" height="160" viewBox="0 0 160 160" className="-rotate-90">
+            <defs>
+              <linearGradient id={`grad-${tier}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor={tierMeta.color} stopOpacity="1" />
+                <stop offset="100%" stopColor={tierMeta.color} stopOpacity="0.6" />
+              </linearGradient>
+            </defs>
+            <circle cx="80" cy="80" r={r} fill="none" stroke="#f3f4f6" strokeWidth="11" />
+            <circle
+              cx="80" cy="80" r={r} fill="none"
+              stroke={`url(#grad-${tier})`}
+              strokeWidth="11"
+              strokeLinecap="round"
+              strokeDasharray={`${dash} ${c}`}
+              style={{ transition: 'stroke-dasharray 0.8s cubic-bezier(0.4, 0, 0.2, 1)' }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            {/* Big score with subtle gradient text — feels premium */}
+            <div className="flex items-baseline gap-0.5">
+              <span className="text-5xl font-black leading-none tabular-nums tracking-tight bg-gradient-to-br from-gray-900 to-gray-600 bg-clip-text text-transparent">{score}</span>
+              <span className="text-base font-black text-gray-300 leading-none">/100</span>
+            </div>
+            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.18em] mt-1.5">
+              {language === 'বাংলা' ? 'স্কোর' : 'SCORE'}
+            </span>
+          </div>
+        </div>
+        <div
+          className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm"
+          style={{ background: `${tierMeta.color}15`, color: tierMeta.color, borderColor: `${tierMeta.color}30` }}
+        >
+          <BadgeCheck size={12} /> {tierMeta.label}
+        </div>
+      </div>
+
+      {/* Breakdown list */}
+      <div className="relative z-10 space-y-2">
+        {breakdown.map((b) => (
+          <div key={b.key} className="flex items-center justify-between text-[11px] font-bold">
+            <span className={`flex items-center gap-2 ${b.done ? 'text-gray-700' : 'text-gray-400'}`}>
+              <span className={`w-4 h-4 rounded-full flex items-center justify-center ${b.done ? 'bg-green-500 text-white shadow-[0_0_0_3px_rgba(34,197,94,0.12)]' : 'bg-gray-100'}`}>
+                {b.done ? <Check size={10} /> : null}
+              </span>
+              {language === 'বাংলা' ? b.labelBn : b.labelEn}
+            </span>
+            <span className={`tabular-nums ${b.done ? 'text-green-600' : 'text-gray-300'}`}>+{b.pts}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  QuickWinsCard — top 3 unfilled high-impact items the user can      ║
+// ║  knock out fastest to raise their Trust Score.                       ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+const QuickWinsCard = ({ breakdown, language, onJump }) => {
+  // Suggest the 3 highest-value unfilled items.
+  const top = [...breakdown].filter((b) => !b.done).sort((a, b) => b.pts - a.pts).slice(0, 3);
+  if (top.length === 0) {
+    return (
+      <div className="bg-gradient-to-br from-emerald-50 via-green-50 to-white rounded-[2rem] border border-emerald-100 shadow-[0_4px_20px_rgba(16,185,129,0.08)] p-6 md:p-8">
+        <div className="flex items-center gap-3 mb-2">
+          <BadgeCheck className="text-emerald-600" size={20} />
+          <h3 className="text-sm font-black text-gray-900">{language === 'বাংলা' ? 'প্রোফাইল সম্পূর্ণ! 🎉' : 'Profile Complete! 🎉'}</h3>
+        </div>
+        <p className="text-xs font-bold text-gray-600 leading-relaxed">
+          {language === 'বাংলা' ? 'অসাধারণ! আপনার প্রোফাইল ১০০% — ভাড়াটিয়াদের কাছে আপনি এখন প্ল্যাটিনাম।' : 'You hit max Trust Score. Tenants see you as Platinum tier.'}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-6 md:p-8">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-xl bg-[#ba0036]/10 flex items-center justify-center">
+          <Edit3 className="text-[#ba0036]" size={18} />
+        </div>
+        <div>
+          <h3 className="text-sm font-black text-gray-900">{language === 'বাংলা' ? 'দ্রুত উন্নতি' : 'Quick Wins'}</h3>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'স্কোর বাড়ান' : 'Boost your score'}</p>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {top.map((b) => (
+          <button
+            key={b.key}
+            onClick={() => onJump && onJump(b.key)}
+            className="w-full flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-[#ba0036]/5 border border-gray-100 hover:border-[#ba0036]/20 transition-all group text-left"
+          >
+            <span className="text-[12px] font-black text-gray-800 group-hover:text-[#ba0036] transition-colors">{language === 'বাংলা' ? b.labelBn : b.labelEn}</span>
+            <span className="bg-[#ba0036]/10 text-[#ba0036] px-2 py-0.5 rounded-full text-[10px] font-black">+{b.pts}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
