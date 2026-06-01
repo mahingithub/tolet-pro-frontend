@@ -368,6 +368,16 @@ const ChatSystem = () => {
   const [activeReceipt, setActiveReceipt] = useState(null);
   const [paymentReceipts, setPaymentReceipts] = useState([]);
 
+  // ── Chat media (image upload + voice message) ──────────────────────────────
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false); // image/audio upload in flight
+  const [isRecording, setIsRecording] = useState(false);           // mic actively recording
+  const [recordSecs, setRecordSecs] = useState(0);                 // elapsed record time
+  const fileInputRef = useRef(null);                               // hidden <input type=file>
+  const mediaRecorderRef = useRef(null);                           // MediaRecorder instance
+  const recordChunksRef = useRef([]);                              // recorded audio chunks
+  const recordTimerRef = useRef(null);                             // setInterval handle
+  const recordStreamRef = useRef(null);                            // mic MediaStream (to stop tracks)
+
   // ─── Sidebar tab: 'messages' (chat list) or 'calls' (call history) ────────
   const [sidebarTab, setSidebarTab] = useState('messages');
   // Recent call history (polled). Items are pre-described via callService.describeCall.
@@ -1132,6 +1142,147 @@ const ChatSystem = () => {
     setTimeout(() => inputRef.current?.focus(), 0);
   };
 
+  // ── Chat media handlers ────────────────────────────────────────────────────
+
+  // Push a freshly-sent media message straight into the local stream so the
+  // sender sees it immediately (polling would also pick it up, but instant
+  // feedback feels better). De-duped by id on the next poll merge.
+  const appendLocalMessage = (saved) => {
+    const myId = String(getCurrentUser()?.id || getCurrentUser()?._id || '');
+    setMessages((prev) => {
+      const existing = prev[activeChatId] || [];
+      if (existing.some((m) => String(m.id) === String(saved.id))) return prev;
+      const mapped = {
+        id:        saved.id,
+        sender:    String(saved.senderId) === myId ? 'me' : 'them',
+        text:      saved.text || '',
+        type:      saved.type || 'text',
+        mediaUrl:  saved.mediaUrl || null,
+        mediaMeta: saved.mediaMeta || null,
+        iso:       saved.createdAt,
+        status:    'delivered',
+        senderId:  saved.senderId,
+      };
+      latestMessageIso.current[activeChatId] = saved.createdAt;
+      return { ...prev, [activeChatId]: [...existing, mapped] };
+    });
+  };
+
+  // Paperclip → open file picker.
+  const handleAttachClick = () => {
+    if (activeChat.isAI) return;        // can't send media to the AI bot
+    if (isUploadingMedia) return;
+    fileInputRef.current?.click();
+  };
+
+  // A file was chosen → validate + upload as an image message.
+  const handleFileChosen = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';                // reset so the same file can be re-picked
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { alert('শুধু ছবি পাঠানো যাবে।'); return; }
+    if (file.size > 5 * 1024 * 1024)    { alert('ছবি অনেক বড় (সর্বোচ্চ ৫ MB)।'); return; }
+
+    setIsUploadingMedia(true);
+    try {
+      const saved = await chatService.sendMediaMessage(activeChatId, file, {
+        kind: 'image',
+        filename: file.name,
+      });
+      appendLocalMessage(saved);
+    } catch (err) {
+      alert('ছবি পাঠানো যায়নি: ' + (err?.message || 'unknown'));
+    } finally {
+      setIsUploadingMedia(false);
+    }
+  };
+
+  // Mic → start recording (tap to start / tap to stop).
+  const startRecording = async () => {
+    if (activeChat.isAI) return;
+    if (isRecording || isUploadingMedia) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      alert('আপনার ব্রাউজার ভয়েস রেকর্ডিং সাপোর্ট করে না।');
+      return;
+    }
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      alert('মাইক্রোফোন অনুমতি দেওয়া হয়নি।');
+      return;
+    }
+    recordStreamRef.current = stream;
+    recordChunksRef.current = [];
+
+    // Pick a mime type the browser actually supports.
+    let mime = '';
+    if (MediaRecorder.isTypeSupported?.('audio/webm')) mime = 'audio/webm';
+    else if (MediaRecorder.isTypeSupported?.('audio/mp4')) mime = 'audio/mp4';
+    else if (MediaRecorder.isTypeSupported?.('audio/ogg')) mime = 'audio/ogg';
+
+    const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+    mediaRecorderRef.current = rec;
+
+    rec.ondataavailable = (ev) => { if (ev.data && ev.data.size) recordChunksRef.current.push(ev.data); };
+    rec.start();
+
+    setIsRecording(true);
+    setRecordSecs(0);
+    recordTimerRef.current = setInterval(() => {
+      setRecordSecs((s) => {
+        // Safety: auto-stop at 2 minutes so we never record forever.
+        if (s >= 120) { stopRecording(true); return s; }
+        return s + 1;
+      });
+    }, 1000);
+  };
+
+  // Stop recording. If `send` is true, upload the clip; otherwise discard.
+  const stopRecording = async (send = true) => {
+    const rec = mediaRecorderRef.current;
+    if (!rec) return;
+    const finalSecs = recordSecs;
+
+    const cleanup = () => {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
+      recordStreamRef.current?.getTracks?.().forEach((t) => t.stop());
+      recordStreamRef.current = null;
+      mediaRecorderRef.current = null;
+      setIsRecording(false);
+      setRecordSecs(0);
+    };
+
+    rec.onstop = async () => {
+      const chunks = recordChunksRef.current;
+      recordChunksRef.current = [];
+      cleanup();
+      if (!send) return;
+      if (!chunks.length) return;
+      const type = rec.mimeType || 'audio/webm';
+      const blob = new Blob(chunks, { type });
+      if (blob.size < 1000) { alert('রেকর্ডিং খুব ছোট।'); return; }
+      if (blob.size > 5 * 1024 * 1024) { alert('ভয়েস মেসেজ অনেক বড়।'); return; }
+
+      const ext = type.includes('mp4') ? 'mp4' : type.includes('ogg') ? 'ogg' : 'webm';
+      setIsUploadingMedia(true);
+      try {
+        const saved = await chatService.sendMediaMessage(activeChatId, blob, {
+          kind: 'audio',
+          durationSec: finalSecs,
+          filename: `voice.${ext}`,
+        });
+        appendLocalMessage(saved);
+      } catch (err) {
+        alert('ভয়েস মেসেজ পাঠানো যায়নি: ' + (err?.message || 'unknown'));
+      } finally {
+        setIsUploadingMedia(false);
+      }
+    };
+    try { rec.stop(); } catch { /* already stopped */ }
+  };
+
   // Filter & sort the sidebar chat list.
   const visibleChats = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -1257,6 +1408,9 @@ const ChatSystem = () => {
             id:     m.id,
             sender: String(m.senderId) === myId ? 'me' : 'them',
             text:   m.text,
+            type:   m.type || 'text',
+            mediaUrl: m.mediaUrl || null,
+            mediaMeta: m.mediaMeta || null,
             iso:    m.createdAt,
             status: 'delivered',
             senderId: m.senderId,
@@ -1280,6 +1434,9 @@ const ChatSystem = () => {
             id:     m.id,
             sender: String(m.senderId) === myId ? 'me' : 'them',
             text:   m.text,
+            type:   m.type || 'text',
+            mediaUrl: m.mediaUrl || null,
+            mediaMeta: m.mediaMeta || null,
             iso:    m.createdAt,
             status: 'delivered',
             senderId: m.senderId,
@@ -1762,7 +1919,28 @@ const ChatSystem = () => {
                         <Sparkles size={10}/> AI Assistant
                       </div>
                     )}
-                    <p className="text-[13px] sm:text-sm font-medium whitespace-pre-line leading-relaxed">{m.text}</p>
+                    {m.type === 'image' && m.mediaUrl ? (
+                      <a href={m.mediaUrl} target="_blank" rel="noopener noreferrer" className="block">
+                        <img
+                          src={m.mediaUrl}
+                          alt="shared"
+                          className="rounded-xl max-w-full max-h-72 object-cover cursor-pointer"
+                          loading="lazy"
+                        />
+                      </a>
+                    ) : m.type === 'audio' && m.mediaUrl ? (
+                      <audio
+                        controls
+                        src={m.mediaUrl}
+                        className="max-w-[240px] sm:max-w-[260px]"
+                        style={{ height: 40 }}
+                      />
+                    ) : null}
+                    {(m.type === 'text' || !m.type) ? (
+                      <p className="text-[13px] sm:text-sm font-medium whitespace-pre-line leading-relaxed">{m.text}</p>
+                    ) : (m.text ? (
+                      <p className="text-[13px] sm:text-sm font-medium whitespace-pre-line leading-relaxed mt-1.5">{m.text}</p>
+                    ) : null)}
                     {showTail && (
                       <div className={`flex items-center gap-1.5 mt-1 ${mine ? 'justify-end text-white/70' : fromBot ? 'justify-start text-white/50' : 'justify-start text-gray-400'}`}>
                         <span className="text-[9px] font-bold tabular-nums">{formatTime(m.iso)}</span>
@@ -1829,33 +2007,78 @@ const ChatSystem = () => {
               >
                 <Smile size={18}/>
               </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChosen}
+              />
               <button
-                className="p-2.5 rounded-xl text-gray-400 hover:text-[#ba0036] hover:bg-gray-50 transition-all hidden sm:block"
-                aria-label="Attach file"
-                title="Attach (coming soon)"
+                onClick={handleAttachClick}
+                disabled={isUploadingMedia || isRecording}
+                className="p-2.5 rounded-xl text-gray-400 hover:text-[#ba0036] hover:bg-gray-50 transition-all hidden sm:block disabled:opacity-40"
+                aria-label="Attach image"
+                title="Send a photo"
               >
                 <Paperclip size={18}/>
               </button>
-              <textarea
-                ref={inputRef}
-                rows="1"
-                value={inputText}
-                onChange={(e) => {
-                  setInputText(e.target.value);
-                  const el = e.target;
-                  el.style.height = 'auto';
-                  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
-                placeholder={activeChat.isAI ? 'Ask the AI assistant anything…' : 'Type a message…'}
-                className="flex-1 bg-transparent outline-none text-sm font-bold text-gray-800 resize-none py-2 max-h-[120px] leading-relaxed placeholder:text-gray-400"
-              />
-              {inputText.trim() ? (
+              {isRecording ? (
+                /* Recording in progress — replace the textarea with a live indicator */
+                <div className="flex-1 flex items-center gap-2 py-2 px-1">
+                  <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shrink-0" />
+                  <span className="text-sm font-bold text-gray-700 tabular-nums">
+                    {String(Math.floor(recordSecs / 60)).padStart(1, '0')}:{String(recordSecs % 60).padStart(2, '0')}
+                  </span>
+                  <span className="text-xs font-bold text-gray-400">রেকর্ড হচ্ছে…</span>
+                </div>
+              ) : (
+                <textarea
+                  ref={inputRef}
+                  rows="1"
+                  value={inputText}
+                  onChange={(e) => {
+                    setInputText(e.target.value);
+                    const el = e.target;
+                    el.style.height = 'auto';
+                    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  placeholder={activeChat.isAI ? 'Ask the AI assistant anything…' : 'Type a message…'}
+                  className="flex-1 bg-transparent outline-none text-sm font-bold text-gray-800 resize-none py-2 max-h-[120px] leading-relaxed placeholder:text-gray-400"
+                />
+              )}
+              {isRecording ? (
+                /* Cancel + Send buttons while recording */
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => stopRecording(false)}
+                    className="w-11 h-11 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-xl flex items-center justify-center transition-all active:scale-95"
+                    aria-label="Cancel recording"
+                    title="বাতিল"
+                  >
+                    <X size={18}/>
+                  </button>
+                  <button
+                    onClick={() => stopRecording(true)}
+                    className="w-11 h-11 bg-gradient-to-br from-[#ba0036] to-[#7a0024] text-white rounded-xl flex items-center justify-center shadow-[0_8px_20px_rgba(186,0,54,0.30)] transition-all active:scale-95"
+                    aria-label="Send voice message"
+                    title="পাঠান"
+                  >
+                    <Send size={18} className="ml-0.5"/>
+                  </button>
+                </div>
+              ) : isUploadingMedia ? (
+                /* Upload spinner */
+                <div className="w-11 h-11 bg-gray-100 rounded-xl flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-gray-300 border-t-[#ba0036] rounded-full animate-spin" />
+                </div>
+              ) : inputText.trim() ? (
                 <button
                   onClick={handleSendMessage}
                   className="w-11 h-11 bg-gradient-to-br from-[#ba0036] to-[#7a0024] text-white rounded-xl flex items-center justify-center shadow-[0_8px_20px_rgba(186,0,54,0.30)] hover:-translate-y-0.5 transition-all active:scale-95"
@@ -1863,11 +2086,22 @@ const ChatSystem = () => {
                 >
                   <Send size={18} className="ml-0.5"/>
                 </button>
+              ) : activeChat.isAI ? (
+                /* AI chat: no voice message, keep a disabled-looking mic */
+                <button
+                  className="w-11 h-11 bg-gray-100 text-gray-300 rounded-xl flex items-center justify-center cursor-not-allowed"
+                  aria-label="Voice message unavailable"
+                  title="Voice message is for chats with people"
+                  disabled
+                >
+                  <Mic size={18}/>
+                </button>
               ) : (
                 <button
-                  className="w-11 h-11 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-xl flex items-center justify-center transition-all active:scale-95"
-                  aria-label="Voice message (coming soon)"
-                  title="Voice (coming soon)"
+                  onClick={startRecording}
+                  className="w-11 h-11 bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-[#ba0036] rounded-xl flex items-center justify-center transition-all active:scale-95"
+                  aria-label="Record voice message"
+                  title="ভয়েস মেসেজ"
                 >
                   <Mic size={18}/>
                 </button>
