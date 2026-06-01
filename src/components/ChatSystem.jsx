@@ -1808,8 +1808,7 @@ const ChatSystem = () => {
         </aside>
 
         {/* MAIN CHAT PANE */}
-        <main className={`${isMobile && showSidebarMobile ? 'hidden' : 'flex'} flex-1 flex-col min-w-0 bg-white/30`}>
-          <header
+            <main className={`${isMobile && showSidebarMobile ? 'hidden' : 'flex'} flex-1 flex-col min-w-0 min-h-0 bg-white/30`}>          <header
             className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/60 bg-white/40 backdrop-blur-md flex justify-between items-center gap-3"
             style={mobileChatOpen ? { paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' } : undefined}
           >
@@ -1918,7 +1917,7 @@ const ChatSystem = () => {
           )}
 
           {/* Messages stream */}
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 bg-gradient-to-b from-transparent via-white/10 to-white/40 relative">
+          <div className="flex-1 overflow-y-auto min-h-0 px-4 sm:px-6 py-4 sm:py-6 bg-gradient-to-b from-transparent via-white/10 to-white/40 relative">
             {groupedStream.length === 0 && !isBotTyping && (
               <div className="h-full flex flex-col items-center justify-center text-center px-6">
                 <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-[#ba0036] to-[#7a0024] text-white flex items-center justify-center shadow-[0_15px_30px_rgba(186,0,54,0.25)] mb-4">
