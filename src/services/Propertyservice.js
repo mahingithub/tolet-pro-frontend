@@ -202,7 +202,7 @@ const buildRoomPhotoRecords = (form) =>
         .filter(p => p.url)
     : [];
 
-const formToProperty = (form, owner) => {
+const formToProperty = (form, owner, videoUrlStr = '') => {
   const priceNumber  = Number(String(form.price ?? '').replace(/[^\d.]/g, '')) || 0;
   const today        = now().slice(0, 10);
   const coverImg     = form.coverPhoto?.preview || '';
@@ -253,8 +253,8 @@ const formToProperty = (form, owner) => {
     coverPhoto:    coverImg,
     roomPhotos:    roomRecords,
     videoId:       form.videoId       || '',
-    mainVideo:     form.mainVideo?.preview || '',
-    videoUrl:      form.mainVideo?.preview || '',
+    mainVideo:     videoUrlStr || form.mainVideo?.preview || '',
+    videoUrl:      videoUrlStr || form.mainVideo?.preview || '',
   };
 };
 
@@ -352,6 +352,20 @@ export const propertyService = {
     const owner = getCurrentUser();
     if (!owner) throw new Error('Sign in as a host before adding a property.');
 
+    let videoUrlStr = form.mainVideo?.preview || '';
+    if (form.mainVideo?.file) {
+      try {
+        videoUrlStr = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(form.mainVideo.file);
+        });
+      } catch (err) {
+        console.error("Failed to read video file", err);
+      }
+    }
+
     if (getToken()) {
       const body = {
         title:       form.title,
@@ -376,7 +390,7 @@ export const propertyService = {
         coverPhoto:  form.coverPhoto?.preview || '',
         roomPhotos:  buildRoomPhotoRecords(form),
         videoId:     form.videoId     || '',
-        videoUrl:    form.mainVideo?.preview || '',
+        videoUrl:    videoUrlStr,
       };
 
       const res = await probeFetch('createProperty', `${API}/properties`, {
@@ -393,7 +407,7 @@ export const propertyService = {
     }
 
     await fakeLatency(400);
-    const record = formToProperty(form, owner);
+    const record = formToProperty(form, owner, videoUrlStr);
     const list   = readAllUserProperties();
     list.push(record);
     writeJson(KEY_USER_PROPERTIES, list);
