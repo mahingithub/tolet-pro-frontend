@@ -460,6 +460,14 @@ const ChatSystem = () => {
   // Each backend conversation becomes a chat row keyed by its Mongo id.
   const mergeBackendConversations = useCallback((list) => {
     setChats((prev) => {
+      // Build a map of existing local UI state (blocked, muted, pinned) keyed by id
+      // so polling never wipes out what the user just set in this session.
+      const localState = new Map(prev.map((c) => [c.id, {
+        blocked: c.blocked,
+        muted:   c.muted,
+        pinned:  c.pinned,
+      }]));
+
       const next = [...initialChats];
       // Anything in `prev` that's a backend convo (id is not 'ai-bot') will be
       // refreshed from `list`. AI bot + any in-flight dynamic threads stay.
@@ -471,6 +479,7 @@ const ChatSystem = () => {
         if (!next.find((x) => x.id === c.id)) next.push(c);
       }
       for (const b of list) {
+        const ls = localState.get(b.id) || {};
         next.push({
           id:        b.id,
           name:      b.peerName || 'User',
@@ -483,7 +492,10 @@ const ChatSystem = () => {
           lastMsg:   b.lastMessageText || 'New conversation',
           time:      b.lastMessageAt ? new Date(b.lastMessageAt).toISOString() : 'Just now',
           unread:    Number(b.unread) || 0,
-          pinned:    false,
+          // Preserve local UI toggles so polling doesn't revert block/mute/pin.
+          pinned:    ls.pinned  ?? false,
+          blocked:   ls.blocked ?? (b.blocked   || false),
+          muted:     ls.muted   ?? (b.muted     || false),
           peerUserId: b.peerUserId,
           propertyId: b.propertyId,
         });
@@ -1194,18 +1206,20 @@ const ChatSystem = () => {
     const file = e.target.files?.[0];
     e.target.value = '';                // reset so the same file can be re-picked
     if (!file) return;
-    if (!file.type.startsWith('image/')) { alert('শুধু ছবি পাঠানো যাবে।'); return; }
-    if (file.size > 5 * 1024 * 1024)    { alert('ছবি অনেক বড় (সর্বোচ্চ ৫ MB)।'); return; }
+    const isImage = file.type.startsWith('image/');
+    const isPdf   = file.type === 'application/pdf';
+    if (!isImage && !isPdf) { alert('শুধু ছবি বা PDF পাঠানো যাবে।'); return; }
+    if (file.size > 10 * 1024 * 1024)  { alert('ফাইল অনেক বড় (সর্বোচ্চ ১০ MB)।'); return; }
 
     setIsUploadingMedia(true);
     try {
       const saved = await chatService.sendMediaMessage(activeChatId, file, {
-        kind: 'image',
+        kind: isPdf ? 'document' : 'image',
         filename: file.name,
       });
       appendLocalMessage(saved);
     } catch (err) {
-      alert('ছবি পাঠানো যায়নি: ' + (err?.message || 'unknown'));
+      alert('ফাইল পাঠানো যায়নি: ' + (err?.message || 'unknown'));
     } finally {
       setIsUploadingMedia(false);
     }
@@ -1512,7 +1526,7 @@ const ChatSystem = () => {
   const QUICK_EMOJI = ['👍', '🙏', '🙂', '🎉', '❤️', '🔥', '✅', '🏠', '💸', '📅'];
 
   return (
-    <div className="relative w-full">
+    <div className={`relative w-full ${isMobile ? 'h-[100dvh] overflow-hidden' : ''}`}>
       {/* Backdrop accents */}
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute -top-40 -left-32 w-[480px] h-[480px] bg-[#ba0036]/15 rounded-full blur-3xl"></div>
@@ -2067,16 +2081,16 @@ const ChatSystem = () => {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,application/pdf"
                 className="hidden"
                 onChange={handleFileChosen}
               />
               <button
                 onClick={handleAttachClick}
                 disabled={isUploadingMedia || isRecording}
-                className="p-2.5 rounded-xl text-gray-400 hover:text-[#ba0036] hover:bg-gray-50 transition-all hidden sm:block disabled:opacity-40"
-                aria-label="Attach image"
-                title="Send a photo"
+                className="p-2.5 rounded-xl text-gray-400 hover:text-[#ba0036] hover:bg-gray-50 transition-all disabled:opacity-40"
+                aria-label="Attach image or PDF"
+                title="ছবি বা PDF পাঠান"
               >
                 <Paperclip size={18}/>
               </button>
