@@ -1900,7 +1900,6 @@ const PropertyDetails = () => {
                     <p className="text-lg md:text-xl font-black text-slate-900" style={{ fontFamily: 'Oxanium, sans-serif' }}>{stat.value}</p>
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">{stat.label}</p>
                   </div>
-                  </div>
                 ))}
               </div>
 
