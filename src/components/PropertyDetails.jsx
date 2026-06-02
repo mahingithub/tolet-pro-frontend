@@ -301,10 +301,15 @@ const fetchNearbyPlaces = async (lat, lng) => {
   `;
 
   try {
-    const res = await fetch('https://overpass-api.de/api/interpreter', {
+    // Routed through our own backend proxy (server-side Overpass call). The
+    // browser can't hit overpass-api.de directly — CORS-blocked + 406 on the
+    // browser User-Agent. The proxy returns Overpass JSON untouched, so the
+    // parsing below is unchanged.
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+    const res = await fetch(`${API_BASE}/geo/overpass`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `data=${encodeURIComponent(query)}`,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
