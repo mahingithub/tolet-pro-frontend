@@ -63,7 +63,7 @@ const IMAGE_JPEG_QUALITY = 0.85;
 // the upload on the client side. The real ceiling will be whatever the
 // host's Cloudinary/storage plan allows (Cloudinary free tier = 100 MB
 // per file; bump it in their dashboard if you need more).
-const MAX_VIDEO_BYTES = 18 * 1024 * 1024;  // 18 MB ceiling for base64 JSON payload
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024;  // 100 MB ceiling
 const formatMB = (bytes) => (bytes / (1024 * 1024)).toFixed(1);
 
 /**
