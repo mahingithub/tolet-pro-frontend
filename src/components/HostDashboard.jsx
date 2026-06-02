@@ -587,7 +587,7 @@ const HostDashboard = () => {
   // backend's PATCH /api/properties/:id can accept the same shape).
   const EMPTY_EDIT_FORM = {
     title: '', price: '', location: '',
-    beds: 1, baths: 1, sqft: 0, furnishing: 'Unfurnished',
+    beds: 1, baths: 1, sqft: 0, floor: 0, furnishing: 'Unfurnished',
     description: '', status: 'active',
     img: '', images: [],
   };
@@ -945,6 +945,7 @@ const HostDashboard = () => {
         beds: Number(data.beds) || 1,
         baths: Number(data.baths) || 1,
         sqft: Number(data.sqft) || 0,
+        floor: Number(data.floor) || 0,
         furnishing: data.furnishing || 'Unfurnished',
         description: data.description || '',
         status: data.status || 'active',
@@ -4901,6 +4902,7 @@ const HostDashboard = () => {
                     beds: Number(editForm.beds) || 0,
                     baths: Number(editForm.baths) || 0,
                     sqft: Number(editForm.sqft) || 0,
+                    floor: Number(editForm.floor) || 0,
                     furnishing: editForm.furnishing,
                     description: editForm.description,
                     status: editForm.status,
@@ -4991,7 +4993,7 @@ const HostDashboard = () => {
                       <input type="text" value={editForm.location} onChange={e => setEditForm(f => ({...f, location: e.target.value}))} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বেডরুম' : 'Beds'}</label>
                         <input type="number" min="0" value={editForm.beds} onChange={e => setEditForm(f => ({...f, beds: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
@@ -5003,6 +5005,10 @@ const HostDashboard = () => {
                       <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বর্গফুট' : 'Sqft'}</label>
                         <input type="number" min="0" value={editForm.sqft} onChange={e => setEditForm(f => ({...f, sqft: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'কত তলায়' : 'Floor'}</label>
+                        <input type="number" min="0" value={editForm.floor} onChange={e => setEditForm(f => ({...f, floor: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
                       </div>
                     </div>
 
