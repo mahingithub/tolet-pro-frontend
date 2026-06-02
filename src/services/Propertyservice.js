@@ -233,7 +233,7 @@ const formToProperty = (form, owner, videoUrlStr = '') => {
     beds:          Number(form.beds)  || 1,
     baths:         Number(form.baths) || 1,
     sqft:          Number(form.sqft)  || 0,
-    floor:         Number(form.floor) || 0,
+    floor:         Number(form.floor ?? form.floorNumber) || 0,
     furnishing:    form.furnishing    || 'Unfurnished',
     description:   form.description   || '',
     amenities:     Array.isArray(form.amenities) ? [...form.amenities] : [],
@@ -382,6 +382,7 @@ export const propertyService = {
         beds:        Number(form.beds)  || 1,
         baths:       Number(form.baths) || 1,
         sqft:        Number(form.sqft)  || 0,
+        floor:       Number(form.floor ?? form.floorNumber) || 0,
         furnishing:  form.furnishing,
         description: form.description,
         amenities:   form.amenities   || [],
@@ -518,6 +519,7 @@ function _normaliseApiProperty(p) {
     originalPrice:  p.originalPrice ?? p.price,
     lat:            p.gpsLat     ?? p.lat ?? null,
     lng:            p.gpsLng     ?? p.lng ?? null,
+    floor:          p.floor      ?? 0,
     mainVideo:      p.videoUrl   || p.mainVideo || '',
   };
 }

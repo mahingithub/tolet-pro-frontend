@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
-import { Search, MapPin, BedDouble, Bath, Square, Heart, Star, X, ChevronRight, ShieldCheck, ChevronDown, ChevronUp, Filter, Ruler, Navigation, CheckCircle2, Flame, Building, Wifi, Map, List, LayoutGrid, Home, Users, User, BookOpen, Share2, MessageCircle, ArrowLeft, SlidersHorizontal, ArrowUpDown, Camera, Layers } from "lucide-react";
+import { Search, MapPin, BedDouble, Bath, Square, Heart, Star, X, ChevronRight, ShieldCheck, ChevronDown, ChevronUp, Filter, Ruler, Navigation, CheckCircle2, Flame, Building, Wifi, Map, List, LayoutGrid, Home, Users, User, BookOpen, Share2, MessageCircle, ArrowLeft, SlidersHorizontal, ArrowUpDown, Camera } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 // ─── SHARED INQUIRY MODAL (single source of truth for the inquiry flow) ───────
 import InquiryModal from "./InquiryModal";
@@ -244,9 +244,6 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 						</span>
 						<span className="flex items-center gap-1.5">
 							<Square size={14} className="text-gray-400" /> {property.sqft} {t.sqft || "sqft"}
-						</span>
-						<span className="flex items-center gap-1.5">
-							<Layers size={14} className="text-gray-400" /> {(property.floor || property.floorNumber) ? `${t.floorLabel || "Floor"} ${property.floor || property.floorNumber}` : (t.groundFloor || "Ground")}
 						</span>
 						<span className="hidden sm:flex items-center gap-1.5">
 							<Building size={14} className="text-gray-400" />
@@ -611,9 +608,11 @@ const PropertyListing = () => {
 	// substring matching against every location-ish field on the property,
 	// so this also matches a property where area="Dhanmondi" and the address
 	// line has "Dhanmondi 12".
-	const initialSearchAreaFromURL = (!isKnownDivision && routeParam !== "all")
-		? routeParam.replace(/-/g, ' ')
-		: "";
+	const initialSearchAreaFromURL = searchParams.get("q") 
+		? searchParams.get("q") 
+		: (!isKnownDivision && routeParam !== "all")
+			? routeParam.replace(/-/g, ' ')
+			: "";
 
 	const formattedDivision = (t.cities && t.cities[activeDivision]) || (t.districtNames && t.districtNames[activeDivision]) || (activeDivision === 'all' ? (t.allCities || "All") : activeDivision.charAt(0).toUpperCase() + activeDivision.slice(1));
 
@@ -821,6 +820,11 @@ const PropertyListing = () => {
 			if ((prop.sqft || 0) > maxSqft) return false;
 			if (selectedFurnish && prop.furnishing !== selectedFurnish) return false;
 			if (minRating > 0 && (prop.rating || 0) < minRating) return false;
+			if (selectedFloor && selectedFloor !== (t.anyFloor || "Any Floor")) {
+				const fl = Number(prop.floor) || 0;
+				if (selectedFloor === (t.groundFloor || "Ground Floor")) { if (fl !== 0) return false; }
+				else if (selectedFloor === (t.floor1to3 || "1st to 3rd Floor")) { if (fl < 1 || fl > 3) return false; }
+			}
 			return true;
 		});
 		list.sort((a, b) => {
@@ -830,7 +834,7 @@ const PropertyListing = () => {
 			return new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0);
 		});
 		return list;
-	}, [properties, activeDivision, searchArea, minPrice, maxPrice, selectedTypes, selectedCategories, selectedBeds, maxSqft, selectedFurnish, minRating, sortBy, t.nearMe]);
+	}, [properties, activeDivision, searchArea, minPrice, maxPrice, selectedTypes, selectedCategories, selectedBeds, maxSqft, selectedFurnish, minRating, selectedFloor, sortBy, t.nearMe]);
 
 	const isMapMode = viewMode === "map";
 
@@ -1207,8 +1211,8 @@ const PropertyListing = () => {
 									filteredProperties.map((property) => {
 										return (
 											<React.Fragment key={property.id}>
-												{/* Property card — same layout on mobile & desktop */}
-												<div className="mb-4 md:mb-6">
+												{/* DESKTOP: full PropertyCard */}
+												<div className="hidden md:block mb-6">
 													<PropertyCard property={property} navigate={navigate} t={t} showToast={showToast} isHighlighted={highlightedId === property.id} onHover={setHighlightedId} onHoverEnd={() => setHighlightedId(null)} onInquire={openInquiry} />
 												</div>
 											</React.Fragment>
@@ -1227,6 +1231,94 @@ const PropertyListing = () => {
 									</div>
 								)}
 
+								{/* MOBILE: single-column horizontal cards (image left, info right).
+								    Easier to read than the previous cramped 2-col grid and matches
+								    the OYO/airbnb list-view pattern. */}
+								{filteredProperties.length > 0 && (
+									<div className="flex flex-col gap-3 pb-10 md:hidden">
+										{filteredProperties.map((property) => {
+											const catLabel = RENTAL_CATEGORIES.find((c) => c.id === property.rentalCategory);
+											const catText = (catLabel?.tKey && t[catLabel.tKey]) || catLabel?.label || "Property";
+											const discountPercent = Math.round(((property.originalPrice - property.price) / property.originalPrice) * 100);
+											return (
+												<div
+													key={property.id}
+													onClick={() => navigate(`/property/${property.id}`)}
+													className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm active:scale-[0.99] transition-transform cursor-pointer"
+												>
+													<div className="flex">
+														{/* Photo */}
+														<div className="relative w-[130px] h-[130px] shrink-0 bg-gray-100">
+															<img
+																src={property.images[0]}
+																alt={property.title}
+																className="absolute inset-0 w-full h-full object-cover"
+															/>
+															{property.verified && (
+																<div className="absolute top-1.5 left-1.5 bg-white/95 backdrop-blur-sm px-1.5 py-0.5 rounded-md text-[8px] font-black text-brandRed flex items-center gap-0.5">
+																	<ShieldCheck size={8} /> Verified
+																</div>
+															)}
+															<button
+																onClick={(e) => {
+																	e.stopPropagation();
+																	handleSave(e, property);
+																}}
+																aria-label="Save"
+																className="absolute top-1.5 right-1.5 p-1.5 bg-white/95 backdrop-blur-sm rounded-full hover:bg-white transition-all">
+																<Heart size={11} className="text-gray-700" />
+															</button>
+														</div>
+
+														{/* Info */}
+														<div className="flex-1 min-w-0 p-3 flex flex-col">
+															<p className="text-[9px] font-black text-brandRed uppercase tracking-widest line-clamp-1">{catText}</p>
+															<h4 className="text-[13px] font-black text-gray-900 leading-tight line-clamp-2 mt-0.5">{property.title}</h4>
+															<p className="text-[10px] text-gray-500 font-bold flex items-center gap-1 line-clamp-1 mt-1">
+																<MapPin size={10} className="shrink-0" /> {property.location}
+															</p>
+															<div className="mt-auto flex items-baseline gap-1.5 pt-2">
+																<span className="text-base font-black text-gray-900">৳{(property.price / 1000).toFixed(0)}k</span>
+																<span className="text-[10px] text-gray-500 font-bold">/{t.monthText || "mo"}</span>
+																{property.originalPrice > property.price && (
+																	<span className="ml-auto bg-green-100 text-green-700 text-[9px] font-black px-1.5 py-0.5 rounded">{discountPercent}% {t.offText || "OFF"}</span>
+																)}
+															</div>
+															<div className="flex items-center gap-2.5 text-[10px] font-bold text-gray-500 mt-1.5 pt-1.5 border-t border-gray-100">
+																<span className="flex items-center gap-1"><BedDouble size={10} /> {property.beds}</span>
+																<span className="flex items-center gap-1"><Bath size={10} /> {property.baths}</span>
+																<span className="flex items-center gap-1"><Square size={10} /> {property.sqft}</span>
+																<span className="ml-auto flex items-center gap-1">
+																	<Star size={10} className="fill-yellow-400 text-yellow-400" /> {property.rating}
+																</span>
+															</div>
+														</div>
+													</div>
+
+													{/* CTAs */}
+													<div className="px-3 pb-3 grid grid-cols-2 gap-2 -mt-1">
+														<button
+															onClick={(e) => {
+																e.stopPropagation();
+																navigate(`/property/${property.id}`);
+															}}
+															className="py-2 rounded-lg text-[11px] font-black text-gray-700 bg-gray-50 border border-gray-100 active:scale-95 transition-transform">
+															{t.detailsBtn || "Details"}
+														</button>
+														<button
+															onClick={(e) => {
+																e.stopPropagation();
+																openInquiry(property);
+															}}
+															className="py-2 rounded-lg bg-brandRed text-white text-[11px] font-black active:scale-95 transition-transform flex items-center justify-center gap-1 shadow-sm">
+															<MessageCircle size={11} /> {t.inquireBtn || "Inquire"}
+														</button>
+													</div>
+												</div>
+											);
+										})}
+									</div>
+								)}
 							</motion.div>
 						)}
 					</AnimatePresence>
