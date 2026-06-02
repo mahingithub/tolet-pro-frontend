@@ -1232,80 +1232,44 @@ const PropertyListing = () => {
 										{filteredProperties.map((property) => {
 											const catLabel = RENTAL_CATEGORIES.find((c) => c.id === property.rentalCategory);
 											const catText = (catLabel?.tKey && t[catLabel.tKey]) || catLabel?.label || "Property";
-											const discountPercent = Math.round(((property.originalPrice - property.price) / property.originalPrice) * 100);
+											const discountPercent = property.originalPrice > property.price ? Math.round(((property.originalPrice - property.price) / property.originalPrice) * 100) : 0;
+											const cover = property.coverPhoto || (property.images && property.images[0]) || (property.roomPhotos && property.roomPhotos[0] && property.roomPhotos[0].url) || "";
+											const locText = [property.area, property.district].filter(Boolean).join(", ") || property.location || "";
 											return (
-												<div
-													key={property.id}
-													onClick={() => navigate(`/property/${property.id}`)}
-													className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm active:scale-[0.99] transition-transform cursor-pointer"
-												>
-													<div className="flex">
-														{/* Photo */}
-														<div className="relative w-[130px] h-[130px] shrink-0 bg-gray-100">
-															<img
-																src={property.images[0]}
-																alt={property.title}
-																className="absolute inset-0 w-full h-full object-cover"
-															/>
+												<div key={property.id} onClick={() => navigate(`/property/${property.id}`)} className="bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden shadow-[0_8px_24px_rgba(15,23,42,0.06)] active:scale-[0.99] transition-transform cursor-pointer">
+													<div className="relative w-full h-[190px] bg-gray-100">
+														{cover ? (
+															<img src={cover} alt={property.title} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+														) : (
+															<div className="absolute inset-0 flex items-center justify-center text-gray-300"><Camera size={40} /></div>
+														)}
+														<div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
 															{property.verified && (
-																<div className="absolute top-1.5 left-1.5 bg-white/95 backdrop-blur-sm px-1.5 py-0.5 rounded-md text-[8px] font-black text-brandRed flex items-center gap-0.5">
-																	<ShieldCheck size={8} /> Verified
-																</div>
+																<span className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-lg text-[9px] font-black text-brandRed flex items-center gap-1 shadow-sm"><ShieldCheck size={10} /> {t.verified || "Verified"}</span>
 															)}
-															<button
-																onClick={(e) => {
-																	e.stopPropagation();
-																	handleSave(e, property);
-																}}
-																aria-label="Save"
-																className="absolute top-1.5 right-1.5 p-1.5 bg-white/95 backdrop-blur-sm rounded-full hover:bg-white transition-all">
-																<Heart size={11} className="text-gray-700" />
-															</button>
+															<span className="bg-brandRed/90 backdrop-blur-sm text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg shadow-sm">{catText}</span>
 														</div>
-
-														{/* Info */}
-														<div className="flex-1 min-w-0 p-3 flex flex-col">
-															<p className="text-[9px] font-black text-brandRed uppercase tracking-widest line-clamp-1">{catText}</p>
-															<h4 className="text-[13px] font-black text-gray-900 leading-tight line-clamp-2 mt-0.5">{property.title}</h4>
-															<p className="text-[10px] text-gray-500 font-bold flex items-center gap-1 line-clamp-1 mt-1">
-																<MapPin size={10} className="shrink-0" /> {property.location}
-															</p>
-															<div className="mt-auto flex items-baseline gap-1.5 pt-2">
-																<span className="text-base font-black text-gray-900">৳{(property.price / 1000).toFixed(0)}k</span>
-																<span className="text-[10px] text-gray-500 font-bold">/{t.monthText || "mo"}</span>
-																{property.originalPrice > property.price && (
-																	<span className="ml-auto bg-green-100 text-green-700 text-[9px] font-black px-1.5 py-0.5 rounded">{discountPercent}% {t.offText || "OFF"}</span>
-																)}
-															</div>
-															<div className="flex items-center gap-2.5 text-[10px] font-bold text-gray-500 mt-1.5 pt-1.5 border-t border-gray-100">
-																<span className="flex items-center gap-1"><BedDouble size={10} /> {property.beds}</span>
-																<span className="flex items-center gap-1"><Bath size={10} /> {property.baths}</span>
-																<span className="flex items-center gap-1"><Square size={10} /> {property.sqft}</span>
-																<span className="ml-auto flex items-center gap-1">
-																	<Star size={10} className="fill-yellow-400 text-yellow-400" /> {property.rating}
-																</span>
-															</div>
-														</div>
+														<button onClick={(e) => { e.stopPropagation(); handleSave(e, property); }} aria-label="Save" className="absolute top-2.5 right-2.5 p-2 bg-white/95 backdrop-blur-sm rounded-full hover:bg-white active:scale-90 transition-all shadow-sm"><Heart size={14} className="text-gray-700" /></button>
+														<div className="absolute bottom-2.5 left-2.5 bg-gray-900/85 backdrop-blur-sm text-white px-3 py-1.5 rounded-xl flex items-baseline gap-1 shadow-sm"><span className="text-base font-black tracking-tight">৳{property.price.toLocaleString("en-IN")}</span><span className="text-[10px] font-bold text-white/80">/{t.monthText || "mo"}</span></div>
+														{property.originalPrice > property.price && (
+															<span className="absolute bottom-2.5 right-2.5 bg-green-500 text-white text-[10px] font-black px-2 py-1 rounded-lg shadow-sm">{discountPercent}% {t.offText || "OFF"}</span>
+														)}
 													</div>
-
-													{/* CTAs */}
-													<div className="px-3 pb-3 grid grid-cols-2 gap-2 -mt-1">
-														<button
-															onClick={(e) => {
-																e.stopPropagation();
-																navigate(`/property/${property.id}`);
-															}}
-															className="py-2 rounded-lg text-[11px] font-black text-gray-700 bg-gray-50 border border-gray-100 active:scale-95 transition-transform">
-															{t.detailsBtn || "Details"}
-														</button>
-														<button
-															onClick={(e) => {
-																e.stopPropagation();
-																openInquiry(property);
-															}}
-															className="py-2 rounded-lg bg-brandRed text-white text-[11px] font-black active:scale-95 transition-transform flex items-center justify-center gap-1 shadow-sm">
-															<MessageCircle size={11} /> {t.inquireBtn || "Inquire"}
-														</button>
+													<div className="p-3.5">
+														<div className="flex items-start justify-between gap-2">
+															<h4 className="text-[14px] font-black text-gray-900 leading-snug line-clamp-1 flex-1">{property.title}</h4>
+															<span className="flex items-center gap-1 text-[11px] font-black text-gray-700 shrink-0"><Star size={11} className="fill-yellow-400 text-yellow-400" /> {property.rating}</span>
+														</div>
+														<p className="text-[11px] text-gray-500 font-bold flex items-center gap-1 line-clamp-1 mt-1"><MapPin size={11} className="shrink-0 text-gray-400" /> {locText}</p>
+														<div className="flex items-center gap-3 text-[11px] font-bold text-gray-600 mt-2.5 pt-2.5 border-t border-gray-100">
+															<span className="flex items-center gap-1"><BedDouble size={13} className="text-gray-400" /> {property.beds} {t.beds || "Beds"}</span>
+															<span className="flex items-center gap-1"><Bath size={13} className="text-gray-400" /> {property.baths} {t.baths || "Baths"}</span>
+															<span className="flex items-center gap-1"><Square size={13} className="text-gray-400" /> {property.sqft}</span>
+														</div>
+														<div className="grid grid-cols-2 gap-2 mt-3">
+															<button onClick={(e) => { e.stopPropagation(); navigate(`/property/${property.id}`); }} className="py-2.5 rounded-xl text-[11px] font-black text-gray-700 bg-gray-50 border border-gray-100 active:scale-95 transition-transform">{t.detailsBtn || "Details"}</button>
+															<button onClick={(e) => { e.stopPropagation(); openInquiry(property); }} className="py-2.5 rounded-xl bg-brandRed text-white text-[11px] font-black active:scale-95 transition-transform flex items-center justify-center gap-1 shadow-[0_8px_18px_rgba(186,0,54,0.25)]"><MessageCircle size={11} /> {t.inquireBtn || "Inquire"}</button>
+														</div>
 													</div>
 												</div>
 											);
