@@ -4896,6 +4896,11 @@ const HostDashboard = () => {
                     return;
                   }
                   const priceNumber = Number(String(editForm.price).replace(/[^\d.]/g, '')) || 0;
+                  const cover = editForm.img || (editForm.images || [])[0] || '';
+                  // Backend stores the cover as `coverPhoto` and validates the
+                  // PATCH with a STRICT schema — sending `img`/`images` (not
+                  // schema fields) bounces the whole update, so edits only ever
+                  // survived in local state. Send `coverPhoto` instead.
                   const patch = {
                     title: editForm.title.trim(),
                     location: editForm.location.trim(),
@@ -4906,8 +4911,7 @@ const HostDashboard = () => {
                     furnishing: editForm.furnishing,
                     description: editForm.description,
                     status: editForm.status,
-                    img: editForm.img,
-                    images: editForm.images,
+                    coverPhoto: cover,
                     price: priceNumber,
                   };
                   // Persist host-owned listings; demo seed entries fall through
@@ -4918,6 +4922,10 @@ const HostDashboard = () => {
                   setProperties(prev => prev.map(p => p.id === modalData.id ? {
                     ...p,
                     ...patch,
+                    // Mirror the cover to the display aliases the card reads.
+                    img: cover,
+                    coverPhoto: cover,
+                    images: editForm.images,
                     // Keep the display-formatted price string on the card.
                     price: priceNumber.toLocaleString('en-IN'),
                   } : p));
