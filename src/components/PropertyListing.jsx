@@ -641,6 +641,14 @@ const PropertyListing = () => {
 
 	// ── FILTER STATES ───────────────────────────────────────────────────────────
 	const [searchArea, setSearchArea] = useState(initialSearchAreaFromURL);
+	// Debounced mirror of the search box → drives the server-side `q` fetch so
+	// we don't hit the API on every keystroke. The header/input use `searchArea`
+	// directly so typing still feels instant.
+	const [debouncedSearch, setDebouncedSearch] = useState(initialSearchAreaFromURL);
+	useEffect(() => {
+		const id = setTimeout(() => setDebouncedSearch(searchArea), 300);
+		return () => clearTimeout(id);
+	}, [searchArea]);
 	// Default to 0 so freshly-uploaded test listings priced below 5000 BDT
 	// (very common in dev/QA — placeholder rents of 2000–3000) still show
 	// up out of the box. Users can drag the slider up if they want a real
@@ -671,7 +679,10 @@ const PropertyListing = () => {
 		let cancelled = false;
 		const load = async () => {
 			try {
-				const list = await propertyService.getProperties({ activeDivision }, "Newest Listings");
+				const list = await propertyService.getProperties(
+					{ activeDivision, searchArea: debouncedSearch, nearMeLabel: t.nearMe || "Nearby Location" },
+					sortBy,
+				);
 				if (!cancelled) setProperties(Array.isArray(list) ? list : []);
 			} catch {
 				if (!cancelled) setProperties([]);
@@ -680,7 +691,7 @@ const PropertyListing = () => {
 		load();
 		const unsub = subscribeUserProperties(load);
 		return () => { cancelled = true; unsub && unsub(); };
-	}, [activeDivision]);
+	}, [activeDivision, debouncedSearch]);
 
 	// ── LANDLORD LOOKUP FOR INQUIRY ─────────────────────────────────────────────
 	// Look up the landlord lazily when the inquiry modal opens so we don't issue
@@ -800,16 +811,12 @@ const PropertyListing = () => {
 	// Same shape as the propertyService.applyFilters helper, just inlined so it
 	// can read directly from the sidebar state without a serialisation step.
 	const filteredProperties = useMemo(() => {
-		const nearMeLabel = t.nearMe || "Nearby Location";
-		const needle = (searchArea || "").trim().toLowerCase();
+		// Text search is handled server-side now (the `q` param → $text + regex
+		// over the rich haystack). We deliberately do NOT re-filter by the
+		// search term here — that would undo the server's alias / multi-word
+		// matches. Everything else (price/beds/sqft/floor/…) stays client-side.
 		const list = (properties || []).filter((prop) => {
 			if (activeDivision !== "all" && prop.division !== activeDivision) return false;
-			// Match the search term against ANY location-ish field on the
-			// property (location, area, district, division, gpsAddress, title)
-			// so a property picked from the cascading dropdowns shows up even
-			// if the host didn't repeat the area name in the address line.
-			if (needle && needle !== nearMeLabel.toLowerCase() &&
-				!propertyLocationHaystack(prop).includes(needle)) return false;
 			if (prop.price < minPrice || prop.price > maxPrice) return false;
 			if (selectedTypes.length > 0 && !selectedTypes.includes(prop.type)) return false;
 			if (selectedCategories.length > 0 && !selectedCategories.includes(prop.rentalCategory)) return false;
@@ -834,7 +841,7 @@ const PropertyListing = () => {
 			return new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0);
 		});
 		return list;
-	}, [properties, activeDivision, searchArea, minPrice, maxPrice, selectedTypes, selectedCategories, selectedBeds, maxSqft, selectedFurnish, minRating, selectedFloor, sortBy, t.nearMe]);
+	}, [properties, activeDivision, minPrice, maxPrice, selectedTypes, selectedCategories, selectedBeds, maxSqft, selectedFurnish, minRating, selectedFloor, sortBy]);
 
 	const isMapMode = viewMode === "map";
 

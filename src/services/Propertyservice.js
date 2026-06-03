@@ -266,21 +266,52 @@ export const propertyService = {
    * প্রথমে backend, তারপর localStorage। কোনো demo data merge হয় না।
    */
   async getProperties(filters = {}, sortBy = "Newest Listings") {
-    const params = new URLSearchParams();
-    if (filters.activeDivision && filters.activeDivision !== 'all')
-      params.set('division', filters.activeDivision);
-    params.set('status', 'active');
+    const div = filters.activeDivision && filters.activeDivision !== 'all'
+      ? filters.activeDivision : '';
+    // Search text → backend `q` (server-side $text + regex over the rich
+    // haystack: location/area/district + type/category aliases). Skip the
+    // "Nearby Location" placeholder, which isn't a real text query.
+    const nearMe = String(filters.nearMeLabel || '').trim().toLowerCase();
+    const rawQ   = String(filters.searchArea || '').trim();
+    const q = rawQ && rawQ.toLowerCase() !== nearMe ? rawQ : '';
 
-    const res = await probeFetch('properties', `${API}/properties?${params}`, {
-      signal: AbortSignal.timeout(15000),
-    });
-    if (res && res.ok) {
-      const data = await res.json();
-      const apiProps = (data.properties || []).map(p => _normaliseApiProperty(p));
-      return _sortProperties(applyFilters(apiProps, filters), sortBy);
-    }
+    const urlFor = (withQ) => {
+      const params = new URLSearchParams();
+      if (div) params.set('division', div);
+      params.set('status', 'active');
+      // Was unset → server defaulted to 50, silently hiding extra listings.
+      params.set('limit', '100');
+      if (withQ && q) params.set('q', q);
+      return `${API}/properties?${params}`;
+    };
 
-    // ── Fallback: শুধুই user-uploaded properties ──
+    try {
+      const res = await probeFetch('properties', urlFor(true), {
+        signal: AbortSignal.timeout(15000),
+      });
+      if (res && res.ok) {
+        const data = await res.json();
+        const apiProps = (data.properties || []).map(p => _normaliseApiProperty(p));
+        // Safety net: a text query that returns nothing from the server is
+        // retried WITHOUT `q` and matched client-side — so even if the server
+        // search ever hiccups, results are never lost.
+        if (q && apiProps.length === 0) {
+          const res2 = await probeFetch('properties', urlFor(false), {
+            signal: AbortSignal.timeout(15000),
+          });
+          if (res2 && res2.ok) {
+            const data2 = await res2.json();
+            const all = (data2.properties || []).map(p => _normaliseApiProperty(p));
+            return _sortProperties(applyFilters(all, filters), sortBy);
+          }
+        }
+        // Server already did the text match — don't re-narrow by text here
+        // (that would undo alias / multi-word matches); apply only the rest.
+        return _sortProperties(applyFilters(apiProps, { ...filters, searchArea: "" }), sortBy);
+      }
+    } catch (_) { /* network / abort → local fallback below */ }
+
+    // ── Fallback: শুধুই user-uploaded properties (full client-side filter) ──
     return _sortProperties(applyFilters(readAllUserProperties(), filters), sortBy);
   },
 
