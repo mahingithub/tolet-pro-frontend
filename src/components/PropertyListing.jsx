@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
-import { Search, MapPin, BedDouble, Bath, Square, Heart, Star, X, ChevronRight, ShieldCheck, ChevronDown, ChevronUp, Filter, Ruler, Navigation, CheckCircle2, Flame, Building, Wifi, Map, List, LayoutGrid, Home, Users, User, BookOpen, Share2, MessageCircle, ArrowLeft, SlidersHorizontal, ArrowUpDown, Camera } from "lucide-react";
+import { Search, MapPin, BedDouble, Bath, Square, Heart, Star, X, ChevronRight, ShieldCheck, ChevronDown, ChevronUp, Filter, Ruler, Navigation, CheckCircle2, Flame, Building, Wifi, Map, List, LayoutGrid, Home, Users, User, BookOpen, Share2, MessageCircle, ArrowLeft, SlidersHorizontal, ArrowUpDown, Camera, Layers } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 // ─── SHARED INQUIRY MODAL (single source of truth for the inquiry flow) ───────
 import InquiryModal from "./InquiryModal";
 // ─── DATA SOURCE: live properties (API + user uploads). NO demo data. ─────────
-import { propertyService, subscribeUserProperties, propertyLocationHaystack } from "../services/Propertyservice.js";
+import { propertyService, subscribeUserProperties } from "../services/Propertyservice.js";
 
 // ╔══════════════════════════════════════════════════════════════════════════╗
 // ║  GOOGLE MAPS                                                            ║
@@ -165,9 +165,9 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 	const extraRoomCount = Math.max(0, totalRoomCategories - 1 - collageThumbs.length);
 
 	return (
-		<div onMouseEnter={() => onHover && onHover(property.id)} onMouseLeave={() => onHoverEnd && onHoverEnd()} className={`bg-white rounded-[2rem] border overflow-hidden flex flex-col md:flex-row hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 group ${isHighlighted ? "border-brandRed shadow-[0_0_0_2px_rgba(186,0,54,0.3)]" : "border-gray-100"}`}>
-			<div className="w-full md:w-[380px] lg:w-[400px] h-[260px] md:h-auto p-3 shrink-0">
-				<div className="relative w-full h-full rounded-[1.5rem] overflow-hidden flex gap-1.5 bg-gray-100">
+		<div onMouseEnter={() => onHover && onHover(property.id)} onMouseLeave={() => onHoverEnd && onHoverEnd()} className={`bg-white rounded-3xl border overflow-hidden flex flex-col md:flex-row hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 group ${isHighlighted ? "border-brandRed shadow-[0_0_0_2px_rgba(186,0,54,0.3)]" : "border-gray-100"}`}>
+			<div className="w-full md:w-[280px] lg:w-[300px] h-[190px] md:h-auto p-2.5 shrink-0">
+				<div className="relative w-full h-full rounded-2xl overflow-hidden flex gap-1.5 bg-gray-100">
 					<div className="relative w-[75%] h-full overflow-hidden cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
 						{coverImg ? (
 							<img src={coverImg} alt={property.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out" />
@@ -211,9 +211,9 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 				</div>
 			</div>
 
-			<div className="p-5 md:p-6 flex-1 flex flex-col justify-between">
+			<div className="p-3.5 md:p-4 flex-1 flex flex-col justify-between">
 				<div>
-					<div className="flex justify-between items-start gap-4 mb-3">
+					<div className="flex justify-between items-start gap-4 mb-2">
 						<div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
 							<div className="bg-gray-900 text-white text-[11px] font-black px-2 py-1 rounded-lg flex items-center gap-1 shadow-sm">
 								<Star size={10} className="fill-yellow-400 text-yellow-400" /> {property.rating}
@@ -229,13 +229,13 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 							</span>
 						</div>
 					</div>
-					<h3 className="text-xl md:text-2xl font-black text-gray-900 leading-tight group-hover:text-brandRed transition-colors cursor-pointer mb-2" onClick={() => navigate(`/property/${property.id}`)}>
+					<h3 className="text-base md:text-lg font-black text-gray-900 leading-tight group-hover:text-brandRed transition-colors cursor-pointer mb-1" onClick={() => navigate(`/property/${property.id}`)}>
 						{property.title}
 					</h3>
-					<p className="text-xs font-bold text-gray-500 flex items-center gap-1.5 mb-5">
+					<p className="text-xs font-bold text-gray-500 flex items-center gap-1.5 mb-2.5">
 						<MapPin size={14} className="text-gray-400" /> {property.location}
 					</p>
-					<div className="flex flex-wrap items-center gap-4 text-xs font-bold text-gray-600 bg-gray-50 p-3 rounded-2xl">
+					<div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] font-bold text-gray-600 bg-gray-50 p-2.5 rounded-xl">
 						<span className="flex items-center gap-1.5">
 							<BedDouble size={14} className="text-gray-400" /> {property.beds} {t.beds || "Beds"}
 						</span>
@@ -245,16 +245,19 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 						<span className="flex items-center gap-1.5">
 							<Square size={14} className="text-gray-400" /> {property.sqft} {t.sqft || "sqft"}
 						</span>
+						<span className="flex items-center gap-1.5">
+							<Layers size={14} className="text-gray-400" /> {(property.floor || property.floorNumber) ? `${t.floorLabel || "Floor"} ${property.floor || property.floorNumber}` : (t.groundFloor || "Ground")}
+						</span>
 						<span className="hidden sm:flex items-center gap-1.5">
 							<Building size={14} className="text-gray-400" />
 							{property.furnishing === "Furnished" ? t.furnished || "Furnished" : property.furnishing === "Semi-Furnished" ? t.semiFurnished || "Semi-Furnished" : t.unfurnished || "Unfurnished"}
 						</span>
 					</div>
 				</div>
-				<div className="flex flex-col sm:flex-row justify-between items-end gap-4 pt-5 mt-5 border-t border-gray-100">
+				<div className="flex flex-col sm:flex-row justify-between items-center gap-2.5 pt-3 mt-3 border-t border-gray-100">
 					<div className="w-full sm:w-auto flex flex-col cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
 						<div className="flex items-baseline gap-2">
-							<span className="text-2xl md:text-3xl font-black text-gray-900 tracking-tighter">৳ {property.price.toLocaleString("en-IN")}</span>
+							<span className="text-lg md:text-xl font-black text-gray-900 tracking-tighter">৳ {property.price.toLocaleString("en-IN")}</span>
 							{property.originalPrice > property.price && (
 								<div className="flex items-center gap-2">
 									<span className="text-xs text-gray-400 line-through font-bold">৳ {property.originalPrice.toLocaleString("en-IN")}</span>
@@ -264,10 +267,10 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 								</div>
 							)}
 						</div>
-						<p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">{t.perMonthExcluding || "Per Month • Excluding Utilities"}</p>
+						<p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">{t.perMonth || "Per Month"}</p>
 					</div>
 					<div className="flex items-center gap-3 w-full sm:w-auto">
-						<button onClick={() => navigate(`/property/${property.id}`)} className="flex-1 sm:flex-none px-6 py-3 rounded-xl text-xs font-black text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all">
+						<button onClick={() => navigate(`/property/${property.id}`)} className="flex-1 sm:flex-none px-4 py-2 rounded-lg text-[11px] font-black text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all">
 							{t.detailsBtn || "Details"}
 						</button>
 						{/* ── INQUIRY BUTTON: opens modal inline, no page navigation ── */}
@@ -276,7 +279,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 								e.stopPropagation();
 								onInquire(property);
 							}}
-							className="flex-1 sm:flex-none px-8 py-3 rounded-xl bg-brandRed hover:bg-[#a0002e] text-white text-xs font-black shadow-[0_10px_20px_rgba(186,0,54,0.2)] hover:shadow-[0_15px_30px_rgba(186,0,54,0.3)] hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-1.5">
+							className="flex-1 sm:flex-none px-5 py-2 rounded-lg bg-brandRed hover:bg-[#a0002e] text-white text-[11px] font-black shadow-[0_8px_16px_rgba(186,0,54,0.18)] hover:shadow-[0_12px_24px_rgba(186,0,54,0.28)] hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-1.5">
 							<MessageCircle size={13} />
 							{t.inquireBtn || "Inquire"}
 						</button>
@@ -344,10 +347,9 @@ const MapView = ({ properties, highlightedId, onMarkerHover, onMarkerHoverEnd, o
 	// When the search area or property set changes, fit the map to the matches.
 	useEffect(() => {
 		if (!mapInstance || !window.google) return;
-		const points = (searchArea
-			? properties.filter((p) => p.location?.toLowerCase().includes(searchArea.toLowerCase()))
-			: properties
-		).filter((p) => p.lat && p.lng);
+		// `properties` is already the (server-side) search-filtered set — fit the
+		// map to all of them instead of re-filtering by the raw search text.
+		const points = properties.filter((p) => p.lat && p.lng);
 		if (points.length === 0) return;
 		if (points.length === 1) {
 			mapInstance.panTo({ lat: points[0].lat, lng: points[0].lng });
@@ -357,7 +359,7 @@ const MapView = ({ properties, highlightedId, onMarkerHover, onMarkerHoverEnd, o
 		const bounds = new window.google.maps.LatLngBounds();
 		points.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
 		mapInstance.fitBounds(bounds, 64);
-	}, [searchArea, properties, mapInstance]);
+	}, [properties, mapInstance]);
 
 	const onLoad = useCallback((map) => setMapInstance(map), []);
 	const onUnmount = useCallback(() => setMapInstance(null), []);
