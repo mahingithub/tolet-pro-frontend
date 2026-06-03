@@ -651,6 +651,8 @@ const PropertyListing = () => {
 		const id = setTimeout(() => setDebouncedSearch(searchArea), 300);
 		return () => clearTimeout(id);
 	}, [searchArea]);
+	// Visibility of the location autocomplete dropdown.
+	const [showSuggest, setShowSuggest] = useState(false);
 	// Default to 0 so freshly-uploaded test listings priced below 5000 BDT
 	// (very common in dev/QA — placeholder rents of 2000–3000) still show
 	// up out of the box. Users can drag the slider up if they want a real
@@ -845,6 +847,39 @@ const PropertyListing = () => {
 		return list;
 	}, [properties, activeDivision, minPrice, maxPrice, selectedTypes, selectedCategories, selectedBeds, maxSqft, selectedFurnish, minRating, selectedFloor, sortBy]);
 
+	// ── LOCATION AUTOCOMPLETE ────────────────────────────────────────────────
+	// Distinct, human-readable place labels pulled from the loaded listings'
+	// own `area` / `location` fields (the granular names hosts entered), each
+	// tagged with its district for context. Lets a tenant jump straight to e.g.
+	// "Lalmohan" instead of browsing the whole district.
+	const locationSuggestions = useMemo(() => {
+		const seen = new Map();
+		for (const p of properties || []) {
+			for (const cand of [{ label: p.area, sub: p.district || p.division }, { label: p.location, sub: p.district || p.division }]) {
+				const label = String(cand.label || "").trim();
+				if (!label) continue;
+				const key = label.toLowerCase();
+				if (!seen.has(key)) seen.set(key, { label, sub: String(cand.sub || "").trim() });
+			}
+		}
+		return Array.from(seen.values());
+	}, [properties]);
+
+	const matchingSuggestions = useMemo(() => {
+		const q = (searchArea || "").trim().toLowerCase();
+		if (q.length < 1) return [];
+		const out = locationSuggestions.filter((s) => {
+			const l = s.label.toLowerCase();
+			return l.includes(q) && l !== q;
+		});
+		out.sort((a, b) => {
+			const aS = a.label.toLowerCase().startsWith(q) ? 0 : 1;
+			const bS = b.label.toLowerCase().startsWith(q) ? 0 : 1;
+			return aS - bS || a.label.localeCompare(b.label);
+		});
+		return out.slice(0, 6);
+	}, [locationSuggestions, searchArea]);
+
 	const isMapMode = viewMode === "map";
 
 	return (
@@ -942,11 +977,25 @@ const PropertyListing = () => {
 
 						<FilterSection title={t.filterLocation || "Location"}>
 							<div className="relative mb-4">
-								<input type="text" value={searchArea} onChange={(e) => setSearchArea(e.target.value)} placeholder={t.searchAreaPlaceholder || "Search area..."} className="w-full bg-gray-50 border border-gray-100 rounded-xl py-3 pl-10 pr-24 text-xs font-bold focus:border-brandRed outline-none" />
+								<input type="text" value={searchArea} onChange={(e) => { setSearchArea(e.target.value); setShowSuggest(true); }} onFocus={() => setShowSuggest(true)} onBlur={() => setTimeout(() => setShowSuggest(false), 120)} placeholder={t.searchAreaPlaceholder || "Search area..."} className="w-full bg-gray-50 border border-gray-100 rounded-xl py-3 pl-10 pr-24 text-xs font-bold focus:border-brandRed outline-none" />
 								<Search size={14} className="absolute left-3.5 top-3.5 text-gray-400" />
 								<button onClick={handleNearestMe} disabled={isLocating} className="absolute right-2 top-2 bg-white border border-gray-200 shadow-sm text-[9px] font-black uppercase text-brandRed px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-red-50 transition-colors">
 									<Navigation size={10} className={isLocating ? "animate-spin" : ""} /> {isLocating ? t.locating || "Locating" : t.nearMe || "Near Me"}
 								</button>
+								{showSuggest && matchingSuggestions.length > 0 && (
+									<div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-gray-100 rounded-xl shadow-[0_12px_30px_rgba(0,0,0,0.10)] z-40 overflow-hidden">
+										{matchingSuggestions.map((s, i) => (
+											<button
+												key={`${s.label}-${i}`}
+												onMouseDown={(e) => { e.preventDefault(); setSearchArea(s.label); setShowSuggest(false); }}
+												className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
+												<MapPin size={13} className="text-brandRed shrink-0" />
+												<span className="text-xs font-bold text-gray-900 truncate">{s.label}</span>
+												{s.sub && <span className="text-[10px] font-bold text-gray-400 ml-auto uppercase tracking-wide shrink-0 capitalize">{s.sub}</span>}
+											</button>
+										))}
+									</div>
+								)}
 							</div>
 							<div className="flex flex-wrap gap-2">
 								{[t.districtNames?.gulshan || "Gulshan", t.districtNames?.banani || "Banani", t.districtNames?.dhanmondi || "Dhanmondi", t.districtNames?.bashundhara || "Bashundhara"].map((area) => (
