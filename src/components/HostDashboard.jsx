@@ -84,6 +84,42 @@ const initialBookings = [];
 // pre-seeded — the inbox is empty until a real tenant messages.
 const initialInquiries = [];
 
+// Maps a raw inquiry from inquiryService.listHostInquiries() into the shape the
+// dashboard renders. The backend already stamps most fields (user/init/timeAgo),
+// so this normalises defensively with fallbacks. (This mapper had gone missing,
+// which threw "toInquiryRow is not defined" and broke the inquiries tab.)
+const _inqInitials = (name) =>
+  (String(name || '').trim().split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('') || '?').toUpperCase();
+
+const _inqTimeAgo = (value) => {
+  if (!value) return '';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return String(value); // already a label like "2h ago"
+  const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
+  const dd = Math.floor(h / 24); if (dd < 30) return `${dd}d ago`;
+  return d.toLocaleDateString();
+};
+
+const toInquiryRow = (raw = {}) => {
+  const user = raw.user || raw.inquirerName || raw.userName || raw.name || raw.guestName || 'Guest';
+  return {
+    id:             raw.id || raw._id || '',
+    inquirerUserId: raw.inquirerUserId || raw.userId || raw.tenantId || null,
+    user,
+    init:           raw.init || _inqInitials(user),
+    timeAgo:        raw.timeAgo || _inqTimeAgo(raw.createdAt || raw.created_at || raw.date),
+    phone:          raw.phone || raw.inquirerPhone || raw.userPhone || '',
+    propTitle:      raw.propTitle || raw.propertyTitle || raw.property || '',
+    propertyId:     raw.propertyId || raw.property || '',
+    msg:            raw.msg || raw.message || raw.text || '',
+    status:         raw.status || 'new',
+    chatId:         raw.chatId || raw.conversationId || raw.threadId || '',
+  };
+};
+
 // 🟢 ৩ দিনের মধ্যে অ্যাড হয়েছে কিনা তা চেক করার ফাংশন
 const isRecent = (dateString) => {
   if(!dateString) return false;
