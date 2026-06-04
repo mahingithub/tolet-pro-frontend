@@ -353,6 +353,39 @@ const AREAS_BY_DISTRICT = {
   mymensingh:  ['Mymensingh Sadar', 'Charpara', 'Maskanda', 'Notun Bazar', 'Ganginar Par', 'Brahmapalli'],
 };
 
+// ─── THANAS / UPAZILAS BY DISTRICT ────────────────────────────────────────────
+// The specific thana (police-station area / upazila) a property sits in — the
+// level tenants actually search by, since a district like Dhaka or Bhola is far
+// too broad. Dhaka is covered comprehensively; other districts list their main
+// upazilas. Where a district isn't mapped here, the wizard falls back to a
+// free-text thana input and search still works (thana feeds the search haystack).
+const THANAS_BY_DISTRICT = {
+  dhaka: [
+    'Dhanmondi', 'Gulshan', 'Banani', 'Baridhara', 'Mohammadpur', 'Adabar',
+    'Mirpur', 'Pallabi', 'Kafrul', 'Sher-e-Bangla Nagar', 'Darus Salam', 'Shah Ali',
+    'Uttara West', 'Uttara East', 'Dakshinkhan', 'Uttarkhan', 'Turag', 'Khilkhet',
+    'Vatara', 'Badda', 'Tejgaon', 'Tejgaon I/A', 'Hazaribagh', 'Kalabagan',
+    'New Market', 'Ramna', 'Shahbagh', 'Kotwali', 'Sutrapur', 'Gendaria', 'Wari',
+    'Lalbagh', 'Chawkbazar', 'Kamrangirchar', 'Khilgaon', 'Sabujbagh', 'Mugda',
+    'Motijheel', 'Paltan', 'Shahjahanpur', 'Jatrabari', 'Demra', 'Shyampur',
+    'Kadamtali', 'Cantonment', 'Bhashantek',
+  ],
+  gazipur:     ['Gazipur Sadar', 'Tongi', 'Kaliakair', 'Kapasia', 'Sreepur', 'Kaliganj'],
+  narayanganj: ['Narayanganj Sadar', 'Fatullah', 'Siddhirganj', 'Bandar', 'Sonargaon', 'Rupganj', 'Araihazar'],
+  chattogram: [
+    'Kotwali', 'Panchlaish', 'Pahartali', 'Double Mooring', 'Halishahar', 'Chandgaon',
+    'Bayezid Bostami', 'Khulshi', 'Bakalia', 'Patenga', 'EPZ', 'Akbarshah', 'Chawkbazar',
+  ],
+  coxs_bazar:  ["Cox's Bazar Sadar", 'Teknaf', 'Ukhia', 'Chakaria', 'Maheshkhali', 'Ramu'],
+  sylhet:      ['Sylhet Sadar', 'Beanibazar', 'Golapganj', 'Jaintiapur', 'Companiganj', 'Kanaighat', 'Zakiganj', 'Bishwanath'],
+  rajshahi:    ['Boalia', 'Rajpara', 'Motihar', 'Shah Makhdum', 'Paba', 'Godagari'],
+  khulna:      ['Khulna Sadar', 'Sonadanga', 'Khalishpur', 'Daulatpur', 'Khan Jahan Ali', 'Rupsha'],
+  barishal:    ['Barishal Sadar', 'Bakerganj', 'Babuganj', 'Banaripara', 'Gournadi', 'Hizla', 'Mehendiganj', 'Muladi', 'Wazirpur', 'Agailjhara'],
+  bhola:       ['Bhola Sadar', 'Borhanuddin', 'Charfasson', 'Daulatkhan', 'Lalmohan', 'Manpura', 'Tazumuddin'],
+  rangpur:     ['Rangpur Sadar', 'Badarganj', 'Gangachara', 'Kaunia', 'Mithapukur', 'Pirgachha', 'Pirganj', 'Taraganj'],
+  mymensingh:  ['Mymensingh Sadar', 'Trishal', 'Bhaluka', 'Muktagachha', 'Gouripur', 'Fulbaria', 'Gafargaon', 'Phulpur'],
+};
+
 const FURNISHING_OPTIONS = [
   { id: 'Furnished',      label: 'Furnished',      labelBn: 'সম্পূর্ণ আসবাবপত্র', color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200' },
   { id: 'Semi-Furnished', label: 'Semi-Furnished', labelBn: 'আংশিক আসবাবপত্র',   color: 'text-amber-600',   bg: 'bg-amber-50 border-amber-200'   },
@@ -396,6 +429,7 @@ const INITIAL_FORM = {
   division: '',
   district: '',
   area: '',
+  thana: '',
   location: '',
   gpsLat: '',
   gpsLng: '',
@@ -1362,6 +1396,7 @@ const AddProperty = () => {
                         set('division', e.target.value);
                         set('district', '');
                         set('area', '');
+                        set('thana', '');
                         setErrors(er => ({ ...er, division: false }));
                       }}>
                       <option value="">{isBn ? 'বিভাগ নির্বাচন করুন' : 'Select Division'}</option>
@@ -1384,6 +1419,7 @@ const AddProperty = () => {
                             onChange={e => {
                               set('district', e.target.value);
                               set('area', '');
+                              set('thana', '');
                               setErrors(er => ({ ...er, district: false }));
                             }}>
                             <option value="">{isBn ? 'জেলা নির্বাচন করুন' : 'Select District'}</option>
@@ -1394,6 +1430,38 @@ const AddProperty = () => {
                           <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                         </div>
                         {err('district') && <ErrMsg text={isBn ? 'জেলা বেছে নিন' : 'Please select a district'} />}
+                      </Field>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Thana / Upazila (cascades from District) — the specific place tenants search by */}
+                <AnimatePresence>
+                  {form.district && (
+                    <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                      <Field label={isBn ? 'থানা / উপজেলা' : 'Thana / Upazila'}
+                        hint={isBn ? 'নির্দিষ্ট থানা — ভাড়াটিয়া এটা দিয়েই বাসা খুঁজে পাবে' : 'The specific thana — tenants find your place by this'}>
+                        {(THANAS_BY_DISTRICT[form.district] || []).length > 0 ? (
+                          <div className="relative">
+                            <select className={`${inputCls} appearance-none pr-10`}
+                              value={form.thana}
+                              onChange={e => set('thana', e.target.value)}>
+                              <option value="">{isBn ? 'থানা নির্বাচন করুন' : 'Select Thana'}</option>
+                              {(THANAS_BY_DISTRICT[form.district] || []).map(th => (
+                                <option key={th} value={th}>{th}</option>
+                              ))}
+                            </select>
+                            <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <MapPin size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+                            <input type="text" className={`${inputCls} pl-10`}
+                              placeholder={isBn ? 'যেমন: লালমোহন' : 'e.g. Lalmohan'}
+                              value={form.thana}
+                              onChange={e => set('thana', e.target.value)} />
+                          </div>
+                        )}
                       </Field>
                     </motion.div>
                   )}
