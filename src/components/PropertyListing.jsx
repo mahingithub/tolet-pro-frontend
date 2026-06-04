@@ -855,7 +855,7 @@ const PropertyListing = () => {
 	const locationSuggestions = useMemo(() => {
 		const seen = new Map();
 		for (const p of properties || []) {
-			for (const cand of [{ label: p.area, sub: p.district || p.division }, { label: p.location, sub: p.district || p.division }]) {
+			for (const cand of [{ label: p.thana, sub: p.district || p.division }, { label: p.area, sub: p.district || p.division }, { label: p.location, sub: p.district || p.division }]) {
 				const label = String(cand.label || "").trim();
 				if (!label) continue;
 				const key = label.toLowerCase();
