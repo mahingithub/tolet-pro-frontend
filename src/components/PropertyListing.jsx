@@ -166,7 +166,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 
 	return (
 		<div onMouseEnter={() => onHover && onHover(property.id)} onMouseLeave={() => onHoverEnd && onHoverEnd()} className={`bg-white rounded-3xl border overflow-hidden flex flex-col md:flex-row hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 group ${isHighlighted ? "border-brandRed shadow-[0_0_0_2px_rgba(186,0,54,0.3)]" : "border-gray-100"}`}>
-			<div className="w-full md:w-[280px] lg:w-[300px] h-[190px] md:h-auto p-2.5 shrink-0">
+			<div className="w-full md:w-[280px] lg:w-[300px] h-[160px] md:h-auto p-2.5 shrink-0">
 				<div className="relative w-full h-full rounded-2xl overflow-hidden flex gap-1.5 bg-gray-100">
 					<div className="relative w-[75%] h-full overflow-hidden cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
 						{coverImg ? (
@@ -853,16 +853,20 @@ const PropertyListing = () => {
 	// tagged with its district for context. Lets a tenant jump straight to e.g.
 	// "Lalmohan" instead of browsing the whole district.
 	const locationSuggestions = useMemo(() => {
-		const seen = new Map();
+		// NOTE: `Map` is imported from lucide-react in this file, so we must NOT
+		// use `new Map()` here (it resolves to the icon → "is not a constructor"
+		// crash). Plain-object dedup instead.
+		const seen = {};
+		const out = [];
 		for (const p of properties || []) {
 			for (const cand of [{ label: p.thana, sub: p.district || p.division }, { label: p.area, sub: p.district || p.division }, { label: p.location, sub: p.district || p.division }]) {
 				const label = String(cand.label || "").trim();
 				if (!label) continue;
 				const key = label.toLowerCase();
-				if (!seen.has(key)) seen.set(key, { label, sub: String(cand.sub || "").trim() });
+				if (!seen[key]) { seen[key] = true; out.push({ label, sub: String(cand.sub || "").trim() }); }
 			}
 		}
-		return Array.from(seen.values());
+		return out;
 	}, [properties]);
 
 	const matchingSuggestions = useMemo(() => {
