@@ -386,6 +386,17 @@ const THANAS_BY_DISTRICT = {
   mymensingh:  ['Mymensingh Sadar', 'Trishal', 'Bhaluka', 'Muktagachha', 'Gouripur', 'Fulbaria', 'Gafargaon', 'Phulpur'],
 };
 
+// Areas filtered to the selected thana — derived from the district's area list by
+// matching the thana name (e.g. thana "Dhanmondi" → "Dhanmondi 3/27/32"; "Gulshan"
+// → "Gulshan 1/2"). Falls back to the full district list when nothing matches.
+function areasForThana(district, thana) {
+  const all = AREAS_BY_DISTRICT[district] || [];
+  const t = String(thana || '').trim().toLowerCase();
+  if (!t) return all;
+  const filtered = all.filter((a) => a.toLowerCase().includes(t));
+  return filtered.length ? filtered : all;
+}
+
 const FURNISHING_OPTIONS = [
   { id: 'Furnished',      label: 'Furnished',      labelBn: 'সম্পূর্ণ আসবাবপত্র', color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200' },
   { id: 'Semi-Furnished', label: 'Semi-Furnished', labelBn: 'আংশিক আসবাবপত্র',   color: 'text-amber-600',   bg: 'bg-amber-50 border-amber-200'   },
@@ -1445,7 +1456,7 @@ const AddProperty = () => {
                           <div className="relative">
                             <select className={`${inputCls} appearance-none pr-10`}
                               value={form.thana}
-                              onChange={e => set('thana', e.target.value)}>
+                              onChange={e => { set('thana', e.target.value); set('area', ''); }}>
                               <option value="">{isBn ? 'থানা নির্বাচন করুন' : 'Select Thana'}</option>
                               {(THANAS_BY_DISTRICT[form.district] || []).map(th => (
                                 <option key={th} value={th}>{th}</option>
@@ -1459,7 +1470,7 @@ const AddProperty = () => {
                             <input type="text" className={`${inputCls} pl-10`}
                               placeholder={isBn ? 'যেমন: লালমোহন' : 'e.g. Lalmohan'}
                               value={form.thana}
-                              onChange={e => set('thana', e.target.value)} />
+                              onChange={e => { set('thana', e.target.value); set('area', ''); }} />
                           </div>
                         )}
                       </Field>
@@ -1469,7 +1480,7 @@ const AddProperty = () => {
 
                 {/* Area / neighborhood (cascades from District) */}
                 <AnimatePresence>
-                  {form.district && (AREAS_BY_DISTRICT[form.district] || []).length > 0 && (
+                  {form.district && areasForThana(form.district, form.thana).length > 0 && (
                     <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
                       <Field label={isBn ? 'এলাকা / পাড়া' : 'Area / Neighborhood'}
                         hint={isBn ? 'যেমন: ধানমন্ডি ৩, গুলশান ২, উত্তরা সেক্টর ৭' : 'e.g. Dhanmondi 3, Gulshan 2, Uttara Sector 7'}>
@@ -1485,7 +1496,7 @@ const AddProperty = () => {
                               }
                             }}>
                             <option value="">{isBn ? 'এলাকা নির্বাচন করুন (ঐচ্ছিক)' : 'Select Area (optional)'}</option>
-                            {(AREAS_BY_DISTRICT[form.district] || []).map(a => (
+                            {areasForThana(form.district, form.thana).map(a => (
                               <option key={a} value={a}>{a}</option>
                             ))}
                           </select>
