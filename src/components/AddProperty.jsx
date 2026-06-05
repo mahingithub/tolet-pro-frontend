@@ -655,6 +655,66 @@ const matchGeo = (raw, options, getLabel = (o) => o) => {
   return bestDist <= 2 ? best : null;
 };
 
+// Normalise a Google geocode result (works for both the JS SDK geocoder and the
+// REST web service — identical address_components shape) into a common parts object.
+const _fromGoogle = (result) => {
+  const comp = (type) => {
+    const c = (result.address_components || []).find((x) => (x.types || []).includes(type));
+    return c ? c.long_name : '';
+  };
+  return {
+    division: comp('administrative_area_level_1'),
+    district: comp('administrative_area_level_2'),
+    thana:    comp('administrative_area_level_3'),
+    // Union/village level — what rural Bangladesh listings (e.g. Kalma) need.
+    union:    comp('administrative_area_level_4') || comp('sublocality_level_1') || comp('sublocality') || comp('locality'),
+    road:     comp('route') || comp('neighborhood') || '',
+    formatted: result.formatted_address || '',
+  };
+};
+
+// Normalise a Nominatim/OSM reverse result into the same parts object.
+const _fromOsm = (data) => {
+  const a = data.address || {};
+  return {
+    division: a.state || a.region || '',
+    district: a.state_district || a.district || a.county || '',
+    thana:    a.county || a.subdistrict || a.municipality || a.city_district || a.town || '',
+    union:    a.village || a.suburb || a.neighbourhood || a.hamlet || '',
+    road:     a.road || '',
+    formatted: data.display_name || '',
+  };
+};
+
+// Reverse geocode with Google: prefer the already-loaded JS SDK geocoder (uses the
+// referrer-restricted Maps key seamlessly); fall back to the REST web service
+// (works before the SDK has finished loading). Returns a result object or null.
+// Both paths require the "Geocoding API" to be enabled on the key in Google Cloud.
+const _googleReverse = async (lat, lng) => {
+  if (typeof window !== 'undefined' && window.google && window.google.maps && window.google.maps.Geocoder) {
+    try {
+      const geocoder = new window.google.maps.Geocoder();
+      const results = await new Promise((resolve, reject) => {
+        geocoder.geocode({ location: { lat, lng } }, (res, status) => {
+          if (status === 'OK' && res && res.length) resolve(res);
+          else reject(new Error(status || 'GEOCODE_FAILED'));
+        });
+      });
+      if (results && results.length) return results[0];
+    } catch { /* fall through to REST */ }
+  }
+  if (GOOGLE_MAPS_API_KEY) {
+    try {
+      const r = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=en&key=${GOOGLE_MAPS_API_KEY}`
+      );
+      const d = await r.json();
+      if (d.status === 'OK' && d.results && d.results.length) return d.results[0];
+    } catch { /* fall through */ }
+  }
+  return null;
+};
+
 const GpsPanel = ({ form, set, isBn }) => {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError]     = useState('');
@@ -672,40 +732,55 @@ const GpsPanel = ({ form, set, isBn }) => {
         const { latitude, longitude } = pos.coords;
         set('gpsLat', latitude.toFixed(6));
         set('gpsLng', longitude.toFixed(6));
-        // Reverse geocode (Nominatim/OSM — free, no key). addressdetails=1 gives
-        // structured parts; accept-language=en keeps names matchable to our data.
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1&accept-language=en`
-          );
-          const data = await res.json();
-          const placeName = data.display_name || `${latitude}, ${longitude}`;
-          set('gpsAddress', placeName);
-          // Show the Google/OSM place name as the location text (specific → broad).
-          set('location', placeName.split(',').slice(0, 3).map((s) => s.trim()).filter(Boolean).join(', '));
+        // Reverse geocode. Google first (best Bangladesh coverage — resolves down
+        // to union/village like Kalma), then OSM as a free fallback. Both return the
+        // same normalised parts, so the auto-fill below is source-agnostic.
+        const applyGeo = (g) => {
+          // Location text leads with the most specific piece (union/road), then
+          // thana, then district — de-duplicated, case-insensitive, order kept.
+          const out = [];
+          for (const p of [g.union || g.road, g.thana, g.district]) {
+            const v = String(p || '').trim();
+            if (v && !out.some((q) => q.toLowerCase() === v.toLowerCase())) out.push(v);
+          }
+          if (out.length) set('location', out.join(', '));
 
-          // Best-effort: auto-fill the Division → District → Thana → Area cascade
-          // from the geocoded parts. Each level only fills when confidently matched,
-          // so an odd geocode never blocks setting the coordinates + place name.
-          const a = data.address || {};
-          const divMatch = matchGeo(a.state || a.region || '', DIVISIONS, (d) => d.label);
+          // Auto-fill the Division → District → Thana → Area cascade (best-effort;
+          // each level fills only on a confident match, tolerating spelling variants).
+          const divMatch = matchGeo(g.division, DIVISIONS, (d) => d.label);
           if (divMatch) {
             set('division', divMatch.id);
             const distList = DISTRICTS_BY_DIVISION[divMatch.id] || [];
-            const distStr  = a.state_district || a.district || a.county || '';
-            const thanaStr = a.county || a.subdistrict || a.municipality || a.city_district || a.town || a.suburb || '';
-            const distMatch = matchGeo(distStr, distList, (d) => d.label) || matchGeo(thanaStr, distList, (d) => d.label);
+            const distMatch = matchGeo(g.district, distList, (d) => d.label) || matchGeo(g.thana, distList, (d) => d.label);
             if (distMatch) {
               set('district', distMatch.id);
               const thanaList = THANAS_BY_DISTRICT[distMatch.id] || [];
-              const thMatch = matchGeo(thanaStr, thanaList) || matchGeo(distStr, thanaList);
+              const thMatch = matchGeo(g.thana, thanaList) || matchGeo(g.district, thanaList);
               if (thMatch) {
                 set('thana', thMatch);
                 const areaList = (AREAS_BY_THANA[distMatch.id] || {})[thMatch] || [];
-                const areaMatch = matchGeo(a.suburb || a.neighbourhood || a.village || a.road || '', areaList);
+                const areaMatch = matchGeo(g.union || g.road, areaList);
                 if (areaMatch) set('area', areaMatch);
               }
             }
+          }
+        };
+
+        try {
+          const gResult = await _googleReverse(latitude, longitude);
+          if (gResult) {
+            const g = _fromGoogle(gResult);
+            set('gpsAddress', g.formatted || `${latitude}, ${longitude}`);
+            applyGeo(g);
+          } else {
+            // Free OSM fallback (no key) — reaches thana level for most rural points.
+            const res = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1&accept-language=en`
+            );
+            const data = await res.json();
+            const o = _fromOsm(data);
+            set('gpsAddress', o.formatted || `${latitude}, ${longitude}`);
+            applyGeo(o);
           }
         } catch {
           set('gpsAddress', `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
