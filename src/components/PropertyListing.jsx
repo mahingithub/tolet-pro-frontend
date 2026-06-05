@@ -166,7 +166,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 
 	return (
 		<div onMouseEnter={() => onHover && onHover(property.id)} onMouseLeave={() => onHoverEnd && onHoverEnd()} className={`bg-white rounded-3xl border overflow-hidden flex flex-col md:flex-row hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 group ${isHighlighted ? "border-brandRed shadow-[0_0_0_2px_rgba(186,0,54,0.3)]" : "border-gray-100"}`}>
-			<div className="w-full md:w-[280px] lg:w-[300px] h-[160px] md:h-auto p-2.5 shrink-0">
+			<div className="w-full md:w-[280px] lg:w-[300px] h-[190px] md:h-auto p-2.5 shrink-0">
 				<div className="relative w-full h-full rounded-2xl overflow-hidden flex gap-1.5 bg-gray-100">
 					<div className="relative w-[75%] h-full overflow-hidden cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
 						{coverImg ? (
@@ -640,6 +640,7 @@ const PropertyListing = () => {
 	const [viewMode, setViewMode] = useState("list");
 	const [highlightedId, setHighlightedId] = useState(null);
 	const [selectedMapProperty, setSelectedMapProperty] = useState(null);
+	const [openSections, setOpenSections] = useState([]);
 
 	// ── FILTER STATES ───────────────────────────────────────────────────────────
 	const [searchArea, setSearchArea] = useState(initialSearchAreaFromURL);
@@ -853,20 +854,16 @@ const PropertyListing = () => {
 	// tagged with its district for context. Lets a tenant jump straight to e.g.
 	// "Lalmohan" instead of browsing the whole district.
 	const locationSuggestions = useMemo(() => {
-		// NOTE: `Map` is imported from lucide-react in this file, so we must NOT
-		// use `new Map()` here (it resolves to the icon → "is not a constructor"
-		// crash). Plain-object dedup instead.
-		const seen = {};
-		const out = [];
+		const seen = new Map();
 		for (const p of properties || []) {
 			for (const cand of [{ label: p.thana, sub: p.district || p.division }, { label: p.area, sub: p.district || p.division }, { label: p.location, sub: p.district || p.division }]) {
 				const label = String(cand.label || "").trim();
 				if (!label) continue;
 				const key = label.toLowerCase();
-				if (!seen[key]) { seen[key] = true; out.push({ label, sub: String(cand.sub || "").trim() }); }
+				if (!seen.has(key)) seen.set(key, { label, sub: String(cand.sub || "").trim() });
 			}
 		}
-		return out;
+		return Array.from(seen.values());
 	}, [properties]);
 
 	const matchingSuggestions = useMemo(() => {
@@ -914,20 +911,110 @@ const PropertyListing = () => {
 				</div>
 			</motion.div>
 
-			{/* MOBILE TOP BAR */}
-			<div className={`bg-white border-b border-gray-100 sticky top-0 md:top-[72px] z-30 shadow-sm transition-opacity duration-300 ${isStickyFilter ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
-				<div className="lg:hidden max-w-[1400px] mx-auto px-4 h-16 flex items-center justify-between gap-3">
-					<span className="text-sm font-bold text-gray-900 truncate">
-						{searchArea ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision} {t.properties || "Properties"}
-					</span>
+			{/* ═══════════════════════════════════════════════════════════════
+			    MOBILE: Daraz-style immersive header — replaces global Navbar
+			    ─────────────────────────────────────────────────────────────── */}
+			<div className="md:hidden sticky top-0 z-40 bg-white shadow-sm">
+				{/* Row 1: Back arrow · Search bar · Sort icon */}
+				<div className="flex items-center gap-2 px-3 pt-3 pb-2">
+					<button
+						onClick={() => navigate(-1)}
+						className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0 active:scale-90 transition-transform"
+						aria-label="Go back">
+						<ArrowLeft size={18} className="text-gray-800" />
+					</button>
+					<div className="flex-1 relative">
+						<input
+							type="text"
+							value={searchArea}
+							onChange={(e) => setSearchArea(e.target.value)}
+							placeholder={t.searchAreaPlaceholder || "Search area, location..."}
+							className="w-full bg-gray-100 rounded-full py-2.5 pl-9 pr-8 text-[13px] font-bold text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-brandRed/30 transition-all"
+						/>
+						<Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+						{searchArea && (
+							<button
+								onClick={() => setSearchArea("")}
+								className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full bg-gray-300 text-white active:scale-90 transition-transform"
+								aria-label="Clear search">
+								<X size={12} />
+							</button>
+						)}
+					</div>
+				</div>
+
+				{/* Row 2: Sort Dropdown, Filter, Map */}
+				<div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-white">
+					{/* Sort Dropdown */}
+					<div className="flex items-center gap-2 flex-1">
+						<select 
+							value={sortBy} 
+							onChange={(e) => setSortBy(e.target.value)} 
+							className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-[12px] font-bold text-gray-900 outline-none focus:border-brandRed cursor-pointer"
+						>
+							<option value="Newest Listings">{t.sortNewest || "Newest Listings"}</option>
+							<option value="Price: Low to High">{t.sortPriceLowHigh || "Price: Low to High"}</option>
+							<option value="Price: High to Low">{t.sortPriceHighLow || "Price: High to Low"}</option>
+							<option value="Popular">{t.sortPopular || "Popular"}</option>
+						</select>
+					</div>
+					
 					<div className="flex items-center gap-2 shrink-0">
-						<button onClick={() => setViewMode((v) => (v === "map" ? "list" : "map"))} className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-black transition-all active:scale-95 ${isMapMode ? "bg-brandRed text-white shadow-md" : "bg-gray-100 text-gray-700 hover:bg-red-50 hover:text-brandRed"}`}>
+						{/* Filter button */}
+						<button
+							onClick={() => setIsMobileFilterOpen(true)}
+							className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-black border transition-all active:scale-95 ${
+								(selectedCategories.length > 0 || selectedFurnish || selectedBeds !== "any" || minRating > 0)
+									? "bg-brandRed text-white border-brandRed shadow-sm"
+									: "bg-white text-gray-700 border-gray-200"
+							}`}>
+							<Filter size={14} />
+							{t.filtersBtn || "Filters"}
+						</button>
+
+						{/* Map button */}
+						<button
+							onClick={() => setViewMode((v) => (v === "map" ? "list" : "map"))}
+							className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-black border transition-all active:scale-95 ${
+								isMapMode
+									? "bg-brandRed text-white border-brandRed shadow-sm"
+									: "bg-white text-gray-700 border-gray-200"
+							}`}>
 							{isMapMode ? <List size={14} /> : <Map size={14} />}
 							{isMapMode ? "List" : "Map"}
 						</button>
-						<button onClick={() => setIsMobileFilterOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full text-sm font-bold text-gray-700 active:scale-95 transition-transform">
-							<Filter size={16} /> {t.filtersBtn || "Filters"}
+					</div>
+				</div>
+
+				{/* Row 3: Results count + location context */}
+				<div className="flex items-center justify-between px-3 py-1.5 bg-gray-50/80">
+					<span className="text-[11px] font-bold text-gray-500">
+						<strong className="text-gray-900">{filteredProperties.length}</strong> {t.properties || "প্রপার্টি"} · {searchArea ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision}
+					</span>
+					{searchArea && (
+						<button onClick={() => setSearchArea("")} className="text-[10px] font-black text-brandRed active:scale-95 transition-transform">
+							{t.clearAll || "Clear"}
 						</button>
+					)}
+				</div>
+			</div>
+
+			{/* Old desktop-only top bar — hidden on mobile since the new header above replaces it */}
+			<div className="hidden md:block">
+				<div className={`bg-white border-b border-gray-100 sticky top-[72px] z-30 shadow-sm`}>
+					<div className="max-w-[1400px] mx-auto px-4 h-16 flex items-center justify-between gap-3">
+						<span className="text-sm font-bold text-gray-900 truncate">
+							{searchArea ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision} {t.properties || "Properties"}
+						</span>
+						<div className="flex items-center gap-2 shrink-0">
+							<button onClick={() => setViewMode((v) => (v === "map" ? "list" : "map"))} className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-black transition-all active:scale-95 ${isMapMode ? "bg-brandRed text-white shadow-md" : "bg-gray-100 text-gray-700 hover:bg-red-50 hover:text-brandRed"}`}>
+								{isMapMode ? <List size={14} /> : <Map size={14} />}
+								{isMapMode ? "List" : "Map"}
+							</button>
+							<button onClick={() => setIsMobileFilterOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full text-sm font-bold text-gray-700 active:scale-95 transition-transform">
+								<Filter size={16} /> {t.filtersBtn || "Filters"}
+							</button>
+						</div>
 					</div>
 				</div>
 			</div>
