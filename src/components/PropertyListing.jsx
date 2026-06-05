@@ -34,10 +34,6 @@ const GOOGLE_MAPS_API_KEY =
 	(typeof process !== "undefined" && process?.env?.REACT_APP_GOOGLE_MAPS_API_KEY) ||
 	"AIzaSyC9xWNjjSPhxy2aUWLubPqHR7N6KZWmKlg";
 
-// Loaded libraries (kept as a stable reference for useJsApiLoader).
-// Add 'places' / 'geometry' here if you wire up auto-complete or distance calcs.
-const GOOGLE_MAPS_LIBRARIES = [];
-
 // Default centre — middle of Dhaka. Override via the prop on <MapView />.
 const DEFAULT_MAP_CENTER = { lat: 23.7652, lng: 90.3893 };
 const DEFAULT_MAP_ZOOM = 12;
@@ -324,10 +320,11 @@ const MapView = ({ properties, highlightedId, onMarkerHover, onMarkerHoverEnd, o
 	);
 
 	// Load the Maps JS SDK once per page (the loader de-duplicates internally).
+	// NOTE: `libraries` prop is intentionally omitted — passing an empty array
+	// causes an internal constructor crash in some versions of @react-google-maps/api.
 	const { isLoaded, loadError } = useJsApiLoader({
 		id: "tlp-google-map-script",
 		googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-		libraries: GOOGLE_MAPS_LIBRARIES,
 	});
 
 	// TODO (backend): when the user pans/zooms the map, refetch properties
