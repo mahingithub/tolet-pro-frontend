@@ -34,16 +34,27 @@ import { useAuth } from '../../context/AuthContext.jsx';
  *   - Logged in as admin/support → /admin (already-protected route)
  *
  * @param {{ hideOnRoutes?: string[] }} props - optional route prefixes where
- *   the bottom nav should be hidden (defaults to /login + /admin + /property).
+ *   the bottom nav should be hidden (defaults to /login + /admin + /list-property).
+ *   Property detail pages (/properties/:id) are hidden via a separate check.
  */
 const MobileBottomNav = ({ hideOnRoutes }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated, isAdmin } = useAuth();
 
-  const hides = hideOnRoutes ?? ['/login', '/admin', '/list-property', '/property/'];
+  const hides = hideOnRoutes ?? ['/login', '/admin', '/list-property'];
 
+  // Hide on static route prefixes
   if (hides.some((r) => location.pathname.startsWith(r))) return null;
+
+  // Hide on property detail pages: /properties/:id
+  // but NOT on /properties/all (the Explore listing page)
+  const propertiesSegments = location.pathname.split('/').filter(Boolean);
+  const isPropertyDetail =
+    propertiesSegments[0] === 'properties' &&
+    propertiesSegments[1] &&
+    propertiesSegments[1] !== 'all';
+  if (isPropertyDetail) return null;
 
   const isTenant = isAuthenticated && user?.role === 'tenant';
 
