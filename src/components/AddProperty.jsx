@@ -611,14 +611,14 @@ const ErrMsg = ({ text }) => (
 // Normalises an OSM/Google place name and matches it to the app's own
 // division/district/thana/area lists, tolerating Bangladesh spelling variants
 // (Chittagong↔Chattogram, Barisal↔Barishal) and small differences
-// (OSM "Laimohan" ↔ our "Lalmohan") via an edit-distance fallback.
+// (OSM "Lalmohan" ↔ our "Lalmohan") via an edit-distance fallback.
 const _GEO_ALIASES = {
   chittagong: 'chattogram', chattagram: 'chattogram',
   barisal: 'barishal',
   comilla: 'cumilla',
   jessore: 'jashore',
   bogra: 'bogura',
-  laimohan: 'lalmohan',
+  lalmohan: 'lalmohan',
 };
 const _geoNorm = (s) =>
   String(s || '')
@@ -654,6 +654,52 @@ const matchGeo = (raw, options, getLabel = (o) => o) => {
   }
   return bestDist <= 2 ? best : null;
 };
+
+// ── Union (Bangladesh rural sub-thana level) data ───────────────────────────
+// Numbered union parishads (EN + BN) so GPS results in rural upazilas resolve to
+// the actual union (e.g. Kalma) with its official number. Verified against the
+// union parishad sites / Bengali Wikipedia. Keyed district → thana; extendable.
+const UNIONS_BY_THANA = {
+  bhola: {
+    Lalmohan: [
+      { no: 1, en: 'Badarpur',          bn: 'বদরপুর' },
+      { no: 2, en: 'Kalma',             bn: 'কালমা' },
+      { no: 3, en: 'Dhali Gournagar',   bn: 'ধলী গৌরনগর' },
+      { no: 4, en: 'Char Bhuta',        bn: 'চর ভূতা' },
+      { no: 5, en: 'Lalmohan',          bn: 'লালমোহন' },
+      { no: 6, en: 'Farajganj',         bn: 'ফরাজগঞ্জ' },
+      { no: 7, en: 'Paschim Char Umed', bn: 'পশ্চিম চর উমেদ' },
+      { no: 8, en: 'Ramagonj',          bn: 'রমাগঞ্জ' },
+      { no: 9, en: 'Lord Hardinge',     bn: 'লর্ড হার্ডিঞ্জ' },
+    ],
+  },
+};
+
+// Bengali thana/upazila labels (district-nested). Division & district already
+// carry BN labels; this fills the thana gap so the form + GPS text show Bengali
+// in Bengali mode. Districts not listed here fall back to the English label.
+const THANA_BN = {
+  bhola: {
+    'Bhola Sadar': 'ভোলা সদর',
+    'Borhanuddin': 'বোরহানউদ্দিন',
+    'Charfasson':  'চরফ্যাশন',
+    'Daulatkhan':  'দৌলতখান',
+    'Lalmohan':    'লালমোহন',
+    'Manpura':     'মনপুরা',
+    'Tazumuddin':  'তজুমদ্দিন',
+  },
+};
+const thanaBn = (districtId, thanaLabel) => (THANA_BN[districtId] || {})[thanaLabel] || '';
+
+// Match a geocoded union name (English) to our numbered union list for a thana.
+const matchUnion = (raw, districtId, thanaLabel) => {
+  const list = (UNIONS_BY_THANA[districtId] || {})[thanaLabel] || [];
+  if (!list.length || !raw) return null;
+  return matchGeo(raw, list, (u) => u.en);
+};
+
+const _BN_DIGITS = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+const _toBnDigits = (n) => String(n).replace(/[0-9]/g, (d) => _BN_DIGITS[+d]);
 
 // Normalise a Google geocode result (works for both the JS SDK geocoder and the
 // REST web service — identical address_components shape) into a common parts object.
@@ -734,53 +780,68 @@ const GpsPanel = ({ form, set, isBn }) => {
         set('gpsLng', longitude.toFixed(6));
         // Reverse geocode. Google first (best Bangladesh coverage — resolves down
         // to union/village like Kalma), then OSM as a free fallback. Both return the
-        // same normalised parts, so the auto-fill below is source-agnostic.
+        // same normalised parts, so the matching + display below is source-agnostic.
         const applyGeo = (g) => {
-          // Location text leads with the most specific piece (union/road), then
-          // thana, then district — de-duplicated, case-insensitive, order kept.
-          const out = [];
-          for (const p of [g.union || g.road, g.thana, g.district]) {
-            const v = String(p || '').trim();
-            if (v && !out.some((q) => q.toLowerCase() === v.toLowerCase())) out.push(v);
-          }
-          if (out.length) set('location', out.join(', '));
-
-          // Auto-fill the Division → District → Thana → Area cascade (best-effort;
-          // each level fills only on a confident match, tolerating spelling variants).
+          // Resolve the Division → District → Thana → Area cascade first (English
+          // matching, spelling-tolerant), setting each dropdown on a confident match.
           const divMatch = matchGeo(g.division, DIVISIONS, (d) => d.label);
+          let distMatch = null, thMatch = null, unionObj = null;
           if (divMatch) {
             set('division', divMatch.id);
             const distList = DISTRICTS_BY_DIVISION[divMatch.id] || [];
-            const distMatch = matchGeo(g.district, distList, (d) => d.label) || matchGeo(g.thana, distList, (d) => d.label);
+            distMatch = matchGeo(g.district, distList, (d) => d.label) || matchGeo(g.thana, distList, (d) => d.label);
             if (distMatch) {
               set('district', distMatch.id);
               const thanaList = THANAS_BY_DISTRICT[distMatch.id] || [];
-              const thMatch = matchGeo(g.thana, thanaList) || matchGeo(g.district, thanaList);
+              thMatch = matchGeo(g.thana, thanaList) || matchGeo(g.district, thanaList);
               if (thMatch) {
                 set('thana', thMatch);
                 const areaList = (AREAS_BY_THANA[distMatch.id] || {})[thMatch] || [];
                 const areaMatch = matchGeo(g.union || g.road, areaList);
                 if (areaMatch) set('area', areaMatch);
+                unionObj = matchUnion(g.union, distMatch.id, thMatch);
               }
             }
+          }
+
+          // Build the location label in the ACTIVE language from the matched
+          // entities, so Bengali mode shows Bengali names. Falls back to the raw
+          // geocode text where there's no match. Union carries its official number.
+          const districtLabel = distMatch ? (isBn ? distMatch.labelBn : distMatch.label) : String(g.district || '').trim();
+          const thanaLabel    = thMatch  ? (isBn ? (thanaBn(distMatch.id, thMatch) || thMatch) : thMatch) : String(g.thana || '').trim();
+          let unionLabel;
+          if (unionObj) {
+            unionLabel = isBn ? `${_toBnDigits(unionObj.no)}নং ${unionObj.bn}` : `${unionObj.en} (No. ${unionObj.no})`;
+          } else {
+            unionLabel = String(g.union || g.road || '').trim();
+          }
+          const out = [];
+          for (const p of [unionLabel, thanaLabel, districtLabel]) {
+            const v = String(p || '').trim();
+            if (v && !out.some((q) => q.toLowerCase() === v.toLowerCase())) out.push(v);
+          }
+          if (out.length) set('location', out.join(', '));
+
+          // Confirmation address line — also language-aware.
+          if (isBn) {
+            const divLabel = divMatch ? divMatch.labelBn : String(g.division || '').trim();
+            set('gpsAddress', [...out, divLabel, 'বাংলাদেশ'].filter(Boolean).join(', '));
+          } else {
+            set('gpsAddress', g.formatted || out.join(', '));
           }
         };
 
         try {
           const gResult = await _googleReverse(latitude, longitude);
           if (gResult) {
-            const g = _fromGoogle(gResult);
-            set('gpsAddress', g.formatted || `${latitude}, ${longitude}`);
-            applyGeo(g);
+            applyGeo(_fromGoogle(gResult));
           } else {
             // Free OSM fallback (no key) — reaches thana level for most rural points.
             const res = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1&accept-language=en`
+              `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1&accept-language=${isBn ? 'bn' : 'en'}`
             );
             const data = await res.json();
-            const o = _fromOsm(data);
-            set('gpsAddress', o.formatted || `${latitude}, ${longitude}`);
-            applyGeo(o);
+            applyGeo(_fromOsm(data));
           }
         } catch {
           set('gpsAddress', `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
