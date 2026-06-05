@@ -6,7 +6,7 @@ import { useLanguage } from "../context/LanguageContext";
 // ─── SHARED INQUIRY MODAL (single source of truth for the inquiry flow) ───────
 import InquiryModal from "./InquiryModal";
 // ─── DATA SOURCE: live properties (API + user uploads). NO demo data. ─────────
-import { propertyService, subscribeUserProperties } from "../services/Propertyservice.js";
+import { propertyService, subscribeUserProperties, propertyLocationHaystack } from "../services/Propertyservice.js";
 
 // ╔══════════════════════════════════════════════════════════════════════════╗
 // ║  GOOGLE MAPS                                                            ║
@@ -1067,7 +1067,9 @@ const PropertyListing = () => {
 						</div>
 
 						<FilterSection title={t.filterLocation || "Location"}>
-							<div className="relative mb-4">
+							{/* Search input — desktop sidebar only.
+							    On mobile the top bar search already handles this. */}
+							<div className="hidden lg:block relative mb-4">
 								<input type="text" value={searchArea} onChange={(e) => { setSearchArea(e.target.value); setShowSuggest(true); }} onFocus={() => setShowSuggest(true)} onBlur={() => setTimeout(() => setShowSuggest(false), 120)} placeholder={t.searchAreaPlaceholder || "Search area..."} className="w-full bg-gray-50 border border-gray-100 rounded-xl py-3 pl-10 pr-24 text-xs font-bold focus:border-brandRed outline-none" />
 								<Search size={14} className="absolute left-3.5 top-3.5 text-gray-400" />
 								<button onClick={handleNearestMe} disabled={isLocating} className="absolute right-2 top-2 bg-white border border-gray-200 shadow-sm text-[9px] font-black uppercase text-brandRed px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-red-50 transition-colors">
