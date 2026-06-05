@@ -104,10 +104,19 @@ const AppLayout = () => {
 		location.pathname.startsWith("/admin") ||
 		location.pathname === "/messages";
 
+	// On the property listing page, the Navbar is replaced on mobile by the
+	// immersive Daraz-style header built into PropertyListing itself.
+	// We still render it on desktop (lg+) so the brand bar stays visible there.
+	const isPropertyListingRoute = location.pathname.startsWith("/properties/");
+
 	return (
 		<div className="min-h-screen bg-white">
 			<GlobalCallSocket />
-			{!shouldHideNavbar && <Navbar />}
+			{!shouldHideNavbar && (
+				<div className={isPropertyListingRoute ? "hidden lg:block" : ""}>
+					<Navbar />
+				</div>
+			)}
 
 			<Routes>
 				{/* Public Routes */}
@@ -187,7 +196,7 @@ const AppLayout = () => {
 			</Routes>
 
 			{!shouldHideAIAssistant && <GlobalAIAssistant />}
-			<MobileBottomNav />
+			<MobileBottomNav hideOnRoutes={['/login', '/admin', '/list-property', '/properties/']} />
 			<InstallPrompt />
 			<FeedbackButton />
 		</div>
