@@ -607,6 +607,54 @@ const ErrMsg = ({ text }) => (
 );
 
 // ─── GPS LOCATION PANEL ───────────────────────────────────────────────────────
+// ── Reverse-geocode → app location matching ─────────────────────────────────
+// Normalises an OSM/Google place name and matches it to the app's own
+// division/district/thana/area lists, tolerating Bangladesh spelling variants
+// (Chittagong↔Chattogram, Barisal↔Barishal) and small differences
+// (OSM "Laimohan" ↔ our "Lalmohan") via an edit-distance fallback.
+const _GEO_ALIASES = {
+  chittagong: 'chattogram', chattagram: 'chattogram',
+  barisal: 'barishal',
+  comilla: 'cumilla',
+  jessore: 'jashore',
+  bogra: 'bogura',
+  laimohan: 'lalmohan',
+};
+const _geoNorm = (s) =>
+  String(s || '')
+    .toLowerCase()
+    .replace(/\b(division|district|sub-?district|upazil[al]+|thana|metropolitan|paurashava|union|ward)\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, '');
+const _geoCanon = (s) => { const n = _geoNorm(s); return _GEO_ALIASES[n] || n; };
+const _geoLev = (a, b) => {
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[n];
+};
+// Returns the best-matching option (exact/substring on canonical form, else edit
+// distance ≤ 2), or null when nothing is close enough.
+const matchGeo = (raw, options, getLabel = (o) => o) => {
+  const target = _geoCanon(raw);
+  if (!target) return null;
+  let best = null, bestDist = Infinity;
+  for (const opt of options) {
+    const cand = _geoCanon(getLabel(opt));
+    if (!cand) continue;
+    if (cand === target || (target.length >= 4 && (cand.includes(target) || target.includes(cand)))) return opt;
+    const d = _geoLev(cand, target);
+    if (d < bestDist) { bestDist = d; best = opt; }
+  }
+  return bestDist <= 2 ? best : null;
+};
+
 const GpsPanel = ({ form, set, isBn }) => {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError]     = useState('');
@@ -624,15 +672,41 @@ const GpsPanel = ({ form, set, isBn }) => {
         const { latitude, longitude } = pos.coords;
         set('gpsLat', latitude.toFixed(6));
         set('gpsLng', longitude.toFixed(6));
-        // Reverse geocode using nominatim (free, no key required)
+        // Reverse geocode (Nominatim/OSM — free, no key). addressdetails=1 gives
+        // structured parts; accept-language=en keeps names matchable to our data.
         try {
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1&accept-language=en`
           );
           const data = await res.json();
-          const addr = data.display_name || `${latitude}, ${longitude}`;
-          set('gpsAddress', addr);
-          if (!form.location) set('location', addr.split(',').slice(0, 3).join(',').trim());
+          const placeName = data.display_name || `${latitude}, ${longitude}`;
+          set('gpsAddress', placeName);
+          // Show the Google/OSM place name as the location text (specific → broad).
+          set('location', placeName.split(',').slice(0, 3).map((s) => s.trim()).filter(Boolean).join(', '));
+
+          // Best-effort: auto-fill the Division → District → Thana → Area cascade
+          // from the geocoded parts. Each level only fills when confidently matched,
+          // so an odd geocode never blocks setting the coordinates + place name.
+          const a = data.address || {};
+          const divMatch = matchGeo(a.state || a.region || '', DIVISIONS, (d) => d.label);
+          if (divMatch) {
+            set('division', divMatch.id);
+            const distList = DISTRICTS_BY_DIVISION[divMatch.id] || [];
+            const distStr  = a.state_district || a.district || a.county || '';
+            const thanaStr = a.county || a.subdistrict || a.municipality || a.city_district || a.town || a.suburb || '';
+            const distMatch = matchGeo(distStr, distList, (d) => d.label) || matchGeo(thanaStr, distList, (d) => d.label);
+            if (distMatch) {
+              set('district', distMatch.id);
+              const thanaList = THANAS_BY_DISTRICT[distMatch.id] || [];
+              const thMatch = matchGeo(thanaStr, thanaList) || matchGeo(distStr, thanaList);
+              if (thMatch) {
+                set('thana', thMatch);
+                const areaList = (AREAS_BY_THANA[distMatch.id] || {})[thMatch] || [];
+                const areaMatch = matchGeo(a.suburb || a.neighbourhood || a.village || a.road || '', areaList);
+                if (areaMatch) set('area', areaMatch);
+              }
+            }
+          }
         } catch {
           set('gpsAddress', `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
         }
