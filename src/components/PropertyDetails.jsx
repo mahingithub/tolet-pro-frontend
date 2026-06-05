@@ -2167,7 +2167,7 @@ const PropertyDetails = () => {
       {/* Sits above the 64px MobileBottomNav so it is never hidden behind it */}
       <div className="lg:hidden fixed left-3 right-3 z-40"
         style={{
-          bottom: 'calc(64px + 10px + env(safe-area-inset-bottom))',
+          bottom: 'calc(18px + env(safe-area-inset-bottom))',
         }}>
         <motion.div
           initial={{ y: 30, opacity: 0 }}
