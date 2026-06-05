@@ -1364,8 +1364,8 @@ const PropertyListing = () => {
 									filteredProperties.map((property) => {
 										return (
 											<React.Fragment key={property.id}>
-												{/* DESKTOP: full PropertyCard */}
-												<div className="hidden md:block mb-6">
+												{/* Unified PropertyCard for both Desktop and Mobile */}
+												<div className="mb-4 md:mb-6">
 													<PropertyCard property={property} navigate={navigate} t={t} showToast={showToast} isHighlighted={highlightedId === property.id} onHover={setHighlightedId} onHoverEnd={() => setHighlightedId(null)} onInquire={openInquiry} />
 												</div>
 											</React.Fragment>
@@ -1381,95 +1381,6 @@ const PropertyListing = () => {
 										<button onClick={handleClearAll} className="bg-gray-900 text-white px-8 py-3 rounded-xl text-sm font-bold active:scale-95 transition-transform shadow-md hover:shadow-lg">
 											{t.clearFilters || "Clear Filters"}
 										</button>
-									</div>
-								)}
-
-								{/* MOBILE: single-column horizontal cards (image left, info right).
-								    Easier to read than the previous cramped 2-col grid and matches
-								    the OYO/airbnb list-view pattern. */}
-								{filteredProperties.length > 0 && (
-									<div className="flex flex-col gap-3 pb-10 md:hidden">
-										{filteredProperties.map((property) => {
-											const catLabel = RENTAL_CATEGORIES.find((c) => c.id === property.rentalCategory);
-											const catText = (catLabel?.tKey && t[catLabel.tKey]) || catLabel?.label || "Property";
-											const discountPercent = Math.round(((property.originalPrice - property.price) / property.originalPrice) * 100);
-											return (
-												<div
-													key={property.id}
-													onClick={() => navigate(`/property/${property.id}`)}
-													className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm active:scale-[0.99] transition-transform cursor-pointer"
-												>
-													<div className="flex">
-														{/* Photo */}
-														<div className="relative w-[130px] h-[130px] shrink-0 bg-gray-100">
-															<img
-																src={property.images[0]}
-																alt={property.title}
-																className="absolute inset-0 w-full h-full object-cover"
-															/>
-															{property.verified && (
-																<div className="absolute top-1.5 left-1.5 bg-white/95 backdrop-blur-sm px-1.5 py-0.5 rounded-md text-[8px] font-black text-brandRed flex items-center gap-0.5">
-																	<ShieldCheck size={8} /> Verified
-																</div>
-															)}
-															<button
-																onClick={(e) => {
-																	e.stopPropagation();
-																	handleSave(e, property);
-																}}
-																aria-label="Save"
-																className="absolute top-1.5 right-1.5 p-1.5 bg-white/95 backdrop-blur-sm rounded-full hover:bg-white transition-all">
-																<Heart size={11} className="text-gray-700" />
-															</button>
-														</div>
-
-														{/* Info */}
-														<div className="flex-1 min-w-0 p-3 flex flex-col">
-															<p className="text-[9px] font-black text-brandRed uppercase tracking-widest line-clamp-1">{catText}</p>
-															<h4 className="text-[13px] font-black text-gray-900 leading-tight line-clamp-2 mt-0.5">{property.title}</h4>
-															<p className="text-[10px] text-gray-500 font-bold flex items-center gap-1 line-clamp-1 mt-1">
-																<MapPin size={10} className="shrink-0" /> {property.location}
-															</p>
-															<div className="mt-auto flex items-baseline gap-1.5 pt-2">
-																<span className="text-base font-black text-gray-900">৳{(property.price / 1000).toFixed(0)}k</span>
-																<span className="text-[10px] text-gray-500 font-bold">/{t.monthText || "mo"}</span>
-																{property.originalPrice > property.price && (
-																	<span className="ml-auto bg-green-100 text-green-700 text-[9px] font-black px-1.5 py-0.5 rounded">{discountPercent}% {t.offText || "OFF"}</span>
-																)}
-															</div>
-															<div className="flex items-center gap-2.5 text-[10px] font-bold text-gray-500 mt-1.5 pt-1.5 border-t border-gray-100">
-																<span className="flex items-center gap-1"><BedDouble size={10} /> {property.beds}</span>
-																<span className="flex items-center gap-1"><Bath size={10} /> {property.baths}</span>
-																<span className="flex items-center gap-1"><Square size={10} /> {property.sqft}</span>
-																<span className="ml-auto flex items-center gap-1">
-																	<Star size={10} className="fill-yellow-400 text-yellow-400" /> {property.rating}
-																</span>
-															</div>
-														</div>
-													</div>
-
-													{/* CTAs */}
-													<div className="px-3 pb-3 grid grid-cols-2 gap-2 -mt-1">
-														<button
-															onClick={(e) => {
-																e.stopPropagation();
-																navigate(`/property/${property.id}`);
-															}}
-															className="py-2 rounded-lg text-[11px] font-black text-gray-700 bg-gray-50 border border-gray-100 active:scale-95 transition-transform">
-															{t.detailsBtn || "Details"}
-														</button>
-														<button
-															onClick={(e) => {
-																e.stopPropagation();
-																openInquiry(property);
-															}}
-															className="py-2 rounded-lg bg-brandRed text-white text-[11px] font-black active:scale-95 transition-transform flex items-center justify-center gap-1 shadow-sm">
-															<MessageCircle size={11} /> {t.inquireBtn || "Inquire"}
-														</button>
-													</div>
-												</div>
-											);
-										})}
 									</div>
 								)}
 							</motion.div>
