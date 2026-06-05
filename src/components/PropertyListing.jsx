@@ -850,17 +850,22 @@ const PropertyListing = () => {
 	// own `area` / `location` fields (the granular names hosts entered), each
 	// tagged with its district for context. Lets a tenant jump straight to e.g.
 	// "Lalmohan" instead of browsing the whole district.
+	//
+	// NOTE: We use a plain object instead of `new Map()` here because the
+	// lucide-react `Map` icon is imported in this file and shadows the built-in
+	// JavaScript Map class — causing a "Map is not a constructor" crash when
+	// bundled/minified by Vite.
 	const locationSuggestions = useMemo(() => {
-		const seen = new Map();
+		const seen = {};
 		for (const p of properties || []) {
 			for (const cand of [{ label: p.thana, sub: p.district || p.division }, { label: p.area, sub: p.district || p.division }, { label: p.location, sub: p.district || p.division }]) {
 				const label = String(cand.label || "").trim();
 				if (!label) continue;
 				const key = label.toLowerCase();
-				if (!seen.has(key)) seen.set(key, { label, sub: String(cand.sub || "").trim() });
+				if (!seen[key]) seen[key] = { label, sub: String(cand.sub || "").trim() };
 			}
 		}
-		return Array.from(seen.values());
+		return Object.values(seen);
 	}, [properties]);
 
 	const matchingSuggestions = useMemo(() => {
