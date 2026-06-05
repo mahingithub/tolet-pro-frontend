@@ -353,6 +353,78 @@ const AREAS_BY_DISTRICT = {
   mymensingh:  ['Mymensingh Sadar', 'Charpara', 'Maskanda', 'Notun Bazar', 'Ganginar Par', 'Brahmapalli'],
 };
 
+// ─── AREAS BY THANA ───────────────────────────────────────────────────────────
+// Per-thana neighbourhood lists — so picking a thana shows ONLY that thana's
+// areas (e.g. Mohammadpur → Lalmatia/Shyamoli, which a name-substring filter
+// would miss). District-nested to avoid thana-name collisions (Dhaka & Chattogram
+// both have "Kotwali"/"Chawkbazar"). Thanas not listed here fall back to a
+// substring filter on the district's flat area list (see areasForThana).
+const AREAS_BY_THANA = {
+  dhaka: {
+    'Dhanmondi':       ['Dhanmondi 1', 'Dhanmondi 2', 'Dhanmondi 3', 'Dhanmondi 4', 'Dhanmondi 5', 'Dhanmondi 6', 'Dhanmondi 7', 'Dhanmondi 8', 'Dhanmondi 9A', 'Dhanmondi 10', 'Dhanmondi 11', 'Dhanmondi 12', 'Dhanmondi 13', 'Dhanmondi 14', 'Dhanmondi 15', 'Dhanmondi 27', 'Dhanmondi 32', 'Jigatola', 'Sukrabad', 'Shankar', 'West Dhanmondi'],
+    'Gulshan':         ['Gulshan 1', 'Gulshan 2', 'Niketan', 'Gulshan Avenue', 'Gulshan Circle 1', 'Gulshan Circle 2'],
+    'Banani':          ['Banani', 'Banani DOHS', 'Mohakhali', 'Mohakhali DOHS', 'Banani Chairmanbari', 'Kakoli'],
+    'Baridhara':       ['Baridhara DOHS', 'Baridhara J Block', 'Baridhara K Block', 'Baridhara Diplomatic Zone', 'Notun Bazar'],
+    'Mohammadpur':     ['Mohammadpur', 'Lalmatia', 'Shyamoli', 'Tajmahal Road', 'Nurjahan Road', 'Asad Avenue', 'Iqbal Road', 'Mohammadia Housing', 'Katasur', 'Bosila', 'Ring Road', 'Town Hall', 'Shekhertek', 'Chand Udyan'],
+    'Adabar':          ['Adabar', 'Sunibir Housing', 'Baitul Aman Housing', 'Shyamoli Housing', 'Mohammadpur Bera'],
+    'Mirpur':          ['Mirpur 1', 'Mirpur 2', 'Mirpur 6', 'Mirpur 7', 'Mirpur 10', 'Mirpur 11', 'Mirpur 12', 'Mirpur 13', 'Mirpur 14', 'Mirpur DOHS', 'Kazipara', 'Shewrapara', 'Senpara Parbata', 'Monipur'],
+    'Pallabi':         ['Pallabi', 'Mirpur 11', 'Mirpur 12', 'Kalshi', 'Duaripara', 'Baunia'],
+    'Kafrul':          ['Kafrul', 'Mirpur 13', 'Mirpur 14', 'Ibrahimpur', 'Kachukhet', 'West Kafrul'],
+    'Sher-e-Bangla Nagar': ['Agargaon', 'Sher-e-Bangla Nagar', 'Taltola', 'East Sher-e-Bangla Nagar'],
+    'Darus Salam':     ['Darus Salam', 'Gabtoli', 'Technical', 'Ahmed Nagar', 'Mirpur 1'],
+    'Shah Ali':        ['Shah Ali', 'Mirpur 1', 'Rupnagar', 'Pirerbag', 'Gudaraghat'],
+    'Uttara West':     ['Uttara Sector 11', 'Uttara Sector 12', 'Uttara Sector 13', 'Uttara Sector 14', 'Uttara Sector 16', 'Uttara Sector 17', 'Uttara Sector 18'],
+    'Uttara East':     ['Uttara Sector 1', 'Uttara Sector 3', 'Uttara Sector 4', 'Uttara Sector 5', 'Uttara Sector 6', 'Uttara Sector 7', 'Uttara Sector 9', 'Uttara Sector 10', 'Jasimuddin'],
+    'Dakshinkhan':     ['Dakshinkhan', 'Ashkona', 'Faydabad', 'Kawla', 'Gawair'],
+    'Uttarkhan':       ['Uttarkhan', 'Mausaid', 'Chamurkhan', 'Bawnia'],
+    'Turag':           ['Turag', 'Diabari', 'Ranavola', 'Kamarpara', 'Dhour'],
+    'Khilkhet':        ['Khilkhet', 'Nikunja 1', 'Nikunja 2', 'Namapara', 'Tanpara'],
+    'Vatara':          ['Bashundhara R/A', 'Vatara', 'Notun Bazar', 'Jagannathpur', 'Solmaid', 'Kuril'],
+    'Badda':           ['Badda', 'Merul Badda', 'North Badda', 'Middle Badda', 'South Badda', 'Shahjadpur', 'Gulshan Link Road', 'Beraid'],
+    'Tejgaon':         ['Tejgaon', 'Farmgate', 'Karwan Bazar', 'Nakhalpara', 'Tejturi Bazar', 'Indira Road'],
+    'Tejgaon I/A':     ['Tejgaon Industrial Area', 'Nabisco', 'Love Road', 'Gulshan Link'],
+    'Hazaribagh':      ['Hazaribagh', 'Rayer Bazar', 'Zafrabad', 'Beribadh', 'Ganaktuli'],
+    'Kalabagan':       ['Kalabagan', 'Lake Circus', 'First Lane', 'Second Lane', 'Mirpur Road'],
+    'New Market':      ['New Market', 'Nilkhet', 'Azimpur', 'Hatirpool', 'Elephant Road', 'Katabon', 'Green Road'],
+    'Ramna':           ['Shantinagar', 'Eskaton', 'Bailey Road', 'Magbazar', 'Kakrail', 'Bangla Motor', 'Minto Road'],
+    'Shahbagh':        ['Shahbagh', 'Paribagh', 'Bakshibazar', 'Hatirpool', 'Nilkhet'],
+    'Kotwali':         ['Sadarghat', 'Babubazar', 'Islampur', 'Patuatuli', 'Shakhari Bazar'],
+    'Sutrapur':        ['Sutrapur', 'Tikatuli', 'Dholaikhal', 'Faridabad', 'Narinda'],
+    'Gendaria':        ['Gendaria', 'Dhupkhola', 'Distillery Road', 'Dayaganj'],
+    'Wari':            ['Wari', 'Rankin Street', 'Hatkhola', 'Joykali Mandir', 'Baniyanagar'],
+    'Lalbagh':         ['Lalbagh', 'Nawabganj', 'Shahid Nagar', 'Posta', 'Chawk Circular Road'],
+    'Chawkbazar':      ['Chawkbazar', 'Bakshibazar', 'Urdu Road', 'Champatoli', 'Begum Bazar'],
+    'Kamrangirchar':   ['Kamrangirchar', 'Ashrafabad', 'Bosila', 'Char Kamrangir', 'Hujurpara'],
+    'Khilgaon':        ['Khilgaon', 'Malibagh', 'Mouchak', 'Taltola', 'Goran', 'Tilpapara', 'Nandipara', 'Chowdhurypara'],
+    'Sabujbagh':       ['Bashabo', 'Madartek', 'Sabujbagh', 'Kadamtala', 'South Bashabo'],
+    'Mugda':           ['Mugda', 'Mugdapara', 'Maniknagar', 'Manda', 'Golapbagh'],
+    'Motijheel':       ['Motijheel', 'Arambagh', 'Fakirapool', 'Kamalapur', 'Dilkusha', 'Toyenbee Road'],
+    'Paltan':          ['Purana Paltan', 'Naya Paltan', 'Bijoynagar', 'Segunbagicha', 'Topkhana Road'],
+    'Shahjahanpur':    ['Shahjahanpur', 'Shantibagh', 'Razarbagh', 'North Shahjahanpur'],
+    'Jatrabari':       ['Jatrabari', 'Kazla', 'Dholaipar', 'Shanir Akhra', 'Mridha Bari', 'Kutubkhali'],
+    'Demra':           ['Demra', 'Matuail', 'Sarulia', 'Dogair', 'Konapara', 'Staff Quarter'],
+    'Shyampur':        ['Shyampur', 'Jurain', 'Postogola', 'Dolaipar', 'Mir Hajirbag'],
+    'Kadamtali':       ['Kadamtali', 'Dhania', 'Raysaheb Bazar', 'Mir Hazaribagh', 'Shyampur Bazar'],
+    'Cantonment':      ['Cantonment', 'Manikdi', 'Matikata', 'MES', 'Ibrahimpur', 'Balughat'],
+    'Bhashantek':      ['Bhashantek', 'Damalkot', 'Mirpur Cantonment', 'Kalshi'],
+  },
+  chattogram: {
+    'Kotwali':         ['Kotwali', 'Anderkilla', 'Jamalkhan', 'Laldighi', 'Court Building', 'Riazuddin Bazar'],
+    'Panchlaish':      ['Panchlaish', 'Nasirabad', 'Mehedibag', 'Probartak', 'O.R. Nizam Road', 'Hillview'],
+    'Pahartali':       ['Pahartali', "Foy's Lake", 'Akbarshah', 'Sarail', 'Khulshi Hills'],
+    'Double Mooring':  ['Agrabad', 'Double Mooring', 'Dewanhat', 'Barik Building', 'Chowmuhani'],
+    'Halishahar':      ['Halishahar', 'Boropol', 'Artillery', 'Block A', 'Block G', 'Ananda Bazar'],
+    'Chandgaon':       ['Chandgaon', 'Bahaddarhat', 'Kapasgola', 'Mohra', 'Khaja Road'],
+    'Bayezid Bostami': ['Bayezid', 'Nasirabad Industrial', 'Oxygen', 'Sholoshahar', 'Amin Colony'],
+    'Khulshi':         ['Khulshi', 'South Khulshi', 'North Khulshi', 'Jakir Hossain Road', 'Lalkhan Bazar'],
+    'Bakalia':         ['Bakalia', 'Chaktai', 'Rajakhali', 'Bou Bazar', 'DC Road'],
+    'Patenga':         ['Patenga', 'EPZ', 'Steel Mill', 'Airport Road', 'Sea Beach'],
+    'EPZ':             ['EPZ', 'Free Port', 'Bandartila', 'Steel Mill Bazar'],
+    'Akbarshah':       ['Akbarshah', 'Kornelhat', 'A K Khan', 'Firingi Bazar'],
+    'Chawkbazar':      ['Chawkbazar', 'Gulzar', 'Kapasgola', 'College Road', 'Didar Market'],
+  },
+};
+
 // ─── THANAS / UPAZILAS BY DISTRICT ────────────────────────────────────────────
 // The specific thana (police-station area / upazila) a property sits in — the
 // level tenants actually search by, since a district like Dhaka or Bhola is far
@@ -390,8 +462,13 @@ const THANAS_BY_DISTRICT = {
 // matching the thana name (e.g. thana "Dhanmondi" → "Dhanmondi 3/27/32"; "Gulshan"
 // → "Gulshan 1/2"). Falls back to the full district list when nothing matches.
 function areasForThana(district, thana) {
+  const key = String(thana || '').trim();
+  const mapped = (AREAS_BY_THANA[district] || {})[key] || [];
+  if (mapped.length) return mapped;
+  // Fallback for thanas/districts not in AREAS_BY_THANA: substring-filter the
+  // district's flat area list by the thana name.
   const all = AREAS_BY_DISTRICT[district] || [];
-  const t = String(thana || '').trim().toLowerCase();
+  const t = key.toLowerCase();
   if (!t) return all;
   const filtered = all.filter((a) => a.toLowerCase().includes(t));
   return filtered.length ? filtered : all;
@@ -1480,7 +1557,7 @@ const AddProperty = () => {
 
                 {/* Area / neighborhood (cascades from District) */}
                 <AnimatePresence>
-                  {form.district && areasForThana(form.district, form.thana).length > 0 && (
+                  {form.district && form.thana && areasForThana(form.district, form.thana).length > 0 && (
                     <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
                       <Field label={isBn ? 'এলাকা / পাড়া' : 'Area / Neighborhood'}
                         hint={isBn ? 'যেমন: ধানমন্ডি ৩, গুলশান ২, উত্তরা সেক্টর ৭' : 'e.g. Dhanmondi 3, Gulshan 2, Uttara Sector 7'}>
