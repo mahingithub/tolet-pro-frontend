@@ -34,21 +34,17 @@ import { useAuth } from '../../context/AuthContext.jsx';
  *   - Logged in as admin/support → /admin (already-protected route)
  *
  * @param {{ hideOnRoutes?: string[] }} props - optional route prefixes where
- *   the bottom nav should be hidden (defaults to /login + /admin).
+ *   the bottom nav should be hidden (defaults to /login + /admin + /property).
  */
 const MobileBottomNav = ({ hideOnRoutes }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated, isAdmin } = useAuth();
 
-  const hides = hideOnRoutes ?? ['/login', '/admin', '/list-property'];
+  const hides = hideOnRoutes ?? ['/login', '/admin', '/list-property', '/property/'];
 
   if (hides.some((r) => location.pathname.startsWith(r))) return null;
 
-  // Tenants don't list properties — swap the centre +List FAB for a
-  // regular "Saved" tab that deep-links into the tenant dashboard's
-  // Saved view. Landlords + guests keep the existing FAB so they can
-  // start a new listing in one tap.
   const isTenant = isAuthenticated && user?.role === 'tenant';
 
   const LEFT = isTenant
@@ -61,13 +57,10 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
         { id: 'explore', label: 'Explore', icon: Search, to: '/properties/all' },
       ];
 
-  // Profile target depends on who's logged in. Falls back to "open drawer"
-  // for guests so they can pick Login / Sign Up.
   const profileTarget = (() => {
     if (!isAuthenticated) return { id: 'profile', label: 'Profile', icon: User, action: 'drawer' };
     if (isAdmin)           return { id: 'profile', label: 'Profile', icon: User, to: '/admin' };
     if (user?.role === 'landlord') return { id: 'profile', label: 'Profile', icon: User, to: '/host-dashboard' };
-    // default to tenant
     return { id: 'profile', label: 'Profile', icon: User, to: '/tenant-dashboard' };
   })();
 
@@ -85,9 +78,6 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   const isActive = (item) => {
     if (item.action === 'drawer') return false;
     if (item.id === 'home') return location.pathname === '/';
-    // Tenant Saved + Profile both point at /tenant-dashboard —
-    // disambiguate via the `tab` flag in location.state so only the
-    // matching button shows the active treatment.
     if (item.to === '/tenant-dashboard') {
       const onTenant = location.pathname === '/tenant-dashboard';
       if (!onTenant) return false;
@@ -101,8 +91,6 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
 
   const handleClick = (item) => {
     if (item.action === 'drawer') {
-      // Tell <Navbar> to open its slide-out drawer. See the matching
-      // `open-mobile-menu` listener in Navbar.jsx.
       window.dispatchEvent(new CustomEvent('open-mobile-menu'));
       return;
     }
@@ -163,9 +151,6 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
           ))}
 
           {isTenant ? null : (
-            /* CENTRE (non-tenant only): floating "+ List" action. Tenants
-               never list properties, so the FAB is omitted for them and the
-               nav becomes 5 equal-width tabs. */
             <div className="flex-1 h-full flex flex-col items-center justify-end relative pb-1">
               <button
                 onClick={() => navigate('/list-property')}
