@@ -920,7 +920,7 @@ const PropertyListing = () => {
 				{/* Row 1: Back arrow · Search bar · Sort icon */}
 				<div className="flex items-center gap-2 px-3 pt-3 pb-2">
 					<button
-						onClick={() => navigate(-1)}
+						onClick={() => window.history.length > 2 ? navigate(-1) : navigate("/")}
 						className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0 active:scale-90 transition-transform"
 						aria-label="Go back">
 						<ArrowLeft size={18} className="text-gray-800" />
