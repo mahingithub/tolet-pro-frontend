@@ -775,6 +775,35 @@ const HostDashboard = () => {
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
+  // ── Hydrate REAL host performance stats (/api/host-stats) ───────────────
+  // Response rate, avg response time, conversion rate — all server-computed
+  // from live inquiries / bookings / chat threads. Replaces the old hardcoded
+  // 98% / 15min / 24% card.
+  const [hostStats, setHostStats] = useState({ responseRate: 0, avgResponseTime: 0, conversionRate: 0 });
+  useEffect(() => {
+    let cancelled = false;
+    const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+    const hydrate = async () => {
+      try {
+        const token = localStorage.getItem('auth:token');
+        if (!token) return;
+        const res = await fetch(`${API}/host-stats`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        setHostStats({
+          responseRate:    Number(data.responseRate)    || 0,
+          avgResponseTime: Number(data.avgResponseTime) || 0,
+          conversionRate:  Number(data.conversionRate)  || 0,
+        });
+      } catch (err) {
+        console.warn('[host] failed to load stats:', err.message || err);
+      }
+    };
+    hydrate();
+    const interval = setInterval(hydrate, 60_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     let timer = null;
@@ -903,6 +932,29 @@ const HostDashboard = () => {
         ...context,
       },
     });
+  };
+
+  // 🟢 CLICKABLE NOTIFICATIONS — deep-link a notification to its target surface.
+  // The host inbox mostly sees inquiry_new + message_new; rent_* (if any) land
+  // on the rent ledger. 'system' / unknown types just mark-read (no navigation).
+  const handleNotifClick = (notif) => {
+    const d = notif?.data || {};
+    switch (notif?.type) {
+      case 'message_new':
+        if (d.conversationId) openChatPanel(d.conversationId, { source: 'notification' });
+        break;
+      case 'inquiry_new':
+      case 'inquiry_status':
+        setActiveTab('inquiries');
+        break;
+      case 'rent_receipt':
+      case 'rent_invoice':
+      case 'rent_overdue':
+        setActiveTab('rent');
+        break;
+      default:
+        break;
+    }
   };
 
   const handleRemoveBooking = (id) => {
@@ -1296,18 +1348,6 @@ const HostDashboard = () => {
   const filteredProperties = properties.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()) || p.location.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredPropertiesByStatus = filteredProperties.filter(p => propertyFilter === 'all' || p.status === propertyFilter);
 
-  // Live host performance — computed from REAL bookings + inquiries (replaces the
-  // old hardcoded 98% / 15 / 24% demo numbers). A new host now sees honest zeros.
-  const _curMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-  const livePerformance = {
-    activeBookings: bookings.length,
-    openInquiries:  inquiries.length,
-    collectedThisMonth: bookings.reduce((sum, b) => {
-      const e = (b.ledger || {})[_curMonthKey];
-      return sum + (e && e.paid ? (Number(e.amount) || 0) : 0);
-    }, 0),
-  };
-  
   const recentProps = filteredProperties.filter(p => isRecent(p.addedDate));
   const dashboardProperties = recentProps.length > 0 ? recentProps : filteredProperties.slice(0, 3);
   const dashboardPropTitle = recentProps.length > 0 
@@ -1435,6 +1475,7 @@ const HostDashboard = () => {
                               setUnreadCount(prev => Math.max(0, prev - 1));
                             } catch (err) {} 
                             setIsNotifOpen(false); 
+                            handleNotifClick(notif);
                           }} 
                           className={`p-3 rounded-2xl border cursor-pointer hover:bg-white hover:shadow-sm transition-all group ${!notif.read ? 'bg-blue-50/50 border-blue-100' : 'bg-gray-50 border-gray-100'}`}
                         >
@@ -2741,20 +2782,20 @@ const HostDashboard = () => {
                 <div className="bg-gradient-to-br from-[#ba0036] to-[#ff004c] rounded-[2rem] p-8 text-white shadow-[0_15px_40px_rgba(186,0,54,0.2)] relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-10 translate-x-10"></div>
                   <h3 className="text-2xl font-black mb-1 relative z-10">{language === 'বাংলা' ? 'আপনার পারফরম্যান্স' : 'Host Performance'}</h3>
-                  <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest mb-8 relative z-10">{language === 'বাংলা' ? 'এই মাসের ওভারভিউ' : 'This Month\'s Overview'}</p>
+                  <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest mb-8 relative z-10">{language === 'বাংলা' ? 'সার্বিক পারফরম্যান্স' : 'Performance Overview'}</p>
                   
                   <div className="space-y-6 relative z-10">
                     <div>
-                      <p className="text-white/70 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'সক্রিয় বুকিং' : 'Active Bookings'}</p>
-                      <p className="text-3xl font-black">{livePerformance.activeBookings}</p>
+                      <p className="text-white/70 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'রেসপন্স রেট' : 'Response Rate'}</p>
+                      <p className="text-3xl font-black">{hostStats.responseRate}%</p>
                     </div>
                     <div>
-                      <p className="text-white/70 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'খোলা ইনকোয়ারি' : 'Open Inquiries'}</p>
-                      <p className="text-3xl font-black">{livePerformance.openInquiries}</p>
+                      <p className="text-white/70 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'গড় রেসপন্স টাইম' : 'Avg Response Time'}</p>
+                      <p className="text-3xl font-black">{hostStats.avgResponseTime >= 60 ? `${Math.floor(hostStats.avgResponseTime / 60)}${language === 'বাংলা' ? 'ঘ ' : 'h '}${hostStats.avgResponseTime % 60}${language === 'বাংলা' ? 'মি' : 'm'}` : `${hostStats.avgResponseTime} ${language === 'বাংলা' ? 'মিনিট' : 'min'}`}</p>
                     </div>
                     <div>
-                      <p className="text-white/70 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'এ মাসে আদায়' : 'Collected This Month'}</p>
-                      <p className="text-3xl font-black">৳{livePerformance.collectedThisMonth.toLocaleString('en-IN')}</p>
+                      <p className="text-white/70 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'কনভার্সন রেট' : 'Conversion Rate'}</p>
+                      <p className="text-3xl font-black">{hostStats.conversionRate}%</p>
                     </div>
                   </div>
                 </div>
