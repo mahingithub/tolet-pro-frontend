@@ -2164,6 +2164,7 @@ const PropertyDetails = () => {
       </div>
 
       {/* ── MOBILE: FLOATING BOTTOM ACTION CARD ── */}
+      {/* Sits above the 64px MobileBottomNav so it is never hidden behind it */}
       <div className="lg:hidden fixed left-3 right-3 z-40"
         style={{
           bottom: 'calc(18px + env(safe-area-inset-bottom))',

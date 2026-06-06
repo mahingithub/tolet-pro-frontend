@@ -6,7 +6,7 @@ import { useLanguage } from "../context/LanguageContext";
 // ─── SHARED INQUIRY MODAL (single source of truth for the inquiry flow) ───────
 import InquiryModal from "./InquiryModal";
 // ─── DATA SOURCE: live properties (API + user uploads). NO demo data. ─────────
-import { propertyService, subscribeUserProperties } from "../services/Propertyservice.js";
+import { propertyService, subscribeUserProperties, propertyLocationHaystack } from "../services/Propertyservice.js";
 
 // ╔══════════════════════════════════════════════════════════════════════════╗
 // ║  GOOGLE MAPS                                                            ║
@@ -33,10 +33,6 @@ const GOOGLE_MAPS_API_KEY =
 	(typeof import.meta !== "undefined" && import.meta?.env?.VITE_GOOGLE_MAPS_API_KEY) ||
 	(typeof process !== "undefined" && process?.env?.REACT_APP_GOOGLE_MAPS_API_KEY) ||
 	"AIzaSyC9xWNjjSPhxy2aUWLubPqHR7N6KZWmKlg";
-
-// Loaded libraries (kept as a stable reference for useJsApiLoader).
-// Add 'places' / 'geometry' here if you wire up auto-complete or distance calcs.
-const GOOGLE_MAPS_LIBRARIES = [];
 
 // Default centre — middle of Dhaka. Override via the prop on <MapView />.
 const DEFAULT_MAP_CENTER = { lat: 23.7652, lng: 90.3893 };
@@ -324,10 +320,11 @@ const MapView = ({ properties, highlightedId, onMarkerHover, onMarkerHoverEnd, o
 	);
 
 	// Load the Maps JS SDK once per page (the loader de-duplicates internally).
+	// NOTE: `libraries` prop is intentionally omitted — passing an empty array
+	// causes an internal constructor crash in some versions of @react-google-maps/api.
 	const { isLoaded, loadError } = useJsApiLoader({
 		id: "tlp-google-map-script",
 		googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-		libraries: GOOGLE_MAPS_LIBRARIES,
 	});
 
 	// TODO (backend): when the user pans/zooms the map, refetch properties
@@ -640,6 +637,7 @@ const PropertyListing = () => {
 	const [viewMode, setViewMode] = useState("list");
 	const [highlightedId, setHighlightedId] = useState(null);
 	const [selectedMapProperty, setSelectedMapProperty] = useState(null);
+	const [openSections, setOpenSections] = useState([]);
 
 	// ── FILTER STATES ───────────────────────────────────────────────────────────
 	const [searchArea, setSearchArea] = useState(initialSearchAreaFromURL);
@@ -852,17 +850,22 @@ const PropertyListing = () => {
 	// own `area` / `location` fields (the granular names hosts entered), each
 	// tagged with its district for context. Lets a tenant jump straight to e.g.
 	// "Lalmohan" instead of browsing the whole district.
+	//
+	// NOTE: We use a plain object instead of `new Map()` here because the
+	// lucide-react `Map` icon is imported in this file and shadows the built-in
+	// JavaScript Map class — causing a "Map is not a constructor" crash when
+	// bundled/minified by Vite.
 	const locationSuggestions = useMemo(() => {
-		const seen = new Map();
+		const seen = {};
 		for (const p of properties || []) {
 			for (const cand of [{ label: p.thana, sub: p.district || p.division }, { label: p.area, sub: p.district || p.division }, { label: p.location, sub: p.district || p.division }]) {
 				const label = String(cand.label || "").trim();
 				if (!label) continue;
 				const key = label.toLowerCase();
-				if (!seen.has(key)) seen.set(key, { label, sub: String(cand.sub || "").trim() });
+				if (!seen[key]) seen[key] = { label, sub: String(cand.sub || "").trim() };
 			}
 		}
-		return Array.from(seen.values());
+		return Object.values(seen);
 	}, [properties]);
 
 	const matchingSuggestions = useMemo(() => {
@@ -910,20 +913,110 @@ const PropertyListing = () => {
 				</div>
 			</motion.div>
 
-			{/* MOBILE TOP BAR */}
-			<div className={`bg-white border-b border-gray-100 sticky top-0 md:top-[72px] z-30 shadow-sm transition-opacity duration-300 ${isStickyFilter ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
-				<div className="lg:hidden max-w-[1400px] mx-auto px-4 h-16 flex items-center justify-between gap-3">
-					<span className="text-sm font-bold text-gray-900 truncate">
-						{searchArea ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision} {t.properties || "Properties"}
-					</span>
+			{/* ═══════════════════════════════════════════════════════════════
+			    MOBILE: Daraz-style immersive header — replaces global Navbar
+			    ─────────────────────────────────────────────────────────────── */}
+			<div className="md:hidden sticky top-0 z-40 bg-white shadow-sm">
+				{/* Row 1: Back arrow · Search bar · Sort icon */}
+				<div className="flex items-center gap-2 px-3 pt-3 pb-2">
+					<button
+						onClick={() => navigate(-1)}
+						className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0 active:scale-90 transition-transform"
+						aria-label="Go back">
+						<ArrowLeft size={18} className="text-gray-800" />
+					</button>
+					<div className="flex-1 relative">
+						<input
+							type="text"
+							value={searchArea}
+							onChange={(e) => setSearchArea(e.target.value)}
+							placeholder={t.searchAreaPlaceholder || "Search area, location..."}
+							className="w-full bg-gray-100 rounded-full py-2.5 pl-9 pr-8 text-[13px] font-bold text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-brandRed/30 transition-all"
+						/>
+						<Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+						{searchArea && (
+							<button
+								onClick={() => setSearchArea("")}
+								className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full bg-gray-300 text-white active:scale-90 transition-transform"
+								aria-label="Clear search">
+								<X size={12} />
+							</button>
+						)}
+					</div>
+				</div>
+
+				{/* Row 2: Sort Dropdown, Filter, Map */}
+				<div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-white">
+					{/* Sort Dropdown */}
+					<div className="flex items-center gap-2 flex-1">
+						<select 
+							value={sortBy} 
+							onChange={(e) => setSortBy(e.target.value)} 
+							className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-[12px] font-bold text-gray-900 outline-none focus:border-brandRed cursor-pointer"
+						>
+							<option value="Newest Listings">{t.sortNewest || "Newest Listings"}</option>
+							<option value="Price: Low to High">{t.sortPriceLowHigh || "Price: Low to High"}</option>
+							<option value="Price: High to Low">{t.sortPriceHighLow || "Price: High to Low"}</option>
+							<option value="Popular">{t.sortPopular || "Popular"}</option>
+						</select>
+					</div>
+					
 					<div className="flex items-center gap-2 shrink-0">
-						<button onClick={() => setViewMode((v) => (v === "map" ? "list" : "map"))} className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-black transition-all active:scale-95 ${isMapMode ? "bg-brandRed text-white shadow-md" : "bg-gray-100 text-gray-700 hover:bg-red-50 hover:text-brandRed"}`}>
+						{/* Filter button */}
+						<button
+							onClick={() => setIsMobileFilterOpen(true)}
+							className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-black border transition-all active:scale-95 ${
+								(selectedCategories.length > 0 || selectedFurnish || selectedBeds !== "any" || minRating > 0)
+									? "bg-brandRed text-white border-brandRed shadow-sm"
+									: "bg-white text-gray-700 border-gray-200"
+							}`}>
+							<Filter size={14} />
+							{t.filtersBtn || "Filters"}
+						</button>
+
+						{/* Map button */}
+						<button
+							onClick={() => setViewMode((v) => (v === "map" ? "list" : "map"))}
+							className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-black border transition-all active:scale-95 ${
+								isMapMode
+									? "bg-brandRed text-white border-brandRed shadow-sm"
+									: "bg-white text-gray-700 border-gray-200"
+							}`}>
 							{isMapMode ? <List size={14} /> : <Map size={14} />}
 							{isMapMode ? "List" : "Map"}
 						</button>
-						<button onClick={() => setIsMobileFilterOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full text-sm font-bold text-gray-700 active:scale-95 transition-transform">
-							<Filter size={16} /> {t.filtersBtn || "Filters"}
+					</div>
+				</div>
+
+				{/* Row 3: Results count + location context */}
+				<div className="flex items-center justify-between px-3 py-1.5 bg-gray-50/80">
+					<span className="text-[11px] font-bold text-gray-500">
+						<strong className="text-gray-900">{filteredProperties.length}</strong> {t.properties || "প্রপার্টি"} · {searchArea ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision}
+					</span>
+					{searchArea && (
+						<button onClick={() => setSearchArea("")} className="text-[10px] font-black text-brandRed active:scale-95 transition-transform">
+							{t.clearAll || "Clear"}
 						</button>
+					)}
+				</div>
+			</div>
+
+			{/* Old desktop-only top bar — hidden on mobile since the new header above replaces it */}
+			<div className="hidden md:block">
+				<div className={`bg-white border-b border-gray-100 sticky top-[72px] z-30 shadow-sm`}>
+					<div className="max-w-[1400px] mx-auto px-4 h-16 flex items-center justify-between gap-3">
+						<span className="text-sm font-bold text-gray-900 truncate">
+							{searchArea ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision} {t.properties || "Properties"}
+						</span>
+						<div className="flex items-center gap-2 shrink-0">
+							<button onClick={() => setViewMode((v) => (v === "map" ? "list" : "map"))} className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-black transition-all active:scale-95 ${isMapMode ? "bg-brandRed text-white shadow-md" : "bg-gray-100 text-gray-700 hover:bg-red-50 hover:text-brandRed"}`}>
+								{isMapMode ? <List size={14} /> : <Map size={14} />}
+								{isMapMode ? "List" : "Map"}
+							</button>
+							<button onClick={() => setIsMobileFilterOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full text-sm font-bold text-gray-700 active:scale-95 transition-transform">
+								<Filter size={16} /> {t.filtersBtn || "Filters"}
+							</button>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -976,7 +1069,9 @@ const PropertyListing = () => {
 						</div>
 
 						<FilterSection title={t.filterLocation || "Location"}>
-							<div className="relative mb-4">
+							{/* Search input — desktop sidebar only.
+							    On mobile the top bar search already handles this. */}
+							<div className="hidden lg:block relative mb-4">
 								<input type="text" value={searchArea} onChange={(e) => { setSearchArea(e.target.value); setShowSuggest(true); }} onFocus={() => setShowSuggest(true)} onBlur={() => setTimeout(() => setShowSuggest(false), 120)} placeholder={t.searchAreaPlaceholder || "Search area..."} className="w-full bg-gray-50 border border-gray-100 rounded-xl py-3 pl-10 pr-24 text-xs font-bold focus:border-brandRed outline-none" />
 								<Search size={14} className="absolute left-3.5 top-3.5 text-gray-400" />
 								<button onClick={handleNearestMe} disabled={isLocating} className="absolute right-2 top-2 bg-white border border-gray-200 shadow-sm text-[9px] font-black uppercase text-brandRed px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-red-50 transition-colors">
@@ -1269,8 +1364,8 @@ const PropertyListing = () => {
 									filteredProperties.map((property) => {
 										return (
 											<React.Fragment key={property.id}>
-												{/* DESKTOP: full PropertyCard */}
-												<div className="hidden md:block mb-6">
+												{/* Unified PropertyCard for both Desktop and Mobile */}
+												<div className="mb-4 md:mb-6">
 													<PropertyCard property={property} navigate={navigate} t={t} showToast={showToast} isHighlighted={highlightedId === property.id} onHover={setHighlightedId} onHoverEnd={() => setHighlightedId(null)} onInquire={openInquiry} />
 												</div>
 											</React.Fragment>
@@ -1286,95 +1381,6 @@ const PropertyListing = () => {
 										<button onClick={handleClearAll} className="bg-gray-900 text-white px-8 py-3 rounded-xl text-sm font-bold active:scale-95 transition-transform shadow-md hover:shadow-lg">
 											{t.clearFilters || "Clear Filters"}
 										</button>
-									</div>
-								)}
-
-								{/* MOBILE: single-column horizontal cards (image left, info right).
-								    Easier to read than the previous cramped 2-col grid and matches
-								    the OYO/airbnb list-view pattern. */}
-								{filteredProperties.length > 0 && (
-									<div className="flex flex-col gap-3 pb-10 md:hidden">
-										{filteredProperties.map((property) => {
-											const catLabel = RENTAL_CATEGORIES.find((c) => c.id === property.rentalCategory);
-											const catText = (catLabel?.tKey && t[catLabel.tKey]) || catLabel?.label || "Property";
-											const discountPercent = Math.round(((property.originalPrice - property.price) / property.originalPrice) * 100);
-											return (
-												<div
-													key={property.id}
-													onClick={() => navigate(`/property/${property.id}`)}
-													className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm active:scale-[0.99] transition-transform cursor-pointer"
-												>
-													<div className="flex">
-														{/* Photo */}
-														<div className="relative w-[130px] h-[130px] shrink-0 bg-gray-100">
-															<img
-																src={property.images[0]}
-																alt={property.title}
-																className="absolute inset-0 w-full h-full object-cover"
-															/>
-															{property.verified && (
-																<div className="absolute top-1.5 left-1.5 bg-white/95 backdrop-blur-sm px-1.5 py-0.5 rounded-md text-[8px] font-black text-brandRed flex items-center gap-0.5">
-																	<ShieldCheck size={8} /> Verified
-																</div>
-															)}
-															<button
-																onClick={(e) => {
-																	e.stopPropagation();
-																	handleSave(e, property);
-																}}
-																aria-label="Save"
-																className="absolute top-1.5 right-1.5 p-1.5 bg-white/95 backdrop-blur-sm rounded-full hover:bg-white transition-all">
-																<Heart size={11} className="text-gray-700" />
-															</button>
-														</div>
-
-														{/* Info */}
-														<div className="flex-1 min-w-0 p-3 flex flex-col">
-															<p className="text-[9px] font-black text-brandRed uppercase tracking-widest line-clamp-1">{catText}</p>
-															<h4 className="text-[13px] font-black text-gray-900 leading-tight line-clamp-2 mt-0.5">{property.title}</h4>
-															<p className="text-[10px] text-gray-500 font-bold flex items-center gap-1 line-clamp-1 mt-1">
-																<MapPin size={10} className="shrink-0" /> {property.location}
-															</p>
-															<div className="mt-auto flex items-baseline gap-1.5 pt-2">
-																<span className="text-base font-black text-gray-900">৳{(property.price / 1000).toFixed(0)}k</span>
-																<span className="text-[10px] text-gray-500 font-bold">/{t.monthText || "mo"}</span>
-																{property.originalPrice > property.price && (
-																	<span className="ml-auto bg-green-100 text-green-700 text-[9px] font-black px-1.5 py-0.5 rounded">{discountPercent}% {t.offText || "OFF"}</span>
-																)}
-															</div>
-															<div className="flex items-center gap-2.5 text-[10px] font-bold text-gray-500 mt-1.5 pt-1.5 border-t border-gray-100">
-																<span className="flex items-center gap-1"><BedDouble size={10} /> {property.beds}</span>
-																<span className="flex items-center gap-1"><Bath size={10} /> {property.baths}</span>
-																<span className="flex items-center gap-1"><Square size={10} /> {property.sqft}</span>
-																<span className="ml-auto flex items-center gap-1">
-																	<Star size={10} className="fill-yellow-400 text-yellow-400" /> {property.rating}
-																</span>
-															</div>
-														</div>
-													</div>
-
-													{/* CTAs */}
-													<div className="px-3 pb-3 grid grid-cols-2 gap-2 -mt-1">
-														<button
-															onClick={(e) => {
-																e.stopPropagation();
-																navigate(`/property/${property.id}`);
-															}}
-															className="py-2 rounded-lg text-[11px] font-black text-gray-700 bg-gray-50 border border-gray-100 active:scale-95 transition-transform">
-															{t.detailsBtn || "Details"}
-														</button>
-														<button
-															onClick={(e) => {
-																e.stopPropagation();
-																openInquiry(property);
-															}}
-															className="py-2 rounded-lg bg-brandRed text-white text-[11px] font-black active:scale-95 transition-transform flex items-center justify-center gap-1 shadow-sm">
-															<MessageCircle size={11} /> {t.inquireBtn || "Inquire"}
-														</button>
-													</div>
-												</div>
-											);
-										})}
 									</div>
 								)}
 							</motion.div>
