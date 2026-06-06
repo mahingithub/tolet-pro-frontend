@@ -384,50 +384,11 @@ const todayIso = () => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CROSS-SYSTEM BRIDGE — HostDashboard → TenantDashboard receipts
-//
-// The tenant's dashboard listens on this exact localStorage key + custom event
-// so the moment a landlord ticks a month as paid, the tenant sees a receipt
-// in their inbox without an API round-trip. When the backend lands, swap this
-// for a websocket / push-notification broadcast — the storage shape stays
-// the same so the tenant UI keeps working unchanged.
+// Rent receipts are now created server-side (Receipt model) by the booking
+// ledger API and read by the tenant via GET /api/receipts/tenant. The old
+// localStorage bridge (pushReceiptToTenant / PAYMENT_RECEIPTS_KEY) was removed —
+// it was single-browser only and is fully superseded by the backend receipts.
 // ─────────────────────────────────────────────────────────────────────────────
-const PAYMENT_RECEIPTS_KEY = 'tolet_payment_receipts';
-const PAYMENT_RECEIPTS_EVENT = 'tolet-payment-receipts-updated';
-
-// Push (or upsert) a receipt into the tenant's localStorage bucket. Multiple
-// payments for the same booking + month replace the prior receipt so the
-// tenant always sees the latest balance/status.
-// TODO(backend): replace with `POST /api/tenants/{tenantId}/receipts` and
-// emit a server-side push so other tenant devices get the receipt too.
-const pushReceiptToTenant = (receipt) => {
-  if (typeof window === 'undefined') return;
-  try {
-    const existing = JSON.parse(window.localStorage.getItem(PAYMENT_RECEIPTS_KEY) || '[]');
-    const filtered = Array.isArray(existing)
-      ? existing.filter(r => !(r.bookingId === receipt.bookingId && r.monthKey === receipt.monthKey))
-      : [];
-    const next = [receipt, ...filtered].slice(0, 200); // hard cap to avoid quota errors
-    window.localStorage.setItem(PAYMENT_RECEIPTS_KEY, JSON.stringify(next));
-    window.dispatchEvent(new CustomEvent(PAYMENT_RECEIPTS_EVENT));
-  } catch {
-    // Quota / serialisation errors — swallow silently. The host UI still
-    // shows the payment locally; only the cross-tab tenant view is missed.
-  }
-};
-
-// Remove the receipt for a booking + month — used when a host undoes a payment.
-const removeReceiptFromTenant = (bookingId, monthKey) => {
-  if (typeof window === 'undefined') return;
-  try {
-    const existing = JSON.parse(window.localStorage.getItem(PAYMENT_RECEIPTS_KEY) || '[]');
-    const next = Array.isArray(existing)
-      ? existing.filter(r => !(r.bookingId === bookingId && r.monthKey === monthKey))
-      : [];
-    window.localStorage.setItem(PAYMENT_RECEIPTS_KEY, JSON.stringify(next));
-    window.dispatchEvent(new CustomEvent(PAYMENT_RECEIPTS_EVENT));
-  } catch { /* ignore */ }
-};
 
 const HostDashboard = () => {
   const { t = {}, language = 'English', setLanguage } = useLanguage() || {}; 
@@ -634,11 +595,10 @@ const HostDashboard = () => {
   // truth for conversations across the app.
 
   // 🟢 PREMIUM + RENT-LEDGER STATES
-  // `isPremium` is a frontend stub today; the backend will hydrate it from the
-  // host's subscription record. Booking creation (Convert Inquiry → Booking)
-  // is gated behind this flag so non-premium hosts get the upgrade prompt.
-  // TODO(backend): GET /api/host/me  →  { ..., subscription: { tier, isPremium } }
-  const [isPremium, setIsPremium] = useState(true);
+  // Premium access is now DERIVED from the real subscription status (computed
+  // just below, after subStatus), not a hardcoded stub. Booking creation
+  // (Convert Inquiry → Booking) is gated behind it, so hosts whose trial /
+  // subscription has expired get the upgrade prompt.
 
   // Subscription state — feeds the sidebar lock badges and the
   // "Verify Profile" / "Upgrade to Premium" chips. Live-syncs across tabs
@@ -657,6 +617,12 @@ const HostDashboard = () => {
     [subStatus],
   );
   const isFeatureLocked = (featureId) => lockedFeatureIds.includes(featureId);
+
+  // Premium = the subscription / 3-month free trial is still active (not expired).
+  // Single source of truth for the booking-conversion gate + premium badges. If
+  // subscriptionService later exposes a more specific flag (e.g. paid tier),
+  // swap it in here and everything downstream follows.
+  const isPremium = !subStatus?.isExpired;
 
   // Active tab guarded by subscription. If the host lands on a locked tab
   // (e.g. via a stale link), we bounce them to /subscription with a `from`
@@ -809,6 +775,35 @@ const HostDashboard = () => {
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
+  // ── Hydrate REAL host performance stats (/api/host-stats) ───────────────
+  // Response rate, avg response time, conversion rate — all server-computed
+  // from live inquiries / bookings / chat threads. Replaces the old hardcoded
+  // 98% / 15min / 24% card.
+  const [hostStats, setHostStats] = useState({ responseRate: 0, avgResponseTime: 0, conversionRate: 0 });
+  useEffect(() => {
+    let cancelled = false;
+    const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+    const hydrate = async () => {
+      try {
+        const token = localStorage.getItem('auth:token');
+        if (!token) return;
+        const res = await fetch(`${API}/host-stats`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        setHostStats({
+          responseRate:    Number(data.responseRate)    || 0,
+          avgResponseTime: Number(data.avgResponseTime) || 0,
+          conversionRate:  Number(data.conversionRate)  || 0,
+        });
+      } catch (err) {
+        console.warn('[host] failed to load stats:', err.message || err);
+      }
+    };
+    hydrate();
+    const interval = setInterval(hydrate, 60_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     let timer = null;
@@ -937,6 +932,29 @@ const HostDashboard = () => {
         ...context,
       },
     });
+  };
+
+  // 🟢 CLICKABLE NOTIFICATIONS — deep-link a notification to its target surface.
+  // The host inbox mostly sees inquiry_new + message_new; rent_* (if any) land
+  // on the rent ledger. 'system' / unknown types just mark-read (no navigation).
+  const handleNotifClick = (notif) => {
+    const d = notif?.data || {};
+    switch (notif?.type) {
+      case 'message_new':
+        if (d.conversationId) openChatPanel(d.conversationId, { source: 'notification' });
+        break;
+      case 'inquiry_new':
+      case 'inquiry_status':
+        setActiveTab('inquiries');
+        break;
+      case 'rent_receipt':
+      case 'rent_invoice':
+      case 'rent_overdue':
+        setActiveTab('rent');
+        break;
+      default:
+        break;
+    }
   };
 
   const handleRemoveBooking = (id) => {
@@ -1112,35 +1130,8 @@ const HostDashboard = () => {
       : b
     ));
 
-    // ── Cross-system: push receipt to tenant for full + partial only.
-    // "Due" notes are landlord-side only — no receipt is generated because
-    // no money has changed hands yet.
-    if (status !== 'due') {
-      const receipt = {
-        id: `RCP-${booking.id}-${key}-${Date.now().toString(36).toUpperCase()}`,
-        read: false,
-        bookingId: booking.id,
-        tenantPhone: booking.tenantPhone,
-        landlordChatId: booking.chatId,
-        propertyTitle: booking.property,
-        monthKey: key,
-        monthLabel: monthFullLabel(key, language),
-        status,                        // 'full' | 'partial'
-        totalDue: expected,
-        totalPaid: amt,
-        balance,
-        method,
-        txnId: txnId || '',
-        paidOn,
-        date: formatDate(paidOn, language),
-        issuedAt: new Date().toISOString(),
-      };
-      pushReceiptToTenant(receipt);
-    } else {
-      // Editing a previously-paid month back to "due" should also pull the
-      // stale receipt from the tenant's inbox so they aren't confused.
-      removeReceiptFromTenant(booking.id, key);
-    }
+    // Receipt is created/updated (or cleared for 'due') server-side by the
+    // ledger API call below — no local receipt handling needed.
 
     // ── Toasts (Bn/En) ─────────────────────────────────────────────────────
     const monthLabel = monthFullLabel(key, language);
@@ -1159,7 +1150,11 @@ const HostDashboard = () => {
     }
 
     const bookingMongoId = booking._id || bookingId;
-    updateLedgerApi(bookingMongoId, key, entry).catch(err => {
+    updateLedgerApi(bookingMongoId, key, {
+      ...entry,
+      monthLabel: monthFullLabel(key, language),
+      totalDue: expected,
+    }).catch(err => {
       console.warn('[host] mark paid sync failed:', err.message || err);
     });
 
@@ -1178,7 +1173,7 @@ const HostDashboard = () => {
       delete next[key];
       return { ...b, ledger: next };
     }));
-    removeReceiptFromTenant(bookingId, key);
+    // The receipt is removed server-side by undoLedgerApi() below.
     showToast(language === 'বাংলা' ? 'পেমেন্ট রেকর্ড মুছে ফেলা হয়েছে — রিসিটও সরানো হয়েছে' : 'Payment record removed — receipt withdrawn');
     setActiveModal(null);
 
@@ -1352,7 +1347,7 @@ const HostDashboard = () => {
   // 🟢 100% FIXED: Moved logic inside the component to prevent White Screen Error!
   const filteredProperties = properties.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()) || p.location.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredPropertiesByStatus = filteredProperties.filter(p => propertyFilter === 'all' || p.status === propertyFilter);
-  
+
   const recentProps = filteredProperties.filter(p => isRecent(p.addedDate));
   const dashboardProperties = recentProps.length > 0 ? recentProps : filteredProperties.slice(0, 3);
   const dashboardPropTitle = recentProps.length > 0 
@@ -1480,6 +1475,7 @@ const HostDashboard = () => {
                               setUnreadCount(prev => Math.max(0, prev - 1));
                             } catch (err) {} 
                             setIsNotifOpen(false); 
+                            handleNotifClick(notif);
                           }} 
                           className={`p-3 rounded-2xl border cursor-pointer hover:bg-white hover:shadow-sm transition-all group ${!notif.read ? 'bg-blue-50/50 border-blue-100' : 'bg-gray-50 border-gray-100'}`}
                         >
@@ -2786,20 +2782,20 @@ const HostDashboard = () => {
                 <div className="bg-gradient-to-br from-[#ba0036] to-[#ff004c] rounded-[2rem] p-8 text-white shadow-[0_15px_40px_rgba(186,0,54,0.2)] relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-10 translate-x-10"></div>
                   <h3 className="text-2xl font-black mb-1 relative z-10">{language === 'বাংলা' ? 'আপনার পারফরম্যান্স' : 'Host Performance'}</h3>
-                  <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest mb-8 relative z-10">{language === 'বাংলা' ? 'এই মাসের ওভারভিউ' : 'This Month\'s Overview'}</p>
+                  <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest mb-8 relative z-10">{language === 'বাংলা' ? 'সার্বিক পারফরম্যান্স' : 'Performance Overview'}</p>
                   
                   <div className="space-y-6 relative z-10">
                     <div>
                       <p className="text-white/70 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'রেসপন্স রেট' : 'Response Rate'}</p>
-                      <p className="text-3xl font-black">{hostInsights.responseRate}</p>
+                      <p className="text-3xl font-black">{hostStats.responseRate}%</p>
                     </div>
                     <div>
-                      <p className="text-white/70 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'গড় রেসপন্স টাইম' : 'Avg. Response Time'}</p>
-                      <p className="text-3xl font-black">{hostInsights.avgResponseTime} <span className="text-lg text-white/80">min</span></p>
+                      <p className="text-white/70 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'গড় রেসপন্স টাইম' : 'Avg Response Time'}</p>
+                      <p className="text-3xl font-black">{hostStats.avgResponseTime >= 60 ? `${Math.floor(hostStats.avgResponseTime / 60)}${language === 'বাংলা' ? 'ঘ ' : 'h '}${hostStats.avgResponseTime % 60}${language === 'বাংলা' ? 'মি' : 'm'}` : `${hostStats.avgResponseTime} ${language === 'বাংলা' ? 'মিনিট' : 'min'}`}</p>
                     </div>
                     <div>
-                      <p className="text-white/70 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'সাকসেস রেট' : 'Conversion Rate'}</p>
-                      <p className="text-3xl font-black">{hostInsights.conversionRate}</p>
+                      <p className="text-white/70 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'কনভার্সন রেট' : 'Conversion Rate'}</p>
+                      <p className="text-3xl font-black">{hostStats.conversionRate}%</p>
                     </div>
                   </div>
                 </div>
@@ -4459,6 +4455,7 @@ const HostDashboard = () => {
                      <div className="bg-blue-100 w-10 h-10 rounded-full flex items-center justify-center text-blue-600 shrink-0 font-black">{modalData.init}</div>
                      <div>
                        <p className="text-sm font-black text-gray-900">{modalData.user}</p>
+                       <p className="text-[11px] font-black text-gray-700 mt-0.5">{modalData.phone || (language === 'বাংলা' ? 'ফোন নেই' : 'No phone')}</p>
                        <p className="text-[10px] font-bold text-gray-500 mt-0.5">{modalData.propTitle}</p>
                      </div>
                   </div>
@@ -4885,12 +4882,6 @@ const HostDashboard = () => {
                       className="w-full bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white py-4 rounded-xl font-black shadow-[0_8px_20px_rgba(251,146,60,0.3)] hover:-translate-y-0.5 transition-all text-sm flex items-center justify-center gap-2"
                     >
                       <Sparkles size={16} /> {language === 'বাংলা' ? 'প্রিমিয়াম আপগ্রেড করুন' : 'Upgrade to Premium'}
-                    </button>
-                    <button
-                      onClick={() => { setIsPremium(true); setActiveModal(null); showToast(language === 'বাংলা' ? 'ডেমো প্রিমিয়াম চালু — এপিআই কানেক্ট করার সময় সরিয়ে নিন' : 'Demo premium enabled — remove when API is wired'); }}
-                      className="w-full bg-gray-50 text-gray-500 py-2.5 rounded-xl font-bold text-[10px] hover:bg-gray-100 transition-all"
-                    >
-                      {language === 'বাংলা' ? 'ডেমো: প্রিমিয়াম চালু করুন' : 'Demo: enable premium for this session'}
                     </button>
                   </div>
                 </div>
