@@ -84,6 +84,42 @@ const initialBookings = [];
 // pre-seeded — the inbox is empty until a real tenant messages.
 const initialInquiries = [];
 
+// Maps a raw inquiry from inquiryService.listHostInquiries() into the shape the
+// dashboard renders. The backend already stamps most fields (user/init/timeAgo),
+// so this normalises defensively with fallbacks. (This mapper had gone missing,
+// which threw "toInquiryRow is not defined" and broke the inquiries tab.)
+const _inqInitials = (name) =>
+  (String(name || '').trim().split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('') || '?').toUpperCase();
+
+const _inqTimeAgo = (value) => {
+  if (!value) return '';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return String(value); // already a label like "2h ago"
+  const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
+  const dd = Math.floor(h / 24); if (dd < 30) return `${dd}d ago`;
+  return d.toLocaleDateString();
+};
+
+const toInquiryRow = (raw = {}) => {
+  const user = raw.user || raw.inquirerName || raw.userName || raw.name || raw.guestName || 'Guest';
+  return {
+    id:             raw.id || raw._id || '',
+    inquirerUserId: raw.inquirerUserId || raw.userId || raw.tenantId || null,
+    user,
+    init:           raw.init || _inqInitials(user),
+    timeAgo:        raw.timeAgo || _inqTimeAgo(raw.createdAt || raw.created_at || raw.date),
+    phone:          raw.phone || raw.inquirerPhone || raw.userPhone || '',
+    propTitle:      raw.propTitle || raw.propertyTitle || raw.property || '',
+    propertyId:     raw.propertyId || raw.property || '',
+    msg:            raw.msg || raw.message || raw.text || '',
+    status:         raw.status || 'new',
+    chatId:         raw.chatId || raw.conversationId || raw.threadId || '',
+  };
+};
+
 // 🟢 ৩ দিনের মধ্যে অ্যাড হয়েছে কিনা তা চেক করার ফাংশন
 const isRecent = (dateString) => {
   if(!dateString) return false;
@@ -587,7 +623,7 @@ const HostDashboard = () => {
   // backend's PATCH /api/properties/:id can accept the same shape).
   const EMPTY_EDIT_FORM = {
     title: '', price: '', location: '',
-    beds: 1, baths: 1, sqft: 0, furnishing: 'Unfurnished',
+    beds: 1, baths: 1, sqft: 0, floor: 0, furnishing: 'Unfurnished',
     description: '', status: 'active',
     img: '', images: [],
   };
@@ -945,6 +981,7 @@ const HostDashboard = () => {
         beds: Number(data.beds) || 1,
         baths: Number(data.baths) || 1,
         sqft: Number(data.sqft) || 0,
+        floor: Number(data.floor) || 0,
         furnishing: data.furnishing || 'Unfurnished',
         description: data.description || '',
         status: data.status || 'active',
@@ -1178,10 +1215,9 @@ const HostDashboard = () => {
       setActiveModal('premium_gate');
       return;
     }
-    if (inquiry.status !== 'accepted') {
-      showToast(language === 'বাংলা' ? 'বুকিং তৈরি করার আগে ইনকোয়ারি স্ট্যাটাস "গৃহীত (Accepted)" করুন' : 'Please mark the inquiry as "Accepted" before converting to a booking.');
-      return;
-    }
+    // Hassle-free: no "mark Accepted first" step — Accept goes straight to the
+    // pre-filled lease modal; confirming it creates the booking and the server
+    // marks the inquiry 'converted'.
     // Pre-fill from inquiry; host adjusts dates + rent before confirming.
     const matchingProp = properties.find(p => p.id === inquiry.propertyId) || null;
     const start = todayIso();
@@ -1204,6 +1240,16 @@ const HostDashboard = () => {
       notes: inquiry.msg ? `From inquiry: ${inquiry.msg.slice(0, 140)}${inquiry.msg.length > 140 ? '…' : ''}` : '',
     });
     setActiveModal('create_lease');
+  };
+
+  // Reject an inquiry — marks it 'rejected' server-side and removes it from the
+  // inbox. The tenant gets an 'inquiry_status' notification automatically.
+  const rejectInquiry = (inquiry) => {
+    setInquiries(prev => prev.filter(i => i.id !== inquiry.id));
+    updateInquiryStatus(inquiry.id, 'rejected').catch(err => {
+      console.warn('[host] inquiry reject sync failed:', err.message || err);
+    });
+    showToast(language === 'বাংলা' ? 'ইনকোয়ারি রিজেক্ট করা হয়েছে।' : 'Inquiry rejected.');
   };
 
   // Open create_lease standalone (no inquiry pre-fill).
@@ -2862,15 +2908,24 @@ const HostDashboard = () => {
                             
                             <div className="space-y-3">
 
-                              {/* Primary CTA — convert inquiry into a booking + start the rent ledger.
-                                  Premium-only; non-premium hosts see a Crown lock and the upgrade modal opens. */}
-                              <button
-                                onClick={() => openConvertInquiry(inquiry)}
-                                className={`w-full py-3.5 md:py-4 rounded-2xl font-black text-[12px] md:text-[13px] shadow-[0_8px_20px_rgba(34,197,94,0.25)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 ${isPremium ? 'bg-gradient-to-br from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white' : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white'}`}
-                              >
-                                {isPremium ? <Sparkles size={16} /> : <Crown size={16} />}
-                                {language === 'বাংলা' ? 'বুকিং-এ কনভার্ট করুন' : 'Convert to Booking'}
-                              </button>
+                              {/* Accept → hassle-free booking: opens the pre-filled lease modal directly
+                                  (no separate "mark accepted" step), confirming it creates the booking.
+                                  Reject → marks the inquiry rejected and removes it. Accept is premium-gated. */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <button
+                                  onClick={() => openConvertInquiry(inquiry)}
+                                  className={`w-full py-3.5 md:py-4 rounded-2xl font-black text-[12px] md:text-[13px] shadow-[0_8px_20px_rgba(34,197,94,0.25)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 ${isPremium ? 'bg-gradient-to-br from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white' : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white'}`}
+                                >
+                                  {isPremium ? <Sparkles size={16} /> : <Crown size={16} />}
+                                  {language === 'বাংলা' ? 'একসেপ্ট' : 'Accept'}
+                                </button>
+                                <button
+                                  onClick={() => rejectInquiry(inquiry)}
+                                  className="w-full py-3.5 md:py-4 rounded-2xl font-black text-[12px] md:text-[13px] bg-white text-red-600 border border-red-200 hover:bg-red-50 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                                >
+                                  <XCircle size={16} /> {language === 'বাংলা' ? 'রিজেক্ট' : 'Reject'}
+                                </button>
+                              </div>
 
                               <button onClick={() => openModal('update_inquiry', inquiry)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-2xl font-black text-[11px] md:text-[12px] shadow-[0_8px_20px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
                                 <Calendar size={14} /> {language === 'বাংলা' ? 'স্ট্যাটাস ও ভিজিট' : 'Update Status & Visit'}
@@ -4895,17 +4950,22 @@ const HostDashboard = () => {
                     return;
                   }
                   const priceNumber = Number(String(editForm.price).replace(/[^\d.]/g, '')) || 0;
+                  const cover = editForm.img || (editForm.images || [])[0] || '';
+                  // Backend stores the cover as `coverPhoto` and validates the
+                  // PATCH with a STRICT schema — sending `img`/`images` (not
+                  // schema fields) bounces the whole update, so edits only ever
+                  // survived in local state. Send `coverPhoto` instead.
                   const patch = {
                     title: editForm.title.trim(),
                     location: editForm.location.trim(),
                     beds: Number(editForm.beds) || 0,
                     baths: Number(editForm.baths) || 0,
                     sqft: Number(editForm.sqft) || 0,
+                    floor: Number(editForm.floor) || 0,
                     furnishing: editForm.furnishing,
                     description: editForm.description,
                     status: editForm.status,
-                    img: editForm.img,
-                    images: editForm.images,
+                    coverPhoto: cover,
                     price: priceNumber,
                   };
                   // Persist host-owned listings; demo seed entries fall through
@@ -4916,6 +4976,10 @@ const HostDashboard = () => {
                   setProperties(prev => prev.map(p => p.id === modalData.id ? {
                     ...p,
                     ...patch,
+                    // Mirror the cover to the display aliases the card reads.
+                    img: cover,
+                    coverPhoto: cover,
+                    images: editForm.images,
                     // Keep the display-formatted price string on the card.
                     price: priceNumber.toLocaleString('en-IN'),
                   } : p));
@@ -4991,7 +5055,7 @@ const HostDashboard = () => {
                       <input type="text" value={editForm.location} onChange={e => setEditForm(f => ({...f, location: e.target.value}))} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বেডরুম' : 'Beds'}</label>
                         <input type="number" min="0" value={editForm.beds} onChange={e => setEditForm(f => ({...f, beds: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
@@ -5003,6 +5067,10 @@ const HostDashboard = () => {
                       <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বর্গফুট' : 'Sqft'}</label>
                         <input type="number" min="0" value={editForm.sqft} onChange={e => setEditForm(f => ({...f, sqft: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'কত তলায়' : 'Floor'}</label>
+                        <input type="number" min="0" value={editForm.floor} onChange={e => setEditForm(f => ({...f, floor: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
                       </div>
                     </div>
 
