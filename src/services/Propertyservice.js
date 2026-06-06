@@ -14,7 +14,7 @@
  */
 
 import {
-  readJson, writeJson, broadcast, subscribe as subscribeKey, fakeLatency, now, newId,
+  broadcast, subscribe as subscribeKey,
 } from './_storage.js';
 import { getCurrentUser } from './authService.js';
 
@@ -190,7 +190,6 @@ export function applyFilters(properties, filters) {
 }
 
 // ─── INTERNAL HELPERS ─────────────────────────────────────────────────────────
-const readAllUserProperties = () => readJson(KEY_USER_PROPERTIES, []);
 
 // Build the canonical `[{ room, url }]` representation that PropertyDetails
 // groups by and PropertyListing builds its collage from. Source of truth is
@@ -202,62 +201,6 @@ const buildRoomPhotoRecords = (form) =>
         .filter(p => p.url)
     : [];
 
-const formToProperty = (form, owner, videoUrlStr = '') => {
-  const priceNumber  = Number(String(form.price ?? '').replace(/[^\d.]/g, '')) || 0;
-  const today        = now().slice(0, 10);
-  const coverImg     = form.coverPhoto?.preview || '';
-  const roomRecords  = buildRoomPhotoRecords(form);
-  const roomImgs     = roomRecords.map(r => r.url);
-
-  return {
-    id:            newId(),
-    landlordId:    owner.id,
-    ownerUserId:   owner.id,
-    ownerName:     owner.name,
-    date:          today,
-    addedDate:     today,
-    createdAt:     now(),
-    division:      form.division      || '',
-    district:      form.district      || '',
-    area:          form.area          || '',
-    thana:         form.thana         || '',
-    type:          form.type          || 'apartment',
-    rentalCategory:form.category      || 'family',
-    intent:        form.intent        || 'rent',
-    title:         form.title         || 'Untitled property',
-    location:      form.location      || '',
-    gps: { lat: form.gpsLat || null, lng: form.gpsLng || null, address: form.gpsAddress || '' },
-    gpsLat:        form.gpsLat        || null,
-    gpsLng:        form.gpsLng        || null,
-    lat:           form.gpsLat        || null,
-    lng:           form.gpsLng        || null,
-    beds:          Number(form.beds)  || 1,
-    baths:         Number(form.baths) || 1,
-    sqft:          Number(form.sqft)  || 0,
-    floor:         Number(form.floor ?? form.floorNumber) || 0,
-    furnishing:    form.furnishing    || 'Unfurnished',
-    description:   form.description   || '',
-    amenities:     Array.isArray(form.amenities) ? [...form.amenities] : [],
-    price:         priceNumber,
-    originalPrice: priceNumber,
-    rating:        0,
-    reviews:       0,
-    verified:      false,
-    popularity:    0,
-    inquiries:     0,
-    status:        form.status        || 'active',
-    img:           coverImg,
-    images:        [coverImg, ...roomImgs].filter(Boolean),
-    // Cover + room-tagged photos preserved so:
-    //   • PropertyDetails groups the gallery by room category
-    //   • PropertyListing's card collage shows one photo per category
-    coverPhoto:    coverImg,
-    roomPhotos:    roomRecords,
-    videoId:       form.videoId       || '',
-    mainVideo:     videoUrlStr || form.mainVideo?.preview || '',
-    videoUrl:      videoUrlStr || form.mainVideo?.preview || '',
-  };
-};
 
 // ─── PROPERTY SERVICE ─────────────────────────────────────────────────────────
 export const propertyService = {
@@ -310,10 +253,12 @@ export const propertyService = {
         // (that would undo alias / multi-word matches); apply only the rest.
         return _sortProperties(applyFilters(apiProps, { ...filters, searchArea: "" }), sortBy);
       }
-    } catch (_) { /* network / abort → local fallback below */ }
+    } catch (_) { /* network / abort → empty below (no localStorage) */ }
 
-    // ── Fallback: শুধুই user-uploaded properties (full client-side filter) ──
-    return _sortProperties(applyFilters(readAllUserProperties(), filters), sortBy);
+    // No localStorage fallback. Listings come ONLY from the backend (MongoDB).
+    // If the API is unreachable we return an empty list rather than showing
+    // stale, device-local "demo" data.
+    return [];
   },
 
   /**
@@ -329,14 +274,13 @@ export const propertyService = {
       return _normaliseApiProperty(data.property);
     }
 
-    const userHit = readAllUserProperties().find(p => String(p.id) === String(id));
-    return userHit || null;
+    // No localStorage fallback — a property comes only from the backend.
+    return null;
   },
 
   /**
    * Landlord info আনে।
    *   ✅ GET /api/landlords/:id  (roadmap-v2 Feature 2 — public landlord card)
-   *   📦 localStorage fallback so dev without a backend still renders.
    *
    * No demo landlord ever leaks in — যিনি আসলেই কোনো প্রপার্টি upload করেছেন
    * শুধু তার তথ্য return করা হয়।
@@ -359,26 +303,13 @@ export const propertyService = {
       // experience matches what the rest of the service does.
     }
 
-    // ── 2. localStorage fallback (no backend reachable) ───────────────────
-    const owned = readAllUserProperties().find(
-      p => String(p.ownerUserId) === String(landlordId)
-        || String(p.landlordId)   === String(landlordId),
-    );
-    if (owned) {
-      return {
-        id:           landlordId,
-        name:         owned.ownerName || 'TO-LET PRO Host',
-        responseTime: '— hrs',
-        avatar:       `https://ui-avatars.com/api/?name=${encodeURIComponent(owned.ownerName || 'Host')}&background=fce4ec&color=ba0036&size=256`,
-      };
-    }
+    // No localStorage fallback — landlord info comes only from the backend.
     return null;
   },
 
   /**
    * নতুন প্রপার্টি তৈরি করে।
    * ✅ POST /api/properties  (backend চালু থাকলে)
-   * 📦 localStorage fallback (backend না থাকলে)
    */
   async createProperty(form) {
     const owner = getCurrentUser();
@@ -440,19 +371,15 @@ export const propertyService = {
       }
     }
 
-    await fakeLatency(400);
-    const record = formToProperty(form, owner, videoUrlStr);
-    const list   = readAllUserProperties();
-    list.push(record);
-    writeJson(KEY_USER_PROPERTIES, list);
-    broadcast(KEY_USER_PROPERTIES);
-    return record;
+    // No localStorage fallback. If we reach here the server create failed (or
+    // there's no auth token) — surface a real error instead of silently saving
+    // the listing to this device only.
+    throw new Error('Could not save the property to the server. Please check your connection and try again.');
   },
 
   /**
    * Host এর নিজের সব প্রপার্টি আনে।
    * ✅ GET /api/host/properties  (backend চালু থাকলে)
-   * 📦 localStorage fallback
    */
   async listMyProperties() {
     if (getToken()) {
@@ -466,27 +393,19 @@ export const propertyService = {
       }
     }
 
-    await fakeLatency(120);
-    const me = getCurrentUser();
-    if (!me) return [];
-    return readAllUserProperties()
-      .filter(p => p.ownerUserId === me.id)
-      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    // No localStorage fallback — a host's listings come only from the backend.
+    return [];
   },
 
-  /** Sync version (useMemo এর ভেতরে use করা যায়) */
+  /** Sync version — localStorage has been removed, so this now returns [].
+   *  Components should use the async listMyProperties() (backend) instead. */
   listMyPropertiesSync() {
-    const me = getCurrentUser();
-    if (!me) return [];
-    return readAllUserProperties()
-      .filter(p => p.ownerUserId === me.id)
-      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    return [];
   },
 
   /**
    * প্রপার্টি update করে।
    * ✅ PATCH /api/properties/:id  (backend চালু থাকলে)
-   * 📦 localStorage fallback
    */
   async updateProperty(id, patch = {}) {
     if (getToken()) {
@@ -502,20 +421,8 @@ export const propertyService = {
       }
     }
 
-    await fakeLatency(200);
-    const me = getCurrentUser();
-    if (!me) throw new Error('Sign in as a host before editing a property.');
-    const list = readAllUserProperties();
-    const idx  = list.findIndex(p => String(p.id) === String(id));
-    if (idx === -1) return null;
-    if (list[idx].ownerUserId && list[idx].ownerUserId !== me.id) {
-      throw new Error('You can only edit your own listings.');
-    }
-    const merged = { ...list[idx], ...patch, id: list[idx].id, updatedAt: now() };
-    list[idx] = merged;
-    writeJson(KEY_USER_PROPERTIES, list);
-    broadcast(KEY_USER_PROPERTIES);
-    return merged;
+    // No localStorage fallback — surface a real error if the server update failed.
+    throw new Error('Could not update the property on the server. Please try again.');
   },
 };
 
