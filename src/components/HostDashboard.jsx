@@ -775,35 +775,6 @@ const HostDashboard = () => {
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
-  // ── Hydrate REAL host performance stats (/api/host-stats) ───────────────
-  // Response rate, avg response time, conversion rate — all server-computed
-  // from live inquiries / bookings / chat threads. Replaces the old hardcoded
-  // 98% / 15min / 24% card.
-  const [hostStats, setHostStats] = useState({ responseRate: 0, avgResponseTime: 0, conversionRate: 0 });
-  useEffect(() => {
-    let cancelled = false;
-    const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-    const hydrate = async () => {
-      try {
-        const token = localStorage.getItem('auth:token');
-        if (!token) return;
-        const res = await fetch(`${API}/host-stats`, { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok || cancelled) return;
-        const data = await res.json();
-        setHostStats({
-          responseRate:    Number(data.responseRate)    || 0,
-          avgResponseTime: Number(data.avgResponseTime) || 0,
-          conversionRate:  Number(data.conversionRate)  || 0,
-        });
-      } catch (err) {
-        console.warn('[host] failed to load stats:', err.message || err);
-      }
-    };
-    hydrate();
-    const interval = setInterval(hydrate, 60_000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
     let timer = null;
