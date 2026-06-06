@@ -500,6 +500,38 @@ const UnavailableOverlay = ({ intent }) => (
   </motion.div>
 );
 
+// Hook to safely convert massive base64 video strings into streamable Blob URLs
+// Browsers natively struggle (or completely fail) to seek/playback large
+// data:video/... base64 strings directly in a <video src="..."> tag.
+function useDataUrlToBlobUrl(dataUrl) {
+  const [blobUrl, setBlobUrl] = useState(dataUrl);
+
+  useEffect(() => {
+    if (typeof dataUrl === 'string' && dataUrl.startsWith('data:video/')) {
+      let active = true;
+      let objectUrl = null;
+      fetch(dataUrl)
+        .then(res => res.blob())
+        .then(blob => {
+          if (!active) return;
+          objectUrl = URL.createObjectURL(blob);
+          setBlobUrl(objectUrl);
+        })
+        .catch(() => {
+          if (active) setBlobUrl(dataUrl);
+        });
+      return () => {
+        active = false;
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+      };
+    } else {
+      setBlobUrl(dataUrl);
+    }
+  }, [dataUrl]);
+
+  return blobUrl;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // VIDEO PLAYER COMPONENT
 // Supports: mainVideo (direct file URL/upload path) OR videoId (YouTube)
@@ -508,6 +540,8 @@ const UnavailableOverlay = ({ intent }) => (
 const VideoPlayer = ({ mainVideo, videoId, coverPhoto, title }) => {
   const [showVideo, setShowVideo] = useState(false);
   const hasVideo = mainVideo || videoId;
+  const safeMainVideoUrl = useDataUrlToBlobUrl(mainVideo?.preview || mainVideo);
+
   if (!hasVideo) return null;
 
   const isYouTube = !mainVideo && videoId;
@@ -570,7 +604,7 @@ const VideoPlayer = ({ mainVideo, videoId, coverPhoto, title }) => {
           {isDirectVideo ? (
             // muted + playsInline are required so browsers actually start playback
             // immediately after the click (autoplay policy blocks unmuted autoplay).
-            <video src={mainVideo?.preview || mainVideo} controls autoPlay muted playsInline
+            <video src={safeMainVideoUrl} controls autoPlay muted playsInline
               className="w-full h-full object-cover" style={{ background: '#000' }} />
           ) : (
             // mute=1 is required so YouTube actually starts playback on autoplay.
@@ -904,6 +938,8 @@ const WidePhotoCarousel = ({ images, isUnavailable, property, onShowAll, onPhoto
 //   • Close button (X) is anchored TOP-RIGHT.
 // ─────────────────────────────────────────────────────────────────────────────
 const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property }) => {
+  const modalVideoUrl = useDataUrlToBlobUrl(property?.mainVideo?.preview || property?.mainVideo);
+
   // Group by room — preserving the order rooms first appear in the gallery.
   const grouped = {};
   const orderedRooms = [];
@@ -1163,7 +1199,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property }) => 
                     </div>
                     {property?.mainVideo ? (
                       <div className="relative rounded-[1.25rem] overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                        <video src={property.mainVideo?.preview || property.mainVideo} controls className="w-full h-full object-cover" style={{ background: '#000' }} />
+                        <video src={modalVideoUrl} controls className="w-full h-full object-cover" style={{ background: '#000' }} />
                       </div>
                     ) : property?.videoId ? (
                       <div className="relative rounded-[1.25rem] overflow-hidden" style={{ aspectRatio: '16/9', border: '1px solid rgba(15,23,42,0.06)' }}>
