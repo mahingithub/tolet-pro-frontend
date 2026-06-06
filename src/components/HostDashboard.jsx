@@ -398,6 +398,14 @@ const HostDashboard = () => {
   
   // 🟢 CORE STATES
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Honor ?tab=… deep-links (e.g. notification bell → /host-dashboard?tab=inquiries).
+  useEffect(() => {
+    const tab = new URLSearchParams(location.search).get('tab');
+    if (tab && ['dashboard', 'inquiries', 'rent', 'bookings', 'properties', 'profile'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
