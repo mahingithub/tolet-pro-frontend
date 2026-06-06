@@ -91,7 +91,7 @@ const LinkAction = ({ to, children }) => (
   </Link>
 );
 
-const TenantSettings = ({ onGoToProfile } = {}) => {
+const SharedSettings = ({ onGoToProfile } = {}) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { language, setLanguage } = useLanguage();
@@ -296,4 +296,4 @@ const TenantSettings = ({ onGoToProfile } = {}) => {
   );
 };
 
-export default TenantSettings;
+export default SharedSettings;

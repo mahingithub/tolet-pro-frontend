@@ -121,7 +121,7 @@ const FaqGroup = ({ data, bn }) => {
   );
 };
 
-const TenantSupport = () => {
+const SharedSupport = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { language } = useLanguage();
@@ -348,4 +348,4 @@ const TenantSupport = () => {
   );
 };
 
-export default TenantSupport;
+export default SharedSupport;

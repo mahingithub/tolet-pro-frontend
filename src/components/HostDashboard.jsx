@@ -19,12 +19,16 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
 import { propertyService, subscribeUserProperties } from '../services/Propertyservice';
 import { subscriptionService } from '../services/subscriptionService';
-import { listHostInquiries, updateInquiryStatus } from "../services/inquiryService.js";
+import { listHostInquiries, updateInquiryStatus, deleteInquiry } from "../services/inquiryService.js";
 import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi } from "../services/bookingService.js";
 import { listNotifications, getUnreadCount, markRead, markAllRead } from "../services/notificationService.js";
 import { uploadAvatar } from "../services/authService";
 import ProfileSection from './shared/ProfileSection';
 import VerificationModal from './VerificationModal';
+import SharedSettings from './shared/SharedSettings';
+import SharedSupport from './shared/SharedSupport';
+import Smartalertspage from './Smartalertspage';
+import Aiinsightspage from './Aiinsightspage';
 
 /**
  * Adapt a property record returned by propertyService (used by the public
@@ -583,6 +587,7 @@ const HostDashboard = () => {
   const [properties, setProperties] = useState(initialPortfolio);
   const [bookings, setBookings] = useState(initialBookings);
   const [inquiries, setInquiries] = useState(initialInquiries);
+  const [inquiryTab, setInquiryTab] = useState('pending'); // 'pending' | 'accepted' | 'rejected'
   const [searchQuery, setSearchQuery] = useState('');
   const [propertyFilter, setPropertyFilter] = useState('all');
   const [activeModal, setActiveModal] = useState(null); 
@@ -1245,14 +1250,29 @@ const HostDashboard = () => {
     setActiveModal('create_lease');
   };
 
-  // Reject an inquiry — marks it 'rejected' server-side and removes it from the
-  // inbox. The tenant gets an 'inquiry_status' notification automatically.
+  // Reject an inquiry
   const rejectInquiry = (inquiry) => {
-    setInquiries(prev => prev.filter(i => i.id !== inquiry.id));
+    setInquiries(prev => prev.map(i => i.id === inquiry.id ? { ...i, status: 'rejected' } : i));
     updateInquiryStatus(inquiry.id, 'rejected').catch(err => {
       console.warn('[host] inquiry reject sync failed:', err.message || err);
     });
     showToast(language === 'বাংলা' ? 'ইনকোয়ারি রিজেক্ট করা হয়েছে।' : 'Inquiry rejected.');
+  };
+
+  const acceptInquiry = (inquiry) => {
+    setInquiries(prev => prev.map(i => i.id === inquiry.id ? { ...i, status: 'accepted' } : i));
+    updateInquiryStatus(inquiry.id, 'accepted').catch(err => {
+      console.warn('[host] inquiry accept sync failed:', err.message || err);
+    });
+    showToast(language === 'বাংলা' ? 'ইনকোয়ারি একসেপ্ট করা হয়েছে।' : 'Inquiry accepted.');
+  };
+
+  const cutInquiry = (inquiryId) => {
+    setInquiries(prev => prev.filter(i => i.id !== inquiryId));
+    deleteInquiry(inquiryId).catch(err => {
+      console.warn('[host] inquiry delete failed:', err.message || err);
+    });
+    showToast(language === 'বাংলা' ? 'ইনকোয়ারি ডিলিট করা হয়েছে।' : 'Inquiry permanently deleted.');
   };
 
   // Open create_lease standalone (no inquiry pre-fill).
@@ -1362,7 +1382,14 @@ const HostDashboard = () => {
       ? (language === 'বাংলা' ? 'সাম্প্রতিক লিস্টিং' : 'Recent Listings') 
       : (language === 'বাংলা' ? 'আপনার প্রপার্টিসমূহ' : 'Your Properties');
 
-  const displayedInquiries = inquiries.filter(i => i.user.toLowerCase().includes(searchQuery.toLowerCase()) || i.propTitle.toLowerCase().includes(searchQuery.toLowerCase()));
+  const displayedInquiries = inquiries.filter(i => {
+    const matchesSearch = i.user.toLowerCase().includes(searchQuery.toLowerCase()) || i.propTitle.toLowerCase().includes(searchQuery.toLowerCase());
+    const s = i.status || 'new';
+    if (inquiryTab === 'pending') return (s === 'new' || s === 'pending') && matchesSearch;
+    if (inquiryTab === 'accepted') return s === 'accepted' && matchesSearch;
+    if (inquiryTab === 'rejected') return s === 'rejected' && matchesSearch;
+    return false;
+  });
 
   // The two Smart Features used to live as big CTA cards on the Dashboard tab
   // but they didn't visually fit, so we moved them into the sidebar as proper
@@ -1377,8 +1404,10 @@ const HostDashboard = () => {
     { id: 'messages', icon: MessageCircle, label: t?.messages || (language === 'বাংলা' ? 'বার্তা' : "Messages"), isLink: true, path: '/messages' },
     { id: 'bookings', icon: Calendar, label: t?.bookings || (language === 'বাংলা' ? 'বুকিং' : "Bookings") },
     { id: 'rent',     icon: Wallet,   label: language === 'বাংলা' ? 'ভাড়া কালেকশন' : "Rent Collection" },
-    { id: 'smartAlerts', icon: BellRing, label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্টস' : 'Smart Alerts', isLink: true, path: '/smart-alerts' },
-    { id: 'aiInsights',  icon: Sparkles, label: language === 'বাংলা' ? 'এআই ইনসাইটস'   : 'AI Insights',  isLink: true, path: '/ai-insights' },
+    { id: 'smartAlerts', icon: BellRing, label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্টস' : 'Smart Alerts' },
+    { id: 'aiInsights',  icon: Sparkles, label: language === 'বাংলা' ? 'এআই ইনসাইটস'   : 'AI Insights' },
+    { id: 'settings', icon: Settings, label: language === 'বাংলা' ? 'সেটিংস' : 'Settings' },
+    { id: 'support', icon: HelpCircle, label: language === 'বাংলা' ? 'হেল্প ও সাপোর্ট' : 'Support' },
   ];
 
   return (
@@ -2837,11 +2866,18 @@ const HostDashboard = () => {
               <div className="xl:col-span-8 w-full flex flex-col xl:h-[calc(100vh-160px)]">
                 
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 shrink-0">
-                   <h3 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
-                     {t?.newInquiries || (language === 'বাংলা' ? 'নতুন যোগাযোগ' : 'New Inquiries')}
-                   </h3>
+                   <div className="flex flex-col gap-2">
+                     <h3 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
+                       {t?.newInquiries || (language === 'বাংলা' ? 'যোগাযোগ সমূহ' : 'Inquiries')}
+                     </h3>
+                     <div className="flex gap-2">
+                       <button onClick={() => setInquiryTab('pending')} className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${inquiryTab === 'pending' ? 'bg-[#ba0036] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Pending</button>
+                       <button onClick={() => setInquiryTab('accepted')} className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${inquiryTab === 'accepted' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Accepted</button>
+                       <button onClick={() => setInquiryTab('rejected')} className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${inquiryTab === 'rejected' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Rejected</button>
+                     </div>
+                   </div>
                    <span className="bg-[#ba0036]/10 text-[#ba0036] px-5 py-2.5 rounded-full font-black text-[11px] tracking-wide border border-[#ba0036]/10">
-                     {displayedInquiries.length} {t?.pending || (language === 'বাংলা' ? 'পেন্ডিং' : 'Pending')}
+                     {displayedInquiries.length} {inquiryTab === 'pending' ? 'Pending' : inquiryTab === 'accepted' ? 'Accepted' : 'Rejected'}
                    </span>
                 </div>
 
@@ -2916,19 +2952,34 @@ const HostDashboard = () => {
                                   (no separate "mark accepted" step), confirming it creates the booking.
                                   Reject → marks the inquiry rejected and removes it. Accept is premium-gated. */}
                               <div className="grid grid-cols-2 gap-3">
-                                <button
-                                  onClick={() => openConvertInquiry(inquiry)}
-                                  className={`w-full py-3.5 md:py-4 rounded-2xl font-black text-[12px] md:text-[13px] shadow-[0_8px_20px_rgba(34,197,94,0.25)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 ${isPremium ? 'bg-gradient-to-br from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white' : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white'}`}
-                                >
-                                  {isPremium ? <Sparkles size={16} /> : <Crown size={16} />}
-                                  {language === 'বাংলা' ? 'একসেপ্ট' : 'Accept'}
-                                </button>
-                                <button
-                                  onClick={() => rejectInquiry(inquiry)}
-                                  className="w-full py-3.5 md:py-4 rounded-2xl font-black text-[12px] md:text-[13px] bg-white text-red-600 border border-red-200 hover:bg-red-50 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
-                                >
-                                  <XCircle size={16} /> {language === 'বাংলা' ? 'রিজেক্ট' : 'Reject'}
-                                </button>
+                                {inquiryTab === 'pending' ? (
+                                  <>
+                                    <button
+                                      onClick={() => acceptInquiry(inquiry)}
+                                      className={`w-full py-3.5 md:py-4 rounded-2xl font-black text-[12px] md:text-[13px] shadow-[0_8px_20px_rgba(34,197,94,0.25)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 ${isPremium ? 'bg-gradient-to-br from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white' : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white'}`}
+                                    >
+                                      <CheckCircle2 size={16} />
+                                      {language === 'বাংলা' ? 'একসেপ্ট' : 'Accept'}
+                                    </button>
+                                    <button
+                                      onClick={() => rejectInquiry(inquiry)}
+                                      className="w-full py-3.5 md:py-4 rounded-2xl font-black text-[12px] md:text-[13px] bg-white text-red-600 border border-red-200 hover:bg-red-50 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                                    >
+                                      <XCircle size={16} /> {language === 'বাংলা' ? 'রিজেক্ট' : 'Reject'}
+                                    </button>
+                                  </>
+                                ) : inquiryTab === 'accepted' ? (
+                                  <button
+                                    onClick={() => openConvertInquiry(inquiry)}
+                                    className="col-span-2 w-full py-3.5 md:py-4 rounded-2xl font-black text-[12px] md:text-[13px] shadow-[0_8px_20px_rgba(34,197,94,0.25)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 bg-gradient-to-br from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white"
+                                  >
+                                    <Sparkles size={16} /> {language === 'বাংলা' ? 'বুকিং এ রূপান্তর করুন' : 'Convert to Booking'}
+                                  </button>
+                                ) : (
+                                  <div className="col-span-2 text-center text-red-600 font-bold text-xs py-3 border border-red-100 rounded-2xl bg-red-50">
+                                    Rejected Inquiry
+                                  </div>
+                                )}
                               </div>
 
                               <button onClick={() => openModal('update_inquiry', inquiry)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-2xl font-black text-[11px] md:text-[12px] shadow-[0_8px_20px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
@@ -2944,8 +2995,8 @@ const HostDashboard = () => {
                                 </button>
                               </div>
 
-                              <button onClick={() => handleRemoveInquiry(inquiry.id)} className="w-full bg-white text-gray-500 py-2.5 rounded-2xl font-bold text-[11px] hover:bg-red-50 hover:text-red-600 transition-all flex items-center justify-center gap-1.5">
-                                <Archive size={14} /> {t?.archive || (language === 'বাংলা' ? 'আর্কাইভ করুন' : 'Archive Inquiry')}
+                              <button onClick={() => cutInquiry(inquiry.id)} className="w-full bg-white text-red-500 py-2.5 rounded-2xl font-bold text-[11px] hover:bg-red-50 hover:text-red-600 transition-all flex items-center justify-center gap-1.5 border border-red-100">
+                                <Trash2 size={14} /> {language === 'বাংলা' ? 'পুরোপুরি মুছে ফেলুন' : 'Cut / Delete Completely'}
                               </button>
                             </div>
 
@@ -4114,7 +4165,34 @@ const HostDashboard = () => {
                   </div>
                   );
                 })}
-              </div>
+                {/* ─────────────────────────────────────────────────────────────────
+            🔴 NEW TABS (Smart Alerts, AI Insights, Settings, Support)
+            ───────────────────────────────────────────────────────────────── */}
+        {activeTab === 'smartAlerts' && (
+          <div className="w-full h-[calc(100vh-120px)] animate-in fade-in zoom-in-95 duration-500 overflow-y-auto">
+             <Smartalertspage />
+          </div>
+        )}
+
+        {activeTab === 'aiInsights' && (
+          <div className="w-full h-[calc(100vh-120px)] animate-in fade-in zoom-in-95 duration-500 overflow-y-auto">
+             <Aiinsightspage />
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="w-full animate-in fade-in zoom-in-95 duration-500">
+             <SharedSettings />
+          </div>
+        )}
+
+        {activeTab === 'support' && (
+          <div className="w-full animate-in fade-in zoom-in-95 duration-500">
+             <SharedSupport />
+          </div>
+        )}
+
+      </div>
             )}
           </div>
         )}
