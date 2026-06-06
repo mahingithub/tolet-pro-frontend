@@ -1215,10 +1215,9 @@ const HostDashboard = () => {
       setActiveModal('premium_gate');
       return;
     }
-    if (inquiry.status !== 'accepted') {
-      showToast(language === 'বাংলা' ? 'বুকিং তৈরি করার আগে ইনকোয়ারি স্ট্যাটাস "গৃহীত (Accepted)" করুন' : 'Please mark the inquiry as "Accepted" before converting to a booking.');
-      return;
-    }
+    // Hassle-free: no "mark Accepted first" step — Accept goes straight to the
+    // pre-filled lease modal; confirming it creates the booking and the server
+    // marks the inquiry 'converted'.
     // Pre-fill from inquiry; host adjusts dates + rent before confirming.
     const matchingProp = properties.find(p => p.id === inquiry.propertyId) || null;
     const start = todayIso();
@@ -1241,6 +1240,16 @@ const HostDashboard = () => {
       notes: inquiry.msg ? `From inquiry: ${inquiry.msg.slice(0, 140)}${inquiry.msg.length > 140 ? '…' : ''}` : '',
     });
     setActiveModal('create_lease');
+  };
+
+  // Reject an inquiry — marks it 'rejected' server-side and removes it from the
+  // inbox. The tenant gets an 'inquiry_status' notification automatically.
+  const rejectInquiry = (inquiry) => {
+    setInquiries(prev => prev.filter(i => i.id !== inquiry.id));
+    updateInquiryStatus(inquiry.id, 'rejected').catch(err => {
+      console.warn('[host] inquiry reject sync failed:', err.message || err);
+    });
+    showToast(language === 'বাংলা' ? 'ইনকোয়ারি রিজেক্ট করা হয়েছে।' : 'Inquiry rejected.');
   };
 
   // Open create_lease standalone (no inquiry pre-fill).
@@ -2899,15 +2908,24 @@ const HostDashboard = () => {
                             
                             <div className="space-y-3">
 
-                              {/* Primary CTA — convert inquiry into a booking + start the rent ledger.
-                                  Premium-only; non-premium hosts see a Crown lock and the upgrade modal opens. */}
-                              <button
-                                onClick={() => openConvertInquiry(inquiry)}
-                                className={`w-full py-3.5 md:py-4 rounded-2xl font-black text-[12px] md:text-[13px] shadow-[0_8px_20px_rgba(34,197,94,0.25)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 ${isPremium ? 'bg-gradient-to-br from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white' : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white'}`}
-                              >
-                                {isPremium ? <Sparkles size={16} /> : <Crown size={16} />}
-                                {language === 'বাংলা' ? 'বুকিং-এ কনভার্ট করুন' : 'Convert to Booking'}
-                              </button>
+                              {/* Accept → hassle-free booking: opens the pre-filled lease modal directly
+                                  (no separate "mark accepted" step), confirming it creates the booking.
+                                  Reject → marks the inquiry rejected and removes it. Accept is premium-gated. */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <button
+                                  onClick={() => openConvertInquiry(inquiry)}
+                                  className={`w-full py-3.5 md:py-4 rounded-2xl font-black text-[12px] md:text-[13px] shadow-[0_8px_20px_rgba(34,197,94,0.25)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 ${isPremium ? 'bg-gradient-to-br from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white' : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white'}`}
+                                >
+                                  {isPremium ? <Sparkles size={16} /> : <Crown size={16} />}
+                                  {language === 'বাংলা' ? 'একসেপ্ট' : 'Accept'}
+                                </button>
+                                <button
+                                  onClick={() => rejectInquiry(inquiry)}
+                                  className="w-full py-3.5 md:py-4 rounded-2xl font-black text-[12px] md:text-[13px] bg-white text-red-600 border border-red-200 hover:bg-red-50 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                                >
+                                  <XCircle size={16} /> {language === 'বাংলা' ? 'রিজেক্ট' : 'Reject'}
+                                </button>
+                              </div>
 
                               <button onClick={() => openModal('update_inquiry', inquiry)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-2xl font-black text-[11px] md:text-[12px] shadow-[0_8px_20px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
                                 <Calendar size={14} /> {language === 'বাংলা' ? 'স্ট্যাটাস ও ভিজিট' : 'Update Status & Visit'}
