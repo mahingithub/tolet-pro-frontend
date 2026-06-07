@@ -100,7 +100,9 @@ export async function enableCallNotifications() {
     // on registration order with the main service-worker.js.
     let swReg;
     if ('serviceWorker' in navigator) {
-      swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+      scope: '/firebase-push/',
+      });
     }
     const token = await getToken(messaging, {
       vapidKey: VAPID_KEY,
