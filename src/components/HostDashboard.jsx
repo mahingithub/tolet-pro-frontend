@@ -2987,7 +2987,7 @@ const HostDashboard = () => {
                               </button>
 
                               <div className="grid grid-cols-2 gap-3">
-                                <button onClick={() => openChatPanel(inquiry.chatId, { source: 'host-inquiries', tenantName: inquiry.user, tenantPhone: inquiry.phone, propertyTitle: inquiry.propTitle, prefillMessage: '' })} className="w-full bg-[#ba0036] hover:bg-[#90002a] text-white py-3.5 rounded-2xl font-bold text-[11px] shadow-[0_4px_15px_rgba(186,0,54,0.2)] transition-all flex items-center justify-center gap-1.5 border-none active:scale-95">
+                                <button onClick={() => openChatPanel(inquiry.chatId, { source: 'host-inquiries', tenantName: inquiry.user, tenantPhone: inquiry.phone, propertyTitle: inquiry.propTitle, prefillMessage: '', peerUserId: inquiry.inquirerUserId })} className="w-full bg-[#ba0036] hover:bg-[#90002a] text-white py-3.5 rounded-2xl font-bold text-[11px] shadow-[0_4px_15px_rgba(186,0,54,0.2)] transition-all flex items-center justify-center gap-1.5 border-none active:scale-95">
                                   <MessageSquare size={14} /> {t?.openMessage || (language === 'বাংলা' ? 'মেসেজ' : 'Message')}
                                 </button>
                                 <button onClick={() => handleCallUser(inquiry.phone, inquiry.id)} className="w-full bg-white text-gray-700 py-3.5 rounded-2xl font-bold text-[11px] hover:bg-gray-50 hover:text-[#ba0036] shadow-[0_4px_15px_rgba(0,0,0,0.03)] transition-all flex items-center justify-center gap-1.5 border border-gray-100">
@@ -3213,7 +3213,7 @@ const HostDashboard = () => {
                             lives in one place; ChatSystem hydrates the right thread from
                             location.state. */}
                         <button
-                          onClick={() => openChatPanel(booking.chatId, { source: 'host-bookings', tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property })}
+                          onClick={() => openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-bookings', tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property, peerUserId: booking.tenantId })}
                           className="px-3 py-2 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-md flex items-center gap-1"
                         >
                           <MessageCircle size={12}/> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
@@ -3727,7 +3727,7 @@ const HostDashboard = () => {
                         )}
                       </div>
                       <button
-                        onClick={() => openChatPanel(booking.chatId, { source: 'host-rent', tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property })}
+                        onClick={() => openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-rent', tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property, peerUserId: booking.tenantId })}
                         className="px-3 py-2 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-md flex items-center gap-1.5"
                       >
                         <MessageCircle size={12}/> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
