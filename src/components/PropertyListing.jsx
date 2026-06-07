@@ -73,35 +73,29 @@ const validDivisions = ["dhaka", "chittagong", "sylhet", "rajshahi", "khulna", "
 
 // ─── ROOM COLLAGE HELPER ──────────────────────────────────────────────────────
 // Builds the listing-card collage: one photo per room category so a card with
-// 4 bedroom photos doesn't fill all four tiles with bedrooms. Order respects
-// the buyer's mental model (bedroom → bathroom → living → kitchen → other) and
-// the cover photo always claims the big tile.
-const ROOM_COLLAGE_ORDER = ["bedroom", "bathroom", "living", "kitchen", "other"];
+// 4 bedroom photos doesn't fill all four tiles with bedrooms. Order is fixed:
+// cover photo first, then bedroom, bathroom, and kitchen.
+const ROOM_COLLAGE_ORDER = ["bedroom", "bathroom", "kitchen"];
+const ROOM_MATCHERS = {
+	bedroom:  (room) => room.includes("bed"),
+	bathroom: (room) => room.includes("bath") || room.includes("toilet") || room.includes("wash"),
+	kitchen:  (room) => room.includes("kitchen") || room.includes("cook"),
+};
 const ROOM_LABEL_FALLBACK = {
 	bedroom:  "Bedroom",
 	bathroom: "Bathroom",
-	living:   "Living",
 	kitchen:  "Kitchen",
 	other:    "Other",
 };
 function buildRoomCollage(property) {
-	const seen = new Set();
 	const uniqueRoomShots = [];
-	if (Array.isArray(property.roomPhotos)) {
+	const hasRoomPhotos = Array.isArray(property.roomPhotos) && property.roomPhotos.some(p => p?.url || p?.preview);
+	if (hasRoomPhotos) {
 		for (const roomId of ROOM_COLLAGE_ORDER) {
-			const hit = property.roomPhotos.find(p => (p.room || "other") === roomId && (p.url || p.preview));
+			const matches = ROOM_MATCHERS[roomId];
+			const hit = property.roomPhotos.find(p => matches(String(p.room || "").toLowerCase()) && (p.url || p.preview));
 			if (hit) {
 				uniqueRoomShots.push({ url: hit.url || hit.preview, room: roomId });
-				seen.add(roomId);
-			}
-		}
-		// Pick up any remaining room categories that weren't in the curated order
-		// (defensive — shouldn't normally happen, but keeps the collage non-empty).
-		for (const p of property.roomPhotos) {
-			const room = p.room || "other";
-			if (!seen.has(room) && (p.url || p.preview)) {
-				uniqueRoomShots.push({ url: p.url || p.preview, room });
-				seen.add(room);
 			}
 		}
 	}
@@ -111,7 +105,7 @@ function buildRoomCollage(property) {
 
 	// If we have no real per-room photos at all, fall back to the flat `images`
 	// array so older API records still render something.
-	if (!thumbs.length && Array.isArray(property.images)) {
+	if (!thumbs.length && !hasRoomPhotos && Array.isArray(property.images)) {
 		const extras = property.images
 			.filter(u => u && u !== cover)
 			.slice(0, 3)
@@ -166,7 +160,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 				<div className="relative w-full h-full rounded-2xl overflow-hidden flex gap-1.5 bg-gray-100">
 					<div className="relative w-[75%] h-full overflow-hidden cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
 						{coverImg ? (
-							<img src={coverImg} alt={property.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out" />
+							<img src={coverImg} alt={property.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out" loading="lazy" decoding="async" />
 						) : (
 							<div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-100">
 								<Camera size={42} />
@@ -185,14 +179,14 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 						</button>
 					</div>
 					{/* ── ROOM COLLAGE STRIP ──────────────────────────────────────────
-					    Renders ONE thumbnail per room category (bedroom / bathroom /
-					    living / kitchen / other) instead of dumping multiple bedrooms
-					    into the strip. Falls back to the flat images list for older
-					    records that didn't tag photos by room. */}
+					    Renders ONE thumbnail per requested room category (bedroom /
+					    bathroom / kitchen) instead of downloading the whole gallery.
+					    Falls back to the flat images list only for older records that
+					    did not tag photos by room. */}
 					<div className="w-[25%] flex flex-col gap-1.5 h-full">
 						{collageThumbs.map((shot, idx) => (
 							<div key={`${shot.room || "x"}-${idx}`} className="relative flex-1 overflow-hidden cursor-pointer bg-gray-200" onClick={() => navigate(`/property/${property.id}`)}>
-								<img src={shot.url} className="w-full h-full object-cover hover:opacity-80 transition-opacity duration-300" alt={shot.room ? (ROOM_LABEL_FALLBACK[shot.room] || shot.room) : ""} />
+								<img src={shot.url} className="w-full h-full object-cover hover:opacity-80 transition-opacity duration-300" alt={shot.room ? (ROOM_LABEL_FALLBACK[shot.room] || shot.room) : ""} loading="lazy" decoding="async" />
 								{shot.room && (
 									<span className="absolute bottom-1 left-1 px-1.5 py-[2px] rounded-md bg-black/55 text-white text-[8px] font-black uppercase tracking-wider">
 										{ROOM_LABEL_FALLBACK[shot.room] || shot.room}
@@ -285,6 +279,47 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 		</div>
 	);
 };
+
+const PropertyCardSkeleton = () => (
+	<div className="bg-white rounded-3xl border border-gray-100 overflow-hidden flex flex-col md:flex-row shadow-sm animate-pulse">
+		<div className="w-full md:w-[280px] lg:w-[300px] h-[190px] md:h-auto p-2.5 shrink-0">
+			<div className="relative w-full h-full rounded-2xl overflow-hidden flex gap-1.5 bg-gray-100">
+				<div className="w-[75%] h-full bg-gray-200" />
+				<div className="w-[25%] flex flex-col gap-1.5 h-full">
+					<div className="flex-1 bg-gray-200" />
+					<div className="flex-1 bg-gray-200" />
+					<div className="flex-1 bg-gray-200" />
+				</div>
+			</div>
+		</div>
+		<div className="p-3.5 md:p-4 flex-1 flex flex-col justify-between">
+			<div>
+				<div className="flex justify-between items-start gap-4 mb-3">
+					<div className="h-6 w-28 rounded-lg bg-gray-200" />
+					<div className="hidden md:block h-6 w-32 rounded-lg bg-gray-100" />
+				</div>
+				<div className="h-5 w-3/4 rounded bg-gray-200 mb-2" />
+				<div className="h-4 w-1/2 rounded bg-gray-100 mb-3" />
+				<div className="flex flex-wrap items-center gap-2 bg-gray-50 p-2.5 rounded-xl">
+					<div className="h-4 w-16 rounded bg-gray-200" />
+					<div className="h-4 w-16 rounded bg-gray-200" />
+					<div className="h-4 w-20 rounded bg-gray-200" />
+					<div className="h-4 w-20 rounded bg-gray-200" />
+				</div>
+			</div>
+			<div className="flex flex-col sm:flex-row justify-between items-center gap-2.5 pt-3 mt-3 border-t border-gray-100">
+				<div className="w-full sm:w-auto">
+					<div className="h-6 w-28 rounded bg-gray-200" />
+					<div className="h-3 w-20 rounded bg-gray-100 mt-2" />
+				</div>
+				<div className="flex items-center gap-3 w-full sm:w-auto">
+					<div className="h-9 flex-1 sm:w-20 rounded-lg bg-gray-100" />
+					<div className="h-9 flex-1 sm:w-24 rounded-lg bg-gray-200" />
+				</div>
+			</div>
+		</div>
+	</div>
+);
 
 // ─── FILTER SECTION ──────────────────────────────────────────────────────────
 const FilterSection = ({ title, children }) => (
@@ -521,9 +556,11 @@ const MapMiniCard = ({ property, navigate, onClose, onInquire, t }) => {
 					{/* Photo */}
 					<div className="relative w-[130px] sm:w-[150px] h-[130px] sm:h-[140px] shrink-0 bg-gray-100">
 						<img
-							src={property.images[0]}
+							src={property.images[0] || property.img || property.coverPhoto || ""}
 							alt={property.title}
 							className="absolute inset-0 w-full h-full object-cover"
+							loading="lazy"
+							decoding="async"
 						/>
 						<div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur px-1.5 py-0.5 rounded-md flex items-center gap-1 text-[10px] font-black">
 							<Star size={10} className="fill-yellow-400 text-yellow-400" />
@@ -628,6 +665,9 @@ const PropertyListing = () => {
 	// Pulled from propertyService — backend first, localStorage fallback. No
 	// demo data is merged in anywhere; an empty list is a legitimate state.
 	const [properties, setProperties] = useState([]);
+	const [isPropertiesLoading, setIsPropertiesLoading] = useState(true);
+	const [propertyLoadError, setPropertyLoadError] = useState("");
+	const [propertyRefreshTick, setPropertyRefreshTick] = useState(0);
 
 	// ── UI STATES ───────────────────────────────────────────────────────────────
 	const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
@@ -680,20 +720,29 @@ const PropertyListing = () => {
 	useEffect(() => {
 		let cancelled = false;
 		const load = async () => {
+			if (!cancelled) {
+				setIsPropertiesLoading(true);
+				setPropertyLoadError("");
+			}
 			try {
 				const list = await propertyService.getProperties(
 					{ activeDivision, searchArea: debouncedSearch, nearMeLabel: t.nearMe || "Nearby Location" },
 					sortBy,
 				);
 				if (!cancelled) setProperties(Array.isArray(list) ? list : []);
-			} catch {
-				if (!cancelled) setProperties([]);
+			} catch (err) {
+				if (!cancelled) {
+					setProperties([]);
+					setPropertyLoadError(err?.message || "Could not load properties. Please try again.");
+				}
+			} finally {
+				if (!cancelled) setIsPropertiesLoading(false);
 			}
 		};
 		load();
 		const unsub = subscribeUserProperties(load);
 		return () => { cancelled = true; unsub && unsub(); };
-	}, [activeDivision, debouncedSearch]);
+	}, [activeDivision, debouncedSearch, propertyRefreshTick]);
 
 	// ── LANDLORD LOOKUP FOR INQUIRY ─────────────────────────────────────────────
 	// Look up the landlord lazily when the inquiry modal opens so we don't issue
@@ -884,6 +933,7 @@ const PropertyListing = () => {
 	}, [locationSuggestions, searchArea]);
 
 	const isMapMode = viewMode === "map";
+	const resultCountLabel = isPropertiesLoading ? "..." : filteredProperties.length;
 
 	return (
 		<div className="w-full bg-[#f8f9fa] min-h-screen font-sans pb-20 relative">
@@ -904,7 +954,7 @@ const PropertyListing = () => {
                             {searchArea ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision}
                         </span>
 						<span className="text-gray-500 font-bold text-sm">
-							{t.showing || "Showing"} <strong className="text-gray-900">{filteredProperties.length}</strong> {t.properties || "properties"}
+							{t.showing || "Showing"} <strong className="text-gray-900">{resultCountLabel}</strong> {t.properties || "properties"}
 						</span>
 					</div>
 					<button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="text-sm font-black text-gray-900 hover:text-[#ba0036] transition-colors flex items-center gap-2 uppercase tracking-wide border-b-2 border-gray-900 hover:border-[#ba0036] pb-0.5">
@@ -991,7 +1041,7 @@ const PropertyListing = () => {
 				{/* Row 3: Results count + location context */}
 				<div className="flex items-center justify-between px-3 py-1.5 bg-gray-50/80">
 					<span className="text-[11px] font-bold text-gray-500">
-						<strong className="text-gray-900">{filteredProperties.length}</strong> {t.properties || "প্রপার্টি"} · {searchArea ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision}
+						<strong className="text-gray-900">{resultCountLabel}</strong> {t.properties || "প্রপার্টি"} · {searchArea ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision}
 					</span>
 					{searchArea && (
 						<button onClick={() => setSearchArea("")} className="text-[10px] font-black text-brandRed active:scale-95 transition-transform">
@@ -1360,7 +1410,13 @@ const PropertyListing = () => {
 					<AnimatePresence mode="wait">
 						{isMapMode ? null : (
 							<motion.div key="list-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="w-full">
-								{filteredProperties.length > 0 ? (
+								{isPropertiesLoading ? (
+									Array.from({ length: 6 }, (_, idx) => (
+										<div key={`property-skeleton-${idx}`} className="mb-4 md:mb-6">
+											<PropertyCardSkeleton />
+										</div>
+									))
+								) : filteredProperties.length > 0 ? (
 									filteredProperties.map((property) => {
 										return (
 											<React.Fragment key={property.id}>
@@ -1376,10 +1432,10 @@ const PropertyListing = () => {
 										<div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
 											<Search className="text-brandRed" size={24} />
 										</div>
-										<h3 className="text-xl font-black text-gray-900 mb-2">{t.noPropsFound || "No Properties Found"}</h3>
-										<p className="text-sm font-bold text-gray-500 mb-6">{t.noPropsDesc || "Try adjusting your filters or search criteria."}</p>
-										<button onClick={handleClearAll} className="bg-gray-900 text-white px-8 py-3 rounded-xl text-sm font-bold active:scale-95 transition-transform shadow-md hover:shadow-lg">
-											{t.clearFilters || "Clear Filters"}
+										<h3 className="text-xl font-black text-gray-900 mb-2">{propertyLoadError ? "Could not load properties" : (t.noPropsFound || "No Properties Found")}</h3>
+										<p className="text-sm font-bold text-gray-500 mb-6">{propertyLoadError || t.noPropsDesc || "Try adjusting your filters or search criteria."}</p>
+										<button onClick={propertyLoadError ? () => setPropertyRefreshTick((tick) => tick + 1) : handleClearAll} className="bg-gray-900 text-white px-8 py-3 rounded-xl text-sm font-bold active:scale-95 transition-transform shadow-md hover:shadow-lg">
+											{propertyLoadError ? "Retry" : (t.clearFilters || "Clear Filters")}
 										</button>
 									</div>
 								)}
@@ -1433,7 +1489,7 @@ const PropertyListing = () => {
 							<div className="max-w-[640px] mx-auto mt-2 pointer-events-auto flex">
 								<span className="bg-white/95 backdrop-blur px-3 py-1.5 rounded-full text-[11px] font-black text-gray-900 shadow-md flex items-center gap-1.5 border border-gray-100">
 									<MapPin size={11} className="text-brandRed" />
-									{filteredProperties.length} {t.properties || "Properties"}
+									{resultCountLabel} {t.properties || "Properties"}
 								</span>
 							</div>
 						</div>

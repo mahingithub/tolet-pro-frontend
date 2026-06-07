@@ -192,15 +192,76 @@ export function applyFilters(properties, filters) {
 
 // ─── INTERNAL HELPERS ─────────────────────────────────────────────────────────
 
-// Build the canonical `[{ room, url }]` representation that PropertyDetails
-// groups by and PropertyListing builds its collage from. Source of truth is
-// the room-tagged uploads in the wizard.
-const buildRoomPhotoRecords = (form) =>
-  Array.isArray(form.roomPhotos)
-    ? form.roomPhotos
-        .map(p => ({ room: p.room || 'other', url: p.preview || p.url || '' }))
-        .filter(p => p.url)
-    : [];
+function toCloudinaryListingImage(url) {
+  const source = String(url || '').trim();
+  if (!/^https?:\/\/res\.cloudinary\.com\//i.test(source)) return source;
+  const marker = '/image/upload/';
+  const markerIndex = source.indexOf(marker);
+  if (markerIndex === -1) return source;
+  const after = source.slice(markerIndex + marker.length);
+  const firstSegment = after.split('/')[0] || '';
+  if (/^(?:a_|ar_|b_|c_|co_|dpr_|e_|f_|fl_|g_|h_|l_|o_|q_|r_|t_|w_|x_|y_|z_)/.test(firstSegment)) {
+    return source;
+  }
+  return `${source.slice(0, markerIndex + marker.length)}f_auto,q_auto:eco,w_640,c_fill/${after}`;
+}
+
+function makeDataUrlThumbnail(url, { maxWidth = 720, maxHeight = 540, quality = 0.72, maxBytes = 950000 } = {}) {
+  const source = String(url || '');
+  if (!/^data:image\//i.test(source) || typeof document === 'undefined' || typeof Image === 'undefined') {
+    return Promise.resolve(source);
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const ratio = Math.min(1, maxWidth / img.naturalWidth, maxHeight / img.naturalHeight);
+        const width = Math.max(1, Math.round(img.naturalWidth * ratio));
+        const height = Math.max(1, Math.round(img.naturalHeight * ratio));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(source);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        const thumb = canvas.toDataURL('image/jpeg', quality);
+        resolve(thumb && thumb.length < source.length && thumb.length <= maxBytes ? thumb : source);
+      } catch {
+        resolve(source);
+      }
+    };
+    img.onerror = () => resolve(source);
+    img.src = source;
+  });
+}
+
+async function makeListingThumbnail(url) {
+  const cloudinary = toCloudinaryListingImage(url);
+  if (cloudinary !== String(url || '').trim()) return cloudinary;
+  return makeDataUrlThumbnail(url);
+}
+
+// Build the canonical `[{ room, url, thumbUrl }]` representation that
+// PropertyDetails groups by and PropertyListing builds its collage from. Source
+// of truth is the room-tagged uploads in the wizard; thumbnails are only for
+// listing cards, while detail pages keep reading the full `url`.
+const buildRoomPhotoRecords = async (form) => {
+  if (!Array.isArray(form.roomPhotos)) return [];
+  const rows = form.roomPhotos
+    .map(p => ({ room: p.room || 'other', url: p.preview || p.url || '', thumbUrl: p.thumbUrl || '' }))
+    .filter(p => p.url);
+  return Promise.all(rows.map(async (p) => {
+    const thumbUrl = p.thumbUrl || await makeListingThumbnail(p.url);
+    return {
+      room: p.room,
+      url: p.url,
+      ...(thumbUrl && thumbUrl !== p.url ? { thumbUrl } : {}),
+    };
+  }));
+};
 
 
 // ─── PROPERTY SERVICE ─────────────────────────────────────────────────────────
@@ -331,6 +392,12 @@ export const propertyService = {
     }
 
     if (getToken()) {
+      const coverPhoto = form.coverPhoto?.preview || '';
+      const [coverPhotoThumb, roomPhotos] = await Promise.all([
+        makeListingThumbnail(coverPhoto),
+        buildRoomPhotoRecords(form),
+      ]);
+
       const body = {
         title:       form.title,
         intent:      form.intent      || 'rent',
@@ -353,8 +420,9 @@ export const propertyService = {
         amenities:   form.amenities   || [],
         price:       Number(String(form.price ?? '').replace(/[^\d.]/g, '')) || 0,
         status:      form.status      || 'active',
-        coverPhoto:  form.coverPhoto?.preview || '',
-        roomPhotos:  buildRoomPhotoRecords(form),
+        coverPhoto,
+        coverPhotoThumb: coverPhotoThumb && coverPhotoThumb !== coverPhoto ? coverPhotoThumb : '',
+        roomPhotos,
         videoId:     form.videoId     || '',
         videoUrl:    videoUrlStr,
       };
@@ -415,10 +483,18 @@ export const propertyService = {
    */
   async updateProperty(id, patch = {}) {
     if (getToken()) {
+      const nextPatch = { ...patch };
+      if (Object.prototype.hasOwnProperty.call(nextPatch, 'coverPhoto')) {
+        const coverPhotoThumb = nextPatch.coverPhoto ? await makeListingThumbnail(nextPatch.coverPhoto) : '';
+        nextPatch.coverPhotoThumb = coverPhotoThumb && coverPhotoThumb !== nextPatch.coverPhoto ? coverPhotoThumb : '';
+      }
+      if (Array.isArray(nextPatch.roomPhotos)) {
+        nextPatch.roomPhotos = await buildRoomPhotoRecords({ roomPhotos: nextPatch.roomPhotos });
+      }
       const res = await probeFetch('updateProperty', `${API}/properties/${id}`, {
         method:  'PATCH',
         headers: apiHeaders(),
-        body:    JSON.stringify(patch),
+        body:    JSON.stringify(nextPatch),
       });
       if (res && res.ok) {
         const data = await res.json();
@@ -439,10 +515,10 @@ export const subscribeUserProperties = (listener) =>
 // ─── INTERNAL: API → frontend shape converter ─────────────────────────────────
 function _normaliseApiProperty(p) {
   if (!p) return null;
-  const coverImg = p.coverPhoto || '';
+  const coverImg = p.coverPhoto || p.coverPhotoThumb || '';
   const roomRecords = Array.isArray(p.roomPhotos)
     ? p.roomPhotos
-        .map(r => ({ room: r.room || 'other', url: r.url || r.preview || '' }))
+        .map(r => ({ room: r.room || 'other', url: r.url || r.preview || '', thumbUrl: r.thumbUrl || '' }))
         .filter(r => r.url)
     : [];
   const roomImgs = roomRecords.map(r => r.url);
