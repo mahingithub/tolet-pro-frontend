@@ -585,6 +585,9 @@ const HostDashboard = () => {
 
   // 🟢 DATA STATES
   const [properties, setProperties] = useState(initialPortfolio);
+  const [isPropertiesLoading, setIsPropertiesLoading] = useState(true);
+  const [propertyLoadError, setPropertyLoadError] = useState('');
+  const [propertyRefreshTick, setPropertyRefreshTick] = useState(0);
   const [bookings, setBookings] = useState(initialBookings);
   const [inquiries, setInquiries] = useState(initialInquiries);
   const [inquiryTab, setInquiryTab] = useState('pending'); // 'pending' | 'accepted' | 'rejected'
@@ -724,7 +727,7 @@ const HostDashboard = () => {
   }, [location]);
 
   // Backend contract:
-  //   GET /api/host/me/properties (Bearer)  →  { properties[] }
+  //   GET /api/host/properties (Bearer)  →  { properties[] }
   //
   // We merge the host's own listings (from propertyService) with the seeded
   // demo portfolio so brand-new listings created via /list-property show up
@@ -740,19 +743,29 @@ const HostDashboard = () => {
     let cancelled = false;
 
     const hydrate = async () => {
-      const mine = await propertyService.listMyProperties();
-      if (cancelled) return;
-      setProperties([
-        ...mine.map(toPortfolioCard),
-        ...initialPortfolio,
-      ]);
+      setIsPropertiesLoading(true);
+      setPropertyLoadError('');
+      try {
+        const mine = await propertyService.listMyProperties();
+        if (cancelled) return;
+        setProperties([
+          ...mine.map(toPortfolioCard),
+          ...initialPortfolio,
+        ]);
+      } catch (err) {
+        if (cancelled) return;
+        console.warn('[host] failed to load properties:', err.message || err);
+        setPropertyLoadError(err.message || 'Could not load your properties.');
+      } finally {
+        if (!cancelled) setIsPropertiesLoading(false);
+      }
     };
 
     hydrate();
     const unsubscribe = subscribeUserProperties(hydrate);
     return () => { cancelled = true; unsubscribe?.(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [propertyRefreshTick]);
 
   // ── Hydrate the host's bookings from the backend ────────────────────────
   useEffect(() => {
@@ -1373,6 +1386,7 @@ const HostDashboard = () => {
   };
 
   // 🟢 100% FIXED: Moved logic inside the component to prevent White Screen Error!
+  const retryLoadProperties = () => setPropertyRefreshTick((tick) => tick + 1);
   const filteredProperties = properties.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()) || p.location.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredPropertiesByStatus = filteredProperties.filter(p => propertyFilter === 'all' || p.status === propertyFilter);
 
@@ -1793,17 +1807,17 @@ const HostDashboard = () => {
             <div className="grid grid-cols-3 gap-3 md:gap-5">
               {[
                 {
-                  icon: Building, bg: 'bg-gradient-to-br from-red-50 to-rose-100/60', iconColor: 'text-[#ba0036]',
-                  label: language === 'বাংলা' ? 'মোট বাসা' : 'PROPERTIES',
-                  value: properties.length, shadow: 'shadow-[0_4px_20px_rgba(186,0,54,0.08)]',
-                  indicator: 'bg-[#ba0036]'
-                },
-                {
-                  icon: TrendingUp, bg: 'bg-gradient-to-br from-emerald-50 to-green-100/60', iconColor: 'text-emerald-600',
-                  label: language === 'বাংলা' ? 'অ্যাক্টিভ' : 'ACTIVE',
-                  value: properties.filter(p => p.status === 'active').length, shadow: 'shadow-[0_4px_20px_rgba(16,185,129,0.08)]',
-                  indicator: 'bg-emerald-500'
-                },
+	                  icon: Building, bg: 'bg-gradient-to-br from-red-50 to-rose-100/60', iconColor: 'text-[#ba0036]',
+	                  label: language === 'বাংলা' ? 'মোট বাসা' : 'PROPERTIES',
+	                  value: isPropertiesLoading && properties.length === 0 ? '...' : properties.length, shadow: 'shadow-[0_4px_20px_rgba(186,0,54,0.08)]',
+	                  indicator: 'bg-[#ba0036]'
+	                },
+	                {
+	                  icon: TrendingUp, bg: 'bg-gradient-to-br from-emerald-50 to-green-100/60', iconColor: 'text-emerald-600',
+	                  label: language === 'বাংলা' ? 'অ্যাক্টিভ' : 'ACTIVE',
+	                  value: isPropertiesLoading && properties.length === 0 ? '...' : properties.filter(p => p.status === 'active').length, shadow: 'shadow-[0_4px_20px_rgba(16,185,129,0.08)]',
+	                  indicator: 'bg-emerald-500'
+	                },
                 {
                   icon: MessageSquare, bg: 'bg-gradient-to-br from-violet-50 to-purple-100/60', iconColor: 'text-violet-600',
                   label: language === 'বাংলা' ? 'যোগাযোগ' : 'INQUIRIES',
@@ -1937,13 +1951,73 @@ const HostDashboard = () => {
                   {language === 'বাংলা' ? 'সব দেখুন' : 'View All'}
                 </button>
               </div>
-              {/* Dashboard overview cards — single-column on phones (matches
-                  the homepage feed), 2-up from sm:, 3-up from lg:. */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                {dashboardProperties.map((prop) => (
-                  <div key={prop.id} className="bg-white rounded-[1.5rem] p-3 shadow-sm border border-gray-50 flex flex-col hover:shadow-[0_8px_30px_rgba(0,0,0,0.07)] hover:-translate-y-0.5 transition-all duration-300">
-                    <div className="relative h-44 md:h-60 overflow-hidden rounded-2xl">
-                      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${prop.img})` }}></div>
+	              {/* Dashboard overview cards — single-column on phones (matches
+	                  the homepage feed), 2-up from sm:, 3-up from lg:. */}
+	              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+	                {isPropertiesLoading && dashboardProperties.length === 0 ? (
+	                  Array.from({ length: 3 }).map((_, i) => (
+	                    <div key={i} className="bg-white rounded-[1.5rem] p-3 shadow-sm border border-gray-50 animate-pulse">
+	                      <div className="h-44 md:h-60 rounded-2xl bg-gray-100" />
+	                      <div className="py-3 px-1">
+	                        <div className="h-4 w-2/3 rounded bg-gray-100" />
+	                        <div className="h-3 w-1/2 rounded bg-gray-100 mt-3" />
+	                        <div className="grid grid-cols-2 gap-2 mt-4">
+	                          <div className="h-9 rounded-xl bg-gray-100" />
+	                          <div className="h-9 rounded-xl bg-gray-100" />
+	                        </div>
+	                      </div>
+	                    </div>
+	                  ))
+	                ) : propertyLoadError && dashboardProperties.length === 0 ? (
+	                  <div className="sm:col-span-2 lg:col-span-3 bg-white rounded-[1.5rem] p-6 border border-red-100 shadow-sm">
+	                    <div className="flex items-start gap-4">
+	                      <div className="w-11 h-11 rounded-2xl bg-red-50 text-[#ba0036] flex items-center justify-center shrink-0">
+	                        <AlertCircle size={20} />
+	                      </div>
+	                      <div className="min-w-0 flex-1">
+	                        <h4 className="text-sm md:text-base font-black text-gray-900">
+	                          {language === 'বাংলা' ? 'প্রপার্টি লোড করা যায়নি' : 'Could not load your properties'}
+	                        </h4>
+	                        <p className="text-xs font-bold text-gray-500 mt-1">
+	                          {propertyLoadError}
+	                        </p>
+	                        <button
+	                          onClick={retryLoadProperties}
+	                          className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#ba0036] text-white text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all"
+	                        >
+	                          <RefreshCw size={13} />
+	                          {language === 'বাংলা' ? 'আবার চেষ্টা করুন' : 'Retry'}
+	                        </button>
+	                      </div>
+	                    </div>
+	                  </div>
+	                ) : dashboardProperties.length === 0 ? (
+	                  <div className="sm:col-span-2 lg:col-span-3 bg-white rounded-[1.5rem] p-6 border border-gray-100 shadow-sm">
+	                    <div className="flex items-start gap-4">
+	                      <div className="w-11 h-11 rounded-2xl bg-red-50 text-[#ba0036] flex items-center justify-center shrink-0">
+	                        <Building2 size={20} />
+	                      </div>
+	                      <div className="min-w-0 flex-1">
+	                        <h4 className="text-sm md:text-base font-black text-gray-900">
+	                          {language === 'বাংলা' ? 'এখনও কোনো বাসা নেই' : 'No properties listed yet'}
+	                        </h4>
+	                        <p className="text-xs font-bold text-gray-500 mt-1">
+	                          {language === 'বাংলা' ? 'আপনার প্রথম বাসা লিস্ট করলে এটি এখানে দেখা যাবে।' : 'Your first uploaded property will appear here as soon as it is saved.'}
+	                        </p>
+	                        <Link
+	                          to="/list-property"
+	                          className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#ba0036] text-white text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all"
+	                        >
+	                          <Plus size={13} />
+	                          {language === 'বাংলা' ? 'বাসা লিস্ট করুন' : 'List Property'}
+	                        </Link>
+	                      </div>
+	                    </div>
+	                  </div>
+	                ) : dashboardProperties.map((prop) => (
+	                  <div key={prop.id} className="bg-white rounded-[1.5rem] p-3 shadow-sm border border-gray-50 flex flex-col hover:shadow-[0_8px_30px_rgba(0,0,0,0.07)] hover:-translate-y-0.5 transition-all duration-300">
+	                    <div className="relative h-44 md:h-60 overflow-hidden rounded-2xl">
+	                      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${prop.img})` }}></div>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-2xl"></div>
                       <div className="absolute top-3 left-3 flex gap-1.5">
                         <div className="bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[9px] font-black uppercase text-green-600 shadow-sm flex items-center gap-1">
@@ -4024,10 +4098,39 @@ const HostDashboard = () => {
                </div>
             </div>
 
-            {filteredPropertiesByStatus.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-[2rem] shadow-[0_4px_15px_rgba(0,0,0,0.02)]">
-                <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-5"><Search className="text-gray-300" size={32} /></div>
-                <h3 className="text-lg font-black text-gray-900">{t?.noPropsFound || (language === 'বাংলা' ? 'কোনো বাসা পাওয়া যায়নি।' : 'No properties found.')}</h3>
+	            {isPropertiesLoading && properties.length === 0 ? (
+	              <div className="text-center py-20 bg-white rounded-[2rem] shadow-[0_4px_15px_rgba(0,0,0,0.02)]">
+	                <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-5">
+	                  <RefreshCw className="text-[#ba0036] animate-spin" size={32} />
+	                </div>
+	                <h3 className="text-lg font-black text-gray-900">
+	                  {language === 'বাংলা' ? 'আপনার বাসাগুলো লোড হচ্ছে...' : 'Loading your properties...'}
+	                </h3>
+	                <p className="text-xs font-bold text-gray-500 mt-2">
+	                  {language === 'বাংলা' ? 'সার্ভার জেগে উঠলে এগুলো এখানে দেখা যাবে।' : 'This can take a moment if the server is waking up.'}
+	                </p>
+	              </div>
+	            ) : propertyLoadError && properties.length === 0 ? (
+	              <div className="text-center py-20 bg-white rounded-[2rem] border border-red-100 shadow-[0_4px_15px_rgba(0,0,0,0.02)]">
+	                <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5">
+	                  <AlertCircle className="text-[#ba0036]" size={32} />
+	                </div>
+	                <h3 className="text-lg font-black text-gray-900">
+	                  {language === 'বাংলা' ? 'প্রপার্টি লোড করা যায়নি' : 'Could not load properties'}
+	                </h3>
+	                <p className="text-xs font-bold text-gray-500 mt-2 max-w-md mx-auto">{propertyLoadError}</p>
+	                <button
+	                  onClick={retryLoadProperties}
+	                  className="mt-5 inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#ba0036] text-white text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all"
+	                >
+	                  <RefreshCw size={13} />
+	                  {language === 'বাংলা' ? 'আবার চেষ্টা করুন' : 'Retry'}
+	                </button>
+	              </div>
+	            ) : filteredPropertiesByStatus.length === 0 ? (
+	              <div className="text-center py-20 bg-white rounded-[2rem] shadow-[0_4px_15px_rgba(0,0,0,0.02)]">
+	                <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-5"><Search className="text-gray-300" size={32} /></div>
+	                <h3 className="text-lg font-black text-gray-900">{t?.noPropsFound || (language === 'বাংলা' ? 'কোনো বাসা পাওয়া যায়নি।' : 'No properties found.')}</h3>
               </div>
             ) : (
               // Single-column on mobile so each card reads like a homepage

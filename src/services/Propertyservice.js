@@ -20,6 +20,7 @@ import { getCurrentUser } from './authService.js';
 
 // ─── API CONFIG ───────────────────────────────────────────────────────────────
 const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const HOST_PROPERTIES_TIMEOUT_MS = 45000;
 
 // Token key must match the one written by authService.loginWithPassword /
 // signupVerify. Earlier this read `'tolet_token'`, which was never written
@@ -385,12 +386,17 @@ export const propertyService = {
     if (getToken()) {
       const res = await probeFetch('hostProperties', `${API}/host/properties`, {
         headers: apiHeaders(),
-        signal:  AbortSignal.timeout(15000),
+        signal:  AbortSignal.timeout(HOST_PROPERTIES_TIMEOUT_MS),
       });
       if (res && res.ok) {
         const data = await res.json();
         return (data.properties || []).map(_normaliseApiProperty);
       }
+      if (!res) {
+        throw new Error('Could not reach the server while loading your properties.');
+      }
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `Could not load your properties (${res.status}).`);
     }
 
     // No localStorage fallback — a host's listings come only from the backend.
