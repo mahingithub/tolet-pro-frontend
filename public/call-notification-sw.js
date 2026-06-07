@@ -27,6 +27,7 @@
   }
 
   function isIncomingCallData(data) {
+    data = payloadData(data);
     if (!data) return false;
     return (
       data.kind === 'incoming_call' ||
@@ -36,6 +37,7 @@
   }
 
   function isMissedCallData(data) {
+    data = payloadData(data);
     if (!data) return false;
     return data.kind === 'missed_call' || data.click_action === 'MISSED_CALL';
   }
@@ -44,8 +46,13 @@
     return isIncomingCallData(data) || isMissedCallData(data);
   }
 
+  function payloadData(raw) {
+    if (raw && raw.FCM_MSG && raw.FCM_MSG.data) return raw.FCM_MSG.data;
+    return raw || {};
+  }
+
   function normalizeCallData(raw) {
-    const data = raw || {};
+    const data = payloadData(raw);
     return {
       kind: asString(data.kind, 'incoming_call'),
       callId: asString(data.callId),
@@ -85,8 +92,8 @@
       tag: `incoming-call-${call.callId}`,
       data: call,
       actions: [
-        { action: 'accept', title: 'Accept' },
-        { action: 'decline', title: 'Decline' },
+        { action: 'accept', title: 'Receive' },
+        { action: 'decline', title: 'Reject' },
       ],
     });
   }
@@ -214,6 +221,10 @@
       const messaging = firebase.messaging();
       messaging.onBackgroundMessage((payload) => {
         const data = (payload && payload.data) || {};
+        if (payload && payload.notification && isCallData(data)) {
+          console.log('[call-sw] browser-displayed call push received:', data.callId);
+          return Promise.resolve();
+        }
         if (isMissedCallData(data)) {
           console.log('[call-sw] missed call push received:', data.callId);
           return showMissedCallNotification(data);

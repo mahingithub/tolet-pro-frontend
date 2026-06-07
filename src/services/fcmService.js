@@ -167,8 +167,8 @@ function bindForegroundHandler(messaging) {
         data,
         requireInteraction: !isMissed,
         actions: isMissed ? [] : [
-          { action: 'accept', title: 'Accept' },
-          { action: 'decline', title: 'Decline' },
+          { action: 'accept', title: 'Receive' },
+          { action: 'decline', title: 'Reject' },
         ],
       };
 
