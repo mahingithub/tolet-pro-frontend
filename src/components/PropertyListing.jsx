@@ -74,28 +74,33 @@ const validDivisions = ["dhaka", "chittagong", "sylhet", "rajshahi", "khulna", "
 // ─── ROOM COLLAGE HELPER ──────────────────────────────────────────────────────
 // Builds the listing-card collage: one photo per room category so a card with
 // 4 bedroom photos doesn't fill all four tiles with bedrooms. Order is fixed:
-// cover photo first, then bedroom, bathroom, and kitchen.
-const ROOM_COLLAGE_ORDER = ["bedroom", "bathroom", "kitchen"];
+// cover photo first, then bedroom, bathroom, living room, kitchen, and other.
+const ROOM_COLLAGE_ORDER = ["bedroom", "bathroom", "living", "kitchen", "other"];
 const ROOM_MATCHERS = {
 	bedroom:  (room) => room.includes("bed"),
 	bathroom: (room) => room.includes("bath") || room.includes("toilet") || room.includes("wash"),
+	living:   (room) => room.includes("living") || room.includes("drawing") || room.includes("hall"),
 	kitchen:  (room) => room.includes("kitchen") || room.includes("cook"),
+	other:    (room) => room.includes("other"),
 };
 const ROOM_LABEL_FALLBACK = {
 	bedroom:  "Bedroom",
 	bathroom: "Bathroom",
+	living:   "Living",
 	kitchen:  "Kitchen",
 	other:    "Other",
 };
 function buildRoomCollage(property) {
 	const uniqueRoomShots = [];
+	const usedPhotos = new Set();
 	const hasRoomPhotos = Array.isArray(property.roomPhotos) && property.roomPhotos.some(p => p?.url || p?.preview);
 	if (hasRoomPhotos) {
 		for (const roomId of ROOM_COLLAGE_ORDER) {
 			const matches = ROOM_MATCHERS[roomId];
-			const hit = property.roomPhotos.find(p => matches(String(p.room || "").toLowerCase()) && (p.url || p.preview));
+			const hit = property.roomPhotos.find(p => !usedPhotos.has(p) && matches(String(p.room || "").toLowerCase()) && (p.url || p.preview));
 			if (hit) {
 				uniqueRoomShots.push({ url: hit.url || hit.preview, room: roomId });
+				usedPhotos.add(hit);
 			}
 		}
 	}
@@ -180,7 +185,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 					</div>
 					{/* ── ROOM COLLAGE STRIP ──────────────────────────────────────────
 					    Renders ONE thumbnail per requested room category (bedroom /
-					    bathroom / kitchen) instead of downloading the whole gallery.
+					    bathroom / living / kitchen / other) instead of downloading the whole gallery.
 					    Falls back to the flat images list only for older records that
 					    did not tag photos by room. */}
 					<div className="w-[25%] flex flex-col gap-1.5 h-full">
