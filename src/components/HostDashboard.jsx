@@ -1610,9 +1610,6 @@ const HostDashboard = () => {
               </button>
              )
           })}
-          <div className="pt-2 pb-1"><div className="h-px w-full bg-gray-100"></div></div>
-          <button onClick={() => {openModal('settings'); setIsProfileDrawerOpen(false);}} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-900 font-bold text-xs text-left transition-colors"><Settings size={16} className="text-gray-400"/> {t?.settings || (language === 'বাংলা' ? 'সেটিংস' : 'Settings')}</button>
-          <button onClick={() => {openModal('support'); setIsProfileDrawerOpen(false);}} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-900 font-bold text-xs text-left transition-colors"><HelpCircle size={16} className="text-gray-400"/> {t?.support || (language === 'বাংলা' ? 'সাপোর্ট' : 'Support')}</button>
         </nav>
 
         <div className="p-5 border-t border-gray-100 bg-gray-50/50 flex flex-col gap-3 mt-auto">
