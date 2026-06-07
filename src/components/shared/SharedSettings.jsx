@@ -22,7 +22,7 @@
  *                                  otherwise we route to the dashboard
  *                                  with state.activeTab='profile'.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ChevronDown, User, Shield, Bell, Sliders, CreditCard,
@@ -31,6 +31,7 @@ import {
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useLanguage } from '../../context/LanguageContext';
 import { readJson, writeJson, broadcast } from '../../services/_storage.js';
+import { getPreferences, setPreferences as savePreferences } from '../../services/settingsService.js';
 
 const KEY = (uid) => `tenant:settings:${uid || '_anon'}`;
 
@@ -103,10 +104,55 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
   };
 
   const [settings, setSettings] = useState(() => ({ ...DEFAULTS, ...(readJson(KEY(user?.id), null) || {}) }));
+  const apiSyncTimer = useRef(null);
+  const initialLoad = useRef(false);
 
+  // On mount: fetch from backend and merge with localStorage cache.
+  useEffect(() => {
+    if (initialLoad.current) return;
+    initialLoad.current = true;
+    (async () => {
+      try {
+        const data = await getPreferences();
+        if (data?.preferences) {
+          const p = data.preferences;
+          setSettings((prev) => ({
+            ...prev,
+            notif: {
+              ...prev.notif,
+              pushEnabled: p.callNotifications !== undefined ? p.callNotifications : prev.notif.pushEnabled,
+              emailEnabled: p.marketingEmails !== undefined ? p.marketingEmails : prev.notif.emailEnabled,
+              smsEnabled: p.smsAlerts !== undefined ? p.smsAlerts : prev.notif.smsEnabled,
+            },
+            app: {
+              ...prev.app,
+              theme: p.theme || prev.app.theme,
+            },
+          }));
+        }
+      } catch (e) {
+        // Offline or unauthenticated — localStorage values already loaded.
+      }
+    })();
+  }, []);
+
+  // Persist to localStorage immediately; debounce API sync by 800ms.
   useEffect(() => {
     writeJson(KEY(user?.id), settings);
     broadcast(KEY(user?.id));
+
+    if (apiSyncTimer.current) clearTimeout(apiSyncTimer.current);
+    apiSyncTimer.current = setTimeout(() => {
+      savePreferences({
+        callNotifications: settings.notif.pushEnabled,
+        marketingEmails:   settings.notif.emailEnabled,
+        smsAlerts:         settings.notif.smsEnabled,
+        theme:             settings.app.theme,
+        language:          settings.prefs.language === 'বাংলা' ? 'bn' : 'en',
+      }).catch(() => {}); // silent — offline fallback is localStorage
+    }, 800);
+
+    return () => { if (apiSyncTimer.current) clearTimeout(apiSyncTimer.current); };
   }, [settings, user?.id]);
 
   const upd = (section, patch) =>
