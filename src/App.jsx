@@ -68,15 +68,20 @@ const GlobalCallSocket = () => {
 		if (!token) return;
 		callProvider.connect(token);
 		// Phase Call-6: register this device for incoming-call push so the user
-		// is alerted even when the PWA is closed. Runs once per login; no-ops if
-		// the browser can't do push or the user denies permission. We delay a
-		// touch so it doesn't fight the initial render / socket handshake.
+		// is alerted even when the PWA is closed. If permission is already
+		// granted, refresh the token quietly; if permission is undecided, wait
+		// for the user's next tap/key so mobile browsers allow the permission
+		// prompt and the token registration actually succeeds.
 		const fcmTimer = setTimeout(() => {
-			fcmService.enableCallNotifications().catch(() => {});
+			fcmService.enableCallNotifications({ prompt: false }).catch(() => {});
 		}, 1500);
+		const cleanupPushGesture = fcmService.enableCallNotificationsOnNextUserGesture();
 		// No socket cleanup — we want it to persist across navigations.
 		// It only tears down on logout (handled by the !isAuthenticated branch).
-		return () => clearTimeout(fcmTimer);
+		return () => {
+			clearTimeout(fcmTimer);
+			cleanupPushGesture?.();
+		};
 	}, [isAuthenticated, user?.id, user?._id]);
 
 	return null;

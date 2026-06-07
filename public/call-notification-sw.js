@@ -35,6 +35,15 @@
     );
   }
 
+  function isMissedCallData(data) {
+    if (!data) return false;
+    return data.kind === 'missed_call' || data.click_action === 'MISSED_CALL';
+  }
+
+  function isCallData(data) {
+    return isIncomingCallData(data) || isMissedCallData(data);
+  }
+
   function normalizeCallData(raw) {
     const data = raw || {};
     return {
@@ -68,7 +77,9 @@
       body: notificationBody(call),
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
+      timestamp: Date.now(),
       vibrate: [250, 100, 250, 100, 250],
+      silent: false,
       requireInteraction: true,
       renotify: true,
       tag: `incoming-call-${call.callId}`,
@@ -77,6 +88,24 @@
         { action: 'accept', title: 'Accept' },
         { action: 'decline', title: 'Decline' },
       ],
+    });
+  }
+
+  function showMissedCallNotification(rawData) {
+    const call = normalizeCallData(rawData);
+    if (!call.callId) return Promise.resolve();
+
+    return self.registration.showNotification(`Missed call from ${call.callerName || 'Someone'}`, {
+      body: call.type === 'video' ? 'You missed a video call' : 'You missed a voice call',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      timestamp: Date.now(),
+      vibrate: [160, 80, 160],
+      silent: false,
+      requireInteraction: false,
+      renotify: true,
+      tag: `incoming-call-${call.callId}`,
+      data: { ...call, kind: 'missed_call' },
     });
   }
 
@@ -185,6 +214,10 @@
       const messaging = firebase.messaging();
       messaging.onBackgroundMessage((payload) => {
         const data = (payload && payload.data) || {};
+        if (isMissedCallData(data)) {
+          console.log('[call-sw] missed call push received:', data.callId);
+          return showMissedCallNotification(data);
+        }
         if (!isIncomingCallData(data)) return Promise.resolve();
         console.log('[call-sw] incoming call push received:', data.callId);
         return showIncomingCallNotification(data);
@@ -196,9 +229,14 @@
 
   self.addEventListener('notificationclick', (event) => {
     const call = normalizeCallData(event.notification && event.notification.data);
-    if (!isIncomingCallData(call)) return;
+    if (!isCallData(call)) return;
 
     event.notification.close();
+
+    if (isMissedCallData(event.notification && event.notification.data)) {
+      event.waitUntil(focusOrOpenApp('missed', call));
+      return;
+    }
 
     const action = event.action || 'open';
     if (action === 'decline') {

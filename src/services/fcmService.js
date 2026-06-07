@@ -59,6 +59,16 @@ async function getMessagingSafe() {
   }
 }
 
+async function ensureNotificationPermission({ prompt = true } = {}) {
+  if (typeof Notification === 'undefined') return 'unsupported';
+
+  let permission = Notification.permission;
+  if (permission === 'default' && prompt) {
+    try { permission = await Notification.requestPermission(); } catch { return Notification.permission; }
+  }
+  return permission;
+}
+
 async function getCallServiceWorkerRegistration() {
   if (!('serviceWorker' in navigator)) return null;
 
@@ -98,18 +108,9 @@ async function postToBackend(path, body) {
  *
  * @returns {Promise<string|null>} the FCM token, or null
  */
-export async function enableCallNotifications() {
+export async function enableCallNotifications({ prompt = true } = {}) {
   // Must be served over HTTPS (or localhost) and have Notification API.
-  if (typeof Notification === 'undefined') return null;
-
-  const messaging = await getMessagingSafe();
-  if (!messaging) return null;
-
-  // Ask permission if not already decided.
-  let permission = Notification.permission;
-  if (permission === 'default') {
-    try { permission = await Notification.requestPermission(); } catch { return null; }
-  }
+  const permission = await ensureNotificationPermission({ prompt });
   if (permission !== 'granted') return null;
 
   try {
@@ -118,6 +119,9 @@ export async function enableCallNotifications() {
     // on the same service worker as push delivery.
     const swReg = await getCallServiceWorkerRegistration();
     if (!swReg) return null;
+
+    const messaging = await getMessagingSafe();
+    if (!messaging) return null;
 
     const token = await getToken(messaging, {
       vapidKey: VAPID_KEY,
@@ -148,15 +152,21 @@ function bindForegroundHandler(messaging) {
     (async () => {
       const callerName = data.callerName || 'Someone';
       const isVideo = data.type === 'video';
-      const title = `${callerName} is calling`;
+      const isMissed = data.kind === 'missed_call' || data.click_action === 'MISSED_CALL';
+      const title = isMissed ? `Missed call from ${callerName}` : `${callerName} is calling`;
       const options = {
-        body: isVideo ? 'Incoming video call' : 'Incoming voice call',
+        body: isMissed
+          ? (isVideo ? 'You missed a video call' : 'You missed a voice call')
+          : (isVideo ? 'Incoming video call' : 'Incoming voice call'),
         icon: '/icons/icon-192.png',
         badge: '/icons/icon-192.png',
+        timestamp: Date.now(),
+        vibrate: isMissed ? [160, 80, 160] : [250, 100, 250, 100, 250],
+        silent: false,
         tag: data.callId ? `incoming-call-${data.callId}` : 'incoming-call',
         data,
-        requireInteraction: true,
-        actions: [
+        requireInteraction: !isMissed,
+        actions: isMissed ? [] : [
           { action: 'accept', title: 'Accept' },
           { action: 'decline', title: 'Decline' },
         ],
@@ -188,9 +198,38 @@ export async function disableCallNotifications() {
   } catch { /* ignore */ }
 }
 
+export function enableCallNotificationsOnNextUserGesture() {
+  if (typeof window === 'undefined' || typeof Notification === 'undefined') return () => {};
+  if (Notification.permission !== 'default') {
+    enableCallNotifications({ prompt: false }).catch(() => {});
+    return () => {};
+  }
+
+  let done = false;
+  const cleanup = () => {
+    window.removeEventListener('pointerdown', onGesture, true);
+    window.removeEventListener('keydown', onGesture, true);
+  };
+  const onGesture = () => {
+    if (done) return;
+    done = true;
+    cleanup();
+    enableCallNotifications({ prompt: true }).catch(() => {});
+  };
+
+  window.addEventListener('pointerdown', onGesture, { once: true, capture: true });
+  window.addEventListener('keydown', onGesture, { once: true, capture: true });
+  return cleanup;
+}
+
 /** Toggle the server-side call-notification preference. */
 export async function setCallNotificationPref(enabled) {
   return postToBackend('/call-pref', { enabled: !!enabled });
 }
 
-export default { enableCallNotifications, disableCallNotifications, setCallNotificationPref };
+export default {
+  enableCallNotifications,
+  enableCallNotificationsOnNextUserGesture,
+  disableCallNotifications,
+  setCallNotificationPref,
+};
