@@ -38,6 +38,7 @@ import RefundPolicy from "./components/legal/RefundPolicy";
 
 // --- Beta feedback button (Phase 7) ---
 import FeedbackButton from "./components/FeedbackButton";
+import GlobalCallUI from "./components/GlobalCallUI";
 
 // --- Admin Imports ---
 import AdminLayout from "./components/AdminLayout";
@@ -195,6 +196,7 @@ const AppLayout = () => {
 				<Route path="*" element={<Navigate to="/" replace />} />
 			</Routes>
 
+			<GlobalCallUI />
 			{!shouldHideAIAssistant && <GlobalAIAssistant />}
 			<MobileBottomNav hideOnRoutes={['/login', '/admin', '/list-property', '/properties/']} />
 			<InstallPrompt />

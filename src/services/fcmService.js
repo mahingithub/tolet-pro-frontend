@@ -17,7 +17,7 @@
 //     VITE_FIREBASE_VAPID_KEY   ← the Web Push certificate key pair
 //
 // ► Foreground messages (tab open) are handled here via onMessage; background
-//   messages are handled by /public/firebase-messaging-sw.js.
+//   messages and notification action clicks are handled by /service-worker.js.
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
@@ -39,6 +39,7 @@ const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
 let _messaging = null;
 let _onMessageBound = false;
+let _swRegistrationPromise = null;
 
 // Get (or lazily create) a Messaging instance, but only if the browser
 // supports it (e.g. not old iOS, not some in-app webviews).
@@ -56,6 +57,23 @@ async function getMessagingSafe() {
     console.warn('[fcm] messaging unavailable:', err?.message);
     return null;
   }
+}
+
+async function getCallServiceWorkerRegistration() {
+  if (!('serviceWorker' in navigator)) return null;
+
+  if (!_swRegistrationPromise) {
+    _swRegistrationPromise = (async () => {
+      const existing = await navigator.serviceWorker.getRegistration('/');
+      if (existing) return existing;
+
+      return navigator.serviceWorker.register('/service-worker.js', {
+        scope: '/',
+      });
+    })();
+  }
+
+  return _swRegistrationPromise;
 }
 
 async function postToBackend(path, body) {
@@ -95,15 +113,12 @@ export async function enableCallNotifications() {
   if (permission !== 'granted') return null;
 
   try {
-    // The background SW must be registered for getToken to work. We point
-    // getToken at /firebase-messaging-sw.js explicitly so it doesn't depend
-    // on registration order with the main service-worker.js.
-    let swReg;
-    if ('serviceWorker' in navigator) {
-      swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-      scope: '/firebase-push/',
-      });
-    }
+    // Register the ROOT PWA worker as the FCM worker. That gives notification
+    // clicks root-scope control over /messages and keeps installed PWA launches
+    // on the same service worker as push delivery.
+    const swReg = await getCallServiceWorkerRegistration();
+    if (!swReg) return null;
+
     const token = await getToken(messaging, {
       vapidKey: VAPID_KEY,
       serviceWorkerRegistration: swReg,
@@ -130,15 +145,32 @@ function bindForegroundHandler(messaging) {
     // Only auto-show if the tab is actually hidden; if it's visible the in-app
     // call UI (CALL_RINGING over socket) already handles it.
     if (document.visibilityState === 'visible') return;
-    const callerName = data.callerName || 'Someone';
-    const isVideo = data.type === 'video';
-    try {
-      new Notification(`${callerName} is calling`, {
+    (async () => {
+      const callerName = data.callerName || 'Someone';
+      const isVideo = data.type === 'video';
+      const title = `${callerName} is calling`;
+      const options = {
         body: isVideo ? 'Incoming video call' : 'Incoming voice call',
         icon: '/icons/icon-192.png',
-        tag: data.callId || 'incoming-call',
-      });
-    } catch { /* ignore */ }
+        badge: '/icons/icon-192.png',
+        tag: data.callId ? `incoming-call-${data.callId}` : 'incoming-call',
+        data,
+        requireInteraction: true,
+        actions: [
+          { action: 'accept', title: 'Accept' },
+          { action: 'decline', title: 'Decline' },
+        ],
+      };
+
+      try {
+        const swReg = await getCallServiceWorkerRegistration();
+        if (swReg?.showNotification) {
+          await swReg.showNotification(title, options);
+          return;
+        }
+        new Notification(title, options);
+      } catch { /* ignore */ }
+    })();
   });
 }
 
@@ -147,7 +179,11 @@ export async function disableCallNotifications() {
   try {
     const messaging = await getMessagingSafe();
     if (!messaging) return;
-    const token = await getToken(messaging, { vapidKey: VAPID_KEY }).catch(() => null);
+    const swReg = await getCallServiceWorkerRegistration();
+    const token = await getToken(messaging, {
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: swReg || undefined,
+    }).catch(() => null);
     if (token) await postToBackend('/unregister-device', { token });
   } catch { /* ignore */ }
 }

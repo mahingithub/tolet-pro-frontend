@@ -47,18 +47,15 @@ export default function CallQualityOverlay({ callType = 'voice', enableSwitchCam
   const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
-    // Register our consumers. These overwrite any prior handler, which is fine
-    // because only one call overlay is mounted at a time.
-    callProvider.onNetworkQuality((q) => {
+    const unsubQuality = callProvider.onNetworkQuality((q) => {
       setLevel(q && typeof q.level === 'number' ? q.level : null);
     });
-    callProvider.onReconnectStateChange((isReconnecting) => {
+    const unsubReconnect = callProvider.onReconnectStateChange((isReconnecting) => {
       setReconnecting(!!isReconnecting);
     });
     return () => {
-      // Detach so a stale closure doesn't update an unmounted overlay.
-      callProvider.onNetworkQuality(null);
-      callProvider.onReconnectStateChange(null);
+      unsubQuality?.();
+      unsubReconnect?.();
     };
   }, []);
 

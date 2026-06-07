@@ -18,7 +18,7 @@
  * ── Public API (UNCHANGED across providers — ChatSystem relies on this) ─────
  *   connect, disconnect, getSocket
  *   initiateCall, acceptCall, rejectCall, endCall
- *   onRemoteStream, onCallStateChange, onIncomingCall
+ *   onRemoteStream, onLocalStream, onCallStateChange, onIncomingCall, onOutgoingCall
  *   toggleMute, toggleVideo, getLocalStream, cleanup
  *   PROVIDERS, ACTIVE_PROVIDER
  *
@@ -97,9 +97,11 @@ const RECONNECT = {
 let _socket = null;
 let _localStream = null;
 let _peerConnection = null;
-let _onRemoteStreamCb = null;
-let _onCallStateCb = null;
-let _onIncomingCallCb = null;
+const _onRemoteStreamCbs = new Set();
+const _onLocalStreamCbs = new Set();
+const _onCallStateCbs = new Set();
+const _onIncomingCallCbs = new Set();
+const _onOutgoingCallCbs = new Set();
 let _currentCallId = null;
 let _reconnectAttempt = 0;
 let _reconnectTimer = null;
@@ -110,8 +112,23 @@ let _currentCallType = null;
 let _currentPeerId = null;
 
 // Additive callbacks (fire only under ZegoCloud; harmless no-ops otherwise).
-let _onNetworkQualityCb = null;
-let _onReconnectStateCb = null;
+const _onNetworkQualityCbs = new Set();
+const _onReconnectStateCbs = new Set();
+
+function _emit(cbs, ...args) {
+  for (const cb of cbs) {
+    try { cb(...args); } catch (err) { console.warn('[callProvider] listener failed:', err); }
+  }
+}
+
+function _subscribe(cbs, cb) {
+  if (typeof cb !== 'function') {
+    cbs.clear();
+    return () => {};
+  }
+  cbs.add(cb);
+  return () => cbs.delete(cb);
+}
 
 // ── ZegoCloud-specific state ────────────────────────────────────────────────
 let _zegoEngine = null;
@@ -176,7 +193,7 @@ function connect(token) {
   // ── Incoming call ─────────────────────────────────────────────────────
   _socket.on('CALL_RINGING', (data) => {
     console.log('[callProvider] incoming call:', data);
-    if (_onIncomingCallCb) _onIncomingCallCb(data);
+    _emit(_onIncomingCallCbs, data);
   });
 
   // ── Call accepted by receiver ─────────────────────────────────────────
@@ -195,28 +212,28 @@ function connect(token) {
       }
     }
 
-    if (_onCallStateCb) _onCallStateCb('accepted', data);
+    _emit(_onCallStateCbs, 'accepted', data);
   });
 
   // ── Call rejected ─────────────────────────────────────────────────────
   _socket.on('CALL_REJECTED', (data) => {
     console.log('[callProvider] call rejected:', data);
     cleanup();
-    if (_onCallStateCb) _onCallStateCb('rejected', data);
+    _emit(_onCallStateCbs, 'rejected', data);
   });
 
   // ── Call ended ────────────────────────────────────────────────────────
   _socket.on('CALL_ENDED', (data) => {
     console.log('[callProvider] call ended:', data);
     cleanup();
-    if (_onCallStateCb) _onCallStateCb('ended', data);
+    _emit(_onCallStateCbs, 'ended', data);
   });
 
   // ── Missed call ───────────────────────────────────────────────────────
   _socket.on('CALL_MISSED', (data) => {
     console.log('[callProvider] call missed:', data);
     cleanup();
-    if (_onCallStateCb) _onCallStateCb('missed', data);
+    _emit(_onCallStateCbs, 'missed', data);
   });
 
   // ── WebRTC signaling relay (NATIVE provider only) ─────────────────────
@@ -266,6 +283,7 @@ async function getLocalStream(type) {
   };
   try {
     _localStream = await navigator.mediaDevices.getUserMedia(constraints);
+    _emit(_onLocalStreamCbs, _localStream, type);
     return _localStream;
   } catch (err) {
     console.error('[callProvider] getUserMedia failed:', err);
@@ -273,6 +291,7 @@ async function getLocalStream(type) {
     if (type === 'video') {
       console.warn('[callProvider] falling back to audio-only');
       _localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS_BD, video: false });
+      _emit(_onLocalStreamCbs, _localStream, 'voice');
       return _localStream;
     }
     throw err;
@@ -291,9 +310,7 @@ function createPeerConnection(targetUserId) {
 
   // Receive remote tracks.
   _peerConnection.ontrack = (event) => {
-    if (_onRemoteStreamCb && event.streams[0]) {
-      _onRemoteStreamCb(event.streams[0]);
-    }
+    if (event.streams[0]) _emit(_onRemoteStreamCbs, event.streams[0]);
   };
 
   // Relay ICE candidates to the peer via Socket.IO.
@@ -421,7 +438,7 @@ function _bindZegoEvents(engine) {
         try {
           const remoteStream = await engine.startPlayingStream(s.streamID, { audio: true, video: true });
           _zegoRemoteStreamId = s.streamID;
-          if (_onRemoteStreamCb && remoteStream) _onRemoteStreamCb(remoteStream);
+          if (remoteStream) _emit(_onRemoteStreamCbs, remoteStream);
         } catch (err) {
           console.error('[callProvider] zego startPlayingStream failed:', err);
         }
@@ -436,10 +453,9 @@ function _bindZegoEvents(engine) {
 
   // Room connection state → drives the "Reconnecting…" overlay.
   engine.on('roomStateUpdate', (roomID, state) => {
-    if (!_onReconnectStateCb) return;
-    if (state === 'CONNECTING') _onReconnectStateCb(true);
-    else if (state === 'CONNECTED') _onReconnectStateCb(false);
-    else if (state === 'DISCONNECTED') _onReconnectStateCb(false);
+    if (state === 'CONNECTING') _emit(_onReconnectStateCbs, true);
+    else if (state === 'CONNECTED') _emit(_onReconnectStateCbs, false);
+    else if (state === 'DISCONNECTED') _emit(_onReconnectStateCbs, false);
   });
 
   // Network quality (fires ~every 2s). Local user reports with userID === ''
@@ -447,9 +463,9 @@ function _bindZegoEvents(engine) {
   // of up/down so the indicator reflects perceived quality.
   engine.on('networkQuality', (userID, upstreamQuality, downstreamQuality) => {
     const isLocal = userID === '' || userID === _zegoUserId;
-    if (!isLocal || !_onNetworkQualityCb) return;
+    if (!isLocal) return;
     const level = Math.max(Number(upstreamQuality), Number(downstreamQuality));
-    _onNetworkQualityCb({ level, upstreamQuality, downstreamQuality });
+    _emit(_onNetworkQualityCbs, { level, upstreamQuality, downstreamQuality });
   });
 }
 
@@ -486,12 +502,14 @@ async function _zegoCreateLocalStream(type) {
     _localStream = await engine.createStream({
       camera: wantVideo ? { ...ZEGO_VIDEO_CAMERA } : { audio: true, video: false },
     });
+    _emit(_onLocalStreamCbs, _localStream, type);
     return _localStream;
   } catch (err) {
     console.error('[callProvider] zego createStream failed:', err);
     if (wantVideo) {
       console.warn('[callProvider] falling back to audio-only (zego)');
       _localStream = await engine.createStream({ camera: { audio: true, video: false } });
+      _emit(_onLocalStreamCbs, _localStream, 'voice');
       return _localStream;
     }
     throw err;
@@ -561,6 +579,7 @@ function cleanup() {
   if (_localStream) {
     _localStream.getTracks().forEach((t) => t.stop());
     _localStream = null;
+    _emit(_onLocalStreamCbs, null, null);
   }
   if (_peerConnection) {
     _peerConnection.close();
@@ -612,6 +631,12 @@ async function initiateCall({ receiverId, type, callerName, callerAvatar }) {
   _currentRoomId = call.roomId;
   _currentCallType = type;
   _currentPeerId = receiverId;
+  _emit(_onOutgoingCallCbs, {
+    callId: call.id || call._id,
+    receiverId,
+    type,
+    roomId: call.roomId,
+  });
 
   // 2. Acquire local media stream.
   if (ACTIVE_PROVIDER === PROVIDERS.NATIVE) {
@@ -691,25 +716,33 @@ function endCall({ callId }) {
 // ─── Event listeners ────────────────────────────────────────────────────────
 
 function onRemoteStream(cb) {
-  _onRemoteStreamCb = cb;
+  return _subscribe(_onRemoteStreamCbs, cb);
+}
+
+function onLocalStream(cb) {
+  return _subscribe(_onLocalStreamCbs, cb);
 }
 
 function onCallStateChange(cb) {
-  _onCallStateCb = cb;
+  return _subscribe(_onCallStateCbs, cb);
 }
 
 function onIncomingCall(cb) {
-  _onIncomingCallCb = cb;
+  return _subscribe(_onIncomingCallCbs, cb);
+}
+
+function onOutgoingCall(cb) {
+  return _subscribe(_onOutgoingCallCbs, cb);
 }
 
 // Additive — used by the call overlay's quality indicator / reconnect banner.
 // Under the native provider these simply never fire.
 function onNetworkQuality(cb) {
-  _onNetworkQualityCb = cb;
+  return _subscribe(_onNetworkQualityCbs, cb);
 }
 
 function onReconnectStateChange(cb) {
-  _onReconnectStateCb = cb;
+  return _subscribe(_onReconnectStateCbs, cb);
 }
 
 // ─── Media controls ─────────────────────────────────────────────────────────
@@ -782,8 +815,10 @@ const callProvider = {
 
   // Event handlers
   onRemoteStream,
+  onLocalStream,
   onCallStateChange,
   onIncomingCall,
+  onOutgoingCall,
   onNetworkQuality,        // additive
   onReconnectStateChange,  // additive
 

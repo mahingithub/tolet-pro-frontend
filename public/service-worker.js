@@ -1,3 +1,5 @@
+importScripts('/call-notification-sw.js');
+
 /* TO-LET PRO — Service Worker
  * ───────────────────────────────────────────────────────────────────────────
  * Makes the app installable + gives a basic offline shell. Written DEFENSIVELY
