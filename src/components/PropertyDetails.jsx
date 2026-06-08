@@ -44,10 +44,14 @@ import { GoogleMap, MarkerF, useJsApiLoader } from '@react-google-maps/api';
 
 // Pull the API key from whichever bundler the host project uses. Comment the
 // line that does NOT match your build tool — the other line stays.
+// Last-resort fallback so the interactive map keeps working even if the
+// build's env var is missing. This key is restricted in Google Cloud (locked
+// to our domains + Maps JavaScript API only), so exposing it here is low-risk
+// — a Maps JS key is public in the browser bundle regardless.
 const GOOGLE_MAPS_API_KEY =
   (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_GOOGLE_MAPS_API_KEY) ||
   (typeof process !== 'undefined' && process?.env?.REACT_APP_GOOGLE_MAPS_API_KEY) ||
-  '';
+  'AIzaSyC9xWNjjSPhxy2aUWLubPqHR7N6KZWmKlg';
 
 // Loaded libraries (kept as a stable reference for useJsApiLoader). Add
 // 'places' here if you wire up address autocomplete in the inquiry/edit flow.
