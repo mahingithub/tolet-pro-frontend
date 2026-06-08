@@ -27,12 +27,14 @@ import { propertyService, subscribeUserProperties, propertyLocationHaystack } fr
 // ╚══════════════════════════════════════════════════════════════════════════╝
 import { GoogleMap, OverlayView, OverlayViewF, useJsApiLoader } from "@react-google-maps/api";
 
-// Pull the API key from whichever bundler the host project uses. Comment the
-// line that does NOT match your build tool — the other line stays.
+// Pull the API key from whichever bundler the host project uses. There is NO
+// hard-coded fallback: a Maps key shipped in source is a security risk, and an
+// empty key here cleanly degrades to the keyless iframe map below. Set
+// VITE_GOOGLE_MAPS_API_KEY on the FRONTEND host (Vercel), then redeploy.
 const GOOGLE_MAPS_API_KEY =
 	(typeof import.meta !== "undefined" && import.meta?.env?.VITE_GOOGLE_MAPS_API_KEY) ||
 	(typeof process !== "undefined" && process?.env?.REACT_APP_GOOGLE_MAPS_API_KEY) ||
-	"AIzaSyC9xWNjjSPhxy2aUWLubPqHR7N6KZWmKlg";
+	"";
 
 // Default centre — middle of Dhaka. Override via the prop on <MapView />.
 const DEFAULT_MAP_CENTER = { lat: 23.7652, lng: 90.3893 };
