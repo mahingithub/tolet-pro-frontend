@@ -511,14 +511,23 @@ useEffect(() => {
             {isAuthed && <NotificationBell isAuthed={isAuthed} />}
 
             {/* List Property Desktop Button (Always Visible) */}
-            <button onClick={() => handleProtected('/list-property')} className="relative flex items-center gap-2 overflow-hidden px-4 py-2 rounded-xl font-black text-xs whitespace-nowrap transition-all active:scale-95 group shadow-[0_4px_18px_rgba(186,0,54,0.28)] hover:shadow-[0_8px_26px_rgba(186,0,54,0.42)] hover:-translate-y-0.5" style={{background:'linear-gradient(135deg,#ba0036 0%,#e8004e 60%,#ba0036 100%)'}}>
-              <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{background:'linear-gradient(135deg,#d4004a 0%,#ff1a5e 60%,#d4004a 100%)'}} />
-              <span className="relative z-10 flex items-center gap-2 text-white">
-                <span className="w-5 h-5 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
-                  <PlusCircle size={13} className="text-white" />
+            <button
+              onClick={() => handleProtected('/list-property')}
+              className="group relative flex items-center gap-2.5 overflow-hidden rounded-full pl-1.5 pr-4 py-1.5 font-black text-xs whitespace-nowrap text-white transition-all duration-300 active:scale-95 shadow-[0_6px_20px_-4px_rgba(186,0,54,0.5)] hover:shadow-[0_12px_30px_-6px_rgba(186,0,54,0.65)] hover:-translate-y-0.5"
+              style={{ background: 'linear-gradient(135deg,#e8004e 0%,#ba0036 100%)' }}
+            >
+              {/* brighten on hover */}
+              <span className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{ background: 'linear-gradient(135deg,#ff2168 0%,#cc003c 100%)' }} />
+              {/* top gloss highlight for depth */}
+              <span className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent" />
+              {/* subtle shine sweep on hover */}
+              <span className="pointer-events-none absolute -inset-y-3 -left-12 w-10 -skew-x-12 bg-white/25 blur-md transition-all duration-700 ease-out group-hover:left-[115%]" />
+              <span className="relative z-10 flex items-center gap-2.5">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/30 shrink-0 transition-all duration-300 group-hover:bg-white/30 group-hover:scale-105">
+                  <PlusCircle size={15} className="text-white" strokeWidth={2.5} />
                 </span>
                 {t?.listProperty || 'Post Property'}
-                <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] tracking-widest">FREE</span>
+                <span className="rounded-full bg-white px-2 py-[3px] text-[10px] font-extrabold leading-none tracking-wider text-[#ba0036] shadow-sm">FREE</span>
               </span>
             </button>
 
