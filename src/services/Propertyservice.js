@@ -192,6 +192,62 @@ export function applyFilters(properties, filters) {
 
 // ─── INTERNAL HELPERS ─────────────────────────────────────────────────────────
 
+// ─── CLOUDINARY DIRECT UPLOAD ───────────────────────────────────────────────
+// Property media (cover photo, room photos, walkthrough video) is uploaded
+// straight from the browser to Cloudinary using an UNSIGNED upload preset, and
+// only the resulting https URL is sent to our API. This keeps base64 blobs OUT
+// of the request body (which was causing POST 400s) and OUT of MongoDB / the
+// Render backend (which was causing listing 500 OOMs). Large videos never
+// touch our server at all.
+//
+// Requires two Vite env vars (set on Vercel, then REDEPLOY — Vite inlines env
+// at build time):
+//   VITE_CLOUDINARY_CLOUD_NAME    — your Cloudinary cloud name
+//   VITE_CLOUDINARY_UPLOAD_PRESET — an UNSIGNED upload preset name
+const CLOUDINARY_CLOUD  = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '';
+const CLOUDINARY_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || '';
+
+const isHttpUrl = (s) => /^https?:\/\//i.test(String(s || '').trim());
+
+/**
+ * Upload one asset to Cloudinary and return its secure https URL.
+ *  - `asset` may be a File/Blob (preferred) OR a base64 `data:` URL string.
+ *  - If `asset` is ALREADY an https URL (e.g. editing a listing whose media was
+ *    uploaded earlier), it is returned unchanged — no wasteful re-upload.
+ *  - `resourceType` is 'image' or 'video'.
+ */
+async function uploadToCloudinary(asset, resourceType = 'image') {
+  if (isHttpUrl(asset)) return String(asset).trim(); // already hosted
+  if (!asset) return '';
+  if (!CLOUDINARY_CLOUD || !CLOUDINARY_PRESET) {
+    throw new Error(
+      'Cloudinary is not configured. Set VITE_CLOUDINARY_CLOUD_NAME and ' +
+      'VITE_CLOUDINARY_UPLOAD_PRESET in the frontend environment, then redeploy.'
+    );
+  }
+
+  const fd = new FormData();
+  fd.append('file', asset);                 // Cloudinary accepts a File/Blob OR a data: URI
+  fd.append('upload_preset', CLOUDINARY_PRESET);
+
+  const endpoint = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/${resourceType}/upload`;
+  let res;
+  try {
+    res = await fetch(endpoint, { method: 'POST', body: fd });
+  } catch {
+    throw new Error('Could not reach Cloudinary. Check your connection and try again.');
+  }
+  if (!res.ok) {
+    let detail = '';
+    try { detail = (await res.json())?.error?.message || ''; } catch { /* ignore */ }
+    throw new Error(`Media upload failed (${res.status})${detail ? `: ${detail}` : ''}.`);
+  }
+  const data = await res.json();
+  const url = data.secure_url || data.url || '';
+  if (!url) throw new Error('Media upload returned no URL.');
+  return url;
+}
+
 function toCloudinaryListingImage(url) {
   const source = String(url || '').trim();
   if (!/^https?:\/\/res\.cloudinary\.com\//i.test(source)) return source;
@@ -251,16 +307,18 @@ async function makeListingThumbnail(url) {
 const buildRoomPhotoRecords = async (form) => {
   if (!Array.isArray(form.roomPhotos)) return [];
   const rows = form.roomPhotos
-    .map(p => ({ room: p.room || 'other', url: p.preview || p.url || '', thumbUrl: p.thumbUrl || '' }))
-    .filter(p => p.url);
-  return Promise.all(rows.map(async (p) => {
-    const thumbUrl = p.thumbUrl || await makeListingThumbnail(p.url);
-    return {
-      room: p.room,
-      url: p.url,
-      ...(thumbUrl && thumbUrl !== p.url ? { thumbUrl } : {}),
-    };
-  }));
+    // Prefer the original File (smaller + better quality than the base64
+    // preview); fall back to the data: URL preview, or an already-hosted url.
+    .map(p => ({ room: p.room || 'other', source: p.file || p.preview || p.url || '' }))
+    .filter(p => p.source);
+  // Upload each room photo to Cloudinary; store ONLY the resulting https URL.
+  // The listing card derives its own resized version from this URL on the fly
+  // (toCloudinaryListingImage / backend toCloudinaryCardImage), so a separate
+  // base64 thumbUrl is no longer needed.
+  return Promise.all(rows.map(async (p) => ({
+    room: p.room,
+    url:  await uploadToCloudinary(p.source, 'image'),
+  })));
 };
 
 
@@ -377,25 +435,18 @@ export const propertyService = {
     const owner = getCurrentUser();
     if (!owner) throw new Error('Sign in as a host before adding a property.');
 
-    let videoUrlStr = form.mainVideo?.preview || '';
-    if (form.mainVideo?.file) {
-      try {
-        videoUrlStr = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(form.mainVideo.file);
-        });
-      } catch (err) {
-        console.error("Failed to read video file", err);
-      }
-    }
-
     if (getToken()) {
-      const coverPhoto = form.coverPhoto?.preview || '';
-      const [coverPhotoThumb, roomPhotos] = await Promise.all([
-        makeListingThumbnail(coverPhoto),
+      // Upload all media straight to Cloudinary FIRST; the request body then
+      // carries ONLY https URLs (never base64). This is the fix for the POST
+      // 400s, and a big part of the listing 500 OOMs — the heavy bytes go to
+      // Cloudinary instead of into the request body / MongoDB / the backend.
+      const [coverPhoto, roomPhotos, videoUrl] = await Promise.all([
+        // Cover: prefer the original File, else the data: preview, else a url.
+        uploadToCloudinary(form.coverPhoto?.file || form.coverPhoto?.preview || '', 'image'),
         buildRoomPhotoRecords(form),
+        // Video: upload the raw File directly (no base64 conversion). An
+        // already-hosted https url (e.g. on edit) is passed through untouched.
+        uploadToCloudinary(form.mainVideo?.file || form.mainVideo?.preview || '', 'video'),
       ]);
 
       const body = {
@@ -421,10 +472,12 @@ export const propertyService = {
         price:       Number(String(form.price ?? '').replace(/[^\d.]/g, '')) || 0,
         status:      form.status      || 'active',
         coverPhoto,
-        coverPhotoThumb: coverPhotoThumb && coverPhotoThumb !== coverPhoto ? coverPhotoThumb : '',
+        // Card-size cover is derived from the Cloudinary URL on the fly, so we
+        // no longer send a separate base64 thumbnail.
+        coverPhotoThumb: '',
         roomPhotos,
         videoId:     form.videoId     || '',
-        videoUrl:    videoUrlStr,
+        videoUrl,
       };
 
       const res = await probeFetch('createProperty', `${API}/properties`, {
@@ -484,12 +537,20 @@ export const propertyService = {
   async updateProperty(id, patch = {}) {
     if (getToken()) {
       const nextPatch = { ...patch };
+      // Mirror createProperty: any media in the patch is uploaded to Cloudinary
+      // first so we never PATCH base64 into the document.
       if (Object.prototype.hasOwnProperty.call(nextPatch, 'coverPhoto')) {
-        const coverPhotoThumb = nextPatch.coverPhoto ? await makeListingThumbnail(nextPatch.coverPhoto) : '';
-        nextPatch.coverPhotoThumb = coverPhotoThumb && coverPhotoThumb !== nextPatch.coverPhoto ? coverPhotoThumb : '';
+        nextPatch.coverPhoto = nextPatch.coverPhoto
+          ? await uploadToCloudinary(nextPatch.coverPhoto, 'image')
+          : '';
+        nextPatch.coverPhotoThumb = ''; // derived from the URL on the fly
       }
       if (Array.isArray(nextPatch.roomPhotos)) {
         nextPatch.roomPhotos = await buildRoomPhotoRecords({ roomPhotos: nextPatch.roomPhotos });
+      }
+      // Guard: if a raw/base64 video sneaks into an edit, host it too.
+      if (Object.prototype.hasOwnProperty.call(nextPatch, 'videoUrl') && nextPatch.videoUrl) {
+        nextPatch.videoUrl = await uploadToCloudinary(nextPatch.videoUrl, 'video');
       }
       const res = await probeFetch('updateProperty', `${API}/properties/${id}`, {
         method:  'PATCH',
