@@ -57,6 +57,7 @@ const apiAvailability = {
   createProperty: true,
   hostProperties: true,
   updateProperty: true,
+  deleteProperty: true,
 };
 
 const inFlight = new Map();   // url → Promise<Response|null>
@@ -566,6 +567,41 @@ export const propertyService = {
 
     // No localStorage fallback — surface a real error if the server update failed.
     throw new Error('Could not update the property on the server. Please try again.');
+  },
+
+  /**
+   * প্রপার্টি ডিলিট করে।
+   * ✅ DELETE /api/properties/:id  (backend চালু থাকলে)
+   *
+   * Returns { ok, id, deletedBookings, deletedInquiries, deletedReceipts }
+   * on success. Throws with `e.code === 'active_bookings_exist'` (409) if
+   * there are active leases blocking deletion.
+   */
+  async deleteProperty(id) {
+    if (!getToken()) throw new Error('Sign in before deleting a property.');
+
+    const res = await probeFetch('deleteProperty', `${API}/properties/${id}`, {
+      method:  'DELETE',
+      headers: apiHeaders(),
+    });
+
+    if (res && res.ok) {
+      const data = await res.json();
+      broadcast(KEY_USER_PROPERTIES);
+      return data; // { ok, id, deletedBookings, deletedInquiries, deletedReceipts }
+    }
+
+    // Surface structured errors so the UI can branch on code / status.
+    if (res) {
+      const body = await res.json().catch(() => ({}));
+      const err = new Error(body.message || `Delete failed (${res.status}).`);
+      err.status = res.status;
+      err.code = body.code;
+      err.activeBookings = body.activeBookings;
+      throw err;
+    }
+
+    throw new Error('Could not reach the server. Please try again.');
   },
 };
 

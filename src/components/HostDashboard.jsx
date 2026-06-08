@@ -582,6 +582,7 @@ const HostDashboard = () => {
   const utilityRef = useRef(null);
   const notifRef = useRef(null);
   const langRef = useRef(null);
+  const toastTimerRef = useRef(null);
 
   // 🟢 DATA STATES
   const [properties, setProperties] = useState(initialPortfolio);
@@ -609,6 +610,11 @@ const HostDashboard = () => {
   // NOTE: in-dashboard chat panel removed — all message CTAs now route to
   // /messages (the standalone ChatSystem) so there's a single source of
   // truth for conversations across the app.
+
+  // 🟢 DELETE PROPERTY STATES
+  const [deleteTarget, setDeleteTarget] = useState(null);     // property object to delete
+  const [deleteLoading, setDeleteLoading] = useState(false);   // spinner during API call
+  const [undoState, setUndoState] = useState(null);            // { prop, timeoutId } for undo grace
 
   // 🟢 PREMIUM + RENT-LEDGER STATES
   // Premium access is now DERIVED from the real subscription status (computed
@@ -864,9 +870,13 @@ const HostDashboard = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  const showToast = (msg, { undo, duration, type } = {}) => {
+    setToastMessage({ text: msg, undo: undo || null, type: type || 'success' });
+    clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(
+      () => setToastMessage(null),
+      undo ? 6000 : (duration || 3000),
+    );
   };
 
   // 🟢 PROFILE LOGIC HANDLERS
@@ -1008,6 +1018,82 @@ const HostDashboard = () => {
       return p;
     }));
   };
+
+  // ─── DELETE PROPERTY (deferred with undo grace period) ────────────────
+  // Step 1: User clicks Delete → opens the confirmation modal.
+  const handleDeleteProperty = (prop) => {
+    setDeleteTarget(prop);
+    setActiveModal('confirm_delete');
+  };
+
+  // Step 2: User confirms in the modal → card removed from UI immediately,
+  // actual API call deferred by 5 seconds. During that window the Undo
+  // button in the toast re-inserts the card and cancels the timeout.
+  const confirmDeleteProperty = () => {
+    const prop = deleteTarget;
+    if (!prop) return;
+    setActiveModal(null);
+    setDeleteTarget(null);
+
+    // Optimistically remove from state
+    setProperties((prev) => prev.filter((p) => p.id !== prop.id));
+
+    // Schedule the real API call
+    const tid = setTimeout(async () => {
+      setUndoState(null);
+      setDeleteLoading(true);
+      try {
+        await propertyService.deleteProperty(prop.id);
+        showToast(
+          language === 'বাংলা'
+            ? 'প্রপার্টি সফলভাবে মুছে ফেলা হয়েছে'
+            : 'Property deleted successfully',
+        );
+      } catch (err) {
+        // Re-add to the list on failure
+        setProperties((prev) => [prop, ...prev]);
+        if (err.code === 'active_bookings_exist') {
+          showToast(
+            language === 'বাংলা'
+              ? `মুছতে পারেননি — ${err.activeBookings || ''}টি চলমান বুকিং আছে`
+              : `Cannot delete — ${err.activeBookings || ''} active booking(s) exist`,
+            { type: 'error' },
+          );
+        } else {
+          showToast(
+            language === 'বাংলা'
+              ? 'প্রপার্টি মুছতে সমস্যা হয়েছে'
+              : (err.message || 'Failed to delete property'),
+            { type: 'error' },
+          );
+        }
+      } finally {
+        setDeleteLoading(false);
+      }
+    }, 5000);
+
+    setUndoState({ prop, timeoutId: tid });
+
+    // Show undo toast
+    showToast(
+      language === 'বাংলা' ? 'প্রপার্টি মুছে ফেলা হবে...' : 'Property will be deleted...',
+      {
+        undo: () => {
+          clearTimeout(tid);
+          setUndoState(null);
+          setProperties((prev) => [prop, ...prev]);
+          showToast(language === 'বাংলা' ? 'আনডু সফল!' : 'Undo successful!');
+        },
+      },
+    );
+  };
+
+  // Cleanup undo timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (undoState?.timeoutId) clearTimeout(undoState.timeoutId);
+    };
+  }, [undoState]);
 
   const openModal = (type, data = null) => {
     setActiveModal(type);
@@ -1461,15 +1547,33 @@ const HostDashboard = () => {
         </button>
       )}
 
-      {/* TOAST NOTIFICATION */}
-      <div className={`fixed top-8 left-1/2 -translate-x-1/2 z-[100] transition-all duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${toastMessage ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-10 scale-95 pointer-events-none'}`}>
-        <div className="bg-gray-900/90 backdrop-blur-2xl text-white px-5 py-3 rounded-full shadow-[0_20px_40px_rgba(0,0,0,0.2)] border border-white/10 flex items-center gap-3">
-          <div className="w-5 h-5 bg-green-500/20 rounded-full flex items-center justify-center">
-             <CheckCircle2 size={12} className="text-green-400" />
+      {/* TOAST NOTIFICATION (supports undo + error/success types) */}
+      {(() => {
+        const toastText = typeof toastMessage === 'string' ? toastMessage : toastMessage?.text;
+        const toastUndo = typeof toastMessage === 'object' ? toastMessage?.undo : null;
+        const toastType = typeof toastMessage === 'object' ? (toastMessage?.type || 'success') : 'success';
+        const isError = toastType === 'error';
+        return (
+          <div className={`fixed top-8 left-1/2 -translate-x-1/2 z-[100] transition-all duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${toastMessage ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-10 scale-95 pointer-events-none'}`}>
+            <div className="bg-gray-900/90 backdrop-blur-2xl text-white px-5 py-3 rounded-full shadow-[0_20px_40px_rgba(0,0,0,0.2)] border border-white/10 flex items-center gap-3">
+              <div className={`w-5 h-5 ${isError ? 'bg-red-500/20' : 'bg-green-500/20'} rounded-full flex items-center justify-center`}>
+                {isError
+                  ? <AlertCircle size={12} className="text-red-400" />
+                  : <CheckCircle2 size={12} className="text-green-400" />}
+              </div>
+              <span className="text-xs font-bold tracking-wide">{toastText}</span>
+              {toastUndo && (
+                <button
+                  onClick={() => { toastUndo(); setToastMessage(null); clearTimeout(toastTimerRef.current); }}
+                  className="ml-1 px-3 py-1 bg-white/15 hover:bg-white/25 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors"
+                >
+                  {language === 'বাংলা' ? 'আনডু' : 'Undo'}
+                </button>
+              )}
+            </div>
           </div>
-          <span className="text-xs font-bold tracking-wide">{toastMessage}</span>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* --- TOP HEADER --- */}
       <div className="w-full max-w-[1600px] mx-auto z-40 relative">
@@ -4260,6 +4364,14 @@ const HostDashboard = () => {
                          ) : (
                            <button onClick={() => openModal('lease', prop)} className="flex-[2] flex items-center justify-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 py-2.5 md:py-3 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95"><FileText size={12} /> {t?.viewLeaseBtn || (language === 'বাংলা' ? 'লিজ দেখুন' : 'View Lease')}</button>
                          )}
+                         <button
+                           onClick={() => handleDeleteProperty(prop)}
+                           aria-label={language === 'বাংলা' ? `${prop.title} মুছুন` : `Delete ${prop.title}`}
+                           className="flex items-center justify-center gap-1.5 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 py-2.5 md:py-3 px-3 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ba0036]"
+                           title={language === 'বাংলা' ? 'প্রপার্টি মুছুন' : 'Delete property'}
+                         >
+                           <Trash2 size={13} />
+                         </button>
                       </div>
                     </div>
                   </div>
@@ -4319,9 +4431,67 @@ const HostDashboard = () => {
                 {activeModal === 'export_report' && (language === 'বাংলা' ? 'রিপোর্ট এক্সপোর্ট' : 'Export Report')}
                 {activeModal === 'send_reminders' && (language === 'বাংলা' ? 'পেমেন্ট রিমাইন্ডার' : 'Payment Reminders')}
                 {activeModal === 'download_user_document' && (language === 'বাংলা' ? 'ভাড়াটিয়ার ডকুমেন্ট' : 'Tenant Documents')}
+                {activeModal === 'confirm_delete' && (language === 'বাংলা' ? 'প্রপার্টি মুছুন' : 'Delete Property')}
               </h3>
               <button onClick={() => setActiveModal(null)} className="p-2 bg-white hover:bg-red-50 hover:text-red-500 rounded-full transition-all shadow-sm"><X size={18} /></button>
             </div>
+
+            {activeModal === 'confirm_delete' && deleteTarget && (
+              <div className="p-6 space-y-5" role="alertdialog" aria-labelledby="delete-confirm-title" aria-describedby="delete-confirm-desc">
+                {/* Property preview */}
+                <div className="flex items-center gap-4 p-4 bg-red-50/60 border border-red-100 rounded-2xl">
+                  {(deleteTarget.img || deleteTarget.coverPhoto) ? (
+                    <img
+                      src={deleteTarget.img || deleteTarget.coverPhoto}
+                      alt=""
+                      className="w-16 h-16 rounded-xl object-cover shrink-0"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+                      <Building2 size={24} className="text-red-300" />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p id="delete-confirm-title" className="text-sm font-black text-gray-900 truncate">{deleteTarget.title}</p>
+                    <p className="text-[10px] font-bold text-gray-500 flex items-center gap-1 mt-0.5"><MapPin size={10} className="text-[#ba0036]" /> {deleteTarget.location}</p>
+                  </div>
+                </div>
+
+                {/* Warning */}
+                <div id="delete-confirm-desc" className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle size={16} className="text-amber-600 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs font-black text-amber-800">
+                        {language === 'বাংলা' ? 'এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না' : 'This action cannot be undone'}
+                      </p>
+                      <p className="text-[10px] font-bold text-amber-700 mt-1 leading-relaxed">
+                        {language === 'বাংলা'
+                          ? 'এই প্রপার্টির সাথে সম্পর্কিত সকল ইনকোয়ারি, সম্পন্ন বুকিং এবং রসিদ মুছে যাবে। চলমান বুকিং থাকলে ডিলিট হবে না।'
+                          : 'All related inquiries, completed bookings, and receipts will be permanently removed. Properties with active bookings cannot be deleted.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-3 pt-1">
+                  <button
+                    onClick={() => { setActiveModal(null); setDeleteTarget(null); }}
+                    className="flex-1 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95"
+                  >
+                    {language === 'বাংলা' ? 'বাতিল' : 'Cancel'}
+                  </button>
+                  <button
+                    onClick={confirmDeleteProperty}
+                    className="flex-1 py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-[0_6px_15px_rgba(220,38,38,0.3)] flex items-center justify-center gap-2"
+                  >
+                    <Trash2 size={14} />
+                    {language === 'বাংলা' ? 'মুছে ফেলুন' : 'Delete Permanently'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {activeModal === 'upload_document' && (
                 <div className="space-y-5 p-6">
