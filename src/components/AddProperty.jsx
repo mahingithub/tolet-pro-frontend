@@ -16,10 +16,14 @@ import { propertyService } from '../services/Propertyservice';
 import { GoogleMap, MarkerF, useJsApiLoader } from '@react-google-maps/api';
 
 // ─── GOOGLE MAPS CONFIG (shared with PropertyDetails) ────────────────────────
+// Last-resort fallback so the interactive map keeps working even if the
+// build's env var is missing. This key is restricted in Google Cloud (locked
+// to our domains + Maps JavaScript API only), so exposing it here is low-risk
+// — a Maps JS key is public in the browser bundle regardless.
 const GOOGLE_MAPS_API_KEY =
   (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_GOOGLE_MAPS_API_KEY) ||
   (typeof process !== 'undefined' && process?.env?.REACT_APP_GOOGLE_MAPS_API_KEY) ||
-  '';
+  'AIzaSyC9xWNjjSPhxy2aUWLubPqHR7N6KZWmKlg';
 const GOOGLE_MAPS_LIBRARIES = [];
 const ADD_PROP_MAP_STYLES = [
   { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
