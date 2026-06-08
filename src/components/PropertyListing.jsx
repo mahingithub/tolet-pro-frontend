@@ -47,6 +47,8 @@ const MAP_STYLES = [
 	{ featureType: "transit", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
 ];
 
+const GOOGLE_MAPS_LIBRARIES = [];
+
 // ─── DATA SOURCE ──────────────────────────────────────────────────────────────
 // Listings now come from propertyService. No demo / hard-coded properties live
 // in this file anymore — the only properties that ever render are:
@@ -362,11 +364,12 @@ const MapView = ({ properties, highlightedId, onMarkerHover, onMarkerHoverEnd, o
 	);
 
 	// Load the Maps JS SDK once per page (the loader de-duplicates internally).
-	// NOTE: `libraries` prop is intentionally omitted — passing an empty array
-	// causes an internal constructor crash in some versions of @react-google-maps/api.
+	// Must match the options passed in other files exactly to avoid the
+	// "Loader must not be called again with different options" error.
 	const { isLoaded, loadError } = useJsApiLoader({
 		id: "tlp-google-map-script",
 		googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+		libraries: GOOGLE_MAPS_LIBRARIES,
 	});
 
 	// TODO (backend): when the user pans/zooms the map, refetch properties
