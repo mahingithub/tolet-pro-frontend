@@ -528,12 +528,36 @@ const HostDashboard = () => {
     utilityBill: false
   });
 
-  const [verificationStatus, setVerificationStatus] = useState({
-    profileCompleted: true, 
-    nidUploaded: false,
-    faceVerified: false,
-    underReview: false
+  const [verificationStatus, setVerificationStatus] = useState(() => {
+    const isTenantVerified = authUser?.tenantProfile?.verification?.status === 'verified';
+    const isHostVerified = authUser?.landlordProfile?.verification?.status === 'verified';
+    const hasNid = !!authUser?.tenantProfile?.verification?.nidFront || !!authUser?.landlordProfile?.verification?.nidFront;
+    const hasFace = !!authUser?.tenantProfile?.verification?.photo || !!authUser?.landlordProfile?.verification?.photo;
+    const isVerified = isTenantVerified || isHostVerified;
+
+    return {
+      profileCompleted: true, 
+      nidUploaded: isVerified || hasNid,
+      faceVerified: isVerified || hasFace,
+      underReview: authUser?.landlordProfile?.verification?.status === 'pending' || authUser?.tenantProfile?.verification?.status === 'pending'
+    };
   });
+
+  useEffect(() => {
+    if (!authUser) return;
+    const isTenantVerified = authUser?.tenantProfile?.verification?.status === 'verified';
+    const isHostVerified = authUser?.landlordProfile?.verification?.status === 'verified';
+    const hasNid = !!authUser?.tenantProfile?.verification?.nidFront || !!authUser?.landlordProfile?.verification?.nidFront;
+    const hasFace = !!authUser?.tenantProfile?.verification?.photo || !!authUser?.landlordProfile?.verification?.photo;
+    const isVerified = isTenantVerified || isHostVerified;
+
+    setVerificationStatus(prev => ({
+      ...prev,
+      nidUploaded: isVerified || hasNid,
+      faceVerified: isVerified || hasFace,
+      underReview: authUser?.landlordProfile?.verification?.status === 'pending' || authUser?.tenantProfile?.verification?.status === 'pending'
+    }));
+  }, [authUser]);
 
   const landlordTrustScore = (() => {
     const lp = landlordProfile || {};
@@ -1889,6 +1913,10 @@ const HostDashboard = () => {
                 onClose={() => setVerifModalOpen(false)}
                 onSubmit={handleHostWizardSubmit}
                 language={language}
+                role="landlord"
+                initialData={{
+                  nidVerified: authUser?.tenantProfile?.verification?.status === 'verified' || !!authUser?.tenantProfile?.verification?.nidFront || !!authUser?.landlordProfile?.verification?.nidFront
+                }}
               />
             )}
           </div>

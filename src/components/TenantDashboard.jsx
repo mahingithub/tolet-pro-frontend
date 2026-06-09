@@ -93,7 +93,6 @@ const DEFAULT_TENANT_PROFILE = {
     photo: false,
     nidFront: false,
     nidBack: false,
-    professionProof: false,
     submittedForReview: false,
     status: 'unverified',
   },
@@ -104,15 +103,12 @@ const DEFAULT_TENANT_PROFILE = {
 // ║  Single source of truth for "how done are the *required* docs?".      ║
 // ╚════════════════════════════════════════════════════════════════════════╝
 const countVerificationSteps = (p) => {
-  if (!p?.verification) return { done: 0, total: 3 };
+  if (!p?.verification) return { done: 0, total: 2 };
   const v = p.verification;
-  // Step 3 (profession proof) is N/A for "other" — auto-complete then.
-  const skipStep3 = p.professionType === 'other' || p.professionType === '';
-  const total = skipStep3 ? 2 : 3;
+  const total = 2;
   let done = 0;
   if (v.photo) done += 1;
   if (v.nidFront && v.nidBack) done += 1;
-  if (!skipStep3 && v.professionProof) done += 1;
   return { done, total };
 };
 
@@ -132,9 +128,8 @@ const computeTrustScore = (p) => {
   const v = p.verification || {};
   const items = [
     { key: 'phone',      labelEn: 'Phone OTP verified', labelBn: 'ফোন OTP ভেরিফাইড', pts: 20, done: !!p.phone },
-    { key: 'photo',      labelEn: 'Profile photo',      labelBn: 'প্রোফাইল ছবি',     pts: 20, done: !!v.photo },
-    { key: 'nid',        labelEn: 'NID verified',       labelBn: 'NID ভেরিফাইড',     pts: 30, done: !!(v.nidFront && v.nidBack) },
-    { key: 'profession', labelEn: 'Profession proof',   labelBn: 'পেশার প্রমাণ',     pts: 30, done: !!v.professionProof || p.professionType === 'other' },
+    { key: 'photo',      labelEn: 'Profile photo',      labelBn: 'প্রোফাইল ছবি',     pts: 30, done: !!v.photo },
+    { key: 'nid',        labelEn: 'NID verified',       labelBn: 'NID ভেরিফাইড',     pts: 50, done: !!(v.nidFront && v.nidBack) },
   ];
   const score = items.filter((i) => i.done).reduce((sum, i) => sum + i.pts, 0);
   let tier = 'bronze';
@@ -793,7 +788,6 @@ const TenantDashboard = () => {
   //     photo:           { dataUrl, file, ... },
   //     nidFront:        { dataUrl, file, ... },
   //     nidBack:         { dataUrl, file, ... },
-  //     professionProof: { dataUrl, file, ... },
   //     liveScore }
   //
   // The previous implementation only wrote to localStorage — backend never
@@ -825,7 +819,6 @@ const handleWizardSubmit = async (payload) => {
   if (payload.photo?.file)           uploads.push(['photo',           payload.photo.file]);
   if (payload.nidFront?.file)        uploads.push(['nidFront',        payload.nidFront.file]);
   if (payload.nidBack?.file)         uploads.push(['nidBack',         payload.nidBack.file]);
-  if (payload.professionProof?.file) uploads.push(['professionProof', payload.professionProof.file]);
 
   try {
     // ── 2. Upload to Cloudinary (sequential — keeps the admin's audit
@@ -870,7 +863,6 @@ const handleWizardSubmit = async (payload) => {
         photo:           !!v.photo           || !!payload.photo?.file,
         nidFront:        !!v.nidFront        || !!payload.nidFront?.file,
         nidBack:         !!v.nidBack         || !!payload.nidBack?.file,
-        professionProof: !!v.professionProof || !!payload.professionProof?.file,
       });
     }
 
@@ -890,7 +882,6 @@ const handleWizardSubmit = async (payload) => {
         photo:              !!payload.photo?.file           || !!tenantProfile.verification?.photo,
         nidFront:           !!payload.nidFront?.file        || !!tenantProfile.verification?.nidFront,
         nidBack:            !!payload.nidBack?.file         || !!tenantProfile.verification?.nidBack,
-        professionProof:    !!payload.professionProof?.file || !!tenantProfile.verification?.professionProof,
         submittedForReview: true,
         status:             'pending',
       },
@@ -945,7 +936,6 @@ const handleWizardSubmit = async (payload) => {
           photo:           !!tenantProfile.verification.photo,
           nidFront:        !!tenantProfile.verification.nidFront,
           nidBack:         !!tenantProfile.verification.nidBack,
-          professionProof: !!tenantProfile.verification.professionProof,
           professionType:  tenantProfile.professionType || '',
         },
       });
@@ -1904,15 +1894,7 @@ const handleWizardSubmit = async (payload) => {
                   textBn="NID আপলোড"
                   language={language}
                 />
-                {tenantProfile.professionType !== '' && tenantProfile.professionType !== 'other' && (
-                  <TimelineRow
-                    done={tenantProfile.verification.professionProof}
-                    icon={FileText}
-                    textEn="Profession proof uploaded"
-                    textBn="পেশা প্রমাণ আপলোড"
-                    language={language}
-                  />
-                )}
+
                 <TimelineRow
                   done={verifPending || isVerified}
                   icon={Hourglass}

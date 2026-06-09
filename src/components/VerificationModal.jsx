@@ -51,10 +51,9 @@ const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
 // ── Tenant trust-score weights (mirrors backend computeTenantTrust) ──────
 // phone(20) is NOT in the modal — already captured at signup.
 const TENANT_POINTS = {
-  photo:           20,
-  nidFront:        15, // 30 total for nid, split visually
-  nidBack:         15,
-  professionProof: 30,
+  photo:           30,
+  nidFront:        25, // 50 total for nid, split visually
+  nidBack:         25,
 };
 
 // ── Landlord trust-score weights (mirrors backend computeLandlordTrust) ──
@@ -115,7 +114,6 @@ const HOUSE_RULES_OPTIONS = [
 const TENANT_STEPS = [
   { key: 'profession',      icon: Briefcase,  required: true,  optional: false },
   { key: 'photo',           icon: Camera,     required: true,  optional: false },
-  { key: 'professionProof', icon: Briefcase,  required: true,  optional: true  },
   { key: 'nid',             icon: IdCard,     required: false, optional: true  },
   { key: 'review',          icon: Sparkles,   required: false, optional: false },
 ];
@@ -365,7 +363,7 @@ const SummaryRow = ({ icon: Icon, labelBn, labelEn, value, muted, isBn }) => (
 // ═══════════════════════════════════════════════════════════════════════════
 //  <TenantFields> — renders step bodies for tenant-only scoring fields
 // ═══════════════════════════════════════════════════════════════════════════
-const TenantFields = ({ stepKey, data, setData, isBn, photoInputRef, professionProofInputRef, handleFilePick, removeFile }) => {
+const TenantFields = ({ stepKey, data, setData, isBn, photoInputRef, handleFilePick, removeFile }) => {
   if (stepKey === 'profession') {
     return (
       <StepFrame
@@ -431,38 +429,7 @@ const TenantFields = ({ stepKey, data, setData, isBn, photoInputRef, professionP
     );
   }
 
-  if (stepKey === 'professionProof') {
-    return (
-      <StepFrame
-        key="professionProof"
-        icon={Briefcase}
-        titleBn="পেশার প্রমাণ" titleEn="Profession proof"
-        hintBn="জব আইডি, স্টুডেন্ট আইডি বা ব্যবসার কাগজ — ট্রাস্ট স্কোরে ৩০ পয়েন্ট।"
-        hintEn="Job ID, student ID, or business docs — adds 30 trust points."
-        optional isBn={isBn}
-      >
-        <ImageUploadCard
-          value={data.professionProof}
-          inputRef={professionProofInputRef}
-          onPick={(e) => handleFilePick('professionProof', e)}
-          onRemove={() => removeFile('professionProof')}
-          emptyLabelBn="পেশার প্রমাণ আপলোড করুন" emptyLabelEn="Upload profession proof"
-          isBn={isBn}
-          aspect="aspect-[4/3]"
-        />
-        {data.profession === 'other' && (
-          <div className="mt-3.5 p-3.5 rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/10 flex gap-2.5 items-start">
-            <Award size={14} className="text-emerald-400 shrink-0 mt-0.5" />
-            <p className="text-[11px] font-bold text-emerald-300/70 leading-relaxed">
-              {isBn
-                ? 'আপনি "অন্যান্য" বাছাই করেছেন, তাই এটা স্কিপ করলেও ট্রাস্ট পয়েন্ট পাবেন।'
-                : 'You selected "Other" — you\'ll get trust points even if you skip this.'}
-            </p>
-          </div>
-        )}
-      </StepFrame>
-    );
-  }
+
 
   return null;
 };
@@ -640,13 +607,7 @@ const TenantReview = ({ data, isBn }) => (
     <SummaryRow icon={Camera} labelBn="প্রোফাইল ফটো" labelEn="Profile photo" isBn={isBn}
       value={data.photo ? (isBn ? 'যোগ করা হয়েছে' : 'Added') : (isBn ? 'যোগ করা হয়নি' : 'Not added')}
       muted={!data.photo} />
-    <SummaryRow icon={Briefcase} labelBn="পেশার প্রমাণ" labelEn="Profession proof" isBn={isBn}
-      value={data.professionProof
-        ? (isBn ? 'যোগ করা হয়েছে' : 'Added')
-        : data.profession === 'other'
-          ? (isBn ? 'প্রয়োজন নেই' : 'Not needed')
-          : (isBn ? 'পরে যোগ করব' : 'Add later')}
-      muted={!data.professionProof && data.profession !== 'other'} />
+
     <SummaryRow icon={IdCard} labelBn="NID" labelEn="NID" isBn={isBn}
       value={(data.nidFront && data.nidBack)
         ? (isBn ? 'যোগ করা হয়েছে' : 'Added')
@@ -677,10 +638,10 @@ const HostReview = ({ data, isBn }) => (
       value={data.photo ? (isBn ? 'যোগ করা হয়েছে' : 'Added') : (isBn ? 'যোগ করা হয়নি' : 'Not added')}
       muted={!data.photo} />
     <SummaryRow icon={IdCard} labelBn="NID" labelEn="NID" isBn={isBn}
-      value={(data.nidFront && data.nidBack)
+      value={(data.nidFront && data.nidBack) || data.nidVerified
         ? (isBn ? 'যোগ করা হয়েছে' : 'Added')
         : (isBn ? 'আবশ্যক' : 'Required')}
-      muted={!(data.nidFront && data.nidBack)} />
+      muted={!(data.nidFront && data.nidBack) && !data.nidVerified} />
   </div>
 );
 
@@ -706,7 +667,6 @@ const VerificationModal = ({
   const buildTenantState = () => ({
     profession:      '',
     photo:           null,
-    professionProof: null,
     nidFront:        null,
     nidBack:         null,
   });
@@ -750,11 +710,15 @@ const VerificationModal = ({
           profession: initialData.professionType || '',
         };
       }
+      if (initialData.nidVerified) {
+        seed.nidVerified = true;
+      }
     }
 
     // Skip already-completed steps
     const filtered = BASE_STEPS.filter((step) => {
-      if (['nid', 'review'].includes(step.key)) return true;
+      if (step.key === 'review') return true;
+      if (step.key === 'nid') return !seed.nidVerified;
       if (step.key === 'profession'       && seed.profession)                            return false;
       if (step.key === 'preferredTenants'  && (seed.preferredTenants || []).length > 0)   return false;
       if (step.key === 'communication'     && (seed.communication || []).length > 0)      return false;
@@ -775,17 +739,14 @@ const VerificationModal = ({
     let s = 0;
     if (isLandlord) {
       if (data.photo)                                              s += POINTS.photo;
-      if (data.nidFront)                                           s += POINTS.nidFront;
-      if (data.nidBack)                                            s += POINTS.nidBack;
+      if (data.nidFront || data.nidVerified)                       s += POINTS.nidFront + POINTS.nidBack; // Assuming NID points total
       if ((data.preferredTenants || []).length > 0)                 s += POINTS.preferredTenants;
       if ((data.communication || []).length > 0)                    s += POINTS.communication;
       if (data.serviceCharge !== '' && data.serviceCharge != null)  s += POINTS.serviceCharge;
       if ((data.houseRules || []).length > 0)                       s += POINTS.houseRules;
     } else {
       if (data.photo)                                              s += POINTS.photo;
-      if (data.nidFront)                                           s += POINTS.nidFront;
-      if (data.nidBack)                                            s += POINTS.nidBack;
-      if (data.professionProof || data.profession === 'other')     s += POINTS.professionProof;
+      if (data.nidFront || data.nidVerified)                       s += POINTS.nidFront + POINTS.nidBack;
     }
     return Math.min(100, s);
   }, [data, isLandlord, POINTS]);
@@ -797,7 +758,6 @@ const VerificationModal = ({
     switch (step.key) {
       // Tenant
       case 'profession':       return !!data.profession;
-      case 'professionProof':  return true; // optional
       // Landlord
       case 'preferredTenants': return (data.preferredTenants || []).length > 0;
       case 'communication':    return (data.communication || []).length > 0;
@@ -805,9 +765,9 @@ const VerificationModal = ({
       case 'serviceCharge':    return data.serviceCharge !== '' && data.serviceCharge != null;
       // Shared
       case 'photo':            return !!data.photo;
-      case 'nid':              return isLandlord
+      case 'nid':              return data.nidVerified || (isLandlord
                                   ? !!(data.nidFront && data.nidBack)
-                                  : true; // optional for tenant
+                                  : true); // optional for tenant
       case 'review':           return true;
       default:                 return false;
     }
@@ -820,12 +780,11 @@ const VerificationModal = ({
       map[s.key] =
         (s.key === 'profession'       && !!data.profession) ||
         (s.key === 'photo'            && !!data.photo) ||
-        (s.key === 'professionProof'  && (!!data.professionProof || data.profession === 'other')) ||
         (s.key === 'preferredTenants' && (data.preferredTenants || []).length > 0) ||
         (s.key === 'communication'    && (data.communication || []).length > 0) ||
         (s.key === 'houseRules'       && (data.houseRules || []).length > 0) ||
         (s.key === 'serviceCharge'    && data.serviceCharge !== '' && data.serviceCharge != null) ||
-        (s.key === 'nid'              && !!(data.nidFront && data.nidBack));
+        (s.key === 'nid'              && (data.nidVerified || !!(data.nidFront && data.nidBack)));
     });
     return map;
   }, [activeSteps, data]);
@@ -856,7 +815,6 @@ const VerificationModal = ({
   const nidFrontInputRef      = useRef(null);
   const nidBackInputRef       = useRef(null);
   const photoInputRef         = useRef(null);
-  const professionProofInput  = useRef(null);
 
   const handleFilePick = async (slot, e) => {
     const file = e.target.files?.[0];
@@ -902,7 +860,6 @@ const VerificationModal = ({
             role: 'tenant',
             professionType:  data.profession,
             photo:           data.photo,
-            professionProof: data.professionProof,
             nidFront:        data.nidFront,
             nidBack:         data.nidBack,
             liveScore,
@@ -1001,7 +958,6 @@ const VerificationModal = ({
                 setData={setData}
                 isBn={isBn}
                 photoInputRef={photoInputRef}
-                professionProofInputRef={professionProofInput}
                 handleFilePick={handleFilePick}
                 removeFile={removeFile}
               />
