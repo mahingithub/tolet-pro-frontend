@@ -162,7 +162,21 @@ const Navbar = () => {
   // "Switch to Tenant" clicked, no visible change).
   const handleSwitchRole = async () => {
     const target = userRole === 'tenant' ? 'landlord' : 'tenant';
-    setUserRole(target);  // optimistic — keeps the UI snappy
+
+    // Intercept action: Evaluate the user's current verification status
+    if (target === 'landlord') {
+      const isVerified = authUser?.tenantProfile?.verification?.status === 'verified' || authUser?.landlordProfile?.verification?.status === 'verified';
+      
+      // Failure Scenario: If NOT Verified, block role switch and open Verification Modal
+      if (!isVerified) {
+        closeAll();
+        setShowVerificationModal(true);
+        return;
+      }
+    }
+
+    // Success Scenario (If Verified): optimistic switch and proceed
+    setUserRole(target);
     try {
       const owns = Array.isArray(auth.roles) && auth.roles.includes(target);
       if (!owns) await auth.addRole?.(target);
@@ -172,23 +186,11 @@ const Navbar = () => {
       closeAll();
       navigate(target === 'landlord' ? '/host-dashboard' : '/tenant-dashboard');
     } catch (err) {
-      // Server refused. The most common reason is "verification_required" —
-      // tenant tried to become a landlord without uploading their NID +
-      // profile photo + profession proof first. Instead of silently
-      // reverting the pill (which leaves the user wondering "why didn't
-      // anything happen?"), route them straight into the verification
-      // flow with a `next` param so they bounce back to the host dashboard
-      // once docs are submitted. Any other error reverts the optimistic
-      // switch so the UI matches the truth.
-      setUserRole(userRole); // revert in both branches
+      // Revert optimistic switch on any other error
+      setUserRole(userRole);
       if (err?.code === 'verification_required') {
         closeAll();
-        // Route them into the tenant dashboard with a query param so
-        // the dashboard can auto-open the new VerificationWizardModal.
-        // We previously sent them to a standalone /verify-identity page
-        // (IdentityVerification.jsx), but that component has been retired
-        // in favour of the modal-based wizard shared with HostDashboard.
-        navigate('/tenant-dashboard?openVerify=1&reason=host_upgrade');
+        setShowVerificationModal(true);
       }
     }
   };
@@ -210,6 +212,7 @@ const Navbar = () => {
   };
 
   const [showAuthModal,     setShowAuthModal]     = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [isLangMenuOpen,    setIsLangMenuOpen]    = useState(false);
   const [isMobileMenuOpen,  setIsMobileMenuOpen]  = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -320,7 +323,7 @@ useEffect(() => {
       if (top) window.scrollTo({ top: -parseInt(top, 10), behavior: 'instant' });
     }
     return () => { document.body.style.cssText = ''; };
-  }, [isMobileMenuOpen, showAuthModal]);
+  }, [isMobileMenuOpen, showAuthModal, showVerificationModal]);
 
   // The bottom-nav Profile tab opens this drawer for logged-out users. It
   // dispatches a 'open-mobile-menu' custom event on window; we listen for it
@@ -331,7 +334,7 @@ useEffect(() => {
     return () => window.removeEventListener('open-mobile-menu', handler);
   }, []);
 
-  const closeAll = () => { setIsMobileMenuOpen(false); setIsProfileMenuOpen(false); };
+  const closeAll = () => { setIsMobileMenuOpen(false); setIsProfileMenuOpen(false); setShowVerificationModal(false); };
 
   const go = path => { navigate(path); closeAll(); };
 
@@ -958,6 +961,54 @@ useEffect(() => {
                 <button onClick={() => setShowAuthModal(false)}
                   className="w-full bg-white border border-gray-200 text-gray-600 py-4 rounded-2xl font-black text-sm hover:bg-gray-50 transition-all active:scale-95">
                   Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Verification Required Modal */}
+      {showVerificationModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" 
+            onClick={() => setShowVerificationModal(false)}
+          />
+          
+          {/* Modal Content */}
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-[slideUp_0.3s_ease-out]">
+            <div className="p-6 sm:p-8">
+              <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-6 shadow-sm">
+                <ShieldAlert size={32} className="text-[#ba0036]" />
+              </div>
+              
+              <h3 className="text-xl sm:text-2xl font-black text-gray-900 mb-3 tracking-tight">
+                {language === 'বাংলা' ? 'ভেরিফিকেশন প্রয়োজন' : 'Verification Required'}
+              </h3>
+              
+              <p className="text-sm sm:text-base text-gray-600 mb-8 leading-relaxed">
+                {language === 'বাংলা' 
+                  ? 'বাড়িওয়ালা হিসেবে প্রপার্টি লিস্টিং করতে হলে আপনাকে আগে নিজের প্রোফাইল ভেরিফাই করতে হবে। দয়া করে আপনার এনআইডি এবং প্রয়োজনীয় তথ্য জমা দিন।' 
+                  : 'To become a host and list properties, you must first verify your profile. Please submit your NID and required documents to complete the verification process.'}
+              </p>
+              
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={() => {
+                    setShowVerificationModal(false);
+                    navigate('/tenant-dashboard?openVerify=1&reason=host_upgrade');
+                  }}
+                  className="w-full bg-[#ba0036] hover:bg-[#9a002d] text-white py-3.5 rounded-xl font-bold transition-colors shadow-lg shadow-red-500/30 flex items-center justify-center gap-2"
+                >
+                  {language === 'বাংলা' ? 'ভেরিফিকেশন শুরু করুন' : 'Start Verification'} <ArrowRight size={18} />
+                </button>
+                <button 
+                  onClick={() => setShowVerificationModal(false)}
+                  className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 py-3.5 rounded-xl font-bold transition-colors"
+                >
+                  {language === 'বাংলা' ? 'পরে করব' : 'Maybe Later'}
                 </button>
               </div>
             </div>
