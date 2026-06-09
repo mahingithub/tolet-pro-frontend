@@ -706,6 +706,7 @@ const PropertyListing = () => {
 	const [selectedTypes, setSelectedTypes] = useState([]);
 	const [selectedCategories, setSelectedCategories] = useState([]);
 	const [selectedBeds, setSelectedBeds] = useState("any");
+	const [selectedBaths, setSelectedBaths] = useState("any");
 	const [selectedBathType, setSelectedBathType] = useState([]);
 	const [maxSqft, setMaxSqft] = useState(4000);
 	const [selectedUtilities, setSelectedUtilities] = useState([]);
@@ -767,6 +768,17 @@ const PropertyListing = () => {
 	useEffect(() => {
 		window.scrollTo(0, 0);
 
+		// Sync searchArea from URL when route or divisionName changes
+		const isKnownDivision = validDivisions.includes(routeParam);
+		const newSearchArea = searchParams.get("q") 
+			? searchParams.get("q") 
+			: (!isKnownDivision && routeParam !== "all")
+				? routeParam.replace(/-/g, ' ')
+				: "";
+		if (newSearchArea !== searchArea) {
+			setSearchArea(newSearchArea);
+		}
+
 		// ── Budget ────────────────────────────────────────────────────────────────
 		const initialBudget = searchParams.get("budget");
 		if (initialBudget === "low") { setMinPrice(5000);   setMaxPrice(20000); }
@@ -806,7 +818,7 @@ const PropertyListing = () => {
 		if (urlLocation && !searchArea) {
 			setSearchArea(urlLocation.split(",")[0]);
 		}
-	}, [searchParams]);
+	}, [searchParams, routeParam]);
 
 	const handleNearestMe = () => {
 		setIsLocating(true);
@@ -821,7 +833,8 @@ const PropertyListing = () => {
 				() => {
 					setIsLocating(false);
 					showToast("Please enable location permissions.");
-				}
+				},
+				{ enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
 			);
 		} else {
 			setIsLocating(false);
@@ -842,6 +855,7 @@ const PropertyListing = () => {
 		setSelectedTypes([]);
 		setSelectedCategories([]);
 		setSelectedBeds("any");
+		setSelectedBaths("any");
 		setSelectedBathType([]);
 		setMaxSqft(4000);
 		setSelectedUtilities([]);
@@ -893,6 +907,15 @@ const PropertyListing = () => {
 				if (selectedBeds === "4+" && prop.beds < 4) return false;
 				if (selectedBeds !== "4+" && prop.beds !== Number(selectedBeds)) return false;
 			}
+			if (selectedBaths !== "any") {
+				if (selectedBaths === "4+" && prop.baths < 4) return false;
+				if (selectedBaths !== "4+" && prop.baths !== Number(selectedBaths)) return false;
+			}
+			if (selectedBathType.length > 0) {
+				// E.g. if prop.bathroomType is 'Attached' or 'Shared'
+				// If prop doesn't have bathroomType, we might want to let it pass or not, but strictly:
+				if (!prop.bathroomType || !selectedBathType.includes(prop.bathroomType)) return false;
+			}
 			if ((prop.sqft || 0) > maxSqft) return false;
 			if (selectedFurnish && prop.furnishing !== selectedFurnish) return false;
 			if (minRating > 0 && (prop.rating || 0) < minRating) return false;
@@ -915,7 +938,7 @@ const PropertyListing = () => {
 			return new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0);
 		});
 		return list;
-	}, [properties, activeDivision, minPrice, maxPrice, selectedTypes, selectedCategories, selectedBeds, maxSqft, selectedFurnish, minRating, selectedFloor, sortBy, userLocation, searchArea, t.nearMe]);
+	}, [properties, activeDivision, minPrice, maxPrice, selectedTypes, selectedCategories, selectedBeds, selectedBaths, selectedBathType, maxSqft, selectedFurnish, minRating, selectedFloor, sortBy, userLocation, searchArea, t.nearMe]);
 
 	// ── LOCATION AUTOCOMPLETE ────────────────────────────────────────────────
 	// Distinct, human-readable place labels pulled from the loaded listings'
@@ -1074,21 +1097,7 @@ const PropertyListing = () => {
 				</div>
 			</div>
 
-			{/* Old desktop-only top bar — hidden on mobile since the new header above replaces it */}
-			<div className="hidden md:block">
-				<div className={`bg-white border-b border-gray-100 sticky top-[72px] z-30 shadow-sm`}>
-					<div className="max-w-[1400px] mx-auto px-4 h-16 flex items-center justify-between gap-3">
-						<span className="text-sm font-bold text-gray-900 truncate">
-							{searchArea ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision} {t.properties || "Properties"}
-						</span>
-						<div className="flex items-center gap-2 shrink-0">
-							<button onClick={() => setIsMobileFilterOpen(true)} className="lg:hidden flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full text-sm font-bold text-gray-700 active:scale-95 transition-transform">
-								<Filter size={16} /> {t.filtersBtn || "Filters"}
-							</button>
-						</div>
-					</div>
-				</div>
-			</div>
+
 
 			<div className="max-w-[1400px] mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-8 items-start">
 				{/* Backdrop. On mobile it shows whenever the filter sheet is open.
@@ -1272,6 +1281,22 @@ const PropertyListing = () => {
 									{ id: "4+", text: "4+" },
 								].map((num) => (
 									<button key={num.id} onClick={() => setSelectedBeds(num.id)} className={`flex-1 py-2 text-xs font-black rounded-lg border transition-all ${selectedBeds === num.id ? "bg-brandRed text-white border-brandRed" : "border-gray-100 text-gray-500 hover:border-brandRed"}`}>
+										{num.text}
+									</button>
+								))}
+							</div>
+						</FilterSection>
+
+						<FilterSection title={t.bathrooms || "Bathrooms"}>
+							<div className="flex gap-2">
+								{[
+									{ id: "any", text: t.any || "Any" },
+									{ id: "1", text: "1" },
+									{ id: "2", text: "2" },
+									{ id: "3", text: "3" },
+									{ id: "4+", text: "4+" },
+								].map((num) => (
+									<button key={num.id} onClick={() => setSelectedBaths(num.id)} className={`flex-1 py-2 text-xs font-black rounded-lg border transition-all ${selectedBaths === num.id ? "bg-brandRed text-white border-brandRed" : "border-gray-100 text-gray-500 hover:border-brandRed"}`}>
 										{num.text}
 									</button>
 								))}
