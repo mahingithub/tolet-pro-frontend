@@ -412,7 +412,7 @@ const ChatSystem = () => {
 
     callProvider.connect(token);
 
-    callProvider.onIncomingCall((data) => {
+    const offIncomingCall = callProvider.onIncomingCall((data) => {
       setCallState({
         status: 'ringing',
         direction: 'incoming',
@@ -427,7 +427,7 @@ const ChatSystem = () => {
       setIsCalling(true);
     });
 
-    callProvider.onCallStateChange((status, data) => {
+    const offCallStateChange = callProvider.onCallStateChange((status, data) => {
       if (status === 'ended' || status === 'rejected' || status === 'missed') {
         setIsCalling(false);
         setCallState(null);
@@ -450,9 +450,15 @@ const ChatSystem = () => {
       }
     });
 
-    // No disconnect on unmount — socket stays alive so incoming calls
-    // still reach this user when ChatSystem isn't currently mounted.
-    return () => {};
+    // Socket stays connected on unmount so incoming calls still reach this
+    // user even when ChatSystem isn't mounted. But we DO remove our callbacks
+    // here — otherwise each remount stacks another onIncomingCall /
+    // onCallStateChange handler on the provider, which caused duplicate call
+    // popups after navigating between chats (audit 5.1).
+    return () => {
+      offIncomingCall?.();
+      offCallStateChange?.();
+    };
   }, []);
 
   // ─── Backend conversation hydration ────────────────────────────────────
@@ -714,7 +720,7 @@ const ChatSystem = () => {
   // once callState==='accepted'). So we just capture the stream into state
   // here, and a separate effect attaches it whenever the element is present.
   useEffect(() => {
-    callProvider.onRemoteStream((stream) => {
+    const offRemoteStream = callProvider.onRemoteStream((stream) => {
       if (!stream) return;
       setRemoteStream(stream);
       // Audio element exists for the whole call, so it's safe to attach now.
@@ -722,6 +728,10 @@ const ChatSystem = () => {
         remoteAudioRef.current.srcObject = stream;
       }
     });
+    // Remove the callback on unmount so it doesn't stack across remounts (5.1).
+    return () => {
+      offRemoteStream?.();
+    };
   }, []);
 
   // Attach remote stream to the video element once BOTH exist. Re-runs when the
