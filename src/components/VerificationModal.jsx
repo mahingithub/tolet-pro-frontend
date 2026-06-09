@@ -1,35 +1,33 @@
 /**
  * VerificationModal.jsx
  * ─────────────────────────────────────────────────────────────────────────
- * Unified identity-verification wizard (Smart Version) — works for BOTH
- * tenants and landlords. Role is selected via the `role` prop:
+ * Unified identity-verification wizard — modularised into role-specific
+ * sub-components. Only fields that DIRECTLY impact the backend Trust Score
+ * (utils/trustScore.js) are collected. Everything else is discarded.
  *
- *   <VerificationModal role="tenant"  ... />   ← default; existing flow
- *   <VerificationModal role="landlord" ... />  ← new flow
+ * Usage:
+ *   <VerificationModal role="tenant"   ... />   ← default
+ *   <VerificationModal role="landlord" ... />   ← host flow
+ *
+ * TENANT trust score items collected here (max 80 pts in modal):
+ *   • professionType  → gates professionProof scoring  (30 pts)
+ *   • photo           → profile photo                  (20 pts)
+ *   • nidFront+Back   → NID                            (30 pts)
+ *   • professionProof → profession proof doc            (30 pts)
+ *   (phone 20 pts is already captured at signup — not re-asked)
+ *
+ * LANDLORD trust score items collected here (max 70 pts in modal):
+ *   • photo             → selfie verification          (20 pts)
+ *   • nidFront+Back     → NID                          (25 pts)
+ *   • preferredTenants  → landlord preferences          (5 pts)
+ *   • communication     → landlord preferences          (5 pts)
+ *   • serviceCharge     → landlord preferences          (5 pts)
+ *   • houseRules        → landlord preferences         (10 pts)
+ *   (phone 20 pts + avatar 10 pts already captured elsewhere)
  *
  * Backwards-compat:
- *   The default export is still re-named `TenantVerificationModal` so
- *   every existing import (TenantDashboard, etc.) keeps working with
- *   zero changes. New code can import { VerificationModal } directly.
- *
- * Visual language unchanged — "Neo-glass" (strict green & red theme).
- * Only the step list, copy, and submission payload differ by role; the
- * visual frame, animations, and gauge are 100% shared.
- *
- * Role flows:
- *
- *   TENANT (unchanged)
- *     profession → workPlace → familySize → emergency → nid (opt) → review
- *
- *   LANDLORD (new)
- *     ownerType → propertyAddress → caretaker (opt) → nid (REQUIRED)
- *       → ownershipProof (opt) → review
- *
- * Why NID is OPTIONAL for tenants but REQUIRED for landlords:
- *   A landlord lists property — that's a financial transaction with
- *   strangers. We can't legally / ethically let unverified landlords
- *   take deposits. Tenants can browse + send inquiries without NID,
- *   they just don't get the blue "Verified" badge until they upload.
+ *   Default export = VerificationModal
+ *   Named exports: { VerificationModal, TenantVerificationModal }
  */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -37,39 +35,43 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, ChevronLeft, ChevronRight, Check, CheckCircle2,
   Sparkles, Briefcase, GraduationCap, Store, Users,
-  Building2, MapPin, Phone, IdCard, ShieldCheck,
-  ImagePlus, Loader2, AlertCircle, Trash2, Heart,
-  ArrowRight, Lock, Star, Award, Zap, Fingerprint,
-  Edit3, KeySquare, UserCog, HandHeart, FileText,
+  Building2, Phone, IdCard, ShieldCheck,
+  ImagePlus, Loader2, AlertCircle, Trash2,
+  ArrowRight, Lock, Award, Zap, Fingerprint,
+  Edit3, Camera, MessageSquare, DollarSign, ScrollText,
+  UserCog, HandHeart,
 } from 'lucide-react';
 
-// ─── Constants ───────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════
 const MAX_BYTES   = 5 * 1024 * 1024;
 const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
 
-// Tenant trust-score weights (unchanged from original modal).
+// ── Tenant trust-score weights (mirrors backend computeTenantTrust) ──────
+// phone(20) is NOT in the modal — already captured at signup.
 const TENANT_POINTS = {
-  profession:       15,
-  workPlace:        15,
-  familySize:        5,
-  emergencyContact: 15,
-  nidFront:         25,
-  nidBack:          25,
+  photo:           20,
+  nidFront:        15, // 30 total for nid, split visually
+  nidBack:         15,
+  professionProof: 30,
 };
 
-// Landlord trust-score weights — geared toward identity, not preferences.
-// Preferences (preferredTenants, communication, houseRules, serviceCharge)
-// live in the inline-edit ProfileSection, not here.
+// ── Landlord trust-score weights (mirrors backend computeLandlordTrust) ──
+// phone(20) + avatar(10) are NOT in the modal.
 const LANDLORD_POINTS = {
-  ownerType:        10,
-  propertyAddress:  10,
-  caretakerPhone:    5,
-  nidFront:         25,
-  nidBack:          25,
-  ownershipProof:   25,
+  photo:            20,
+  nidFront:         12, // 25 total for nid, split visually
+  nidBack:          13,
+  preferredTenants:  5,
+  communication:     5,
+  serviceCharge:     5,
+  houseRules:       10,
 };
 
-// ─── Tenant options ──────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+//  TENANT OPTIONS
+// ═══════════════════════════════════════════════════════════════════════════
 const PROFESSIONS = [
   { key: 'employed',      icon: Briefcase,     en: 'Salaried',   bn: 'চাকরিজীবী' },
   { key: 'self-employed', icon: Store,         en: 'Business',   bn: 'ব্যবসায়ী' },
@@ -77,25 +79,60 @@ const PROFESSIONS = [
   { key: 'other',         icon: Users,         en: 'Other',      bn: 'অন্যান্য' },
 ];
 
-const FAMILY_SIZES = [
-  { key: 1, en: '1 person (Bachelor)',  bn: '১ জন (ব্যাচেলর)' },
-  { key: 2, en: '2 people (Couple)',    bn: '২ জন (কাপল)' },
-  { key: 4, en: '3–5 people',           bn: '৩-৫ জন' },
-  { key: 6, en: '5+ people',            bn: '৫+ জন' },
+// ═══════════════════════════════════════════════════════════════════════════
+//  LANDLORD OPTIONS (all scoring fields from computeLandlordTrust)
+// ═══════════════════════════════════════════════════════════════════════════
+const TENANT_TYPE_OPTIONS = [
+  { key: 'family',       icon: Users,         en: 'Family',       bn: 'পরিবার' },
+  { key: 'bachelor_m',   icon: UserCog,       en: 'Bachelor (M)', bn: 'ব্যাচেলর (পুরুষ)' },
+  { key: 'bachelor_f',   icon: UserCog,       en: 'Bachelor (F)', bn: 'ব্যাচেলর (মহিলা)' },
+  { key: 'student',      icon: GraduationCap, en: 'Student',      bn: 'ছাত্র' },
+  { key: 'job_holder',   icon: Briefcase,     en: 'Job Holder',   bn: 'চাকরিজীবী' },
+  { key: 'anyone',       icon: HandHeart,     en: 'Anyone',       bn: 'যে কেউ' },
 ];
 
-// ─── Landlord options ────────────────────────────────────────────────────
-// Drives which ownership-proof options we hint at in step 5. A "family
-// property" landlord typically has different paperwork than an outright
-// owner (e.g. tax bill in a relative's name), so we capture the intent
-// upfront.
-const OWNERSHIP_TYPES = [
-  { key: 'owner',   icon: KeySquare, en: 'I own it',           bn: 'আমি মালিক' },
-  { key: 'manager', icon: UserCog,   en: 'Authorised manager', bn: 'অনুমোদিত ব্যবস্থাপক' },
-  { key: 'family',  icon: HandHeart, en: 'Family property',    bn: 'পারিবারিক সম্পত্তি' },
+const COMM_OPTIONS = [
+  { key: 'phone',        en: 'Phone call',  bn: 'ফোন কল' },
+  { key: 'whatsapp',     en: 'WhatsApp',    bn: 'হোয়াটসঅ্যাপ' },
+  { key: 'sms',          en: 'SMS',         bn: 'এসএমএস' },
+  { key: 'app_only',     en: 'App Only',    bn: 'শুধু অ্যাপ' },
+  { key: 'direct_call',  en: 'Direct Call', bn: 'সরাসরি কল' },
 ];
 
-// ─── File reader helper ──────────────────────────────────────────────────
+const HOUSE_RULES_OPTIONS = [
+  { key: 'no_smoking',    en: 'No smoking',          bn: 'ধূমপান নিষেধ' },
+  { key: 'no_pets',       en: 'No pets',             bn: 'পোষা প্রাণী নিষেধ' },
+  { key: 'no_loud_music', en: 'No loud music',       bn: 'উচ্চ শব্দে গান নিষেধ' },
+  { key: 'no_late_guest', en: 'No late guests',      bn: 'রাত ১১টার পর অতিথি নিষেধ' },
+  { key: 'keep_clean',    en: 'Keep clean',          bn: 'পরিষ্কার রাখুন' },
+  { key: 'no_sublet',     en: 'No subletting',       bn: 'সাবলেট নিষেধ' },
+  { key: 'curfew_11pm',   en: 'Curfew 11 PM',        bn: 'রাত ১১টায় গেট বন্ধ' },
+];
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  STEP LISTS
+// ═══════════════════════════════════════════════════════════════════════════
+const TENANT_STEPS = [
+  { key: 'profession',      icon: Briefcase,  required: true,  optional: false },
+  { key: 'photo',           icon: Camera,     required: true,  optional: false },
+  { key: 'professionProof', icon: Briefcase,  required: true,  optional: true  },
+  { key: 'nid',             icon: IdCard,     required: false, optional: true  },
+  { key: 'review',          icon: Sparkles,   required: false, optional: false },
+];
+
+const LANDLORD_STEPS = [
+  { key: 'preferredTenants', icon: Users,          required: true,  optional: false },
+  { key: 'communication',    icon: MessageSquare,  required: true,  optional: false },
+  { key: 'houseRules',       icon: ScrollText,     required: true,  optional: false },
+  { key: 'serviceCharge',    icon: DollarSign,     required: true,  optional: false },
+  { key: 'photo',            icon: Camera,         required: true,  optional: false },
+  { key: 'nid',              icon: IdCard,         required: true,  optional: false },
+  { key: 'review',           icon: Sparkles,       required: false, optional: false },
+];
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
 const readAsDataURL = (file) => new Promise((resolve, reject) => {
   const r = new FileReader();
   r.onload  = () => resolve(r.result);
@@ -103,29 +140,11 @@ const readAsDataURL = (file) => new Promise((resolve, reject) => {
   r.readAsDataURL(file);
 });
 
-// ─── Step lists (per role) ───────────────────────────────────────────────
-// `required` controls trust scoring + UI hints. `optional` shows the
-// little "Optional" pill in the step header and the Skip button at
-// bottom. Note: landlord NID is REQUIRED (no Skip), tenant NID is OPTIONAL.
-const TENANT_STEPS = [
-  { key: 'profession',  icon: Briefcase, required: true,  optional: false },
-  { key: 'workPlace',   icon: Building2, required: true,  optional: false },
-  { key: 'familySize',  icon: Users,     required: true,  optional: false },
-  { key: 'emergency',   icon: Phone,     required: true,  optional: false },
-  { key: 'nid',         icon: IdCard,    required: false, optional: true  },
-  { key: 'review',      icon: Sparkles,  required: false, optional: false },
-];
+// ═══════════════════════════════════════════════════════════════════════════
+//  SHARED UI ATOMS
+// ═══════════════════════════════════════════════════════════════════════════
 
-const LANDLORD_STEPS = [
-  { key: 'ownerType',       icon: KeySquare,   required: true,  optional: false },
-  { key: 'propertyAddress', icon: MapPin,      required: true,  optional: false },
-  { key: 'caretaker',       icon: UserCog,     required: false, optional: true  },
-  { key: 'nid',             icon: IdCard,      required: true,  optional: false }, // ← REQUIRED for landlord
-  { key: 'ownershipProof',  icon: FileText,    required: false, optional: true  },
-  { key: 'review',          icon: Sparkles,    required: false, optional: false },
-];
-
-// ─── Futuristic Chip ─────────────────────────────────────────────────────
+// ── Chip (single-select or multi-select toggle) ─────────────────────────
 const Chip = ({ active, onClick, icon: Icon, children }) => (
   <motion.button
     type="button"
@@ -157,7 +176,7 @@ const Chip = ({ active, onClick, icon: Icon, children }) => (
   </motion.button>
 );
 
-// ─── Animated Trust Score Gauge ─────────────────────────────────────────
+// ── Trust Score Gauge ───────────────────────────────────────────────────
 const TrustScoreGauge = ({ score, isBn }) => {
   const tier =
     score >= 90 ? 'platinum' :
@@ -204,7 +223,7 @@ const TrustScoreGauge = ({ score, isBn }) => {
   );
 };
 
-// ─── Step Rail (visual progress) ────────────────────────────────────────
+// ── Step Rail ───────────────────────────────────────────────────────────
 const StepRail = ({ steps, currentIdx, completed }) => (
   <div className="flex items-center gap-1 flex-wrap">
     {steps.map((s, i) => {
@@ -245,7 +264,7 @@ const StepRail = ({ steps, currentIdx, completed }) => (
   </div>
 );
 
-// ─── Step Frame ──────────────────────────────────────────────────────────
+// ── Step Frame ──────────────────────────────────────────────────────────
 const StepFrame = ({ icon: Icon, titleBn, titleEn, hintBn, hintEn, optional, isBn, children }) => (
   <motion.div
     initial={{ opacity: 0, y: 12 }}
@@ -277,8 +296,7 @@ const StepFrame = ({ icon: Icon, titleBn, titleEn, hintBn, hintEn, optional, isB
   </motion.div>
 );
 
-// ─── NID / Image Upload Card ─────────────────────────────────────────────
-// Renamed conceptually — also used for landlord ownershipProof, not just NID.
+// ── Image Upload Card ───────────────────────────────────────────────────
 const ImageUploadCard = ({ value, inputRef, onPick, onRemove, emptyLabelBn, emptyLabelEn, aspect, isBn }) => (
   <div>
     <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={onPick} />
@@ -326,7 +344,7 @@ const ImageUploadCard = ({ value, inputRef, onPick, onRemove, emptyLabelBn, empt
   </div>
 );
 
-// ─── Summary Row (review step) ───────────────────────────────────────────
+// ── Summary Row ─────────────────────────────────────────────────────────
 const SummaryRow = ({ icon: Icon, labelBn, labelEn, value, muted, isBn }) => (
   <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.05] transition-colors">
     <div className="w-8 h-8 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center shrink-0">
@@ -343,13 +361,339 @@ const SummaryRow = ({ icon: Icon, labelBn, labelEn, value, muted, isBn }) => (
   </div>
 );
 
-// ─── Main Modal ──────────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  <TenantFields> — renders step bodies for tenant-only scoring fields
+// ═══════════════════════════════════════════════════════════════════════════
+const TenantFields = ({ stepKey, data, setData, isBn, photoInputRef, professionProofInputRef, handleFilePick, removeFile }) => {
+  if (stepKey === 'profession') {
+    return (
+      <StepFrame
+        key="profession"
+        icon={Briefcase}
+        titleBn="আপনি কী করেন?" titleEn="What do you do?"
+        hintBn="পেশা বাছাই করুন — এটি ট্রাস্ট স্কোরে প্রভাব ফেলবে।"
+        hintEn="Pick your profession — this affects your Trust Score."
+        isBn={isBn}
+      >
+        <div className="grid grid-cols-2 gap-2.5">
+          {PROFESSIONS.map((p) => (
+            <Chip
+              key={p.key}
+              icon={p.icon}
+              active={data.profession === p.key}
+              onClick={() => setData((d) => ({ ...d, profession: p.key }))}
+            >
+              {isBn ? p.bn : p.en}
+            </Chip>
+          ))}
+        </div>
+        <div className="mt-3.5 p-3.5 rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/10 flex gap-2.5 items-start">
+          <Sparkles size={13} className="text-emerald-400 shrink-0 mt-0.5" />
+          <p className="text-[11px] font-bold text-emerald-300/70 leading-relaxed">
+            {isBn
+              ? '"অন্যান্য" বাছাই করলেও পেশার প্রমাণ ছাড়াই ট্রাস্ট পয়েন্ট পাবেন।'
+              : 'Choosing "Other" earns profession trust points without uploading proof.'}
+          </p>
+        </div>
+      </StepFrame>
+    );
+  }
+
+  if (stepKey === 'photo') {
+    return (
+      <StepFrame
+        key="photo"
+        icon={Camera}
+        titleBn="প্রোফাইল ফটো" titleEn="Profile photo"
+        hintBn="একটি পরিষ্কার ছবি আপলোড করুন — ট্রাস্ট স্কোরে ২০ পয়েন্ট যোগ হবে।"
+        hintEn="Upload a clear photo — adds 20 points to your Trust Score."
+        isBn={isBn}
+      >
+        <ImageUploadCard
+          value={data.photo}
+          inputRef={photoInputRef}
+          onPick={(e) => handleFilePick('photo', e)}
+          onRemove={() => removeFile('photo')}
+          emptyLabelBn="ছবি আপলোড করুন" emptyLabelEn="Upload photo"
+          isBn={isBn}
+          aspect="aspect-square max-w-[200px] mx-auto"
+        />
+        <div className="mt-4 p-3.5 rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/10 flex gap-2.5 items-start">
+          <Lock size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+          <p className="text-[11px] font-bold text-emerald-300/70 leading-relaxed">
+            {isBn
+              ? 'আপনার ছবি শুধু অ্যাডমিন রিভিউয়ের জন্য — পাবলিকলি দেখানো হবে না।'
+              : 'Your photo is for admin review only — never shown publicly.'}
+          </p>
+        </div>
+      </StepFrame>
+    );
+  }
+
+  if (stepKey === 'professionProof') {
+    return (
+      <StepFrame
+        key="professionProof"
+        icon={Briefcase}
+        titleBn="পেশার প্রমাণ" titleEn="Profession proof"
+        hintBn="জব আইডি, স্টুডেন্ট আইডি বা ব্যবসার কাগজ — ট্রাস্ট স্কোরে ৩০ পয়েন্ট।"
+        hintEn="Job ID, student ID, or business docs — adds 30 trust points."
+        optional isBn={isBn}
+      >
+        <ImageUploadCard
+          value={data.professionProof}
+          inputRef={professionProofInputRef}
+          onPick={(e) => handleFilePick('professionProof', e)}
+          onRemove={() => removeFile('professionProof')}
+          emptyLabelBn="পেশার প্রমাণ আপলোড করুন" emptyLabelEn="Upload profession proof"
+          isBn={isBn}
+          aspect="aspect-[4/3]"
+        />
+        {data.profession === 'other' && (
+          <div className="mt-3.5 p-3.5 rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/10 flex gap-2.5 items-start">
+            <Award size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+            <p className="text-[11px] font-bold text-emerald-300/70 leading-relaxed">
+              {isBn
+                ? 'আপনি "অন্যান্য" বাছাই করেছেন, তাই এটা স্কিপ করলেও ট্রাস্ট পয়েন্ট পাবেন।'
+                : 'You selected "Other" — you\'ll get trust points even if you skip this.'}
+            </p>
+          </div>
+        )}
+      </StepFrame>
+    );
+  }
+
+  return null;
+};
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  <HostFields> — renders step bodies for landlord-only scoring fields
+// ═══════════════════════════════════════════════════════════════════════════
+const HostFields = ({ stepKey, data, setData, isBn, photoInputRef, handleFilePick, removeFile }) => {
+
+  // Multi-select toggle helper
+  const toggleArray = (field, key) => {
+    setData((d) => {
+      const arr = d[field] || [];
+      return {
+        ...d,
+        [field]: arr.includes(key) ? arr.filter((k) => k !== key) : [...arr, key],
+      };
+    });
+  };
+
+  if (stepKey === 'preferredTenants') {
+    return (
+      <StepFrame
+        key="preferredTenants"
+        icon={Users}
+        titleBn="পছন্দের ভাড়াটিয়া" titleEn="Preferred tenants"
+        hintBn="কাদের ভাড়া দিতে চান? একাধিক বাছাই করতে পারেন। (+৫ ট্রাস্ট)"
+        hintEn="Who would you prefer to rent to? Select multiple. (+5 Trust)"
+        isBn={isBn}
+      >
+        <div className="grid grid-cols-2 gap-2.5">
+          {TENANT_TYPE_OPTIONS.map((o) => (
+            <Chip
+              key={o.key}
+              icon={o.icon}
+              active={(data.preferredTenants || []).includes(o.key)}
+              onClick={() => toggleArray('preferredTenants', o.key)}
+            >
+              {isBn ? o.bn : o.en}
+            </Chip>
+          ))}
+        </div>
+      </StepFrame>
+    );
+  }
+
+  if (stepKey === 'communication') {
+    return (
+      <StepFrame
+        key="communication"
+        icon={MessageSquare}
+        titleBn="যোগাযোগের মাধ্যম" titleEn="Communication method"
+        hintBn="ভাড়াটেরা আপনাকে কীভাবে যোগাযোগ করবে? (+৫ ট্রাস্ট)"
+        hintEn="How should tenants reach you? (+5 Trust)"
+        isBn={isBn}
+      >
+        <div className="grid grid-cols-2 gap-2.5">
+          {COMM_OPTIONS.map((o) => (
+            <Chip
+              key={o.key}
+              active={(data.communication || []).includes(o.key)}
+              onClick={() => toggleArray('communication', o.key)}
+            >
+              {isBn ? o.bn : o.en}
+            </Chip>
+          ))}
+        </div>
+      </StepFrame>
+    );
+  }
+
+  if (stepKey === 'houseRules') {
+    return (
+      <StepFrame
+        key="houseRules"
+        icon={ScrollText}
+        titleBn="বাড়ির নিয়ম" titleEn="House rules"
+        hintBn="কোন নিয়ম প্রযোজ্য? একাধিক বাছাই করতে পারেন। (+১০ ট্রাস্ট)"
+        hintEn="Which rules apply? Select multiple. (+10 Trust)"
+        isBn={isBn}
+      >
+        <div className="grid grid-cols-2 gap-2.5">
+          {HOUSE_RULES_OPTIONS.map((o) => (
+            <Chip
+              key={o.key}
+              active={(data.houseRules || []).includes(o.key)}
+              onClick={() => toggleArray('houseRules', o.key)}
+            >
+              {isBn ? o.bn : o.en}
+            </Chip>
+          ))}
+        </div>
+      </StepFrame>
+    );
+  }
+
+  if (stepKey === 'serviceCharge') {
+    return (
+      <StepFrame
+        key="serviceCharge"
+        icon={DollarSign}
+        titleBn="সার্ভিস চার্জ" titleEn="Service charge"
+        hintBn="মাসিক সার্ভিস চার্জ (৳) — ০ হলেও লিখুন। (+৫ ট্রাস্ট)"
+        hintEn="Monthly service charge (৳) — enter 0 if none. (+5 Trust)"
+        isBn={isBn}
+      >
+        <div className="relative">
+          <DollarSign size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
+          <input
+            type="number"
+            inputMode="numeric"
+            min="0"
+            value={data.serviceCharge}
+            onChange={(e) => setData((d) => ({ ...d, serviceCharge: e.target.value }))}
+            placeholder={isBn ? 'যেমন: ৩০০০' : 'e.g. 3000'}
+            className="w-full pl-12 pr-4 py-4 bg-white/[0.03] hover:bg-white/[0.05] focus:bg-white/[0.06] border border-white/[0.08] focus:border-emerald-500/40 rounded-2xl text-sm font-bold text-white placeholder:text-white/20 transition-all outline-none focus:shadow-[0_0_20px_rgba(16,185,129,0.1)] focus:ring-1 focus:ring-emerald-500/20"
+            autoFocus
+          />
+        </div>
+        <div className="mt-3.5 p-3.5 rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/10 flex gap-2.5 items-start">
+          <Sparkles size={13} className="text-emerald-400 shrink-0 mt-0.5" />
+          <p className="text-[11px] font-bold text-emerald-300/70 leading-relaxed">
+            {isBn
+              ? 'সার্ভিস চার্জ যোগ করলে ভাড়াটেরা স্বচ্ছতা দেখে আস্থা পান।'
+              : 'Adding a service charge shows transparency and builds tenant trust.'}
+          </p>
+        </div>
+      </StepFrame>
+    );
+  }
+
+  if (stepKey === 'photo') {
+    return (
+      <StepFrame
+        key="photo"
+        icon={Camera}
+        titleBn="সেলফি ভেরিফিকেশন" titleEn="Selfie verification"
+        hintBn="একটি পরিষ্কার সেলফি আপলোড করুন — ট্রাস্ট স্কোরে ২০ পয়েন্ট যোগ হবে।"
+        hintEn="Upload a clear selfie — adds 20 points to your Trust Score."
+        isBn={isBn}
+      >
+        <ImageUploadCard
+          value={data.photo}
+          inputRef={photoInputRef}
+          onPick={(e) => handleFilePick('photo', e)}
+          onRemove={() => removeFile('photo')}
+          emptyLabelBn="সেলফি আপলোড করুন" emptyLabelEn="Upload selfie"
+          isBn={isBn}
+          aspect="aspect-square max-w-[200px] mx-auto"
+        />
+        <div className="mt-4 p-3.5 rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/10 flex gap-2.5 items-start">
+          <ShieldCheck size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+          <p className="text-[11px] font-bold text-emerald-300/70 leading-relaxed">
+            {isBn
+              ? 'শুধু অ্যাডমিন দেখবে। ভাড়াটেরা শুধু "Verified Host" badge দেখে।'
+              : 'Only our admin team sees this. Tenants only see your "Verified Host" badge.'}
+          </p>
+        </div>
+      </StepFrame>
+    );
+  }
+
+  return null;
+};
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  <TenantReview> — review summary rows for tenant
+// ═══════════════════════════════════════════════════════════════════════════
+const TenantReview = ({ data, isBn }) => (
+  <div className="space-y-2.5">
+    <SummaryRow icon={Briefcase} labelBn="পেশা" labelEn="Profession" isBn={isBn}
+      value={PROFESSIONS.find((p) => p.key === data.profession)?.[isBn ? 'bn' : 'en']} />
+    <SummaryRow icon={Camera} labelBn="প্রোফাইল ফটো" labelEn="Profile photo" isBn={isBn}
+      value={data.photo ? (isBn ? 'যোগ করা হয়েছে' : 'Added') : (isBn ? 'যোগ করা হয়নি' : 'Not added')}
+      muted={!data.photo} />
+    <SummaryRow icon={Briefcase} labelBn="পেশার প্রমাণ" labelEn="Profession proof" isBn={isBn}
+      value={data.professionProof
+        ? (isBn ? 'যোগ করা হয়েছে' : 'Added')
+        : data.profession === 'other'
+          ? (isBn ? 'প্রয়োজন নেই' : 'Not needed')
+          : (isBn ? 'পরে যোগ করব' : 'Add later')}
+      muted={!data.professionProof && data.profession !== 'other'} />
+    <SummaryRow icon={IdCard} labelBn="NID" labelEn="NID" isBn={isBn}
+      value={(data.nidFront && data.nidBack)
+        ? (isBn ? 'যোগ করা হয়েছে' : 'Added')
+        : (isBn ? 'পরে যোগ করব' : 'Add later')}
+      muted={!(data.nidFront && data.nidBack)} />
+  </div>
+);
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  <HostReview> — review summary rows for landlord
+// ═══════════════════════════════════════════════════════════════════════════
+const HostReview = ({ data, isBn }) => (
+  <div className="space-y-2.5">
+    <SummaryRow icon={Users} labelBn="পছন্দের ভাড়াটিয়া" labelEn="Preferred tenants" isBn={isBn}
+      value={(data.preferredTenants || []).map(k => TENANT_TYPE_OPTIONS.find(o => o.key === k)?.[isBn ? 'bn' : 'en']).filter(Boolean).join(', ')}
+      muted={(data.preferredTenants || []).length === 0} />
+    <SummaryRow icon={MessageSquare} labelBn="যোগাযোগের মাধ্যম" labelEn="Communication" isBn={isBn}
+      value={(data.communication || []).map(k => COMM_OPTIONS.find(o => o.key === k)?.[isBn ? 'bn' : 'en']).filter(Boolean).join(', ')}
+      muted={(data.communication || []).length === 0} />
+    <SummaryRow icon={ScrollText} labelBn="বাড়ির নিয়ম" labelEn="House rules" isBn={isBn}
+      value={(data.houseRules || []).map(k => HOUSE_RULES_OPTIONS.find(o => o.key === k)?.[isBn ? 'bn' : 'en']).filter(Boolean).join(', ')}
+      muted={(data.houseRules || []).length === 0} />
+    <SummaryRow icon={DollarSign} labelBn="সার্ভিস চার্জ" labelEn="Service charge" isBn={isBn}
+      value={data.serviceCharge !== '' && data.serviceCharge != null ? `৳ ${data.serviceCharge}` : ''}
+      muted={data.serviceCharge === '' || data.serviceCharge == null} />
+    <SummaryRow icon={Camera} labelBn="সেলফি" labelEn="Selfie" isBn={isBn}
+      value={data.photo ? (isBn ? 'যোগ করা হয়েছে' : 'Added') : (isBn ? 'যোগ করা হয়নি' : 'Not added')}
+      muted={!data.photo} />
+    <SummaryRow icon={IdCard} labelBn="NID" labelEn="NID" isBn={isBn}
+      value={(data.nidFront && data.nidBack)
+        ? (isBn ? 'যোগ করা হয়েছে' : 'Added')
+        : (isBn ? 'আবশ্যক' : 'Required')}
+      muted={!(data.nidFront && data.nidBack)} />
+  </div>
+);
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  MAIN MODAL
+// ═══════════════════════════════════════════════════════════════════════════
 const VerificationModal = ({
   open,
   onClose,
   onSubmit,
   onEditProfile,
-  role         = 'tenant',     // ← NEW. 'tenant' (default) | 'landlord'
+  role         = 'tenant',
   language     = 'বাংলা',
   initialData  = null,
 }) => {
@@ -358,26 +702,26 @@ const VerificationModal = ({
   const POINTS      = isLandlord ? LANDLORD_POINTS : TENANT_POINTS;
   const BASE_STEPS  = isLandlord ? LANDLORD_STEPS  : TENANT_STEPS;
 
-  // ─── Form state ────────────────────────────────────────────────────
-  // Single bag of state keyed by every possible field across both roles.
-  // Keeps reset / hydration simple; unused fields just sit at default.
-  const buildEmptyState = () => ({
-    // Tenant
-    profession:       '',
-    workPlace:        '',
-    familySize:       null,
-    emergencyName:    '',
-    emergencyPhone:   '+880',
-    // Landlord
-    ownerType:        '',
-    propertyAddress:  '',
-    caretakerName:    '',
-    caretakerPhone:   '+880',
-    ownershipProof:   null,
-    // Shared
+  // ─── State (only trust-scoring fields) ─────────────────────────────
+  const buildTenantState = () => ({
+    profession:      '',
+    photo:           null,
+    professionProof: null,
+    nidFront:        null,
+    nidBack:         null,
+  });
+
+  const buildHostState = () => ({
+    preferredTenants: [],
+    communication:    [],
+    houseRules:       [],
+    serviceCharge:    '',
+    photo:            null,
     nidFront:         null,
     nidBack:          null,
   });
+
+  const buildEmptyState = isLandlord ? buildHostState : buildTenantState;
 
   const [activeSteps, setActiveSteps] = useState(BASE_STEPS);
   const [stepIdx, setStepIdx]         = useState(0);
@@ -385,11 +729,7 @@ const VerificationModal = ({
   const [submitting, setSubmitting]   = useState(false);
   const [error,      setError]        = useState('');
 
-  // ─── Smart Hydration & Step Filtering ──────────────────────────────
-  // When user re-opens the modal with existing data, skip the steps
-  // they've already completed and land them on the first incomplete one.
-  // Keep NID and Review in the active list regardless — they always
-  // appear (re-confirming NID is fine; review is always last).
+  // ─── Hydration ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
 
@@ -399,39 +739,27 @@ const VerificationModal = ({
       if (isLandlord) {
         seed = {
           ...seed,
-          ownerType:       initialData.ownerType       || '',
-          propertyAddress: initialData.address         || initialData.propertyAddress || '',
-          caretakerName:   initialData.caretaker?.name  || initialData.caretakerName  || '',
-          caretakerPhone:  initialData.caretaker?.phone || initialData.caretakerPhone || '+880',
-          // NID + ownershipProof intentionally NOT hydrated — file objects
-          // can't survive a JSON round-trip; if the user already uploaded
-          // them, the backend will already have the URLs and won't ask
-          // again at submission time.
+          preferredTenants: initialData.preferredTenants || [],
+          communication:    initialData.communication    || [],
+          houseRules:       initialData.houseRules        || [],
+          serviceCharge:    initialData.serviceCharge != null ? String(initialData.serviceCharge) : '',
         };
       } else {
         seed = {
           ...seed,
-          profession:     initialData.professionType || '',
-          workPlace:      initialData.workPlace      || '',
-          familySize:     initialData.familySize     || null,
-          emergencyName:  initialData.emergencyContact?.name  || '',
-          emergencyPhone: initialData.emergencyContact?.phone || '+880',
+          profession: initialData.professionType || '',
         };
       }
     }
 
+    // Skip already-completed steps
     const filtered = BASE_STEPS.filter((step) => {
-      // Always keep NID, ownershipProof, and Review visible
-      if (['nid', 'ownershipProof', 'review'].includes(step.key)) return true;
-      // Drop completed tenant steps
-      if (step.key === 'profession' && seed.profession)               return false;
-      if (step.key === 'workPlace'  && seed.workPlace?.trim().length >= 2) return false;
-      if (step.key === 'familySize' && seed.familySize !== null)      return false;
-      if (step.key === 'emergency'  && seed.emergencyPhone?.replace(/\D/g, '').length >= 10) return false;
-      // Drop completed landlord steps
-      if (step.key === 'ownerType'       && seed.ownerType)            return false;
-      if (step.key === 'propertyAddress' && seed.propertyAddress?.trim().length >= 5) return false;
-      if (step.key === 'caretaker'       && seed.caretakerPhone?.replace(/\D/g, '').length >= 10) return false;
+      if (['nid', 'review'].includes(step.key)) return true;
+      if (step.key === 'profession'       && seed.profession)                            return false;
+      if (step.key === 'preferredTenants'  && (seed.preferredTenants || []).length > 0)   return false;
+      if (step.key === 'communication'     && (seed.communication || []).length > 0)      return false;
+      if (step.key === 'houseRules'        && (seed.houseRules || []).length > 0)         return false;
+      if (step.key === 'serviceCharge'     && seed.serviceCharge !== '')                  return false;
       return true;
     });
 
@@ -442,23 +770,22 @@ const VerificationModal = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialData, role]);
 
-  // ─── Live trust score (animated gauge) ─────────────────────────────
+  // ─── Live trust score ──────────────────────────────────────────────
   const liveScore = useMemo(() => {
     let s = 0;
     if (isLandlord) {
-      if (data.ownerType)                                          s += POINTS.ownerType;
-      if (data.propertyAddress?.trim().length >= 5)                s += POINTS.propertyAddress;
-      if (data.caretakerPhone?.replace(/\D/g, '').length >= 10)    s += POINTS.caretakerPhone;
+      if (data.photo)                                              s += POINTS.photo;
       if (data.nidFront)                                           s += POINTS.nidFront;
       if (data.nidBack)                                            s += POINTS.nidBack;
-      if (data.ownershipProof)                                     s += POINTS.ownershipProof;
+      if ((data.preferredTenants || []).length > 0)                 s += POINTS.preferredTenants;
+      if ((data.communication || []).length > 0)                    s += POINTS.communication;
+      if (data.serviceCharge !== '' && data.serviceCharge != null)  s += POINTS.serviceCharge;
+      if ((data.houseRules || []).length > 0)                       s += POINTS.houseRules;
     } else {
-      if (data.profession)                                         s += POINTS.profession;
-      if (data.workPlace?.trim().length >= 2)                      s += POINTS.workPlace;
-      if (data.familySize)                                         s += POINTS.familySize;
-      if (data.emergencyPhone?.replace(/\D/g, '').length >= 10)    s += POINTS.emergencyContact;
+      if (data.photo)                                              s += POINTS.photo;
       if (data.nidFront)                                           s += POINTS.nidFront;
       if (data.nidBack)                                            s += POINTS.nidBack;
+      if (data.professionProof || data.profession === 'other')     s += POINTS.professionProof;
     }
     return Math.min(100, s);
   }, [data, isLandlord, POINTS]);
@@ -470,37 +797,35 @@ const VerificationModal = ({
     switch (step.key) {
       // Tenant
       case 'profession':       return !!data.profession;
-      case 'workPlace':        return data.workPlace.trim().length >= 2;
-      case 'familySize':       return data.familySize !== null;
-      case 'emergency':        return data.emergencyPhone?.replace(/\D/g, '').length >= 10;
+      case 'professionProof':  return true; // optional
       // Landlord
-      case 'ownerType':        return !!data.ownerType;
-      case 'propertyAddress':  return data.propertyAddress.trim().length >= 5;
-      case 'caretaker':        return true; // optional — always valid (Skip allowed)
-      case 'ownershipProof':   return true; // optional — always valid (Skip allowed)
+      case 'preferredTenants': return (data.preferredTenants || []).length > 0;
+      case 'communication':    return (data.communication || []).length > 0;
+      case 'houseRules':       return (data.houseRules || []).length > 0;
+      case 'serviceCharge':    return data.serviceCharge !== '' && data.serviceCharge != null;
       // Shared
+      case 'photo':            return !!data.photo;
       case 'nid':              return isLandlord
-                                  ? !!(data.nidFront && data.nidBack)  // REQUIRED for landlord
-                                  : true;                              // optional for tenant
+                                  ? !!(data.nidFront && data.nidBack)
+                                  : true; // optional for tenant
       case 'review':           return true;
       default:                 return false;
     }
   }, [activeSteps, stepIdx, data, isLandlord]);
 
-  // Visual completion map (for step rail)
+  // ─── Completion map (step rail) ────────────────────────────────────
   const completedMap = useMemo(() => {
     const map = {};
     activeSteps.forEach((s) => {
       map[s.key] =
         (s.key === 'profession'       && !!data.profession) ||
-        (s.key === 'workPlace'        && data.workPlace.trim().length >= 2) ||
-        (s.key === 'familySize'       && data.familySize !== null) ||
-        (s.key === 'emergency'        && data.emergencyPhone?.replace(/\D/g, '').length >= 10) ||
-        (s.key === 'ownerType'        && !!data.ownerType) ||
-        (s.key === 'propertyAddress'  && data.propertyAddress.trim().length >= 5) ||
-        (s.key === 'caretaker'        && data.caretakerPhone?.replace(/\D/g, '').length >= 10) ||
-        (s.key === 'nid'              && !!(data.nidFront && data.nidBack)) ||
-        (s.key === 'ownershipProof'   && !!data.ownershipProof);
+        (s.key === 'photo'            && !!data.photo) ||
+        (s.key === 'professionProof'  && (!!data.professionProof || data.profession === 'other')) ||
+        (s.key === 'preferredTenants' && (data.preferredTenants || []).length > 0) ||
+        (s.key === 'communication'    && (data.communication || []).length > 0) ||
+        (s.key === 'houseRules'       && (data.houseRules || []).length > 0) ||
+        (s.key === 'serviceCharge'    && data.serviceCharge !== '' && data.serviceCharge != null) ||
+        (s.key === 'nid'              && !!(data.nidFront && data.nidBack));
     });
     return map;
   }, [activeSteps, data]);
@@ -508,16 +833,15 @@ const VerificationModal = ({
   // ─── Navigation ────────────────────────────────────────────────────
   const goNext = () => {
     if (!isStepValid()) {
-      // Custom per-step messages keep the flow feeling smart vs generic.
       const step = activeSteps[stepIdx];
       const msgs = {
-        profession:       isBn ? 'একটি পেশা বাছাই করুন।'              : 'Pick a profession to continue.',
-        workPlace:        isBn ? 'প্রতিষ্ঠানের নাম লিখুন।'             : 'Type the workplace name.',
-        familySize:       isBn ? 'সদস্য সংখ্যা বাছাই করুন।'            : 'Pick a household size.',
-        emergency:        isBn ? 'একটি বৈধ মোবাইল নাম্বার লিখুন।'     : 'Enter a valid mobile number.',
-        ownerType:        isBn ? 'মালিকানার ধরন বাছাই করুন।'           : 'Pick how you relate to the property.',
-        propertyAddress:  isBn ? 'সম্পত্তির ঠিকানা লিখুন।'              : 'Type the property address.',
-        nid:              isBn ? 'NID-এর সামনে ও পিছনে আপলোড করুন।'   : 'Upload both NID front and back.',
+        profession:       isBn ? 'একটি পেশা বাছাই করুন।'                     : 'Pick a profession to continue.',
+        photo:            isBn ? 'একটি ছবি আপলোড করুন।'                     : 'Upload a photo to continue.',
+        preferredTenants: isBn ? 'অন্তত একটি ভাড়াটিয়ার ধরন বাছাই করুন।'    : 'Select at least one tenant type.',
+        communication:    isBn ? 'অন্তত একটি যোগাযোগ মাধ্যম বাছাই করুন।'    : 'Select at least one communication method.',
+        houseRules:       isBn ? 'অন্তত একটি বাড়ির নিয়ম বাছাই করুন।'       : 'Select at least one house rule.',
+        serviceCharge:    isBn ? 'সার্ভিস চার্জের পরিমাণ লিখুন।'              : 'Enter the service charge amount.',
+        nid:              isBn ? 'NID-এর সামনে ও পিছনে আপলোড করুন।'        : 'Upload both NID front and back.',
       };
       setError(msgs[step?.key] || (isBn ? 'এই ধাপ পূরণ করুন।' : 'Please complete this step.'));
       return;
@@ -528,10 +852,11 @@ const VerificationModal = ({
 
   const goBack = () => { setError(''); if (stepIdx > 0) setStepIdx((i) => i - 1); };
 
-  // ─── File handling (NID + ownership proof) ─────────────────────────
-  const nidFrontInputRef     = useRef(null);
-  const nidBackInputRef      = useRef(null);
-  const ownershipProofInput  = useRef(null);
+  // ─── File handling ─────────────────────────────────────────────────
+  const nidFrontInputRef      = useRef(null);
+  const nidBackInputRef       = useRef(null);
+  const photoInputRef         = useRef(null);
+  const professionProofInput  = useRef(null);
 
   const handleFilePick = async (slot, e) => {
     const file = e.target.files?.[0];
@@ -557,8 +882,6 @@ const VerificationModal = ({
   const removeFile = (slot) => setData((d) => ({ ...d, [slot]: null }));
 
   // ─── Submit ────────────────────────────────────────────────────────
-  // Payload shape is role-aware so the backend can route by `role`
-  // without sniffing field names. Keeps controller code obvious.
   const handleSubmit = async () => {
     setError('');
     setSubmitting(true);
@@ -566,26 +889,20 @@ const VerificationModal = ({
       const payload = isLandlord
         ? {
             role: 'landlord',
-            ownerType:       data.ownerType,
-            address:         data.propertyAddress.trim(),
-            caretaker: {
-              name:  data.caretakerName.trim(),
-              phone: data.caretakerPhone.trim(),
-            },
-            nidFront:        data.nidFront,
-            nidBack:         data.nidBack,
-            ownershipProof:  data.ownershipProof,
+            preferredTenants: data.preferredTenants,
+            communication:    data.communication,
+            houseRules:       data.houseRules,
+            serviceCharge:    data.serviceCharge !== '' ? Number(data.serviceCharge) : null,
+            photo:            data.photo,
+            nidFront:         data.nidFront,
+            nidBack:          data.nidBack,
             liveScore,
           }
         : {
             role: 'tenant',
             professionType:  data.profession,
-            workPlace:       data.workPlace.trim(),
-            familySize:      data.familySize,
-            emergencyContact: {
-              name:  data.emergencyName.trim(),
-              phone: data.emergencyPhone.trim(),
-            },
+            photo:           data.photo,
+            professionProof: data.professionProof,
             nidFront:        data.nidFront,
             nidBack:         data.nidBack,
             liveScore,
@@ -604,12 +921,11 @@ const VerificationModal = ({
 
   if (!open || !current) return null;
 
-  // Role-aware header copy.
   const headerTitle = isLandlord
-    ? (isBn ? 'মালিকানা যাচাই' : 'Owner verification')
-    : (isBn ? 'পরিচয় যাচাই'   : 'Identity verification');
+    ? (isBn ? 'মালিক যাচাই' : 'Host verification')
+    : (isBn ? 'পরিচয় যাচাই' : 'Identity verification');
   const headerSubtitle = isLandlord
-    ? (isBn ? 'সম্পত্তির বিবরণ দিন' : 'Tell us about your property')
+    ? (isBn ? 'ট্রাস্ট স্কোর বাড়ান' : 'Boost your Trust Score')
     : (isBn ? 'নিজেকে পরিচিত করুন'  : 'Tell us about yourself');
 
   // ─── Render ────────────────────────────────────────────────────────
@@ -677,260 +993,33 @@ const VerificationModal = ({
         <div className="relative flex-1 overflow-y-auto px-5 sm:px-7 py-6">
           <AnimatePresence mode="wait">
 
-            {/* ─────────────────────────────────────────────────────
-                TENANT STEPS
-                ───────────────────────────────────────────────────── */}
-            {current.key === 'profession' && (
-              <StepFrame
-                key="profession"
-                icon={Briefcase}
-                titleBn="আপনি কী করেন?" titleEn="What do you do?"
-                hintBn="বাড়িওয়ালা সাধারণত এটাই প্রথম জিজ্ঞেস করেন।"
-                hintEn="This is usually a landlord's first question."
+            {/* ── Role-specific steps ── */}
+            {!isLandlord && !['nid', 'review'].includes(current.key) && (
+              <TenantFields
+                stepKey={current.key}
+                data={data}
+                setData={setData}
                 isBn={isBn}
-              >
-                <div className="grid grid-cols-2 gap-2.5">
-                  {PROFESSIONS.map((p) => (
-                    <Chip
-                      key={p.key}
-                      icon={p.icon}
-                      active={data.profession === p.key}
-                      onClick={() => setData((d) => ({ ...d, profession: p.key }))}
-                    >
-                      {isBn ? p.bn : p.en}
-                    </Chip>
-                  ))}
-                </div>
-              </StepFrame>
+                photoInputRef={photoInputRef}
+                professionProofInputRef={professionProofInput}
+                handleFilePick={handleFilePick}
+                removeFile={removeFile}
+              />
             )}
 
-            {current.key === 'workPlace' && (
-              <StepFrame
-                key="workPlace"
-                icon={Building2}
-                titleBn={data.profession === 'student' ? 'কোথায় পড়াশোনা করেন?' : 'কোথায় কাজ করেন?'}
-                titleEn={data.profession === 'student' ? 'Where do you study?'    : 'Where do you work?'}
-                hintBn="শুধু নাম লিখুন। কোনো আইডি কার্ড দরকার নেই।"
-                hintEn="Just the name. No ID card required."
+            {isLandlord && !['nid', 'review'].includes(current.key) && (
+              <HostFields
+                stepKey={current.key}
+                data={data}
+                setData={setData}
                 isBn={isBn}
-              >
-                <div className="relative">
-                  <Building2 size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
-                  <input
-                    type="text"
-                    value={data.workPlace}
-                    onChange={(e) => setData((d) => ({ ...d, workPlace: e.target.value }))}
-                    placeholder={isBn
-                      ? (data.profession === 'student' ? 'যেমন: ঢাকা ইউনিভার্সিটি' : 'যেমন: যমুনা ব্যাংক')
-                      : (data.profession === 'student' ? 'e.g. Dhaka University'     : 'e.g. Jamuna Bank')}
-                    className="w-full pl-12 pr-4 py-4 bg-white/[0.03] hover:bg-white/[0.05] focus:bg-white/[0.06] border border-white/[0.08] focus:border-emerald-500/40 rounded-2xl text-sm font-bold text-white placeholder:text-white/20 transition-all outline-none focus:shadow-[0_0_20px_rgba(16,185,129,0.1)] focus:ring-1 focus:ring-emerald-500/20"
-                    autoFocus
-                  />
-                </div>
-                <div className="mt-3.5 p-3.5 rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/10 flex gap-2.5 items-start">
-                  <Sparkles size={13} className="text-emerald-400 shrink-0 mt-0.5" />
-                  <p className="text-[11px] font-bold text-emerald-300/70 leading-relaxed">
-                    {isBn
-                      ? 'বাড়িওয়ালারা একটা পরিচিত নাম দেখলেই আশ্বস্ত হন। আপনাকে কোনো প্রমাণ দিতে হবে না।'
-                      : 'A familiar workplace name puts most landlords at ease. No proof required.'}
-                  </p>
-                </div>
-              </StepFrame>
+                photoInputRef={photoInputRef}
+                handleFilePick={handleFilePick}
+                removeFile={removeFile}
+              />
             )}
 
-            {current.key === 'familySize' && (
-              <StepFrame
-                key="familySize"
-                icon={Users}
-                titleBn="পরিবারে কত জন?" titleEn="How many people?"
-                hintBn="বাসায় মোট কত জন থাকবেন?"
-                hintEn="Total number of people who'll be living there."
-                isBn={isBn}
-              >
-                <div className="grid grid-cols-2 gap-2.5">
-                  {FAMILY_SIZES.map((f) => (
-                    <Chip
-                      key={f.key}
-                      active={data.familySize === f.key}
-                      onClick={() => setData((d) => ({ ...d, familySize: f.key }))}
-                    >
-                      {isBn ? f.bn : f.en}
-                    </Chip>
-                  ))}
-                </div>
-              </StepFrame>
-            )}
-
-            {current.key === 'emergency' && (
-              <StepFrame
-                key="emergency"
-                icon={Phone}
-                titleBn="জরুরি যোগাযোগ" titleEn="Emergency contact"
-                hintBn="বাবা-মা, ভাই-বোন বা একজন আত্মীয়ের নাম্বার।"
-                hintEn="A parent, sibling, or close relative's number."
-                isBn={isBn}
-              >
-                <div className="space-y-2.5">
-                  <div className="relative">
-                    <Heart size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
-                    <input
-                      type="text"
-                      value={data.emergencyName}
-                      onChange={(e) => setData((d) => ({ ...d, emergencyName: e.target.value }))}
-                      placeholder={isBn ? 'নাম (ঐচ্ছিক) — যেমন: বাবা / ভাই' : 'Name (optional) — e.g. Father / Brother'}
-                      className="w-full pl-11 pr-4 py-3.5 bg-white/[0.03] hover:bg-white/[0.05] focus:bg-white/[0.06] border border-white/[0.08] focus:border-[#ff4d6d]/40 rounded-2xl text-sm font-bold text-white placeholder:text-white/20 transition-all outline-none focus:shadow-[0_0_20px_rgba(186,0,54,0.1)] focus:ring-1 focus:ring-[#ff4d6d]/20"
-                    />
-                  </div>
-                  <div className="relative">
-                    <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
-                    <input
-                      type="tel"
-                      inputMode="tel"
-                      value={data.emergencyPhone}
-                      onChange={(e) => setData((d) => ({ ...d, emergencyPhone: e.target.value }))}
-                      placeholder={isBn ? 'মোবাইল নাম্বার (+880…)' : 'Mobile number (+880…)'}
-                      className="w-full pl-11 pr-4 py-3.5 bg-white/[0.03] hover:bg-white/[0.05] focus:bg-white/[0.06] border border-white/[0.08] focus:border-emerald-500/40 rounded-2xl text-sm font-bold text-white placeholder:text-white/20 transition-all outline-none focus:shadow-[0_0_20px_rgba(16,185,129,0.1)] focus:ring-1 focus:ring-emerald-500/20"
-                    />
-                  </div>
-                </div>
-              </StepFrame>
-            )}
-
-            {/* ─────────────────────────────────────────────────────
-                LANDLORD STEPS
-                ───────────────────────────────────────────────────── */}
-            {current.key === 'ownerType' && (
-              <StepFrame
-                key="ownerType"
-                icon={KeySquare}
-                titleBn="আপনি এই সম্পত্তির কে?" titleEn="How are you tied to this property?"
-                hintBn="ভাড়াটেরা স্বচ্ছতা পছন্দ করেন।"
-                hintEn="Tenants prefer transparency about who they're renting from."
-                isBn={isBn}
-              >
-                <div className="grid grid-cols-1 gap-2.5">
-                  {OWNERSHIP_TYPES.map((o) => (
-                    <Chip
-                      key={o.key}
-                      icon={o.icon}
-                      active={data.ownerType === o.key}
-                      onClick={() => setData((d) => ({ ...d, ownerType: o.key }))}
-                    >
-                      {isBn ? o.bn : o.en}
-                    </Chip>
-                  ))}
-                </div>
-              </StepFrame>
-            )}
-
-            {current.key === 'propertyAddress' && (
-              <StepFrame
-                key="propertyAddress"
-                icon={MapPin}
-                titleBn="সম্পত্তির ঠিকানা" titleEn="Property address"
-                hintBn="শহর + এলাকা। বিস্তারিত ঠিকানা ভাড়াটে confirm হলেই দেখবে।"
-                hintEn="City + area is enough here. Full address only revealed after a tenant is confirmed."
-                isBn={isBn}
-              >
-                <div className="relative">
-                  <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
-                  <input
-                    type="text"
-                    value={data.propertyAddress}
-                    onChange={(e) => setData((d) => ({ ...d, propertyAddress: e.target.value }))}
-                    placeholder={isBn ? 'যেমন: ধানমন্ডি ৩২, ঢাকা' : 'e.g. Dhanmondi 32, Dhaka'}
-                    className="w-full pl-12 pr-4 py-4 bg-white/[0.03] hover:bg-white/[0.05] focus:bg-white/[0.06] border border-white/[0.08] focus:border-emerald-500/40 rounded-2xl text-sm font-bold text-white placeholder:text-white/20 transition-all outline-none focus:shadow-[0_0_20px_rgba(16,185,129,0.1)] focus:ring-1 focus:ring-emerald-500/20"
-                    autoFocus
-                  />
-                </div>
-                <div className="mt-3.5 p-3.5 rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/10 flex gap-2.5 items-start">
-                  <Lock size={13} className="text-emerald-400 shrink-0 mt-0.5" />
-                  <p className="text-[11px] font-bold text-emerald-300/70 leading-relaxed">
-                    {isBn
-                      ? 'বিস্তারিত ঠিকানা আমরা ভাড়াটেদের তখনই দেখাই যখন আপনি তাদের inquiry accept করেন।'
-                      : 'Full address is revealed to a tenant only after you accept their inquiry.'}
-                  </p>
-                </div>
-              </StepFrame>
-            )}
-
-            {current.key === 'caretaker' && (
-              <StepFrame
-                key="caretaker"
-                icon={UserCog}
-                titleBn="কেয়ারটেকার / ব্যাকআপ যোগাযোগ"
-                titleEn="Caretaker / backup contact"
-                hintBn="আপনি অনুপলব্ধ থাকলে যাকে ভাড়াটে কল করতে পারবে।"
-                hintEn="Someone tenants can reach when you're unavailable."
-                optional isBn={isBn}
-              >
-                <div className="space-y-2.5">
-                  <div className="relative">
-                    <UserCog size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
-                    <input
-                      type="text"
-                      value={data.caretakerName}
-                      onChange={(e) => setData((d) => ({ ...d, caretakerName: e.target.value }))}
-                      placeholder={isBn ? 'নাম (ঐচ্ছিক)' : 'Name (optional)'}
-                      className="w-full pl-11 pr-4 py-3.5 bg-white/[0.03] hover:bg-white/[0.05] focus:bg-white/[0.06] border border-white/[0.08] focus:border-[#ff4d6d]/40 rounded-2xl text-sm font-bold text-white placeholder:text-white/20 transition-all outline-none focus:shadow-[0_0_20px_rgba(186,0,54,0.1)] focus:ring-1 focus:ring-[#ff4d6d]/20"
-                    />
-                  </div>
-                  <div className="relative">
-                    <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
-                    <input
-                      type="tel"
-                      inputMode="tel"
-                      value={data.caretakerPhone}
-                      onChange={(e) => setData((d) => ({ ...d, caretakerPhone: e.target.value }))}
-                      placeholder={isBn ? 'মোবাইল নাম্বার (+880…)' : 'Mobile number (+880…)'}
-                      className="w-full pl-11 pr-4 py-3.5 bg-white/[0.03] hover:bg-white/[0.05] focus:bg-white/[0.06] border border-white/[0.08] focus:border-emerald-500/40 rounded-2xl text-sm font-bold text-white placeholder:text-white/20 transition-all outline-none focus:shadow-[0_0_20px_rgba(16,185,129,0.1)] focus:ring-1 focus:ring-emerald-500/20"
-                    />
-                  </div>
-                </div>
-              </StepFrame>
-            )}
-
-            {current.key === 'ownershipProof' && (
-              <StepFrame
-                key="ownershipProof"
-                icon={FileText}
-                titleBn="মালিকানার প্রমাণ"
-                titleEn="Ownership proof"
-                hintBn={
-                  data.ownerType === 'family'
-                    ? 'যেকোনো একটা — হোল্ডিং ট্যাক্স, বিদ্যুৎ বিল, বা দলিলের ছবি।'
-                    : 'দলিল, হোল্ডিং ট্যাক্স রসিদ, বা সর্বশেষ বিদ্যুৎ বিলের ছবি।'
-                }
-                hintEn={
-                  data.ownerType === 'family'
-                    ? 'Any one — holding tax bill, electricity bill, or deed photo.'
-                    : 'Deed, holding tax receipt, or latest electricity bill.'
-                }
-                optional isBn={isBn}
-              >
-                <ImageUploadCard
-                  value={data.ownershipProof}
-                  inputRef={ownershipProofInput}
-                  onPick={(e) => handleFilePick('ownershipProof', e)}
-                  onRemove={() => removeFile('ownershipProof')}
-                  emptyLabelBn="মালিকানার ছবি" emptyLabelEn="Ownership document"
-                  isBn={isBn}
-                  aspect="aspect-[4/3]"
-                />
-                <div className="mt-4 p-3.5 rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/10 flex gap-2.5 items-start">
-                  <ShieldCheck size={14} className="text-emerald-400 shrink-0 mt-0.5" />
-                  <p className="text-[11px] font-bold text-emerald-300/70 leading-relaxed">
-                    {isBn
-                      ? 'শুধু অ্যাডমিন এটা দেখবে। ভাড়াটেরা শুধু "Verified Owner" badge দেখে।'
-                      : 'Only our admin team sees this. Tenants only see your "Verified Owner" badge.'}
-                  </p>
-                </div>
-              </StepFrame>
-            )}
-
-            {/* ─────────────────────────────────────────────────────
-                SHARED — NID (visible for both, behaviour role-aware)
-                ───────────────────────────────────────────────────── */}
+            {/* ── Shared: NID ── */}
             {current.key === 'nid' && (
               <StepFrame
                 key="nid"
@@ -938,13 +1027,13 @@ const VerificationModal = ({
                 titleBn="NID যাচাই" titleEn="NID verification"
                 hintBn={
                   isLandlord
-                    ? 'মালিকদের জন্য NID আবশ্যক।'
-                    : 'এখন না দিলেও চলবে। বাসা চূড়ান্ত করার সময় চাইব।'
+                    ? 'মালিকদের জন্য NID আবশ্যক। (+২৫ ট্রাস্ট)'
+                    : 'এখন না দিলেও চলবে — পরে চাইব। (+৩০ ট্রাস্ট)'
                 }
                 hintEn={
                   isLandlord
-                    ? 'NID is required for landlords.'
-                    : "Skip for now if you'd rather not. We'll ask again when you finalise a property."
+                    ? 'NID is required for hosts. (+25 Trust)'
+                    : "Skip for now if you'd prefer. We'll ask later. (+30 Trust)"
                 }
                 optional={!isLandlord} isBn={isBn}
               >
@@ -979,9 +1068,7 @@ const VerificationModal = ({
               </StepFrame>
             )}
 
-            {/* ─────────────────────────────────────────────────────
-                SHARED — REVIEW
-                ───────────────────────────────────────────────────── */}
+            {/* ── Shared: Review ── */}
             {isReview && (
               <StepFrame
                 key="review"
@@ -1004,52 +1091,9 @@ const VerificationModal = ({
                   </div>
                 )}
 
-                <div className="space-y-2.5">
-                  {isLandlord ? (
-                    <>
-                      <SummaryRow icon={KeySquare} labelBn="মালিকানা" labelEn="Ownership" isBn={isBn}
-                        value={OWNERSHIP_TYPES.find((o) => o.key === data.ownerType)?.[isBn ? 'bn' : 'en']} />
-                      <SummaryRow icon={MapPin} labelBn="ঠিকানা" labelEn="Address" isBn={isBn}
-                        value={data.propertyAddress} />
-                      <SummaryRow icon={UserCog} labelBn="কেয়ারটেকার" labelEn="Caretaker" isBn={isBn}
-                        value={data.caretakerPhone ? `${data.caretakerName || '—'} · ${data.caretakerPhone}` : ''}
-                        muted={!data.caretakerPhone} />
-                      <SummaryRow icon={IdCard} labelBn="NID" labelEn="NID" isBn={isBn}
-                        value={(data.nidFront && data.nidBack)
-                          ? (isBn ? 'যোগ করা হয়েছে' : 'Added')
-                          : (isBn ? 'আবশ্যক' : 'Required')}
-                        muted={!(data.nidFront && data.nidBack)} />
-                      <SummaryRow icon={FileText} labelBn="মালিকানার প্রমাণ" labelEn="Ownership proof" isBn={isBn}
-                        value={data.ownershipProof
-                          ? (isBn ? 'যোগ করা হয়েছে' : 'Added')
-                          : (isBn ? 'পরে যোগ করব' : 'Add later')}
-                        muted={!data.ownershipProof} />
-                    </>
-                  ) : (
-                    <>
-                      <SummaryRow icon={Briefcase} labelBn="পেশা" labelEn="Profession" isBn={isBn}
-                        value={PROFESSIONS.find((p) => p.key === data.profession)?.[isBn ? 'bn' : 'en']} />
-                      <SummaryRow icon={Building2}
-                        labelBn={data.profession === 'student' ? 'প্রতিষ্ঠান' : 'কাজের স্থান'}
-                        labelEn={data.profession === 'student' ? 'Institution' : 'Workplace'}
-                        isBn={isBn}
-                        value={data.workPlace} />
-                      <SummaryRow icon={Users} labelBn="সদস্য সংখ্যা" labelEn="Household size" isBn={isBn}
-                        value={data.familySize ? (FAMILY_SIZES.find((f) => f.key === data.familySize)?.[isBn ? 'bn' : 'en']) : ''} />
-                      <SummaryRow icon={Phone} labelBn="জরুরি যোগাযোগ" labelEn="Emergency contact" isBn={isBn}
-                        value={data.emergencyPhone ? `${data.emergencyName || '—'} · ${data.emergencyPhone}` : ''} />
-                      <SummaryRow icon={IdCard} labelBn="NID" labelEn="NID" isBn={isBn}
-                        value={(data.nidFront && data.nidBack)
-                          ? (isBn ? 'যোগ করা হয়েছে' : 'Added')
-                          : (isBn ? 'পরে যোগ করব' : 'Add later')}
-                        muted={!(data.nidFront && data.nidBack)} />
-                    </>
-                  )}
-                </div>
+                {isLandlord ? <HostReview data={data} isBn={isBn} /> : <TenantReview data={data} isBn={isBn} />}
 
-                {/* Trust booster nudge — only when NID is still missing AND
-                    role allows skipping it (tenants). Landlords can't reach
-                    review without NID, so this card never shows for them. */}
+                {/* Trust booster nudge — only for tenants missing NID */}
                 {!data.nidFront && !isLandlord && (
                   <div className="mt-5 p-4 rounded-2xl bg-gradient-to-br from-emerald-500/[0.06] to-[#ff4d6d]/[0.04] border border-emerald-500/10">
                     <div className="flex items-start gap-3">
@@ -1086,7 +1130,7 @@ const VerificationModal = ({
           )}
         </div>
 
-        {/* ─── Footer (nav buttons) ─── */}
+        {/* ─── Footer ─── */}
         <div className="relative px-5 sm:px-7 py-4 border-t border-white/[0.04] flex items-center justify-between gap-3 shrink-0 bg-[#0f0f1a]/60 backdrop-blur-sm">
           <button
             type="button"
@@ -1144,10 +1188,6 @@ const VerificationModal = ({
 };
 
 // ─── Exports ─────────────────────────────────────────────────────────────
-// Default export keeps the old name so every existing
-//   `import TenantVerificationModal from './TenantVerificationModal'`
-// keeps working without any change. `VerificationModal` is also exported
-// as a named export for new call sites that want explicit naming.
 export default VerificationModal;
 export { VerificationModal };
 export const TenantVerificationModal = VerificationModal;
