@@ -154,14 +154,7 @@ export function applyFilters(properties, filters) {
     activeDivision  = "all",
     searchArea      = "",
     nearMeLabel     = "Nearby Location",
-    // The fallback floor used to be 5000 BDT/month — sensible for a
-    // real production listing but cruel during dev/QA where a host is
-    // testing with placeholder prices like 2000-2500. Empty listing
-    // pages were the no-1 confusion: properties added by the user did
-    // get saved, they just got filtered out before render. We now
-    // default to 0 so a freshly-added test listing shows up immediately
-    // regardless of price; the PropertyListing UI is still free to
-    // pass its own minPrice if it wants the old behaviour.
+    intent          = "",
     minPrice        = 0,
     maxPrice        = 300000,
     selectedTypes   = [],
@@ -177,6 +170,7 @@ export function applyFilters(properties, filters) {
     if (activeDivision !== "all" && prop.division !== activeDivision) return false;
     if (needle && needle !== (nearMeLabel || '').toLowerCase() &&
         !propertyLocationHaystack(prop).includes(needle)) return false;
+    if (intent && prop.intent !== intent) return false;
     if (prop.price < minPrice || prop.price > maxPrice) return false;
     if (selectedTypes.length > 0 && !selectedTypes.includes(prop.type)) return false;
     if (selectedCategories.length > 0 && !selectedCategories.includes(prop.rentalCategory)) return false;
@@ -347,6 +341,14 @@ export const propertyService = {
       // Was unset → server defaulted to 50, silently hiding extra listings.
       params.set('limit', '100');
       if (withQ && q) params.set('q', q);
+      
+      // Backend filters mapped from frontend state
+      if (filters.intent) params.set('intent', filters.intent);
+      if (filters.minPrice !== undefined) params.set('minPrice', filters.minPrice);
+      if (filters.maxPrice !== undefined) params.set('maxPrice', filters.maxPrice);
+      if (filters.selectedTypes?.length) params.set('type', filters.selectedTypes[0]);
+      if (filters.selectedCategories?.length) params.set('category', filters.selectedCategories[0]);
+      
       return `${API}/properties?${params}`;
     };
 

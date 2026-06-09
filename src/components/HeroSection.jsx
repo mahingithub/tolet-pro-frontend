@@ -170,6 +170,29 @@ const HeroSection = () => {
     }
   }, [searchType]);
 
+  const [liveSuggestions, setLiveSuggestions] = useState([]);
+
+  useEffect(() => {
+    const raw = location.trim();
+    if (raw.length < 2) {
+      setLiveSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+        const res = await fetch(`${API}/properties/suggestions?q=${encodeURIComponent(raw)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setLiveSuggestions(data.suggestions || []);
+        }
+      } catch (err) {
+        console.error('Autocomplete fetch error:', err);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [location]);
+
   const filteredSuggestions = useCallback((properties = []) => {
     const raw = location.trim();
     if (!raw) return allSuggestions.slice(0, 7);
@@ -214,7 +237,7 @@ const HeroSection = () => {
     return merged.slice(0, 9);
   }, [location, t]);
 
-  const suggestions = filteredSuggestions();
+  const suggestions = filteredSuggestions(liveSuggestions);
 
   useEffect(() => {
     const handleClickOutside = e => {

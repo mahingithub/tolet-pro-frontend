@@ -702,6 +702,7 @@ const PropertyListing = () => {
 	// floor.
 	const [minPrice, setMinPrice] = useState(0);
 	const [maxPrice, setMaxPrice] = useState(300000);
+	const [selectedIntent, setSelectedIntent] = useState("");
 	const [selectedTypes, setSelectedTypes] = useState([]);
 	const [selectedCategories, setSelectedCategories] = useState([]);
 	const [selectedBeds, setSelectedBeds] = useState("any");
@@ -731,7 +732,7 @@ const PropertyListing = () => {
 			}
 			try {
 				const list = await propertyService.getProperties(
-					{ activeDivision, searchArea: debouncedSearch, nearMeLabel: t.nearMe || "Nearby Location" },
+					{ activeDivision, searchArea: debouncedSearch, nearMeLabel: t.nearMe || "Nearby Location", intent: selectedIntent, selectedCategories, selectedTypes, minPrice, maxPrice },
 					sortBy,
 				);
 				if (!cancelled) setProperties(Array.isArray(list) ? list : []);
@@ -747,7 +748,7 @@ const PropertyListing = () => {
 		load();
 		const unsub = subscribeUserProperties(load);
 		return () => { cancelled = true; unsub && unsub(); };
-	}, [activeDivision, debouncedSearch, propertyRefreshTick]);
+	}, [activeDivision, debouncedSearch, selectedIntent, selectedCategories, selectedTypes, minPrice, maxPrice, propertyRefreshTick, sortBy, t.nearMe]);
 
 	// ── LANDLORD LOOKUP FOR INQUIRY ─────────────────────────────────────────────
 	// Look up the landlord lazily when the inquiry modal opens so we don't issue
@@ -775,6 +776,16 @@ const PropertyListing = () => {
 		else if (initialBudget && initialBudget.includes("-")) {
 			const [mn, mx] = initialBudget.split("-").map(Number);
 			if (!isNaN(mn) && !isNaN(mx)) { setMinPrice(mn); setMaxPrice(mx); }
+		}
+
+		// ── Intent / Purpose ──────────────────────────────────────────────────────
+		const initialPurpose = searchParams.get("purpose");
+		if (initialPurpose === 'buy') {
+			setSelectedIntent('buy');
+		} else if (initialPurpose === 'rent') {
+			setSelectedIntent('rent');
+		} else if (initialPurpose === 'commercial') {
+			setSelectedIntent('commercial');
 		}
 
 		// ── Property Type (prop.type: apartment / studio / duplex …) ─────────────
