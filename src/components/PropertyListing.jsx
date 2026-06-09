@@ -715,7 +715,7 @@ const PropertyListing = () => {
 	const [selectedFloor, setSelectedFloor] = useState(t.anyFloor || "Any Floor");
 	const [minRating, setMinRating] = useState(0);
 	const [sortBy, setSortBy] = useState("Newest Listings");
-
+	const [userLocation, setUserLocation] = useState(null);
 	useMotionValueEvent(scrollY, "change", (latest) => {
 		setIsStickyFilter(latest > 120);
 	});
@@ -812,8 +812,9 @@ const PropertyListing = () => {
 		setIsLocating(true);
 		if ("geolocation" in navigator) {
 			navigator.geolocation.getCurrentPosition(
-				() => {
+				(position) => {
 					setIsLocating(false);
+					setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
 					setSearchArea(t.nearMe || "Nearby Location");
 					showToast("Live location applied!");
 				},
@@ -835,6 +836,7 @@ const PropertyListing = () => {
 
 	const handleClearAll = () => {
 		setSearchArea("");
+		setUserLocation(null);
 		setMinPrice(0);
 		setMaxPrice(300000);
 		setSelectedTypes([]);
@@ -902,13 +904,18 @@ const PropertyListing = () => {
 			return true;
 		});
 		list.sort((a, b) => {
+			if (userLocation && searchArea === (t.nearMe || "Nearby Location")) {
+				const distA = Math.hypot((a.lat || 0) - userLocation.lat, (a.lng || 0) - userLocation.lng);
+				const distB = Math.hypot((b.lat || 0) - userLocation.lat, (b.lng || 0) - userLocation.lng);
+				return distA - distB;
+			}
 			if (sortBy === "Price: Low to High") return a.price - b.price;
 			if (sortBy === "Price: High to Low") return b.price - a.price;
 			if (sortBy === "Popular")            return (b.popularity || 0) - (a.popularity || 0);
 			return new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0);
 		});
 		return list;
-	}, [properties, activeDivision, minPrice, maxPrice, selectedTypes, selectedCategories, selectedBeds, maxSqft, selectedFurnish, minRating, selectedFloor, sortBy]);
+	}, [properties, activeDivision, minPrice, maxPrice, selectedTypes, selectedCategories, selectedBeds, maxSqft, selectedFurnish, minRating, selectedFloor, sortBy, userLocation, searchArea, t.nearMe]);
 
 	// ── LOCATION AUTOCOMPLETE ────────────────────────────────────────────────
 	// Distinct, human-readable place labels pulled from the loaded listings'
@@ -1075,7 +1082,7 @@ const PropertyListing = () => {
 							{searchArea ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision} {t.properties || "Properties"}
 						</span>
 						<div className="flex items-center gap-2 shrink-0">
-							<button onClick={() => setIsMobileFilterOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full text-sm font-bold text-gray-700 active:scale-95 transition-transform">
+							<button onClick={() => setIsMobileFilterOpen(true)} className="lg:hidden flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full text-sm font-bold text-gray-700 active:scale-95 transition-transform">
 								<Filter size={16} /> {t.filtersBtn || "Filters"}
 							</button>
 						</div>
@@ -1255,9 +1262,8 @@ const PropertyListing = () => {
 							</div>
 						</FilterSection>
 
-						<FilterSection title={t.filterRooms || "Bedrooms & Bathrooms"}>
-							<p className="text-[10px] font-black text-gray-400 mb-2 uppercase">{t.bedrooms || "Bedrooms"}</p>
-							<div className="flex gap-2 mb-5">
+						<FilterSection title={t.bedrooms || "Bedrooms"}>
+							<div className="flex gap-2">
 								{[
 									{ id: "any", text: t.any || "Any" },
 									{ id: "1", text: "1" },
@@ -1270,7 +1276,9 @@ const PropertyListing = () => {
 									</button>
 								))}
 							</div>
-							<p className="text-[10px] font-black text-gray-400 mb-2 uppercase">{t.bathroomType || "Bathroom Type"}</p>
+						</FilterSection>
+
+						<FilterSection title={t.bathroomType || "Bathroom Type"}>
 							<div className="grid grid-cols-2 gap-3">
 								{[t.attachedBath || "Attached", t.sharedBath || "Shared"].map((b) => (
 									<label key={b} className="flex items-center gap-2 text-xs font-bold text-gray-600">
