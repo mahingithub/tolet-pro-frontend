@@ -1039,6 +1039,12 @@ const PropertyListing = () => {
 							</button>
 						)}
 					</div>
+					<button
+						onClick={handleNearestMe}
+						className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center shrink-0 active:scale-90 transition-transform"
+						aria-label={t.nearMe || "Near Me"}>
+						{isLocating ? <Loader2 size={16} className="text-brandRed animate-spin" /> : <Crosshair size={16} className="text-brandRed" />}
+					</button>
 				</div>
 
 				{/* Row 2: Sort Dropdown, Filter, Map */}
