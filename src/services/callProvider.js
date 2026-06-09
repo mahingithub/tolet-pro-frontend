@@ -47,15 +47,8 @@ const PROVIDERS = {
 };
 
 // Which provider to use. Defaults to NATIVE for development.
-// 4.3 decision: ZegoCloud is the single production call provider — it ships
-// TURN / NAT traversal + auto-reconnect, which the native path lacks (native
-// has STUN only, so it can't connect BD mobile users behind symmetric NAT).
-// Default to Zego so production never silently falls back to the TURN-less
-// native path if the env var is ever missing. Native stays available for
-// LOCAL DEV ONLY via an explicit VITE_CALL_PROVIDER=native. If Zego is the
-// provider but unconfigured, _initZego() throws a clear "ZegoCloud not
-// configured" error (fail-loud) rather than degrading silently.
-const ACTIVE_PROVIDER = import.meta.env.VITE_CALL_PROVIDER || PROVIDERS.ZEGO;
+// Set VITE_CALL_PROVIDER=zegocloud in .env to switch.
+const ACTIVE_PROVIDER = import.meta.env.VITE_CALL_PROVIDER || PROVIDERS.NATIVE;
 
 const _isZego = () => ACTIVE_PROVIDER === PROVIDERS.ZEGO;
 
