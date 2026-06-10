@@ -15,11 +15,19 @@ importScripts('/call-notification-sw.js');
  * ► TO CHANGE LATER:
  *   - Bump CACHE_VERSION whenever you want every client to drop the old cache
  *     and re-fetch fresh assets (e.g. after a big release).
+ *   - The version below is a STATIC string, so it only invalidates caches when
+ *     YOU change it by hand (audit 6.5). For automatic per-deploy invalidation,
+ *     inject the build hash here at build time — e.g. a post-`vite build` script
+ *     that replaces a `__BUILD_ID__` placeholder in dist/service-worker.js with
+ *     `Date.now()` or the git short SHA, or adopt vite-plugin-pwa.
  *   - NEVER add /api, socket.io, or media hosts to precache or to the
  *     cache-first branch. Keep them on the network-only path below.
  */
 
-const CACHE_VERSION = 'tolet-pro-v1';
+// Bump this on any release that changes a PRECACHED file (index.html, manifest,
+// icons, offline.html). Hashed build assets (index-*.js/css) already bust their
+// own cache via unique filenames, so they don't need a version bump.
+const CACHE_VERSION = 'tolet-pro-v2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 // Minimal app shell. Hashed build assets (index-*.js/css) are cached at runtime
@@ -102,6 +110,22 @@ self.addEventListener('fetch', (event) => {
           return res;
         })
         .catch(() => caches.match(req).then((r) => r || caches.match('/offline.html')))
+    );
+    return;
+  }
+
+  // PWA manifest: network-first so install metadata (name, icons, theme)
+  // refreshes on its own without waiting for a manual CACHE_VERSION bump
+  // (audit 6.5). Falls back to the cached copy when offline.
+  if (url.endsWith('/manifest.json')) {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(STATIC_CACHE).then((c) => c.put(req, copy)).catch(() => {});
+          return res;
+        })
+        .catch(() => caches.match(req))
     );
     return;
   }
