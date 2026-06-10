@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   Users, Search, ShieldCheck, ShieldAlert, ShieldX, CheckCircle2,
   XCircle, AlertTriangle, Ban, RotateCcw, FileImage, Eye, Clock,
-  Filter, RefreshCw, BadgeCheck, Loader2,
+  Filter, RefreshCw, BadgeCheck, Loader2, Trash2
 } from 'lucide-react';
 import {
   listUsers,
@@ -14,6 +14,7 @@ import {
   rejectLandlord,
   banUser,
   unbanUser,
+  deleteAdminUser,
 } from '../services/adminService';
 
 /**
@@ -352,6 +353,15 @@ const UserRow = ({ user, busyId, onBan, onUnban }) => {
             Ban
           </button>
         )}
+        <button
+          onClick={() => onBan(user.id, true)} // We'll pass a flag to onBan, or create onDelete
+          disabled={busy || user.role === 'super_admin'}
+          title={user.role === 'super_admin' ? "Super admins can't be deleted" : 'Permanently Delete User'}
+          className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-black text-xs transition-all disabled:opacity-30 flex items-center gap-1.5 ml-2"
+        >
+          {busy ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+          Delete
+        </button>
       </div>
     </div>
   );
@@ -618,14 +628,24 @@ const UserManagement = () => {
     }
   };
 
-  const handleBan = async (id) => {
+  const handleBan = async (id, isDelete = false) => {
     setBusyId(id);
     try {
-      const updated = await banUser(id, 'Banned by admin.');
-      setAllUsers((prev) => prev.map((u) => (u.id === id ? updated : u)));
-      showToast('User banned.');
+      if (isDelete) {
+        if (!window.confirm("Are you sure you want to permanently delete this user and ALL their properties? This cannot be undone.")) {
+          setBusyId(null);
+          return;
+        }
+        await deleteAdminUser(id);
+        setAllUsers((prev) => prev.filter((u) => u.id !== id));
+        showToast('User and properties deleted.');
+      } else {
+        const updated = await banUser(id, 'Banned by admin.');
+        setAllUsers((prev) => prev.map((u) => (u.id === id ? updated : u)));
+        showToast('User banned.');
+      }
     } catch (err) {
-      showToast(err?.message || 'Ban failed.', 'error');
+      showToast(err?.message || (isDelete ? 'Delete failed.' : 'Ban failed.'), 'error');
     } finally {
       setBusyId(null);
     }
