@@ -397,14 +397,16 @@ const DivisionDistrictsSheet = ({ division, onClose, onPickDistrict, t }) => {
  */
 
 const POPULAR_AREA_IMAGES = {
-  Dhanmondi: 'https://images.unsplash.com/photo-1542361345-89e58247f2d5?w=900&q=80',
-  Gulshan: 'https://images.unsplash.com/photo-1496372412473-e8a1444ece6f?w=900&q=80',
-  Banani: 'https://images.unsplash.com/photo-1555529771-835f59fc5efe?w=900&q=80',
-  Uttara: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=900&q=80',
-  Bashundhara: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=900&q=80',
-  Mirpur: 'https://images.unsplash.com/photo-1449844908441-8829872d2607?w=900&q=80',
-  Mohammadpur: 'https://images.unsplash.com/photo-1479839672679-a46483c0e7c8?w=900&q=80'
+  Dhanmondi: 'https://greatruns.com/wp-content/uploads/2020/12/Dhanmondi_Lake_Dhaka_BD.jpg',
+  Gulshan: 'https://thumbs.dreamstime.com/b/gulshan-dhaka-bangladesh-traffics-crossing-signal-busy-circle-evening-high-buildings-background-280740296.jpg',
+  Banani: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRrmLre9dcvRHKLjGX3e5NLY27tjItA8HsZ4g&s',
+  Uttara: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/RAJUK_Uttara_Apartment_Project_%28cropped%29.jpg/330px-RAJUK_Uttara_Apartment_Project_%28cropped%29.jpg',
+  Bashundhara: 'https://www.bashundharahousing.com/api/assets/Several%20Nice%20Location%20of%20Bashundhara%20RA%202.jpeg',
+  Mirpur: 'https://dscdn.daily-sun.com/english/uploads/news_photos/2025/07/21/1753105721-78de7f89e9acf2851f429b382a631c18.jpeg',
+  Mohammadpur: 'https://thumbs.dreamstime.com/b/aerial-view-buildings-capital-city-dhaka-bangladesh-view-mohammadpur-bright-sunny-day-aerial-view-buildings-229193615.jpg'
 };
+
+
 
 const PopularAreasBento = ({ t, onPickArea, properties = [] }) => {
   // Build (area, featuredProperty) pairs from the live properties feed so
