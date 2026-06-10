@@ -106,11 +106,22 @@ export const listAdminProperties = async (filter = {}) => {
   return api(path);
 };
 
+// ─── POST /api/admin/properties/:id/moderate ───────────────────────────────
 export const moderateProperty = async (propertyId, action, reason = '') =>
   (await api(`/properties/${encodeURIComponent(propertyId)}/moderate`, {
     method: 'POST',
     body: { action, reason },
   })).property;
+
+export const deleteAdminProperty = async (propertyId) =>
+  await api(`/properties/${encodeURIComponent(propertyId)}`, {
+    method: 'DELETE',
+  });
+
+export const deleteAdminUser = async (userId) =>
+  await api(`/users/${encodeURIComponent(userId)}`, {
+    method: 'DELETE',
+  });
 
 // ─── Audit Log ───────────────────────────────────────────────────────────────
 export const logAuditAction = async (action, details = {}) => {
