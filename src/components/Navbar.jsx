@@ -865,33 +865,44 @@ useEffect(() => {
         <div className="flex flex-col px-5 pt-6 pb-28 gap-5">
 
           {isLoggedIn ? (
-            <div 
-              onClick={() => {
-                navigate(userRole === 'landlord' ? '/host-dashboard' : '/tenant-dashboard');
-                setIsMobileMenuOpen(false);
-              }}
-              className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-[1.75rem] p-5 flex items-center gap-4 shadow-lg relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
-            >
-              <div className={`w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center text-white font-black text-lg shadow-md shrink-0 ${userRole === 'landlord' ? 'bg-[#ba0036]' : 'bg-blue-500'}`}>
-                {authUser?.avatar ? (
-                  <img
-                    src={authUser.avatar}
-                    alt={userName}
-                    className="w-full h-full object-cover"
-                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                    draggable={false}
-                  />
-                ) : (
-                  initials(userName)
-                )}
+            <div className="flex flex-col gap-2">
+              <div 
+                onClick={() => {
+                  navigate(userRole === 'landlord' ? '/host-dashboard' : '/tenant-dashboard');
+                  setIsMobileMenuOpen(false);
+                }}
+                className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-[1.75rem] p-5 flex items-center gap-4 shadow-lg relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
+              >
+                <div className={`w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center text-white font-black text-lg shadow-md shrink-0 ${userRole === 'landlord' ? 'bg-[#ba0036]' : 'bg-blue-500'}`}>
+                  {authUser?.avatar ? (
+                    <img
+                      src={authUser.avatar}
+                      alt={userName}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      draggable={false}
+                    />
+                  ) : (
+                    initials(userName)
+                  )}
+                </div>
+                <div className="relative z-10 flex-1 min-w-0">
+                  <p className={`text-[9px] font-black uppercase tracking-widest mb-0.5 ${userRole === 'landlord' ? 'text-[#ba0036]' : 'text-blue-400'}`}>
+                    {userRole === 'landlord' ? '🏠 Host Portal' : '👤 Tenant Portal'}
+                  </p>
+                  <h3 className="text-white font-black text-base leading-tight truncate">{userName}</h3>
+                  <p className="text-gray-400 text-[10px] font-medium truncate">{userEmail}</p>
+                </div>
               </div>
-              <div className="relative z-10 flex-1 min-w-0">
-                <p className={`text-[9px] font-black uppercase tracking-widest mb-0.5 ${userRole === 'landlord' ? 'text-[#ba0036]' : 'text-blue-400'}`}>
-                  {userRole === 'landlord' ? '🏠 Host Portal' : '👤 Tenant Portal'}
-                </p>
-                <h3 className="text-white font-black text-base leading-tight truncate">{userName}</h3>
-                <p className="text-gray-400 text-[10px] font-medium truncate">{userEmail}</p>
-              </div>
+              <button onClick={handleSwitchRole}
+                className="flex items-center gap-3 px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl hover:bg-gray-100 transition-all text-left w-full mt-1">
+                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
+                  <RefreshCw size={15} className="text-gray-600" />
+                </div>
+                <span className="font-bold text-sm text-gray-600 flex-1">
+                  Switch to {userRole === 'tenant' ? 'Host' : 'Tenant'}
+                </span>
+              </button>
             </div>
           ) : (
             <div className="bg-gradient-to-br from-[#ba0036] to-[#e60045] p-6 rounded-[1.75rem] shadow-[0_10px_30px_rgba(186,0,54,0.3)] text-white relative overflow-hidden">
@@ -942,16 +953,6 @@ useEffect(() => {
               <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1 mb-1.5">My Account</p>
               <div className="bg-gray-50 border border-gray-100 rounded-2xl p-2 flex flex-col gap-0.5">
                 {(userRole === 'landlord' ? hostLinks : tenantLinks).map(item => <Row key={item.label} {...item} />)}
-                <button onClick={handleSwitchRole}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white transition-all text-left w-full">
-                  <div className="w-8 h-8 rounded-xl bg-gray-200 flex items-center justify-center shrink-0"><RefreshCw size={15} className="text-gray-500" /></div>
-                  <span className="font-bold text-sm text-gray-500 flex-1">Switch to {userRole === 'tenant' ? 'Host' : 'Tenant'}</span>
-                </button>
-                <button onClick={async () => { await handleLogout(); setIsMobileMenuOpen(false); }}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 transition-all text-left w-full border-t border-gray-100 mt-1">
-                  <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center shrink-0"><LogOut size={15} className="text-red-500" /></div>
-                  <span className="font-bold text-sm text-red-500 flex-1">Log Out</span>
-                </button>
               </div>
             </div>
           )}
@@ -987,6 +988,18 @@ useEffect(() => {
               ))}
             </div>
           </div>
+
+          {isLoggedIn && (
+            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-2 flex flex-col gap-0.5">
+              <button onClick={async () => { await handleLogout(); setIsMobileMenuOpen(false); }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 transition-all text-left w-full">
+                <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                  <LogOut size={15} className="text-red-500" />
+                </div>
+                <span className="font-bold text-sm text-red-500 flex-1">Log Out</span>
+              </button>
+            </div>
+          )}
 
         </div>
       </div>
