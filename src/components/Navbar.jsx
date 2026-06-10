@@ -165,10 +165,11 @@ const Navbar = () => {
 
     // Intercept action: Evaluate the user's current verification status
     if (target === 'landlord') {
-      const isVerified = authUser?.tenantProfile?.verification?.status === 'verified' || authUser?.landlordProfile?.verification?.status === 'verified';
+      const owns = Array.isArray(auth.roles) && auth.roles.includes(target);
+      const isVerified = authUser?.landlordProfile?.verification?.status === 'verified';
       
-      // Failure Scenario: If NOT Verified, block role switch and open Verification Modal
-      if (!isVerified) {
+      // Failure Scenario: If NOT Verified and doesn't already own the role, block role switch and open Verification Modal
+      if (!owns && !isVerified) {
         closeAll();
         setShowVerificationModal(true);
         return;
