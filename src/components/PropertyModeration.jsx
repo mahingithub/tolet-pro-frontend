@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   CheckCircle2, XCircle, MapPin, DollarSign,
-  BedDouble, Bath, Square, User, ShieldAlert, RefreshCw, AlertCircle,
+  BedDouble, Bath, Square, User, ShieldAlert, RefreshCw, AlertCircle, Trash2, Loader2
 } from 'lucide-react';
-import { listAdminProperties, moderateProperty } from '../services/adminService';
+import { listAdminProperties, moderateProperty, deleteAdminProperty } from '../services/adminService';
 
 // Filter buttons surface every status the model supports today. Default
 // to "active" so the moderation page shows what's currently live on the
@@ -51,11 +51,20 @@ const PropertyModeration = () => {
   const handleAction = async (id, action) => {
     setActingId(id);
     try {
-      await moderateProperty(id, action);
-      // Optimistically drop the row from the current list — when the
-      // admin flips an active listing to rejected/removed it should
-      // disappear from the "Active" tab immediately.
-      setItems((prev) => prev.filter((p) => String(p._id || p.id) !== String(id)));
+      if (action === 'delete') {
+        if (!window.confirm("Are you sure you want to permanently delete this property? This cannot be undone.")) {
+          setActingId(null);
+          return;
+        }
+        await deleteAdminProperty(id);
+        setItems((prev) => prev.filter((p) => String(p._id || p.id) !== String(id)));
+      } else {
+        await moderateProperty(id, action);
+        // Optimistically drop the row from the current list — when the
+        // admin flips an active listing to rejected/removed it should
+        // disappear from the "Active" tab immediately.
+        setItems((prev) => prev.filter((p) => String(p._id || p.id) !== String(id)));
+      }
     } catch (err) {
       setError(err?.message || `Moderation failed (${action}).`);
     } finally {
@@ -191,7 +200,7 @@ const PropertyModeration = () => {
                         disabled={actingId === id}
                         className="flex-1 md:flex-none px-6 py-3 bg-white text-gray-700 rounded-xl font-black text-sm shadow-sm hover:text-[#ba0036] hover:shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                       >
-                        <XCircle size={18} /> Remove from public
+                        {actingId === id ? <Loader2 size={18} className="animate-spin" /> : <XCircle size={18} />} Remove from public
                       </button>
                     ) : (
                       <button
@@ -199,9 +208,17 @@ const PropertyModeration = () => {
                         disabled={actingId === id}
                         className="flex-1 md:flex-none px-6 py-3 bg-gradient-to-r from-[#ba0036] to-[#d11147] text-white rounded-xl font-black text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                       >
-                        <CheckCircle2 size={18} /> Restore to active
+                        {actingId === id ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />} Restore to active
                       </button>
                     )}
+                    <button
+                      onClick={() => handleAction(id, 'delete')}
+                      disabled={actingId === id}
+                      className="flex-1 md:flex-none px-4 py-3 bg-red-50 text-red-600 rounded-xl font-black text-sm shadow-sm hover:bg-red-100 hover:text-red-700 hover:shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      title="Permanently Delete Property"
+                    >
+                      <Trash2 size={18} /> Delete
+                    </button>
                   </div>
                 </div>
               </div>
