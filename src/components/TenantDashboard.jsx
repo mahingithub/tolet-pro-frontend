@@ -29,6 +29,7 @@ import InquiryModal from './InquiryModal';
 // (Landlords still use the older modal until the next session ships a host
 // version with the same design language.)
 import VerificationModal from './VerificationModal';
+import LandlordOnboardingModal from './LandlordOnboardingModal';
 // 🆕 Session 2: shared profile primitives. ProfileSection is the
 // new role-aware card that replaces the old "Personal Information"
 // + header block. It handles avatar, inline-edit fields, and the
@@ -764,6 +765,7 @@ const TenantDashboard = () => {
   // will stream the picked files to Cloudinary and store the returned
   // secure URLs on `verification.{kind}Url`.
   const [verifModalOpen, setVerifModalOpen] = useState(false);
+  const [landlordOnboardingOpen, setLandlordOnboardingOpen] = useState(false);
 
   // Auto-open the verification wizard when the user lands here with
   // `?openVerify=1` — currently fired by the Navbar's "Switch to Host"
@@ -773,7 +775,13 @@ const TenantDashboard = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('openVerify') === '1') {
-      setVerifModalOpen(true);
+      const reason = params.get('reason');
+      // If the user wants to upgrade to host, go straight to the landlord onboarding modal.
+      if (reason === 'host_upgrade') {
+        setLandlordOnboardingOpen(true);
+      } else {
+        setVerifModalOpen(true);
+      }
       // Clean the URL so the modal opens once, not on every render.
       const url = new URL(window.location.href);
       url.searchParams.delete('openVerify');
@@ -963,25 +971,7 @@ const handleWizardSubmit = async (payload) => {
   // Server-side role mutation is unchanged from the original "single
   // click" version — the only thing that moved is the trigger.
   const isAlsoLandlord = Array.isArray(authRoles) && authRoles.includes('landlord');
-  const [hostUpgradePromptOpen, setHostUpgradePromptOpen] = useState(false);
-  const performBecomeLandlord = async () => {
-    setHostUpgradePromptOpen(false);
-    try {
-      if (!isAlsoLandlord) await authAddRole?.('landlord');
-      await authSetActiveRole?.('landlord');
-      navigate('/host-dashboard');
-    } catch (err) {
-      showProfileToast(language === 'বাংলা'
-        ? 'হোস্ট মোডে যাওয়া যায়নি — পরে চেষ্টা করুন।'
-        : 'Could not switch to host mode — please try again.');
-    }
-  };
-  const openBecomeLandlordPrompt = () => setHostUpgradePromptOpen(true);
-  const goVerifyNidFirst = () => {
-    setHostUpgradePromptOpen(false);
-    setActiveTab('profile');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  const openBecomeLandlordPrompt = () => setLandlordOnboardingOpen(true);
 
   const persistReceipts = (next) => {
     setPaymentReceipts(next);
@@ -1372,52 +1362,6 @@ const handleWizardSubmit = async (payload) => {
                   >
                     {language === 'বাংলা' ? 'হোস্ট হন' : 'Become a Host'} <ArrowRight size={15} />
                   </button>
-                </div>
-              </div>
-            )}
-
-            {/* ── BECOME A LANDLORD — soft NID warning (Q2 approved) ──
-                The first-listing flow is intentionally not blocked on
-                NID verification. We just surface a friendly heads-up so
-                the user knows verifying lifts their trust score, but
-                they can still continue and publish immediately.
-                Roadmap-v2 §4 / tenant-roadmap §T4. */}
-            {hostUpgradePromptOpen && (
-              <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                <div className="w-full max-w-md bg-white rounded-[1.75rem] shadow-2xl border border-gray-100 p-6 md:p-7 relative">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4">
-                    <ShieldCheck size={22} strokeWidth={2.4} />
-                  </div>
-                  <h4 className="text-lg md:text-xl font-black text-gray-900 leading-tight mb-2">
-                    {language === 'বাংলা'
-                      ? 'হোস্ট হতে এনআইডি লাগবে না'
-                      : 'You can list without NID verification'}
-                  </h4>
-                  <p className="text-[13px] md:text-sm font-bold text-gray-500 leading-relaxed mb-5">
-                    {language === 'বাংলা'
-                      ? 'এনআইডি যাচাই না করে এখনই প্রথম প্রপার্টি লিস্ট করতে পারবেন। তবে যাচাই করলে আপনার ট্রাস্ট স্কোর বাড়বে এবং বেশি ইনকোয়ারি পাবেন।'
-                      : 'You can publish your first property right now without verifying your NID. Verifying later raises your trust score and brings in more inquiries.'}
-                  </p>
-                  <div className="flex flex-col gap-3">
-                    <button
-                      onClick={performBecomeLandlord}
-                      className="w-full py-3 rounded-2xl bg-[#ba0036] text-white font-black text-sm shadow-[0_8px_24px_rgba(186,0,54,0.25)] hover:bg-[#90002a] active:scale-[0.99] transition-all"
-                    >
-                      {language === 'বাংলা' ? 'কন্টিনিউ — পরে যাচাই করব' : 'Continue — verify later'}
-                    </button>
-                    <button
-                      onClick={goVerifyNidFirst}
-                      className="w-full py-3 rounded-2xl bg-gray-50 text-gray-700 font-black text-sm border border-gray-100 hover:bg-gray-100 active:scale-[0.99] transition-all"
-                    >
-                      {language === 'বাংলা' ? 'আগে এনআইডি যাচাই করুন' : 'Verify NID first'}
-                    </button>
-                    <button
-                      onClick={() => setHostUpgradePromptOpen(false)}
-                      className="w-full py-2 text-[12px] font-bold text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      {language === 'বাংলা' ? 'বাতিল' : 'Cancel'}
-                    </button>
-                  </div>
                 </div>
               </div>
             )}
@@ -2343,7 +2287,7 @@ const handleWizardSubmit = async (payload) => {
                       {language === 'বাংলা' ? `${payYear} সালে পরিশোধ` : `Paid in ${payYear}`}
                     </p>
                     <p className="mt-1 text-3xl md:text-4xl font-black leading-none tabular-nums tracking-tight">
-                      ৳ {paidThisYear.toLocaleString()}
+                      ৳ {paidThisYear.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}
                     </p>
                     <p className="mt-2 text-[11px] font-bold opacity-80">
                       {paymentReceipts.filter((r) => r.monthKey?.startsWith(`${payYear}-`)).length}{' '}
@@ -2356,7 +2300,7 @@ const handleWizardSubmit = async (payload) => {
                       {language === 'বাংলা' ? 'বাকি' : 'Outstanding'}
                     </p>
                     <p className={`mt-1 text-3xl md:text-4xl font-black leading-none tabular-nums tracking-tight ${outstanding > 0 ? 'text-rose-200' : 'text-emerald-200'}`}>
-                      ৳ {outstanding.toLocaleString()}
+                      ৳ {outstanding.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}
                     </p>
                     <p className="mt-2 text-[11px] font-bold opacity-80">
                       {partialCount > 0
@@ -2371,7 +2315,7 @@ const handleWizardSubmit = async (payload) => {
                       </p>
                       <p className="mt-1 text-base md:text-lg font-black leading-tight">
                         {nextDue
-                          ? `${nextDue.monthLabel || nextDue.monthKey} · ৳${(nextDue.balance || 0).toLocaleString()}`
+                          ? `${nextDue.monthLabel || nextDue.monthKey} · ৳${(nextDue.balance || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}`
                           : (language === 'বাংলা' ? 'কিছু বাকি নেই' : 'Nothing due')}
                       </p>
                     </div>
@@ -2455,11 +2399,11 @@ const handleWizardSubmit = async (payload) => {
                           {isPartial && <Hourglass size={11} className={isActive ? 'text-amber-300' : 'text-amber-600'} />}
                         </div>
                         <div className="mt-1.5 text-[11px] font-black tabular-nums truncate">
-                          {hasAny ? `৳${paid.toLocaleString()}` : '—'}
+                          {hasAny ? `৳${paid.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}` : '—'}
                         </div>
                         {isPartial && (
                           <div className={`text-[9px] font-bold mt-0.5 truncate ${isActive ? 'text-amber-200' : 'text-amber-700'}`}>
-                            {language === 'বাংলা' ? 'বাকি' : 'Due'} ৳{due.toLocaleString()}
+                            {language === 'বাংলা' ? 'বাকি' : 'Due'} ৳{due.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}
                           </div>
                         )}
                         {isCurrent && (
@@ -2584,13 +2528,13 @@ const handleWizardSubmit = async (payload) => {
                               ? 'bg-gradient-to-br from-blue-600 to-indigo-700 bg-clip-text text-transparent'
                               : 'bg-gradient-to-br from-amber-600 to-orange-600 bg-clip-text text-transparent'
                           }`}>
-                            ৳ {(r.totalPaid || 0).toLocaleString()}
+                            ৳ {(r.totalPaid || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}
                             {isFull && <CheckCheck size={22} strokeWidth={3} className="text-blue-600 shrink-0" />}
                           </p>
                           <div className="flex items-center justify-between mt-2.5 text-[11px] font-bold text-gray-500">
-                            <span>{language === 'বাংলা' ? 'মোট বকেয়া' : 'Total Due'}: ৳{(r.totalDue || 0).toLocaleString()}</span>
+                            <span>{language === 'বাংলা' ? 'মোট বকেয়া' : 'Total Due'}: ৳{(r.totalDue || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}</span>
                             <span className={r.balance > 0 ? 'text-[#ba0036]' : 'text-green-600'}>
-                              {language === 'বাংলা' ? 'বাকি' : 'Balance'}: {r.balance > 0 ? `৳${r.balance.toLocaleString()}` : '✓'}
+                              {language === 'বাংলা' ? 'বাকি' : 'Balance'}: {r.balance > 0 ? `৳${r.balance.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}` : '✓'}
                             </span>
                           </div>
                         </div>
@@ -2660,6 +2604,16 @@ const handleWizardSubmit = async (payload) => {
         onSubmit={handleWizardSubmit}
         language={language}
         initialData={tenantProfile}
+      />
+
+      <LandlordOnboardingModal
+        open={landlordOnboardingOpen}
+        onClose={() => setLandlordOnboardingOpen(false)}
+        onSuccess={() => {
+          setLandlordOnboardingOpen(false);
+          // showProfileToast handles the success feedback
+        }}
+        language={language}
       />
 
       {/* 🟢 NEW: Futuristic Welcome Splash — fires once per browser session.
@@ -2806,7 +2760,7 @@ const handleWizardSubmit = async (payload) => {
                   {language === 'বাংলা' ? 'ডিজিটাল রেন্ট রিসিট' : 'Digital Rent Receipt'}
                 </p>
                 <h3 className="text-2xl font-black tracking-tight">
-                  ৳ {(activeReceipt.totalPaid || 0).toLocaleString()}
+                  ৳ {(activeReceipt.totalPaid || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}
                 </h3>
                 <p className="text-[11px] font-bold text-white/80 mt-1">
                   {(activeReceipt.status === 'full' || activeReceipt.balance <= 0)
@@ -2828,16 +2782,16 @@ const handleWizardSubmit = async (payload) => {
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-100">
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'মোট বকেয়া' : 'Total Due'}</span>
-                <span className="text-sm font-black text-gray-900">৳ {(activeReceipt.totalDue || 0).toLocaleString()}</span>
+                <span className="text-sm font-black text-gray-900">৳ {(activeReceipt.totalDue || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-100">
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'মোট পেইড' : 'Total Paid'}</span>
-                <span className="text-sm font-black text-gray-900">৳ {(activeReceipt.totalPaid || 0).toLocaleString()}</span>
+                <span className="text-sm font-black text-gray-900">৳ {(activeReceipt.totalPaid || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-100">
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বাকি' : 'Balance'}</span>
                 <span className={`text-sm font-black ${activeReceipt.balance > 0 ? 'text-[#ba0036]' : 'text-green-600'}`}>
-                  {activeReceipt.balance > 0 ? `৳ ${activeReceipt.balance.toLocaleString()}` : (language === 'বাংলা' ? 'ক্লিয়ার' : 'Cleared')}
+                  {activeReceipt.balance > 0 ? `৳ ${activeReceipt.balance.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}` : (language === 'বাংলা' ? 'ক্লিয়ার' : 'Cleared')}
                 </span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-100">
@@ -2862,8 +2816,8 @@ const handleWizardSubmit = async (payload) => {
                       const isPartial = activeReceipt.balance > 0;
                       const prefill = isPartial
                         ? (language === 'বাংলা'
-                            ? `${monthLbl} এর বাকি ৳${activeReceipt.balance.toLocaleString()} নিয়ে কথা বলতে চাই।`
-                            : `Hi, about ${monthLbl} — when should I clear the remaining ৳${activeReceipt.balance.toLocaleString()}?`)
+                            ? `${monthLbl} এর বাকি ৳${activeReceipt.balance.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')} নিয়ে কথা বলতে চাই।`
+                            : `Hi, about ${monthLbl} — when should I clear the remaining ৳${activeReceipt.balance.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}?`)
                         : (language === 'বাংলা'
                             ? `${monthLbl} এর রিসিট পেয়েছি, ধন্যবাদ।`
                             : `Got the ${monthLbl} receipt, thank you.`);
@@ -2896,9 +2850,9 @@ const handleWizardSubmit = async (payload) => {
                         `${language === 'বাংলা' ? 'TO-LET PRO রেন্ট রিসিট' : 'TO-LET PRO Rent Receipt'}`,
                         `Property: ${activeReceipt.propertyTitle}`,
                         `Month: ${activeReceipt.monthLabel || activeReceipt.monthKey}`,
-                        `Total Due: ৳${(activeReceipt.totalDue || 0).toLocaleString()}`,
-                        `Total Paid: ৳${(activeReceipt.totalPaid || 0).toLocaleString()}`,
-                        `Balance: ${activeReceipt.balance > 0 ? '৳' + activeReceipt.balance.toLocaleString() : 'Cleared'}`,
+                        `Total Due: ৳${(activeReceipt.totalDue || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}`,
+                        `Total Paid: ৳${(activeReceipt.totalPaid || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}`,
+                        `Balance: ${activeReceipt.balance > 0 ? '৳' + activeReceipt.balance.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN') : 'Cleared'}`,
                         `Method: ${activeReceipt.method || '—'}${activeReceipt.txnId ? ' · Txn ' + activeReceipt.txnId : ''}`,
                         `Date: ${activeReceipt.date}`,
                         `Receipt ID: ${activeReceipt.id}`,
