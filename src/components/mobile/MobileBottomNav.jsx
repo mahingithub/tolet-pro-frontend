@@ -71,11 +71,12 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   // Profile target depends on who's logged in. Falls back to "open drawer"
   // for guests so they can pick Login / Sign Up.
   const profileTarget = (() => {
-    if (!isAuthenticated) return { id: 'profile', label: 'Profile', icon: User, action: 'drawer' };
-    if (isAdmin)           return { id: 'profile', label: 'Profile', icon: User, to: '/admin' };
-    if (user?.role === 'landlord') return { id: 'profile', label: 'Profile', icon: User, to: '/host-dashboard' };
+    const base = { id: 'profile', label: 'Profile', icon: User, action: 'drawer' };
+    if (!isAuthenticated) return base;
+    if (isAdmin)           return { ...base, to: '/admin' };
+    if (user?.role === 'landlord') return { ...base, to: '/host-dashboard' };
     // default to tenant
-    return { id: 'profile', label: 'Profile', icon: User, to: '/tenant-dashboard' };
+    return { ...base, to: '/tenant-dashboard' };
   })();
 
   const RIGHT = isTenant
@@ -90,7 +91,7 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
       ];
 
   const isActive = (item) => {
-    if (item.action === 'drawer') return false;
+    if (item.action === 'drawer' && !item.to) return false;
     if (item.id === 'home') return location.pathname === '/';
     // Tenant Saved + Profile both point at /tenant-dashboard —
     // disambiguate via the `tab` flag in location.state so only the
