@@ -1513,7 +1513,16 @@ const ChatSystem = () => {
     };
 
     const pollDelta = async () => {
-      const since = latestMessageIso.current[activeChatId];
+      const cursorIso = latestMessageIso.current[activeChatId];
+      // Overlap the cursor by 1ms so a message sharing the exact same
+      // millisecond as the last one we already hold is never skipped by a
+      // strict `createdAt > since` query on the backend. Any message that gets
+      // re-fetched by this overlap is dropped by the id-dedupe in
+      // mergeMessages, so the overlap can never create a visible duplicate
+      // (audit 6.3 — same-millisecond delta polling).
+      const since = cursorIso
+        ? new Date(new Date(cursorIso).getTime() - 1).toISOString()
+        : cursorIso;
       try {
         const msgs = await chatService.listMessages(activeChatId, { since });
         if (cancelled) return;
