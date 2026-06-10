@@ -910,18 +910,26 @@ useEffect(() => {
           <div>
             <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1 mb-1.5">Explore</p>
             <div className="bg-gray-50 border border-gray-100 rounded-2xl p-2 flex flex-col gap-0.5">
-              {exploreLinks.map(item => (
+              {exploreLinks.filter(item => {
+                if (isLoggedIn) {
+                  if (userRole === 'tenant' && item.label === 'List a Property') return false;
+                  if (userRole === 'landlord' && item.label === 'All Properties') return false;
+                }
+                return true;
+              }).map(item => (
                 <Row key={item.label} {...item} onClick={item.protected ? () => handleProtected(item.path) : undefined} />
               ))}
             </div>
           </div>
 
-          <div>
-            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1 mb-1.5">AI & Tools</p>
-            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-2 flex flex-col gap-0.5">
-              {toolLinks.map(item => <Row key={item.label} {...item} />)}
+          {!isLoggedIn && (
+            <div>
+              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1 mb-1.5">AI & Tools</p>
+              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-2 flex flex-col gap-0.5">
+                {toolLinks.map(item => <Row key={item.label} {...item} />)}
+              </div>
             </div>
-          </div>
+          )}
 
           {isLoggedIn && (
             <div>
@@ -947,7 +955,10 @@ useEffect(() => {
               and surfaces support / brand pages where users naturally look. */}
           <div>
             <div className="bg-gray-50 border border-gray-100 rounded-2xl p-2 flex flex-col gap-0.5">
-              {footerLinks.map(item => <Row key={item.label} {...item} />)}
+              {footerLinks.filter(item => {
+                if (!isLoggedIn && item.label === 'Our story') return false;
+                return true;
+              }).map(item => <Row key={item.label} {...item} />)}
             </div>
           </div>
 
