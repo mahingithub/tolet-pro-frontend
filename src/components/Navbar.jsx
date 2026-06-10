@@ -865,7 +865,13 @@ useEffect(() => {
         <div className="flex flex-col px-5 pt-6 pb-28 gap-5">
 
           {isLoggedIn ? (
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-[1.75rem] p-5 flex items-center gap-4 shadow-lg relative overflow-hidden">
+            <div 
+              onClick={() => {
+                navigate(userRole === 'landlord' ? '/host-dashboard' : '/tenant-dashboard');
+                setIsMobileMenuOpen(false);
+              }}
+              className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-[1.75rem] p-5 flex items-center gap-4 shadow-lg relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
+            >
               <div className={`w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center text-white font-black text-lg shadow-md shrink-0 ${userRole === 'landlord' ? 'bg-[#ba0036]' : 'bg-blue-500'}`}>
                 {authUser?.avatar ? (
                   <img
