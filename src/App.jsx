@@ -103,12 +103,14 @@ const AppLayout = () => {
 		location.pathname.startsWith(route),
 	);
 
-	// Hide the AI Assistant on auth, admin, and the messages page
+	// Hide the AI Assistant on auth, admin, dashboards, and the messages page
 	// (the chat page has its own interface — the floating widget is redundant there).
 	const shouldHideAIAssistant =
 		location.pathname === "/login" ||
 		location.pathname.startsWith("/admin") ||
-		location.pathname === "/messages";
+		location.pathname === "/messages" ||
+		location.pathname.startsWith("/tenant-dashboard") ||
+		location.pathname.startsWith("/host-dashboard");
 
 	// On the property listing page, the Navbar is replaced on mobile by the
 	// immersive Daraz-style header built into PropertyListing itself.
