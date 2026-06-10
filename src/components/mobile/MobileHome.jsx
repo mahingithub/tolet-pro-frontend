@@ -19,6 +19,7 @@ import {
   Wallet,
   X,
   TrendingUp,
+  Camera,
 } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
@@ -164,6 +165,35 @@ const SuggestionIcon = ({ category }) => {
   return                            <MapPin    size={13} className="text-emerald-500" />;
 };
 
+// ─── SAFE IMAGE ───────────────────────────────────────────────────────────────
+// Renders an <img> ONLY when there is a usable URL. An empty/falsy src (e.g. a
+// listing whose legacy base64 cover was stripped by the backend list endpoint)
+// or a URL that 404s would otherwise make the browser try to load the page URL
+// as an image and paint a broken-image icon + alt text. Instead we paint a
+// clean placeholder. `showIconOnError` keeps the camera glyph for the big cover
+// tile but renders a plain grey tile for the small thumbnails (less clutter).
+const PhotoFallback = ({ className = '', showIcon = true }) => (
+  <div className={`bg-gray-100 ${showIcon ? 'text-gray-300 flex items-center justify-center' : ''} ${className}`}>
+    {showIcon && <Camera size={26} strokeWidth={1.8} />}
+  </div>
+);
+
+const SafeImg = ({ src, alt = '', className = '', showIconOnError = true }) => {
+  const [ok, setOk] = useState(Boolean(src));
+  useEffect(() => { setOk(Boolean(src)); }, [src]);
+  if (!ok) return <PhotoFallback className={className} showIcon={showIconOnError} />;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      className={className}
+      onError={() => setOk(false)}
+    />
+  );
+};
+
 /**
  * Trust card — eye-catching trust anchor below the search panel. Centered,
  * gradient-glow with three 3D "badge" tiles. Replaces the old pill-rail.
@@ -248,10 +278,9 @@ const DivisionsStrip = ({ onPick, t }) => (
           onClick={() => onPick(d)}
           className="snap-start shrink-0 relative w-[170px] h-[210px] rounded-3xl overflow-hidden shadow-[0_14px_36px_-16px_rgba(15,23,42,0.45)] active:scale-[0.98] transition-transform group"
         >
-          <img
+          <SafeImg
             src={d.image}
             alt={d.name}
-            loading="lazy"
             className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/0" />
@@ -301,7 +330,7 @@ const DivisionDistrictsSheet = ({ division, onClose, onPickDistrict, t }) => {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative h-32 shrink-0">
-          <img src={division.image} alt={division.name} className="absolute inset-0 w-full h-full object-cover" />
+          <SafeImg src={division.image} alt={division.name} className="absolute inset-0 w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/0" />
           <button
             onClick={onClose}
@@ -368,13 +397,13 @@ const DivisionDistrictsSheet = ({ division, onClose, onPickDistrict, t }) => {
  */
 
 const POPULAR_AREA_IMAGES = {
-  Dhanmondi: 'https://greatruns.com/wp-content/uploads/2020/12/Dhanmondi_Lake_Dhaka_BD.jpg',
-  Gulshan: 'https://thumbs.dreamstime.com/b/gulshan-dhaka-bangladesh-traffics-crossing-signal-busy-circle-evening-high-buildings-background-280740296.jpg',
-  Banani: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRrmLre9dcvRHKLjGX3e5NLY27tjItA8HsZ4g&s',
-  Uttara: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/RAJUK_Uttara_Apartment_Project_%28cropped%29.jpg/330px-RAJUK_Uttara_Apartment_Project_%28cropped%29.jpg',
-  Bashundhara: 'https://www.bashundharahousing.com/api/assets/Several%20Nice%20Location%20of%20Bashundhara%20RA%202.jpeg',
-  Mirpur: 'https://dscdn.daily-sun.com/english/uploads/news_photos/2025/07/21/1753105721-78de7f89e9acf2851f429b382a631c18.jpeg',
-  Mohammadpur: 'https://thumbs.dreamstime.com/b/aerial-view-buildings-capital-city-dhaka-bangladesh-view-mohammadpur-bright-sunny-day-aerial-view-buildings-229193615.jpg'
+  Dhanmondi: 'https://images.unsplash.com/photo-1542361345-89e58247f2d5?w=900&q=80',
+  Gulshan: 'https://images.unsplash.com/photo-1496372412473-e8a1444ece6f?w=900&q=80',
+  Banani: 'https://images.unsplash.com/photo-1555529771-835f59fc5efe?w=900&q=80',
+  Uttara: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=900&q=80',
+  Bashundhara: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=900&q=80',
+  Mirpur: 'https://images.unsplash.com/photo-1449844908441-8829872d2607?w=900&q=80',
+  Mohammadpur: 'https://images.unsplash.com/photo-1479839672679-a46483c0e7c8?w=900&q=80'
 };
 
 const PopularAreasBento = ({ t, onPickArea, properties = [] }) => {
@@ -423,10 +452,10 @@ const PopularAreasBento = ({ t, onPickArea, properties = [] }) => {
               }}
             >
               {cover ? (
-                <img
+                <SafeImg
                   src={cover}
                   alt={area}
-                  loading="lazy"
+                  showIconOnError={false}
                   className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                 />
               ) : (
@@ -696,11 +725,14 @@ const PropertyCard = ({ property, t, landlord }) => {
     ? t.mobNewToday
     : `${daysAgo} ${daysAgo === 1 ? t.mobDayAgo : t.mobDaysAgo}`;
 
-  // Primary cover + one thumb per room category (max 3 thumbs). Pad with the
-  // cover so the 3-tile right column stays visually balanced when there's
-  // only one or two distinct rooms.
+  // Primary cover + one thumb per room category (max 3 thumbs). We DON'T pad
+  // with the cover anymore — padding pushed empty '' strings into <img src>,
+  // which painted broken-image icons for listings whose photos were stripped
+  // (legacy base64). SafeImg renders a clean placeholder for any empty/dead
+  // tile instead.
   const { cover: primary, thumbs: rawThumbs } = mobBuildCollage(property);
   const thumbs = [...rawThumbs, primary, primary].slice(0, 3);
+  const extraImages = Array.isArray(property.images) ? property.images.length : 0;
 
   const go = () => navigate(`/property/${property.id}`);
 
@@ -714,10 +746,9 @@ const PropertyCard = ({ property, t, landlord }) => {
         <div className="relative grid grid-cols-[1.7fr_1fr] gap-1 p-1 bg-white">
           {/* Primary image */}
           <div className="relative rounded-[20px] overflow-hidden bg-gray-100 aspect-[4/3.4]">
-            <img
+            <SafeImg
               src={primary}
               alt={property.title}
-              loading="lazy"
               className="w-full h-full object-cover"
             />
 
@@ -753,7 +784,7 @@ const PropertyCard = ({ property, t, landlord }) => {
             </button>
 
             {/* BOTTOM-LEFT: posted age */}
-            <div className="absolute bottom-3 left-3 inline-flex items-center gap-1 bg-black/55 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+            <div className="absolute bottom-3 left-3 inline-flex items-center gap-1 bg-black/55 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-10">
               <Clock size={10} />
               {ageLabel}
             </div>
@@ -763,16 +794,16 @@ const PropertyCard = ({ property, t, landlord }) => {
           <div className="grid grid-rows-3 gap-1">
             {thumbs.map((src, i) => (
               <div key={i} className="relative rounded-[16px] overflow-hidden bg-gray-100">
-                <img
+                <SafeImg
                   src={src}
-                  alt={`${property.title} ${i + 2}`}
-                  loading="lazy"
+                  alt={src ? `${property.title} ${i + 2}` : ''}
+                  showIconOnError={false}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
-                {i === 2 && property.images.length > 4 && (
+                {i === 2 && extraImages > 4 && (
                   <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
                     <span className="text-white text-[12px] font-black">
-                      +{property.images.length - 4}
+                      +{extraImages - 4}
                     </span>
                   </div>
                 )}
@@ -809,9 +840,10 @@ const PropertyCard = ({ property, t, landlord }) => {
           <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100">
             <div className="flex items-center gap-2 min-w-0">
               {landlord && (
-                <img
+                <SafeImg
                   src={landlord.avatar}
                   alt={landlord.name}
+                  showIconOnError={false}
                   className="w-7 h-7 rounded-full object-cover border border-white shadow"
                 />
               )}
