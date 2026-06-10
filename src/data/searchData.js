@@ -41,7 +41,7 @@ export const DIVISIONS = [
     image: 'https://images.unsplash.com/photo-1588600878108-578307a3cc9d?w=900&q=80',
     districts: ['Barishal','Barguna','Bhola','Jhalokati','Patuakhali','Pirojpur'] },
   { id: 'rangpur',    name: 'Rangpur',    tagline: 'North',
-    image: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=900&q=80',
+    image: 'https://images.unsplash.com/photo-1706640254392-4648f5aac0d6?w=900&q=80',
     districts: ['Rangpur','Dinajpur','Gaibandha','Kurigram','Lalmonirhat','Nilphamari','Panchagarh','Thakurgaon'] },
   { id: 'mymensingh', name: 'Mymensingh', tagline: 'Heritage',
     image: 'https://images.unsplash.com/photo-1518709594023-6eab9bab7b23?w=900&q=80',
