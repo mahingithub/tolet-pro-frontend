@@ -56,7 +56,7 @@ import { propertyService, subscribeUserProperties, propertyLocationHaystack } fr
  */
 
 // Marketing banner — drop your campaign poster URL here.
-const BANNER_IMAGE = 'https://besacenter.org/wp-content/uploads/2024/09/%D7%9C%D7%95%D7%A8%D7%9F-%D7%93%D7%92%D7%9F-%D7%91%D7%A0%D7%92%D7%9C%D7%93%D7%A9-scaled.jpg';
+const BANNER_VIDEO = 'https://youtu.be/PpeE86P9TnA?si=EmNtcV7n2lZPyvLX';
 
 const SEARCH_TYPES = [
   { id: 'rent',       labelKey: 'tabRent' },
@@ -366,6 +366,17 @@ const DivisionDistrictsSheet = ({ division, onClose, onPickDistrict, t }) => {
  *    will be shown … and when he clicks there, on the property listing
  *    page, all the houses in that sub-zone will be shown."
  */
+
+const POPULAR_AREA_IMAGES = {
+  Dhanmondi: 'https://greatruns.com/wp-content/uploads/2020/12/Dhanmondi_Lake_Dhaka_BD.jpg',
+  Gulshan: 'https://thumbs.dreamstime.com/b/gulshan-dhaka-bangladesh-traffics-crossing-signal-busy-circle-evening-high-buildings-background-280740296.jpg',
+  Banani: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRrmLre9dcvRHKLjGX3e5NLY27tjItA8HsZ4g&s',
+  Uttara: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/RAJUK_Uttara_Apartment_Project_%28cropped%29.jpg/330px-RAJUK_Uttara_Apartment_Project_%28cropped%29.jpg',
+  Bashundhara: 'https://www.bashundharahousing.com/api/assets/Several%20Nice%20Location%20of%20Bashundhara%20RA%202.jpeg',
+  Mirpur: 'https://dscdn.daily-sun.com/english/uploads/news_photos/2025/07/21/1753105721-78de7f89e9acf2851f429b382a631c18.jpeg',
+  Mohammadpur: 'https://thumbs.dreamstime.com/b/aerial-view-buildings-capital-city-dhaka-bangladesh-view-mohammadpur-bright-sunny-day-aerial-view-buildings-229193615.jpg'
+};
+
 const PopularAreasBento = ({ t, onPickArea, properties = [] }) => {
   // Build (area, featuredProperty) pairs from the live properties feed so
   // each tile still has a nice cover image. When no listing matches a given
@@ -376,8 +387,7 @@ const PopularAreasBento = ({ t, onPickArea, properties = [] }) => {
     return POPULAR_AREAS.map((area) => {
       const a = lower(area);
       const matches = properties.filter((p) => lower(p.location).includes(a));
-      const featured = matches[0] || properties[0] || null;
-      return { area, property: featured, homeCount: matches.length };
+      return { area, homeCount: matches.length };
     });
   }, [properties]);
 
@@ -400,18 +410,9 @@ const PopularAreasBento = ({ t, onPickArea, properties = [] }) => {
           large angled card with a holographic ring + sub-zone count chip +
           area name. Tap → opens the sub-zone bottom-sheet. */}
       <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory px-4 pb-3 -mr-4 pr-7">
-        {tiles.map(({ area, property, homeCount }, idx) => {
+        {tiles.map(({ area, homeCount }, idx) => {
           const subzoneCount = POPULAR_AREA_SUBZONES[area]?.length || 0;
-          // Pick the best available cover for this tile. When no host has
-          // uploaded anything yet, `property` is null — fall back to a
-          // gradient-only tile instead of crashing on `property.images[0]`.
-          const cover = property
-            ? (property.coverPhoto
-              || property.img
-              || (Array.isArray(property.images) && property.images[0])
-              || (Array.isArray(property.roomPhotos) && (property.roomPhotos[0]?.url || property.roomPhotos[0]?.preview))
-              || '')
-            : '';
+          const cover = POPULAR_AREA_IMAGES[area] || '';
           return (
             <button
               key={area}
@@ -498,21 +499,13 @@ const PopularAreasBento = ({ t, onPickArea, properties = [] }) => {
  * category=any, budget=any) so the listing page shows every home in that
  * sub-zone.
  */
-const AreaSubzonesSheet = ({ area, onClose, t }) => {
-  const navigate = useNavigate();
+const AreaSubzonesSheet = ({ area, onClose, onPickLocation, t }) => {
   if (!area) return null;
   const subzones = POPULAR_AREA_SUBZONES[area] || [];
 
   const handlePick = (sub) => {
     onClose();
-    // Same handler the desktop search button uses → /properties/<slug>?...
-    const url = buildSearchUrl({
-      location: `${sub.name}, ${area}, Dhaka`,
-      purpose: 'rent',
-      categoryId: 'any',
-      budgetId: 'any',
-    });
-    navigate(url);
+    onPickLocation(`${sub.name}, ${area}, Dhaka`);
   };
 
   return (
@@ -694,6 +687,7 @@ const mobBuildCollage = (property) => {
 
 const PropertyCard = ({ property, t, landlord }) => {
   const navigate = useNavigate();
+  const { language } = useLanguage();
   const [liked, setLiked] = useState(false);
   const { typeLabel, catLabel } = cardLabels(property, t);
 
@@ -806,10 +800,10 @@ const PropertyCard = ({ property, t, landlord }) => {
 
           <div className="flex items-center gap-3 mt-2 text-[11px] text-gray-600 font-semibold">
             <span className="inline-flex items-center gap-1">
-              <Building2 size={12} /> {property.beds} {t.mobBed} · {property.baths} {t.mobBath}
+              <Building2 size={12} /> {property.beds.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} {t.mobBed} · {property.baths.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} {t.mobBath}
             </span>
             <span className="text-gray-300">·</span>
-            <span>{property.sqft.toLocaleString('en-BD')} sqft</span>
+            <span>{property.sqft.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} sqft</span>
           </div>
 
           <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100">
@@ -825,12 +819,12 @@ const PropertyCard = ({ property, t, landlord }) => {
                 {landlord?.name || ''}
               </span>
               <span className="text-[10px] text-gray-400 font-semibold shrink-0">
-                · {property.reviews} {t.mobReviews}
+                · {property.reviews.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} {t.mobReviews}
               </span>
             </div>
             <div className="shrink-0 inline-flex items-baseline gap-1 bg-gray-50 border border-gray-100 px-2.5 py-1 rounded-2xl">
               <span className="text-[14px] font-black text-gray-900">
-                ৳{property.price.toLocaleString('en-BD')}
+                ৳{property.price.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')}
               </span>
               <span className="text-[10px] text-gray-500 font-semibold">/{t.mobMonth}</span>
             </div>
@@ -838,6 +832,83 @@ const PropertyCard = ({ property, t, landlord }) => {
         </div>
       </div>
     </article>
+  );
+};
+
+
+const CategoryPromptSheet = ({ open, locationName, onClose, onPickCategory }) => {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-[90] flex items-end md:hidden bg-black/55 backdrop-blur-sm animate-in fade-in duration-150"
+      onClick={onClose}
+    >
+      <div
+        className="w-full bg-white rounded-t-3xl pb-[calc(env(safe-area-inset-bottom)+1rem)] animate-in slide-in-from-bottom-10 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="pt-3 pb-2 flex justify-center">
+          <span className="w-10 h-1 rounded-full bg-gray-300" />
+        </div>
+        <div className="px-5 pb-3 flex flex-col">
+          <h3 className="text-[14px] font-black uppercase tracking-widest text-gray-500 mb-1">
+            {locationName}
+          </h3>
+          <h2 className="text-[20px] font-black text-gray-900 leading-tight">
+            What are you looking for?
+          </h2>
+        </div>
+        <div className="px-4 pb-4 grid gap-3">
+          <button
+            onClick={() => onPickCategory('rent')}
+            className="w-full flex items-center justify-between p-4 rounded-2xl border border-gray-200 hover:border-[#ba0036]/50 hover:bg-red-50/30 active:scale-[0.98] transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-[#ba0036]">
+                <HomeIcon size={20} strokeWidth={2.5} />
+              </div>
+              <div className="text-left">
+                <h4 className="text-[15px] font-black text-gray-900 group-hover:text-[#ba0036]">Rent a Home</h4>
+                <p className="text-[11px] font-bold text-gray-500">Apartments, sublets, bachelor flats</p>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-gray-400 group-hover:text-[#ba0036]" />
+          </button>
+
+          <button
+            onClick={() => onPickCategory('buy')}
+            className="w-full flex items-center justify-between p-4 rounded-2xl border border-gray-200 hover:border-blue-500/50 hover:bg-blue-50/30 active:scale-[0.98] transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                <Wallet size={20} strokeWidth={2.5} />
+              </div>
+              <div className="text-left">
+                <h4 className="text-[15px] font-black text-gray-900 group-hover:text-blue-600">Buy a Property</h4>
+                <p className="text-[11px] font-bold text-gray-500">Houses, flats, land, commercial</p>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-gray-400 group-hover:text-blue-600" />
+          </button>
+
+          <button
+            onClick={() => onPickCategory('commercial')}
+            className="w-full flex items-center justify-between p-4 rounded-2xl border border-gray-200 hover:border-amber-500/50 hover:bg-amber-50/30 active:scale-[0.98] transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+                <Building2 size={20} strokeWidth={2.5} />
+              </div>
+              <div className="text-left">
+                <h4 className="text-[15px] font-black text-gray-900 group-hover:text-amber-600">Commercial Space</h4>
+                <p className="text-[11px] font-bold text-gray-500">Offices, shops, restaurants</p>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-gray-400 group-hover:text-amber-600" />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -932,15 +1003,29 @@ const MobileHome = () => {
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [openDivision, setOpenDivision] = useState(null);
   const [openArea, setOpenArea] = useState(null); // Popular-area → sub-zone sheet
+  const [pendingLocation, setPendingLocation] = useState(null);
+  const [isCategoryPromptOpen, setIsCategoryPromptOpen] = useState(false);
+
+  const handleFinalNavigate = (purpose) => {
+    setIsCategoryPromptOpen(false);
+    navigate(buildSearchUrl({
+      location: pendingLocation,
+      purpose: purpose,
+      categoryId: 'any',
+      budgetId: 'any',
+    }));
+  };
 
   const handleDistrictPick = (districtName) => {
     setOpenDivision(null);
-    navigate(buildSearchUrl({
-      location: districtName,
-      purpose:  searchType,
-      categoryId: propType.id,
-      budgetId:   budget.id,
-    }));
+    setPendingLocation(districtName);
+    setIsCategoryPromptOpen(true);
+  };
+
+  const handleAreaSubzonePick = (loc) => {
+    setOpenArea(null);
+    setPendingLocation(loc);
+    setIsCategoryPromptOpen(true);
   };
 
   // Mirrors desktop HeroSection.handleSearch exactly.
@@ -990,20 +1075,16 @@ const MobileHome = () => {
       {/* ───────── MARKETING BANNER ───────── */}
       <div className="px-4 pt-3">
         <div className="relative overflow-hidden rounded-3xl aspect-[16/10] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.25)]">
-          <img
-            src={BANNER_IMAGE}
-            alt={`${t.mobHeroLine1} ${t.mobHeroLine2}`}
+          <video
+            src={BANNER_VIDEO}
+            autoPlay
+            loop
+            muted
+            playsInline
             className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/30 to-black/55" />
-          <div className="absolute inset-0 px-5 py-5 flex flex-col justify-end">
-            <h1 className="text-white text-[26px] leading-[1.1] font-black tracking-tight">
-              {t.mobHeroLine1}<br />{t.mobHeroLine2}
-            </h1>
-            <p className="text-white/85 text-[12px] font-semibold mt-1.5">
-              {t.mobHeroSubtitle}
-            </p>
-          </div>
+          
         </div>
       </div>
 
@@ -1116,7 +1197,13 @@ const MobileHome = () => {
               onClick={() => setTypeOpen(true)}
               className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2.5 active:scale-[0.99] transition-transform text-left"
             >
-              <HomeIcon size={14} className="text-[#ba0036] shrink-0" />
+              {searchType === 'commercial' ? (
+                <Building2 size={14} className="text-[#ba0036] shrink-0" />
+              ) : searchType === 'buy' ? (
+                <Wallet size={14} className="text-[#ba0036] shrink-0" />
+              ) : (
+                <HomeIcon size={14} className="text-[#ba0036] shrink-0" />
+              )}
               <span className="flex-1 min-w-0">
                 <span className="block text-[9px] font-black text-gray-500 uppercase tracking-widest leading-tight">
                   {t.mobTypeLabel}
@@ -1176,7 +1263,7 @@ const MobileHome = () => {
           </h3>
           <p className="text-[11px] text-gray-500 font-semibold inline-flex items-center gap-1">
             <Clock size={11} className="text-[#ba0036]" strokeWidth={2.5} />
-            {filteredFeed.length}{' '}
+            {filteredFeed.length.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')}{' '}
             {filteredFeed.length === 1
               ? (t.mobActiveHomeShown || 'active home — newest first')
               : (t.mobActiveHomesShown || 'active homes — newest first')}
@@ -1259,7 +1346,14 @@ const MobileHome = () => {
       <AreaSubzonesSheet
         area={openArea}
         onClose={() => setOpenArea(null)}
+        onPickLocation={handleAreaSubzonePick}
         t={t}
+      />
+      <CategoryPromptSheet
+        open={isCategoryPromptOpen}
+        locationName={pendingLocation}
+        onClose={() => setIsCategoryPromptOpen(false)}
+        onPickCategory={handleFinalNavigate}
       />
     </div>
   );
