@@ -967,33 +967,7 @@ useEffect(() => {
             {settingsLinks.map(item => <Row key={item.label} {...item} />)}
           </div>
 
-          <div>
-            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1 mb-1.5">Browse by District</p>
-            <div className="flex flex-col gap-2">
-              {currentData.map(div => (
-                <div key={div.id}>
-                  <button
-                    onClick={() => setExpandedDiv(expandedDiv === div.id ? null : div.id)}
-                    className={`w-full border py-3 px-4 rounded-xl text-xs font-bold flex items-center justify-between transition-colors ${expandedDiv === div.id ? 'bg-red-50 border-red-100 text-[#ba0036]' : 'bg-gray-50 border-gray-100 text-gray-700'}`}
-                  >
-                    {div.name}
-                    <ChevronDown size={14} className={`transition-transform duration-300 ${expandedDiv === div.id ? 'rotate-180' : ''}`} />
-                  </button>
-                  <div className={`grid grid-cols-2 gap-2 overflow-hidden transition-all duration-300 ${expandedDiv === div.id ? 'max-h-[800px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
-                    {div.districts.map((district, idx) => {
-                      const param = locationData['en'].find(d => d.id === div.id).districts[idx].toLowerCase().replace(/\s+/g, '-');
-                      return (
-                        <div key={idx} onClick={() => { navigate(`/properties/${param}`); setIsMobileMenuOpen(false); }}
-                          className="h-10 flex items-center justify-center bg-white border border-gray-100 rounded-lg hover:bg-red-50 hover:border-red-100 hover:text-[#ba0036] cursor-pointer px-2 shadow-sm transition-all">
-                          <span className="text-[11px] font-bold text-gray-600 truncate text-center">{district}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+
 
           <div>
             <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1 mb-1.5">Language</p>
