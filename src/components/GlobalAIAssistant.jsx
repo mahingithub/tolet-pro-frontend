@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import Draggable from 'react-draggable';
 import {
   Bot, Send, Sparkles, Minimize2, ExternalLink, TrendingUp,
-  Headphones, Inbox, ArrowLeft, ShieldCheck, CheckCircle2, Clock,
+  Headphones, Inbox, ArrowLeft, ShieldCheck, CheckCircle2, Clock, Play
 } from 'lucide-react';
+import VideoModal from './shared/VideoModal';
 
 import { useAuth } from '../context/AuthContext.jsx';
 import {
@@ -32,6 +33,8 @@ import {
 
 const HUMAN_KEYWORDS = ['human', 'agent', 'support', 'complaint', 'real person', 'staff'];
 
+const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
+
 const GlobalAIAssistant = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -45,13 +48,32 @@ const GlobalAIAssistant = () => {
   const [activeTicketId, setActiveTicketId] = useState(/** @type {string|null} */(null));
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
+
+  const [aiGuides, setAiGuides] = useState([]);
+  const [activeVideoModal, setActiveVideoModal] = useState({ isOpen: false, url: '', title: '' });
+
+  useEffect(() => {
+    fetch(`${API}/ai-guides`)
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to fetch AI guides");
+        return res.json();
+      })
+      .then(data => {
+        if (Array.isArray(data)) setAiGuides(data);
+      })
+      .catch(console.error);
+  }, []);
+
+  // We'll declare handleGuideClick lower down after aiMessages is defined.
 
   // AI chat history (persisted in localStorage so it survives refreshes).
   const [aiMessages, setAiMessages] = useState(() => {
     try {
       const saved = localStorage.getItem('ai_chat_history');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
     } catch {
       // fall through
     }
@@ -72,13 +94,31 @@ const GlobalAIAssistant = () => {
   const [unhelpfulStreak, setUnhelpfulStreak] = useState(0);
   const [showHandoffCta, setShowHandoffCta] = useState(false);
 
+  const handleGuideClick = (guide) => {
+    const userMsg = { id: crypto.randomUUID(), sender: 'user', text: guide.suggestionText };
+    const aiMsg = {
+        id: crypto.randomUUID(),
+        sender: 'ai',
+        text: `Here is a video guide for: ${guide.title}`,
+        videoAction: { label: 'Play Video', url: guide.videoUrl, title: guide.title }
+    };
+    setAiMessages(prev => [...prev, userMsg, aiMsg]);
+    setTimeout(() => {
+      setActiveVideoModal({ isOpen: true, url: guide.videoUrl, title: guide.title });
+    }, 500);
+  };
+
   // Tickets list + currently-open ticket detail.
   const [tickets, setTickets] = useState([]);
   const [activeTicket, setActiveTicket] = useState(/** @type {any} */(null));
 
   // ── persistence ─────────────────────────────────────────────────────────
   useEffect(() => {
-    localStorage.setItem('ai_chat_history', JSON.stringify(aiMessages));
+    try {
+      localStorage.setItem('ai_chat_history', JSON.stringify(aiMessages));
+    } catch (e) {
+      console.warn("Could not save chat history to localStorage", e);
+    }
   }, [aiMessages]);
 
   // ── auto-scroll on every render that adds content ──────────────────────
@@ -95,14 +135,22 @@ const GlobalAIAssistant = () => {
       setTickets([]);
       return;
     }
-    const list = await listMyTickets();
-    setTickets(list);
+    try {
+      const list = await listMyTickets();
+      setTickets(list);
+    } catch (e) {
+      console.error(e);
+    }
   }, [isAuthenticated]);
 
   const refreshActiveTicket = useCallback(async () => {
     if (!activeTicketId) return;
-    const data = await getTicket(activeTicketId);
-    setActiveTicket(data);
+    try {
+      const data = await getTicket(activeTicketId);
+      setActiveTicket(data);
+    } catch (e) {
+      console.error(e);
+    }
   }, [activeTicketId]);
 
   useEffect(() => {
@@ -117,14 +165,17 @@ const GlobalAIAssistant = () => {
     refreshActiveTicket();
   }, [activeTicketId, refreshActiveTicket]);
 
-  // ── AI chat send handler (mock NLP — replace with real backend later) ──
-  const handleAiSend = (e) => {
+  useEffect(() => {
+    setInputText('');
+  }, [view]);
+
+  // ── AI chat send handler ───────────────────────────────────────────────
+  const handleAiSend = async (e) => {
     e?.preventDefault();
     const text = inputText.trim();
-    if (!text) return;
+    if (!text || isTyping) return;
 
-    /** @type {{id:number,sender:'user'|'ai',text:string,action?:{label:string,route:string}}} */
-    const userMsg = { id: Date.now(), sender: 'user', text };
+    const userMsg = { id: crypto.randomUUID(), sender: 'user', text };
     setAiMessages((prev) => [...prev, userMsg]);
     setInputText('');
     setIsTyping(true);
@@ -135,55 +186,39 @@ const GlobalAIAssistant = () => {
       setShowHandoffCta(true);
     }
 
-    setTimeout(() => {
-      const reply = computeAiReply(text);
-      setAiMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'ai', ...reply }]);
-      setIsTyping(false);
+    try {
+      const historyPayload = aiMessages
+        .filter(m => !m.videoAction && m.text !== "Sorry, I am having trouble connecting to my brain right now. Please try again or speak to a human teammate.")
+        .slice(-15);
+        
+      const response = await fetch(`${API}/ai-chat/ask`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, history: historyPayload })
+      });
+
+      if (!response.ok) {
+        throw new Error('API Error');
+      }
+      
+      const data = await response.json();
+      
+      if (data?.text) {
+        setAiMessages((prev) => [...prev, { id: crypto.randomUUID(), sender: 'ai', text: data.text }]);
+        setUnhelpfulStreak(0); // reset streak on success
+      }
+    } catch (err) {
+      console.error('AI Chat Error:', err);
+      setAiMessages((prev) => [...prev, { id: crypto.randomUUID(), sender: 'ai', text: "Sorry, I am having trouble connecting to my brain right now. Please try again or speak to a human teammate." }]);
       setUnhelpfulStreak((s) => {
-        const next = reply.action ? 0 : s + 1;
+        const next = s + 1;
         if (next >= 2) setShowHandoffCta(true);
         return next;
       });
-    }, 900);
+    } finally {
+      setIsTyping(false);
+    }
   };
-
-  /** Pure helper so we can unit-test it easily later. */
-  function computeAiReply(text) {
-    const q = text.toLowerCase();
-    if (q.includes('saved')) {
-      return {
-        text:
-          "I've pulled up your saved items on your tenant dashboard. " +
-          'Would you like to review them now?',
-        action: { label: 'Open Tenant Dashboard', route: '/tenant-dashboard' },
-      };
-    }
-    if (q.includes('cheap') || q.includes('budget')) {
-      return {
-        text:
-          'Here are budget-friendly listings in Dhaka.',
-        action: { label: 'Browse Dhaka Listings', route: '/properties/dhaka' },
-      };
-    }
-    if (q.includes('host') || q.includes('landlord') || (q.includes('list') && q.includes('property'))) {
-      return {
-        text: 'Sure - opening your host dashboard.',
-        action: { label: 'Open Host Dashboard', route: '/host-dashboard' },
-      };
-    }
-    if (q.includes('dashboard')) {
-      return {
-        text: 'Sure - opening your dashboard.',
-        action: { label: 'Open Tenant Dashboard', route: '/tenant-dashboard' },
-      };
-    }
-    return {
-      text:
-        "I'm not sure I have a great answer to that yet. Try asking about " +
-        "'saved properties', 'budget homes', or your dashboard - or tap " +
-        "'Talk to a human' below to get a teammate on the line.",
-    };
-  }
 
   // ── handoff: open a real ticket and switch into ticket view ────────────
   const handleHandoff = async () => {
@@ -207,23 +242,34 @@ const GlobalAIAssistant = () => {
       text: m.text,
       createdAt: new Date(typeof m.id === 'number' ? m.id : Date.now()).toISOString(),
     }));
-    const ticket = await svcOpenTicket({ initialMessage, aiTranscript: transcript });
-    setShowHandoffCta(false);
-    setUnhelpfulStreak(0);
-    setActiveTicketId(ticket.id);
-    setView('ticket');
+    try {
+      const ticket = await svcOpenTicket({ initialMessage, aiTranscript: transcript });
+      setShowHandoffCta(false);
+      setUnhelpfulStreak(0);
+      setActiveTicketId(ticket.id);
+      setView('ticket');
+    } catch (e) {
+      console.error('Failed to open ticket:', e);
+      alert('Failed to connect to a human teammate right now.');
+    }
   };
 
   // ── ticket reply handler (user side) ───────────────────────────────────
   const handleTicketSend = async (e) => {
     e?.preventDefault();
     const text = inputText.trim();
-    if (!text || !activeTicketId) return;
-    setInputText('');
-    await svcSendMessage(activeTicketId, text);
-    // refreshActiveTicket fires automatically via the storage broadcast,
-    // but we also nudge to feel snappy.
-    refreshActiveTicket();
+    if (!text || !activeTicketId || isTyping) return;
+    setIsTyping(true);
+    try {
+      await svcSendMessage(activeTicketId, text);
+      setInputText('');
+      refreshActiveTicket();
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      alert('Failed to send message. Please try again.');
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   // ── view-mode dispatch for the input form ──────────────────────────────
@@ -371,6 +417,14 @@ const GlobalAIAssistant = () => {
                           <Sparkles size={12} /> {msg.action.label} <ExternalLink size={12} />
                         </button>
                       )}
+                      {msg.videoAction && (
+                        <button
+                          onClick={() => setActiveVideoModal({ isOpen: true, url: msg.videoAction.url, title: msg.videoAction.title })}
+                          className="mt-2 flex items-center gap-2 bg-[#ba0036]/10 text-[#ba0036] hover:bg-[#ba0036]/20 px-4 py-2 rounded-xl text-xs font-bold transition-colors shadow-sm"
+                        >
+                          <Play size={12} /> {msg.videoAction.label}
+                        </button>
+                      )}
                     </div>
                   ))}
 
@@ -501,7 +555,21 @@ const GlobalAIAssistant = () => {
 
             {/* ── input row ───────────────────────────────────────────── */}
             {view !== 'tickets' && (
-              <div className="p-3 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.03)] shrink-0 z-10 relative">
+              <div className="bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.03)] shrink-0 z-10 relative">
+                {aiGuides.length > 0 && view === 'ai' && (
+                  <div className="flex gap-2 overflow-x-auto custom-scrollbar px-3 pt-3 pb-1">
+                    {aiGuides.map(g => (
+                      <button
+                        key={g._id}
+                        onClick={() => handleGuideClick(g)}
+                        className="whitespace-nowrap px-3 py-1.5 bg-[#f4f7fb] hover:bg-[#eaeff5] text-gray-700 rounded-full text-[11px] font-bold transition-colors border border-gray-100"
+                      >
+                        {g.suggestionText}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="p-3 pt-2">
                 <form
                   onSubmit={onSubmit}
                   className="flex items-center bg-[#f4f7fb] rounded-2xl p-1.5 shadow-inner focus-within:ring-2 focus-within:ring-[#ba0036]/10 transition-all"
@@ -532,6 +600,7 @@ const GlobalAIAssistant = () => {
                       ? 'AI responses may not always be 100% accurate'
                       : 'You\'re chatting with a human teammate'}
                   </span>
+                </div>
                 </div>
               </div>
             )}
@@ -566,6 +635,13 @@ const GlobalAIAssistant = () => {
           </div>
         </button>
       )}
+
+      <VideoModal
+        isOpen={activeVideoModal.isOpen}
+        onClose={() => setActiveVideoModal({ ...activeVideoModal, isOpen: false })}
+        videoUrl={activeVideoModal.url}
+        title={activeVideoModal.title}
+      />
     </div>
   );
 };

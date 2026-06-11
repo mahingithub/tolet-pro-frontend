@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   MessageSquare, Bot, Search, ShieldAlert, Clock, User as UserIcon,
   Send, Sparkles, CheckCircle2, RefreshCcw, AlertCircle, FileText,
-  ShieldCheck, BadgeCheck, ChevronDown, ChevronRight, Inbox,
+  ShieldCheck, BadgeCheck, ChevronDown, ChevronRight, Inbox, Video
 } from 'lucide-react';
 
 import {
@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import LoadingState from './common/LoadingState.jsx';
 import EmptyState from './common/EmptyState.jsx';
 import ErrorState from './common/ErrorState.jsx';
+import AIGuidesManager from './AIGuidesManager.jsx';
 
 /**
  * Real ticket workspace for /admin/support.
@@ -44,6 +45,7 @@ const REPLY_TEMPLATES = [
 
 const SupportAndAI = () => {
   const { user: adminUser } = useAuth();
+  const [activeMainTab, setActiveMainTab] = useState('tickets');
 
   // ── data + ui state ──────────────────────────────────────────────────
   const [tickets, setTickets] = useState([]);
@@ -106,6 +108,9 @@ const SupportAndAI = () => {
       setLoadingActive(true);
       refreshActive();
     }
+    // Clear draft text and UI states when switching tickets
+    setReplyText('');
+    setShowTemplates(false);
   }, [activeId, refreshActive]);
 
   // ── actions ──────────────────────────────────────────────────────────
@@ -122,6 +127,9 @@ const SupportAndAI = () => {
         targetId: activeId,
       });
       setReplyText('');
+    } catch (e) {
+      console.error('Failed to send message:', e);
+      alert('Failed to send message. Please try again.');
     } finally {
       setSending(false);
     }
@@ -166,9 +174,9 @@ const SupportAndAI = () => {
       const q = searchQuery.toLowerCase();
       list = list.filter(
         (t) =>
-          t.subject.toLowerCase().includes(q) ||
-          t.userName.toLowerCase().includes(q) ||
-          t.userPhone.toLowerCase().includes(q),
+          t.subject?.toLowerCase().includes(q) ||
+          t.userName?.toLowerCase().includes(q) ||
+          t.userPhone?.toLowerCase().includes(q),
       );
     }
     return list;
@@ -196,8 +204,31 @@ const SupportAndAI = () => {
             </button>
           </div>
         </div>
+        <div className="flex gap-6 mt-6 border-b border-gray-200">
+          <button
+            onClick={() => setActiveMainTab('tickets')}
+            className={`pb-3 text-xs font-black uppercase tracking-widest transition-colors ${
+              activeMainTab === 'tickets' ? 'text-[#ba0036] border-b-2 border-[#ba0036]' : 'text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            Support Tickets
+          </button>
+          <button
+            onClick={() => setActiveMainTab('ai_guides')}
+            className={`pb-3 text-xs font-black uppercase tracking-widest transition-colors flex items-center gap-2 ${
+              activeMainTab === 'ai_guides' ? 'text-[#ba0036] border-b-2 border-[#ba0036]' : 'text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            <Video size={14} /> AI Video Guides
+          </button>
+        </div>
       </header>
 
+      {activeMainTab === 'ai_guides' ? (
+        <div className="flex-1 overflow-y-auto custom-scrollbar pb-6">
+          <AIGuidesManager />
+        </div>
+      ) : (
       <div className="grid grid-cols-12 gap-6 flex-1 min-h-0">
         {/* ── ticket list ──────────────────────────────────────────── */}
         <aside className="col-span-12 md:col-span-3 bg-white rounded-[2rem] shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex flex-col overflow-hidden min-h-0">
@@ -457,6 +488,7 @@ const SupportAndAI = () => {
           )}
         </aside>
       </div>
+      )}
     </div>
   );
 };

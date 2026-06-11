@@ -1338,6 +1338,26 @@ const AddProperty = () => {
     ...(SPECIFIC_FIELDS_BY_TYPE[form.intent]?.[form.type] || []),
   ];
 
+  // Beds / baths only make sense for somewhere people live: all rentals, plus
+  // flats & houses for sale. Land, buildings, and every commercial type
+  // (office / shop / showroom / restaurant) hide the counters entirely.
+  const showBedsBaths =
+    form.intent === 'rent' ||
+    (form.intent === 'purchase' && ['flat', 'house'].includes(form.type));
+
+  // Keep the DATA in step with the UI: zero beds/baths whenever they're hidden,
+  // so a shop never carries a phantom "1 bed" onto its listing card (cards
+  // already guard on `> 0`). Restore sensible defaults if the user switches
+  // back to a residential type from a commercial/land one.
+  useEffect(() => {
+    if (!form.intent) return; // step 1 not done yet — leave the initial defaults
+    if (!showBedsBaths) {
+      setForm(f => (f.beds === 0 && f.baths === 0 ? f : { ...f, beds: 0, baths: 0 }));
+    } else {
+      setForm(f => (f.beds === 0 && f.baths === 0 ? { ...f, beds: 1, baths: 1 } : f));
+    }
+  }, [form.intent, form.type]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ─── TOAST ─────────────────────────────────────────────────────────────────
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
