@@ -219,6 +219,45 @@ const INTENT_DATA = {
   },
 };
 
+// ─── INTENT-SPECIFIC DETAIL FIELDS (Dynamic Tab Architecture) ─────────────────
+// Rendered at the end of Step 2 and bundled into form.specificDetails (stored as
+// Mixed on the backend). Keyed by the form's intent ('rent' | 'purchase' |
+// 'commercial'). The renderer also has form.type in scope, so per-type branching
+// (e.g. land-only fields) can be layered in later without touching the markup.
+const SPECIFIC_FIELDS = {
+  rent: [
+    { key: 'tenantPreference', kind: 'select',
+      label: 'Tenant Preference', labelBn: 'ভাড়াটিয়ার পছন্দ',
+      options: [
+        { id: 'family',   label: 'Family',   labelBn: 'পরিবার' },
+        { id: 'bachelor', label: 'Bachelor', labelBn: 'ব্যাচেলর' },
+        { id: 'any',      label: 'Any',      labelBn: 'যেকোনো' },
+      ] },
+    { key: 'floorLevel', kind: 'text',
+      label: 'Floor Level', labelBn: 'কোন তলা',
+      placeholder: 'e.g. 3rd of 6', placeholderBn: 'যেমন: ৬ তলার ৩য়' },
+    { key: 'utilities', kind: 'text',
+      label: 'Utilities Included', labelBn: 'অন্তর্ভুক্ত ইউটিলিটি',
+      placeholder: 'Gas, water, service charge…', placeholderBn: 'গ্যাস, পানি, সার্ভিস চার্জ…' },
+  ],
+  purchase: [
+    { key: 'landMeasurement', kind: 'text',
+      label: 'Land Measurement', labelBn: 'জমির পরিমাণ',
+      placeholder: 'e.g. 5 katha', placeholderBn: 'যেমন: ৫ কাঠা' },
+    { key: 'frontRoadWidth', kind: 'text',
+      label: 'Front Road Width', labelBn: 'সামনের রাস্তার প্রস্থ',
+      placeholder: 'e.g. 20 ft', placeholderBn: 'যেমন: ২০ ফুট' },
+    { key: 'khatian', kind: 'text',
+      label: 'CS / RS Khatian', labelBn: 'সিএস / আরএস খতিয়ান',
+      placeholder: 'Khatian / dag no.', placeholderBn: 'খতিয়ান / দাগ নম্বর' },
+  ],
+  commercial: [
+    { key: 'gasLine',    kind: 'toggle', label: 'Commercial Gas Line',     labelBn: 'বাণিজ্যিক গ্যাস লাইন' },
+    { key: 'ducting',    kind: 'toggle', label: 'Ducting / Exhaust Space', labelBn: 'ডাক্টিং / এক্সহস্ট স্পেস' },
+    { key: 'fireSafety', kind: 'toggle', label: 'Fire Safety Setup',       labelBn: 'অগ্নি নিরাপত্তা ব্যবস্থা' },
+  ],
+};
+
 const DIVISIONS = [
   { id: 'dhaka',      label: 'Dhaka',      labelBn: 'ঢাকা' },
   { id: 'chittagong', label: 'Chittagong', labelBn: 'চট্টগ্রাম' },
@@ -550,6 +589,9 @@ const INITIAL_FORM = {
   price: '',
   status: 'active',
   description: '',
+  // Intent-specific details (rent/sale/commercial). Populated by the dynamic
+  // Step-2 section below and stored as Mixed on the backend.
+  specificDetails: {},
 };
 
 // Room photo categories
@@ -1200,6 +1242,9 @@ const AddProperty = () => {
   const [selectedRoomType, setSelectedRoomType] = useState('bedroom');
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
+  // Nested setter for the intent-specific details bag (form.specificDetails).
+  const setSpecific = (key, val) =>
+    setForm(f => ({ ...f, specificDetails: { ...(f.specificDetails || {}), [key]: val } }));
   const err = (key) => errors[key];
 
   const currentIntentData = INTENT_DATA[form.intent] || {};
@@ -1904,6 +1949,68 @@ const AddProperty = () => {
                   </div>
                   {err('furnishing') && <ErrMsg text={isBn ? 'অবস্থা বেছে নিন' : 'Furnishing status required'} />}
                 </Field>
+
+                {/* ── DYNAMIC INTENT-SPECIFIC DETAILS (Step 2) ── */}
+                {form.intent && form.type && (SPECIFIC_FIELDS[form.intent]?.length > 0) && (
+                  <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_4px_15px_rgba(0,0,0,0.03)] space-y-5">
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={15} className="text-[#ba0036]" />
+                      <h4 className="text-sm font-black text-gray-900">
+                        {isBn ? 'অতিরিক্ত তথ্য' : 'Additional Details'}
+                      </h4>
+                    </div>
+                    {SPECIFIC_FIELDS[form.intent].map((fld) => {
+                      const sval = (form.specificDetails || {})[fld.key];
+                      if (fld.kind === 'select') {
+                        return (
+                          <Field key={fld.key} label={isBn ? fld.labelBn : fld.label}>
+                            <div className="relative">
+                              <select className={`${inputCls} appearance-none pr-10`}
+                                value={sval || ''}
+                                onChange={e => setSpecific(fld.key, e.target.value)}>
+                                <option value="">{isBn ? 'নির্বাচন করুন' : 'Select…'}</option>
+                                {fld.options.map(o => (
+                                  <option key={o.id} value={o.id}>{isBn ? o.labelBn : o.label}</option>
+                                ))}
+                              </select>
+                              <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
+                            </div>
+                          </Field>
+                        );
+                      }
+                      if (fld.kind === 'toggle') {
+                        return (
+                          <Field key={fld.key} label={isBn ? fld.labelBn : fld.label}>
+                            <div className="grid grid-cols-2 gap-3">
+                              {[{ v: true, en: 'Yes', bn: 'হ্যাঁ' }, { v: false, en: 'No', bn: 'না' }].map(opt => (
+                                <button key={String(opt.v)} type="button"
+                                  onClick={() => setSpecific(fld.key, opt.v)}
+                                  className={`py-3 px-2 rounded-2xl border-2 text-xs font-black transition-all active:scale-95 text-center
+                                    ${sval === opt.v
+                                      ? 'bg-[#ba0036]/5 border-[#ba0036] text-[#ba0036] shadow-sm'
+                                      : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200'}`}>
+                                  {isBn ? opt.bn : opt.en}
+                                </button>
+                              ))}
+                            </div>
+                          </Field>
+                        );
+                      }
+                      return (
+                        <Field key={fld.key} label={isBn ? fld.labelBn : fld.label}>
+                          <input type={fld.kind === 'number' ? 'number' : 'text'}
+                            className={inputCls}
+                            placeholder={isBn ? (fld.placeholderBn || '') : (fld.placeholder || '')}
+                            value={sval || ''}
+                            onChange={e => setSpecific(fld.key, e.target.value)} />
+                        </Field>
+                      );
+                    })}
+                    <p className="text-[10px] font-bold text-gray-300">
+                      {isBn ? 'এই তথ্যগুলো ঐচ্ছিক, তবে ক্রেতা/ভাড়াটিয়ার সিদ্ধান্তে সাহায্য করে।' : 'Optional — these help buyers/tenants decide.'}
+                    </p>
+                  </div>
+                )}
 
                 {/* Description used to live here. Per the user's request
                     ("give the description to everyone's last so that AI
