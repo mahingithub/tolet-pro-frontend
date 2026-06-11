@@ -1,189 +1,249 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-import { Play } from 'lucide-react';
+import { Play, Bot, X, Video } from 'lucide-react';
+import VideoModal from './shared/VideoModal';
 
 const WelcomeRobotOverlay = () => {
-  const { showWelcomeAnimation, setShowWelcomeAnimation } = useAuth();
+  const { activeRole } = useAuth();
+  const [showWelcome, setShowWelcome] = useState(false);
   const [started, setStarted] = useState(false);
-  const [shrinking, setShrinking] = useState(false);
+  const [activeVideo, setActiveVideo] = useState({ isOpen: false, url: '', title: '' });
+  const [showOptions, setShowOptions] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
 
-  // Fallback cleanup if component unmounts unexpectedly
+  const utteranceRef = useRef(null);
+  const timeoutRef = useRef(null);
+
+  // Listen for the login trigger and handle unmount cleanup
   useEffect(() => {
-    return () => {
+    const handleTrigger = () => {
+      console.log('[DEBUG] triggerWelcomeRobot event received!');
       window.speechSynthesis.cancel();
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      setShowWelcome(true);
+      setStarted(false);
+      setShowOptions(false);
+      setIsClosing(false);
+    };
+    window.addEventListener('triggerWelcomeRobot', handleTrigger);
+    console.log('[DEBUG] triggerWelcomeRobot listener attached');
+
+    return () => {
+      console.log('[DEBUG] triggerWelcomeRobot listener removed');
+      window.removeEventListener('triggerWelcomeRobot', handleTrigger);
+      window.speechSynthesis.cancel();
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 
-  if (!showWelcomeAnimation) return null;
-
   const handleStart = () => {
     setStarted(true);
-
-    const text = "স্বাগতম টু-লেট প্রো তে! আমি আপনার গ্লোবাল এআই অ্যাসিস্ট্যান্ট।";
+    const text = "স্বাগতম!";
     const utterance = new SpeechSynthesisUtterance(text);
+    utteranceRef.current = utterance;
     
-    // Use Bengali if available, otherwise fallback to default
-    utterance.lang = "bn-BD";
-    utterance.pitch = 1.2;
-    utterance.rate = 0.95;
-    
-    let isFinished = false;
-    
-    const finishAnimation = () => {
-      if (isFinished) return;
-      isFinished = true;
-      setShrinking(true);
-      // Wait for shrink animation to finish before removing overlay
-      setTimeout(() => {
-        setShowWelcomeAnimation(false);
-        setStarted(false);
-        setShrinking(false);
-      }, 1000); 
+    const startSpeech = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const bnVoices = voices.filter(v => v.lang.includes('bn') || v.lang.includes('bn-BD') || v.lang.includes('bn-IN'));
+      const bestVoice = bnVoices.find(v => v.name.includes('Google')) || bnVoices[0];
+      if (bestVoice) {
+        utterance.voice = bestVoice;
+      }
+      utterance.lang = "bn-BD";
+      window.speechSynthesis.speak(utterance);
     };
-
-    utterance.onend = finishAnimation;
-    utterance.onerror = finishAnimation;
-
-    window.speechSynthesis.speak(utterance);
     
-    // Safety fallback: if speech takes too long or fails silently, shrink anyway after 6 seconds
-    setTimeout(() => {
-        finishAnimation();
-    }, 6000);
+    if (window.speechSynthesis.getVoices().length > 0) {
+      startSpeech();
+    } else {
+      let fired = false;
+      const onVoicesChanged = () => {
+        if (fired) return;
+        fired = true;
+        startSpeech();
+      };
+      window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged, { once: true });
+      setTimeout(onVoicesChanged, 1000);
+    }
+    
+    utterance.onend = () => setShowOptions(true);
+    utterance.onerror = () => setShowOptions(true);
+    
+    // Fallback just in case speech fails
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setShowOptions(true), 3000);
   };
 
+  const handleClose = () => {
+    if (isClosing) return;
+    setIsClosing(true);
+    window.speechSynthesis.cancel();
+
+    const text = "সি ইউ এগেইন!";
+    const utterance = new SpeechSynthesisUtterance(text);
+    utteranceRef.current = utterance;
+
+    const startSpeech = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const bnVoices = voices.filter(v => v.lang.includes('bn') || v.lang.includes('bn-BD') || v.lang.includes('bn-IN'));
+      const bestVoice = bnVoices.find(v => v.name.includes('Google')) || bnVoices[0];
+      if (bestVoice) {
+        utterance.voice = bestVoice;
+      }
+      utterance.lang = "bn-BD";
+      window.speechSynthesis.speak(utterance);
+    };
+
+    if (window.speechSynthesis.getVoices().length > 0) {
+      startSpeech();
+    } else {
+      let fired = false;
+      const onVoicesChanged = () => {
+        if (fired) return;
+        fired = true;
+        startSpeech();
+      };
+      window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged, { once: true });
+      setTimeout(onVoicesChanged, 1000);
+    }
+
+    const finishClose = () => {
+      setShowWelcome(false);
+      setIsClosing(false);
+      window.dispatchEvent(new Event('welcomeRobotFinished'));
+    };
+
+    utterance.onend = finishClose;
+    utterance.onerror = finishClose;
+    
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(finishClose, 3000);
+  };
+
+  const isTenant = activeRole !== 'landlord';
+
+  // Standard placeholder YouTube URLs for demonstration - admin can configure these later
+  const tenantVideoUrl = "https://www.youtube.com/embed/dQw4w9WgXcQ"; 
+  const landlordVideoUrl = "https://www.youtube.com/embed/dQw4w9WgXcQ";
+
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center pointer-events-none">
-      
-      {/* 1. Tap to Start Overlay */}
+    <>
       <AnimatePresence>
-        {!started && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/60 backdrop-blur-md pointer-events-auto flex flex-col items-center justify-center"
-          >
-            <motion.div
-               initial={{ scale: 0.8, opacity: 0 }}
-               animate={{ scale: 1, opacity: 1 }}
-               transition={{ delay: 0.2 }}
-               className="mb-8 text-center text-white"
-            >
-               <h2 className="text-3xl font-bold mb-2">Welcome!</h2>
-               <p className="text-white/80">Turn on your sound to hear my voice.</p>
-            </motion.div>
+        {showWelcome && (
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center pointer-events-none">
+            {/* 1. Heavy Glassmorphic Background Overlay */}
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: isClosing ? 0 : 1 }} 
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-gray-900/40 backdrop-blur-xl pointer-events-auto"
+            />
 
+            {/* 2. Top-right Cancel Button */}
             <motion.button
-              onClick={handleStart}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-3 px-10 py-4 bg-primary text-white rounded-full shadow-2xl shadow-primary/40 hover:shadow-primary/60 transition-all font-semibold text-lg border border-white/20"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: isClosing ? 0 : 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              onClick={handleClose}
+              className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all pointer-events-auto z-[100000] border border-white/20 shadow-lg"
             >
-              <Play className="w-5 h-5 fill-current" />
-              Tap to Start
+              <X size={24} />
             </motion.button>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
-      {/* 2. Robot Animation */}
-      <AnimatePresence>
-        {started && (
-          <motion.div
-            initial={{ scale: 0, y: 100, opacity: 0 }}
-            animate={
-              shrinking
-                ? { scale: 0, x: '45vw', y: '45vh', opacity: 0 } // Move toward bottom-right
-                : { scale: 1, x: 0, y: 0, opacity: 1 }
-            }
-            transition={{ type: 'spring', damping: 20, stiffness: 100, duration: shrinking ? 1 : 1.5 }}
-            className="relative pointer-events-auto flex flex-col items-center text-primary"
-          >
-            {/* Robot Visuals */}
-            <div className="relative flex flex-col items-center">
-              <motion.div
-                animate={{ y: [0, -20, 0] }}
-                transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-                className="relative"
-              >
-                {/* Glow effect behind robot */}
-                <div className="absolute inset-0 bg-primary/20 blur-[80px] rounded-full scale-150" />
-                
-                {/* Sleek SVG Robot */}
-                <svg width="240" height="320" viewBox="0 0 240 320" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative z-10 drop-shadow-2xl">
-                  {/* Antenna */}
-                  <line x1="120" y1="40" x2="120" y2="15" stroke="currentColor" strokeWidth="6" strokeLinecap="round" />
-                  <motion.circle 
-                    animate={{ fill: ['#currentColor', '#ffffff', 'currentColor'] }}
-                    transition={{ repeat: Infinity, duration: 1.5 }}
-                    cx="120" cy="15" r="8" fill="currentColor" 
-                  />
-
-                  {/* Head */}
-                  <rect x="70" y="40" width="100" height="80" rx="25" fill="#ffffff" />
-                  <rect x="70" y="40" width="100" height="80" rx="25" fill="url(#glassGrad)" />
-                  <path d="M85 95 H155" stroke="#f1f5f9" strokeWidth="3" strokeLinecap="round"/>
-                  
-                  {/* Eyes */}
-                  <motion.circle animate={{ scaleY: [1, 0.1, 1] }} transition={{ repeat: Infinity, duration: 4, times: [0, 0.05, 0.1] }} cx="100" cy="70" r="10" fill="currentColor" />
-                  <motion.circle animate={{ scaleY: [1, 0.1, 1] }} transition={{ repeat: Infinity, duration: 4, times: [0, 0.05, 0.1] }} cx="140" cy="70" r="10" fill="currentColor" />
-                  
-                  {/* Body */}
-                  <rect x="50" y="140" width="140" height="120" rx="35" fill="#ffffff" />
-                  <rect x="50" y="140" width="140" height="120" rx="35" fill="url(#glassGrad)" />
-                  
-                  {/* Screen on Body */}
-                  <rect x="70" y="160" width="100" height="60" rx="15" fill="#f8fafc" />
-                  <motion.path 
-                    animate={{ pathLength: [0, 1, 0], opacity: [0, 1, 0] }}
-                    transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
-                    d="M85 190 Q 120 160 155 190" stroke="currentColor" strokeWidth="4" strokeLinecap="round" fill="none"
-                  />
-
-                  {/* Arms */}
-                  <rect x="25" y="160" width="20" height="70" rx="10" fill="#ffffff" />
-                  <rect x="195" y="160" width="20" height="70" rx="10" fill="#ffffff" />
-
-                  <defs>
-                    <linearGradient id="glassGrad" x1="0" y1="0" x2="240" y2="320" gradientUnits="userSpaceOnUse">
-                      <stop offset="0%" stopColor="rgba(0,0,0,0.02)" />
-                      <stop offset="100%" stopColor="rgba(0,0,0,0.1)" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-
-              </motion.div>
-              
-              {/* Speech Bubble */}
-              {!shrinking && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  transition={{ delay: 0.4, type: 'spring' }}
-                  className="absolute -top-12 bg-white text-gray-800 px-8 py-4 rounded-3xl rounded-br-sm shadow-2xl font-bold text-xl text-center whitespace-nowrap border border-gray-100"
+            {/* 3. Tap to Start Overlay */}
+            <AnimatePresence mode="wait">
+              {!started ? (
+                <motion.div 
+                  key="start-btn"
+                  initial={{ opacity: 0 }} 
+                  animate={{ opacity: 1 }} 
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 pointer-events-auto flex flex-col items-center justify-center z-[99999]"
                 >
-                  স্বাগতম টু-লেট প্রো তে!
-                  {/* Small animated sound waves */}
-                  <div className="flex gap-1 justify-center mt-2">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <motion.div
-                        key={i}
-                        animate={{ height: [4, 12, 4] }}
-                        transition={{ repeat: Infinity, duration: 0.8, delay: i * 0.1 }}
-                        className="w-1 bg-primary rounded-full"
-                      />
-                    ))}
+                  <motion.button
+                    onClick={handleStart}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="flex items-center gap-3 px-10 py-4 bg-[#ba0036] text-white rounded-full shadow-[0_15px_40px_rgba(186,0,54,0.4)] hover:shadow-[0_20px_50px_rgba(186,0,54,0.6)] transition-all font-bold text-lg border border-white/20"
+                  >
+                    <Play className="w-5 h-5 fill-current" />
+                    Tap to Start
+                  </motion.button>
+                </motion.div>
+              ) : (
+                /* 4. Futuristic Robot Modal */
+                <motion.div
+                  key="robot-modal"
+                  initial={{ scale: 0.8, opacity: 0, y: 50 }}
+                  animate={isClosing 
+                    ? { scale: 0.15, x: '42vw', y: '40vh', opacity: 0 } 
+                    : { scale: 1, x: 0, y: 0, opacity: 1 }
+                  }
+                  exit={{ opacity: 0 }}
+                  transition={{ type: 'spring', damping: 20, stiffness: 100 }}
+                  className="relative pointer-events-auto flex flex-col items-center w-full max-w-[340px] mx-4"
+                >
+                  {/* Robot Head Icon */}
+                  <div className="relative z-20">
+                    <div className="absolute inset-0 bg-[#ba0036] blur-[40px] opacity-40 rounded-full scale-150 animate-pulse" />
+                    <div className="relative w-28 h-28 bg-gradient-to-br from-[#ba0036] to-[#8a0028] rounded-[2rem] flex items-center justify-center shadow-2xl border-4 border-white/20">
+                      <Bot size={56} className="text-white" />
+                    </div>
                   </div>
+
+                  {/* Content Card */}
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                    className="w-full bg-white/95 backdrop-blur-xl rounded-[2rem] p-8 pt-16 -mt-10 shadow-[0_30px_60px_rgba(0,0,0,0.15)] border border-white/50 text-center"
+                  >
+                    <h3 className="text-3xl font-black text-gray-900 mb-2 tracking-tight">স্বাগতম!</h3>
+                    
+                    {showOptions && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-6 space-y-5"
+                      >
+                        <p className="text-[13px] font-bold text-gray-600 leading-relaxed px-2">
+                          {isTenant 
+                            ? 'কীভাবে সহজে বাসা খুঁজে পাবেন এবং ভাড়া নেবেন?'
+                            : 'কীভাবে খুব সহজেই বাসা ভাড়া দেবেন এবং ম্যানেজ করবেন?'}
+                        </p>
+                        
+                        <button
+                          onClick={() => setActiveVideo({ 
+                            isOpen: true, 
+                            url: isTenant ? tenantVideoUrl : landlordVideoUrl, 
+                            title: isTenant ? 'কীভাবে বাসা খুঁজবেন?' : 'হোস্ট ড্যাশবোর্ড গাইড' 
+                          })}
+                          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-gray-900 to-gray-800 text-white px-6 py-4 rounded-[1.2rem] font-bold shadow-[0_10px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_15px_30px_rgba(0,0,0,0.3)] hover:-translate-y-0.5 transition-all text-[13px]"
+                        >
+                          <Video size={16} />
+                          {isTenant ? 'নির্দেশিকা ভিডিও দেখুন' : 'হোস্ট গাইড ভিডিও দেখুন'}
+                        </button>
+                      </motion.div>
+                    )}
+                  </motion.div>
                 </motion.div>
               )}
-            </div>
-          </motion.div>
+            </AnimatePresence>
+          </div>
         )}
       </AnimatePresence>
-    </div>
+
+      {/* Reusing the shared VideoModal */}
+      <VideoModal
+        isOpen={activeVideo.isOpen}
+        onClose={() => setActiveVideo({ ...activeVideo, isOpen: false })}
+        videoUrl={activeVideo.url}
+        title={activeVideo.title}
+      />
+    </>
   );
 };
 
 export default WelcomeRobotOverlay;
+

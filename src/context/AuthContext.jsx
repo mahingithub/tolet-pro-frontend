@@ -18,17 +18,6 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => getCurrentUser());
-  const [showWelcomeAnimation, setShowWelcomeAnimation] = useState(false);
-  const prevUserRef = useRef(user);
-
-  // Trigger welcome animation when user transitions from null -> logged in
-  // (This naturally covers both login and signup without triggering on page reload for already-auth'd users)
-  useEffect(() => {
-    if (!prevUserRef.current && user) {
-      setShowWelcomeAnimation(true);
-    }
-    prevUserRef.current = user;
-  }, [user]);
 
   // On boot, if a token exists, validate it server-side via /me. If the token
   // is invalid or the user was deleted, this returns null and we clear the
@@ -93,17 +82,20 @@ export const AuthProvider = ({ children }) => {
       roles,
       activeRole,
       hasRole: (r) => roles.includes(r),
-      showWelcomeAnimation,
-      setShowWelcomeAnimation,
       // ──────────────────────────────────────────────────────────────────
       login: async (input) => {
+        console.log('[DEBUG] svcLogin calling...');
         const u = await svcLogin(input);
+        console.log('[DEBUG] svcLogin success. User:', u);
         setUser(u);
+        console.log('[DEBUG] Dispatching triggerWelcomeRobot event...');
+        window.dispatchEvent(new Event('triggerWelcomeRobot'));
         return u;
       },
       loginAsDemoAdmin: async () => {
         const u = await svcLoginAsDemoAdmin();
         setUser(u);
+        window.dispatchEvent(new Event('triggerWelcomeRobot'));
         return u;
       },
       logout: async () => {
@@ -136,7 +128,7 @@ export const AuthProvider = ({ children }) => {
       },
       refresh,
     };
-  }, [user, refresh, showWelcomeAnimation]);
+  }, [user, refresh]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

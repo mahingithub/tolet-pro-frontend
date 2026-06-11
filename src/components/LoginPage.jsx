@@ -209,6 +209,7 @@ const LoginPage = () => {
       const idToken = await credential.user.getIdToken();
       await signupVerify({ idToken });
       if (refresh) await refresh();
+      window.dispatchEvent(new Event('triggerWelcomeRobot'));
       goToNextOrDashboard(role);
     } catch (err) {
       setErrorMsg(err.code?.startsWith?.('auth/') ? firebaseErrToMsg(err) : (err.message || 'অ্যাকাউন্ট তৈরি করা যায়নি।'));

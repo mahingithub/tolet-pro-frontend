@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Draggable from 'react-draggable';
 import {
   Bot, Send, Sparkles, Minimize2, ExternalLink, TrendingUp,
@@ -37,6 +37,7 @@ const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').r
 
 const GlobalAIAssistant = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, isAuthenticated } = useAuth();
 
   const messagesEndRef = useRef(null);
@@ -44,6 +45,7 @@ const GlobalAIAssistant = () => {
   const floatingBtnRef = useRef(null);
 
   const [isOpen, setIsOpen] = useState(false);
+  const [isIconVisible, setIsIconVisible] = useState(true);
   const [view, setView] = useState(/** @type {'ai'|'tickets'|'ticket'} */('ai'));
   const [activeTicketId, setActiveTicketId] = useState(/** @type {string|null} */(null));
   const [inputText, setInputText] = useState('');
@@ -51,6 +53,39 @@ const GlobalAIAssistant = () => {
 
   const [aiGuides, setAiGuides] = useState([]);
   const [activeVideoModal, setActiveVideoModal] = useState({ isOpen: false, url: '', title: '' });
+
+  // Hide icon after 10s on non-visual pages
+  useEffect(() => {
+    const isVisualPage = location.pathname === '/' || 
+                         location.pathname.startsWith('/property/') || 
+                         location.pathname.startsWith('/properties/');
+
+    if (isVisualPage || isOpen) {
+      setIsIconVisible(true);
+      return;
+    }
+
+    let timer;
+    const startHideTimer = () => {
+      setIsIconVisible(true);
+      timer = setTimeout(() => {
+        setIsIconVisible(false);
+      }, 10000);
+    };
+
+    startHideTimer();
+
+    const handleRobotFinish = () => {
+      clearTimeout(timer);
+      startHideTimer();
+    };
+
+    window.addEventListener('welcomeRobotFinished', handleRobotFinish);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('welcomeRobotFinished', handleRobotFinish);
+    };
+  }, [location.pathname, isOpen]);
 
   useEffect(() => {
     fetch(`${API}/ai-guides`)
@@ -609,14 +644,6 @@ const GlobalAIAssistant = () => {
       )}
 
       {!isOpen && (
-        // The floating AI orb is intentionally NOT wrapped in <Draggable />.
-        // On mobile touch devices Draggable would fire its onDrag handler
-        // even for plain taps, then suppress the subsequent click — which
-        // is why "tap the bot button" was doing nothing on phones. A plain
-        // fixed-position button is reliable across mouse + touch.
-        // Positioned above the bottom-nav (bottom-24 on mobile, bottom-6 on
-        // desktop) so it never overlaps the rail. z-[100] keeps it above
-        // sticky/modal layers.
         <button
           ref={floatingBtnRef}
           type="button"
@@ -626,11 +653,11 @@ const GlobalAIAssistant = () => {
             setIsOpen(true);
           }}
           aria-label="Open AI assistant"
-          className="fixed bottom-24 md:bottom-6 right-4 md:right-8 z-[100] group flex items-center justify-center animate-in zoom-in duration-500 cursor-pointer touch-manipulation select-none"
+          className={`fixed bottom-24 md:bottom-6 right-4 md:right-8 z-[100] group flex items-center justify-center animate-in zoom-in cursor-pointer touch-manipulation select-none transition-all duration-700 ${!isIconVisible ? 'opacity-0 scale-50 pointer-events-none' : 'opacity-100 scale-100'}`}
         >
           <div className="absolute inset-0 bg-[#ba0036] rounded-full blur-xl opacity-40 group-hover:opacity-70 group-hover:scale-110 transition-all duration-300 animate-pulse pointer-events-none"></div>
           <div className="relative w-14 h-14 bg-gradient-to-br from-[#ba0036] to-[#8a0028] rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(186,0,54,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] group-hover:-translate-y-1 transition-transform duration-300 pointer-events-none">
-            <Sparkles size={24} className="text-white" />
+            <Bot size={24} className="text-white" />
             <div className="absolute top-0 right-0 w-3.5 h-3.5 bg-green-400 shadow-[0_0_0_2px_white] rounded-full"></div>
           </div>
         </button>
@@ -647,6 +674,7 @@ const GlobalAIAssistant = () => {
 };
 
 // ─── small subcomponents ────────────────────────────────────────────────
+
 
 const TicketStatusPill = ({ status }) => {
   const styles = {
