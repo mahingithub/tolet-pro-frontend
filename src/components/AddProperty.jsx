@@ -1982,23 +1982,26 @@ const AddProperty = () => {
                   title={isBn ? 'প্রপার্টির বিবরণ' : 'Property Details'}
                   subtitle={isBn ? 'রুম এবং আয়তনের তথ্য দিন' : 'Provide room counts, size, and description'} />
 
-                {/* Beds / Baths */}
-                <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_4px_15px_rgba(0,0,0,0.03)]">
-                  <div className="grid grid-cols-2 gap-6">
-                    <Field label={isBn ? 'শোবার ঘর' : 'Bedrooms'} required>
-                      <div className="flex items-center gap-3 mt-1">
-                        <BedDouble size={18} className="text-gray-300 shrink-0" />
-                        <CounterInput value={form.beds} onChange={v => set('beds', v)} min={1} max={12} />
-                      </div>
-                    </Field>
-                    <Field label={isBn ? 'বাথরুম' : 'Bathrooms'} required>
-                      <div className="flex items-center gap-3 mt-1">
-                        <Bath size={18} className="text-gray-300 shrink-0" />
-                        <CounterInput value={form.baths} onChange={v => set('baths', v)} min={1} max={12} />
-                      </div>
-                    </Field>
+                {/* Beds / Baths — residential only (hidden for land/building
+                    and every commercial type) */}
+                {showBedsBaths && (
+                  <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_4px_15px_rgba(0,0,0,0.03)]">
+                    <div className="grid grid-cols-2 gap-6">
+                      <Field label={isBn ? 'শোবার ঘর' : 'Bedrooms'} required>
+                        <div className="flex items-center gap-3 mt-1">
+                          <BedDouble size={18} className="text-gray-300 shrink-0" />
+                          <CounterInput value={form.beds} onChange={v => set('beds', v)} min={1} max={12} />
+                        </div>
+                      </Field>
+                      <Field label={isBn ? 'বাথরুম' : 'Bathrooms'} required>
+                        <div className="flex items-center gap-3 mt-1">
+                          <Bath size={18} className="text-gray-300 shrink-0" />
+                          <CounterInput value={form.baths} onChange={v => set('baths', v)} min={1} max={12} />
+                        </div>
+                      </Field>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Sqft + Floor — both optional, side by side. Floor was
                     added per the user's explicit request: "on which
