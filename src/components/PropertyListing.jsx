@@ -7,6 +7,8 @@ import { useLanguage } from "../context/LanguageContext";
 import InquiryModal from "./InquiryModal";
 // ─── DATA SOURCE: live properties (API + user uploads). NO demo data. ─────────
 import { propertyService, subscribeUserProperties, propertyLocationHaystack } from "../services/Propertyservice.js";
+import usePropertyStore from "../store/usePropertyStore";
+import { normaliseIntent } from "../constants/listingIntents";
 
 // ╔══════════════════════════════════════════════════════════════════════════╗
 // ║  GOOGLE MAPS                                                            ║
@@ -702,7 +704,12 @@ const PropertyListing = () => {
 	// floor.
 	const [minPrice, setMinPrice] = useState(0);
 	const [maxPrice, setMaxPrice] = useState(300000);
-	const [selectedIntent, setSelectedIntent] = useState("");
+	// Listing intent is now GLOBAL — the single source of truth is the store's
+	// activeMode (shared with the navbar + hero, persisted, canonical
+	// rent/sale/commercial). The URL param parser below writes INTO the store on
+	// load, so a shared ?intent= link wins over the persisted mode.
+	const selectedIntent = usePropertyStore((s) => s.activeMode);
+	const setActiveMode  = usePropertyStore((s) => s.setActiveMode);
 	const [selectedTypes, setSelectedTypes] = useState([]);
 	const [selectedCategories, setSelectedCategories] = useState([]);
 	const [selectedBeds, setSelectedBeds] = useState("any");
@@ -791,13 +798,12 @@ const PropertyListing = () => {
 		}
 
 		// ── Intent / Purpose ──────────────────────────────────────────────────────
-		const initialPurpose = searchParams.get("purpose");
-		if (initialPurpose === 'buy') {
-			setSelectedIntent('buy');
-		} else if (initialPurpose === 'rent') {
-			setSelectedIntent('rent');
-		} else if (initialPurpose === 'commercial') {
-			setSelectedIntent('commercial');
+		const initialIntentParam = searchParams.get("intent") || searchParams.get("purpose");
+		if (initialIntentParam) {
+			// normaliseIntent maps legacy 'buy'→'sale' and unknown→default, then we
+			// push it into the global store so the navbar + hero sync to the URL
+			// (a shared ?intent= link wins over the persisted mode).
+			setActiveMode(normaliseIntent(initialIntentParam));
 		}
 
 		// ── Property Type (prop.type: apartment / studio / duplex …) ─────────────
