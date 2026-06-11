@@ -18,6 +18,7 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
 import { propertyService, subscribeUserProperties } from '../services/Propertyservice';
+import { getDynamicFields } from '../constants/propertyFields';
 import { subscriptionService } from '../services/subscriptionService';
 import { listHostInquiries, updateInquiryStatus, deleteInquiry } from "../services/inquiryService.js";
 import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi } from "../services/bookingService.js";
@@ -628,6 +629,7 @@ const HostDashboard = () => {
     beds: 1, baths: 1, sqft: 0, floor: 0, furnishing: 'Unfurnished',
     description: '', status: 'active',
     img: '', images: [],
+    specificDetails: {},
   };
   const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM);
   const [activeDropdownId, setActiveDropdownId] = useState(null);
@@ -1132,6 +1134,7 @@ const HostDashboard = () => {
         status: data.status || 'active',
         img: data.img || gallery[0] || '',
         images: gallery,
+        specificDetails: (data.specificDetails && typeof data.specificDetails === 'object' && !Array.isArray(data.specificDetails)) ? data.specificDetails : {},
       });
     } else if (type === 'update_inquiry' && data) {
       setInquiryStatusForm({
@@ -5334,6 +5337,7 @@ const HostDashboard = () => {
                     status: editForm.status,
                     coverPhoto: cover,
                     price: priceNumber,
+                    specificDetails: editForm.specificDetails || {},
                   };
                   // Persist host-owned listings; demo seed entries fall through
                   // and live only in component state.
@@ -5484,6 +5488,62 @@ const HostDashboard = () => {
                         ))}
                       </div>
                     </div>
+
+                    {/* Intent-specific details — the SAME fields as the
+                        AddProperty wizard, driven by this property's intent +
+                        type (shared config). Hidden when the property has no
+                        intent/type or that combo has no extra fields. */}
+                    {(() => {
+                      const dynFields = getDynamicFields(modalData.intent, modalData.type);
+                      if (!modalData.intent || !modalData.type || dynFields.length === 0) return null;
+                      const isBn = language === 'বাংলা';
+                      const labelCls = "text-[10px] font-black text-gray-400 uppercase tracking-widest";
+                      const fieldCls = "w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20";
+                      const setSpec = (key, val) => setEditForm(f => ({ ...f, specificDetails: { ...(f.specificDetails || {}), [key]: val } }));
+                      return (
+                        <div className="space-y-4 pt-1">
+                          <p className="text-[11px] font-black text-gray-900">{isBn ? 'অতিরিক্ত তথ্য' : 'Additional Details'}</p>
+                          {dynFields.map((fld) => {
+                            const v = (editForm.specificDetails || {})[fld.key];
+                            if (fld.kind === 'select') {
+                              return (
+                                <div key={fld.key}>
+                                  <label className={labelCls}>{isBn ? fld.labelBn : fld.label}</label>
+                                  <select value={v || ''} onChange={e => setSpec(fld.key, e.target.value)} className={fieldCls}>
+                                    <option value="">{isBn ? 'নির্বাচন করুন' : 'Select…'}</option>
+                                    {fld.options.map(o => <option key={o.id} value={o.id}>{isBn ? o.labelBn : o.label}</option>)}
+                                  </select>
+                                </div>
+                              );
+                            }
+                            if (fld.kind === 'toggle') {
+                              return (
+                                <div key={fld.key}>
+                                  <label className={labelCls}>{isBn ? fld.labelBn : fld.label}</label>
+                                  <div className="mt-1.5 grid grid-cols-2 gap-2">
+                                    {[{ val: true, en: 'Yes', bn: 'হ্যাঁ' }, { val: false, en: 'No', bn: 'না' }].map(opt => (
+                                      <button key={String(opt.val)} type="button" onClick={() => setSpec(fld.key, opt.val)}
+                                        className={`py-3 rounded-xl text-xs font-black border transition-all ${v === opt.val ? 'bg-[#ba0036]/5 border-[#ba0036] text-[#ba0036]' : 'bg-gray-50 border-transparent text-gray-400 hover:bg-gray-100'}`}>
+                                        {isBn ? opt.bn : opt.en}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div key={fld.key}>
+                                <label className={labelCls}>{isBn ? fld.labelBn : fld.label}</label>
+                                <input type={fld.kind === 'number' ? 'number' : 'text'} value={v || ''}
+                                  onChange={e => setSpec(fld.key, e.target.value)}
+                                  placeholder={isBn ? (fld.placeholderBn || '') : (fld.placeholder || '')}
+                                  className={fieldCls} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
 
                     <button
                       onClick={handleSave}
