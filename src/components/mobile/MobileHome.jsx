@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
+import usePropertyStore from '../../store/usePropertyStore';
 import {
   DIVISIONS,
   POPULAR_AREAS,
@@ -953,7 +954,15 @@ const MobileHome = () => {
   const langKey = language === 'বাংলা' ? 'bn' : 'en';
 
   // ── Search-bar state ───────────────────────────────────────────────────
-  const [searchType,  setSearchType]  = useState('rent');
+  // Listing mode is GLOBAL — shared with the navbar + desktop hero and
+  // persisted across reloads (usePropertyStore.activeMode). MobileHome
+  // historically used 'buy' for the sale mode, so we adapt at this single
+  // boundary: the store holds the canonical 'sale', while every existing
+  // `searchType === 'buy'` branch below keeps working unchanged.
+  const activeMode    = usePropertyStore((s) => s.activeMode);
+  const setActiveMode = usePropertyStore((s) => s.setActiveMode);
+  const searchType    = activeMode === 'sale' ? 'buy' : activeMode;
+  const setSearchType = (mode) => setActiveMode(mode === 'buy' ? 'sale' : mode);
   const [location,    setLocation]    = useState('');
   const [propType,    setPropType]    = useState(RESIDENTIAL_TYPES[0]);
   const [budget,      setBudget]      = useState(BUDGET_RANGES[0]);
