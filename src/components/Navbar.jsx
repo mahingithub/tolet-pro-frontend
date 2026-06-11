@@ -351,31 +351,9 @@ useEffect(() => {
     return n.split(/\s+/).map(p => p[0] || '').join('').slice(0, 2).toUpperCase() || 'U';
   };
 
-  const hiddenPaths = ['/inquire', '/success', '/login', '/host-dashboard', '/tenant-dashboard', '/list-property'];
-  if (hiddenPaths.some(p => location.pathname.includes(p))) return null;
-
-  // `compactHeader` keeps the centred search bar visible by default on the
-  // properties LISTING route (e.g. /properties/dhaka) where users actively
-  // search. On the singular /property/:id DETAILS route we deliberately let
-  // the bar follow the same scroll-reveal behaviour as the home page — i.e.
-  // it stays hidden until the user scrolls (matches the mobile pattern the
-  // designer asked for).
-  const compactHeader = /^\/properties\/[^/]+/.test(location.pathname) && !location.pathname.includes('/properties/all');
-
-  const Row = ({ Icon, color, bg, label, path, badge, onClick }) => (
-    <button
-      onClick={onClick ?? (() => go(path))}
-      className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white active:scale-[0.98] transition-all text-left w-full group"
-    >
-      <div className={`w-8 h-8 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
-        <Icon size={16} className={color} />
-      </div>
-      <span className="font-bold text-sm text-gray-800 flex-1">{label}</span>
-      {badge && <span className="text-[8px] font-black bg-[#ba0036] text-white px-1.5 py-0.5 rounded-full uppercase tracking-widest">{badge}</span>}
-      <ChevronRight size={13} className="text-gray-300 shrink-0" />
-    </button>
-  );
-
+  // Autocomplete state + fetchers. These MUST live above the hiddenPaths
+  // early-return below, otherwise on hidden routes (e.g. /list-property)
+  // these hooks get skipped and React throws "rendered fewer hooks".
   const [liveSuggestions, setLiveSuggestions] = useState([]);
   const [mobileLiveSuggestions, setMobileLiveSuggestions] = useState([]);
 
@@ -420,6 +398,31 @@ useEffect(() => {
     }, 300);
     return () => clearTimeout(timer);
   }, [mobileNavLoc]);
+
+  const hiddenPaths = ['/inquire', '/success', '/login', '/host-dashboard', '/tenant-dashboard', '/list-property'];
+  if (hiddenPaths.some(p => location.pathname.includes(p))) return null;
+
+  // `compactHeader` keeps the centred search bar visible by default on the
+  // properties LISTING route (e.g. /properties/dhaka) where users actively
+  // search. On the singular /property/:id DETAILS route we deliberately let
+  // the bar follow the same scroll-reveal behaviour as the home page — i.e.
+  // it stays hidden until the user scrolls (matches the mobile pattern the
+  // designer asked for).
+  const compactHeader = /^\/properties\/[^/]+/.test(location.pathname) && !location.pathname.includes('/properties/all');
+
+  const Row = ({ Icon, color, bg, label, path, badge, onClick }) => (
+    <button
+      onClick={onClick ?? (() => go(path))}
+      className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white active:scale-[0.98] transition-all text-left w-full group"
+    >
+      <div className={`w-8 h-8 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
+        <Icon size={16} className={color} />
+      </div>
+      <span className="font-bold text-sm text-gray-800 flex-1">{label}</span>
+      {badge && <span className="text-[8px] font-black bg-[#ba0036] text-white px-1.5 py-0.5 rounded-full uppercase tracking-widest">{badge}</span>}
+      <ChevronRight size={13} className="text-gray-300 shrink-0" />
+    </button>
+  );
 
   const getFilteredSuggestions = (q, liveData) => {
     const staticMatches = allSuggestions.filter(s => s.title.toLowerCase().includes(q));
@@ -1091,4 +1094,3 @@ useEffect(() => {
 };
 
 export default Navbar;
- 
