@@ -6,6 +6,7 @@ import {
   Mail, Phone, Zap, TrendingUp, Tag, Sparkles, PlusCircle
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import usePropertyStore from '../store/usePropertyStore';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTEXT DATA
@@ -121,7 +122,15 @@ const HeroSection = () => {
     return () => clearInterval(iv);
   }, []);
 
-  const [searchType,     setSearchType]     = useState('rent');
+  // Listing mode is now GLOBAL — shared with the navbar ModeSwitcher and
+  // persisted across reloads (usePropertyStore.activeMode). The hero
+  // historically used 'buy' for the sale mode, so we adapt at this single
+  // boundary: the store holds the canonical 'sale', while every existing
+  // `searchType === 'buy'` branch below keeps working unchanged.
+  const activeMode    = usePropertyStore((s) => s.activeMode);
+  const setActiveMode = usePropertyStore((s) => s.setActiveMode);
+  const searchType    = activeMode === 'sale' ? 'buy' : activeMode;
+  const setSearchType = (mode) => setActiveMode(mode === 'buy' ? 'sale' : mode);
   const [location,       setLocation]       = useState('');
   const [selectedType,   setSelectedType]   = useState(residentialTypes[0]);
   const [selectedBudget, setSelectedBudget] = useState(budgetRanges[0]);
@@ -286,6 +295,11 @@ const HeroSection = () => {
     setActiveIndex(-1);
     setMobileActiveIndex(-1);
     const queryParams = new URLSearchParams({
+      // Canonical listing intent ('rent' | 'sale' | 'commercial') — the primary
+      // filter the listing page + backend key off. `purpose` is kept for now so
+      // the current PropertyListing keeps working until it's switched to read
+      // `intent`; it can be dropped in that step.
+      intent:   activeMode,
       purpose:  searchType,
       // ── 'category' maps to prop.rentalCategory (family / bachelor_male / etc.)
       // ── This is intentionally separate from 'type' (apartment / studio / etc.)
