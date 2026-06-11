@@ -360,23 +360,6 @@ const TenantDashboard = () => {
     ? { name: inquiryProp.landlordName || 'Landlord', phone: inquiryProp.landlordPhone || '' }
     : null;
 
-  // 🟢 NEW: One-time futuristic Welcome splash — fires on first dashboard
-  // mount per browser session. Uses sessionStorage so it doesn't reappear
-  // on tab navigation or component re-renders, but does reappear on a
-  // fresh login or new browser session.
-  const [showWelcome, setShowWelcome] = useState(false);
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      if (window.sessionStorage.getItem('tolet_welcome_shown') === '1') return;
-      window.sessionStorage.setItem('tolet_welcome_shown', '1');
-    } catch {
-      /* storage blocked — still show once for this mount */
-    }
-    setShowWelcome(true);
-    const t1 = window.setTimeout(() => setShowWelcome(false), 3200);
-    return () => window.clearTimeout(t1);
-  }, []);
 
   // 🟢 Tenant profile state — lives entirely inside the dashboard now.
   // Synced to localStorage so it survives reloads and other tabs.
@@ -2616,116 +2599,7 @@ const handleWizardSubmit = async (payload) => {
         language={language}
       />
 
-      {/* 🟢 NEW: Futuristic Welcome Splash — fires once per browser session.
-          Animated home icon w/ concentric pulse rings, gradient bg,
-          orbit dots, sparkle accents, Bn/En greeting, auto-dismiss ~3.2s. */}
-      {showWelcome && (
-        <div
-          onClick={() => setShowWelcome(false)}
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4 cursor-pointer animate-in fade-in duration-300"
-          style={{ background: 'radial-gradient(ellipse at center, rgba(186,0,54,0.12) 0%, rgba(15,15,30,0.55) 60%, rgba(15,15,30,0.7) 100%)', backdropFilter: 'blur(12px)' }}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md mx-auto bg-gradient-to-br from-white via-white to-rose-50/40 rounded-[2.25rem] border border-white/80 shadow-[0_30px_80px_rgba(186,0,54,0.25)] p-8 md:p-10 overflow-hidden animate-in zoom-in-90 slide-in-from-bottom-6 duration-500"
-          >
-            {/* Background ambient orbs */}
-            <div className="absolute -top-20 -right-20 w-56 h-56 bg-[#ba0036]/15 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-24 -left-20 w-64 h-64 bg-amber-200/30 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute top-10 right-12 text-[#ba0036]/40 animate-pulse" style={{ animationDuration: '2s' }}>
-              <Sparkles size={16} />
-            </div>
-            <div className="absolute bottom-14 left-10 text-amber-400/50 animate-pulse" style={{ animationDuration: '2.4s', animationDelay: '0.4s' }}>
-              <Sparkles size={12} />
-            </div>
-            <div className="absolute top-20 left-8 text-rose-300/60 animate-pulse" style={{ animationDuration: '2.8s', animationDelay: '0.8s' }}>
-              <Sparkles size={10} />
-            </div>
 
-            {/* Close pill */}
-            <button
-              onClick={() => setShowWelcome(false)}
-              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/80 backdrop-blur border border-gray-100 text-gray-400 hover:text-[#ba0036] hover:border-[#ba0036]/30 flex items-center justify-center transition-all z-10"
-              aria-label="Close welcome"
-            >
-              <X size={14} strokeWidth={2.5} />
-            </button>
-
-            <div className="relative z-10 flex flex-col items-center text-center">
-              {/* Animated Home stack: concentric pulse rings + gradient tile + orbit dots */}
-              <div className="relative w-32 h-32 md:w-36 md:h-36 mb-6 flex items-center justify-center">
-                {/* outer pulse rings */}
-                <span className="absolute inset-0 rounded-full bg-[#ba0036]/12 animate-ping" style={{ animationDuration: '2.4s' }} />
-                <span className="absolute inset-2 rounded-full bg-[#ba0036]/15 animate-ping" style={{ animationDuration: '2.4s', animationDelay: '0.4s' }} />
-                <span className="absolute inset-4 rounded-full bg-[#ba0036]/20 animate-ping" style={{ animationDuration: '2.4s', animationDelay: '0.8s' }} />
-                {/* solid halo */}
-                <span className="absolute inset-5 rounded-full bg-gradient-to-br from-[#ba0036]/15 to-amber-100/50 blur-md" />
-                {/* the home tile */}
-                <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-[1.5rem] bg-gradient-to-br from-[#ba0036] via-rose-500 to-orange-400 shadow-[0_15px_40px_rgba(186,0,54,0.4)] flex items-center justify-center overflow-hidden">
-                  {/* shimmer streak across tile */}
-                  <span
-                    className="absolute -inset-1 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-[shimmer_2s_ease-in-out_infinite]"
-                    style={{ animation: 'tdShimmer 2.4s ease-in-out infinite' }}
-                  />
-                  <Home className="relative text-white drop-shadow" size={42} strokeWidth={2.2} />
-                </div>
-                {/* orbit dots */}
-                <span className="absolute top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-[#ba0036] shadow-[0_0_12px_rgba(186,0,54,0.7)] animate-bounce" style={{ animationDuration: '1.6s' }} />
-                <span className="absolute bottom-1 right-3 w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.6)] animate-bounce" style={{ animationDuration: '1.8s', animationDelay: '0.3s' }} />
-                <span className="absolute bottom-3 left-2 w-1.5 h-1.5 rounded-full bg-rose-300 animate-bounce" style={{ animationDuration: '2s', animationDelay: '0.6s' }} />
-                {/* keyhole sparkle */}
-                <span className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-white border border-rose-100 flex items-center justify-center shadow-md">
-                  <KeyRound size={12} className="text-[#ba0036]" />
-                </span>
-              </div>
-
-              {/* Eyebrow */}
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-100 text-[#ba0036] text-[10px] font-black uppercase tracking-[0.2em] mb-3">
-                <Sparkles size={10} /> {language === 'বাংলা' ? 'টু-লেট প্রো' : 'To-Let Pro'}
-              </span>
-
-              {/* Greeting */}
-              <h3 className="text-2xl md:text-3xl font-black text-gray-900 mb-1.5 bg-gradient-to-br from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                {language === 'বাংলা' ? `স্বাগতম, ${loggedInUser}` : `Welcome, ${loggedInUser}`}
-              </h3>
-
-              {/* Subtitle */}
-              <p className="text-sm text-gray-500 max-w-xs leading-relaxed mb-5">
-                {language === 'বাংলা'
-                  ? 'আপনার পরবর্তী ভাড়া বাসা খুঁজে পেতে প্রস্তুত। চলুন শুরু করি।'
-                  : 'Ready to find your next home. Let\u2019s get you settled in.'}
-              </p>
-
-              {/* Animated progress bar that fills as the splash plays */}
-              <div className="w-32 h-1 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-[#ba0036] via-rose-500 to-orange-400 rounded-full"
-                  style={{ animation: 'tdWelcomeBar 3.2s linear forwards' }}
-                />
-              </div>
-              <p className="mt-3 text-[10px] font-bold text-gray-300 uppercase tracking-[0.2em]">
-                {language === 'বাংলা' ? 'ট্যাপ করুন বন্ধ করতে' : 'tap anywhere to dismiss'}
-              </p>
-            </div>
-          </div>
-
-          {/* Local keyframes — scoped via inline <style> so we don't touch
-              your tailwind config. */}
-          <style>{`
-            @keyframes tdShimmer {
-              0%   { transform: translateX(-100%) skewX(-12deg); }
-              60%  { transform: translateX(120%)  skewX(-12deg); }
-              100% { transform: translateX(120%)  skewX(-12deg); }
-            }
-            @keyframes tdWelcomeBar {
-              0%   { width: 0%; }
-              100% { width: 100%; }
-            }
-          `}</style>
-        </div>
-      )}
 
       {/* 🟢 NEW: Receipt Detail Modal */}
       {activeReceipt && (
