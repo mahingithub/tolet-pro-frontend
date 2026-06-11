@@ -24,3 +24,4 @@ yarn-error.log*
 # Editor swap files
 *.swp
 .DS_Store
+.DS_Store
