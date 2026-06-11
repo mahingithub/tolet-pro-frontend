@@ -18,6 +18,7 @@ import HomePage from "./components/HomePage";
 import ChatSystem from "./components/ChatSystem";
 import TenantDashboard from "./components/TenantDashboard";
 import GlobalAIAssistant from "./components/GlobalAIAssistant";
+import WelcomeRobotOverlay from "./components/WelcomeRobotOverlay";
 import SmartAlertsPage from "./components/Smartalertspage";
 import AIInsightsPage from "./components/Aiinsightspage";
 import LandlordProfile from "./components/LandlordProfile";
@@ -203,6 +204,7 @@ const AppLayout = () => {
 			</Routes>
 
 			<GlobalCallUI />
+			<WelcomeRobotOverlay />
 			{!shouldHideAIAssistant && <GlobalAIAssistant />}
 			<MobileBottomNav hideOnRoutes={['/login', '/admin', '/list-property', '/properties/']} />
 			<InstallPrompt />

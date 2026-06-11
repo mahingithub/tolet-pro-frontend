@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   getCurrentUser,
   getCurrentToken,
@@ -18,6 +18,17 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => getCurrentUser());
+  const [showWelcomeAnimation, setShowWelcomeAnimation] = useState(false);
+  const prevUserRef = useRef(user);
+
+  // Trigger welcome animation when user transitions from null -> logged in
+  // (This naturally covers both login and signup without triggering on page reload for already-auth'd users)
+  useEffect(() => {
+    if (!prevUserRef.current && user) {
+      setShowWelcomeAnimation(true);
+    }
+    prevUserRef.current = user;
+  }, [user]);
 
   // On boot, if a token exists, validate it server-side via /me. If the token
   // is invalid or the user was deleted, this returns null and we clear the
@@ -68,13 +79,13 @@ export const AuthProvider = ({ children }) => {
   // `roles` is the canonical superset granted to this user; `activeRole`
   // is whichever one the UI currently treats as primary (mirrors
   // `user.role` on the backend). The Navbar mode pill flips this.
-  const roles      = Array.isArray(user?.roles) && user.roles.length
-    ? user.roles
-    : (user?.role ? [user.role] : []);
-  const activeRole = user?.role || roles[0] || null;
+  const value = useMemo(() => {
+    const roles = Array.isArray(user?.roles) && user.roles.length
+      ? user.roles
+      : (user?.role ? [user.role] : []);
+    const activeRole = user?.role || roles[0] || null;
 
-  const value = useMemo(
-    () => ({
+    return {
       user,
       isAuthenticated: !!user,
       isAdmin: !!user && isAdminRole(user.role),
@@ -82,6 +93,8 @@ export const AuthProvider = ({ children }) => {
       roles,
       activeRole,
       hasRole: (r) => roles.includes(r),
+      showWelcomeAnimation,
+      setShowWelcomeAnimation,
       // ──────────────────────────────────────────────────────────────────
       login: async (input) => {
         const u = await svcLogin(input);
@@ -122,9 +135,8 @@ export const AuthProvider = ({ children }) => {
         return u;
       },
       refresh,
-    }),
-    [user, refresh, roles, activeRole],
-  );
+    };
+  }, [user, refresh, showWelcomeAnimation]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
