@@ -481,6 +481,11 @@ export const propertyService = {
         roomPhotos,
         videoId:     form.videoId     || '',
         videoUrl,
+        // Intent-specific details bag (rent/sale/commercial fields). AddProperty
+        // bundles the dynamic Step-2 inputs into form.specificDetails; the
+        // backend stores it as Mixed. (updateProperty already forwards it via its
+        // {...patch} spread — only this create whitelist needed it added.)
+        specificDetails: form.specificDetails || {},
       };
 
       const res = await probeFetch('createProperty', `${API}/properties`, {
