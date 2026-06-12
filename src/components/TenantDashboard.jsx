@@ -364,6 +364,38 @@ const TenantDashboard = () => {
 
   // 🟢 Tenant profile state — lives entirely inside the dashboard now.
   // Synced to localStorage so it survives reloads and other tabs.
+  useEffect(() => {
+    if (location.state && location.state.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+    const tab = new URLSearchParams(location.search).get('tab');
+    if (tab && ['overview', 'saved', 'applications', 'payments', 'settings', 'profile'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location]);
+
+  // Deep-link scrolling
+  useEffect(() => {
+    if (location.state?.highlightId && location.state?.scrollTo) {
+      setTimeout(() => {
+        const id = location.state.highlightId;
+        const el = document.getElementById(`application-${id}`) || document.getElementById(`receipt-${id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-2', 'ring-[#ba0036]', 'ring-offset-2', 'transition-all', 'duration-500');
+          setTimeout(() => el.classList.remove('ring-2', 'ring-[#ba0036]', 'ring-offset-2'), 3000);
+        }
+        
+        if (location.state.autoOpen) {
+          if (el && el.id.startsWith('receipt-')) {
+            const r = paymentReceipts.find(x => String(x.id) === String(id));
+            if (r) setActiveReceipt(r);
+          }
+        }
+      }, 500);
+    }
+  }, [location.state, paymentReceipts]);
+
   const [tenantProfile, setTenantProfile] = useState(DEFAULT_TENANT_PROFILE);
   const [draftProfile, setDraftProfile] = useState(DEFAULT_TENANT_PROFILE);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -2052,7 +2084,7 @@ const handleWizardSubmit = async (payload) => {
 
               {/* Application cards */}
               {sampleApps.map((app) => (
-                <div key={app.id} className="bg-white/80 backdrop-blur-xl rounded-[1.5rem] md:rounded-[2rem] border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all overflow-hidden">
+                <div id={`application-${app.id}`} key={app.id} className="bg-white/80 backdrop-blur-xl rounded-[1.5rem] md:rounded-[2rem] border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all overflow-hidden">
                   <div className="flex flex-col md:flex-row gap-0 md:gap-6">
                     {/* Image */}
                     <div className="w-full md:w-48 h-40 md:h-auto bg-gray-100 shrink-0 relative">
@@ -2462,6 +2494,7 @@ const handleWizardSubmit = async (payload) => {
                     const isFull = r.status === 'full' || r.balance <= 0;
                     return (
                       <button
+                        id={`receipt-${r.id}`}
                         key={r.id}
                         onClick={() => { setActiveReceipt(r); markReceiptRead(r.id); }}
                         className={`text-left bg-white/80 backdrop-blur-xl p-6 rounded-[2rem] border shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.99] relative overflow-hidden ${

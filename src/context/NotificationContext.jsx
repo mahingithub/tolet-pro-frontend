@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import notificationService from '../services/notificationService';
 import chatService from '../services/chatService';
 import callProvider from '../services/callProvider';
@@ -8,6 +10,7 @@ const NotificationContext = createContext();
 
 export function NotificationProvider({ children }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isAuthed = !!user;
 
   // Items and Unread Count
@@ -98,6 +101,58 @@ export function NotificationProvider({ children }) {
       lastConnectedTimeRef.current = new Date().toISOString();
     };
 
+    const handleNewNotification = (data) => {
+      if (cancelled) return;
+      setItems((prev) => [data, ...prev]);
+      setUnreadCount((prev) => prev + 1);
+
+      if (['message', 'message_new', 'booking', 'payment', 'receipt', 'rent_receipt'].includes(data.type)) {
+        toast.info(data.title || 'New Notification', {
+          description: data.body,
+          action: {
+            label: "দেখুন",
+            onClick: () => {
+              const { targetId, peerId, peerName, peerAvatar } = data.data || {};
+              switch (data.type) {
+                case 'message':
+                case 'message_new':
+                  navigate('/messages', {
+                    state: {
+                      peerUserId: peerId,
+                      peerName: peerName,
+                      peerAvatar: peerAvatar,
+                      conversationId: targetId || data.data?.conversationId,
+                      autoOpen: true
+                    }
+                  });
+                  break;
+                case 'booking':
+                  navigate('/tenant-dashboard?tab=bookings', { 
+                    state: { highlightId: targetId, autoOpen: true, scrollTo: true } 
+                  });
+                  break;
+                case 'payment':
+                case 'receipt':
+                case 'rent_receipt':
+                case 'rent_invoice':
+                case 'rent_overdue':
+                  navigate('/tenant-dashboard?tab=payments', { 
+                    state: { highlightId: targetId, autoOpen: true, scrollTo: true } 
+                  });
+                  break;
+                default:
+                  navigate('/notifications');
+              }
+              // Mark read optimistically when clicked from toast
+              setItems((prev) => prev.map((x) => x.id === data.id ? { ...x, read: true } : x));
+              setUnreadCount((u) => Math.max(0, u - 1));
+              notificationService.markRead(data.id).catch(() => {});
+            }
+          }
+        });
+      }
+    };
+
     const handleConnect = async () => {
       try {
         const missed = await chatService.getMissedMessagesCount(lastConnectedTimeRef.current);
@@ -111,6 +166,7 @@ export function NotificationProvider({ children }) {
 
     if (socket) {
       socket.on('RECEIVE_MESSAGE', handleReceiveMessage);
+      socket.on('new_notification', handleNewNotification);
       socket.on('connect', handleConnect);
     }
 
@@ -118,6 +174,7 @@ export function NotificationProvider({ children }) {
       cancelled = true;
       if (socket) {
         socket.off('RECEIVE_MESSAGE', handleReceiveMessage);
+        socket.off('new_notification', handleNewNotification);
         socket.off('connect', handleConnect);
       }
     };

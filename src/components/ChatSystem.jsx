@@ -430,6 +430,9 @@ const ChatSystem = () => {
 
     const offCallStateChange = callProvider.onCallStateChange((status, data) => {
       if (status === 'ended' || status === 'rejected' || status === 'missed') {
+        if (status === 'rejected' || status === 'missed') {
+          toast.error('কলটি বাতিল করা হয়েছে বা অপর প্রান্ত অফলাইনে আছে।');
+        }
         setIsCalling(false);
         setCallState(null);
         // callProvider only keeps ONE state callback, so a second
@@ -913,7 +916,7 @@ const ChatSystem = () => {
   // callProvider.initiateCall regardless of where the call was triggered.
   const placeCall = useCallback(async ({ peerUserId, peerName, peerAvatar, type }) => {
     if (!peerUserId) {
-      alert('Cannot call: missing user id.');
+      toast.error('Call করা সম্ভব হচ্ছে না, একটু পরে চেষ্টা করুন।');
       return;
     }
     const me = getCurrentUser();
@@ -937,8 +940,8 @@ const ChatSystem = () => {
       });
     } catch (e) {
       setIsCalling(false); setCallState(null);
-      console.error('[CALL FAIL]', e);
-      alert('Failed to call: ' + (e?.message || JSON.stringify(e)));
+      console.error('[CALL FAIL] WebRTC initiateCall failed:', e);
+      toast.error('Call করা সম্ভব হচ্ছে না, একটু পরে চেষ্টা করুন।');
     }
   }, []);
 

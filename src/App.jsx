@@ -222,11 +222,11 @@ function App() {
 		<ErrorBoundary>
 			<AuthProvider>
 				<LanguageProvider>
-					<NotificationProvider>
-						<Router>
+					<Router>
+						<NotificationProvider>
 							<AppLayout />
-						</Router>
-					</NotificationProvider>
+						</NotificationProvider>
+					</Router>
 				</LanguageProvider>
 			</AuthProvider>
 		</ErrorBoundary>

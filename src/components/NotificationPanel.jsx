@@ -29,31 +29,80 @@ export default function NotificationPanel({ onClose }) {
   const navigate = useNavigate();
   const { items, unreadCount, loading, markAsRead, markAllRead } = useNotificationContext();
 
-  const handleRowClick = (n) => {
-    if (!n.read) {
-      markAsRead(n.id);
-    }
-    onClose();
+  const handleRowClick = async (n) => {
+    try {
+      if (!n.read) {
+        await markAsRead(n.id);
+      }
+    } catch (err) {
+      console.error("Failed to mark notification as read:", err);
+    } finally {
+      onClose();
 
-    // Deep-link by type.
-    const d = n.data || {};
-    switch (n.type) {
-      case 'message_new':
-        navigate('/messages', { state: { chatId: d.conversationId || null, source: 'notification' } });
-        return;
-      case 'inquiry_new':
-        navigate('/host-dashboard?tab=inquiries');
-        return;
-      case 'inquiry_status':
-        navigate('/tenant-dashboard?tab=inquiries');
-        return;
-      case 'rent_receipt':
-      case 'rent_invoice':
-      case 'rent_overdue':
-        navigate('/tenant-dashboard?tab=payments');
-        return;
-      default:
-        navigate('/smart-alerts');
+      // Deep-link by type. We support both old and new types.
+      const { targetId, peerId, peerName, peerAvatar } = n.data || {};
+      
+      switch (n.type) {
+        case 'message':
+        case 'message_new':
+          navigate('/messages', {
+            state: {
+              peerUserId: peerId,
+              peerName: peerName,
+              peerAvatar: peerAvatar,
+              conversationId: targetId || (n.data && n.data.conversationId),
+              autoOpen: true
+            }
+          });
+          break;
+
+        case 'inquiry':
+        case 'inquiry_new':
+          navigate('/host-dashboard?tab=inquiries', { 
+            state: { highlightId: targetId || n?.data?.inquiryId, autoOpen: true, scrollTo: true } 
+          });
+          break;
+          
+        case 'inquiry_status':
+          navigate('/tenant-dashboard?tab=inquiries', { 
+            state: { highlightId: targetId || n?.data?.inquiryId, autoOpen: true, scrollTo: true } 
+          });
+          break;
+
+        case 'booking':
+          navigate('/tenant-dashboard?tab=bookings', { 
+            state: { highlightId: targetId, autoOpen: true, scrollTo: true } 
+          });
+          break;
+
+        case 'payment':
+        case 'receipt':
+        case 'rent_receipt':
+        case 'rent_invoice':
+        case 'rent_overdue':
+          navigate('/tenant-dashboard?tab=payments', { 
+            state: { highlightId: targetId, autoOpen: true, scrollTo: true } 
+          });
+          break;
+
+        case 'property':
+          navigate(`/property/${targetId}`, { state: { autoOpen: true, scrollTo: true } });
+          break;
+
+        case 'review':
+          navigate(`/property/${targetId}`, { state: { scrollTo: 'reviews' } });
+          break;
+
+        case 'maintenance':
+          navigate('/host-dashboard?tab=maintenance', { 
+            state: { highlightId: targetId, autoOpen: true, scrollTo: true } 
+          });
+          break;
+
+        default:
+          navigate('/notifications');
+          break;
+      }
     }
   };
 

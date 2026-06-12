@@ -411,6 +411,27 @@ const HostDashboard = () => {
       setActiveTab(tab);
     }
   }, [location.search]);
+
+  // Deep-link scrolling and highlight
+  useEffect(() => {
+    if (location.state?.highlightId && location.state?.scrollTo) {
+      setTimeout(() => {
+        const id = location.state.highlightId;
+        const el = document.getElementById(`inquiry-${id}`) || document.getElementById(`booking-${id}`) || document.getElementById(`rent-${id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-2', 'ring-[#ba0036]', 'ring-offset-2', 'transition-all', 'duration-500');
+          setTimeout(() => el.classList.remove('ring-2', 'ring-[#ba0036]', 'ring-offset-2'), 3000);
+        }
+        
+        // Auto-open logic if applicable
+        if (location.state.autoOpen) {
+          const inq = inquiries.find(i => String(i.id) === String(id));
+          if (inq) openModal('update_inquiry', inq);
+        }
+      }, 500); // Wait for tab to switch and render
+    }
+  }, [location.state, inquiries]);
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -973,9 +994,15 @@ const HostDashboard = () => {
   };
 
   // 🟢 ACTION HANDLERS
-  const handleCallUser = (phone, inquiryId) => {
-    showToast(language === 'বাংলা' ? 'কল ইনিশিয়েট করা হচ্ছে...' : 'Initiating Call...');
-    window.location.href = `tel:${phone}`;
+  const handleCallUser = (peerUserId, peerName, peerAvatar) => {
+    navigate('/messages', {
+      state: {
+        peerUserId,
+        peerName,
+        peerAvatar,
+        mode: 'call'
+      }
+    });
   };
 
   // 🟢 UNIFIED MESSAGE HANDLER
@@ -3088,7 +3115,7 @@ const HostDashboard = () => {
                      </div>
                   ) : (
                     displayedInquiries.map((inquiry) => (
-                      <div key={inquiry.id} className="bg-white rounded-[2rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_15px_40px_rgba(0,0,0,0.06)] p-6 md:p-8 transition-all duration-500 border-none">
+                      <div id={`inquiry-${inquiry.id}`} key={inquiry.id} className="bg-white rounded-[2rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_15px_40px_rgba(0,0,0,0.06)] p-6 md:p-8 transition-all duration-500 border-none">
                         <div className="flex flex-col xl:flex-row gap-6 xl:gap-8 items-stretch">
                           
                           <div className="flex-1 w-full flex flex-col justify-between">
@@ -3187,7 +3214,7 @@ const HostDashboard = () => {
                                 <button onClick={() => openChatPanel(inquiry.chatId, { source: 'host-inquiries', tenantName: inquiry.user, tenantPhone: inquiry.phone, propertyTitle: inquiry.propTitle, prefillMessage: '', peerUserId: inquiry.inquirerUserId })} className="w-full bg-[#ba0036] hover:bg-[#90002a] text-white py-3.5 rounded-2xl font-bold text-[11px] shadow-[0_4px_15px_rgba(186,0,54,0.2)] transition-all flex items-center justify-center gap-1.5 border-none active:scale-95">
                                   <MessageSquare size={14} /> {t?.openMessage || (language === 'বাংলা' ? 'মেসেজ' : 'Message')}
                                 </button>
-                                <button onClick={() => handleCallUser(inquiry.phone, inquiry.id)} className="w-full bg-white text-gray-700 py-3.5 rounded-2xl font-bold text-[11px] hover:bg-gray-50 hover:text-[#ba0036] shadow-[0_4px_15px_rgba(0,0,0,0.03)] transition-all flex items-center justify-center gap-1.5 border border-gray-100">
+                                <button onClick={() => handleCallUser(inquiry.inquirerUserId, inquiry.user)} className="w-full bg-white text-gray-700 py-3.5 rounded-2xl font-bold text-[11px] hover:bg-gray-50 hover:text-[#ba0036] shadow-[0_4px_15px_rgba(0,0,0,0.03)] transition-all flex items-center justify-center gap-1.5 border border-gray-100">
                                   <Phone size={14} /> {t?.callUser || (language === 'বাংলা' ? 'কল' : 'Call')}
                                 </button>
                               </div>
@@ -3281,7 +3308,7 @@ const HostDashboard = () => {
                               : 'bg-gradient-to-br from-gray-400 to-gray-500';
 
             return (
-              <div key={booking.id} className={`bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
+              <div id={`booking-${booking.id}`} key={booking.id} className={`bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
 
                 {/* Compact row — always visible. Click-to-toggle suppressed in forceOpen mode. */}
                 <button
@@ -3431,7 +3458,7 @@ const HostDashboard = () => {
                           <button onClick={() => setActiveDropdownId(activeDropdownId === booking.id ? null : booking.id)} className="p-2 rounded-xl bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"><MoreVertical size={13}/></button>
                           {activeDropdownId === booking.id && (
                             <div className="absolute right-0 bottom-full mb-2 w-52 bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[50] animate-in fade-in zoom-in-95 origin-bottom-right border border-gray-100">
-                              <button onClick={() => { handleCallUser(booking.tenantPhone); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
+                              <button onClick={() => { handleCallUser(booking.tenantId, booking.tenantName); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
                               <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
                               <button onClick={() => { showToast(language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড হচ্ছে...' : 'Downloading agreement...'); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
                               <div className="h-px w-full bg-gray-100 my-1"></div>
@@ -3739,7 +3766,7 @@ const HostDashboard = () => {
             const collectedPctRow = expectedThisMonth > 0 ? Math.min(100, Math.round((paidThisMonth / expectedThisMonth) * 100)) : 0;
 
             return (
-              <div key={booking.id} className={`bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
+              <div id={`rent-${booking.id}`} key={booking.id} className={`bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
 
                 {/* ── Compact row — always visible. Click-to-toggle suppressed in forceOpen mode. ── */}
                 <button

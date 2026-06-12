@@ -1421,6 +1421,19 @@ const PropertyDetails = () => {
   // come from /api/properties/{id}/reviews when that endpoint exists.
   const [reviews, setReviews] = useState([]);
   useEffect(() => { setReviews([]); }, [id]);
+
+  useEffect(() => {
+    if (location.state?.scrollTo === 'reviews') {
+      setTimeout(() => {
+        const el = document.getElementById('reviews');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-2', 'ring-[#ba0036]', 'ring-offset-2', 'transition-all', 'duration-500');
+          setTimeout(() => el.classList.remove('ring-2', 'ring-[#ba0036]', 'ring-offset-2'), 3000);
+        }
+      }, 500);
+    }
+  }, [location.state]);
   // Reviewer name is sourced from the authenticated profile; the form no
   // longer asks for a name. Once auth is wired, replace 'You' with profile.name.
   const reviewerName = (langCtx?.user?.name) || 'You';
@@ -1990,7 +2003,7 @@ const PropertyDetails = () => {
             </GlassCard>
 
             {/* REVIEWS — heading removed per request; rating + count remain on the right edge for context */}
-            <GlassCard className="p-5 md:p-7">
+            <GlassCard id="reviews" className="p-5 md:p-7">
               <div className="flex items-center justify-end mb-5">
                 <div className="flex items-center gap-2">
                   <Star size={17} className="fill-yellow-400 text-yellow-400" />
@@ -2297,12 +2310,20 @@ const PropertyDetails = () => {
                   <p className="text-slate-400 text-xs font-bold mb-8">via TO-LET PRO Secure Line</p>
                   <button
                     onClick={() => {
-                      if (landlord?.phoneNumber) {
-                        window.location.href = `tel:${landlord.phoneNumber}`;
-                      } else {
-                        toast.error("Phone number not available for this landlord.");
+                      const peerId = landlord?.id ?? property?.landlordId ?? property?.ownerUserId;
+                      if (!peerId) {
+                        toast.error("Unable to start call. Landlord info missing.");
+                        return;
                       }
                       setActiveModal(null);
+                      navigate('/messages', {
+                        state: {
+                          peerUserId: peerId,
+                          peerName: landlord?.name,
+                          peerAvatar: landlord?.avatar,
+                          mode: 'call'
+                        }
+                      });
                     }}
                     className="cyber-btn w-full text-white py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2"
                     style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 8px 22px rgba(16,185,129,0.22)' }}>
