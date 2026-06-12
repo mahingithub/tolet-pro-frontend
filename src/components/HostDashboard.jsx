@@ -412,26 +412,7 @@ const HostDashboard = () => {
     }
   }, [location.search]);
 
-  // Deep-link scrolling and highlight
-  useEffect(() => {
-    if (location.state?.highlightId && location.state?.scrollTo) {
-      setTimeout(() => {
-        const id = location.state.highlightId;
-        const el = document.getElementById(`inquiry-${id}`) || document.getElementById(`booking-${id}`) || document.getElementById(`rent-${id}`);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.classList.add('ring-2', 'ring-[#ba0036]', 'ring-offset-2', 'transition-all', 'duration-500');
-          setTimeout(() => el.classList.remove('ring-2', 'ring-[#ba0036]', 'ring-offset-2'), 3000);
-        }
-        
-        // Auto-open logic if applicable
-        if (location.state.autoOpen) {
-          const inq = inquiries.find(i => String(i.id) === String(id));
-          if (inq) openModal('update_inquiry', inq);
-        }
-      }, 500); // Wait for tab to switch and render
-    }
-  }, [location.state, inquiries]);
+
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -1182,6 +1163,27 @@ const HostDashboard = () => {
     });
     setActiveModal(null);
   };
+
+  // Deep-link scrolling and highlight (moved here so inquiries and openModal are initialized)
+  useEffect(() => {
+    if (location.state?.highlightId && location.state?.scrollTo) {
+      setTimeout(() => {
+        const id = location.state.highlightId;
+        const el = document.getElementById(`inquiry-${id}`) || document.getElementById(`booking-${id}`) || document.getElementById(`rent-${id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-2', 'ring-[#ba0036]', 'ring-offset-2', 'transition-all', 'duration-500');
+          setTimeout(() => el.classList.remove('ring-2', 'ring-[#ba0036]', 'ring-offset-2'), 3000);
+        }
+        
+        // Auto-open logic if applicable
+        if (location.state.autoOpen) {
+          const inq = inquiries.find(i => String(i.id) === String(id));
+          if (inq) openModal('update_inquiry', inq);
+        }
+      }, 500); // Wait for tab to switch and render
+    }
+  }, [location.state, inquiries]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // RENT-LEDGER + BOOKING HANDLERS
