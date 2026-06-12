@@ -40,21 +40,25 @@ class Ringtone {
       // Resume if browser suspended it.
       if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
       const beep = () => {
-        if (!this.active || !this.ctx) return;
-        const osc  = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = outgoing ? 420 : 480; // slightly different tone in/out
-        const now = this.ctx.currentTime;
-        // gentle envelope, ~0.4s beep
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.12, now + 0.05);
-        gain.gain.setValueAtTime(0.12, now + 0.35);
-        gain.gain.linearRampToValueAtTime(0, now + 0.4);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.45);
+        if (!this.active || !this.ctx || this.ctx.state === 'closed') return;
+        try {
+          const osc  = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = outgoing ? 420 : 480; // slightly different tone in/out
+          const now = this.ctx.currentTime;
+          // gentle envelope, ~0.4s beep
+          gain.gain.setValueAtTime(0, now);
+          gain.gain.linearRampToValueAtTime(0.12, now + 0.05);
+          gain.gain.setValueAtTime(0.12, now + 0.35);
+          gain.gain.linearRampToValueAtTime(0, now + 0.4);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.45);
+        } catch (err) {
+          console.warn('[Ringtone] beep failed:', err);
+        }
       };
       // ring pattern: short beep, 800ms gap, repeat.
       beep();
@@ -193,15 +197,11 @@ const GlobalCallUI = () => {
     });
 
     const unsubOutgoing = callProvider.onOutgoingCall((data) => {
-      // ChatSystem already shows its own outgoing overlay; we still set state
-      // here so audio/video elements are mounted and remote stream can attach.
-      // Direction='outgoing' keeps our overlay hidden in favor of ChatSystem's
-      // (see render below — outgoing only shows a minimal status, not full UI).
       setCallState((prev) => ({
         status: 'ringing',
         direction: 'outgoing',
         callId:      data.callId,
-        peerName:    prev?.peerName  || 'Calling…',
+        peerName:    prev?.peerName  || 'Unknown',
         peerAvatar:  prev?.peerAvatar || null,
         type:        data.type || 'voice',
         roomId:      data.roomId,
@@ -251,16 +251,6 @@ const GlobalCallUI = () => {
     if (callState?.status !== 'accepted' || callState?.type !== 'video') return;
     attachLocalStream(callProvider.getLocalStream(), callState.type);
   }, [attachLocalStream, callState?.status, callState?.type]);
-
-  // CRITICAL: Emit cancel when caller unmounts/leaves
-  useEffect(() => {
-    return () => {
-      if (callState?.direction === 'outgoing' && callState?.callId && ['ringing', 'accepted'].includes(callState.status)) {
-        callProvider.endCall({ callId: callState.callId });
-        ringtoneRef.current?.stop();
-      }
-    };
-  }, [callState]);
 
   // Notification click → app launch. The service worker opens /messages with
   // these params when the PWA was closed or in the background.
@@ -366,10 +356,7 @@ const GlobalCallUI = () => {
     setVideoOff(isOff);
   };
 
-  // Only show OUR overlay for incoming calls. Outgoing calls already get
-  // ChatSystem's overlay. But we still render hidden audio/video elements
-  // for outgoing too so streams play.
-  const showOverlay = callState && callState.direction === 'incoming';
+  const showOverlay = !!callState;
   const isVideoCall = callState?.type === 'video';
   const isInCall    = callState?.status === 'accepted';
 
@@ -426,7 +413,7 @@ const GlobalCallUI = () => {
                   <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-[#ba0036] px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
                     {isInCall
                       ? 'In Call'
-                      : 'Incoming Call'}
+                      : callState?.direction === 'outgoing' ? 'Calling...' : 'Incoming Call'}
                   </div>
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-black mb-1 text-center">{callState?.peerName}</h2>
@@ -439,23 +426,33 @@ const GlobalCallUI = () => {
             {/* Controls */}
             <div className={`flex gap-4 sm:gap-8 ${isInCall && isVideoCall ? 'absolute bottom-8 left-1/2 -translate-x-1/2 z-10' : ''}`}>
               {!isInCall ? (
-                /* Ringing controls: Accept / Reject */
-                <>
+                /* Ringing controls: Accept / Reject for incoming, Hangup for outgoing */
+                callState?.direction === 'incoming' ? (
+                  <>
+                    <button
+                      onClick={handleReject}
+                      className="w-16 h-16 sm:w-20 sm:h-20 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center shadow-2xl shadow-red-600/40 transition-all"
+                      aria-label="Decline"
+                    >
+                      <PhoneOff size={28}/>
+                    </button>
+                    <button
+                      onClick={handleAccept}
+                      className="w-16 h-16 sm:w-20 sm:h-20 bg-green-600 hover:bg-green-700 rounded-full flex items-center justify-center shadow-2xl shadow-green-600/40 transition-all animate-bounce"
+                      aria-label="Accept"
+                    >
+                      <Phone size={28}/>
+                    </button>
+                  </>
+                ) : (
                   <button
-                    onClick={handleReject}
+                    onClick={handleHangup}
                     className="w-16 h-16 sm:w-20 sm:h-20 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center shadow-2xl shadow-red-600/40 transition-all"
-                    aria-label="Decline"
+                    aria-label="End call"
                   >
                     <PhoneOff size={28}/>
                   </button>
-                  <button
-                    onClick={handleAccept}
-                    className="w-16 h-16 sm:w-20 sm:h-20 bg-green-600 hover:bg-green-700 rounded-full flex items-center justify-center shadow-2xl shadow-green-600/40 transition-all animate-bounce"
-                    aria-label="Accept"
-                  >
-                    <Phone size={28}/>
-                  </button>
-                </>
+                )
               ) : (
                 /* In-call controls: Mute / Hangup / Video toggle */
                 <>

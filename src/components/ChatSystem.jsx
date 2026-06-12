@@ -356,11 +356,7 @@ const ChatSystem = () => {
 
   const [activeChatId, setActiveChatId] = useState('ai-bot');
   // Legacy states kept for basic overlay visibility; managed by callProvider now
-  const [isCalling, setIsCalling] = useState(false);
-  const [callType, setCallType] = useState('voice');
   const [muted, setMuted] = useState(false);
-  // Real-time call state: null | { status: 'ringing'|'accepted', direction: 'incoming'|'outgoing', peerName, peerAvatar, type }
-  const [callState, setCallState] = useState(null);
   const [inputText, setInputText] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -389,70 +385,28 @@ const ChatSystem = () => {
   const recordTimerRef = useRef(null);                             // setInterval handle
   const recordStreamRef = useRef(null);                            // mic MediaStream (to stop tracks)
 
-  // ─── Sidebar tab: 'messages' (chat list) or 'calls' (call history) ────────
   const [sidebarTab, setSidebarTab] = useState('messages');
   // Recent call history (polled). Items are pre-described via callService.describeCall.
   const [callHistory, setCallHistory] = useState([]);
   const [callHistoryLoading, setCallHistoryLoading] = useState(false);
   const [selectedCall, setSelectedCall] = useState(null); // Phase Call-4: detail modal
-  // Live duration timer for an active accepted call (seconds since accept).
-  const [liveCallDuration, setLiveCallDuration] = useState(0);
-  // Local UI toggles for media controls (kept in sync with callProvider).
-  const [videoOff, setVideoOff] = useState(false);
-  // Transient toast shown after a call ends ("Call ended", "Declined", …).
-  // Removed callEndToast state as GlobalCallUI manages toasts now.
 
   // Local message store keyed by chatId. For the AI bot this is the only
   // store. For backend conversations it's a cache populated by the poll.
   const [messages, setMessages] = useState({ 'ai-bot': [] });
 
   // ─── Socket.IO Call Connection ──────────────────────────────────────────────
+  // The main connection and ringing UI is now fully handled by GlobalCallUI.jsx.
+  // We only listen to call ends to optimistically refresh the call history.
   useEffect(() => {
-    const token = getCurrentToken();
-    if (!token) return;
-
-    callProvider.connect(token);
-
-    const offIncomingCall = callProvider.onIncomingCall((data) => {
-      setCallState({
-        status: 'ringing',
-        direction: 'incoming',
-        peerName: data.callerName,
-        peerAvatar: data.callerAvatar,
-        type: data.type,
-        callId: data.callId,
-        roomId: data.roomId,
-        callerId: data.callerId,
-      });
-      setCallType(data.type);
-      setIsCalling(true);
-    });
-
-    const offCallStateChange = callProvider.onCallStateChange((status, data) => {
-      if (status === 'ended' || status === 'rejected' || status === 'missed') {
-        if (status === 'rejected' || status === 'missed') {
-          toast.error('কলটি বাতিল করা হয়েছে বা অপর প্রান্ত অফলাইনে আছে।');
-        }
-        setIsCalling(false);
-        setCallState(null);
-        // callProvider only keeps ONE state callback, so a second
-        // onCallStateChange registration was silently overwriting this one —
-        // which left calls stuck on 'ringing' and video never mounting).
-      } else if (status === 'accepted') {
-        setCallState((prev) => prev ? { ...prev, status: 'accepted' } : null);
+    const offCallStateChange = callProvider.onCallStateChange((status) => {
+      if (['ended', 'rejected', 'missed'].includes(status)) {
+        // We defer the refresh slightly to let backend complete saving the Call
+        setTimeout(() => refreshCallHistory?.(), 1000);
       }
     });
-
-    // Socket stays connected on unmount so incoming calls still reach this
-    // user even when ChatSystem isn't mounted. But we DO remove our callbacks
-    // here — otherwise each remount stacks another onIncomingCall /
-    // onCallStateChange handler on the provider, which caused duplicate call
-    // popups after navigating between chats (audit 5.1).
-    return () => {
-      offIncomingCall?.();
-      offCallStateChange?.();
-    };
-  }, []);
+    return () => offCallStateChange?.();
+  }, [refreshCallHistory]);
 
   // ─── Socket Event Handlers for Status & Typing ──────────────────────────────
   useEffect(() => {
@@ -713,149 +667,7 @@ const ChatSystem = () => {
   // ─── Call media refs ──────────────────────────────────────────────────────
   // remoteVideoRef → <video> element that displays the peer's stream
   // remoteAudioRef → <audio> element for voice calls
-  // localVideoRef  → small picture-in-picture preview of own camera
-  // ringtoneRef    → Web Audio API oscillator for ring sound (no asset file)
-  const remoteVideoRef = useRef(null);
-  const remoteAudioRef = useRef(null);
-  const localVideoRef  = useRef(null);
-  const [localStream, setLocalStream] = useState(null);
-  const [remoteStream, setRemoteStream] = useState(null);
-  const ringtoneRef = useRef({ ctx: null, osc: null, gain: null, timer: null });
 
-  // ─── Ringtone helpers (Web Audio API — no MP3 asset needed) ───────────────
-  // 'incoming' = WhatsApp-like double-pulse ring (more urgent, 2x per second)
-  // 'outgoing' = traditional dial tone (single tone pulse, slower)
-  // We use a gain envelope (attack/release) so the tone doesn't click.
-  const startRingtone = useCallback((kind) => {
-    try {
-      if (ringtoneRef.current.ctx) return; // already ringing
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-
-      const playTone = (freq, durationMs) => {
-        const osc  = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = freq;
-        const now = ctx.currentTime;
-        // Attack/sustain/release envelope to avoid clicking.
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.18, now + 0.02);
-        gain.gain.linearRampToValueAtTime(0.18, now + (durationMs / 1000) - 0.05);
-        gain.gain.linearRampToValueAtTime(0, now + (durationMs / 1000));
-        osc.connect(gain).connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + (durationMs / 1000) + 0.01);
-      };
-
-      const playPattern = () => {
-        if (kind === 'incoming') {
-          // Double-pulse: ring-ring … ring-ring
-          playTone(880, 180);
-          setTimeout(() => playTone(880, 180), 240);
-          setTimeout(() => playTone(660, 180), 600);
-          setTimeout(() => playTone(660, 180), 840);
-        } else {
-          // Dial tone: single long pulse
-          playTone(440, 700);
-        }
-      };
-
-      playPattern();
-      ringtoneRef.current.timer = setInterval(playPattern, kind === 'incoming' ? 1800 : 2400);
-      ringtoneRef.current.ctx = ctx;
-    } catch (e) { /* silent */ }
-  }, []);
-
-  const stopRingtone = useCallback(() => {
-    const r = ringtoneRef.current;
-    if (r.timer) { clearInterval(r.timer); r.timer = null; }
-    if (r.ctx) { try { r.ctx.close(); } catch {} r.ctx = null; }
-  }, []);
-
-  // Drive ringtone from call state. Auto-stops after 30s as a safety net
-  // (the backend's missed-call timer also fires at 30s).
-  useEffect(() => {
-    if (!callState) { stopRingtone(); return; }
-    if (callState.status === 'ringing') {
-      startRingtone(callState.direction === 'incoming' ? 'incoming' : 'outgoing');
-      const safety = setTimeout(stopRingtone, 30_000);
-      return () => { clearTimeout(safety); stopRingtone(); };
-    }
-    stopRingtone();
-    return () => stopRingtone();
-  }, [callState, startRingtone, stopRingtone]);
-
-  // ─── Remote stream → media element wiring ─────────────────────────────────
-  // The stream can arrive BEFORE the <video> element exists (it only mounts
-  // once callState==='accepted'). So we just capture the stream into state
-  // here, and a separate effect attaches it whenever the element is present.
-  useEffect(() => {
-    const offRemoteStream = callProvider.onRemoteStream((stream) => {
-      if (!stream) return;
-      setRemoteStream(stream);
-      // Audio element exists for the whole call, so it's safe to attach now.
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = stream;
-      }
-    });
-    // Remove the callback on unmount so it doesn't stack across remounts (5.1).
-    return () => {
-      offRemoteStream?.();
-    };
-  }, []);
-
-  // Attach remote stream to the video element once BOTH exist. Re-runs when the
-  // video element mounts (status flips to 'accepted') or the stream changes.
-  useEffect(() => {
-    if (remoteStream && remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = remoteStream;
-      remoteVideoRef.current.play?.().catch(() => {});
-    }
-    if (remoteStream && remoteAudioRef.current) {
-      remoteAudioRef.current.srcObject = remoteStream;
-    }
-  }, [remoteStream, callType, callState?.status]);
-
-  // ─── Local preview wiring (when our own stream is acquired) ───────────────
-  // We poll callProvider.getLocalStream() shortly after accepting/initiating
-  // a call. The provider grabs media asynchronously inside initiateCall /
-  // acceptCall; this lightweight pull avoids touching the provider API.
-  useEffect(() => {
-    if (!isCalling) { setLocalStream(null); return; }
-    const t = setInterval(() => {
-      const s = callProvider.getLocalStream();
-      if (s && s !== localStream) {
-        setLocalStream(s);
-      }
-    }, 300);
-    return () => clearInterval(t);
-  }, [isCalling, localStream]);
-
-  // Attach local stream to its preview element once both exist (same timing
-  // fix as the remote stream — the PiP <video> only mounts when accepted).
-  useEffect(() => {
-    if (localStream && localVideoRef.current && localStream.getVideoTracks().length > 0) {
-      localVideoRef.current.srcObject = localStream;
-      localVideoRef.current.play?.().catch(() => {});
-    }
-  }, [localStream, callType, callState?.status]);
-
-  // ─── Live call duration counter ─────────────────────────────────────────
-  // Counts up every second while a call is in the 'accepted' state. Reset
-  // whenever the call changes (new call, hangup, etc).
-  useEffect(() => {
-    if (!callState || callState.status !== 'accepted') {
-      setLiveCallDuration(0);
-      return;
-    }
-    const startedAt = Date.now();
-    const t = setInterval(() => {
-      setLiveCallDuration(Math.floor((Date.now() - startedAt) / 1000));
-    }, 1000);
-    return () => clearInterval(t);
-  }, [callState?.status]);
 
   // ─── Call history fetching + light polling ──────────────────────────────
   // We refetch when the sidebar tab is flipped to 'calls', when a call
@@ -883,15 +695,7 @@ const ChatSystem = () => {
     return () => clearInterval(t);
   }, [refreshCallHistory]);
 
-  // Whenever an active call overlay closes, refresh history so the newly
-  // ended call shows up in the Calls tab + chat without waiting 30 s.
-  const prevIsCallingRef = useRef(isCalling);
-  useEffect(() => {
-    if (prevIsCallingRef.current && !isCalling) {
-      refreshCallHistory();
-    }
-    prevIsCallingRef.current = isCalling;
-  }, [isCalling, refreshCallHistory]);
+
 
   // Phase Call-4: when the Calls tab opens, mark missed calls as seen so the
   // red badge clears. Optimistically flip local `seen`, then tell the backend.
@@ -1664,133 +1468,7 @@ const ChatSystem = () => {
             : 'relative h-[calc(100dvh-2rem)] my-4 max-w-[1400px] mx-auto rounded-[2rem] bg-white/60 backdrop-blur-2xl border border-white/70 shadow-[0_30px_80px_rgba(0,0,0,0.08)]'
       }`}>
 
-        {/* CALL OVERLAY */}
-        <AnimatePresence>
-          {isCalling && (
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 z-[120] bg-gray-900/95 backdrop-blur-2xl flex flex-col items-center justify-center text-white p-6"
-            >
-              {/* Hidden audio element for voice calls — autoplays remote audio */}
-              <audio ref={remoteAudioRef} autoPlay playsInline />
 
-              {/* Video elements: shown only for video calls in 'accepted' state */}
-              {callType === 'video' && callState?.status === 'accepted' && (
-                <div className="absolute inset-0 bg-black overflow-hidden">
-                  <video
-                    ref={remoteVideoRef}
-                    autoPlay
-                    playsInline
-                    className="w-full h-full object-cover"
-                  />
-                  <video
-                    ref={localVideoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="absolute top-4 right-4 w-28 h-40 sm:w-36 sm:h-52 object-cover rounded-2xl border-2 border-white/30 shadow-2xl bg-gray-800"
-                  />
-                </div>
-              )}
-
-              {/* Phase Call-3: network-quality bars, reconnect banner, camera switch.
-                  Self-contained; subscribes to callProvider quality/reconnect callbacks.
-                  Renders nothing useful under the native provider (callbacks never fire). */}
-              {callState?.status === 'accepted' && (
-                <CallQualityOverlay callType={callType} />
-              )}
-
-              <div className={`relative mb-6 ${callType === 'video' && callState?.status === 'accepted' ? 'hidden' : ''}`}>
-                <span className="absolute inset-0 rounded-full border-2 border-[#ba0036]/40 animate-ping"></span>
-                <span className="absolute -inset-3 rounded-full border-2 border-[#ba0036]/20 animate-ping" style={{ animationDelay: '0.4s' }}></span>
-                <div className="w-32 h-32 rounded-full border-4 border-[#ba0036] p-1 relative">
-                  {(callState?.peerAvatar || activeChat.avatar) ? (
-                    <img src={callState?.peerAvatar || activeChat.avatar} className="w-full h-full rounded-full object-cover" alt=""/>
-                  ) : (
-                    <div className="w-full h-full rounded-full bg-gradient-to-br from-[#ba0036] to-[#7a0024] flex items-center justify-center">
-                      <Bot size={48}/>
-                    </div>
-                  )}
-                </div>
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-[#ba0036] px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
-                  {callState?.status === 'accepted'
-                    ? `In Call · ${callService.formatCallDuration(liveCallDuration)}`
-                    : callState?.direction === 'incoming' ? 'Incoming Call' 
-                    : (callType === 'video' ? 'Video Calling…' : 'Calling…')}
-                </div>
-              </div>
-
-              <h2 className={`text-2xl sm:text-3xl font-black mb-1 text-center ${callType === 'video' && callState?.status === 'accepted' ? 'absolute bottom-32 z-10 drop-shadow-2xl' : ''}`}>{callState?.peerName || activeChat.name}</h2>
-              <p className={`text-gray-400 font-bold mb-10 text-sm ${callType === 'video' && callState?.status === 'accepted' ? 'hidden' : ''}`}>TO-LET PRO HD {callType === 'video' ? 'Video' : 'Voice'} Call</p>
-
-              <div className={`flex gap-4 sm:gap-8 ${callType === 'video' && callState?.status === 'accepted' ? 'absolute bottom-10 z-10' : ''}`}>
-                {callState?.direction === 'incoming' && callState?.status === 'ringing' ? (
-                  <>
-                    <button
-                      onClick={() => callProvider.rejectCall({ callId: callState.callId })}
-                      className="w-16 h-16 sm:w-20 sm:h-20 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center shadow-2xl shadow-red-600/40 transition-all"
-                      aria-label="Decline"
-                    >
-                      <PhoneOff size={28}/>
-                    </button>
-                    <button
-                      onClick={() => callProvider.acceptCall(callState)}
-                      className="w-16 h-16 sm:w-20 sm:h-20 bg-green-600 hover:bg-green-700 rounded-full flex items-center justify-center shadow-2xl shadow-green-600/40 transition-all animate-bounce"
-                      aria-label="Accept"
-                    >
-                      <Phone size={28}/>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => {
-                        const newMuted = callProvider.toggleMute();
-                        setMuted(newMuted);
-                      }}
-                      className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all border ${
-                        muted ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' : 'bg-white/10 hover:bg-white/20 border-white/10'
-                      }`}
-                      aria-label={muted ? 'Unmute' : 'Mute'}
-                      title={muted ? 'Unmute microphone' : 'Mute microphone'}
-                    >
-                      {muted ? <VolumeX size={22}/> : <Mic size={22}/>}
-                    </button>
-                    {callType === 'video' && (
-                      <button
-                        onClick={() => {
-                          const newOff = callProvider.toggleVideo();
-                          setVideoOff(newOff);
-                        }}
-                        className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all border ${
-                          videoOff ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' : 'bg-white/10 hover:bg-white/20 border-white/10'
-                        }`}
-                        aria-label={videoOff ? 'Turn camera on' : 'Turn camera off'}
-                        title={videoOff ? 'Turn camera on' : 'Turn camera off'}
-                      >
-                        {videoOff ? <VideoOff size={22}/> : <Video size={22}/>}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        callProvider.endCall({ callId: callState?.callId });
-                        setIsCalling(false);
-                        setCallState(null);
-                        setMuted(false);
-                        setVideoOff(false);
-                      }}
-                      className="w-16 h-16 sm:w-20 sm:h-20 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center shadow-2xl shadow-red-600/40 transition-all"
-                      aria-label="End call"
-                    >
-                      <PhoneOff size={28}/>
-                    </button>
-                  </>
-                )}
-              </div>
-              <p className="mt-6 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Tap Esc to hang up</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* SIDEBAR */}
         <aside
