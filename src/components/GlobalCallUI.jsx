@@ -252,6 +252,16 @@ const GlobalCallUI = () => {
     attachLocalStream(callProvider.getLocalStream(), callState.type);
   }, [attachLocalStream, callState?.status, callState?.type]);
 
+  // CRITICAL: Emit cancel when caller unmounts/leaves
+  useEffect(() => {
+    return () => {
+      if (callState?.direction === 'outgoing' && callState?.callId && ['ringing', 'accepted'].includes(callState.status)) {
+        callProvider.endCall({ callId: callState.callId });
+        ringtoneRef.current?.stop();
+      }
+    };
+  }, [callState]);
+
   // Notification click → app launch. The service worker opens /messages with
   // these params when the PWA was closed or in the background.
   useEffect(() => {
@@ -295,8 +305,9 @@ const GlobalCallUI = () => {
 
     const onMessage = (event) => {
       const msg = event.data || {};
-      if (msg.type !== 'TOLET_INCOMING_CALL_NOTIFICATION_CLICK') return;
-      handleNotificationLaunch(msg.call || {}, msg.action || 'open');
+      if (msg.type === 'TOLET_INCOMING_CALL_NOTIFICATION_CLICK' || msg.type === 'ANSWER_CALL') {
+        handleNotificationLaunch(msg.call || msg.payload || {}, msg.action || 'open');
+      }
     };
 
     navigator.serviceWorker.addEventListener('message', onMessage);

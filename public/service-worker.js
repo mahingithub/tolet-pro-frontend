@@ -166,7 +166,11 @@ self.addEventListener('push', function(event) {
     data: data // Pass all data
   };
 
-  if (data.kind === 'incoming_call') {
+  const isCall = data.type === 'incoming_call' || data.kind === 'incoming_call';
+  const isMessage = data.type === 'message';
+  const isBooking = data.type === 'booking';
+
+  if (isCall) {
     options = {
       ...options,
       tag: `incoming-call-${data.callId}`,
@@ -174,21 +178,33 @@ self.addEventListener('push', function(event) {
       renotify: true,
       vibrate: [250, 100, 250, 100, 250],
       actions: [
-        { action: 'accept', title: '✅ রিসিভ করুন' },
+        { action: 'answer', title: '✅ রিসিভ করুন' },
         { action: 'decline', title: '❌ কাটুন' }
       ]
     };
+    event.waitUntil(self.registration.showNotification(title, options));
   } else if (data.kind === 'missed_call') {
     options = {
       ...options,
       tag: `missed-call-${data.callId}`,
       renotify: true,
     };
+    event.waitUntil(self.registration.showNotification(title, options));
+  } else if (isMessage) {
+    options = {
+      ...options,
+      tag: `message-${data.senderId || Date.now()}`,
+    };
+    event.waitUntil(self.registration.showNotification(data.title || 'নতুন মেসেজ', options));
+  } else if (isBooking) {
+    options = {
+      ...options,
+      tag: `booking-${data.targetId || Date.now()}`,
+    };
+    event.waitUntil(self.registration.showNotification(data.title || 'বুকিং আপডেট', options));
+  } else {
+    event.waitUntil(self.registration.showNotification(title, options));
   }
-
-  event.waitUntil(
-    self.registration.showNotification(title, options)
-  );
 });
 
 self.addEventListener('notificationclick', function(event) {
@@ -196,7 +212,7 @@ self.addEventListener('notificationclick', function(event) {
   const data = event.notification.data || {};
   
   // If it's an incoming call and user clicked decline
-  if (data.kind === 'incoming_call' && event.action === 'decline') {
+  if ((data.type === 'incoming_call' || data.kind === 'incoming_call') && event.action === 'decline') {
     event.waitUntil(
       fetch(`${data.apiBaseUrl || '/api'}/calls/push-action`, {
         method: 'POST',
@@ -213,8 +229,8 @@ self.addEventListener('notificationclick', function(event) {
 
   // Otherwise, determine the URL to open
   let urlToOpen = '/';
-  if (data.kind === 'incoming_call') {
-    const action = event.action === 'accept' ? 'accept' : 'open';
+  if (data.type === 'incoming_call' || data.kind === 'incoming_call') {
+    const action = (event.action === 'answer' || event.action === 'accept') ? 'accept' : 'open';
     const params = new URLSearchParams({
       incomingCall: '1',
       callAction: action,
@@ -238,11 +254,10 @@ self.addEventListener('notificationclick', function(event) {
         let client = windowClients[i];
         if (client.url.includes(urlToOpen) && 'focus' in client) {
           // Send message to active client if it's an incoming call
-          if (data.kind === 'incoming_call') {
+          if (data.type === 'incoming_call' || data.kind === 'incoming_call') {
             client.postMessage({
-              type: 'TOLET_INCOMING_CALL_NOTIFICATION_CLICK',
-              action: event.action === 'accept' ? 'accept' : 'open',
-              call: data
+              type: 'ANSWER_CALL',
+              payload: data
             });
           }
           return client.focus();

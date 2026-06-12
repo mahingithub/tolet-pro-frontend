@@ -233,12 +233,16 @@ function connect(token) {
     _emit(_onCallStateCbs, 'rejected', data);
   });
 
-  // ── Call ended ────────────────────────────────────────────────────────
-  _socket.on('CALL_ENDED', (data) => {
-    console.log('[callProvider] call ended:', data);
+  // ── Call ended / variations ─────────────────────────────────────────────
+  const onEnded = (data) => {
+    console.log('[callProvider] call ended/cancelled:', data);
     cleanup();
     _emit(_onCallStateCbs, 'ended', data);
-  });
+  };
+  _socket.on('CALL_ENDED', onEnded);
+  _socket.on('call_ended', onEnded);
+  _socket.on('CALL_CANCELLED', onEnded);
+  _socket.on('cancel_call', onEnded);
 
   // ── Missed call ───────────────────────────────────────────────────────
   _socket.on('CALL_MISSED', (data) => {
