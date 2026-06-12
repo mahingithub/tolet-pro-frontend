@@ -84,18 +84,23 @@ export const AuthProvider = ({ children }) => {
       hasRole: (r) => roles.includes(r),
       // ──────────────────────────────────────────────────────────────────
       login: async (input) => {
-        console.log('[DEBUG] svcLogin calling...');
         const u = await svcLogin(input);
-        console.log('[DEBUG] svcLogin success. User:', u);
         setUser(u);
-        console.log('[DEBUG] Dispatching triggerWelcomeRobot event...');
-        window.dispatchEvent(new Event('triggerWelcomeRobot'));
+        // ওয়েলকাম রোবট শুধু tenant/landlord-এর জন্য — admin-জাতীয় role
+        // (super_admin / moderator / support_agent) হলে dispatch-ই হবে না।
+        if (u && !isAdminRole(u.role)) {
+          window.dispatchEvent(
+            new CustomEvent('triggerWelcomeRobot', {
+              detail: { role: u.role, name: u.name, type: 'login' },
+            }),
+          );
+        }
         return u;
       },
       loginAsDemoAdmin: async () => {
         const u = await svcLoginAsDemoAdmin();
         setUser(u);
-        window.dispatchEvent(new Event('triggerWelcomeRobot'));
+        // অ্যাডমিন প্যানেলে ওয়েলকাম রোবট দেখানো হয় না, তাই এখানে dispatch নেই।
         return u;
       },
       logout: async () => {
