@@ -1407,7 +1407,6 @@ const PropertyDetails = () => {
     })();
     return () => { cancelled = true; };
   }, [id]);
-  }, [id]);
 
   const isUnavailable = property?.status === 'rented' || property?.status === 'sold';
   const isOwnProperty = auth?.user && (String(auth.user.id || auth.user._id) === String(landlord?.id || property?.landlordId || property?.ownerUserId));
