@@ -8,7 +8,7 @@ import {
   Star, Play, Award, Calendar, Clock, Send,
   Shield, BadgeCheck, Home, Users, MessageCircle, Sparkles,
   Building, Building2, ShoppingBag, Briefcase, Store, Layers, Globe,
-  Eye, FileText, Video, ShowerHead, Sofa, Utensils, Camera
+  Eye, FileText, Video, ShowerHead, Sofa, Utensils, Camera, Loader2
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -17,6 +17,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import InquiryModal from './InquiryModal';
 // ─── DATA SOURCE: live property + landlord. NO demo data. ─────────────────────
 import { propertyService } from '../services/Propertyservice.js';
+import { toast } from 'sonner';
 
 // ╔══════════════════════════════════════════════════════════════════════════╗
 // ║  GOOGLE MAPS                                                            ║
@@ -1360,6 +1361,7 @@ const PropertyDetails = () => {
   const [property, setProperty] = useState(null);
   const [landlord, setLandlord] = useState(null);
   const [loadingProperty, setLoadingProperty] = useState(true);
+  const [loadingLandlord, setLoadingLandlord] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -1371,6 +1373,7 @@ const PropertyDetails = () => {
         setProperty(null);
         setLandlord(null);
         setLoadingProperty(false);
+        setLoadingLandlord(false);
         return;
       }
       // Synthesise a safe fallback landlord from the property's own contact
@@ -1397,7 +1400,10 @@ const PropertyDetails = () => {
       setLandlord(fallbackLandlord);
       setLoadingProperty(false);
       const ll = await propertyService.getLandlord(p.landlordId || p.ownerUserId);
-      if (!cancelled && ll) setLandlord({ ...fallbackLandlord, ...ll });
+      if (!cancelled) {
+        if (ll) setLandlord({ ...fallbackLandlord, ...ll });
+        setLoadingLandlord(false);
+      }
     })();
     return () => { cancelled = true; };
   }, [id]);
@@ -1532,7 +1538,7 @@ const PropertyDetails = () => {
       </div>
     );
   }
-  if (!property) {
+  if (!id || !property) {
     return (
       <div className="w-full min-h-screen flex items-center justify-center futuristic-bg p-6">
         <FuturisticTheme />
@@ -2133,15 +2139,21 @@ const PropertyDetails = () => {
                 </button>
 
                 <div className="flex gap-3 mb-5">
-                  <button disabled={isUnavailable} onClick={() => !isUnavailable && requireAuthFor(() => setActiveModal('call'))}
-                    className={`flex-1 py-3 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all ${isUnavailable ? 'opacity-40 cursor-not-allowed text-slate-400' : 'text-emerald-700'}`}
+                  <button 
+                    disabled={isUnavailable || loadingLandlord || (!loadingLandlord && !landlord?.phoneNumber)} 
+                    title={!loadingLandlord && !landlord?.phoneNumber ? "Information not available" : ""}
+                    onClick={() => !isUnavailable && requireAuthFor(() => setActiveModal('call'))}
+                    className={`flex-1 py-3 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all ${(isUnavailable || loadingLandlord || (!loadingLandlord && !landlord?.phoneNumber)) ? 'opacity-40 cursor-not-allowed text-slate-400' : 'text-emerald-700'}`}
                     style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.08)' }}>
-                    <Phone size={14} /> {lt('call')}
+                    {loadingLandlord ? <Loader2 size={14} className="animate-spin" /> : <Phone size={14} />} {lt('call')}
                   </button>
-                  <button disabled={isUnavailable} onClick={() => !isUnavailable && requireAuthFor(() => setActiveModal('message'))}
-                    className={`flex-1 py-3 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all ${isUnavailable ? 'opacity-40 cursor-not-allowed text-slate-400' : 'text-blue-700'}`}
+                  <button 
+                    disabled={isUnavailable || loadingLandlord || (!loadingLandlord && !landlord?.id)} 
+                    title={!loadingLandlord && !landlord?.id ? "Information not available" : ""}
+                    onClick={() => !isUnavailable && requireAuthFor(() => setActiveModal('message'))}
+                    className={`flex-1 py-3 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all ${(isUnavailable || loadingLandlord || (!loadingLandlord && !landlord?.id)) ? 'opacity-40 cursor-not-allowed text-slate-400' : 'text-blue-700'}`}
                     style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.08)' }}>
-                    <MessageSquare size={14} /> {lt('message')}
+                    {loadingLandlord ? <Loader2 size={14} className="animate-spin" /> : <MessageSquare size={14} />} {lt('message')}
                   </button>
                 </div>
 
@@ -2284,7 +2296,14 @@ const PropertyDetails = () => {
                   <p className="text-slate-600 font-bold text-sm mb-2">Connect with <span className="text-[#ba0036]">{landlord.name}</span></p>
                   <p className="text-slate-400 text-xs font-bold mb-8">via TO-LET PRO Secure Line</p>
                   <button
-                    onClick={() => { setActiveModal(null); navigate('/messages', { state: { peerUserId: landlord?.id, propertyId: property.id, mode: 'call' } }); }}
+                    onClick={() => {
+                      if (landlord?.phoneNumber) {
+                        window.location.href = `tel:${landlord.phoneNumber}`;
+                      } else {
+                        toast.error("Phone number not available for this landlord.");
+                      }
+                      setActiveModal(null);
+                    }}
                     className="cyber-btn w-full text-white py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2"
                     style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 8px 22px rgba(16,185,129,0.22)' }}>
                     <Phone size={18} /> Start Secure Call
@@ -2301,7 +2320,23 @@ const PropertyDetails = () => {
                   <h3 className="text-2xl font-black text-slate-900 mb-2" style={{ fontFamily: 'Oxanium, sans-serif' }}>Send Message</h3>
                   <p className="text-slate-600 font-bold text-sm mb-8">Chat with <span className="text-[#ba0036]">{landlord.name}</span></p>
                   <button
-                    onClick={() => { setActiveModal(null); navigate('/messages', { state: { peerUserId: landlord?.id, propertyId: property.id, mode: 'message' } }); }}
+                    onClick={() => {
+                      const peerId = landlord?.id ?? property?.landlordId ?? property?.ownerUserId;
+                      if (!peerId) {
+                        toast.error("Unable to open chat. Landlord info missing.");
+                        return;
+                      }
+                      setActiveModal(null);
+                      navigate('/messages', {
+                        state: {
+                          peerUserId: peerId,
+                          peerName: landlord?.name,
+                          peerAvatar: landlord?.avatar,
+                          propertyId: property?.id,
+                          mode: 'message'
+                        }
+                      });
+                    }}
                     className="cyber-btn w-full text-white py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2"
                     style={{ background: 'linear-gradient(135deg, #ba0036 0%, #7c0026 100%)', boxShadow: '0 8px 22px rgba(186,0,54,0.22)' }}>
                     <MessageSquare size={18} /> Open Chat

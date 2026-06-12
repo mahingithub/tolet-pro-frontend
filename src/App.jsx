@@ -6,6 +6,7 @@ import { NotificationProvider } from "./context/NotificationContext.jsx";
 import callProvider from "./services/callProvider";
 import { getCurrentToken } from "./services/authService";
 import fcmService from "./services/fcmService";
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Existing Imports
 import Navbar from "./components/Navbar";
@@ -218,15 +219,17 @@ const AppLayout = () => {
 
 function App() {
 	return (
-		<AuthProvider>
-			<LanguageProvider>
-				<NotificationProvider>
-					<Router>
-						<AppLayout />
-					</Router>
-				</NotificationProvider>
-			</LanguageProvider>
-		</AuthProvider>
+		<ErrorBoundary>
+			<AuthProvider>
+				<LanguageProvider>
+					<NotificationProvider>
+						<Router>
+							<AppLayout />
+						</Router>
+					</NotificationProvider>
+				</LanguageProvider>
+			</AuthProvider>
+		</ErrorBoundary>
 	);
 }
 

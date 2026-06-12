@@ -60,7 +60,7 @@ const LandlordProfile = () => {
     );
   }
 
-  if (!landlord) {
+  if (!id || !landlord) {
     return (
       <div className="w-full min-h-[50vh] flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-white rounded-2xl p-8 text-center shadow-xl border border-gray-100">

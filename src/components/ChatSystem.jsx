@@ -346,6 +346,7 @@ const ChatRow = ({ chat, lastMsg, isActive, onClick, isMobile }) => {
 const ChatSystem = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const peerUserId = location.state?.peerUserId;
 
   // Chat list = AI bot (local-only) + real backend conversations (polled).
   // We no longer hydrate from localStorage — conversations live in Mongo.

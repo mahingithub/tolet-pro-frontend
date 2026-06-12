@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import { uploadVerificationDoc, uploadAvatar, getCurrentToken } from '../services/authService';
 import { listMyInquiries } from '../services/inquiryService.js';
 import { listTenantReceipts } from '../services/receiptService.js';
@@ -1628,7 +1629,7 @@ const handleWizardSubmit = async (payload) => {
                   </div>
                 </div>
                 <button
-                  onClick={() => navigate('/messages')}
+                  onClick={() => { toast.error("Unable to open chat. Landlord info missing."); }}
                   className="w-full inline-flex items-center justify-center gap-2 py-3 bg-white text-[#ba0036] border border-[#ba0036]/20 rounded-2xl font-black text-xs hover:bg-[#ba0036] hover:text-white hover:border-[#ba0036] transition-all"
                 >
                   <MessageSquare size={14} /> {t.contactHost || (language === 'বাংলা' ? 'যোগাযোগ' : 'Contact')}
@@ -2002,6 +2003,7 @@ const handleWizardSubmit = async (payload) => {
           const sampleApps = myInquiries.map((inq) => ({
             id:         inq.id || inq._id,
             propertyId: inq.propertyId,
+            landlordId: inq.landlordId || inq.ownerUserId || inq.receiverId,
             title:      inq.propTitle || 'Property',
             location:   '',
             price:      '',
@@ -2151,7 +2153,13 @@ const handleWizardSubmit = async (payload) => {
                           <MessageCircle size={13} /> {language === 'বাংলা' ? 'আবার ইনকোয়ারি' : 'Re-inquire'}
                         </button>
                         <button
-                          onClick={() => navigate('/messages')}
+                          onClick={() => {
+                            if (!app.landlordId) {
+                              toast.error("Unable to open chat. Landlord info missing.");
+                              return;
+                            }
+                            navigate('/messages', { state: { peerUserId: app.landlordId, propertyId: app.propertyId } });
+                          }}
                           className="flex-1 bg-gradient-to-r from-[#ba0036] to-[#d11147] text-white py-2.5 rounded-xl text-xs font-black shadow-[0_6px_18px_rgba(186,0,54,0.25)] hover:shadow-[0_10px_24px_rgba(186,0,54,0.4)] active:scale-95 transition-all flex items-center justify-center gap-1.5"
                         >
                           <MessageSquare size={13} /> {language === 'বাংলা' ? 'চ্যাট' : 'Chat'}
