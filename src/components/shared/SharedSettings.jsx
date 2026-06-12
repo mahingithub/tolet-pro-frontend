@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNotificationSettings } from '../../context/NotificationContext';
 import { readJson, writeJson, broadcast } from '../../services/_storage.js';
 import { getPreferences, setPreferences as savePreferences } from '../../services/settingsService.js';
 
@@ -96,6 +97,7 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { language, setLanguage } = useLanguage();
+  const { soundEnabled, setSoundEnabled, dndSchedule, setDndSchedule } = useNotificationSettings();
   const bn = language === 'বাংলা';
 
   const goToProfile = () => {
@@ -229,6 +231,23 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
 
           {/* (c) Notifications */}
           <Card icon={Bell} title={bn ? 'নোটিফিকেশন' : 'Notifications'} subtitle={bn ? 'পুশ, ইমেইল, SMS' : 'Push, email, SMS'}>
+            <Row label={bn ? 'সাউন্ড' : 'Sound'} sublabel={bn ? 'নোটিফিকেশন সাউন্ড' : 'Play notification sounds'} right={<Toggle checked={soundEnabled} onChange={(v) => setSoundEnabled(v)} />} />
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-3 border-b border-gray-50 last:border-b-0">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-black text-gray-900 truncate">{bn ? 'ডু নট ডিস্টার্ব (DND)' : 'Do Not Disturb (DND)'}</p>
+                <p className="text-[11px] font-bold text-gray-400 truncate">{bn ? 'নোটিফিকেশন সাউন্ড বন্ধ রাখুন' : 'Suppress toast and chimes'}</p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <Toggle checked={dndSchedule.enabled} onChange={(v) => setDndSchedule(s => ({ ...s, enabled: v }))} />
+                {dndSchedule.enabled && (
+                  <div className="flex items-center gap-2">
+                    <input type="time" value={dndSchedule.from} onChange={(e) => setDndSchedule(s => ({ ...s, from: e.target.value }))} className="text-xs px-2 py-1 border rounded-md" />
+                    <span className="text-xs font-bold text-gray-400">to</span>
+                    <input type="time" value={dndSchedule.until} onChange={(e) => setDndSchedule(s => ({ ...s, until: e.target.value }))} className="text-xs px-2 py-1 border rounded-md" />
+                  </div>
+                )}
+              </div>
+            </div>
             <Row label={bn ? 'পুশ নোটিফিকেশন' : 'Push notifications'} right={<Toggle checked={settings.notif.pushEnabled} onChange={(v) => upd('notif', { pushEnabled: v })} />} />
             <Row label={bn ? 'ইমেইল নোটিফিকেশন' : 'Email notifications'} sublabel={bn ? 'নতুন প্রপার্টি, পেমেন্ট, ইনকোয়ারি উত্তর' : 'New properties, payments, inquiry replies'} right={<Toggle checked={settings.notif.emailEnabled} onChange={(v) => upd('notif', { emailEnabled: v })} />} />
             <Row label={bn ? 'SMS নোটিফিকেশন' : 'SMS notifications'} right={<Toggle checked={settings.notif.smsEnabled} onChange={(v) => upd('notif', { smsEnabled: v })} />} />

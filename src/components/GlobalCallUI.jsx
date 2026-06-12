@@ -17,6 +17,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, UserPlus } from 'lucide-react';
+import { toast } from 'sonner';
 import callProvider from '../services/callProvider';
 import { getCurrentToken } from '../services/authService';
 
@@ -211,7 +212,21 @@ const GlobalCallUI = () => {
       if (status === 'accepted') {
         setCallState((prev) => prev ? { ...prev, status: 'accepted', roomId: data?.roomId || prev.roomId } : null);
       } else if (status === 'ended' || status === 'rejected' || status === 'missed') {
-        setCallState(null);
+        setCallState((prev) => {
+          if (status === 'missed' && prev?.direction === 'incoming') {
+            toast.error(`Missed call from ${prev.peerName || 'Unknown'}`, {
+              action: {
+                label: 'Call Back',
+                onClick: () => {
+                  toast.dismiss();
+                  navigate('/messages', { state: { userId: prev.callerId, action: 'call' } });
+                }
+              },
+              duration: 10000,
+            });
+          }
+          return null;
+        });
         setMuted(false);
         setVideoOff(false);
       }

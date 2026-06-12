@@ -23,6 +23,7 @@
  */
 
 import { readJson, writeJson, removeKey, broadcast } from './_storage.js';
+import { unsubscribeFromPushNotifications } from '../utils/pushSubscription.js';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL
   ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/auth`
@@ -134,6 +135,7 @@ export const resetPassword = ({ resetToken, password }) =>
 export const fetchMe = () => api('/me', { method: 'GET', auth: true }).then((d) => d.user);
 
 export const logout = async () => {
+  try { await unsubscribeFromPushNotifications(); } catch { /* ignore */ }
   try { await api('/logout', { auth: true }); } catch { /* ignore */ }
   purgeTenantProfileCaches();
   clearSession();

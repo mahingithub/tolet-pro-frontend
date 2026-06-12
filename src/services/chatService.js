@@ -127,6 +127,13 @@ export const markRead = async (conversationId) => {
   return call(`/conversations/${conversationId}/read`, { method: 'POST' });
 };
 
+export const getMissedMessagesCount = async (since) => {
+  if (!since) return 0;
+  const qs = `?since=${encodeURIComponent(since)}`;
+  const data = await call(`/conversations/messages/missed${qs}`);
+  return data.count || 0;
+};
+
 export default {
   listConversations,
   openConversation,
@@ -134,4 +141,5 @@ export default {
   sendMessage,
   sendMediaMessage,
   markRead,
+  getMissedMessagesCount,
 };

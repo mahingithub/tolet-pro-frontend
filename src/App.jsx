@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { LanguageProvider } from "./context/LanguageContext";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
+import { NotificationProvider } from "./context/NotificationContext.jsx";
 import callProvider from "./services/callProvider";
 import { getCurrentToken } from "./services/authService";
 import fcmService from "./services/fcmService";
@@ -19,6 +20,7 @@ import ChatSystem from "./components/ChatSystem";
 import TenantDashboard from "./components/TenantDashboard";
 import GlobalAIAssistant from "./components/GlobalAIAssistant";
 import WelcomeRobotOverlay from "./components/WelcomeRobotOverlay";
+import GlobalToaster from "./components/GlobalToaster";
 import SmartAlertsPage from "./components/Smartalertspage";
 import AIInsightsPage from "./components/Aiinsightspage";
 import LandlordProfile from "./components/LandlordProfile";
@@ -205,6 +207,7 @@ const AppLayout = () => {
 
 			<GlobalCallUI />
 			<WelcomeRobotOverlay />
+			<GlobalToaster />
 			{!shouldHideAIAssistant && <GlobalAIAssistant />}
 			<MobileBottomNav hideOnRoutes={['/login', '/admin', '/list-property', '/properties/']} />
 			<InstallPrompt />
@@ -217,9 +220,11 @@ function App() {
 	return (
 		<AuthProvider>
 			<LanguageProvider>
-				<Router>
-					<AppLayout />
-				</Router>
+				<NotificationProvider>
+					<Router>
+						<AppLayout />
+					</Router>
+				</NotificationProvider>
 			</LanguageProvider>
 		</AuthProvider>
 	);

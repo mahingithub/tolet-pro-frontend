@@ -399,7 +399,7 @@ const ChatSystem = () => {
   // Local UI toggles for media controls (kept in sync with callProvider).
   const [videoOff, setVideoOff] = useState(false);
   // Transient toast shown after a call ends ("Call ended", "Declined", …).
-  const [callEndToast, setCallEndToast] = useState(null);
+  // Removed callEndToast state as GlobalCallUI manages toasts now.
 
   // Local message store keyed by chatId. For the AI bot this is the only
   // store. For backend conversations it's a cache populated by the poll.
@@ -431,20 +431,9 @@ const ChatSystem = () => {
       if (status === 'ended' || status === 'rejected' || status === 'missed') {
         setIsCalling(false);
         setCallState(null);
-        // Surface a terminal-state toast (merged from the old second handler;
         // callProvider only keeps ONE state callback, so a second
         // onCallStateChange registration was silently overwriting this one —
         // which left calls stuck on 'ringing' and video never mounting).
-        let msg = null;
-        if (status === 'ended')         msg = 'Call ended';
-        else if (status === 'rejected') msg = 'Call declined';
-        else if (status === 'missed')   msg = 'No answer';
-        if (msg) {
-          setCallEndToast({ msg, ts: Date.now() });
-          setTimeout(() => {
-            setCallEndToast((cur) => (cur && Date.now() - cur.ts >= 2800) ? null : cur);
-          }, 3000);
-        }
       } else if (status === 'accepted') {
         setCallState((prev) => prev ? { ...prev, status: 'accepted' } : null);
       }
@@ -460,6 +449,85 @@ const ChatSystem = () => {
       offCallStateChange?.();
     };
   }, []);
+
+  // ─── Socket Event Handlers for Status & Typing ──────────────────────────────
+  useEffect(() => {
+    const socket = callProvider.getSocket();
+    if (!socket) return;
+    
+    const onDelivered = ({ messageId }) => {
+      setMessages(prev => {
+        const next = { ...prev };
+        for (const chatId in next) {
+          next[chatId] = next[chatId].map(m => m.id === messageId ? { ...m, status: 'delivered' } : m);
+        }
+        return next;
+      });
+    };
+
+    const onSeen = ({ messageIds }) => {
+      if (!messageIds || !messageIds.length) return;
+      setMessages(prev => {
+        const next = { ...prev };
+        for (const chatId in next) {
+          next[chatId] = next[chatId].map(m => messageIds.includes(m.id) ? { ...m, status: 'read' } : m);
+        }
+        return next;
+      });
+    };
+
+    const onTyping = ({ senderId }) => {
+      if (activeChatId !== 'ai-bot') {
+        const chat = chats.find(c => String(c.peerUserId) === String(senderId));
+        if (chat && chat.id === activeChatId) {
+          setIsBotTyping(true);
+        }
+      }
+    };
+
+    const onStopTyping = ({ senderId }) => {
+      if (activeChatId !== 'ai-bot') {
+        const chat = chats.find(c => String(c.peerUserId) === String(senderId));
+        if (chat && chat.id === activeChatId) {
+          setIsBotTyping(false);
+        }
+      }
+    };
+
+    socket.on('MESSAGE_DELIVERED', onDelivered);
+    socket.on('MESSAGE_SEEN', onSeen);
+    socket.on('USER_TYPING', onTyping);
+    socket.on('USER_STOPPED_TYPING', onStopTyping);
+
+    return () => {
+      socket.off('MESSAGE_DELIVERED', onDelivered);
+      socket.off('MESSAGE_SEEN', onSeen);
+      socket.off('USER_TYPING', onTyping);
+      socket.off('USER_STOPPED_TYPING', onStopTyping);
+    };
+  }, [activeChatId, chats]);
+
+  // Emit MARK_SEEN for unseen incoming messages
+  useEffect(() => {
+    if (!activeChatId || activeChatId === 'ai-bot') return;
+    const chat = chats.find(c => c.id === activeChatId);
+    if (!chat || !chat.peerUserId) return;
+
+    const msgs = messages[activeChatId] || [];
+    const unseenIds = msgs.filter(m => m.sender === 'them' && m.status !== 'read').map(m => m.id);
+
+    if (unseenIds.length > 0) {
+      const socket = callProvider.getSocket();
+      if (socket) {
+        socket.emit('MARK_SEEN', { messageIds: unseenIds, senderId: chat.peerUserId });
+      }
+      // Optimistically mark local as read
+      setMessages(prev => ({
+        ...prev,
+        [activeChatId]: prev[activeChatId].map(m => unseenIds.includes(m.id) ? { ...m, status: 'read' } : m)
+      }));
+    }
+  }, [messages, activeChatId, chats]);
 
   // ─── Backend conversation hydration ────────────────────────────────────
   // Load the user's real conversations on mount, then re-poll every 15 s.
@@ -1171,11 +1239,37 @@ const ChatSystem = () => {
     setInputText('');
     setShowEmojiPicker(false);
     sendMessageTo(activeChatId, text);
+    
+    // Stop typing immediately when sent
+    const chat = chats.find(c => c.id === activeChatId);
+    if (chat && chat.peerUserId) {
+      const socket = callProvider.getSocket();
+      if (socket) socket.emit('TYPING_STOP', { receiverId: chat.peerUserId });
+    }
   };
 
   const insertEmoji = (e) => {
-    setInputText(prev => prev + e);
+    handleTyping(inputText + e);
     setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const typingTimeoutRef = useRef(null);
+
+  const handleTyping = (text) => {
+    setInputText(text);
+    if (activeChatId === 'ai-bot') return;
+    const chat = chats.find(c => c.id === activeChatId);
+    if (!chat || !chat.peerUserId) return;
+
+    const socket = callProvider.getSocket();
+    if (!socket) return;
+
+    socket.emit('TYPING_START', { receiverId: chat.peerUserId });
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      socket.emit('TYPING_STOP', { receiverId: chat.peerUserId });
+    }, 2000);
   };
 
   // ── Chat media handlers ────────────────────────────────────────────────────
@@ -2036,7 +2130,7 @@ const ChatSystem = () => {
               );
             })}
 
-            {isBotTyping && activeChat.isAI && <TypingDots name="AI"/>}
+            {isBotTyping && <TypingDots name={activeChat.isAI ? "AI" : activeChat.name?.split(' ')[0]} />}
             <div ref={scrollRef} />
           </div>
 
@@ -2127,10 +2221,17 @@ const ChatSystem = () => {
                   rows="1"
                   value={inputText}
                   onChange={(e) => {
-                    setInputText(e.target.value);
+                    handleTyping(e.target.value);
                     const el = e.target;
                     el.style.height = 'auto';
                     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+                  }}
+                  onBlur={() => {
+                    const chat = chats.find(c => c.id === activeChatId);
+                    if (chat && chat.peerUserId) {
+                      const socket = callProvider.getSocket();
+                      if (socket) socket.emit('TYPING_STOP', { receiverId: chat.peerUserId });
+                    }
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -2464,20 +2565,6 @@ const ChatSystem = () => {
         )}
       </AnimatePresence>
 
-      {/* CALL END TOAST — bottom-center, auto-dismisses after ~3s */}
-      <AnimatePresence>
-        {callEndToast && (
-          <motion.div
-            initial={{ y: 30, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 30, opacity: 0 }}
-            className="fixed bottom-24 sm:bottom-10 left-1/2 -translate-x-1/2 z-[150] bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-white/10 flex items-center gap-3 pointer-events-none"
-          >
-            <PhoneOff size={16} className="text-red-400"/>
-            <span className="text-[12px] font-black tracking-wide">{callEndToast.msg}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Phase Call-4: call detail modal (tap a row in the Calls tab) */}
       {selectedCall && (
