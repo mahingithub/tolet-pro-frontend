@@ -159,11 +159,32 @@ self.addEventListener('push', function(event) {
   }
 
   const title = data.title || 'New message';
-  const options = {
+  let options = {
     body: data.body || 'You have a new message.',
     icon: '/icons/icon-192.png',
-    data: data.data || { url: '/' }
+    badge: '/icons/icon-192.png',
+    data: data // Pass all data
   };
+
+  if (data.kind === 'incoming_call') {
+    options = {
+      ...options,
+      tag: `incoming-call-${data.callId}`,
+      requireInteraction: true,
+      renotify: true,
+      vibrate: [250, 100, 250, 100, 250],
+      actions: [
+        { action: 'accept', title: '✅ রিসিভ করুন' },
+        { action: 'decline', title: '❌ কাটুন' }
+      ]
+    };
+  } else if (data.kind === 'missed_call') {
+    options = {
+      ...options,
+      tag: `missed-call-${data.callId}`,
+      renotify: true,
+    };
+  }
 
   event.waitUntil(
     self.registration.showNotification(title, options)
@@ -172,13 +193,58 @@ self.addEventListener('push', function(event) {
 
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
-  const urlToOpen = event.notification.data?.url || '/';
+  const data = event.notification.data || {};
+  
+  // If it's an incoming call and user clicked decline
+  if (data.kind === 'incoming_call' && event.action === 'decline') {
+    event.waitUntil(
+      fetch(`${data.apiBaseUrl || '/api'}/calls/push-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'decline',
+          token: data.callActionToken,
+          callId: data.callId
+        })
+      }).catch((err) => console.error('Failed to decline via push:', err))
+    );
+    return;
+  }
+
+  // Otherwise, determine the URL to open
+  let urlToOpen = '/';
+  if (data.kind === 'incoming_call') {
+    const action = event.action === 'accept' ? 'accept' : 'open';
+    const params = new URLSearchParams({
+      incomingCall: '1',
+      callAction: action,
+      callId: data.callId || '',
+      callerId: data.callerId || '',
+      callerName: data.callerName || '',
+      callerAvatar: data.callerAvatar || '',
+      type: data.type || 'voice',
+      roomId: data.roomId || ''
+    });
+    urlToOpen = `/messages?${params.toString()}`;
+  } else if (data.kind === 'missed_call') {
+    urlToOpen = `/messages?userId=${data.callerId || ''}`;
+  } else if (data.url) {
+    urlToOpen = data.url;
+  }
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
       for (let i = 0; i < windowClients.length; i++) {
         let client = windowClients[i];
         if (client.url.includes(urlToOpen) && 'focus' in client) {
+          // Send message to active client if it's an incoming call
+          if (data.kind === 'incoming_call') {
+            client.postMessage({
+              type: 'TOLET_INCOMING_CALL_NOTIFICATION_CLICK',
+              action: event.action === 'accept' ? 'accept' : 'open',
+              call: data
+            });
+          }
           return client.focus();
         }
       }

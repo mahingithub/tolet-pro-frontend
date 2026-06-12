@@ -173,7 +173,8 @@ function connect(token) {
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
-    reconnectionDelayMax: 8000,
+    reconnectionDelayMax: 10000,
+    forceNew: false,
     // Wait long enough for a cold/sleeping server to answer the first handshake.
     timeout: 60000,
   });
@@ -194,7 +195,10 @@ function connect(token) {
   });
 
   _socket.on('disconnect', (reason) => {
-    console.log('[callProvider] socket disconnected:', reason);
+    console.warn('[callProvider] socket disconnected:', reason);
+    if (reason === 'io server disconnect') {
+      _socket.connect(); // manual reconnect if server forced disconnect
+    }
   });
 
   // ── Incoming call ─────────────────────────────────────────────────────
@@ -537,6 +541,10 @@ async function _zegoLoginAndPublish() {
   const creds = await _fetchZegoToken(roomId);
   _zegoUserId = creds.userId;
 
+  try {
+    await engine.logoutRoom();
+  } catch (e) {}
+
   await engine.loginRoom(
     roomId,
     creds.token,
@@ -564,6 +572,7 @@ function _zegoLeave() {
   try { if (_zegoRemoteStreamId) engine.stopPlayingStream(_zegoRemoteStreamId); } catch (_) {}
   try { if (_localStream && engine.destroyStream) engine.destroyStream(_localStream); } catch (_) {}
   try { if (_currentRoomId && _zegoInRoom) engine.logoutRoom(_currentRoomId); } catch (_) {}
+  try { if (engine.destroyEngine) engine.destroyEngine(); } catch (_) {}
   _zegoInRoom = false;
   _zegoLocalStreamId = null;
   _zegoRemoteStreamId = null;
@@ -842,5 +851,12 @@ const callProvider = {
   PROVIDERS,
   ACTIVE_PROVIDER,
 };
+
+window.addEventListener('beforeunload', () => {
+  if (_isZego() && _zegoEngine) {
+    try { _zegoEngine.logoutRoom(); } catch (e) {}
+    try { if (_zegoEngine.destroyEngine) _zegoEngine.destroyEngine(); } catch (e) {}
+  }
+});
 
 export default callProvider;
