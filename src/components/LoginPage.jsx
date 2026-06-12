@@ -208,8 +208,16 @@ const LoginPage = () => {
       const credential = await confirmationResultRef.current.confirm(code);
       const idToken = await credential.user.getIdToken();
       await signupVerify({ idToken });
-      if (refresh) await refresh();
-      window.dispatchEvent(new Event('triggerWelcomeRobot'));
+      const newUser = refresh ? await refresh() : null;
+      window.dispatchEvent(
+        new CustomEvent('triggerWelcomeRobot', {
+          detail: {
+            role: newUser?.role || role,
+            name: newUser?.name || formData.name,
+            type: 'signup',
+          },
+        }),
+      );
       goToNextOrDashboard(role);
     } catch (err) {
       setErrorMsg(err.code?.startsWith?.('auth/') ? firebaseErrToMsg(err) : (err.message || 'অ্যাকাউন্ট তৈরি করা যায়নি।'));
