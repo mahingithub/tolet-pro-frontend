@@ -1407,8 +1407,10 @@ const PropertyDetails = () => {
     })();
     return () => { cancelled = true; };
   }, [id]);
+  }, [id]);
 
   const isUnavailable = property?.status === 'rented' || property?.status === 'sold';
+  const isOwnProperty = auth?.user && (String(auth.user.id || auth.user._id) === String(landlord?.id || property?.landlordId || property?.ownerUserId));
   const priceLabel = INTENT_CONFIG[property?.intent]?.priceLabel || '/mo';
   const galleryImages = useMemo(() => buildGallery(property), [property]);
 
@@ -2145,30 +2147,38 @@ const PropertyDetails = () => {
                 </div>
 
                 {/* CTA buttons */}
-                <button disabled={isUnavailable} onClick={() => !isUnavailable && requireAuthFor(() => setShowInquiry(true))}
-                  className={`cyber-btn w-full text-white py-4 rounded-2xl font-black flex items-center justify-center gap-2 mb-3 transition-all active:scale-95 ${isUnavailable ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  style={{ background: 'linear-gradient(135deg, #ba0036 0%, #7c0026 100%)', boxShadow: isUnavailable ? 'none' : '0 8px 22px rgba(186,0,54,0.22)' }}>
-                  <MessageCircle size={18} /> {isUnavailable ? lt('notAvailable') : lt('sendInquiry')}
-                </button>
+                {isOwnProperty ? (
+                  <div className="bg-blue-50 text-blue-700 font-bold text-center py-4 rounded-2xl mb-5 text-sm border border-blue-100">
+                    {language === 'বাংলা' ? 'এটি আপনার নিজের সম্পত্তি' : 'This is your own property'}
+                  </div>
+                ) : (
+                  <>
+                    <button disabled={isUnavailable} onClick={() => !isUnavailable && requireAuthFor(() => setShowInquiry(true))}
+                      className={`cyber-btn w-full text-white py-4 rounded-2xl font-black flex items-center justify-center gap-2 mb-3 transition-all active:scale-95 ${isUnavailable ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      style={{ background: 'linear-gradient(135deg, #ba0036 0%, #7c0026 100%)', boxShadow: isUnavailable ? 'none' : '0 8px 22px rgba(186,0,54,0.22)' }}>
+                      <MessageCircle size={18} /> {isUnavailable ? lt('notAvailable') : lt('sendInquiry')}
+                    </button>
 
-                <div className="flex gap-3 mb-5">
-                  <button 
-                    disabled={isUnavailable || loadingLandlord || (!loadingLandlord && !landlord?.phoneNumber)} 
-                    title={!loadingLandlord && !landlord?.phoneNumber ? "Information not available" : ""}
-                    onClick={() => !isUnavailable && requireAuthFor(() => setActiveModal('call'))}
-                    className={`flex-1 py-3 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all ${(isUnavailable || loadingLandlord || (!loadingLandlord && !landlord?.phoneNumber)) ? 'opacity-40 cursor-not-allowed text-slate-400' : 'text-emerald-700'}`}
-                    style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.08)' }}>
-                    {loadingLandlord ? <Loader2 size={14} className="animate-spin" /> : <Phone size={14} />} {lt('call')}
-                  </button>
-                  <button 
-                    disabled={isUnavailable || loadingLandlord || (!loadingLandlord && !landlord?.id)} 
-                    title={!loadingLandlord && !landlord?.id ? "Information not available" : ""}
-                    onClick={() => !isUnavailable && requireAuthFor(() => setActiveModal('message'))}
-                    className={`flex-1 py-3 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all ${(isUnavailable || loadingLandlord || (!loadingLandlord && !landlord?.id)) ? 'opacity-40 cursor-not-allowed text-slate-400' : 'text-blue-700'}`}
-                    style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.08)' }}>
-                    {loadingLandlord ? <Loader2 size={14} className="animate-spin" /> : <MessageSquare size={14} />} {lt('message')}
-                  </button>
-                </div>
+                    <div className="flex gap-3 mb-5">
+                      <button 
+                        disabled={isUnavailable || loadingLandlord || (!loadingLandlord && !landlord?.phoneNumber)} 
+                        title={!loadingLandlord && !landlord?.phoneNumber ? "Information not available" : ""}
+                        onClick={() => !isUnavailable && requireAuthFor(() => setActiveModal('call'))}
+                        className={`flex-1 py-3 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all ${(isUnavailable || loadingLandlord || (!loadingLandlord && !landlord?.phoneNumber)) ? 'opacity-40 cursor-not-allowed text-slate-400' : 'text-emerald-700'}`}
+                        style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.08)' }}>
+                        {loadingLandlord ? <Loader2 size={14} className="animate-spin" /> : <Phone size={14} />} {lt('call')}
+                      </button>
+                      <button 
+                        disabled={isUnavailable || loadingLandlord || (!loadingLandlord && !landlord?.id)} 
+                        title={!loadingLandlord && !landlord?.id ? "Information not available" : ""}
+                        onClick={() => !isUnavailable && requireAuthFor(() => setActiveModal('message'))}
+                        className={`flex-1 py-3 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all ${(isUnavailable || loadingLandlord || (!loadingLandlord && !landlord?.id)) ? 'opacity-40 cursor-not-allowed text-slate-400' : 'text-blue-700'}`}
+                        style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.08)' }}>
+                        {loadingLandlord ? <Loader2 size={14} className="animate-spin" /> : <MessageSquare size={14} />} {lt('message')}
+                      </button>
+                    </div>
+                  </>
+                )}
 
                 {/* How it works */}
                 <div className="rounded-2xl p-4" style={{ background: '#fafbfc', border: '1px solid rgba(15,23,42,0.05)' }}>

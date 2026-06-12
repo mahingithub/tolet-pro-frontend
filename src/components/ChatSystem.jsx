@@ -1172,6 +1172,12 @@ const ChatSystem = () => {
     if (s.peerUserId) {
       (async () => {
         try {
+          const me = getCurrentUser();
+          const myId = String(me?.id || me?._id || '');
+          if (String(s.peerUserId) === myId) {
+            toast.error('নিজের সাথে চ্যাট বা কল করা যায় না।');
+            return;
+          }
           const convo = await chatService.openConversation({
             peerUserId: s.peerUserId,
             propertyId: s.propertyId,
