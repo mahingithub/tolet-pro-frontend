@@ -2,6 +2,7 @@ import React from 'react';
 import { Bell, MessageCircle, Inbox, CheckCheck, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationContext } from '../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
 
 const typeIcon = (t) => {
   if (t === 'message_new')     return <MessageCircle size={14} className="text-blue-500" />;
@@ -28,6 +29,8 @@ const formatTime = (iso) => {
 export default function NotificationPanel({ onClose }) {
   const navigate = useNavigate();
   const { items, unreadCount, loading, markAsRead, markAllRead } = useNotificationContext();
+  const { user } = useAuth();
+  const isLandlord = user?.role === 'landlord' || user?.role === 'host';
 
   const handleRowClick = async (n) => {
     try {
@@ -64,13 +67,13 @@ export default function NotificationPanel({ onClose }) {
           break;
           
         case 'inquiry_status':
-          navigate('/tenant-dashboard?tab=inquiries', { 
+          navigate('/tenant-dashboard?tab=applications', { 
             state: { highlightId: targetId || n?.data?.inquiryId, autoOpen: true, scrollTo: true } 
           });
           break;
 
         case 'booking':
-          navigate('/tenant-dashboard?tab=bookings', { 
+          navigate(isLandlord ? '/host-dashboard?tab=bookings' : '/tenant-dashboard?tab=payments', { 
             state: { highlightId: targetId, autoOpen: true, scrollTo: true } 
           });
           break;
@@ -80,7 +83,7 @@ export default function NotificationPanel({ onClose }) {
         case 'rent_receipt':
         case 'rent_invoice':
         case 'rent_overdue':
-          navigate('/tenant-dashboard?tab=payments', { 
+          navigate(isLandlord ? '/host-dashboard?tab=rent' : '/tenant-dashboard?tab=payments', { 
             state: { highlightId: targetId, autoOpen: true, scrollTo: true } 
           });
           break;

@@ -1180,6 +1180,10 @@ const HostDashboard = () => {
         if (location.state.autoOpen) {
           const inq = inquiries.find(i => String(i.id) === String(id));
           if (inq) openModal('update_inquiry', inq);
+          
+          if (el && (el.id.startsWith('rent-') || el.id.startsWith('booking-'))) {
+            setExpandedRentId(id);
+          }
         }
       }, 500); // Wait for tab to switch and render
     }
