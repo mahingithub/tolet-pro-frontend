@@ -224,6 +224,12 @@ const GlobalCallUI = () => {
               },
               duration: 10000,
             });
+          } else if (status === 'rejected') {
+            toast.error(prev?.direction === 'outgoing' ? 'Call Rejected/Busy' : 'Call Declined');
+          } else if (status === 'ended' && prev?.status !== 'accepted') {
+            toast.error('Call Cancelled');
+          } else if (status === 'ended' && prev?.status === 'accepted') {
+            toast.success('Call Ended');
           }
           return null;
         });
