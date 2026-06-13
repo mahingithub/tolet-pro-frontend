@@ -522,7 +522,7 @@ const HeroSection = () => {
           <div className="hidden md:flex flex-col items-center w-full relative z-[100]">
             <div className="bg-white/85 backdrop-blur-[24px] backdrop-saturate-[180%] p-3 md:p-4 rounded-[2rem] shadow-[0_22px_60px_rgba(15,23,42,0.20),0_0_0_3px_rgba(255,255,255,0.6)] w-full transition-all hover:bg-white/95">
               
-              <div className="flex justify-center md:justify-start mb-3 ml-2">
+              <div className="flex justify-center mb-3">
                 <div className="flex bg-slate-100/60 p-1 rounded-full border border-slate-200/50 shadow-inner">
                   {[{ id: 'rent', label: t?.tabRent || 'RENT' }, { id: 'buy', label: t?.tabBuy || 'BUY' }, { id: 'commercial', label: t?.tabCommercial || 'COMMERCIAL' }].map(tab => (
                     <button

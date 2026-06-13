@@ -465,8 +465,6 @@ useEffect(() => {
             </span>
           </a>
 
-          <ModeSwitcher className="hidden md:flex" />
-
           <div className={`hidden md:flex flex-1 justify-center transition-all duration-300 ${(isScrolled || compactHeader) ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-2 pointer-events-none absolute'}`}>
             <div className="w-full max-w-[580px] flex items-center bg-gradient-to-br from-white via-slate-50/80 to-white backdrop-blur-xl backdrop-saturate-[180%] border border-slate-200/80 rounded-full shadow-[inset_0_1.5px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(15,23,42,0.04),0_10px_28px_rgba(15,23,42,0.10)] hover:shadow-[inset_0_1.5px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(15,23,42,0.04),0_14px_36px_rgba(186,0,54,0.18)] hover:border-[#ba0036]/40 transition-all duration-200 overflow-visible">
 
