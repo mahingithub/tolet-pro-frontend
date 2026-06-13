@@ -625,7 +625,7 @@ function cleanup() {
  * @param {string} opts.callerAvatar — Avatar URL shown to receiver.
  * @returns {Promise<Object>} The created Call document.
  */
-async function initiateCall({ receiverId, type, callerName, callerAvatar }) {
+async function initiateCall({ receiverId, type, callerName, callerAvatar, receiverName, receiverAvatar }) {
   const token = window.localStorage.getItem('auth:token');
   const baseUrl = import.meta.env.VITE_API_BASE_URL
     ? import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')
@@ -656,6 +656,8 @@ async function initiateCall({ receiverId, type, callerName, callerAvatar }) {
     receiverId,
     type,
     roomId: call.roomId,
+    receiverName,
+    receiverAvatar,
   });
 
   // 2. Acquire local media stream.

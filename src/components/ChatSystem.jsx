@@ -732,6 +732,8 @@ const ChatSystem = () => {
         type,
         callerName: me?.name || 'User',
         callerAvatar: me?.profilePicture || me?.avatar || null,
+        receiverName: peerName || 'Unknown',
+        receiverAvatar: peerAvatar || null,
       });
     } catch (e) {
              console.error('[CALL FAIL] WebRTC initiateCall failed:', e);

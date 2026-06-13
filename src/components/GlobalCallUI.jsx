@@ -201,8 +201,8 @@ const GlobalCallUI = () => {
         status: 'ringing',
         direction: 'outgoing',
         callId:      data.callId,
-        peerName:    prev?.peerName  || 'Unknown',
-        peerAvatar:  prev?.peerAvatar || null,
+        peerName:    data.receiverName || prev?.peerName || 'Unknown',
+        peerAvatar:  data.receiverAvatar || prev?.peerAvatar || null,
         type:        data.type || 'voice',
         roomId:      data.roomId,
       }));
