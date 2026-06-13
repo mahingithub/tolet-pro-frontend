@@ -113,14 +113,7 @@ const HeroSection = () => {
   const langKey      = language === 'বাংলা' ? 'bn' : 'en';
   const navigate     = useNavigate();
 
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const bgImages = [
-    "https://besacenter.org/wp-content/uploads/2024/09/%D7%9C%D7%95%D7%A8%D7%9F-%D7%93%D7%92%D7%9F-%D7%91%D7%A0%D7%92%D7%9C%D7%93%D7%A9-scaled.jpg", 
-  ];
-  useEffect(() => {
-    const iv = setInterval(() => setCurrentImageIndex(i => (i + 1) % bgImages.length), 5000);
-    return () => clearInterval(iv);
-  }, []);
+  const HERO_YOUTUBE_ID = 'PpeE86P9TnA';
 
   // Listing mode is now GLOBAL — shared with the navbar ModeSwitcher and
   // persisted across reloads (usePropertyStore.activeMode). The hero
@@ -359,13 +352,14 @@ const HeroSection = () => {
         {/* ═══════════════════════════════════════════════════════════════ */}
         <section className="w-full max-w-[1400px] mx-auto px-4 md:px-6 pt-4">
           <div className="relative w-full h-[240px] md:h-[300px] lg:h-[380px] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-sm flex flex-col justify-center items-center text-center">
-            {bgImages.map((img, index) => (
-              <div
-                key={index}
-                className={`absolute inset-0 w-full h-full bg-cover bg-center transition-opacity duration-1000 ease-in-out ${index === currentImageIndex ? 'opacity-100 scale-105' : 'opacity-0 scale-100'}`}
-                style={{ backgroundImage: `url(${img})` }}
-              />
-            ))}
+            <iframe
+              src={`https://www.youtube.com/embed/${HERO_YOUTUBE_ID}?autoplay=1&mute=1&loop=1&playlist=${HERO_YOUTUBE_ID}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1`}
+              title="YouTube background"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="absolute inset-0 w-full h-full pointer-events-none scale-[1.35] md:scale-[1.15]"
+            ></iframe>
             <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />
             <div className="relative z-20 px-4 -mt-8 md:-mt-12">
               <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1] mb-3 drop-shadow-2xl">

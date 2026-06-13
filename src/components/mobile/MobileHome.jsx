@@ -58,7 +58,7 @@ import { propertyService, subscribeUserProperties, propertyLocationHaystack } fr
  */
 
 // Marketing banner — drop your campaign poster URL here.
-const BANNER_VIDEO = 'https://youtu.be/PpeE86P9TnA?si=EmNtcV7n2lZPyvLX';
+const HERO_YOUTUBE_ID = 'PpeE86P9TnA';
 
 const SEARCH_TYPES = [
   { id: 'rent',       labelKey: 'tabRent' },
@@ -1118,14 +1118,14 @@ const MobileHome = () => {
       {/* ───────── MARKETING BANNER ───────── */}
       <div className="px-4 pt-3">
         <div className="relative overflow-hidden rounded-3xl aspect-[16/10] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.25)]">
-          <video
-            src={BANNER_VIDEO}
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover"
-          />
+          <iframe
+            src={`https://www.youtube.com/embed/${HERO_YOUTUBE_ID}?autoplay=1&mute=1&loop=1&playlist=${HERO_YOUTUBE_ID}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1`}
+            title="YouTube background"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="absolute inset-0 w-full h-full pointer-events-none scale-[1.35]"
+          ></iframe>
           <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/30 to-black/55" />
           
         </div>
