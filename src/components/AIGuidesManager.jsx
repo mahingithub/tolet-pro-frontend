@@ -5,19 +5,26 @@ import LoadingState from './common/LoadingState';
 
 const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
 
+// একটা ফাঁকা গাইডের ডিফল্ট শেপ — নতুন placement/audience সহ। তিন জায়গায়
+// (init + দুই reset) একই অবজেক্ট ব্যবহার করায় ভবিষ্যতে ফিল্ড যোগ করলে
+// আর কোথাও মিস হবে না।
+const EMPTY_GUIDE = {
+	title: '',
+	suggestionText: '',
+	videoUrl: '',
+	isActive: true,
+	order: 0,
+	placement: 'assistant',
+	audience: 'all',
+};
+
 const AIGuidesManager = () => {
 	const [guides, setGuides] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
 
 	const [isEditing, setIsEditing] = useState(false);
-	const [currentGuide, setCurrentGuide] = useState({
-		title: '',
-		suggestionText: '',
-		videoUrl: '',
-		isActive: true,
-		order: 0,
-	});
+	const [currentGuide, setCurrentGuide] = useState(EMPTY_GUIDE);
 
 	useEffect(() => {
 		fetchGuides();
@@ -60,7 +67,7 @@ const AIGuidesManager = () => {
 			
 			if (!response.ok) throw new Error("Failed to save");
 			setIsEditing(false);
-			setCurrentGuide({ title: '', suggestionText: '', videoUrl: '', isActive: true, order: 0 });
+			setCurrentGuide(EMPTY_GUIDE);
 			fetchGuides();
 		} catch (err) {
 			console.error("Error saving AI guide:", err);
@@ -146,6 +153,32 @@ const AIGuidesManager = () => {
 							/>
 						</div>
 						<div>
+							<label className="block text-xs font-black text-gray-700 uppercase tracking-widest mb-1.5">Placement</label>
+							<select
+								value={currentGuide.placement || 'assistant'}
+								onChange={(e) => setCurrentGuide({ ...currentGuide, placement: e.target.value })}
+								className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-medium focus:ring-2 focus:ring-[#ba0036]/20 outline-none"
+							>
+								<option value="assistant">AI Assistant (suggestion list)</option>
+								<option value="welcome">Welcome Robot (after login)</option>
+							</select>
+						</div>
+						<div>
+							<label className="block text-xs font-black text-gray-700 uppercase tracking-widest mb-1.5">Audience</label>
+							<select
+								value={currentGuide.audience || 'all'}
+								onChange={(e) => setCurrentGuide({ ...currentGuide, audience: e.target.value })}
+								className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-medium focus:ring-2 focus:ring-[#ba0036]/20 outline-none"
+							>
+								<option value="all">Everyone</option>
+								<option value="tenant">Tenant only</option>
+								<option value="landlord">Landlord only</option>
+							</select>
+							<p className="text-[10px] font-bold text-gray-400 mt-1.5 leading-snug">
+								Welcome Robot–এর জন্য Tenant ও Landlord আলাদা গাইড বানান।
+							</p>
+						</div>
+						<div>
 							<label className="block text-xs font-black text-gray-700 uppercase tracking-widest mb-1.5">Sort Order</label>
 							<input
 								type="number"
@@ -172,7 +205,7 @@ const AIGuidesManager = () => {
 							type="button"
 							onClick={() => {
 								setIsEditing(false);
-								setCurrentGuide({ title: '', suggestionText: '', videoUrl: '', isActive: true, order: 0 });
+								setCurrentGuide(EMPTY_GUIDE);
 							}}
 							className="px-4 py-2 bg-white text-gray-600 rounded-xl text-xs font-black hover:bg-gray-50 transition-colors flex items-center gap-1.5"
 						>
@@ -193,6 +226,7 @@ const AIGuidesManager = () => {
 							<tr className="border-b border-gray-100 text-[10px] font-black uppercase tracking-widest text-gray-400">
 								<th className="pb-3 pl-2">Order</th>
 								<th className="pb-3">Title & Suggestion</th>
+								<th className="pb-3">Placement</th>
 								<th className="pb-3">Video URL</th>
 								<th className="pb-3">Status</th>
 								<th className="pb-3 text-right pr-2">Actions</th>
@@ -201,7 +235,7 @@ const AIGuidesManager = () => {
 						<tbody>
 							{guides.length === 0 ? (
 								<tr>
-									<td colSpan="5" className="py-8 text-center text-sm font-bold text-gray-400">No guides created yet.</td>
+									<td colSpan="6" className="py-8 text-center text-sm font-bold text-gray-400">No guides created yet.</td>
 								</tr>
 							) : (
 								guides.map((g) => (
@@ -210,6 +244,16 @@ const AIGuidesManager = () => {
 										<td className="py-3">
 											<div className="font-bold text-gray-900 text-sm">{g.title}</div>
 											<div className="text-xs text-gray-500 mt-0.5">&quot;{g.suggestionText}&quot;</div>
+										</td>
+										<td className="py-3">
+											{g.placement === 'welcome' ? (
+												<div className="flex flex-col gap-1 w-max">
+													<span className="text-[10px] font-black text-[#ba0036] bg-[#ba0036]/10 px-2 py-0.5 rounded-full">Welcome</span>
+													<span className="text-[10px] font-bold text-gray-500 capitalize">{g.audience || 'all'}</span>
+												</div>
+											) : (
+												<span className="text-[10px] font-black text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full w-max inline-block">Assistant</span>
+											)}
 										</td>
 										<td className="py-3 max-w-[200px] truncate text-xs text-blue-600">
 											<a href={g.videoUrl} target="_blank" rel="noreferrer" className="hover:underline">{g.videoUrl}</a>
