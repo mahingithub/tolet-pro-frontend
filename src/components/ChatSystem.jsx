@@ -16,6 +16,7 @@
 //   navigate('/messages', { state: { chatId, source: 'tenant-receipt', receiptId, propertyTitle, monthKey, prefillMessage }}) → tenant CTA.
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { toast } from 'sonner';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Send, Bot, Search, MoreVertical, Paperclip, Sparkles,
@@ -355,6 +356,7 @@ const ChatSystem = () => {
   const latestMessageIso = useRef({});
 
   const [activeChatId, setActiveChatId] = useState('ai-bot');
+  const activeChat = chats.find(c => c.id === activeChatId) || initialChats[0];
   // Legacy states kept for basic overlay visibility; managed by callProvider now
   const [muted, setMuted] = useState(false);
   const [inputText, setInputText] = useState('');
@@ -406,7 +408,7 @@ const ChatSystem = () => {
       }
     });
     return () => offCallStateChange?.();
-  }, [refreshCallHistory]);
+  }, []);
 
   // ─── Socket Event Handlers for Status & Typing ──────────────────────────────
   useEffect(() => {
@@ -724,18 +726,7 @@ const ChatSystem = () => {
       return;
     }
     const me = getCurrentUser();
-    setCallType(type);
-    setVideoOff(false);
-    setMuted(false);
-    setIsCalling(true);
-    setCallState({
-      status: 'ringing',
-      direction: 'outgoing',
-      peerName: peerName || 'User',
-      peerAvatar: peerAvatar || null,
-      type,
-    });
-    try {
+                        try {
       await callProvider.initiateCall({
         receiverId: peerUserId,
         type,
@@ -743,8 +734,7 @@ const ChatSystem = () => {
         callerAvatar: me?.profilePicture || me?.avatar || null,
       });
     } catch (e) {
-      setIsCalling(false); setCallState(null);
-      console.error('[CALL FAIL] WebRTC initiateCall failed:', e);
+             console.error('[CALL FAIL] WebRTC initiateCall failed:', e);
       toast.error('Call করা সম্ভব হচ্ছে না, একটু পরে চেষ্টা করুন।');
     }
   }, []);
@@ -1022,9 +1012,7 @@ const ChatSystem = () => {
     //    activating a thread (we have no peer mapping for it).
     if (s.chatId) {
       if (s.mode === 'call') {
-        setCallType('voice');
-        setIsCalling(true);
-      }
+                      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location]);
@@ -1039,13 +1027,12 @@ const ChatSystem = () => {
     const onKey = (e) => {
       if (e.key === 'Escape') {
         if (activeReceipt) setActiveReceipt(null);
-        else if (isCalling) setIsCalling(false);
         else if (showEmojiPicker) setShowEmojiPicker(false);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeReceipt, isCalling, showEmojiPicker]);
+  }, [activeReceipt, showEmojiPicker]);
 
   const handleSendMessage = () => {
     if (!inputText.trim()) return;
@@ -1069,7 +1056,7 @@ const ChatSystem = () => {
 
   const typingTimeoutRef = useRef(null);
 
-  const handleTyping = (text) => {
+  function handleTyping(text) {
     setInputText(text);
     if (activeChatId === 'ai-bot') return;
     const chat = chats.find(c => c.id === activeChatId);
@@ -1185,7 +1172,7 @@ const ChatSystem = () => {
   };
 
   // Stop recording. If `send` is true, upload the clip; otherwise discard.
-  const stopRecording = async (send = true) => {
+  async function stopRecording(send = true) {
     const rec = mediaRecorderRef.current;
     if (!rec) return;
     const finalSecs = recordSecs;
@@ -1244,7 +1231,6 @@ const ChatSystem = () => {
     });
   }, [chats, searchQuery, messages]);
 
-  const activeChat = chats.find(c => c.id === activeChatId) || initialChats[0];
 
   // ── Info-pane actions. The optional-chained chatService calls auto-persist
   //    to the backend once those methods exist; until then they're safe
@@ -2090,10 +2076,10 @@ const ChatSystem = () => {
 
             <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 px-1 mt-5">Quick actions</h5>
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => { setCallType('voice'); setIsCalling(true); }} className="bg-white hover:bg-red-50 border border-gray-100 hover:border-[#ba0036]/20 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-700 hover:text-[#ba0036] transition-all flex items-center justify-center gap-1.5">
+              <button onClick={() => {   }} className="bg-white hover:bg-red-50 border border-gray-100 hover:border-[#ba0036]/20 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-700 hover:text-[#ba0036] transition-all flex items-center justify-center gap-1.5">
                 <Phone size={12}/> Call
               </button>
-              <button onClick={() => { setCallType('video'); setIsCalling(true); }} className="bg-white hover:bg-red-50 border border-gray-100 hover:border-[#ba0036]/20 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-700 hover:text-[#ba0036] transition-all flex items-center justify-center gap-1.5">
+              <button onClick={() => {   }} className="bg-white hover:bg-red-50 border border-gray-100 hover:border-[#ba0036]/20 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-700 hover:text-[#ba0036] transition-all flex items-center justify-center gap-1.5">
                 <Video size={12}/> Video
               </button>
               <button
