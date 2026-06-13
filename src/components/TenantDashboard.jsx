@@ -2173,7 +2173,14 @@ const handleWizardSubmit = async (payload) => {
                       {/* Actions */}
                       <div className="flex gap-2 mt-auto pt-4 border-t border-gray-100">
                         <button
-                          onClick={() => navigate(`/property/${app.id}`)}
+                          onClick={() => {
+                            const pid = app.propertyId;
+                            if (!pid) {
+                              toast.error(language === 'বাংলা' ? 'এই ইনকোয়ারির প্রপার্টি আইডি পাওয়া যায়নি' : 'Property ID not found for this inquiry');
+                              return;
+                            }
+                            navigate(`/property/${pid}`);
+                          }}
                           className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 py-2.5 rounded-xl text-xs font-bold transition-all border border-gray-200 active:scale-95"
                         >
                           {language === 'বাংলা' ? 'প্রপার্টি' : 'Property'}
