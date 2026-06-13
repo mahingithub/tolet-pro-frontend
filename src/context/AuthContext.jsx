@@ -77,7 +77,7 @@ export const AuthProvider = ({ children }) => {
     return {
       user,
       isAuthenticated: !!user,
-      isAdmin: !!user && isAdminRole(user.role),
+      isAdmin: !!user && roles.some(isAdminRole),
       // ── New: multi-role surface ──────────────────────────────────────
       roles,
       activeRole,
@@ -88,7 +88,8 @@ export const AuthProvider = ({ children }) => {
         setUser(u);
         // ওয়েলকাম রোবট শুধু tenant/landlord-এর জন্য — admin-জাতীয় role
         // (super_admin / moderator / support_agent) হলে dispatch-ই হবে না।
-        if (u && !isAdminRole(u.role)) {
+        const loggedInRoles = Array.isArray(u?.roles) && u.roles.length ? u.roles : (u?.role ? [u.role] : []);
+        if (u && !loggedInRoles.some(isAdminRole)) {
           window.dispatchEvent(
             new CustomEvent('triggerWelcomeRobot', {
               detail: { role: u.role, name: u.name, type: 'login' },
