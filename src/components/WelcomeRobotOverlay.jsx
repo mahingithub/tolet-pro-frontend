@@ -25,17 +25,12 @@ const MINI_ICON_SIZE = 56;       // মিনি রোবটের সাইজ
 const MINI_LINGER_MS = 5000;     // মিনি রোবট কতক্ষণ থেকে তারপর মিলিয়ে যাবে
 const AUTO_WAKE_MS = 6000;       // intro-তে ট্যাপ না করলে কত ms পরে নিজে খুলবে (ভয়েস ছাড়া)
 
-// ভিডিও গাইড — এখনো placeholder, admin পরে আসল লিংক বসাবে
-const VIDEO_GUIDES = {
-  tenant: {
-    url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-    title: 'কীভাবে বাসা খুঁজবেন?',
-  },
-  landlord: {
-    url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-    title: 'হোস্ট ড্যাশবোর্ড গাইড',
-  },
-};
+// API বেস — AIGuidesManager-এর মতোই, যাতে env কনফিগ এক জায়গায় মেলে।
+const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
+
+// ভিডিও এখন আর হার্ডকোড নয় — অ্যাডমিন প্যানেল (AI Video Guides → Placement
+// "Welcome") থেকে আসে, role অনুযায়ী `GET /ai-guides/welcome?audience=...`।
+// কোনো welcome ভিডিও না থাকলে রোবটের ভিডিও বাটন নিজে থেকেই hide হয়ে যাবে।
 
 const ROLE_COPY = {
   tenant: {
@@ -124,6 +119,7 @@ const WelcomeRobotOverlay = () => {
   const [eventInfo, setEventInfo] = useState(null); // { role, name, type }
   const [fly, setFly] = useState(null);             // { from:{x,y}, to:{x,y} }
   const [activeVideo, setActiveVideo] = useState({ isOpen: false, url: '', title: '' });
+  const [welcomeGuide, setWelcomeGuide] = useState(null); // অ্যাডমিন থেকে আসা ভিডিও (role-অনুযায়ী)
 
   const phaseRef = useRef(phase);
   const headRef = useRef(null);          // রোবটের মাথা — উড়ান শুরুর পজিশন মাপতে
@@ -245,8 +241,34 @@ const WelcomeRobotOverlay = () => {
   const effectiveRole = eventInfo?.role || activeRole;
   const isTenant = effectiveRole !== 'landlord';
   const copy = isTenant ? ROLE_COPY.tenant : ROLE_COPY.landlord;
-  const video = isTenant ? VIDEO_GUIDES.tenant : VIDEO_GUIDES.landlord;
   const firstName = (eventInfo?.name || user?.name || '').trim().split(/\s+/)[0] || '';
+
+  /* ── অ্যাডমিন-কনফিগার করা welcome ভিডিও fetch ──────────────
+     রোবট ট্রিগার হলে role অনুযায়ী active welcome গাইড আনি। endpoint
+     পাবলিক, তাই টোকেন লাগে না। ব্যর্থ হলে welcomeGuide = null → ভিডিও
+     বাটন এমনিতেই দেখাবে না, বাকি রোবট ঠিকঠাক চলবে। */
+  useEffect(() => {
+    if (!eventInfo) {
+      setWelcomeGuide(null);
+      return undefined;
+    }
+    const aud = (eventInfo.role || activeRole) === 'landlord' ? 'landlord' : 'tenant';
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API}/ai-guides/welcome?audience=${aud}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) {
+          setWelcomeGuide(Array.isArray(data) && data.length ? data[0] : null);
+        }
+      } catch (err) {
+        if (!cancelled) setWelcomeGuide(null);
+        console.warn('[WelcomeRobot] welcome ভিডিও আনা যায়নি:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [eventInfo, activeRole]);
 
   /* ── টাইপরাইটার (প্রশ্নের লাইনটা টাইপ হয়ে লেখা হয়) ───────── */
   useEffect(() => {
@@ -420,15 +442,21 @@ const WelcomeRobotOverlay = () => {
                           ))}
                         </div>
 
-                        <button
-                          onClick={() =>
-                            setActiveVideo({ isOpen: true, url: video.url, title: video.title })
-                          }
-                          className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-[1.2rem] bg-white/[0.07] border border-white/15 text-white font-bold text-[13px] hover:bg-white/[0.13] transition-all"
-                        >
-                          <Video size={16} />
-                          {copy.videoLabel}
-                        </button>
+                        {welcomeGuide?.videoUrl && (
+                          <button
+                            onClick={() =>
+                              setActiveVideo({
+                                isOpen: true,
+                                url: welcomeGuide.videoUrl,
+                                title: welcomeGuide.title || copy.videoLabel,
+                              })
+                            }
+                            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-[1.2rem] bg-white/[0.07] border border-white/15 text-white font-bold text-[13px] hover:bg-white/[0.13] transition-all"
+                          >
+                            <Video size={16} />
+                            {welcomeGuide.suggestionText || copy.videoLabel}
+                          </button>
+                        )}
 
                         <button
                           onClick={minimize}

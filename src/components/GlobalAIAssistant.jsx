@@ -647,6 +647,7 @@ const GlobalAIAssistant = () => {
         <button
           ref={floatingBtnRef}
           type="button"
+          data-ai-assistant="true"
           onClick={() => setIsOpen(true)}
           onTouchEnd={(e) => {
             e.preventDefault();
