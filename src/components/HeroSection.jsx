@@ -360,12 +360,12 @@ const HeroSection = () => {
               allowFullScreen
               className="absolute inset-0 w-full h-full pointer-events-none scale-[1.35] md:scale-[1.15]"
             ></iframe>
-            <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-slate-900/80" />
-            <div className="relative z-20 px-4 -mt-8 md:-mt-12">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+            <div className="relative z-20 px-4 -mt-12 md:-mt-20">
               <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1] mb-3 drop-shadow-2xl">
                 {t?.heroTitle1 || 'Find Your Next'} <br className="md:hidden" /> {t?.heroTitle2 || 'Perfect Home'}
               </h1>
-              <p className="text-[12px] md:text-base font-bold text-slate-200 max-w-xl mx-auto drop-shadow-md hidden md:block">
+              <p className="text-[12px] md:text-base font-bold text-slate-100 max-w-xl mx-auto drop-shadow-md hidden md:block">
                 {t?.heroSubtext || 'Discover premium apartments, duplexes, and commercial spaces across Bangladesh.'}
               </p>
             </div>
@@ -520,24 +520,27 @@ const HeroSection = () => {
 
           {/* ──────────────────── DESKTOP SEARCH UI ────────────────────── */}
           <div className="hidden md:flex flex-col items-center w-full relative z-[100]">
+            <div className="bg-white/85 backdrop-blur-[24px] backdrop-saturate-[180%] p-3 md:p-4 rounded-[2rem] shadow-[0_22px_60px_rgba(15,23,42,0.20),0_0_0_3px_rgba(255,255,255,0.6)] w-full transition-all hover:bg-white/95">
+              
+              <div className="flex justify-center md:justify-start mb-3 ml-2">
+                <div className="flex bg-slate-100/60 p-1 rounded-full border border-slate-200/50 shadow-inner">
+                  {[{ id: 'rent', label: t?.tabRent || 'RENT' }, { id: 'buy', label: t?.tabBuy || 'BUY' }, { id: 'commercial', label: t?.tabCommercial || 'COMMERCIAL' }].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setSearchType(tab.id)}
+                      className={`px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all duration-200 ${searchType === tab.id ? 'bg-[#ba0036] text-white shadow-[0_4px_12px_rgba(186,0,54,0.3)]' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-            <div className="flex bg-white/85 backdrop-blur-[24px] backdrop-saturate-[180%] p-1 rounded-full mb-4 mx-auto transition-all shadow-[0_8px_28px_rgba(15,23,42,0.15),0_0_0_3px_rgba(255,255,255,0.6)]">
-              {[{ id: 'rent', label: t?.tabRent || 'RENT' }, { id: 'buy', label: t?.tabBuy || 'BUY' }, { id: 'commercial', label: t?.tabCommercial || 'COMMERCIAL' }].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setSearchType(tab.id)}
-                  className={`px-6 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-all duration-200 ${searchType === tab.id ? 'bg-[#ba0036] text-white shadow-[0_4px_12px_rgba(186,0,54,0.3)]' : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'}`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+              <div className="flex flex-row items-center w-full bg-white rounded-full border border-slate-100 shadow-[inset_0_1px_3px_rgba(0,0,0,0.02)] p-1">
+                <div className="flex flex-row flex-1 divide-x-2 divide-slate-50">
 
-            <div className="bg-white/85 backdrop-blur-[24px] backdrop-saturate-[180%] p-1.5 rounded-full shadow-[0_22px_60px_rgba(15,23,42,0.20),0_0_0_3px_rgba(255,255,255,0.6)] flex flex-row items-center w-full transition-all hover:bg-white/95">
-              <div className="flex flex-row flex-1 divide-x-2 divide-slate-100/80">
-
-                <div
-                  className="flex-[1.4] flex items-center px-5 w-full relative group min-w-0 hover:bg-slate-50/60 rounded-l-full transition-colors"
+                  <div
+                    className="flex-[1.4] flex items-center px-4 w-full relative group min-w-0 hover:bg-slate-50/60 rounded-l-full transition-colors"
                   ref={locationRef}
                 >
                   <div className="bg-crimson-50 p-2.5 rounded-2xl mr-3 shrink-0 shadow-sm border border-crimson-100"><MapPin size={18} className="text-crimson-500" /></div>
@@ -704,9 +707,9 @@ const HeroSection = () => {
               <div className="pl-2.5 shrink-0">
                 <button
                   onClick={handleSearch}
-                  className="h-[56px] bg-[#ba0036] hover:bg-[#a0002d] text-white px-8 rounded-full font-black text-sm uppercase tracking-widest active:scale-95 flex items-center justify-center gap-2 transition-all shadow-[0_10px_24px_rgba(186,0,54,0.35)]"
+                  className="h-[56px] bg-[#ba0036] hover:bg-[#a0002d] text-white px-8 rounded-full font-black text-sm uppercase tracking-widest active:scale-95 hover:scale-[1.02] hover:-translate-y-0.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-[0_10px_24px_rgba(186,0,54,0.35)] hover:shadow-[0_14px_32px_rgba(186,0,54,0.45)] group"
                 >
-                  <Search size={16} /> {t?.searchBtn || 'Search'}
+                  <Search size={16} className="group-hover:scale-110 transition-transform duration-300" /> {t?.searchBtn || 'Search'}
                 </button>
               </div>
             </div>
