@@ -714,6 +714,7 @@ const HeroSection = () => {
               </div>
             </div>
           </div>
+          </div>
 
           {/* ── Trust badges ── */}
           <div className="flex items-stretch justify-center gap-3 md:gap-4 mt-5 md:mt-6 flex-wrap relative z-10">
