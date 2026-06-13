@@ -260,7 +260,7 @@ const TrustRail = ({ t }) => {
  * don't contain homes — their districts do.
  */
 const DivisionsStrip = ({ onPick, t }) => (
-  <div className="pt-4">
+  <div className="pt-8 mt-2">
     <div className="flex items-center justify-between px-4 mb-2.5">
       <div>
         <h3 className="text-[16px] font-black text-gray-900 tracking-tight">
@@ -294,8 +294,8 @@ const DivisionsStrip = ({ onPick, t }) => (
             </span>
           )}
 
-          <div className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white shadow-md">
-            <ChevronRight size={13} strokeWidth={2.5} />
+          <div className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-white/95 shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center text-slate-800">
+            <ChevronRight size={14} strokeWidth={3} />
           </div>
 
           <div className="absolute bottom-0 inset-x-0 p-3.5">
@@ -1278,7 +1278,7 @@ const MobileHome = () => {
           {/* Search button */}
           <button
             onClick={handleSearch}
-            className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#ba0036] to-[#d4143a] text-white font-black uppercase tracking-widest text-[13px] py-3.5 rounded-2xl shadow-[0_10px_28px_-10px_rgba(186,0,54,0.6)] active:scale-[0.98] transition-transform"
+            className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#ba0036] to-[#d4143a] text-white font-black uppercase tracking-widest text-[13px] py-3.5 rounded-2xl shadow-[0_10px_28px_-10px_rgba(186,0,54,0.6)] hover:scale-[1.02] hover:shadow-[0_14px_32px_-10px_rgba(186,0,54,0.7)] active:scale-[0.96] active:shadow-sm transition-all duration-300"
           >
             <Search size={16} strokeWidth={2.5} />
             {t.mobSearchProperties}
