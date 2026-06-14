@@ -1409,6 +1409,22 @@ const HostDashboard = () => {
     showToast(language === 'বাংলা' ? 'ইনকোয়ারি রিজেক্ট করা হয়েছে।' : 'Inquiry rejected.');
   };
 
+  
+  const confirmDeal = (inquiry) => {
+    fetch(`/api/inquiries/${inquiry.id}/deal`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`
+      }
+    }).then(res => res.json()).then(data => {
+      if (data.success) {
+        setInquiries(inquiries.map(i => i.id === inquiry.id ? { ...i, propAvailabilityStatus: "rented" } : i));
+        showToast(language === "বাংলা" ? "ডিল নিশ্চিত করা হয়েছে" : "Deal confirmed.");
+      }
+    }).catch(err => console.error(err));
+  };
+
   const acceptInquiry = (inquiry) => {
     setInquiries(prev => prev.map(i => i.id === inquiry.id ? { ...i, status: 'accepted' } : i));
     updateInquiryStatus(inquiry.id, 'accepted').catch(err => {
@@ -1535,8 +1551,12 @@ const HostDashboard = () => {
 
   const displayedInquiries = inquiries.filter(i => {
     const matchesSearch = i.user.toLowerCase().includes(searchQuery.toLowerCase()) || i.propTitle.toLowerCase().includes(searchQuery.toLowerCase());
-    const s = i.status || 'new';
-    if (inquiryTab === 'pending') return (s === 'new' || s === 'pending') && matchesSearch;
+    const s = i.status || 'sent'; // pipeline uses 'sent', 'delivered', 'viewed', 'replied'
+    
+    // Any status in the active pipeline that isn't terminal is considered "pending" for the landlord's queue.
+    const isPending = ['new', 'pending', 'sent', 'delivered', 'viewed', 'replied'].includes(s);
+    
+    if (inquiryTab === 'pending') return isPending && matchesSearch;
     if (inquiryTab === 'accepted') return s === 'accepted' && matchesSearch;
     if (inquiryTab === 'rejected') return s === 'rejected' && matchesSearch;
     return false;
@@ -5647,6 +5667,19 @@ const HostDashboard = () => {
         </div>
       )}
 
+
+      {activeModal === 'schedule_visit' && modalData && (
+        <ScheduleVisitModal 
+          inquiry={modalData} 
+          onClose={closeModal} 
+          onSchedule={(visit) => {
+            const updated = inquiries.map(i => i.id === modalData.id ? { ...i, visitSchedule: visit } : i);
+            setInquiries(updated);
+            closeModal();
+            showToast(language === 'বাংলা' ? 'ভিজিট শিডিউল করা হয়েছে' : 'Visit scheduled successfully.');
+          }}
+        />
+      )}
     </div>
   );
 };

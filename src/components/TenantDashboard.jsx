@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
+import callProvider from '../services/callProvider';
 // InquiryModal is the same shared modal used by PropertyDetails / PropertyListing.
 // Adjust the import path if your file lives elsewhere — the API is unchanged.
 import InquiryModal from './InquiryModal';
@@ -185,7 +186,30 @@ const NearbyAreaSuggestion = ({ language }) => {
   const [area, setArea] = React.useState(null);
   const [denied, setDenied] = React.useState(false);
 
-  React.useEffect(() => {
+  React.
+  // Setup real-time socket listeners for inquiry and visit updates
+  useEffect(() => {
+    const socket = callProvider.getSocket();
+    if (!socket) return;
+
+    const handleUpdate = () => {
+      fetchMyInquiries(); // simply refresh inquiries
+    };
+
+    socket.on('inquiry:status_updated', handleUpdate);
+    socket.on('visit:scheduled', handleUpdate);
+    socket.on('visit:cancelled', handleUpdate);
+    socket.on('rent:updated', handleUpdate); // deal confirmed
+
+    return () => {
+      socket.off('inquiry:status_updated', handleUpdate);
+      socket.off('visit:scheduled', handleUpdate);
+      socket.off('visit:cancelled', handleUpdate);
+      socket.off('rent:updated', handleUpdate);
+    };
+  }, []);
+
+  useEffect(() => {
     if (typeof window === 'undefined' || !('geolocation' in navigator)) {
       setDenied(true);
       return;
@@ -2034,31 +2058,27 @@ const handleWizardSubmit = async (payload) => {
           // Each stage has an `en` (short pill label), `sub` (one-line
           // explainer shown under the active stage), and a Bengali parity.
           const stages = [
-            { id: 'sent',     icon: Send,          en: 'Sent',      bn: 'পাঠানো',         subEn: 'Inquiry on its way',      subBn: 'ইনকোয়ারি যাচ্ছে' },
-            { id: 'reached',  icon: Inbox,         en: 'Reached',   bn: 'পৌঁছেছে',         subEn: 'Landlord notified',       subBn: 'মালিককে জানানো হয়েছে' },
-            { id: 'viewed',   icon: Eye,           en: 'Viewed',    bn: 'দেখেছেন',         subEn: 'Landlord opened it',      subBn: 'মালিক দেখেছেন' },
-            { id: 'replied',  icon: MessageCircle, en: 'Replied',   bn: 'রিপ্লাই',          subEn: 'Conversation started',    subBn: 'কথা শুরু হয়েছে' },
-            { id: 'decision', icon: CheckCircle2,  en: 'Decision',  bn: 'সিদ্ধান্ত',        subEn: 'Tour or final answer',    subBn: 'ভিজিট অথবা চূড়ান্ত উত্তর' },
+            { id: 'sent',      icon: Send,          en: 'Sent',       bn: 'পাঠানো',         subEn: 'Inquiry on its way',      subBn: 'ইনকোয়ারি যাচ্ছে' },
+            { id: 'delivered', icon: Inbox,         en: 'Delivered',  bn: 'পৌঁছেছে',         subEn: 'Landlord notified',       subBn: 'মালিককে জানানো হয়েছে' },
+            { id: 'viewed',    icon: Eye,           en: 'Viewed',     bn: 'দেখেছেন',         subEn: 'Landlord opened it',      subBn: 'মালিক দেখেছেন' },
+            { id: 'replied',   icon: MessageCircle, en: 'Replied',    bn: 'রিপ্লাই',          subEn: 'Conversation started',    subBn: 'কথা শুরু হয়েছে' },
+            { id: 'decision',  icon: CheckCircle2,  en: 'Decision',   bn: 'সিদ্ধান্ত',        subEn: 'Tour or final answer',    subBn: 'ভিজিট অথবা চূড়ান্ত উত্তর' },
           ];
           // Map the backend Inquiry record onto the 5-stage UI:
-          //   new       → "Reached"   (server has it; landlord hasn't acted)
-          //   active    → "Replied"   (landlord is actively handling it)
-          //   converted → "Decision" + outcome "approved"  (booked)
-          //   rejected  → "Decision" + outcome "declined"
-          //   archived  → "Decision" + outcome "declined"
           const stageOf = (status) => {
             switch (status) {
-              case 'active':    return 3;
-              case 'converted': return 4;
+              case 'delivered': return 1;
+              case 'viewed':    return 2;
+              case 'replied':   return 3;
+              case 'accepted':
               case 'rejected':  return 4;
-              case 'archived':  return 4;
-              case 'new':
-              default:          return 1;
+              case 'sent':
+              default:          return 0;
             }
           };
           const outcomeOf = (status) => {
-            if (status === 'converted') return 'approved';
-            if (status === 'rejected' || status === 'archived') return 'declined';
+            if (status === 'accepted') return 'approved';
+            if (status === 'rejected') return 'declined';
             return 'pending';
           };
           const fmtDate = (iso) => {
@@ -2234,16 +2254,36 @@ const handleWizardSubmit = async (payload) => {
                         })}
                       </div>
 
-                      {/* Where it stands NOW — one human sentence that
-                          summarises the current stage; this is the line
-                          the tenant actually reads first. */}
-                      <div className="mb-5 px-3 py-2 rounded-xl bg-gradient-to-r from-rose-50 via-amber-50 to-emerald-50 border border-amber-100 flex items-center gap-2 text-[11px] font-black text-gray-700">
-                        <Zap size={12} className="text-[#ba0036] shrink-0" />
-                        <span className="flex-1 truncate">
-                          {language === 'বাংলা' ? stages[app.stageIdx].subBn : stages[app.stageIdx].subEn}
-                          {app.lastUpdate ? ` · ${app.lastUpdate}` : ''}
-                        </span>
-                      </div>
+                      {/* Banners for Accepted / Rejected / Visit Scheduled */}
+                      {app.outcome === 'approved' && app.visitSchedule ? (
+                        <div className="mb-5 p-3 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-between text-sm font-black text-blue-700">
+                          <div>
+                            <span className="block">{language === 'বাংলা' ? 'ভিজিট শিডিউল করা হয়েছে' : 'Visit Scheduled!'}</span>
+                            <span className="block text-xs font-bold text-blue-600 mt-0.5">
+                              {new Date(app.visitSchedule.scheduledDate).toLocaleDateString()} @ {app.visitSchedule.scheduledTime}
+                            </span>
+                          </div>
+                          <Calendar size={20} className="opacity-80"/>
+                        </div>
+                      ) : app.outcome === 'approved' ? (
+                        <div className="mb-5 px-3 py-2.5 rounded-xl bg-green-50 border border-green-200 flex items-center gap-2 text-xs font-black text-green-700">
+                          <CheckCircle2 size={16} />
+                          <span>{language === 'বাংলা' ? 'ইনকোয়ারি গ্রহণ করা হয়েছে' : 'Inquiry Accepted!'}</span>
+                        </div>
+                      ) : app.outcome === 'declined' ? (
+                        <div className="mb-5 px-3 py-2.5 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2 text-xs font-black text-red-700">
+                          <XCircle size={16} />
+                          <span>{language === 'বাংলা' ? 'ইনকোয়ারি প্রত্যাখ্যান করা হয়েছে' : 'Inquiry Rejected'}</span>
+                        </div>
+                      ) : (
+                        <div className="mb-5 px-3 py-2 rounded-xl bg-gradient-to-r from-rose-50 via-amber-50 to-emerald-50 border border-amber-100 flex items-center gap-2 text-[11px] font-black text-gray-700">
+                          <Zap size={12} className="text-[#ba0036] shrink-0" />
+                          <span className="flex-1 truncate">
+                            {language === 'বাংলা' ? stages[app.stageIdx].subBn : stages[app.stageIdx].subEn}
+                            {app.lastUpdate ? ` · ${app.lastUpdate}` : ''}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Your sent message. There is no separate landlord-reply
                           field on an inquiry — the landlord's response shows as
