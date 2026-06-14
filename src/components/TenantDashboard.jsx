@@ -1601,7 +1601,7 @@ const handleWizardSubmit = async (payload) => {
                   iconBg: 'bg-emerald-100',
                   iconColor: 'text-emerald-600',
                   label: language === 'বাংলা' ? 'ইনকোয়ারি' : 'INQUIRIES',
-                  value: 2,
+                  value: myInquiries.length,
                   bar: 'bg-emerald-500',
                   onClick: () => setActiveTab('applications'),
                 },
