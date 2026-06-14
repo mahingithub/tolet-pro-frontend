@@ -1557,7 +1557,7 @@ const HostDashboard = () => {
     const isPending = ['new', 'pending', 'sent', 'delivered', 'viewed', 'replied'].includes(s);
     
     if (inquiryTab === 'pending') return isPending && matchesSearch;
-    if (inquiryTab === 'accepted') return s === 'accepted' && matchesSearch;
+    if (inquiryTab === 'accepted') return ['accepted', 'visit_scheduled', 'final_booking'].includes(s) && matchesSearch;
     if (inquiryTab === 'rejected') return s === 'rejected' && matchesSearch;
     return false;
   });
@@ -1789,9 +1789,9 @@ const HostDashboard = () => {
                 <item.icon size={16} className={isActive ? 'text-[#ba0036]' : locked ? 'text-amber-500' : 'text-gray-400'} />
                 <span className="flex-1 tracking-wide flex justify-between items-center">
                    {item.label}
-                   {item.id === 'inquiries' && inquiries.filter(i => i.status === 'new').length > 0 && (
+                   {item.id === 'inquiries' && inquiries.filter(i => i.status === 'sent').length > 0 && (
                      <span className="bg-[#ba0036] text-white text-[9px] px-1.5 py-0.5 rounded-full font-black">
-                       {inquiries.filter(i => i.status === 'new').length}
+                       {inquiries.filter(i => i.status === 'sent').length}
                      </span>
                    )}
                 </span>
