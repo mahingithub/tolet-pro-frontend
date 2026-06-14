@@ -2035,7 +2035,7 @@ const handleWizardSubmit = async (payload) => {
           const sampleApps = myInquiries.map((inq) => ({
             id:         inq.id || inq._id,
             propertyId: inq.propertyId,
-            landlordId: inq.landlordId || inq.ownerUserId || inq.receiverId,
+            landlordId: inq.propertyOwnerId || inq.landlordId || inq.ownerUserId || inq.receiverId,
             title:      inq.propTitle || 'Property',
             location:   '',
             price:      '',

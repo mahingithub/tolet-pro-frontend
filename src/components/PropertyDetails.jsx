@@ -2148,7 +2148,7 @@ const PropertyDetails = () => {
                 {/* CTA buttons */}
                 {isOwnProperty ? (
                   <div className="bg-blue-50 text-blue-700 font-bold text-center py-4 rounded-2xl mb-5 text-sm border border-blue-100">
-                    {language === 'বাংলা' ? 'এটি আপনার নিজের সম্পত্তি' : 'This is your own property'}
+                    {ctxLanguage === 'বাংলা' ? 'এটি আপনার নিজের সম্পত্তি' : 'This is your own property'}
                   </div>
                 ) : (
                   <>
