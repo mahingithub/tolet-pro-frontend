@@ -173,10 +173,19 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 								<Camera size={42} />
 							</div>
 						)}
+                        {property.availabilityStatus === 'rented' && (
+                            <div className="absolute inset-0 z-10 bg-brandRed/70 backdrop-blur-sm flex items-center justify-center">
+                                <div className="bg-white px-4 py-2 rounded-xl shadow-xl text-sm font-black text-brandRed transform -rotate-12 border-2 border-white/50">
+                                    {t.rentedBadge || "ভাড়া হয়ে গেছে"}
+                                </div>
+                            </div>
+                        )}
 						<div className="absolute top-3 left-3 flex flex-col gap-2 items-start">
                             {property.availabilityStatus === 'rented' && (
-                                <div className="bg-gray-900/90 backdrop-blur-md px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm text-[10px] font-black text-white">
-                                    Rented
+                                <div className="absolute inset-0 z-10 bg-brandRed/80 backdrop-blur-[2px] flex items-center justify-center">
+                                    <div className="bg-white px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-xl text-sm font-black text-brandRed transform -rotate-12 border-2 border-brandRed/20">
+                                        {t.rentedBadge || "ভাড়া হয়ে গেছে"}
+                                    </div>
                                 </div>
                             )}
 							{property.verified && (
