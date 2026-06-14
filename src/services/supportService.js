@@ -72,7 +72,7 @@ export const onTicketsChanged = (listener) => {
 // ─── USER-SIDE API ────────────────────────────────────────────────────────
 
 export const openTicket = async ({ initialMessage, aiTranscript }) => {
-  const data = await call('/support/tickets', {
+  const data = await call('/helpdesk/cases', {
     method: 'POST',
     body: { initialMessage, aiTranscript }
   });
@@ -82,13 +82,13 @@ export const openTicket = async ({ initialMessage, aiTranscript }) => {
 
 export const listMyTickets = async () => {
   if (!getToken()) return [];
-  const data = await call('/support/tickets');
+  const data = await call('/helpdesk/cases');
   return data.tickets;
 };
 
 export const getTicket = async (id) => {
   try {
-    const data = await call(`/support/tickets/${id}`);
+    const data = await call(`/helpdesk/cases/${id}`);
     return data; // { ticket, messages }
   } catch (err) {
     if (err.status === 404) return null;
@@ -97,7 +97,7 @@ export const getTicket = async (id) => {
 };
 
 export const sendMessage = async (ticketId, text) => {
-  const data = await call(`/support/tickets/${ticketId}/messages`, {
+  const data = await call(`/helpdesk/cases/${ticketId}/messages`, {
     method: 'POST',
     body: { text }
   });
@@ -106,7 +106,7 @@ export const sendMessage = async (ticketId, text) => {
 };
 
 export const closeTicket = async (ticketId) => {
-  const data = await call(`/support/tickets/${ticketId}/close`, { method: 'POST' });
+  const data = await call(`/helpdesk/cases/${ticketId}/close`, { method: 'POST' });
   broadcast();
   return data;
 };
@@ -119,13 +119,13 @@ export const listAllTickets = async (filters = {}) => {
   if (filters.search) params.set('search', filters.search);
   const qs = params.toString() ? `?${params.toString()}` : '';
   
-  const data = await call(`/admin/support/tickets${qs}`);
+  const data = await call(`/admin/helpdesk/cases${qs}`);
   return data.tickets;
 };
 
 export const getTicketWithContext = async (id) => {
   try {
-    const data = await call(`/admin/support/tickets/${id}`);
+    const data = await call(`/admin/helpdesk/cases/${id}`);
     return data; // { ticket, messages, userContext }
   } catch (err) {
     if (err.status === 404) return null;
@@ -134,7 +134,7 @@ export const getTicketWithContext = async (id) => {
 };
 
 export const sendAdminMessage = async (ticketId, text, opts = {}) => {
-  const data = await call(`/admin/support/tickets/${ticketId}/messages`, {
+  const data = await call(`/admin/helpdesk/cases/${ticketId}/messages`, {
     method: 'POST',
     body: { text, markPendingUser: !!opts.markPendingUser }
   });
@@ -143,7 +143,7 @@ export const sendAdminMessage = async (ticketId, text, opts = {}) => {
 };
 
 export const assignTicket = async (ticketId, assignee) => {
-  const data = await call(`/admin/support/tickets/${ticketId}/assign`, {
+  const data = await call(`/admin/helpdesk/cases/${ticketId}/assign`, {
     method: 'POST',
     body: { adminId: assignee.adminId, adminName: assignee.adminName }
   });
@@ -152,7 +152,7 @@ export const assignTicket = async (ticketId, assignee) => {
 };
 
 export const resolveTicket = async (ticketId, summary) => {
-  const data = await call(`/admin/support/tickets/${ticketId}/resolve`, {
+  const data = await call(`/admin/helpdesk/cases/${ticketId}/resolve`, {
     method: 'POST',
     body: { summary }
   });
@@ -161,7 +161,7 @@ export const resolveTicket = async (ticketId, summary) => {
 };
 
 export const reopenTicket = async (ticketId) => {
-  const data = await call(`/admin/support/tickets/${ticketId}/reopen`, { method: 'POST' });
+  const data = await call(`/admin/helpdesk/cases/${ticketId}/reopen`, { method: 'POST' });
   broadcast();
   return data;
 };
