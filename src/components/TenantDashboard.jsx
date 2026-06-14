@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { uploadVerificationDoc, uploadAvatar, getCurrentToken } from '../services/authService';
-import { listMyInquiries } from '../services/inquiryService.js';
+import { listMyInquiries, deleteInquiry } from '../services/inquiryService.js';
 import { listTenantReceipts } from '../services/receiptService.js';
 import { listNotifications, getUnreadCount, markRead } from '../services/notificationService.js';
 import { propertyService } from '../services/Propertyservice.js';
@@ -15,7 +15,7 @@ import {
   Briefcase, GraduationCap, Building, Shield, ShieldCheck, FileText, AlertCircle, Award,
   LogOut, CheckCircle2, Calendar, Clock, Eye, Send, ThumbsUp, ThumbsDown,
   Inbox, Home, Sparkles, KeyRound, CalendarCheck, DollarSign, Navigation,
-  ChevronLeft, Filter, Zap, RefreshCw
+  ChevronLeft, Filter, Zap, RefreshCw, Share2
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -344,6 +344,46 @@ const TenantDashboard = () => {
       clearInterval(interval);
     };
   }, []);
+  // Withdraw (delete) one of the tenant's OWN inquiries. The backend permits
+  // the original inquirer to delete; on success we optimistically drop the row
+  // from the list and surface a toast either way.
+  const [deletingInquiryId, setDeletingInquiryId] = useState(null);
+  const handleDeleteInquiry = async (app) => {
+    if (!app || !app.id || deletingInquiryId) return;
+    const confirmMsg = language === 'বাংলা'
+      ? 'এই ইনকোয়ারিটি মুছে ফেলবেন? এটি আর ফিরিয়ে আনা যাবে না।'
+      : 'Withdraw this inquiry? This cannot be undone.';
+    if (!window.confirm(confirmMsg)) return;
+    setDeletingInquiryId(app.id);
+    try {
+      await deleteInquiry(app.id);
+      setMyInquiries((prev) => prev.filter((i) => String(i.id || i._id) !== String(app.id)));
+      toast.success(language === 'বাংলা' ? 'ইনকোয়ারি মুছে ফেলা হয়েছে।' : 'Inquiry withdrawn.');
+    } catch (err) {
+      toast.error(err?.message || (language === 'বাংলা' ? 'মুছতে সমস্যা হয়েছে।' : 'Could not withdraw the inquiry.'));
+    } finally {
+      setDeletingInquiryId(null);
+    }
+  };
+
+  // Share the property behind an inquiry — native share sheet on mobile, with a
+  // clipboard copy fallback on desktop.
+  const handleShareProperty = async (app) => {
+    if (!app || !app.propertyId) {
+      toast.error(language === 'বাংলা' ? 'প্রপার্টি আইডি পাওয়া যায়নি' : 'Property ID not found');
+      return;
+    }
+    const url = `${window.location.origin}/property/${app.propertyId}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: app.title || 'Property', url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast.success(language === 'বাংলা' ? 'লিংক কপি হয়েছে।' : 'Link copied.');
+      }
+    } catch (_) { /* user dismissed the share sheet — ignore */ }
+  };
+
   const openInquiry = (prop) => {
     if (!prop) return;
     // Normalise the shape so InquiryModal is happy regardless of source.
@@ -2043,17 +2083,19 @@ const handleWizardSubmit = async (payload) => {
             return new Date(iso).toLocaleDateString();
           };
           const sampleApps = myInquiries.map((inq) => ({
-            id:         inq.id || inq._id,
-            propertyId: inq.propertyId,
-            landlordId: inq.propertyOwnerId || inq.landlordId || inq.ownerUserId || inq.receiverId,
-            title:      inq.propTitle || 'Property',
-            location:   '',
-            price:      '',
-            stageIdx:   stageOf(inq.status),
-            outcome:    outcomeOf(inq.status),
-            sentAt:     fmtDate(inq.createdAt),
-            lastUpdate: relTime(inq.updatedAt || inq.createdAt),
-            img:        '',
+            id:            inq.id || inq._id,
+            propertyId:    inq.propertyId,
+            landlordId:    inq.propertyOwnerId || inq.landlordId || inq.ownerUserId || inq.receiverId,
+            landlordPhone: inq.landlordPhone || inq.ownerPhone || '',
+            title:         inq.propTitle || 'Property',
+            location:      inq.propLocation || '',
+            price:         (inq.propPrice ?? '') === '' ? '' : Number(inq.propPrice).toLocaleString('en-IN'),
+            msg:           inq.msg || '',
+            stageIdx:      stageOf(inq.status),
+            outcome:       outcomeOf(inq.status),
+            sentAt:        fmtDate(inq.createdAt),
+            lastUpdate:    relTime(inq.updatedAt || inq.createdAt),
+            img:           inq.propCover || '',
           }));
           if (sampleApps.length === 0) {
             return (
@@ -2098,13 +2140,21 @@ const handleWizardSubmit = async (payload) => {
                   <div className="flex flex-col md:flex-row gap-0 md:gap-6">
                     {/* Image */}
                     <div className="w-full md:w-48 h-40 md:h-auto bg-gray-100 shrink-0 relative">
-                      <div
-                        className="absolute inset-0 bg-cover bg-center"
-                        style={{ backgroundImage: `url(${app.img})` }}
-                      />
-                      <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm px-2.5 py-1 rounded-lg text-[11px] font-black text-gray-900">
-                        ৳ {app.price}
-                      </div>
+                      {app.img ? (
+                        <div
+                          className="absolute inset-0 bg-cover bg-center"
+                          style={{ backgroundImage: `url(${app.img})` }}
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-gray-300">
+                          <Building2 size={40} strokeWidth={1.5} />
+                        </div>
+                      )}
+                      {app.price ? (
+                        <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm px-2.5 py-1 rounded-lg text-[11px] font-black text-gray-900">
+                          ৳ {app.price}
+                        </div>
+                      ) : null}
                     </div>
 
                     {/* Content */}
@@ -2113,24 +2163,39 @@ const handleWizardSubmit = async (payload) => {
                         <div className="min-w-0">
                           <h4 className="text-base md:text-lg font-black text-gray-900 truncate">{app.title}</h4>
                           <p className="text-xs font-bold text-gray-500 flex items-center gap-1.5 mt-1">
-                            <MapPin size={12} className="text-gray-400" /> {app.location}
-                            <span className="text-gray-300">·</span>
+                            {app.location ? (
+                              <>
+                                <MapPin size={12} className="text-gray-400" /> {app.location}
+                                <span className="text-gray-300">·</span>
+                              </>
+                            ) : null}
                             <Clock size={11} className="text-gray-400" /> {language === 'বাংলা' ? 'পাঠানো:' : 'Sent:'} {app.sentAt}
                           </p>
                         </div>
-                        {/* Outcome pill */}
-                        <span className={`self-start md:self-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                          app.outcome === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                          : app.outcome === 'declined' ? 'bg-red-50 text-red-700 border-red-100'
-                          : 'bg-amber-50 text-amber-700 border-amber-100'
-                        }`}>
-                          {app.outcome === 'approved' ? <ThumbsUp size={11} /> : app.outcome === 'declined' ? <ThumbsDown size={11} /> : <Hourglass size={11} />}
-                          {app.outcome === 'approved'
-                            ? (language === 'বাংলা' ? 'অ্যাপ্রুভড' : 'Approved')
-                            : app.outcome === 'declined'
-                              ? (language === 'বাংলা' ? 'বাতিল' : 'Declined')
-                              : (language === 'বাংলা' ? 'রিভিউ চলছে' : 'In review')}
-                        </span>
+                        {/* Outcome pill + withdraw */}
+                        <div className="flex items-center gap-2 self-start md:self-auto">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                            app.outcome === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                            : app.outcome === 'declined' ? 'bg-red-50 text-red-700 border-red-100'
+                            : 'bg-amber-50 text-amber-700 border-amber-100'
+                          }`}>
+                            {app.outcome === 'approved' ? <ThumbsUp size={11} /> : app.outcome === 'declined' ? <ThumbsDown size={11} /> : <Hourglass size={11} />}
+                            {app.outcome === 'approved'
+                              ? (language === 'বাংলা' ? 'অ্যাপ্রুভড' : 'Approved')
+                              : app.outcome === 'declined'
+                                ? (language === 'বাংলা' ? 'বাতিল' : 'Declined')
+                                : (language === 'বাংলা' ? 'রিভিউ চলছে' : 'In review')}
+                          </span>
+                          <button
+                            onClick={() => handleDeleteInquiry(app)}
+                            disabled={deletingInquiryId === app.id}
+                            title={language === 'বাংলা' ? 'ইনকোয়ারি মুছুন' : 'Withdraw inquiry'}
+                            aria-label={language === 'বাংলা' ? 'ইনকোয়ারি মুছুন' : 'Withdraw inquiry'}
+                            className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 active:scale-90 transition-all disabled:opacity-50"
+                          >
+                            {deletingInquiryId === app.id ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                          </button>
+                        </div>
                       </div>
 
                       {/* Pipeline — 5 stages. We surface a one-line status
@@ -2180,39 +2245,71 @@ const handleWizardSubmit = async (payload) => {
                         </span>
                       </div>
 
+                      {/* Your sent message. There is no separate landlord-reply
+                          field on an inquiry — the landlord's response shows as
+                          the status pill above and in the live chat thread. */}
+                      {app.msg ? (
+                        <div className="mb-4 px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-100">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-0.5">
+                            {language === 'বাংলা' ? 'আপনার মেসেজ' : 'Your message'}
+                          </p>
+                          <p className="text-[12px] font-semibold text-gray-600 line-clamp-2">{app.msg}</p>
+                        </div>
+                      ) : null}
+
                       {/* Actions */}
-                      <div className="flex gap-2 mt-auto pt-4 border-t border-gray-100">
-                        <button
-                          onClick={() => {
-                            const pid = app.propertyId;
-                            if (!pid) {
-                              toast.error(language === 'বাংলা' ? 'এই ইনকোয়ারির প্রপার্টি আইডি পাওয়া যায়নি' : 'Property ID not found for this inquiry');
-                              return;
-                            }
-                            navigate(`/property/${pid}`);
-                          }}
-                          className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 py-2.5 rounded-xl text-xs font-bold transition-all border border-gray-200 active:scale-95"
-                        >
-                          {language === 'বাংলা' ? 'প্রপার্টি' : 'Property'}
-                        </button>
-                        <button
-                          onClick={() => openInquiry(app)}
-                          className="flex-1 bg-white text-[#ba0036] border border-[#ba0036]/20 hover:bg-[#ba0036] hover:text-white hover:border-[#ba0036] py-2.5 rounded-xl text-xs font-black active:scale-95 transition-all flex items-center justify-center gap-1.5"
-                        >
-                          <MessageCircle size={13} /> {language === 'বাংলা' ? 'আবার ইনকোয়ারি' : 'Re-inquire'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (!app.landlordId) {
-                              toast.error("Unable to open chat. Landlord info missing.");
-                              return;
-                            }
-                            navigate('/messages', { state: { peerUserId: app.landlordId, propertyId: app.propertyId } });
-                          }}
-                          className="flex-1 bg-gradient-to-r from-[#ba0036] to-[#d11147] text-white py-2.5 rounded-xl text-xs font-black shadow-[0_6px_18px_rgba(186,0,54,0.25)] hover:shadow-[0_10px_24px_rgba(186,0,54,0.4)] active:scale-95 transition-all flex items-center justify-center gap-1.5"
-                        >
-                          <MessageSquare size={13} /> {language === 'বাংলা' ? 'চ্যাট' : 'Chat'}
-                        </button>
+                      <div className="mt-auto pt-4 border-t border-gray-100 space-y-2">
+                        {/* Secondary: call landlord + share property */}
+                        <div className="flex gap-2">
+                          {app.landlordPhone ? (
+                            <a
+                              href={`tel:${app.landlordPhone}`}
+                              className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 py-2.5 rounded-xl text-xs font-black active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                            >
+                              <Phone size={13} /> {language === 'বাংলা' ? 'কল' : 'Call'}
+                            </a>
+                          ) : null}
+                          <button
+                            onClick={() => handleShareProperty(app)}
+                            className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 py-2.5 rounded-xl text-xs font-bold active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Share2 size={13} /> {language === 'বাংলা' ? 'শেয়ার' : 'Share'}
+                          </button>
+                        </div>
+                        {/* Primary: property / re-inquire / chat */}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              const pid = app.propertyId;
+                              if (!pid) {
+                                toast.error(language === 'বাংলা' ? 'এই ইনকোয়ারির প্রপার্টি আইডি পাওয়া যায়নি' : 'Property ID not found for this inquiry');
+                                return;
+                              }
+                              navigate(`/property/${pid}`);
+                            }}
+                            className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 py-2.5 rounded-xl text-xs font-bold transition-all border border-gray-200 active:scale-95"
+                          >
+                            {language === 'বাংলা' ? 'প্রপার্টি' : 'Property'}
+                          </button>
+                          <button
+                            onClick={() => openInquiry(app)}
+                            className="flex-1 bg-white text-[#ba0036] border border-[#ba0036]/20 hover:bg-[#ba0036] hover:text-white hover:border-[#ba0036] py-2.5 rounded-xl text-xs font-black active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <MessageCircle size={13} /> {language === 'বাংলা' ? 'আবার ইনকোয়ারি' : 'Re-inquire'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (!app.landlordId) {
+                                toast.error("Unable to open chat. Landlord info missing.");
+                                return;
+                              }
+                              navigate('/messages', { state: { peerUserId: app.landlordId, propertyId: app.propertyId } });
+                            }}
+                            className="flex-1 bg-gradient-to-r from-[#ba0036] to-[#d11147] text-white py-2.5 rounded-xl text-xs font-black shadow-[0_6px_18px_rgba(186,0,54,0.25)] hover:shadow-[0_10px_24px_rgba(186,0,54,0.4)] active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <MessageSquare size={13} /> {language === 'বাংলা' ? 'চ্যাট' : 'Chat'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
