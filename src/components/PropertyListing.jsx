@@ -758,6 +758,15 @@ const PropertyListing = () => {
 		return () => { cancelled = true; unsub && unsub(); };
 	}, [activeDivision, debouncedSearch, selectedIntent, selectedCategories, selectedTypes, minPrice, maxPrice, propertyRefreshTick, sortBy, t.nearMe]);
 
+	// ── RECONCILE SAVED FAVOURITES ──────────────────────────────────────────────
+	// On mount, drop any saved listing the landlord/admin has since deleted from
+	// the user's localStorage favourites. Safe by construction —
+	// pruneSavedProperties only removes entries when the server request SUCCEEDS,
+	// so a transient outage never wipes favourites. Runs once.
+	useEffect(() => {
+		propertyService.pruneSavedProperties("savedProperties").catch(() => {});
+	}, []);
+
 	// ── LANDLORD LOOKUP FOR INQUIRY ─────────────────────────────────────────────
 	// Look up the landlord lazily when the inquiry modal opens so we don't issue
 	// a request per card render. If no landlord record exists yet (host hasn't

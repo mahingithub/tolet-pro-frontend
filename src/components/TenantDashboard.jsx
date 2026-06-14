@@ -4,6 +4,7 @@ import { uploadVerificationDoc, uploadAvatar, getCurrentToken } from '../service
 import { listMyInquiries } from '../services/inquiryService.js';
 import { listTenantReceipts } from '../services/receiptService.js';
 import { listNotifications, getUnreadCount, markRead } from '../services/notificationService.js';
+import { propertyService } from '../services/Propertyservice.js';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Building2, Search, Bell, Globe, LayoutDashboard, Heart,
@@ -434,9 +435,18 @@ const TenantDashboard = () => {
       setActiveTab(location.state.activeTab);
     }
     
-    const loadSaved = () => {
+    const loadSaved = async () => {
+      // Show the cached list instantly so the tab never flashes empty.
       const stored = JSON.parse(localStorage.getItem('savedProperties')) || [];
       setSavedProperties(stored);
+      // Then reconcile against the server: drop any listing the landlord/admin
+      // has since deleted. pruneSavedProperties is SAFE — it only removes
+      // entries when the request actually succeeds, so a backend outage (like
+      // yesterday's) can never wipe the user's favourites.
+      try {
+        const pruned = await propertyService.pruneSavedProperties('savedProperties');
+        setSavedProperties(pruned);
+      } catch { /* keep the cached list on any error */ }
     };
     loadSaved();
   }, [location]);

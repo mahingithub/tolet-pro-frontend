@@ -385,6 +385,78 @@ export const propertyService = {
   },
 
   /**
+   * নির্দিষ্ট কিছু id এর CURRENT server-state আনে (saved-list sync এর জন্য)।
+   * GET /api/properties?ids=a,b,c
+   *
+   * গুরুত্বপূর্ণ: এখানে ICCHA করেই `status` filter পাঠানো হয় না — কোনো saved
+   * listing rent/paused হয়ে গেলেও সেটা এখনো EXISTS, তাই সেটাও ফেরত আসতে হবে
+   * (নাহলে frontend ভুল করে "deleted" ধরে favourites থেকে মুছে ফেলবে)। backend
+   * id-lookup এ page limit তুলে দেয়, তাই এখানে limit-ও পাঠাই না।
+   *
+   * Returns { ok, properties }:
+   *   ok:true  → server সত্যিই সাড়া দিয়েছে; `properties` হলো এখনো-existing গুলো।
+   *   ok:false → server unreachable / errored — caller যেন saved list এ হাত না দেয়।
+   */
+  async getPropertiesByIds(ids) {
+    const list  = Array.isArray(ids) ? ids : String(ids || '').split(',');
+    const clean = list.map((s) => String(s).trim()).filter(Boolean);
+    if (clean.length === 0) return { ok: true, properties: [] };
+
+    const params = new URLSearchParams();
+    params.set('ids', clean.join(','));
+
+    try {
+      const res = await probeFetch('properties', `${API}/properties?${params}`, {
+        signal: AbortSignal.timeout(15000),
+      });
+      if (res && res.ok) {
+        const data = await res.json();
+        const properties = (data.properties || []).map((p) => _normaliseApiProperty(p));
+        return { ok: true, properties };
+      }
+      // Reached the server but it errored / route missing (probeFetch → null on
+      // 404 or network). Treat as INCONCLUSIVE — never as "all deleted".
+      return { ok: false, properties: [] };
+    } catch (_) {
+      // Network / timeout / abort — same: inconclusive, do not signal deletion.
+      return { ok: false, properties: [] };
+    }
+  },
+
+  /**
+   * locally-saved favourites (localStorage) কে server এর সাথে মিলিয়ে নেয় এবং
+   * যেগুলো আর নেই (landlord/admin মুছে দিয়েছে — property.service.deleteProperty
+   * এর cascade দেখুন) সেগুলো বাদ দেয়।
+   *
+   * SAFETY: prune শুধু তখনই হয় যখন server request সত্যিই SUCCEED করেছে। backend
+   * unreachable হলে saved list অপরিবর্তিত ফেরত যায়, তাই সাময়িক outage কখনো
+   * favourites মুছে ফেলতে পারবে না।
+   *
+   * (possibly pruned) saved array ফেরত দেয় যাতে caller সরাসরি setState করতে পারে।
+   */
+  async pruneSavedProperties(storageKey = 'savedProperties') {
+    let saved;
+    try { saved = JSON.parse(localStorage.getItem(storageKey)) || []; }
+    catch { saved = []; }
+    if (!Array.isArray(saved) || saved.length === 0) return saved || [];
+
+    const ids = saved.map((p) => p && p.id).filter(Boolean);
+    if (ids.length === 0) return saved;
+
+    const { ok, properties } = await this.getPropertiesByIds(ids);
+    if (!ok) return saved; // server unreachable → keep favourites intact.
+
+    const liveIds = new Set(properties.map((p) => String(p.id)));
+    const pruned  = saved.filter((p) => liveIds.has(String(p && p.id)));
+
+    if (pruned.length !== saved.length) {
+      try { localStorage.setItem(storageKey, JSON.stringify(pruned)); }
+      catch { /* ignore quota / serialization errors */ }
+    }
+    return pruned;
+  },
+
+  /**
    * একটি প্রপার্টির details আনে।
    * GET /api/properties/:id
    */
