@@ -3,7 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Draggable from 'react-draggable';
 import {
   Bot, Send, Sparkles, Minimize2, ExternalLink, TrendingUp,
-  Headphones, Inbox, ArrowLeft, ShieldCheck, CheckCircle2, Clock, Play
+  Headphones, Inbox, ArrowLeft, ShieldCheck, CheckCircle2, Clock, Play,
+  Building2, MapPin, BedDouble, Bath, Mic
 } from 'lucide-react';
 import VideoModal from './shared/VideoModal';
 
@@ -49,6 +50,11 @@ const GlobalAIAssistant = () => {
   const [view, setView] = useState(/** @type {'ai'|'tickets'|'ticket'} */('ai'));
   const [activeTicketId, setActiveTicketId] = useState(/** @type {string|null} */(null));
   const [inputText, setInputText] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const recognitionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
   const [isTyping, setIsTyping] = useState(false);
 
   const [aiGuides, setAiGuides] = useState([]);
@@ -205,9 +211,9 @@ const GlobalAIAssistant = () => {
   }, [view]);
 
   // ── AI chat send handler ───────────────────────────────────────────────
-  const handleAiSend = async (e) => {
+  const handleAiSend = async (e, overrideText) => {
     e?.preventDefault();
-    const text = inputText.trim();
+    const text = (typeof overrideText === 'string' ? overrideText : inputText).trim();
     if (!text || isTyping) return;
 
     const userMsg = { id: crypto.randomUUID(), sender: 'user', text };
@@ -237,9 +243,14 @@ const GlobalAIAssistant = () => {
       }
       
       const data = await response.json();
-      
-      if (data?.text) {
-        setAiMessages((prev) => [...prev, { id: crypto.randomUUID(), sender: 'ai', text: data.text }]);
+
+      if (data?.text || (Array.isArray(data?.properties) && data.properties.length)) {
+        setAiMessages((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          sender: 'ai',
+          text: data.text || '',
+          properties: Array.isArray(data.properties) && data.properties.length ? data.properties : undefined,
+        }]);
         setUnhelpfulStreak(0); // reset streak on success
       }
     } catch (err) {
@@ -254,6 +265,120 @@ const GlobalAIAssistant = () => {
       setIsTyping(false);
     }
   };
+
+  // ── voice input (Bengali speech-to-text) ───────────────────────────────────
+  // Two paths, chosen automatically so it works on every device:
+  //   1) Web Speech API (Chrome / Android Chrome): free, on-device, with a live
+  //      transcript preview. Tap mic -> speak -> on a final result it auto-sends.
+  //   2) Fallback for browsers without Web Speech (notably iOS Safari, Firefox):
+  //      record with MediaRecorder, upload to /ai-chat/transcribe (server-side
+  //      Whisper), then auto-send the returned text. Costs a little per clip.
+  // Both feed the SAME handleAiSend pipeline (already understands Bengali + runs
+  // the property search).
+  const SpeechRec =
+    typeof window !== 'undefined'
+      ? (window.SpeechRecognition || window.webkitSpeechRecognition)
+      : null;
+  const voiceSupported = !!SpeechRec;
+  const recordSupported =
+    typeof navigator !== 'undefined' &&
+    !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) &&
+    typeof window !== 'undefined' &&
+    typeof window.MediaRecorder !== 'undefined';
+  const micAvailable = voiceSupported || recordSupported;
+
+  // Path 1 — Web Speech API (free, on-device, live preview).
+  const startWebSpeech = () => {
+    try {
+      const rec = new SpeechRec();
+      rec.lang = 'bn-BD';        // Bangladeshi Bengali
+      rec.interimResults = true; // stream partial words for a live preview
+      rec.continuous = false;    // stop automatically when the user pauses
+      rec.maxAlternatives = 1;
+
+      rec.onresult = (event) => {
+        let interim = '';
+        let final = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const chunk = event.results[i][0].transcript;
+          if (event.results[i].isFinal) final += chunk;
+          else interim += chunk;
+        }
+        if (interim) setInputText(interim);
+        if (final) {
+          setInputText('');
+          handleAiSend(null, final.trim()); // pass text explicitly (avoids state lag)
+        }
+      };
+      rec.onerror = () => setIsListening(false);
+      rec.onend = () => setIsListening(false);
+
+      recognitionRef.current = rec;
+      setInputText('');
+      setIsListening(true);
+      rec.start();
+    } catch (_) {
+      setIsListening(false);
+    }
+  };
+
+  // Path 2 — record audio, transcribe server-side, then send.
+  const transcribeAndSend = async (blob) => {
+    setIsTranscribing(true);
+    try {
+      const fd = new FormData();
+      fd.append('audio', blob, 'voice.webm');
+      const res = await fetch(`${API}/ai-chat/transcribe`, { method: 'POST', body: fd });
+      if (res.ok) {
+        const data = await res.json();
+        const t = (data.text || '').trim();
+        if (t) handleAiSend(null, t);
+      }
+    } catch (_) {
+      /* ignore — the user can retry or just type */
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        try { stream.getTracks().forEach((t) => t.stop()); } catch (_) { /* noop */ }
+        const blob = new Blob(audioChunksRef.current, { type: mr.mimeType || 'audio/webm' });
+        audioChunksRef.current = [];
+        if (blob.size > 0) await transcribeAndSend(blob);
+      };
+      mediaRecorderRef.current = mr;
+      mr.start();
+      setIsListening(true);
+    } catch (_) {
+      setIsListening(false);
+    }
+  };
+
+  const stopVoice = () => {
+    try { recognitionRef.current && recognitionRef.current.stop(); } catch (_) { /* noop */ }
+    try {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+    } catch (_) { /* noop */ }
+  };
+
+  const toggleVoice = () => {
+    if (inputDisabled || isTyping || isTranscribing) return;
+    if (isListening) { setIsListening(false); stopVoice(); return; }
+    if (voiceSupported) startWebSpeech();
+    else if (recordSupported) startRecording();
+  };
+
+  // Stop any in-flight recognition / recording on unmount.
+  useEffect(() => () => stopVoice(), []);
 
   // ── handoff: open a real ticket and switch into ticket view ────────────
   const handleHandoff = async () => {
@@ -432,15 +557,17 @@ const GlobalAIAssistant = () => {
                         msg.sender === 'user' ? 'self-end items-end' : 'self-start items-start'
                       }`}
                     >
-                      <div
-                        className={`px-4 py-3 shadow-md ${
-                          msg.sender === 'user'
-                            ? 'bg-gray-900 text-white rounded-[1.5rem] rounded-tr-sm'
-                            : 'bg-white text-gray-800 rounded-[1.5rem] rounded-tl-sm'
-                        }`}
-                      >
-                        <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{msg.text}</p>
-                      </div>
+                      {msg.text ? (
+                        <div
+                          className={`px-4 py-3 shadow-md ${
+                            msg.sender === 'user'
+                              ? 'bg-gray-900 text-white rounded-[1.5rem] rounded-tr-sm'
+                              : 'bg-white text-gray-800 rounded-[1.5rem] rounded-tl-sm'
+                          }`}
+                        >
+                          <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                        </div>
+                      ) : null}
                       {msg.action && (
                         <button
                           onClick={() => {
@@ -459,6 +586,17 @@ const GlobalAIAssistant = () => {
                         >
                           <Play size={12} /> {msg.videoAction.label}
                         </button>
+                      )}
+                      {Array.isArray(msg.properties) && msg.properties.length > 0 && (
+                        <div className="mt-2 flex flex-col gap-2 w-full">
+                          {msg.properties.map((p) => (
+                            <AiPropertyCard
+                              key={p.id}
+                              property={p}
+                              onOpen={() => { navigate(`/property/${p.id}`); setIsOpen(false); }}
+                            />
+                          ))}
+                        </div>
                       )}
                     </div>
                   ))}
@@ -609,11 +747,27 @@ const GlobalAIAssistant = () => {
                   onSubmit={onSubmit}
                   className="flex items-center bg-[#f4f7fb] rounded-2xl p-1.5 shadow-inner focus-within:ring-2 focus-within:ring-[#ba0036]/10 transition-all"
                 >
+                  {micAvailable && view === 'ai' && (
+                    <button
+                      type="button"
+                      onClick={toggleVoice}
+                      disabled={inputDisabled || isTyping || isTranscribing}
+                      title={isListening ? 'শোনা বন্ধ করুন' : isTranscribing ? 'রূপান্তর হচ্ছে…' : 'বাংলায় বলুন'}
+                      aria-label={isListening ? 'Stop listening' : 'Speak in Bengali'}
+                      className={`p-2.5 rounded-xl transition-all shrink-0 flex items-center justify-center ${
+                        isListening
+                          ? 'bg-[#ba0036] text-white shadow-[0_4px_12px_rgba(186,0,54,0.3)] animate-pulse'
+                          : 'text-gray-500 hover:text-[#ba0036]'
+                      } disabled:opacity-50`}
+                    >
+                      <Mic size={16} />
+                    </button>
+                  )}
                   <input
                     type="text"
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
-                    placeholder={placeholder}
+                    placeholder={isListening ? 'শুনছি... এখন বলুন' : isTranscribing ? 'রূপান্তর হচ্ছে…' : placeholder}
                     disabled={inputDisabled}
                     className="flex-1 bg-transparent border-none outline-none text-sm font-medium text-gray-900 placeholder-gray-400 px-3 py-2 disabled:opacity-50"
                   />
@@ -675,6 +829,44 @@ const GlobalAIAssistant = () => {
 };
 
 // ─── small subcomponents ────────────────────────────────────────────────
+
+// Compact, tappable property card rendered inside an AI reply when the
+// assistant runs a search. Tapping opens the full property page.
+const AiPropertyCard = ({ property, onOpen }) => {
+  const p = property || {};
+  const price = (p.price ?? '') === '' ? '' : Number(p.price).toLocaleString('en-IN');
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="no-drag w-full text-left bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md border border-gray-100 hover:border-[#ba0036]/30 transition-all active:scale-[0.98] flex"
+    >
+      <div className="w-24 h-24 bg-gray-100 shrink-0 relative">
+        {p.coverPhoto ? (
+          <img src={p.coverPhoto} alt="" loading="lazy" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-300">
+            <Building2 size={26} />
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0 p-2.5 flex flex-col justify-center">
+        <h5 className="text-[13px] font-black text-gray-900 truncate">{p.title}</h5>
+        {p.location ? (
+          <p className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mt-0.5 min-w-0">
+            <MapPin size={11} className="text-gray-400 shrink-0" />
+            <span className="truncate">{p.location}</span>
+          </p>
+        ) : null}
+        <div className="flex items-center gap-2.5 mt-1.5 text-[11px] font-bold text-gray-600">
+          {price ? <span className="text-[#ba0036] font-black">৳{price}</span> : null}
+          {p.beds != null ? <span className="flex items-center gap-0.5"><BedDouble size={11} />{p.beds}</span> : null}
+          {p.baths != null ? <span className="flex items-center gap-0.5"><Bath size={11} />{p.baths}</span> : null}
+        </div>
+      </div>
+    </button>
+  );
+};
 
 
 const TicketStatusPill = ({ status }) => {
