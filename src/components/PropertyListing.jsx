@@ -859,11 +859,12 @@ const PropertyListing = () => {
 					setSearchArea(t.nearMe || "Nearby Location");
 					showToast("Live location applied!");
 				},
-				() => {
+				(err) => {
+					console.warn(`Geolocation error (${err.code}): ${err.message}`);
 					setIsLocating(false);
-					showToast("Please enable location permissions.");
+					showToast("Could not get live location.");
 				},
-				{ enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
+				{ enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
 			);
 		} else {
 			setIsLocating(false);

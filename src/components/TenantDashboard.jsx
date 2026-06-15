@@ -232,8 +232,11 @@ const NearbyAreaSuggestion = ({ language }) => {
           try { window.sessionStorage.setItem('tolet_nearby_area', JSON.stringify(a)); } catch { /* swallow */ }
         }
       },
-      () => { if (!cancelled) setDenied(true); },
-      { timeout: 8000, maximumAge: 5 * 60 * 1000, enableHighAccuracy: false },
+      (err) => {
+        console.warn(`Geolocation error (${err.code}): ${err.message}`);
+        if (!cancelled) setDenied(true); 
+      },
+      { timeout: 5000, maximumAge: 0, enableHighAccuracy: false },
     );
     return () => { cancelled = true; };
   }, []);

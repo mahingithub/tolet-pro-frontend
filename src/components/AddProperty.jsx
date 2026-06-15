@@ -865,6 +865,7 @@ const GpsPanel = ({ form, set, isBn }) => {
         setMapReady(true);
       },
       (err) => {
+        console.warn(`Geolocation error (${err.code}): ${err.message}`);
         setGpsLoading(false);
         setGpsError(
           err.code === 1
@@ -872,7 +873,7 @@ const GpsPanel = ({ form, set, isBn }) => {
             : (isBn ? 'লোকেশন পাওয়া যায়নি। আবার চেষ্টা করুন।' : 'Could not get location. Please try again.')
         );
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
   };
 
