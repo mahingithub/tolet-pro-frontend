@@ -211,7 +211,7 @@ const NearbyAreaSuggestion = ({ language }) => {
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !('geolocation' in navigator)) {
+    if (typeof window === 'undefined' || !navigator.geolocation || !navigator.permissions) {
       setDenied(true);
       return;
     }
@@ -222,22 +222,37 @@ const NearbyAreaSuggestion = ({ language }) => {
         return;
       }
     } catch { /* swallow */ }
+    
     let cancelled = false;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        if (cancelled) return;
-        const a = findClosestArea(pos.coords.latitude, pos.coords.longitude);
-        if (a) {
-          setArea(a);
-          try { window.sessionStorage.setItem('tolet_nearby_area', JSON.stringify(a)); } catch { /* swallow */ }
-        }
-      },
-      (err) => {
-        console.warn(`Geolocation error (${err.code}): ${err.message}`);
-        if (!cancelled) setDenied(true); 
-      },
-      { timeout: 5000, maximumAge: 0, enableHighAccuracy: false },
-    );
+
+    // Only get location automatically if permission is already granted.
+    // If it's 'prompt' or 'denied', we skip to avoid native browser popups 
+    // and unsuppressable CoreLocation native console errors on page mount.
+    navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+      if (cancelled) return;
+      if (result.state === 'granted') {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (cancelled) return;
+            const a = findClosestArea(pos.coords.latitude, pos.coords.longitude);
+            if (a) {
+              setArea(a);
+              try { window.sessionStorage.setItem('tolet_nearby_area', JSON.stringify(a)); } catch { /* swallow */ }
+            }
+          },
+          (err) => {
+            console.warn(`Geolocation error (${err.code}): ${err.message}`);
+            if (!cancelled) setDenied(true); 
+          },
+          { timeout: 5000, maximumAge: 0, enableHighAccuracy: false },
+        );
+      } else {
+        setDenied(true);
+      }
+    }).catch(() => {
+      if (!cancelled) setDenied(true);
+    });
+    
     return () => { cancelled = true; };
   }, []);
 
