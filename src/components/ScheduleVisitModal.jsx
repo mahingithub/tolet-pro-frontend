@@ -91,7 +91,7 @@ export default function ScheduleVisitModal({ inquiry, onClose, onSchedule }) {
 
             <div>
               <label className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-                <MapPin size={14} /> {language === 'বাংলা' ? 'ঠিকানা / স্থান' : 'Location'}
+                <MapPin size={14} /> {language === 'বাংলা' ? 'ঠিকানা/লোকেশন' : 'Location'}
               </label>
               <input 
                 type="text" 
@@ -107,7 +107,7 @@ export default function ScheduleVisitModal({ inquiry, onClose, onSchedule }) {
               disabled={loading}
               className="w-full mt-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 text-white py-4 rounded-xl font-black text-sm shadow-[0_8px_15px_rgba(37,99,235,0.2)] hover:-translate-y-0.5 transition-all"
             >
-              {loading ? '...' : (language === 'বাংলা' ? 'নিশ্চিত করুন' : 'Confirm Schedule')}
+              {loading ? '...' : (language === 'বাংলা' ? 'শিডিউল সেভ করুন' : 'Confirm Schedule')}
             </button>
           </form>
         </div>

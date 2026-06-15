@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TO-LET PRO</string>
+    <string name="title_activity_main">TO-LET PRO</string>
+    <string name="package_name">pro.tolet.app</string>
+    <string name="custom_url_scheme">pro.tolet.app</string>
+</resources>

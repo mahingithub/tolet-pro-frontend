@@ -9,6 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/splash-screen": "^8.0.1",
     "@react-google-maps/api": "^2.20.8",
     "@sentry/react": "^10.55.0",
     "firebase": "^12.13.0",
