@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Check, X, Calendar, CheckCircle2, User, Phone, Home } from 'lucide-react';
+import { Check, X, Calendar, CheckCircle2, User, Phone, Home, MessageSquare, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { updateInquiryStatus } from '../services/inquiryService';
 import ScheduleVisitModal from './ScheduleVisitModal';
 
-export default function InquiryCard({ inquiry, propertyStatus, onStatusChange }) {
+export default function InquiryCard({ inquiry, propertyStatus, onStatusChange, onChat, onCall, onDelete }) {
   const { language } = useAuth();
   const [loadingAction, setLoadingAction] = useState(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -144,6 +144,37 @@ export default function InquiryCard({ inquiry, propertyStatus, onStatusChange })
                 {loadingAction === 'completed' ? '...' : <><CheckCircle2 size={16} strokeWidth={2.5} /> {language === 'বাংলা' ? 'ডিল নিশ্চিত করুন ✓' : 'Confirm Deal ✓'}</>}
               </button>
             </>
+          )}
+        </div>
+      )}
+
+      {(onChat || onCall || onDelete) && (
+        <div className="mt-4 pt-4 border-t border-gray-50 flex flex-col gap-2.5">
+          <div className="grid grid-cols-2 gap-3">
+            {onChat && (
+              <button
+                onClick={onChat}
+                className="w-full bg-[#ba0036] hover:bg-[#90002a] text-white py-3 rounded-xl font-bold text-[11px] shadow-[0_4px_15px_rgba(186,0,54,0.2)] transition-all flex items-center justify-center gap-1.5"
+              >
+                <MessageSquare size={14} /> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
+              </button>
+            )}
+            {onCall && (
+              <button
+                onClick={onCall}
+                className="w-full bg-white text-gray-700 py-3 rounded-xl font-bold text-[11px] hover:bg-gray-50 border border-gray-200 transition-all flex items-center justify-center gap-1.5"
+              >
+                <Phone size={14} /> {language === 'বাংলা' ? 'কল' : 'Call'}
+              </button>
+            )}
+          </div>
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              className="w-full bg-white text-red-500 py-2 rounded-xl font-bold text-[11px] hover:bg-red-50 border border-red-100 transition-all flex items-center justify-center gap-1.5"
+            >
+              <Trash2 size={14} /> {language === 'বাংলা' ? 'পুরোপুরি মুছে ফেলুন' : 'Delete Completely'}
+            </button>
           )}
         </div>
       )}

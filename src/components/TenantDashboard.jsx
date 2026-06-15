@@ -44,6 +44,7 @@ import ProfileSection from './shared/ProfileSection';
 // drawer actually opens the screen.
 import SharedSettings from './shared/SharedSettings';
 import SharedSupport from './shared/SharedSupport';
+import InquiryStatusTimeline from './InquiryStatusTimeline';
 
 // 🟢 Shared localStorage key — written by HostDashboard when the landlord
 // marks rent as paid, read here so the tenant sees an instant receipt.
@@ -2218,72 +2219,12 @@ const handleWizardSubmit = async (payload) => {
                         </div>
                       </div>
 
-                      {/* Pipeline — 5 stages. We surface a one-line status
-                          underneath that reads as the landlord-perspective
-                          truth ("Landlord opened it · 15m ago") rather than
-                          generic verbs. Tenants in Bangladesh repeatedly
-                          told us the worst part of renting is not knowing
-                          whether the landlord even saw the message. */}
-                      <div className="grid grid-cols-5 gap-1 md:gap-2 mb-3">
-                        {stages.map((st, i) => {
-                          const reached = i <= app.stageIdx;
-                          const isCurrent = i === app.stageIdx;
-                          const Icon = st.icon;
-                          return (
-                            <div key={st.id} className="flex flex-col items-center gap-1.5 relative">
-                              {/* connector line — solid green for past, dashed grey for future */}
-                              {i < stages.length - 1 && (
-                                i < app.stageIdx
-                                  ? <span className="absolute top-4 left-[60%] right-[-40%] h-[2px] bg-emerald-400 rounded-full" />
-                                  : <span className="absolute top-4 left-[60%] right-[-40%] h-[2px] border-t-2 border-dashed border-gray-200" />
-                              )}
-                              <div className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all ${
-                                reached
-                                  ? (isCurrent
-                                      ? 'bg-gradient-to-br from-[#ba0036] to-rose-500 text-white border-[#ba0036] shadow-[0_0_0_4px_rgba(186,0,54,0.15)] animate-pulse'
-                                      : 'bg-gradient-to-br from-emerald-500 to-green-600 text-white border-emerald-500 shadow-sm')
-                                  : 'bg-white text-gray-400 border-gray-200'
-                              }`}>
-                                <Icon size={13} strokeWidth={2.5} />
-                              </div>
-                              <span className={`text-[9px] md:text-[10px] font-black text-center leading-tight ${reached ? (isCurrent ? 'text-[#ba0036]' : 'text-gray-700') : 'text-gray-400'}`}>
-                                {language === 'বাংলা' ? st.bn : st.en}
-                              </span>
-                            </div>
-                          );
-                        })}
+                      <div className="mb-4">
+                        <InquiryStatusTimeline 
+                          inquiry={myInquiries.find(i => String(i.id || i._id) === String(app.id))}
+                          onCancelVisit={() => handleDeleteInquiry(app)}
+                        />
                       </div>
-
-                      {/* Banners for Accepted / Rejected / Visit Scheduled */}
-                      {app.outcome === 'approved' && app.visitSchedule ? (
-                        <div className="mb-5 p-3 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-between text-sm font-black text-blue-700">
-                          <div>
-                            <span className="block">{language === 'বাংলা' ? 'ভিজিট শিডিউল করা হয়েছে' : 'Visit Scheduled!'}</span>
-                            <span className="block text-xs font-bold text-blue-600 mt-0.5">
-                              {new Date(app.visitSchedule.scheduledDate).toLocaleDateString()} @ {app.visitSchedule.scheduledTime}
-                            </span>
-                          </div>
-                          <Calendar size={20} className="opacity-80"/>
-                        </div>
-                      ) : app.outcome === 'approved' ? (
-                        <div className="mb-5 px-3 py-2.5 rounded-xl bg-green-50 border border-green-200 flex items-center gap-2 text-xs font-black text-green-700">
-                          <CheckCircle2 size={16} />
-                          <span>{language === 'বাংলা' ? 'ইনকোয়ারি গ্রহণ করা হয়েছে' : 'Inquiry Accepted!'}</span>
-                        </div>
-                      ) : app.outcome === 'declined' ? (
-                        <div className="mb-5 px-3 py-2.5 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2 text-xs font-black text-red-700">
-                          <XCircle size={16} />
-                          <span>{language === 'বাংলা' ? 'ইনকোয়ারি প্রত্যাখ্যান করা হয়েছে' : 'Inquiry Rejected'}</span>
-                        </div>
-                      ) : (
-                        <div className="mb-5 px-3 py-2 rounded-xl bg-gradient-to-r from-rose-50 via-amber-50 to-emerald-50 border border-amber-100 flex items-center gap-2 text-[11px] font-black text-gray-700">
-                          <Zap size={12} className="text-[#ba0036] shrink-0" />
-                          <span className="flex-1 truncate">
-                            {language === 'বাংলা' ? stages[app.stageIdx].subBn : stages[app.stageIdx].subEn}
-                            {app.lastUpdate ? ` · ${app.lastUpdate}` : ''}
-                          </span>
-                        </div>
-                      )}
 
                       {/* Your sent message. There is no separate landlord-reply
                           field on an inquiry — the landlord's response shows as
