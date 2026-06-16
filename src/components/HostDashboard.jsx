@@ -1184,6 +1184,7 @@ const HostDashboard = () => {
     setModalData(data);
     setActiveDropdownId(null);
     setIsProfileDrawerOpen(false);
+    setConfirmDeleteBookingId(null);
     if (type === 'edit' && data) {
       // Seed every editable field. Demo seed entries only carry a subset of
       // the schema; fall back to sensible defaults so the inputs render.
@@ -1446,6 +1447,7 @@ const HostDashboard = () => {
     if (!isPremium) {
       setModalData(inquiry);
       setActiveModal('premium_gate');
+      setConfirmDeleteBookingId(null);
       return;
     }
     // Hassle-free: no "mark Accepted first" step — Accept goes straight to the
@@ -1473,6 +1475,7 @@ const HostDashboard = () => {
       autoReminder: true,
       notes: inquiry.msg ? `From inquiry: ${inquiry.msg.slice(0, 140)}${inquiry.msg.length > 140 ? '…' : ''}` : '',
     });
+    setConfirmDeleteBookingId(null);
     setActiveModal('create_lease');
   };
 
@@ -1519,6 +1522,7 @@ const HostDashboard = () => {
       autoReminder: true,
       notes: '',
     });
+    setConfirmDeleteBookingId(null);
     setActiveModal('create_lease');
   };
 
@@ -1600,6 +1604,8 @@ const HostDashboard = () => {
       // Inquiry card কে filter করে সরাই না — শুধু 'rented' status দিই
       // যেন ইনকোয়ারি ট্যাবে "Rented" পোজিশনে কার্ডটা ঝুলে থাকে।
       setInquiries(prev => prev.map(i => i.id === leaseForm.inquiryId ? { ...i, status: 'rented' } : i));
+      // Backend-এও sync করি যেন refresh দিলেও rented থাকে।
+      updateInquiryStatus(leaseForm.inquiryId, 'rented').catch(err => console.warn('[host] inquiry rented sync failed:', err.message || err));
     }
     showToast(language === 'বাংলা' ? 'বুকিং তৈরি হয়েছে! রেন্ট লেজার চালু হয়েছে।' : 'Booking created — rent ledger is live.');
     setActiveModal(null);
