@@ -195,64 +195,7 @@ const SafeImg = ({ src, alt = '', className = '', showIconOnError = true }) => {
   );
 };
 
-/**
- * Trust card — eye-catching trust anchor below the search panel. Centered,
- * gradient-glow with three 3D "badge" tiles. Replaces the old pill-rail.
- */
-const TrustRail = ({ t }) => {
-  const badges = [
-    { icon: BadgeCheck,  label: t.mobVerifiedHosts,
-      iconBg: 'from-emerald-400 to-emerald-600',
-      tint:   'shadow-[0_8px_22px_-10px_rgba(16,185,129,0.55)]' },
-    { icon: ShieldCheck, label: t.mobSecurePrivate,
-      iconBg: 'from-[#ff4d6d] to-[#ba0036]',
-      tint:   'shadow-[0_8px_22px_-10px_rgba(186,0,54,0.55)]' },
-    { icon: Zap,         label: t.mobInstantBooking,
-      iconBg: 'from-amber-300 to-amber-500',
-      tint:   'shadow-[0_8px_22px_-10px_rgba(245,158,11,0.55)]' },
-  ];
-  return (
-    <div className="px-4 pt-4">
-      <div
-        className="relative overflow-hidden rounded-[26px] px-4 py-4 bg-white/85 backdrop-blur-2xl border border-white/70"
-        style={{ boxShadow: '0 22px 60px -28px rgba(15,23,42,0.35), 0 0 0 1px rgba(255,255,255,0.45) inset' }}
-      >
-        {/* holographic glow */}
-        <div
-          className="absolute -top-12 -left-10 w-44 h-44 rounded-full opacity-50 pointer-events-none"
-          style={{ background: 'radial-gradient(closest-side, rgba(186,0,54,0.22), transparent 70%)' }}
-        />
-        <div
-          className="absolute -bottom-14 -right-8 w-48 h-48 rounded-full opacity-50 pointer-events-none"
-          style={{ background: 'radial-gradient(closest-side, rgba(34,211,238,0.20), transparent 70%)' }}
-        />
 
-        <div className="relative flex items-center justify-center gap-1.5 mb-3">
-          <Sparkles size={12} className="text-[#ba0036]" strokeWidth={3} />
-          <span className="text-[9.5px] font-black uppercase tracking-[0.22em] text-gray-700">
-            {t.mobTrustHeadline || 'Why renters trust us'}
-          </span>
-          <Sparkles size={12} className="text-[#ba0036]" strokeWidth={3} />
-        </div>
-
-        <div className="relative grid grid-cols-3 gap-2.5">
-          {badges.map(({ icon: Icon, label, iconBg, tint }) => (
-            <div key={label} className="flex flex-col items-center text-center">
-              <div
-                className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${iconBg} flex items-center justify-center text-white ring-1 ring-white/50 ${tint}`}
-              >
-                <Icon size={20} strokeWidth={2.6} />
-              </div>
-              <span className="mt-1.5 text-[10.5px] font-black text-gray-800 leading-tight">
-                {label}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 /**
  * Horizontally swipeable Explore Divisions strip. Tapping a card opens the
@@ -1286,8 +1229,7 @@ const MobileHome = () => {
         </div>
       </div>
 
-      {/* ───────── TRUST RAIL ───────── */}
-      <TrustRail t={t} />
+
 
       {/* ───────── DIVISIONS STRIP ───────── */}
       <DivisionsStrip onPick={setOpenDivision} t={t} />
