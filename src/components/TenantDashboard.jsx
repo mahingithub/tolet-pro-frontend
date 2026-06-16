@@ -2808,6 +2808,29 @@ const handleWizardSubmit = async (payload) => {
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'মাস' : 'Month'}</span>
                 <span className="text-sm font-black text-gray-900">{activeReceipt.monthLabel || activeReceipt.monthKey}</span>
               </div>
+              {activeReceipt.landlordName && (
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ল্যান্ডলর্ড' : 'Landlord'}</span>
+                  <span className="text-sm font-black text-gray-900 text-right">
+                    {activeReceipt.landlordName}
+                    {activeReceipt.landlordPhone && (
+                      <a href={`tel:${activeReceipt.landlordPhone}`} className="block text-[11px] font-bold text-[#ba0036] mt-0.5">{activeReceipt.landlordPhone}</a>
+                    )}
+                  </span>
+                </div>
+              )}
+              {activeReceipt.monthlyRent > 0 && (
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বেস ভাড়া' : 'Base Rent'}</span>
+                  <span className="text-sm font-black text-gray-900">৳ {(activeReceipt.monthlyRent || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}</span>
+                </div>
+              )}
+              {activeReceipt.serviceCharge > 0 && (
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'সার্ভিস চার্জ' : 'Service Charge'}</span>
+                  <span className="text-sm font-black text-gray-900">৳ {(activeReceipt.serviceCharge || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}</span>
+                </div>
+              )}
               <div className="flex justify-between items-center py-2 border-b border-gray-100">
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'মোট বকেয়া' : 'Total Due'}</span>
                 <span className="text-sm font-black text-gray-900">৳ {(activeReceipt.totalDue || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}</span>
