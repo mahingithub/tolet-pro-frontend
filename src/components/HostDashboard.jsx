@@ -3331,30 +3331,31 @@ const HostDashboard = () => {
                               </div>
 
                               {inquiry?.visitSchedule?.status === 'accepted' ? (
-                                <div className="w-full bg-blue-50/40 border border-blue-100 rounded-2xl p-4 mt-1">
-                                  <div className="flex items-center gap-2 mb-3">
-                                    <CheckCircle2 size={18} className="text-blue-600" />
-                                    <h4 className="text-sm font-black text-gray-900">{language === 'বাংলা' ? 'ভিজিট কনফার্মড' : 'Visit Confirmed'}</h4>
-                                  </div>
+                                <div className="w-full bg-blue-50/60 border border-blue-200 rounded-2xl p-5 mb-2 mt-2">
+                                  <h4 className="font-black text-gray-900 mb-4 flex items-center gap-2">
+                                    <BadgeCheck className="text-blue-600" size={20} />
+                                    {language === 'বাংলা' ? 'ভিজিট নিশ্চিত হয়েছে' : 'Visit Confirmed'}
+                                    <Check className="text-blue-600" size={16} strokeWidth={3} />
+                                  </h4>
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div className="bg-white p-3 rounded-xl border border-gray-100 flex items-center gap-3">
-                                      <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                                        <Clock className="text-blue-600" size={14} />
+                                    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-start gap-3">
+                                      <div className="bg-blue-50 p-2 rounded-lg text-blue-600 shrink-0">
+                                        <Clock size={18} />
                                       </div>
                                       <div className="min-w-0">
-                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'তারিখ ও সময়' : 'Date & Time'}</p>
-                                        <p className="text-xs font-bold text-gray-900 truncate">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'তারিখ ও সময়' : 'Date & Time'}</p>
+                                        <p className="text-sm font-bold text-gray-900 truncate">
                                           {inquiry.visitSchedule.date} • {inquiry.visitSchedule.time}
                                         </p>
                                       </div>
                                     </div>
-                                    <div className="bg-white p-3 rounded-xl border border-gray-100 flex items-center gap-3">
-                                      <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                                        <MapPin className="text-blue-600" size={14} />
+                                    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-start gap-3">
+                                      <div className="bg-blue-50 p-2 rounded-lg text-blue-600 shrink-0">
+                                        <MapPin size={18} />
                                       </div>
                                       <div className="min-w-0">
-                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'লোকেশন' : 'Location'}</p>
-                                        <p className="text-xs font-bold text-gray-900 truncate">{inquiry.visitSchedule.location || inquiry.propTitle}</p>
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'লোকেশন' : 'Location'}</p>
+                                        <p className="text-sm font-bold text-gray-900 truncate">{inquiry.visitSchedule.location || inquiry.propTitle}</p>
                                       </div>
                                     </div>
                                   </div>

@@ -74,14 +74,15 @@ export default function InquiryStatusTimeline({ inquiry, onCancelVisit }) {
       case 'visit_scheduled': return 4;
       case 'final_booking':
       case 'converted':
-      case 'completed': return 5;
+      case 'completed':
+      case 'rented': return 5;
       default: return 0;
     }
   };
 
   const currentIndex = getStepIndex(currentStatus);
   const isRejected = currentStatus === 'rejected';
-  const isTerminal = isRejected || ['final_booking', 'converted', 'completed'].includes(currentStatus);
+  const isTerminal = isRejected || ['final_booking', 'converted', 'completed', 'rented'].includes(currentStatus);
 
   // A landlord has replied if any message is from the landlord.
   const landlordReplied = messages.some(m => m.sender === 'landlord');
@@ -366,7 +367,7 @@ export default function InquiryStatusTimeline({ inquiry, onCancelVisit }) {
         )}
 
         {/* ── Deal confirmed ── */}
-        {(currentStatus === 'final_booking' || currentStatus === 'converted' || currentStatus === 'completed') && (
+        {(currentStatus === 'final_booking' || currentStatus === 'converted' || currentStatus === 'completed' || currentStatus === 'rented') && (
           <div className="relative overflow-hidden bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl p-6 sm:p-8 text-white shadow-xl">
             <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
             <div className="relative z-10">
