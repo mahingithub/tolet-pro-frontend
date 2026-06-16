@@ -78,3 +78,11 @@ export async function updateBookingSettings(bookingId, data) {
   });
   return booking;
 }
+
+/** Delete / Exclude a booking — SOFT delete (status → 'cancelled' server-side). */
+export async function cancelBooking(bookingId) {
+  const { success } = await request(`/api/bookings/${bookingId}`, {
+    method: 'DELETE',
+  });
+  return success;
+}

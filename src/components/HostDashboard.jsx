@@ -20,8 +20,8 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { propertyService, subscribeUserProperties } from '../services/Propertyservice';
 import { getDynamicFields } from '../constants/propertyFields';
 import { subscriptionService } from '../services/subscriptionService';
-import { listHostInquiries, updateInquiryStatus, deleteInquiry } from "../services/inquiryService.js";
-import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi } from "../services/bookingService.js";
+import { listHostInquiries, updateInquiryStatus, deleteInquiry, replyToInquiry, respondVisit } from "../services/inquiryService.js";
+import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi, cancelBooking as cancelBookingApi } from "../services/bookingService.js";
 import { listNotifications, getUnreadCount, markRead, markAllRead } from "../services/notificationService.js";
 import { uploadAvatar } from "../services/authService";
 import ProfileSection from './shared/ProfileSection';
@@ -729,8 +729,36 @@ const HostDashboard = () => {
     dueNote: '',                   // free-text note for the 'due' branch
     expectedPayBy: '',             // promised pay-by date for the 'due' branch
   });
+  const [inquiryReplies, setInquiryReplies] = useState({});
+  const [replyingId, setReplyingId] = useState(null);
+
+  const sendInquiryReply = async (inquiry) => {
+    const id = inquiry.id || inquiry._id;
+    const text = (inquiryReplies[id] || '').trim();
+    if (!text) return;
+    setReplyingId(id);
+    try {
+      await replyToInquiry(id, text);
+      setInquiries(prev => prev.map(i => i.id === id
+        ? { ...i, messages: [...(i.messages || []), { sender: 'landlord', text, createdAt: new Date().toISOString() }] } : i));
+      setInquiryReplies(prev => ({ ...prev, [id]: '' }));
+      showToast(language === 'বাংলা' ? 'রিপ্লাই পাঠানো হয়েছে।' : 'Reply sent.');
+    } catch (err) { console.warn('[host] reply failed:', err.message || err); }
+    finally { setReplyingId(null); }
+  };
+
+  const hostRespondVisit = async (inquiry, action) => {
+    const id = inquiry.id || inquiry._id;
+    try {
+      const updated = await respondVisit(id, action);
+      setInquiries(prev => prev.map(i => i.id === id ? { ...i, visitSchedule: updated?.visitSchedule, status: updated?.status || i.status } : i));
+      showToast(action === 'accept' ? (language === 'বাংলা' ? 'ভিজিট গ্রহণ ✓' : 'Visit accepted ✓') : (language === 'বাংলা' ? 'ভিজিট বাতিল' : 'Visit rejected'));
+    } catch (err) { console.warn('[host] visit respond failed:', err.message || err); }
+  };
+
   const [leaseForm, setLeaseForm] = useState({
     inquiryId: null,
+    serviceCharge: '',
     propertyId: '',
     property: '',
     tenant: '',
@@ -1029,8 +1057,9 @@ const HostDashboard = () => {
 
   const handleRemoveBooking = (id) => {
     setBookings(bookings.filter(b => b.id !== id));
-    showToast(language === 'বাংলা' ? 'বুকিং মুছে ফেলা হয়েছে।' : 'Booking removed successfully.');
+    showToast(language === 'বাংলা' ? 'বুকিং বাদ দেওয়া হয়েছে।' : 'Booking removed.');
     setActiveDropdownId(null);
+    cancelBookingApi(id).catch(err => console.warn('[host] booking cancel sync failed:', err.message || err));
   };
 
   const handleRemoveInquiry = (id) => {
@@ -1392,6 +1421,7 @@ const HostDashboard = () => {
       leaseStart: start,
       leaseEnd: endIso,
       monthlyRent: String(matchingProp?.price || '').replace(/[^\d]/g, '') || '',
+      serviceCharge: String(landlordProfile?.serviceCharge ?? authUser?.landlordProfile?.serviceCharge ?? ''),
       rentDueDay: 5,
       reminderLeadDays: 3,
       autoReminder: true,
@@ -1409,21 +1439,6 @@ const HostDashboard = () => {
     showToast(language === 'বাংলা' ? 'ইনকোয়ারি রিজেক্ট করা হয়েছে।' : 'Inquiry rejected.');
   };
 
-  
-  const confirmDeal = (inquiry) => {
-    fetch(`/api/inquiries/${inquiry.id}/deal`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`
-      }
-    }).then(res => res.json()).then(data => {
-      if (data.success) {
-        setInquiries(inquiries.map(i => i.id === inquiry.id ? { ...i, propAvailabilityStatus: "rented" } : i));
-        showToast(language === "বাংলা" ? "ডিল নিশ্চিত করা হয়েছে" : "Deal confirmed.");
-      }
-    }).catch(err => console.error(err));
-  };
 
   const acceptInquiry = (inquiry) => {
     setInquiries(prev => prev.map(i => i.id === inquiry.id ? { ...i, status: 'accepted' } : i));
@@ -1452,6 +1467,7 @@ const HostDashboard = () => {
       leaseStart: todayIso(),
       leaseEnd: '',
       monthlyRent: '',
+      serviceCharge: String(landlordProfile?.serviceCharge ?? authUser?.landlordProfile?.serviceCharge ?? ''),
       rentDueDay: 5,
       reminderLeadDays: 3,
       autoReminder: true,
@@ -1502,6 +1518,7 @@ const HostDashboard = () => {
 
     createBookingApi({
       propertyId: matchingProp ? matchingProp._id || matchingProp.id : propertyId,
+      serviceCharge: Number(leaseForm.serviceCharge) || 0,
       inquiryId: leaseForm.inquiryId,
       leaseStart,
       leaseEnd,
@@ -3192,6 +3209,22 @@ const HostDashboard = () => {
                               <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">{t?.messageFromUser || (language === 'বাংলা' ? 'মেসেজ' : 'Message')}</p>
                               <p className="text-sm font-medium text-white italic leading-relaxed">"{inquiry.msg}"</p> 
                             </div>
+
+                            {/* Inline Reply — থ্রেডে যোগ হয়, tenant টাইমলাইনে দেখে */}
+                            <div className="mt-3 flex items-center gap-2">
+                              <input type="text" value={inquiryReplies[inquiry.id] || ''} onChange={e => setInquiryReplies(prev => ({ ...prev, [inquiry.id]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') sendInquiryReply(inquiry); }} placeholder={language === 'বাংলা' ? 'রিপ্লাই লিখুন...' : 'Write a reply...'} className="flex-1 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white border border-transparent focus:border-[#ba0036]/20 transition-all" />
+                              <button onClick={() => sendInquiryReply(inquiry)} disabled={replyingId === inquiry.id || !(inquiryReplies[inquiry.id] || '').trim()} className="shrink-0 w-11 h-11 rounded-xl bg-[#ba0036] hover:bg-[#90002a] disabled:opacity-40 text-white flex items-center justify-center transition-colors"><Send size={16} /></button>
+                            </div>
+
+                            {inquiry.visitSchedule?.status === 'pending' && inquiry.visitSchedule?.proposedBy === 'tenant' && (
+                              <div className="mt-3 bg-amber-50 border border-amber-100 rounded-2xl p-3 flex items-center justify-between gap-2">
+                                <span className="text-[11px] font-bold text-amber-800">{language === 'বাংলা' ? 'ভাড়াটিয়া ভিজিট চেয়েছে:' : 'Tenant proposed:'} {inquiry.visitSchedule.date} {inquiry.visitSchedule.time}</span>
+                                <span className="flex gap-1.5 shrink-0">
+                                  <button onClick={() => hostRespondVisit(inquiry, 'accept')} className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-[11px] font-black">{language === 'বাংলা' ? 'গ্রহণ' : 'Accept'}</button>
+                                  <button onClick={() => hostRespondVisit(inquiry, 'reject')} className="px-3 py-1.5 rounded-lg bg-white border border-red-200 text-red-600 text-[11px] font-black">{language === 'বাংলা' ? 'বাতিল' : 'Reject'}</button>
+                                </span>
+                              </div>
+                            )}
                           </div>
 
                           <div className="w-full xl:w-[240px] flex flex-col gap-4 justify-between shrink-0 mt-2 xl:mt-0">
@@ -4974,6 +5007,11 @@ const HostDashboard = () => {
                     <div>
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'প্রতি মাসের কত তারিখে?' : 'Rent Due Day'}</label>
                       <input type="number" min="1" max="31" value={leaseForm.rentDueDay} onChange={e => setLeaseForm(f => ({ ...f, rentDueDay: e.target.value }))} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'সার্ভিস চার্জ (৳)' : 'Service Charge (BDT)'}</label>
+                      <input type="number" min="0" value={leaseForm.serviceCharge} onChange={e => setLeaseForm(f => ({ ...f, serviceCharge: e.target.value }))} placeholder="0" className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
+                      <p className="text-[9px] font-bold text-gray-400 mt-1">{language === 'বাংলা' ? 'প্রোফাইল থেকে অটো-ফিল · এডিটযোগ্য' : 'Auto-filled from profile · editable'}</p>
                     </div>
 
                     <div className="sm:col-span-2 bg-gray-50/80 p-4 rounded-2xl border border-gray-100">

@@ -1,17 +1,17 @@
 /**
  * inquiryService.js
  * ──────────────────────────────────────────────────────────────────────────
- * Frontend client for the inquiry endpoints exposed by the backend at
- * routes/inquiry.routes.js + routes/host.routes.js.
+ * Frontend client for the inquiry endpoints.
  *
- *   POST   /api/inquiries                         createInquiry (auth)
- *   GET    /api/inquiries/mine                    listMyInquiries (auth, tenant)
- *   PATCH  /api/inquiries/:id/status              updateInquiryStatus (auth, host)
- *   GET    /api/host/inquiries                    listHostInquiries (auth, host)
- *
- * Token comes from authService's `'auth:token'` key. We deliberately read
- * the same key as authService so a single login covers every service in the
- * app — no per-service token namespacing.
+ *   POST   /api/inquiries                createInquiry (auth) — repeat inquiry
+ *                                         on the same property APPENDS to thread
+ *   GET    /api/inquiries/mine           listMyInquiries (auth, tenant)
+ *   POST   /api/inquiries/:id/reply      reply / follow-up message (auth)
+ *   POST   /api/inquiries/:id/visit      propose a visit (auth)
+ *   PATCH  /api/inquiries/:id/visit      accept/reject a visit (auth)
+ *   PATCH  /api/inquiries/:id/status     updateInquiryStatus (auth, host)
+ *   GET    /api/host/inquiries           listHostInquiries (auth, host)
+ *   DELETE /api/inquiries/:id            deleteInquiry (auth)
  */
 
 const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
@@ -47,12 +47,8 @@ async function call(path, { method = 'GET', body } = {}) {
 // ─── Tenant side ────────────────────────────────────────────────────────────
 
 /**
- * Send a new inquiry to the host of a property.
- * @param {object} args
- * @param {string} args.propertyId   - Mongo ObjectId of the property
- * @param {string} args.message      - Free-text message (1..2000 chars)
- * @param {string=} args.leaseStart  - Optional ISO date "YYYY-MM-DD"
- * @param {string=} args.leaseEnd    - Optional ISO date "YYYY-MM-DD"
+ * Send an inquiry to the host of a property. A second inquiry on the same
+ * property appends to the existing thread server-side (no duplicate card).
  */
 export const createInquiry = async ({ propertyId, message, leaseStart, leaseEnd }) => {
   const data = await call('/inquiries', {
@@ -73,6 +69,45 @@ export const listMyInquiries = async () => {
   return Array.isArray(data.inquiries) ? data.inquiries : [];
 };
 
+// ─── Shared (landlord + tenant) — thread + visit ────────────────────────────
+
+/**
+ * Append a message to an inquiry thread. Landlord "Reply" or tenant follow-up.
+ * Server decides sender ('landlord' | 'tenant') from the auth token.
+ * @returns {{ inquiry, message }}
+ */
+export const replyToInquiry = async (id, text) => {
+  const data = await call(`/inquiries/${id}/reply`, {
+    method: 'POST',
+    body: { text },
+  });
+  return data; // { inquiry, message }
+};
+
+/**
+ * Propose a visit slot (either party).
+ * @param {object} slot { date: 'YYYY-MM-DD', time: 'HH:mm', location?: string }
+ */
+export const proposeVisit = async (id, { date, time, location }) => {
+  const data = await call(`/inquiries/${id}/visit`, {
+    method: 'POST',
+    body: { date, time, location },
+  });
+  return data.inquiry;
+};
+
+/**
+ * Accept or reject a pending visit (must be the party who did NOT propose).
+ * @param {'accept'|'reject'} action
+ */
+export const respondVisit = async (id, action) => {
+  const data = await call(`/inquiries/${id}/visit`, {
+    method: 'PATCH',
+    body: { action },
+  });
+  return data.inquiry;
+};
+
 // ─── Host side ──────────────────────────────────────────────────────────────
 
 /** Host's incoming inquiries (every property they own). */
@@ -83,7 +118,8 @@ export const listHostInquiries = async ({ status } = {}) => {
 };
 
 /** Move an inquiry through its lifecycle. Status enum must match the model:
- *  'new' | 'active' | 'archived' | 'converted' | 'rejected'. */
+ *  'sent' | 'delivered' | 'viewed' | 'accepted' | 'rejected'
+ *  | 'visit_scheduled' | 'final_booking'. */
 export const updateInquiryStatus = async (id, status) => {
   const data = await call(`/inquiries/${id}/status`, {
     method: 'PATCH',
@@ -92,7 +128,7 @@ export const updateInquiryStatus = async (id, status) => {
   return data.inquiry;
 };
 
-/** Permanently delete an inquiry (Host only) */
+/** Delete/withdraw an inquiry (either party). */
 export const deleteInquiry = async (id) => {
   const data = await call(`/inquiries/${id}`, {
     method: 'DELETE',
@@ -103,6 +139,9 @@ export const deleteInquiry = async (id) => {
 export default {
   createInquiry,
   listMyInquiries,
+  replyToInquiry,
+  proposeVisit,
+  respondVisit,
   listHostInquiries,
   updateInquiryStatus,
   deleteInquiry,

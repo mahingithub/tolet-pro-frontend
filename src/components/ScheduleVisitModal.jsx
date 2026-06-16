@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Calendar, Clock, MapPin } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { proposeVisit } from '../services/inquiryService';
 
 export default function ScheduleVisitModal({ inquiry, onClose, onSchedule }) {
   const { language } = useAuth();
@@ -10,32 +11,36 @@ export default function ScheduleVisitModal({ inquiry, onClose, onSchedule }) {
     location: ''
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.scheduledDate || !form.scheduledTime) return;
-    
+
     setLoading(true);
+    setError('');
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/visit-schedule', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          inquiryId: inquiry.id,
-          ...form
-        })
+      // Hits POST /api/inquiries/:id/visit — persists visitSchedule on the
+      // inquiry, notifies the other party, and emits a realtime socket event.
+      const updated = await proposeVisit(inquiry.id || inquiry._id, {
+        date: form.scheduledDate,
+        time: form.scheduledTime,
+        location: form.location,
       });
-      
-      if (!res.ok) throw new Error('Failed to schedule visit');
-      
-      const data = await res.json();
-      onSchedule(data.schedule);
+      // Pass the saved visitSchedule back so the caller can patch its state.
+      onSchedule(updated?.visitSchedule || {
+        proposedBy: 'landlord',
+        date: form.scheduledDate,
+        time: form.scheduledTime,
+        location: form.location,
+        status: 'pending',
+      });
     } catch (err) {
       console.error(err);
+      setError(
+        err?.message ||
+        (language === 'বাংলা' ? 'ভিজিট শিডিউল করা যায়নি।' : 'Could not schedule the visit.')
+      );
     } finally {
       setLoading(false);
     }
@@ -67,8 +72,8 @@ export default function ScheduleVisitModal({ inquiry, onClose, onSchedule }) {
               <label className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
                 <Calendar size={14} /> {language === 'বাংলা' ? 'তারিখ' : 'Date'}
               </label>
-              <input 
-                type="date" 
+              <input
+                type="date"
                 required
                 value={form.scheduledDate}
                 onChange={e => setForm(f => ({ ...f, scheduledDate: e.target.value }))}
@@ -80,8 +85,8 @@ export default function ScheduleVisitModal({ inquiry, onClose, onSchedule }) {
               <label className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
                 <Clock size={14} /> {language === 'বাংলা' ? 'সময়' : 'Time'}
               </label>
-              <input 
-                type="time" 
+              <input
+                type="time"
                 required
                 value={form.scheduledTime}
                 onChange={e => setForm(f => ({ ...f, scheduledTime: e.target.value }))}
@@ -93,8 +98,8 @@ export default function ScheduleVisitModal({ inquiry, onClose, onSchedule }) {
               <label className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
                 <MapPin size={14} /> {language === 'বাংলা' ? 'ঠিকানা/লোকেশন' : 'Location'}
               </label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder={language === 'বাংলা' ? 'যেমন: প্রপার্টির ঠিকানা' : 'e.g. Property Address'}
                 value={form.location}
                 onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
@@ -102,8 +107,12 @@ export default function ScheduleVisitModal({ inquiry, onClose, onSchedule }) {
               />
             </div>
 
-            <button 
-              type="submit" 
+            {error && (
+              <p className="text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</p>
+            )}
+
+            <button
+              type="submit"
               disabled={loading}
               className="w-full mt-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 text-white py-4 rounded-xl font-black text-sm shadow-[0_8px_15px_rgba(37,99,235,0.2)] hover:-translate-y-0.5 transition-all"
             >
