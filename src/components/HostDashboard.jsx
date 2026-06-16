@@ -3617,7 +3617,7 @@ const HostDashboard = () => {
                               <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
                               <button onClick={() => { showToast(language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড হচ্ছে...' : 'Downloading agreement...'); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
                               <div className="h-px w-full bg-gray-100 my-1"></div>
-                              <button onClick={() => setConfirmDeleteBookingId(booking.id)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
+                              <button onClick={() => { setActiveDropdownId(null); setConfirmDeleteBookingId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
                             </div>
                           )}
                         </div>
@@ -5409,33 +5409,6 @@ const HostDashboard = () => {
                 );
               })()}
 
-              {/* ─ Booking Delete Confirmation ─ Full-screen overlay modal ─ */}
-              {confirmDeleteBookingId && (() => {
-                const bk = bookings.find(b => b.id === confirmDeleteBookingId);
-                return (
-                  <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setConfirmDeleteBookingId(null)}>
-                    <div className="bg-white rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.2)] max-w-sm w-[90%] mx-auto p-8 text-center space-y-5 animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
-                      <div className="w-16 h-16 mx-auto rounded-2xl bg-red-50 flex items-center justify-center">
-                        <Trash2 size={32} className="text-red-500" />
-                      </div>
-                      <div>
-                        <h4 className="text-xl font-black text-gray-900">{language === 'বাংলা' ? 'বুকিং ডিলিট করবেন?' : 'Delete this booking?'}</h4>
-                        {bk && <p className="text-sm text-gray-500 font-bold mt-2">{bk.tenant} — {bk.property}</p>}
-                        <p className="text-xs text-gray-400 mt-1">{language === 'বাংলা' ? 'এই অ্যাকশন আর undo করা যাবে না।' : 'This action cannot be undone.'}</p>
-                      </div>
-                      <div className="flex gap-3">
-                        <button onClick={() => setConfirmDeleteBookingId(null)} className="flex-1 py-3.5 rounded-2xl font-black text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
-                          {language === 'বাংলা' ? 'বাতিল' : 'Cancel'}
-                        </button>
-                        <button onClick={() => handleRemoveBooking(confirmDeleteBookingId)} className="flex-1 py-3.5 rounded-2xl font-black text-sm bg-red-600 text-white hover:bg-red-700 transition-colors shadow-[0_8px_20px_rgba(220,38,38,0.3)]">
-                          {language === 'বাংলা' ? 'হ্যাঁ, ডিলিট করুন' : 'Yes, Delete'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
               {/* ─ Premium Gate — non-premium hosts trying to convert/create ─ */}
               {activeModal === 'premium_gate' && (
                 <div className="text-center space-y-5">
@@ -5828,6 +5801,32 @@ const HostDashboard = () => {
         </div>
       )}
 
+      {/* ─ Booking Delete Confirmation ─ Full-screen overlay modal ─ */}
+      {confirmDeleteBookingId && (() => {
+        const bk = bookings.find(b => b.id === confirmDeleteBookingId);
+        return (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setConfirmDeleteBookingId(null)}>
+            <div className="bg-white rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.2)] max-w-sm w-[90%] mx-auto p-8 text-center space-y-5 animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-red-50 flex items-center justify-center">
+                <Trash2 size={32} className="text-red-500" />
+              </div>
+              <div>
+                <h4 className="text-xl font-black text-gray-900">{language === 'বাংলা' ? 'বুকিং ডিলিট করবেন?' : 'Delete this booking?'}</h4>
+                {bk && <p className="text-sm text-gray-500 font-bold mt-2">{bk.tenant} — {bk.property}</p>}
+                <p className="text-xs text-gray-400 mt-1">{language === 'বাংলা' ? 'এই অ্যাকশন আর undo করা যাবে না।' : 'This action cannot be undone.'}</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setConfirmDeleteBookingId(null)} className="flex-1 py-3.5 rounded-2xl font-black text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                  {language === 'বাংলা' ? 'বাতিল' : 'Cancel'}
+                </button>
+                <button onClick={() => handleRemoveBooking(confirmDeleteBookingId)} className="flex-1 py-3.5 rounded-2xl font-black text-sm bg-red-600 text-white hover:bg-red-700 transition-colors shadow-[0_8px_20px_rgba(220,38,38,0.3)]">
+                  {language === 'বাংলা' ? 'হ্যাঁ, ডিলিট করুন' : 'Yes, Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {activeModal === 'schedule_visit' && modalData && (
         <ScheduleVisitModal 
