@@ -20,8 +20,9 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { propertyService, subscribeUserProperties } from '../services/Propertyservice';
 import { getDynamicFields } from '../constants/propertyFields';
 import { subscriptionService } from '../services/subscriptionService';
-import { listHostInquiries, updateInquiryStatus, deleteInquiry, replyToInquiry, respondVisit } from "../services/inquiryService.js";
+import { listHostInquiries, updateInquiryStatus, deleteInquiry, replyToInquiry, respondVisit, proposeVisit } from "../services/inquiryService.js";
 import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi, cancelBooking as cancelBookingApi } from "../services/bookingService.js";
+import callProvider from "../services/callProvider";
 import { listNotifications, getUnreadCount, markRead, markAllRead } from "../services/notificationService.js";
 import { uploadAvatar } from "../services/authService";
 import ProfileSection from './shared/ProfileSection';
@@ -122,6 +123,8 @@ const toInquiryRow = (raw = {}) => {
     msg:            raw.msg || raw.message || raw.text || '',
     status:         raw.status || 'new',
     chatId:         raw.chatId || raw.conversationId || raw.threadId || '',
+    messages:       Array.isArray(raw.messages) ? raw.messages : [],
+    visitSchedule:  raw.visitSchedule || null,
   };
 };
 
@@ -412,6 +415,22 @@ const HostDashboard = () => {
     }
   }, [location.search]);
 
+  useEffect(() => {
+    const socket = callProvider.getSocket();
+    if (!socket) return;
+    const onInquiryUpdate = (data) => {
+      setInquiries(prev => prev.map(i => {
+        if (i.id !== data.inquiryId) return i;
+        const next = { ...i };
+        if (data.status) next.status = data.status;
+        if (data.visitSchedule) next.visitSchedule = data.visitSchedule;
+        if (data.message) next.messages = [...(i.messages || []), data.message];
+        return next;
+      }));
+    };
+    socket.on('inquiry:status_updated', onInquiryUpdate);
+    return () => socket.off('inquiry:status_updated', onInquiryUpdate);
+  }, []);
 
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -1059,7 +1078,9 @@ const HostDashboard = () => {
     setBookings(bookings.filter(b => b.id !== id));
     showToast(language === 'বাংলা' ? 'বুকিং বাদ দেওয়া হয়েছে।' : 'Booking removed.');
     setActiveDropdownId(null);
-    cancelBookingApi(id).catch(err => console.warn('[host] booking cancel sync failed:', err.message || err));
+    if (/^[0-9a-fA-F]{24}$/.test(String(id))) {
+      cancelBookingApi(id).catch(err => console.warn('[host] booking cancel sync failed:', err.message || err));
+    }
   };
 
   const handleRemoveInquiry = (id) => {
@@ -1182,15 +1203,26 @@ const HostDashboard = () => {
     }
   };
 
-  const submitInquiryStatus = () => {
+  const submitInquiryStatus = async () => {
     if (!modalData) return;
-    const newStatus = inquiryStatusForm.status;
-    setInquiries(prev => prev.map(i => i.id === modalData.id ? { ...i, status: newStatus } : i));
-    showToast(language === "বাংলা" ? "স্ট্যাটাস আপডেট হয়েছে!" : "Status Updated!");
-    updateInquiryStatus(modalData.id, newStatus).catch(err => {
-      console.warn("[host] update inquiry status failed:", err.message || err);
-    });
+    const id = modalData.id;
+    // মডালের লেবেলগুলো আসল model enum-এ map করি, নাহলে server sync fail করে।
+    const statusMap = { new: 'delivered', pending: 'viewed', accepted: 'accepted', rejected: 'rejected', archived: 'rejected' };
+    const serverStatus = statusMap[inquiryStatusForm.status] || inquiryStatusForm.status;
+
+    setInquiries(prev => prev.map(i => i.id === id ? { ...i, status: serverStatus } : i));
+    showToast(language === 'বাংলা' ? 'স্ট্যাটাস আপডেট হয়েছে!' : 'Status Updated!');
     setActiveModal(null);
+
+    updateInquiryStatus(id, serverStatus).catch(err => console.warn('[host] status sync failed:', err.message || err));
+
+    // Host visit slot দিলে সেটা tenant-কে PROPOSE করো (তখনই tenant পায়)।
+    if (inquiryStatusForm.visitDate) {
+      const [date, time] = String(inquiryStatusForm.visitDate).split('T');
+      proposeVisit(id, { date, time: time || '', location: '' })
+        .then(updated => setInquiries(prev => prev.map(i => i.id === id ? { ...i, visitSchedule: updated?.visitSchedule, status: updated?.status || i.status } : i)))
+        .catch(err => console.warn('[host] propose visit failed:', err.message || err));
+    }
   };
 
   // Deep-link scrolling and highlight (moved here so inquiries and openModal are initialized)
@@ -1487,41 +1519,50 @@ const HostDashboard = () => {
     if (!propertyId) { showToast(language === 'বাংলা' ? 'প্রপার্টি সিলেক্ট করুন' : 'Pick a property'); return; }
     if (!leaseStart || !leaseEnd) { showToast(language === 'বাংলা' ? 'লিজের তারিখ দিন' : 'Lease dates are required'); return; }
     if (new Date(leaseEnd) <= new Date(leaseStart)) {
-      showToast(language === 'বাংলা' ? 'শেষ তারিখ শুরুর তারিখের পরে হতে হবে' : 'End date must be after start date');
-      return;
+      showToast(language === 'বাংলা' ? 'শেষ তারিখ শুরুর তারিখের পরে হতে হবে' : 'End date must be after start date'); return;
     }
     const rent = Number(monthlyRent) || 0;
     if (rent <= 0) { showToast(language === 'বাংলা' ? 'মাসিক ভাড়া দিন' : 'Monthly rent is required'); return; }
 
-    const matchingProp = properties.find(p => p.id === Number(propertyId)) || null;
+    // ── Duplicate guard: এক property / এক inquiry-তে একটাই active booking ──
+    const pidStr = String(propertyId);
+    const dupe = bookings.find(b => b.status !== 'cancelled' && (
+      (leaseForm.inquiryId && b.inquiryId === leaseForm.inquiryId) || String(b.propertyId) === pidStr
+    ));
+    if (dupe) {
+      showToast(language === 'বাংলা' ? 'এই প্রপার্টির জন্য বুকিং আগে থেকেই আছে।' : 'A booking already exists for this property.');
+      setActiveModal(null); setActiveTab('bookings'); return;
+    }
+
+    const matchingProp = properties.find(p => String(p.id) === pidStr) || null;
     const initials = tenant.trim().split(/\s+/).map(s => s[0]).slice(0, 2).join('').toUpperCase() || 'NT';
     const newBooking = {
       id: `BKG-${String(Date.now()).slice(-6)}`,
       inquiryId: leaseForm.inquiryId,
-      propertyId: Number(propertyId),
+      propertyId: pidStr,
       property: matchingProp?.title || leaseForm.property,
       tenant: tenant.trim(),
       tenantInit: initials,
       tenantPhone: tenantPhone.trim(),
       tenantEmail: '',
-      leaseStart,
-      leaseEnd,
+      leaseStart, leaseEnd,
       monthlyRent: rent,
+      serviceCharge: Number(leaseForm.serviceCharge) || 0,
       rentDueDay: Number(leaseForm.rentDueDay) || 5,
       reminderLeadDays: Number(leaseForm.reminderLeadDays) || 3,
       autoReminder: !!leaseForm.autoReminder,
       chatId: leaseForm.inquiryId || Date.now(),
       notes: leaseForm.notes || '',
+      status: 'active',
       ledger: {},
     };
     setBookings(prev => [newBooking, ...prev]);
 
     createBookingApi({
-      propertyId: matchingProp ? matchingProp._id || matchingProp.id : propertyId,
+      propertyId: matchingProp ? (matchingProp._id || matchingProp.id) : propertyId,
       serviceCharge: Number(leaseForm.serviceCharge) || 0,
       inquiryId: leaseForm.inquiryId,
-      leaseStart,
-      leaseEnd,
+      leaseStart, leaseEnd,
       rentDueDay: Number(leaseForm.rentDueDay) || 5,
       reminderLeadDays: Number(leaseForm.reminderLeadDays) || 3,
       autoReminder: !!leaseForm.autoReminder,
@@ -1533,25 +1574,19 @@ const HostDashboard = () => {
       setBookings(prev => prev.map(b => b.id === newBooking.id ? { ...b, ...saved } : b));
     }).catch(err => {
       console.warn('[host] booking create sync failed:', err.message || err);
-      showToast(language === 'বাংলা' ? 'বুকিং লোকালি সেভ — সার্ভার সিঙ্ক পেন্ডিং' : 'Booking saved locally — server sync pending');
+      // Save fail হলে fake-id card মুছে দাও — নাহলে এটা পরে delete করা যায় না।
+      setBookings(prev => prev.filter(b => b.id !== newBooking.id));
+      showToast(language === 'বাংলা' ? 'বুকিং সেভ ব্যর্থ — আবার চেষ্টা করুন' : 'Booking save failed — please retry');
     });
 
-    // Mark the originating property as rented so it stops appearing in the
-    // public listings while this lease is active.
     if (matchingProp) {
       setProperties(prev => prev.map(p => p.id === matchingProp.id ? { ...p, status: 'rented' } : p));
     }
-
-    // Archive the inquiry so it disappears from the inbox once converted.
     if (leaseForm.inquiryId) {
       setInquiries(prev => prev.filter(i => i.id !== leaseForm.inquiryId));
     }
-
     showToast(language === 'বাংলা' ? 'বুকিং তৈরি হয়েছে! রেন্ট লেজার চালু হয়েছে।' : 'Booking created — rent ledger is live.');
     setActiveModal(null);
-    // Land on the Bookings tab so the host sees the new lease's agreement
-    // metadata (term, deposit, next-due) right away. The 12-month rent
-    // matrix is one click away on the Rent Collection tab.
     setActiveTab('bookings');
   };
 
@@ -4950,7 +4985,7 @@ const HostDashboard = () => {
                     <button onClick={submitInquiryStatus} className="flex-[2] bg-blue-600 text-white py-4 rounded-xl font-black shadow-[0_8px_15px_rgba(37,99,235,0.2)] hover:-translate-y-0.5 hover:shadow-[0_12px_20px_rgba(37,99,235,0.3)] transition-all text-sm">
                       {language === 'বাংলা' ? 'আপডেট সেভ করুন' : 'Save Details'}
                     </button>
-                    <button onClick={() => setActiveModal('create_lease')} className="flex-[1] bg-green-50 text-green-700 py-4 rounded-xl font-black hover:bg-green-100 transition-all text-xs border border-green-200 flex flex-col items-center justify-center leading-tight">
+                    <button onClick={() => openConvertInquiry(modalData)} className="flex-[1] bg-green-50 text-green-700 py-4 rounded-xl font-black hover:bg-green-100 transition-all text-xs border border-green-200 flex flex-col items-center justify-center leading-tight">
                       <span>{language === 'বাংলা' ? 'ডিল ডান?' : 'Deal Done?'}</span>
                       <span className="text-[9px] uppercase tracking-wider">{language === 'বাংলা' ? 'লিজ তৈরি করুন' : 'Create Lease'}</span>
                     </button>
