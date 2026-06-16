@@ -1595,11 +1595,11 @@ const HostDashboard = () => {
       setProperties(prev => prev.map(p => p.id === matchingProp.id ? { ...p, status: 'rented' } : p));
     }
     if (leaseForm.inquiryId) {
-      // Inquiry card কে filter করে সরাই না — শুধু 'rented' status দিই
-      // যেন ইনকোয়ারি ট্যাবে "Rented" পোজিশনে কার্ডটা ঝুলে থাকে।
-      setInquiries(prev => prev.map(i => i.id === leaseForm.inquiryId ? { ...i, status: 'rented' } : i));
-      // Backend-এও sync করি যেন refresh দিলেও rented থাকে।
-      updateInquiryStatus(leaseForm.inquiryId, 'rented').catch(err => console.warn('[host] inquiry rented sync failed:', err.message || err));
+      // Convert হলে canonical status = 'final_booking' (tenant timeline এটাই চেনে)।
+      // Inquiry card সরাই না — Rented tab-এ ঝুলে থাকে।
+      setInquiries(prev => prev.map(i => i.id === leaseForm.inquiryId ? { ...i, status: 'final_booking' } : i));
+      // Backend-এও sync (createBooking-ও এটাই mark করে — idempotent, কোনো race নেই)।
+      updateInquiryStatus(leaseForm.inquiryId, 'final_booking').catch(err => console.warn('[host] inquiry convert sync failed:', err.message || err));
     }
     showToast(language === 'বাংলা' ? 'বুকিং তৈরি হয়েছে! রেন্ট লেজার চালু হয়েছে।' : 'Booking created — rent ledger is live.');
     setActiveModal(null);
@@ -1625,9 +1625,9 @@ const HostDashboard = () => {
     const isPending = ['new', 'pending', 'sent', 'delivered', 'viewed', 'replied'].includes(s);
     
     if (inquiryTab === 'pending') return isPending && matchesSearch;
-    if (inquiryTab === 'accepted') return ['accepted', 'visit_scheduled', 'final_booking'].includes(s) && matchesSearch;
+    if (inquiryTab === 'accepted') return ['accepted', 'visit_scheduled'].includes(s) && matchesSearch;
     if (inquiryTab === 'rejected') return s === 'rejected' && matchesSearch;
-    if (inquiryTab === 'rented') return s === 'rented' && matchesSearch;
+    if (inquiryTab === 'rented') return ['rented', 'final_booking'].includes(s) && matchesSearch;
     return false;
   });
 
