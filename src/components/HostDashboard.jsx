@@ -436,7 +436,9 @@ const HostDashboard = () => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isLangMenuOpen, setIsLangMenuOpen] = useState(false); 
+  const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
+  // Booking delete confirmation — stores the booking id pending confirmation
+  const [confirmDeleteBookingId, setConfirmDeleteBookingId] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   const [activeFolder, setActiveFolder] = useState(null);
   
@@ -1075,9 +1077,16 @@ const HostDashboard = () => {
   };
 
   const handleRemoveBooking = (id) => {
+    // First call: show confirmation overlay (don't delete yet).
+    if (confirmDeleteBookingId !== id) {
+      setConfirmDeleteBookingId(id);
+      setActiveDropdownId(null);
+      return;
+    }
+    // Second call (confirmed): actually remove.
+    setConfirmDeleteBookingId(null);
     setBookings(bookings.filter(b => b.id !== id));
     showToast(language === 'বাংলা' ? 'বুকিং বাদ দেওয়া হয়েছে।' : 'Booking removed.');
-    setActiveDropdownId(null);
     if (/^[0-9a-fA-F]{24}$/.test(String(id))) {
       cancelBookingApi(id).catch(err => console.warn('[host] booking cancel sync failed:', err.message || err));
     }
@@ -1583,7 +1592,9 @@ const HostDashboard = () => {
       setProperties(prev => prev.map(p => p.id === matchingProp.id ? { ...p, status: 'rented' } : p));
     }
     if (leaseForm.inquiryId) {
-      setInquiries(prev => prev.filter(i => i.id !== leaseForm.inquiryId));
+      // Inquiry card কে filter করে সরাই না — শুধু 'rented' status দিই
+      // যেন ইনকোয়ারি ট্যাবে "Rented" পোজিশনে কার্ডটা ঝুলে থাকে।
+      setInquiries(prev => prev.map(i => i.id === leaseForm.inquiryId ? { ...i, status: 'rented' } : i));
     }
     showToast(language === 'বাংলা' ? 'বুকিং তৈরি হয়েছে! রেন্ট লেজার চালু হয়েছে।' : 'Booking created — rent ledger is live.');
     setActiveModal(null);
@@ -3556,7 +3567,17 @@ const HostDashboard = () => {
                               <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
                               <button onClick={() => { showToast(language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড হচ্ছে...' : 'Downloading agreement...'); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
                               <div className="h-px w-full bg-gray-100 my-1"></div>
-                              <button onClick={() => handleRemoveBooking(booking.id)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
+                              {confirmDeleteBookingId === booking.id ? (
+                                <div className="px-3 py-2.5 rounded-xl bg-red-50 border border-red-200">
+                                  <p className="text-[11px] font-black text-red-700 mb-2">{language === 'বাংলা' ? 'সত্যিই ডিলিট করবেন?' : 'Confirm delete?'}</p>
+                                  <div className="flex gap-2">
+                                    <button onClick={() => handleRemoveBooking(booking.id)} className="flex-1 bg-red-600 text-white text-[10px] font-black py-1.5 rounded-lg hover:bg-red-700 transition-colors">{language === 'বাংলা' ? 'হ্যাঁ, ডিলিট' : 'Yes, Delete'}</button>
+                                    <button onClick={() => { setConfirmDeleteBookingId(null); setActiveDropdownId(null); }} className="flex-1 bg-gray-100 text-gray-700 text-[10px] font-black py-1.5 rounded-lg hover:bg-gray-200 transition-colors">{language === 'বাংলা' ? 'বাতিল' : 'Cancel'}</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button onClick={() => handleRemoveBooking(booking.id)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
+                              )}
                             </div>
                           )}
                         </div>
