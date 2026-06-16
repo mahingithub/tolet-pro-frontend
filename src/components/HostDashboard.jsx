@@ -1077,13 +1077,7 @@ const HostDashboard = () => {
   };
 
   const handleRemoveBooking = (id) => {
-    // First call: show confirmation overlay (don't delete yet).
-    if (confirmDeleteBookingId !== id) {
-      setConfirmDeleteBookingId(id);
-      setActiveDropdownId(null);
-      return;
-    }
-    // Second call (confirmed): actually remove.
+    // Confirmed: actually remove.
     setConfirmDeleteBookingId(null);
     setBookings(bookings.filter(b => b.id !== id));
     showToast(language === 'বাংলা' ? 'বুকিং বাদ দেওয়া হয়েছে।' : 'Booking removed.');
@@ -3336,9 +3330,40 @@ const HostDashboard = () => {
                                 )}
                               </div>
 
-                              <button onClick={() => openModal('update_inquiry', inquiry)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-2xl font-black text-[11px] md:text-[12px] shadow-[0_8px_20px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
-                                <Calendar size={14} /> {language === 'বাংলা' ? 'স্ট্যাটাস ও ভিজিট' : 'Update Status & Visit'}
-                              </button>
+                              {inquiry?.visitSchedule?.status === 'accepted' ? (
+                                <div className="w-full bg-blue-50/40 border border-blue-100 rounded-2xl p-4 mt-1">
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <CheckCircle2 size={18} className="text-blue-600" />
+                                    <h4 className="text-sm font-black text-gray-900">{language === 'বাংলা' ? 'ভিজিট কনফার্মড' : 'Visit Confirmed'}</h4>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="bg-white p-3 rounded-xl border border-gray-100 flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                                        <Clock className="text-blue-600" size={14} />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'তারিখ ও সময়' : 'Date & Time'}</p>
+                                        <p className="text-xs font-bold text-gray-900 truncate">
+                                          {inquiry.visitSchedule.date} • {inquiry.visitSchedule.time}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="bg-white p-3 rounded-xl border border-gray-100 flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                                        <MapPin className="text-blue-600" size={14} />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'লোকেশন' : 'Location'}</p>
+                                        <p className="text-xs font-bold text-gray-900 truncate">{inquiry.visitSchedule.location || inquiry.propTitle}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button onClick={() => openModal('update_inquiry', inquiry)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-2xl font-black text-[11px] md:text-[12px] shadow-[0_8px_20px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
+                                  <Calendar size={14} /> {language === 'বাংলা' ? 'ভিজিট অ্যাড করুন' : 'Add Visit'}
+                                </button>
+                              )}
 
                               <div className="grid grid-cols-2 gap-3">
                                 <button onClick={() => openChatPanel(inquiry.chatId, { source: 'host-inquiries', tenantName: inquiry.user, tenantPhone: inquiry.phone, propertyTitle: inquiry.propTitle, prefillMessage: '', peerUserId: inquiry.inquirerUserId })} className="w-full bg-[#ba0036] hover:bg-[#90002a] text-white py-3.5 rounded-2xl font-bold text-[11px] shadow-[0_4px_15px_rgba(186,0,54,0.2)] transition-all flex items-center justify-center gap-1.5 border-none active:scale-95">
