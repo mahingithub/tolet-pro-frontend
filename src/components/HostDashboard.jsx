@@ -639,7 +639,7 @@ const HostDashboard = () => {
   const [propertyRefreshTick, setPropertyRefreshTick] = useState(0);
   const [bookings, setBookings] = useState(initialBookings);
   const [inquiries, setInquiries] = useState(initialInquiries);
-  const [inquiryTab, setInquiryTab] = useState('pending'); // 'pending' | 'accepted' | 'rejected'
+  const [inquiryTab, setInquiryTab] = useState('pending'); // 'pending' | 'accepted' | 'rejected' | 'rented'
   const [searchQuery, setSearchQuery] = useState('');
   const [propertyFilter, setPropertyFilter] = useState('all');
   const [activeModal, setActiveModal] = useState(null); 
@@ -1235,8 +1235,13 @@ const HostDashboard = () => {
   };
 
   // Deep-link scrolling and highlight (moved here so inquiries and openModal are initialized)
+  // NOTE: 'inquiries' REMOVED from deps — it was causing infinite re-fire
+  // (socket update → inquiries change → useEffect → modal open → repeat).
+  const deepLinkDoneRef = useRef(false);
   useEffect(() => {
+    if (deepLinkDoneRef.current) return;
     if (location.state?.highlightId && location.state?.scrollTo) {
+      deepLinkDoneRef.current = true;
       setTimeout(() => {
         const id = location.state.highlightId;
         const el = document.getElementById(`inquiry-${id}`) || document.getElementById(`booking-${id}`) || document.getElementById(`rent-${id}`);
@@ -1257,7 +1262,7 @@ const HostDashboard = () => {
         }
       }, 500); // Wait for tab to switch and render
     }
-  }, [location.state, inquiries]);
+  }, [location.state]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // RENT-LEDGER + BOOKING HANDLERS
@@ -1622,6 +1627,7 @@ const HostDashboard = () => {
     if (inquiryTab === 'pending') return isPending && matchesSearch;
     if (inquiryTab === 'accepted') return ['accepted', 'visit_scheduled', 'final_booking'].includes(s) && matchesSearch;
     if (inquiryTab === 'rejected') return s === 'rejected' && matchesSearch;
+    if (inquiryTab === 'rented') return s === 'rented' && matchesSearch;
     return false;
   });
 
@@ -3184,13 +3190,14 @@ const HostDashboard = () => {
                        {t?.newInquiries || (language === 'বাংলা' ? 'যোগাযোগ সমূহ' : 'Inquiries')}
                      </h3>
                      <div className="flex gap-2">
-                       <button onClick={() => setInquiryTab('pending')} className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${inquiryTab === 'pending' ? 'bg-[#ba0036] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Pending</button>
-                       <button onClick={() => setInquiryTab('accepted')} className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${inquiryTab === 'accepted' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Accepted</button>
-                       <button onClick={() => setInquiryTab('rejected')} className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${inquiryTab === 'rejected' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Rejected</button>
+                       <button onClick={() => setInquiryTab('pending')} className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${inquiryTab === 'pending' ? 'bg-[#ba0036] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{language === 'বাংলা' ? 'পেন্ডিং' : 'Pending'}</button>
+                       <button onClick={() => setInquiryTab('accepted')} className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${inquiryTab === 'accepted' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{language === 'বাংলা' ? 'একসেপ্টেড' : 'Accepted'}</button>
+                       <button onClick={() => setInquiryTab('rented')} className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${inquiryTab === 'rented' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{language === 'বাংলা' ? 'ভাড়া হয়েছে' : 'Rented'}</button>
+                       <button onClick={() => setInquiryTab('rejected')} className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${inquiryTab === 'rejected' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{language === 'বাংলা' ? 'রিজেক্টেড' : 'Rejected'}</button>
                      </div>
                    </div>
                    <span className="bg-[#ba0036]/10 text-[#ba0036] px-5 py-2.5 rounded-full font-black text-[11px] tracking-wide border border-[#ba0036]/10">
-                     {displayedInquiries.length} {inquiryTab === 'pending' ? 'Pending' : inquiryTab === 'accepted' ? 'Accepted' : 'Rejected'}
+                     {displayedInquiries.length} {inquiryTab === 'pending' ? (language === 'বাংলা' ? 'পেন্ডিং' : 'Pending') : inquiryTab === 'accepted' ? (language === 'বাংলা' ? 'একসেপ্টেড' : 'Accepted') : inquiryTab === 'rented' ? (language === 'বাংলা' ? 'ভাড়া হয়েছে' : 'Rented') : (language === 'বাংলা' ? 'রিজেক্টেড' : 'Rejected')}
                    </span>
                 </div>
 
@@ -3304,9 +3311,21 @@ const HostDashboard = () => {
                                   >
                                     <Sparkles size={16} /> {language === 'বাংলা' ? 'বুকিং এ রূপান্তর করুন' : 'Convert to Booking'}
                                   </button>
+                                ) : inquiryTab === 'rented' ? (
+                                  <button
+                                    onClick={() => {
+                                      setInquiries(prev => prev.map(i => i.id === inquiry.id ? { ...i, status: 'accepted' } : i));
+                                      updateInquiryStatus(inquiry.id, 'accepted').catch(err => console.warn('[host] return to accepted failed:', err.message || err));
+                                      showToast(language === 'বাংলা' ? 'ইনকোয়ারি একসেপ্টেড এ ফিরে গেছে।' : 'Inquiry returned to Accepted.');
+                                      setInquiryTab('accepted');
+                                    }}
+                                    className="col-span-2 w-full py-3.5 md:py-4 rounded-2xl font-black text-[12px] md:text-[13px] shadow-[0_8px_20px_rgba(59,130,246,0.25)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 bg-gradient-to-br from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white"
+                                  >
+                                    <RefreshCw size={16} /> {language === 'বাংলা' ? 'রিটার্ন করুন' : 'Return to Accepted'}
+                                  </button>
                                 ) : (
                                   <div className="col-span-2 text-center text-red-600 font-bold text-xs py-3 border border-red-100 rounded-2xl bg-red-50">
-                                    Rejected Inquiry
+                                    {language === 'বাংলা' ? 'রিজেক্টেড ইনকোয়ারি' : 'Rejected Inquiry'}
                                   </div>
                                 )}
                               </div>
@@ -3567,17 +3586,7 @@ const HostDashboard = () => {
                               <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
                               <button onClick={() => { showToast(language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড হচ্ছে...' : 'Downloading agreement...'); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
                               <div className="h-px w-full bg-gray-100 my-1"></div>
-                              {confirmDeleteBookingId === booking.id ? (
-                                <div className="px-3 py-2.5 rounded-xl bg-red-50 border border-red-200">
-                                  <p className="text-[11px] font-black text-red-700 mb-2">{language === 'বাংলা' ? 'সত্যিই ডিলিট করবেন?' : 'Confirm delete?'}</p>
-                                  <div className="flex gap-2">
-                                    <button onClick={() => handleRemoveBooking(booking.id)} className="flex-1 bg-red-600 text-white text-[10px] font-black py-1.5 rounded-lg hover:bg-red-700 transition-colors">{language === 'বাংলা' ? 'হ্যাঁ, ডিলিট' : 'Yes, Delete'}</button>
-                                    <button onClick={() => { setConfirmDeleteBookingId(null); setActiveDropdownId(null); }} className="flex-1 bg-gray-100 text-gray-700 text-[10px] font-black py-1.5 rounded-lg hover:bg-gray-200 transition-colors">{language === 'বাংলা' ? 'বাতিল' : 'Cancel'}</button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <button onClick={() => handleRemoveBooking(booking.id)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
-                              )}
+                              <button onClick={() => handleRemoveBooking(booking.id)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
                             </div>
                           )}
                         </div>
@@ -5365,6 +5374,33 @@ const HostDashboard = () => {
                         )}
                       </>
                     )}
+                  </div>
+                );
+              })()}
+
+              {/* ─ Booking Delete Confirmation ─ Full-screen overlay modal ─ */}
+              {confirmDeleteBookingId && (() => {
+                const bk = bookings.find(b => b.id === confirmDeleteBookingId);
+                return (
+                  <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setConfirmDeleteBookingId(null)}>
+                    <div className="bg-white rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.2)] max-w-sm w-[90%] mx-auto p-8 text-center space-y-5 animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+                      <div className="w-16 h-16 mx-auto rounded-2xl bg-red-50 flex items-center justify-center">
+                        <Trash2 size={32} className="text-red-500" />
+                      </div>
+                      <div>
+                        <h4 className="text-xl font-black text-gray-900">{language === 'বাংলা' ? 'বুকিং ডিলিট করবেন?' : 'Delete this booking?'}</h4>
+                        {bk && <p className="text-sm text-gray-500 font-bold mt-2">{bk.tenant} — {bk.property}</p>}
+                        <p className="text-xs text-gray-400 mt-1">{language === 'বাংলা' ? 'এই অ্যাকশন আর undo করা যাবে না।' : 'This action cannot be undone.'}</p>
+                      </div>
+                      <div className="flex gap-3">
+                        <button onClick={() => setConfirmDeleteBookingId(null)} className="flex-1 py-3.5 rounded-2xl font-black text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                          {language === 'বাংলা' ? 'বাতিল' : 'Cancel'}
+                        </button>
+                        <button onClick={() => handleRemoveBooking(confirmDeleteBookingId)} className="flex-1 py-3.5 rounded-2xl font-black text-sm bg-red-600 text-white hover:bg-red-700 transition-colors shadow-[0_8px_20px_rgba(220,38,38,0.3)]">
+                          {language === 'বাংলা' ? 'হ্যাঁ, ডিলিট করুন' : 'Yes, Delete'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 );
               })()}
