@@ -1037,22 +1037,33 @@ const HostDashboard = () => {
     }
   };
 
-  const handleDocPreview = (doc) => {
+  const handleDocPreview = async (doc) => {
     if (!doc || !doc.fileUrl) return;
     const name = String(doc.fileName || '').toLowerCase();
     const mime = String(doc.fileType || '');
     const isOffice = /\.(docx?|xlsx?|pptx?)$/.test(name) || mime.includes('word') || mime.includes('officedocument') || mime.includes('msword');
-    // PDF + images preview natively; Office docs go through the MS viewer.
-    const previewUrl = isOffice
-      ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(doc.fileUrl)}`
-      : doc.fileUrl;
-    const a = document.createElement('a');
-    a.href = previewUrl;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    if (isOffice) {
+      // Browsers can't render Office files — use Microsoft's online viewer.
+      window.open(`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(doc.fileUrl)}`, '_blank', 'noopener');
+      return;
+    }
+    // PDF / images: Cloudinary 'raw' PDFs download instead of previewing when
+    // opened directly. Fetch the bytes and re-serve as a typed blob so the
+    // browser shows them INLINE. Open the tab synchronously first (within the
+    // click gesture) so popup blockers don't kill it after the await.
+    const isPdf = name.endsWith('.pdf') || mime.includes('pdf');
+    const win = window.open('', '_blank');
+    try {
+      const res = await fetch(doc.fileUrl);
+      if (!res.ok) throw new Error('fetch failed');
+      const buf = await res.arrayBuffer();
+      const type = isPdf ? 'application/pdf' : (mime || 'application/octet-stream');
+      const url = URL.createObjectURL(new Blob([buf], { type }));
+      if (win) win.location = url; else window.open(url, '_blank', 'noopener');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      if (win) win.location = doc.fileUrl; else window.open(doc.fileUrl, '_blank', 'noopener');
+    }
   };
 
   const handleDocDelete = async (doc) => {
