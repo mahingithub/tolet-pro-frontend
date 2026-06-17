@@ -1010,9 +1010,49 @@ const HostDashboard = () => {
     }
   };
 
-  const handleDocDownload = (doc) => {
+  const handleDocDownload = async (doc) => {
     if (!doc || !doc.fileUrl) return;
-    window.open(downloadUrlFor(doc.fileUrl, doc.fileName), '_blank');
+    showToast(language === 'বাংলা' ? 'ডাউনলোড হচ্ছে...' : 'Downloading...');
+    try {
+      const res = await fetch(doc.fileUrl);
+      if (!res.ok) throw new Error('fetch failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = doc.fileName || 'document';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (err) {
+      // Fallback: Cloudinary forced-download URL in a new tab.
+      const a = document.createElement('a');
+      a.href = downloadUrlFor(doc.fileUrl, doc.fileName);
+      a.target = '_blank';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+  };
+
+  const handleDocPreview = (doc) => {
+    if (!doc || !doc.fileUrl) return;
+    const name = String(doc.fileName || '').toLowerCase();
+    const mime = String(doc.fileType || '');
+    const isOffice = /\.(docx?|xlsx?|pptx?)$/.test(name) || mime.includes('word') || mime.includes('officedocument') || mime.includes('msword');
+    // PDF + images preview natively; Office docs go through the MS viewer.
+    const previewUrl = isOffice
+      ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(doc.fileUrl)}`
+      : doc.fileUrl;
+    const a = document.createElement('a');
+    a.href = previewUrl;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
   const handleDocDelete = async (doc) => {
@@ -2695,7 +2735,7 @@ const HostDashboard = () => {
                                   <File size={16}/>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-[12px] font-black text-gray-900 truncate group-hover:text-[#ba0036] cursor-pointer transition-colors" onClick={() => handleDocDownload(file.doc)}>
+                                  <p className="text-[12px] font-black text-gray-900 truncate group-hover:text-[#ba0036] cursor-pointer transition-colors" onClick={() => handleDocPreview(file.doc)}>
                                     {file.name}
                                   </p>
                                   <p className="text-[9px] font-bold text-gray-400 mt-0.5 truncate">{file.meta}</p>
@@ -2704,7 +2744,7 @@ const HostDashboard = () => {
                                   {formatDate(file.date)}
                                 </div>
                                 <div className="shrink-0 flex items-center gap-0.5">
-                                  <button onClick={() => file.doc && file.doc.fileUrl && window.open(file.doc.fileUrl, '_blank')} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors active:scale-95" title="Preview"><Eye size={14}/></button>
+                                  <button onClick={() => handleDocPreview(file.doc)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors active:scale-95" title="Preview"><Eye size={14}/></button>
                                   <button onClick={() => handleDocDownload(file.doc)} className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors active:scale-95" title="Download"><Download size={14}/></button>
                                   <button onClick={() => handleDocDelete(file.doc)} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors active:scale-95" title="Delete"><Trash2 size={14}/></button>
                                 </div>
