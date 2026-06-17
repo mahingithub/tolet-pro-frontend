@@ -1210,23 +1210,21 @@ const HostDashboard = () => {
   const submitInquiryStatus = async () => {
     if (!modalData) return;
     const id = modalData.id;
-    // মডালের লেবেলগুলো আসল model enum-এ map করি, নাহলে server sync fail করে।
-    const statusMap = { new: 'delivered', pending: 'viewed', accepted: 'accepted', rejected: 'rejected', archived: 'rejected' };
-    const serverStatus = statusMap[inquiryStatusForm.status] || inquiryStatusForm.status;
 
-    setInquiries(prev => prev.map(i => i.id === id ? { ...i, status: serverStatus } : i));
-    showToast(language === 'বাংলা' ? 'স্ট্যাটাস আপডেট হয়েছে!' : 'Status Updated!');
-    setActiveModal(null);
-
-    updateInquiryStatus(id, serverStatus).catch(err => console.warn('[host] status sync failed:', err.message || err));
-
-    // Host visit slot দিলে সেটা tenant-কে PROPOSE করো (তখনই tenant পায়)।
-    if (inquiryStatusForm.visitDate) {
-      const [date, time] = String(inquiryStatusForm.visitDate).split('T');
-      proposeVisit(id, { date, time: time || '', location: '' })
-        .then(updated => setInquiries(prev => prev.map(i => i.id === id ? { ...i, visitSchedule: updated?.visitSchedule, status: updated?.status || i.status } : i)))
-        .catch(err => console.warn('[host] propose visit failed:', err.message || err));
+    if (!inquiryStatusForm.visitDate) {
+      showToast(language === 'বাংলা' ? 'ভিজিটের তারিখ ও সময় দিন' : 'Pick a visit date & time');
+      return;
     }
+
+    const [date, time] = String(inquiryStatusForm.visitDate).split('T');
+    setActiveModal(null);
+    showToast(language === 'বাংলা' ? 'ভিজিট প্রস্তাব পাঠানো হয়েছে!' : 'Visit proposed!');
+
+    // Propose the visit to the tenant (realtime). Location comes from the
+    // modal's location field (stored in inquiryStatusForm.notes).
+    proposeVisit(id, { date, time: time || '', location: inquiryStatusForm.notes || '' })
+      .then(updated => setInquiries(prev => prev.map(i => i.id === id ? { ...i, visitSchedule: updated?.visitSchedule, status: updated?.status || i.status } : i)))
+      .catch(err => console.warn('[host] propose visit failed:', err.message || err));
   };
 
   // Deep-link scrolling and highlight (moved here so inquiries and openModal are initialized)
@@ -3133,25 +3131,25 @@ const HostDashboard = () => {
           <div className="w-full animate-in fade-in zoom-in-95 duration-500">
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-10 items-start">
               
-              <div className="xl:col-span-4 w-full flex flex-col gap-5">
+              <div className="xl:col-span-4 w-full flex flex-col gap-5 order-2 xl:order-1">
                 
-                <div className="bg-gradient-to-br from-[#ba0036] to-[#ff004c] rounded-[2rem] p-8 text-white shadow-[0_15px_40px_rgba(186,0,54,0.2)] relative overflow-hidden">
+                <div className="bg-gradient-to-br from-[#ba0036] to-[#ff004c] rounded-[2rem] p-5 sm:p-8 text-white shadow-[0_15px_40px_rgba(186,0,54,0.2)] relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-10 translate-x-10"></div>
-                  <h3 className="text-2xl font-black mb-1 relative z-10">{language === 'বাংলা' ? 'আপনার পারফরম্যান্স' : 'Host Performance'}</h3>
-                  <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest mb-8 relative z-10">{language === 'বাংলা' ? 'সার্বিক পারফরম্যান্স' : 'Performance Overview'}</p>
+                  <h3 className="text-lg sm:text-2xl font-black mb-1 relative z-10">{language === 'বাংলা' ? 'আপনার পারফরম্যান্স' : 'Host Performance'}</h3>
+                  <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest mb-4 sm:mb-8 relative z-10">{language === 'বাংলা' ? 'সার্বিক পারফরম্যান্স' : 'Performance Overview'}</p>
                   
-                  <div className="space-y-6 relative z-10">
+                  <div className="grid grid-cols-3 gap-3 sm:grid-cols-1 sm:gap-6 relative z-10">
                     <div>
                       <p className="text-white/70 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'রেসপন্স রেট' : 'Response Rate'}</p>
-                      <p className="text-3xl font-black">{hostStats.responseRate}%</p>
+                      <p className="text-lg sm:text-3xl font-black">{hostStats.responseRate}%</p>
                     </div>
                     <div>
                       <p className="text-white/70 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'গড় রেসপন্স টাইম' : 'Avg Response Time'}</p>
-                      <p className="text-3xl font-black">{hostStats.avgResponseTime >= 60 ? `${Math.floor(hostStats.avgResponseTime / 60)}${language === 'বাংলা' ? 'ঘ ' : 'h '}${hostStats.avgResponseTime % 60}${language === 'বাংলা' ? 'মি' : 'm'}` : `${hostStats.avgResponseTime} ${language === 'বাংলা' ? 'মিনিট' : 'min'}`}</p>
+                      <p className="text-lg sm:text-3xl font-black">{hostStats.avgResponseTime >= 60 ? `${Math.floor(hostStats.avgResponseTime / 60)}${language === 'বাংলা' ? 'ঘ ' : 'h '}${hostStats.avgResponseTime % 60}${language === 'বাংলা' ? 'মি' : 'm'}` : `${hostStats.avgResponseTime} ${language === 'বাংলা' ? 'মিনিট' : 'min'}`}</p>
                     </div>
                     <div>
                       <p className="text-white/70 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'কনভার্সন রেট' : 'Conversion Rate'}</p>
-                      <p className="text-3xl font-black">{hostStats.conversionRate}%</p>
+                      <p className="text-lg sm:text-3xl font-black">{hostStats.conversionRate}%</p>
                     </div>
                   </div>
                 </div>
@@ -3170,19 +3168,23 @@ const HostDashboard = () => {
                   <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4">{language === 'বাংলা' ? 'ইনকোয়ারি সামারি' : 'Inquiry Summary'}</h4>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center text-sm font-bold text-gray-700">
-                      <span>{language === 'বাংলা' ? 'আজকের নতুন' : 'Today\'s New'}</span>
-                      <span className="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg text-xs">2</span>
+                      <span>{language === 'বাংলা' ? 'নতুন' : 'New'}</span>
+                      <span className="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg text-xs">{inquiries.filter(i => i.status === 'sent').length}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm font-bold text-gray-700">
-                      <span>{language === 'বাংলা' ? 'আনরিড মেসেজ' : 'Unread'}</span>
-                      <span className="bg-red-50 text-[#ba0036] px-2.5 py-1 rounded-lg text-xs">3</span>
+                      <span>{language === 'বাংলা' ? 'একসেপ্টেড' : 'Accepted'}</span>
+                      <span className="bg-green-50 text-green-600 px-2.5 py-1 rounded-lg text-xs">{inquiries.filter(i => ['accepted', 'visit_scheduled'].includes(i.status)).length}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm font-bold text-gray-700">
+                      <span>{language === 'বাংলা' ? 'রিজেক্টেড' : 'Rejected'}</span>
+                      <span className="bg-red-50 text-[#ba0036] px-2.5 py-1 rounded-lg text-xs">{inquiries.filter(i => i.status === 'rejected').length}</span>
                     </div>
                   </div>
                 </div>
 
               </div>
 
-              <div className="xl:col-span-8 w-full flex flex-col xl:h-[calc(100vh-160px)]">
+              <div className="xl:col-span-8 w-full flex flex-col xl:h-[calc(100vh-160px)] order-1 xl:order-2">
                 
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 shrink-0">
                    <div className="flex flex-col gap-2">
@@ -3256,11 +3258,6 @@ const HostDashboard = () => {
                                   <p className="text-sm md:text-base font-black text-[#ba0036] truncate">{inquiry.propTitle}</p> 
                                 </div>
                               </div>
-                            </div>
-
-                            <div className="bg-[#111827] p-5 md:p-6 rounded-2xl relative shadow-lg h-full flex flex-col justify-center">
-                              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">{t?.messageFromUser || (language === 'বাংলা' ? 'মেসেজ' : 'Message')}</p>
-                              <p className="text-sm font-medium text-white italic leading-relaxed">"{inquiry.msg}"</p> 
                             </div>
 
                             {/* Inline Reply — থ্রেডে যোগ হয়, tenant টাইমলাইনে দেখে */}
@@ -3337,14 +3334,14 @@ const HostDashboard = () => {
                                     {language === 'বাংলা' ? 'ভিজিট নিশ্চিত হয়েছে' : 'Visit Confirmed'}
                                     <Check className="text-blue-600" size={16} strokeWidth={3} />
                                   </h4>
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  <div className="grid grid-cols-1 gap-3">
                                     <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-start gap-3">
                                       <div className="bg-blue-50 p-2 rounded-lg text-blue-600 shrink-0">
                                         <Clock size={18} />
                                       </div>
                                       <div className="min-w-0">
                                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'তারিখ ও সময়' : 'Date & Time'}</p>
-                                        <p className="text-sm font-bold text-gray-900 truncate">
+                                        <p className="text-sm font-bold text-gray-900 break-words">
                                           {inquiry.visitSchedule.date} • {inquiry.visitSchedule.time}
                                         </p>
                                       </div>
@@ -3355,7 +3352,7 @@ const HostDashboard = () => {
                                       </div>
                                       <div className="min-w-0">
                                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'লোকেশন' : 'Location'}</p>
-                                        <p className="text-sm font-bold text-gray-900 truncate">{inquiry.visitSchedule.location || inquiry.propTitle}</p>
+                                        <p className="text-sm font-bold text-gray-900 break-words">{inquiry.visitSchedule.location || inquiry.propTitle}</p>
                                       </div>
                                     </div>
                                   </div>
@@ -4625,7 +4622,7 @@ const HostDashboard = () => {
               <h3 className="text-xl font-black text-gray-900 capitalize">
                 {activeModal === 'select_year' && (language === 'বাংলা' ? 'বছর নির্বাচন করুন' : 'Select Year')}
                 {activeModal === 'full_report' && (language === 'বাংলা' ? 'পূর্ণাঙ্গ রিপোর্ট' : 'Full Report')}
-                {activeModal === 'update_inquiry' && (language === 'বাংলা' ? 'ইনকোয়ারি স্ট্যাটাস' : 'Inquiry Status')}
+                {activeModal === 'update_inquiry' && (language === 'বাংলা' ? 'ভিজিট যোগ করুন' : 'Add Visit')}
                 {activeModal === 'create_lease' && (language === 'বাংলা' ? 'নতুন লিজ তৈরি করুন' : 'Create New Lease')}
                 {activeModal === 'edit' && (t?.editPropertyTitle || (language === 'বাংলা' ? 'প্রপার্টি এডিট করুন' : 'Edit Property'))}
                 {activeModal === 'lease' && (t?.leaseAgreementTitle || (language === 'বাংলা' ? 'লিজ এগ্রিমেন্ট' : 'Lease Agreement'))}
@@ -5023,33 +5020,18 @@ const HostDashboard = () => {
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বর্তমান স্ট্যাটাস' : 'Current Status'}</label>
-                    <select value={inquiryStatusForm.status} onChange={e => setInquiryStatusForm(f => ({ ...f, status: e.target.value }))} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(37,99,235,0.08)] border border-transparent focus:border-blue-500/20 transition-all cursor-pointer appearance-none">
-                      <option value="new">{language === 'বাংলা' ? 'নতুন (New)' : 'New'}</option>
-                      <option value="pending">{language === 'বাংলা' ? 'পেন্ডিং (Pending)' : 'Pending'}</option>
-                      <option value="accepted">{language === 'বাংলা' ? 'গৃহীত (Accepted)' : 'Accepted'}</option>
-                      <option value="rejected">{language === 'বাংলা' ? 'বাতিল (Rejected)' : 'Rejected'}</option>
-                      <option value="archived">{language === 'বাংলা' ? 'আর্কাইভ (Archived)' : 'Archived'}</option>
-                    </select>
-                  </div>
-
-                  <div>
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ভিজিটের তারিখ ও সময়' : 'Visit Date & Time'}</label>
                     <input type="datetime-local" value={inquiryStatusForm.visitDate} onChange={e => setInquiryStatusForm(f => ({ ...f, visitDate: e.target.value }))} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(37,99,235,0.08)] border border-transparent focus:border-blue-500/20 transition-all" />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ফলো-আপ নোটস' : 'Follow-up Notes'}</label>
-                    <textarea rows="3" value={inquiryStatusForm.notes} onChange={e => setInquiryStatusForm(f => ({ ...f, notes: e.target.value }))} placeholder={language === 'বাংলা' ? 'যেমন: শুক্রবার বিকেলে সপরিবারে বাসা দেখতে আসবে...' : 'e.g. Coming with family on Friday afternoon...'} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(37,99,235,0.08)] border border-transparent focus:border-blue-500/20 transition-all resize-none custom-scrollbar" />
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'লোকেশন / ঠিকানা' : 'Location / Address'}</label>
+                    <input type="text" value={inquiryStatusForm.notes} onChange={e => setInquiryStatusForm(f => ({ ...f, notes: e.target.value }))} placeholder={language === 'বাংলা' ? 'যেমন: প্রপার্টির ঠিকানা' : 'e.g. Property address'} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(37,99,235,0.08)] border border-transparent focus:border-blue-500/20 transition-all" />
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                    <button onClick={submitInquiryStatus} className="flex-[2] bg-blue-600 text-white py-4 rounded-xl font-black shadow-[0_8px_15px_rgba(37,99,235,0.2)] hover:-translate-y-0.5 hover:shadow-[0_12px_20px_rgba(37,99,235,0.3)] transition-all text-sm">
-                      {language === 'বাংলা' ? 'আপডেট সেভ করুন' : 'Save Details'}
-                    </button>
-                    <button onClick={() => openConvertInquiry(modalData)} className="flex-[1] bg-green-50 text-green-700 py-4 rounded-xl font-black hover:bg-green-100 transition-all text-xs border border-green-200 flex flex-col items-center justify-center leading-tight">
-                      <span>{language === 'বাংলা' ? 'ডিল ডান?' : 'Deal Done?'}</span>
-                      <span className="text-[9px] uppercase tracking-wider">{language === 'বাংলা' ? 'লিজ তৈরি করুন' : 'Create Lease'}</span>
+                  <div className="pt-2">
+                    <button onClick={submitInquiryStatus} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black shadow-[0_8px_15px_rgba(37,99,235,0.2)] hover:-translate-y-0.5 hover:shadow-[0_12px_20px_rgba(37,99,235,0.3)] transition-all text-sm flex items-center justify-center gap-2">
+                      <Calendar size={16} /> {language === 'বাংলা' ? 'আপডেট' : 'Update'}
                     </button>
                   </div>
                 </div>
