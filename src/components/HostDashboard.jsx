@@ -22,6 +22,7 @@ import { getDynamicFields } from '../constants/propertyFields';
 import { subscriptionService } from '../services/subscriptionService';
 import { listHostInquiries, updateInquiryStatus, deleteInquiry, replyToInquiry, respondVisit, proposeVisit } from "../services/inquiryService.js";
 import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi, cancelBooking as cancelBookingApi } from "../services/bookingService.js";
+import { listDocuments as listDocsApi, uploadDocument as uploadDocApi, deleteDocument as deleteDocApi, downloadUrlFor } from "../services/documentService.js";
 import callProvider from "../services/callProvider";
 import { listNotifications, getUnreadCount, markRead, markAllRead } from "../services/notificationService.js";
 import { uploadAvatar } from "../services/authService";
@@ -954,6 +955,78 @@ const HostDashboard = () => {
       () => setToastMessage(null),
       undo ? 6000 : (duration || 3000),
     );
+  };
+
+  // ── Document Vault (real Cloudinary-backed storage) ────────────────────
+  const [documents, setDocuments] = useState([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [uploadForm, setUploadForm] = useState({ folder: 'agreements', bookingId: '', file: null });
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== 'documents') return;
+    let alive = true;
+    setLoadingDocs(true);
+    (async () => {
+      try {
+        const docs = await listDocsApi();
+        if (alive) setDocuments(Array.isArray(docs) ? docs : []);
+      } catch (err) {
+        console.warn('[host] documents load failed:', err.message || err);
+      } finally {
+        if (alive) setLoadingDocs(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [activeTab]);
+
+  const handleDocUpload = async () => {
+    if (!uploadForm.file) {
+      showToast(language === 'বাংলা' ? 'একটি ফাইল সিলেক্ট করুন' : 'Choose a file first');
+      return;
+    }
+    setUploadingDoc(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', uploadForm.file);
+      fd.append('folder', uploadForm.folder);
+      fd.append('fileName', uploadForm.file.name);
+      const b = bookings.find(x => String(x.id) === String(uploadForm.bookingId));
+      if (b) {
+        if (b.tenantId) fd.append('tenantId', b.tenantId);
+        fd.append('tenantName', b.tenant || '');
+        fd.append('tenantPhone', b.tenantPhone || '');
+        fd.append('bookingId', b.id);
+      }
+      const doc = await uploadDocApi(fd);
+      setDocuments(prev => [doc, ...prev]);
+      setUploadForm({ folder: 'agreements', bookingId: '', file: null });
+      setActiveModal(null);
+      showToast(language === 'বাংলা' ? 'ডকুমেন্ট আপলোড হয়েছে!' : 'Document uploaded!');
+    } catch (err) {
+      showToast((language === 'বাংলা' ? 'আপলোড ব্যর্থ: ' : 'Upload failed: ') + (err.message || ''));
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleDocDownload = (doc) => {
+    if (!doc || !doc.fileUrl) return;
+    window.open(downloadUrlFor(doc.fileUrl, doc.fileName), '_blank');
+  };
+
+  const handleDocDelete = async (doc) => {
+    const docId = doc.id || doc._id;
+    if (!window.confirm(language === 'বাংলা' ? 'এই ডকুমেন্ট স্থায়ীভাবে মুছে ফেলবেন?' : 'Permanently delete this document?')) return;
+    const snapshot = documents;
+    setDocuments(p => p.filter(d => (d.id || d._id) !== docId));
+    try {
+      await deleteDocApi(docId);
+      showToast(language === 'বাংলা' ? 'ডকুমেন্ট মুছে ফেলা হয়েছে' : 'Document deleted');
+    } catch (err) {
+      setDocuments(snapshot);
+      showToast((language === 'বাংলা' ? 'ডিলিট ব্যর্থ: ' : 'Delete failed: ') + (err.message || ''));
+    }
   };
 
   // 🟢 PROFILE LOGIC HANDLERS
@@ -2318,13 +2391,12 @@ const HostDashboard = () => {
           // Inspection reports: 1 move-in + 1 move-out per booking that has ever been active.
           const inspectionCount = bookings.filter(b => ['active','notice','done'].includes(computeLeaseStage(b, todayDate))).length * 2;
 
+          const docCount = (fid) => documents.filter(d => d.folder === fid).length;
           const folders = [
-            { id: 'agreements',  icon: FileText,         tint: 'blue',    grad: 'from-blue-500 to-indigo-600',      count: leaseAgreements.length, en: 'Rental Agreements', bn: 'রেন্টাল এগ্রিমেন্ট', desc: language === 'বাংলা' ? `${leaseAgreements.length} সক্রিয় চুক্তি`           : `${leaseAgreements.length} signed leases` },
-            { id: 'nids',        icon: ScanFace,         tint: 'emerald', grad: 'from-emerald-500 to-green-600',    count: tenantIdCount,          en: 'Tenant NID / IDs',  bn: 'ভাড়াটিয়া NID / আইডি', desc: language === 'বাংলা' ? `সকল ভাড়াটিয়ার আইডি`                                 : 'All tenants on file' },
-            { id: 'payments',    icon: Receipt,          tint: 'amber',   grad: 'from-amber-500 to-orange-500',     count: paymentReceipts,        en: 'Payment Records',   bn: 'পেমেন্ট রেকর্ড',       desc: language === 'বাংলা' ? `${paymentReceipts}টি রিসিপ্ট সংরক্ষিত`                : `${paymentReceipts} receipts archived` },
-            { id: 'photos',      icon: ImageIcon,        tint: 'violet',  grad: 'from-violet-500 to-purple-600',    count: propertyPhotoCount,     en: 'Property Photos',   bn: 'প্রপার্টির ছবি',        desc: language === 'বাংলা' ? `${properties.length}টি প্রপার্টিতে`                  : `Across ${properties.length} properties` },
-            { id: 'legal',       icon: Scale,            tint: 'rose',    grad: 'from-rose-500 to-red-600',         count: legalCount,             en: 'Legal Documents',   bn: 'লিগ্যাল ডকুমেন্টস',     desc: language === 'বাংলা' ? `NOC, মালিকানার দলিল`                                  : 'NOC, ownership deeds' },
-            { id: 'inspections', icon: ClipboardCheck,   tint: 'teal',    grad: 'from-teal-500 to-cyan-600',        count: inspectionCount,        en: 'Inspection Reports', bn: 'ইন্সপেকশন রিপোর্ট',    desc: language === 'বাংলা' ? `মুভ-ইন / মুভ-আউট রিপোর্ট`                              : 'Move-in / move-out' },
+            { id: 'agreements', icon: FileText, tint: 'blue',    grad: 'from-blue-500 to-indigo-600',   count: docCount('agreements'), en: 'Rental Agreements', bn: 'রেন্টাল এগ্রিমেন্ট', desc: language === 'বাংলা' ? 'লিজ চুক্তিপত্র'  : 'Signed leases' },
+            { id: 'nids',       icon: ScanFace, tint: 'emerald', grad: 'from-emerald-500 to-green-600', count: docCount('nids'),       en: 'Tenant NID / IDs',  bn: 'ভাড়াটিয়া NID / আইডি', desc: language === 'বাংলা' ? 'ভাড়াটিয়ার আইডি' : 'Tenant IDs' },
+            { id: 'payments',   icon: Receipt,  tint: 'amber',   grad: 'from-amber-500 to-orange-500',  count: docCount('payments'),   en: 'Payment Records',   bn: 'পেমেন্ট রেকর্ড',       desc: language === 'বাংলা' ? 'রিসিপ্ট ও রেকর্ড' : 'Receipts & records' },
+            { id: 'legal',      icon: Scale,    tint: 'rose',    grad: 'from-rose-500 to-red-600',      count: docCount('legal'),      en: 'Legal Documents',   bn: 'লিগ্যাল ডকুমেন্টস',     desc: language === 'বাংলা' ? 'NOC, দলিল'     : 'NOC, deeds' },
           ];
 
           const totalDocs = folders.reduce((s, f) => s + f.count, 0);
@@ -2346,73 +2418,19 @@ const HostDashboard = () => {
             return (f.en + ' ' + f.bn).toLowerCase().includes(q);
           });
 
-          // File list for active folder — synthesised from real data sources.
+          // File list for the active folder — REAL uploaded documents.
           const buildFileList = (folder) => {
             if (!folder) return [];
-            if (folder.id === 'agreements') {
-              return leaseAgreements.map(b => ({
-                id: `agr-${b.id}`,
-                name: `Lease_${(b.tenant || 'tenant').replace(/\s+/g,'_')}.pdf`,
-                meta: `${formatDate(b.leaseStart)} → ${formatDate(b.leaseEnd)} • PDF`,
-                date: b.leaseStart,
-                booking: b,
+            const typeLabel = (m) => (String(m || '').startsWith('image/') ? 'Image' : (String(m || '').includes('pdf') ? 'PDF' : 'Document'));
+            return documents
+              .filter(d => d.folder === folder.id)
+              .map(d => ({
+                id:   d.id || d._id,
+                name: d.fileName,
+                meta: `${d.tenantName ? d.tenantName + ' • ' : ''}${typeLabel(d.fileType)}`,
+                date: d.createdAt,
+                doc:  d,
               }));
-            }
-            if (folder.id === 'nids') {
-              return bookings.filter(b => b.tenantInit).map(b => ({
-                id: `nid-${b.id}`,
-                name: `NID_${(b.tenant || 'tenant').replace(/\s+/g,'_')}.jpg`,
-                meta: `${b.tenantPhone || '—'} • Image`,
-                date: b.leaseStart,
-                booking: b,
-              }));
-            }
-            if (folder.id === 'payments') {
-              const out = [];
-              bookings.forEach(b => {
-                Object.entries(b.ledger || {}).forEach(([k, e]) => {
-                  if (e?.paid) {
-                    out.push({
-                      id: `rcpt-${b.id}-${k}`,
-                      name: `Receipt_${(b.tenant || 'tenant').replace(/\s+/g,'_')}_${k}.pdf`,
-                      meta: `${monthFullLabel(k)} • ${formatBDT(Number(e.amount || 0))} • ${e.method || 'Cash'}`,
-                      date: e.paidOn || `${k}-01`,
-                      booking: b,
-                    });
-                  }
-                });
-              });
-              return out.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-            }
-            if (folder.id === 'photos') {
-              return properties.flatMap(p => Array.from({length: 4}, (_, i) => ({
-                id: `photo-${p.id}-${i}`,
-                name: `${(p.title || 'property').replace(/\s+/g,'_')}_${i+1}.jpg`,
-                meta: `${p.location || 'Dhaka'} • Image`,
-                date: todayIso(),
-                property: p,
-              })));
-            }
-            if (folder.id === 'legal') {
-              return properties.map(p => ({
-                id: `legal-${p.id}`,
-                name: `Ownership_Deed_${(p.title || 'property').replace(/\s+/g,'_')}.pdf`,
-                meta: `${p.location || 'Dhaka'} • PDF`,
-                date: todayIso(),
-                property: p,
-              }));
-            }
-            if (folder.id === 'inspections') {
-              const out = [];
-              bookings.filter(b => ['active','notice','done'].includes(computeLeaseStage(b, todayDate))).forEach(b => {
-                out.push({ id: `insp-in-${b.id}`,  name: `Move-In_${(b.tenant || 'tenant').replace(/\s+/g,'_')}.pdf`,  meta: `${formatDate(b.leaseStart)} • PDF`, date: b.leaseStart, booking: b });
-                if (computeLeaseStage(b, todayDate) === 'done') {
-                  out.push({ id: `insp-out-${b.id}`, name: `Move-Out_${(b.tenant || 'tenant').replace(/\s+/g,'_')}.pdf`, meta: `${formatDate(b.leaseEnd)} • PDF`,  date: b.leaseEnd,  booking: b });
-                }
-              });
-              return out;
-            }
-            return [];
           };
 
           const fileList = buildFileList(activeFolder).filter(f => {
@@ -2677,7 +2695,7 @@ const HostDashboard = () => {
                                   <File size={16}/>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-[12px] font-black text-gray-900 truncate group-hover:text-[#ba0036] cursor-pointer transition-colors" onClick={() => showToast(language === 'বাংলা' ? 'প্রিভিউ খোলা হচ্ছে...' : 'Opening preview...')}>
+                                  <p className="text-[12px] font-black text-gray-900 truncate group-hover:text-[#ba0036] cursor-pointer transition-colors" onClick={() => handleDocDownload(file.doc)}>
                                     {file.name}
                                   </p>
                                   <p className="text-[9px] font-bold text-gray-400 mt-0.5 truncate">{file.meta}</p>
@@ -2686,9 +2704,9 @@ const HostDashboard = () => {
                                   {formatDate(file.date)}
                                 </div>
                                 <div className="shrink-0 flex items-center gap-0.5">
-                                  <button onClick={() => showToast(language === 'বাংলা' ? 'প্রিভিউ খোলা হচ্ছে...' : 'Opening preview...')} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors active:scale-95" title="Preview"><Eye size={14}/></button>
-                                  <button onClick={() => showToast(language === 'বাংলা' ? 'ডাউনলোড হচ্ছে...' : 'Downloading...')} className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors active:scale-95" title="Download"><Download size={14}/></button>
-                                  <button onClick={() => showToast(language === 'বাংলা' ? 'ট্র্যাশে সরানো হলো' : 'Moved to trash')} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors active:scale-95" title="Delete"><Trash2 size={14}/></button>
+                                  <button onClick={() => file.doc && file.doc.fileUrl && window.open(file.doc.fileUrl, '_blank')} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors active:scale-95" title="Preview"><Eye size={14}/></button>
+                                  <button onClick={() => handleDocDownload(file.doc)} className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors active:scale-95" title="Download"><Download size={14}/></button>
+                                  <button onClick={() => handleDocDelete(file.doc)} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors active:scale-95" title="Delete"><Trash2 size={14}/></button>
                                 </div>
                               </div>
                             );
@@ -4699,25 +4717,41 @@ const HostDashboard = () => {
                 <div className="space-y-5 p-6">
                   <div>
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ফোল্ডার নির্বাচন করুন' : 'Select Folder'}</label>
-                    <select className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all cursor-pointer appearance-none">
-                      <option>{language === 'বাংলা' ? 'রেন্টাল এগ্রিমেন্ট' : 'Rental Agreements'}</option>
-                      <option>{language === 'বাংলা' ? 'ভাড়াটিয়া NID / আইডি' : 'Tenant NID / IDs'}</option>
-                      <option>{language === 'বাংলা' ? 'পেমেন্ট রেকর্ড' : 'Payment Records'}</option>
-                      <option>{language === 'বাংলা' ? 'লিগ্যাল ডকুমেন্টস' : 'Legal Documents'}</option>
+                    <select value={uploadForm.folder} onChange={e => setUploadForm(f => ({ ...f, folder: e.target.value }))} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all cursor-pointer appearance-none">
+                      <option value="agreements">{language === 'বাংলা' ? 'রেন্টাল এগ্রিমেন্ট' : 'Rental Agreements'}</option>
+                      <option value="nids">{language === 'বাংলা' ? 'ভাড়াটিয়া NID / আইডি' : 'Tenant NID / IDs'}</option>
+                      <option value="payments">{language === 'বাংলা' ? 'পেমেন্ট রেকর্ড' : 'Payment Records'}</option>
+                      <option value="legal">{language === 'বাংলা' ? 'লিগ্যাল ডকুমেন্টস' : 'Legal Documents'}</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">{language === 'বাংলা' ? 'ফাইল সিলেক্ট করুন' : 'Choose File'}</label>
-                    <div className="border-2 border-dashed border-gray-200 hover:border-[#ba0036] hover:bg-red-50/30 rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer group">
-                       <UploadCloud size={32} className="text-gray-400 group-hover:text-[#ba0036] mb-3 transition-colors" />
-                       <p className="text-sm font-black text-gray-900 mb-1">{language === 'বাংলা' ? 'পিডিএফ বা ছবি আপলোড করুন' : 'Upload PDF or Image'}</p>
-                       <p className="text-[10px] text-gray-500 font-bold">{language === 'বাংলা' ? 'সর্বোচ্চ সাইজ: 10MB' : 'Max size: 10MB'}</p>
-                    </div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'কোন ভাড়াটিয়া? (ঐচ্ছিক)' : 'Which tenant? (optional)'}</label>
+                    <select value={uploadForm.bookingId} onChange={e => setUploadForm(f => ({ ...f, bookingId: e.target.value }))} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all cursor-pointer appearance-none">
+                      <option value="">{language === 'বাংলা' ? '— কোনো ভাড়াটিয়া নয় —' : '— No tenant —'}</option>
+                      {bookings.filter(b => b.status !== 'cancelled').map(b => (
+                        <option key={b.id} value={b.id}>{(b.tenant || (language === 'বাংলা' ? 'ভাড়াটিয়া' : 'Tenant'))}{b.property ? ` — ${b.property}` : ''}</option>
+                      ))}
+                    </select>
+                    {bookings.filter(b => b.status !== 'cancelled').length === 0 && (
+                      <p className="text-[10px] font-bold text-gray-400 mt-1.5">{language === 'বাংলা' ? 'এখনো কোনো সক্রিয় ভাড়াটিয়া নেই — চাইলে ভাড়াটিয়া ছাড়াই আপলোড করুন।' : 'No active tenants yet — you can still upload without one.'}</p>
+                    )}
                   </div>
 
-                  <button onClick={() => { showToast(language === 'বাংলা' ? 'ফাইল আপলোড হচ্ছে...' : 'Uploading File...'); setActiveModal(null); }} className="w-full mt-2 bg-gray-900 text-white py-4 rounded-xl font-black shadow-[0_8px_15px_rgba(0,0,0,0.1)] hover:bg-[#ba0036] transition-all text-sm flex items-center justify-center gap-2">
-                    <Check size={18} /> {language === 'বাংলা' ? 'আপলোড কমপ্লিট করুন' : 'Complete Upload'}
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">{language === 'বাংলা' ? 'ফাইল সিলেক্ট করুন' : 'Choose File'}</label>
+                    <label className="border-2 border-dashed border-gray-200 hover:border-[#ba0036] hover:bg-red-50/30 rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer group">
+                       <input type="file" accept=".pdf,.doc,.docx,image/*" className="hidden" onChange={e => setUploadForm(f => ({ ...f, file: (e.target.files && e.target.files[0]) ? e.target.files[0] : null }))} />
+                       <UploadCloud size={32} className="text-gray-400 group-hover:text-[#ba0036] mb-3 transition-colors" />
+                       <p className="text-sm font-black text-gray-900 mb-1 break-all px-2">{uploadForm.file ? uploadForm.file.name : (language === 'বাংলা' ? 'পিডিএফ, DOCX বা ছবি আপলোড করুন' : 'Upload PDF, DOCX or Image')}</p>
+                       <p className="text-[10px] text-gray-500 font-bold">{uploadForm.file ? `${(uploadForm.file.size / 1024 / 1024).toFixed(2)} MB` : (language === 'বাংলা' ? 'সর্বোচ্চ সাইজ: 10MB' : 'Max size: 10MB')}</p>
+                    </label>
+                  </div>
+
+                  <button onClick={handleDocUpload} disabled={uploadingDoc} className="w-full mt-2 bg-gray-900 text-white py-4 rounded-xl font-black shadow-[0_8px_15px_rgba(0,0,0,0.1)] hover:bg-[#ba0036] transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-60">
+                    {uploadingDoc
+                      ? (language === 'বাংলা' ? 'আপলোড হচ্ছে...' : 'Uploading...')
+                      : (<><Check size={18} /> {language === 'বাংলা' ? 'আপলোড কমপ্লিট করুন' : 'Complete Upload'}</>)}
                   </button>
                 </div>
               )}
