@@ -4658,7 +4658,28 @@ const HostDashboard = () => {
             ───────────────────────────────────────────────────────────────── */}
         {activeTab === 'smartAlerts' && (
           <div className="w-full h-[calc(100vh-120px)] animate-in fade-in zoom-in-95 duration-500 overflow-y-auto">
-             <Smartalertspage bookings={bookings} today={today} />
+             <Smartalertspage
+               bookings={bookings}
+               inquiries={inquiries}
+               today={today}
+               onMessageTenant={(alert) => {
+                 let chatId = `chat-${alert.bookingId || alert.inquiryId || Date.now()}`;
+                 let peerUserId = null;
+                 if (alert.category === 'inquiry' && alert.inquiryId) {
+                   const inq = inquiries.find(i => i.id === alert.inquiryId);
+                   if (inq) { chatId = inq.chatId || chatId; peerUserId = inq.inquirerUserId; }
+                 } else if (alert.bookingId) {
+                   const b = bookings.find(b => b.id === alert.bookingId);
+                   if (b) { chatId = b.chatId || chatId; peerUserId = b.tenantId; }
+                 }
+                 openChatPanel(chatId, {
+                   source: 'smart-alerts',
+                   tenantName: alert.tenant,
+                   tenantPhone: alert.phone,
+                   peerUserId
+                 });
+               }}
+             />
           </div>
         )}
 
