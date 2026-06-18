@@ -1441,7 +1441,7 @@ const PropertyListing = () => {
 				</aside>
 
 				{/* MAIN RIGHT CONTENT */}
-				<main className="flex flex-col gap-6 lg:gap-8 min-h-screen">
+				<main className="flex flex-col gap-2 lg:gap-3 min-h-screen">
 					<div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-2">
 						<div>
 							<p className="text-xs font-bold text-gray-500 flex items-center gap-2 mb-2">
