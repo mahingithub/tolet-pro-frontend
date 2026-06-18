@@ -477,6 +477,7 @@ const PopularAreasBento = ({ t, onPickArea, properties = [] }) => {
 const AreaSubzonesSheet = ({ area, onClose, onPickLocation, t }) => {
   if (!area) return null;
   const subzones = POPULAR_AREA_SUBZONES[area] || [];
+  const cover = POPULAR_AREA_IMAGES[area] || '';
 
   const handlePick = (sub) => {
     onClose();
@@ -485,88 +486,57 @@ const AreaSubzonesSheet = ({ area, onClose, onPickLocation, t }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-end"
-      role="dialog"
-      aria-modal="true"
+      className="fixed inset-0 z-[85] flex items-end md:hidden bg-black/55 backdrop-blur-sm animate-in fade-in duration-150"
       onClick={onClose}
     >
-      <div className="absolute inset-0 bg-black/55 backdrop-blur-sm animate-[fadeIn_0.2s_ease]" />
-
       <div
+        className="w-full bg-white rounded-t-3xl pb-[calc(env(safe-area-inset-bottom)+1rem)] animate-in slide-in-from-bottom-10 duration-200 max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-h-[85vh] rounded-t-[32px] overflow-hidden bg-gradient-to-b from-[#0b1320] via-[#161e36] to-[#0b1320] text-white shadow-[0_-30px_60px_-20px_rgba(0,0,0,0.6)] animate-[slideUp_0.32s_cubic-bezier(0.22,1,0.36,1)]"
       >
-        {/* drag handle */}
-        <div className="pt-2.5 flex justify-center">
-          <span className="w-12 h-1.5 rounded-full bg-white/30" />
-        </div>
-
-        {/* header */}
-        <div className="px-5 pt-3 pb-4 relative">
-          <div
-            className="absolute inset-x-0 top-0 h-32 pointer-events-none opacity-60"
-            style={{
-              background:
-                'radial-gradient(closest-side at 50% 0%, rgba(186,0,54,0.45), transparent 70%)',
-            }}
-          />
-          <div className="relative flex items-center justify-between">
+        <div className="relative h-32 shrink-0">
+          <SafeImg src={cover} alt={area} className="absolute inset-0 w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/0" />
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white active:scale-95 transition-transform"
+          >
+            <X size={16} strokeWidth={2.5} />
+          </button>
+          <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between">
             <div>
-              <span className="text-[9.5px] font-black uppercase tracking-[0.24em] text-white/60">
-                {t.mobChooseSubzone || 'Choose a sub-zone'}
-              </span>
-              <h3 className="mt-1 text-[22px] font-black leading-none tracking-tight">
+              <p className="text-[9.5px] font-black uppercase tracking-[0.2em] text-white/80">
+                {t.mobPopularAreas || 'Popular Areas'}
+              </p>
+              <h3 className="text-white text-[22px] font-black tracking-tight leading-none mt-1 drop-shadow-md">
                 {area}
               </h3>
-              <p className="mt-1 text-[11px] text-white/70 font-semibold">
-                {subzones.length} {t.mobZones || 'zones'} · {t.mobTapToBrowse || 'tap to browse homes'}
-              </p>
             </div>
-            <button
-              onClick={onClose}
-              aria-label="Close"
-              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-center text-white transition"
-            >
-              <X size={16} strokeWidth={2.5} />
-            </button>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/80">
+              {subzones.length} {t.mobZones || 'zones'}
+            </span>
           </div>
         </div>
 
-        {/* sub-zone grid */}
-        <div className="px-4 pb-7 overflow-y-auto max-h-[64vh]">
-          <div className="grid grid-cols-2 gap-2.5">
+        <div className="pt-3 pb-2 flex justify-center">
+          <span className="w-10 h-1 rounded-full bg-gray-300 -mt-1.5" />
+        </div>
+        <div className="px-4 pt-1 pb-3">
+          <h4 className="text-[12px] font-black uppercase tracking-widest text-gray-500 mb-2">
+            {t.mobChooseSubzone || 'Choose a sub-zone'}
+          </h4>
+          <div className="grid grid-cols-2 gap-2 overflow-y-auto" style={{ maxHeight: '40vh' }}>
             {subzones.map((sub, idx) => (
               <button
                 key={sub.id}
                 onClick={() => handlePick(sub)}
-                className="relative overflow-hidden text-left px-3 py-3 rounded-2xl bg-white/[0.07] hover:bg-white/[0.12] border border-white/15 active:scale-[0.98] transition"
-                style={{ boxShadow: '0 12px 30px -16px rgba(0,0,0,0.65)' }}
+                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-50 to-white border border-gray-200 hover:border-[#ba0036]/40 hover:from-red-50 hover:to-white px-3 py-2.5 text-left active:scale-[0.98] transition-all"
               >
-                {/* corner index */}
-                <span className="absolute top-2 right-2 text-[9px] font-black tracking-[0.18em] text-white/40">
-                  {String(idx + 1).padStart(2, '0')}
-                </span>
-                {/* glow */}
-                <span
-                  className="absolute -bottom-8 -right-8 w-20 h-20 rounded-full opacity-50 pointer-events-none"
-                  style={{
-                    background:
-                      'radial-gradient(closest-side, rgba(186,0,54,0.55), transparent 70%)',
-                  }}
-                />
-                <span className="relative inline-flex items-center gap-1.5 mb-1.5 px-2 py-0.5 rounded-full bg-[#ba0036]/20 border border-[#ba0036]/40 text-[9px] font-black uppercase tracking-[0.18em] text-[#ff7a98]">
-                  <MapPin size={9} strokeWidth={3} />
-                  {area}
-                </span>
-                <h4 className="relative text-[14px] font-black leading-tight text-white">
+                <span className="block text-[12.5px] font-black text-gray-800 group-hover:text-[#ba0036] truncate">
                   {sub.name}
-                </h4>
-                <p className="relative text-[10.5px] text-white/65 font-semibold mt-0.5 leading-tight">
-                  {sub.tagline}
-                </p>
-                <span className="relative mt-2 inline-flex items-center gap-1 text-[10px] font-black tracking-wide text-white">
+                </span>
+                <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
                   {t.mobBrowseHomes || 'Browse homes'}
-                  <ArrowRight size={11} strokeWidth={3} />
                 </span>
               </button>
             ))}
@@ -814,7 +784,7 @@ const PropertyCard = ({ property, t, landlord }) => {
 };
 
 
-const CategoryPromptSheet = ({ open, locationName, onClose, onPickCategory }) => {
+const CategoryPromptSheet = ({ open, locationName, onClose, onPickCategory, t }) => {
   if (!open) return null;
   return (
     <div
@@ -833,7 +803,7 @@ const CategoryPromptSheet = ({ open, locationName, onClose, onPickCategory }) =>
             {locationName}
           </h3>
           <h2 className="text-[20px] font-black text-gray-900 leading-tight">
-            What are you looking for?
+            {t.mobWhatAreYouLookingFor || 'What are you looking for?'}
           </h2>
         </div>
         <div className="px-4 pb-4 grid gap-3">
@@ -846,8 +816,8 @@ const CategoryPromptSheet = ({ open, locationName, onClose, onPickCategory }) =>
                 <HomeIcon size={20} strokeWidth={2.5} />
               </div>
               <div className="text-left">
-                <h4 className="text-[15px] font-black text-gray-900 group-hover:text-[#ba0036]">Rent a Home</h4>
-                <p className="text-[11px] font-bold text-gray-500">Apartments, sublets, bachelor flats</p>
+                <h4 className="text-[15px] font-black text-gray-900 group-hover:text-[#ba0036]">{t.rentMenu || 'Rent'}</h4>
+                <p className="text-[11px] font-bold text-gray-500">{t.mobRentDesc || 'Apartments, sublets, bachelor flats'}</p>
               </div>
             </div>
             <ChevronRight size={18} className="text-gray-400 group-hover:text-[#ba0036]" />
@@ -862,8 +832,8 @@ const CategoryPromptSheet = ({ open, locationName, onClose, onPickCategory }) =>
                 <Wallet size={20} strokeWidth={2.5} />
               </div>
               <div className="text-left">
-                <h4 className="text-[15px] font-black text-gray-900 group-hover:text-blue-600">Buy a Property</h4>
-                <p className="text-[11px] font-bold text-gray-500">Houses, flats, land, commercial</p>
+                <h4 className="text-[15px] font-black text-gray-900 group-hover:text-blue-600">{t.buyMenu || 'Buy'}</h4>
+                <p className="text-[11px] font-bold text-gray-500">{t.mobBuyDesc || 'Houses, flats, land'}</p>
               </div>
             </div>
             <ChevronRight size={18} className="text-gray-400 group-hover:text-blue-600" />
@@ -878,8 +848,8 @@ const CategoryPromptSheet = ({ open, locationName, onClose, onPickCategory }) =>
                 <Building2 size={20} strokeWidth={2.5} />
               </div>
               <div className="text-left">
-                <h4 className="text-[15px] font-black text-gray-900 group-hover:text-amber-600">Commercial Space</h4>
-                <p className="text-[11px] font-bold text-gray-500">Offices, shops, restaurants</p>
+                <h4 className="text-[15px] font-black text-gray-900 group-hover:text-amber-600">{t.commercialMenu || 'Commercial'}</h4>
+                <p className="text-[11px] font-bold text-gray-500">{t.mobCommercialDesc || 'Offices, shops, restaurants'}</p>
               </div>
             </div>
             <ChevronRight size={18} className="text-gray-400 group-hover:text-amber-600" />
@@ -1338,11 +1308,13 @@ const MobileHome = () => {
         onPickLocation={handleAreaSubzonePick}
         t={t}
       />
+      {/* ───────── POPUPS / BOTTOM SHEETS ───────── */}
       <CategoryPromptSheet
         open={isCategoryPromptOpen}
         locationName={pendingLocation}
         onClose={() => setIsCategoryPromptOpen(false)}
         onPickCategory={handleFinalNavigate}
+        t={t}
       />
     </div>
   );
