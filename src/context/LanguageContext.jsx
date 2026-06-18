@@ -494,6 +494,13 @@ const translations = {
     mobStudent: "STUDENT",
     mobPremium: "PREMIUM",
     mobHot: "HOT",
+    mobWhatAreYouLookingFor: "What are you looking for?",
+    rentMenu: "Rent",
+    mobRentDesc: "Apartments, sublets, bachelor flats",
+    buyMenu: "Buy",
+    mobBuyDesc: "Houses, flats, land",
+    commercialMenu: "Commercial",
+    mobCommercialDesc: "Offices, shops, restaurants",
   },
 
   'বাংলা': {
@@ -976,6 +983,13 @@ const translations = {
     mobStudent: "ছাত্র/ছাত্রী",
     mobPremium: "প্রিমিয়াম",
     mobHot: "হট",
+    mobWhatAreYouLookingFor: "আপনি কী খুঁজছেন?",
+    rentMenu: "ভাড়া",
+    mobRentDesc: "অ্যাপার্টমেন্ট, সাবলেট, ব্যাচেলর ফ্ল্যাট",
+    buyMenu: "ক্রয়",
+    mobBuyDesc: "বাড়ি, ফ্ল্যাট, জমি",
+    commercialMenu: "বাণিজ্যিক",
+    mobCommercialDesc: "অফিস, দোকান, রেস্টুরেন্ট",
   }
 };
 
