@@ -2927,6 +2927,7 @@ const handleWizardSubmit = async (payload) => {
                             : `Got the ${monthLbl} receipt, thank you.`);
                       navigate('/messages', {
                         state: {
+                          peerUserId: activeReceipt.landlordId,
                           chatId: activeReceipt.landlordChatId,
                           source: 'tenant-receipt',
                           receiptId: activeReceipt.id,

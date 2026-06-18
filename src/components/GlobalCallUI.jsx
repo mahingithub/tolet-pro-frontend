@@ -219,7 +219,7 @@ const GlobalCallUI = () => {
                 label: 'Call Back',
                 onClick: () => {
                   toast.dismiss();
-                  navigate('/messages', { state: { userId: prev.callerId, action: 'call' } });
+                  navigate('/messages', { state: { peerUserId: prev.callerId, action: 'call' } });
                 }
               },
               duration: 10000,
