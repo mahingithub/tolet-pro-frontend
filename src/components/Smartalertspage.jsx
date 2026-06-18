@@ -17,7 +17,7 @@ const COLOR = {
   low:    { border: 'border-blue-100',  glow: 'shadow-[0_4px_20px_rgba(59,130,246,0.08)]',  bg: 'bg-blue-50/40',  text: 'text-blue-600',  badge: 'bg-blue-100 text-blue-700' },
 };
 const colorFor = (type) => COLOR[type] || COLOR.low;
-const ICONS = { overdue: AlertTriangle, dueToday: Hourglass, dueSoon: Clock, upcoming: Calendar, collected: CheckCircle2, leaseEnding: RefreshCw, leaseExpired: Building, inquiry: MessageSquare, hot: Home };
+const ICONS = { overdue: AlertTriangle, dueToday: Hourglass, dueSoon: Clock, upcoming: Calendar, collected: CheckCircle2, leaseEnding: RefreshCw, leaseExpired: Building, inquiry: MessageSquare, hot: Home, receipt: CreditCard, accepted: CheckCheck };
 const iconFor = (k) => ICONS[k] || Bell;
 
 const FILTERS = ['all', 'urgent', 'medium', 'low'];
@@ -25,7 +25,7 @@ const CATEGORIES = ['all', 'payment', 'lease', 'maintenance', 'inquiry'];
 
 const categoryLabel = { all: 'All', payment: 'Payment', lease: 'Lease', maintenance: 'Maintenance', inquiry: 'Inquiry' };
 
-export default function SmartAlertsPage({ bookings = [], inquiries = [], today, onMessageTenant }) {
+export default function SmartAlertsPage({ bookings = [], inquiries = [], today, onMessageTenant, alerts: alertsProp, resolved: resolvedProp, actionLabel }) {
   const navigate = useNavigate();
   const { language = 'English' } = useLanguage() || {};
   const bn = language === 'বাংলা';
@@ -39,8 +39,8 @@ export default function SmartAlertsPage({ bookings = [], inquiries = [], today, 
   const showToast = (msg) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
   const dismiss = (id) => { setDismissed(prev => [...prev, id]); showToast(bn ? 'অ্যালার্ট সরানো হয়েছে' : 'Alert dismissed'); };
 
-  // Real alerts derived from the host's data: rent (payment) + lease lifecycle + inquiries/leads.
-  const { alerts: rawAlerts, resolved: rawResolved } = useMemo(() => {
+  // Landlord alerts are computed here; the tenant passes pre-computed alerts via props.
+  const computed = useMemo(() => {
     const now = today || new Date();
     const rent = buildRentAlerts(bookings, now, language);
     const lease = buildLeaseAlerts(bookings, now, language);
@@ -51,6 +51,9 @@ export default function SmartAlertsPage({ bookings = [], inquiries = [], today, 
     );
     return { alerts: merged, resolved: rent.resolved };
   }, [bookings, inquiries, today, language]);
+
+  const rawAlerts = alertsProp ?? computed.alerts;
+  const rawResolved = resolvedProp ?? computed.resolved;
   const allAlerts = rawAlerts.map(a => ({ ...a, color: colorFor(a.type), icon: iconFor(a.iconType) }));
   const resolvedAlerts = rawResolved.map(r => ({ ...r, color: colorFor(r.type).text, icon: iconFor(r.iconType) }));
 
@@ -261,7 +264,7 @@ export default function SmartAlertsPage({ bookings = [], inquiries = [], today, 
                         onClick={() => { if (onMessageTenant) onMessageTenant(alert); else showToast(bn ? 'রিমাইন্ডার পাঠানো হয়েছে' : 'Reminder sent'); }}
                         className={`flex-1 py-2.5 rounded-xl text-[11px] font-black text-white transition-all active:scale-95 ${alert.type === 'urgent' ? 'bg-[#ba0036] shadow-[0_4px_12px_rgba(186,0,54,0.25)]' : 'bg-gray-800'} hover:opacity-90`}
                       >
-                        {bn ? 'মেসেজ করুন' : 'Message Tenant'}
+                        {alert.actionLabel || actionLabel || (bn ? 'মেসেজ করুন' : 'Message Tenant')}
                       </button>
                       <button
                         onClick={() => dismiss(alert.id)}

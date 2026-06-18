@@ -325,3 +325,129 @@ export function buildInquiryAlerts(inquiries = [], today = new Date(), lang = 'E
 
   return { alerts };
 }
+
+/**
+ * buildTenantAlerts — the tenant's side ("both parties" half).
+ * Derived from the tenant's own data: rent ledger receipts + inquiry status.
+ *
+ *   Rent (from receipts, monthly granularity):
+ *     • overdue   → a past month still has an outstanding balance
+ *     • due       → the current month has an outstanding balance
+ *     • upcoming  → a future month has a balance (gentle heads-up)
+ *     • receipt   → a new (unread) paid receipt is ready  [actionable]
+ *     • collected → already-seen paid month               [resolved]
+ *   Inquiry (from status):
+ *     • accepted  → landlord accepted the inquiry 🎉       [contact]
+ *     • replied   → landlord replied                       [contact]
+ *
+ * Each alert carries `actionType` ('view_receipt' | 'contact_landlord') and an
+ * `actionLabel` so the shared page can show the right button + dispatch.
+ */
+export function buildTenantAlerts(inquiries = [], receipts = [], today = new Date(), lang = 'English') {
+  const bn = lang === 'বাংলা';
+  const t0 = startOfDay(today) || startOfDay(new Date());
+  const curKey = monthKeyOf(t0);
+  const alerts = [];
+  const resolved = [];
+
+  // ── Rent, from the tenant's ledger receipts ──
+  for (const r of (receipts || [])) {
+    if (!r || !r.monthKey) continue;
+    const balance = Number(r.balance ?? ((Number(r.totalDue) || 0) - (Number(r.totalPaid) || 0))) || 0;
+    const isFull = r.status === 'full' || balance <= 0;
+    const property = r.propertyTitle || (bn ? 'আপনার বাসা' : 'your rental');
+    const monthLbl = r.monthLabel || r.monthKey;
+    const idTail = `${r.monthKey}-${r.propertyId || ''}`;
+
+    if (isFull) {
+      if (r.read === false) {
+        alerts.push({
+          id: `trcpt-${idTail}`,
+          category: 'payment', type: 'low', iconType: 'receipt',
+          title: bn ? `নতুন রিসিট — ${monthLbl}` : `New receipt — ${monthLbl}`,
+          subtitle: bn ? `${property} • পরিশোধিত` : `${property} • paid`,
+          detail: bn
+            ? `${property}-এর ${monthLbl} মাসের ভাড়ার রিসিট তৈরি হয়েছে। দেখে নিন এবং রেকর্ডের জন্য রাখুন।`
+            : `Your rent receipt for ${monthLbl} (${property}) is ready. Open it and keep it for your records.`,
+          daysLeft: null, actionType: 'view_receipt', actionLabel: bn ? 'রিসিট দেখুন' : 'View receipt', monthKey: r.monthKey,
+        });
+      } else {
+        resolved.push({
+          id: `trcpt-${idTail}`, type: 'low', iconType: 'collected',
+          title: bn ? `ভাড়া পরিশোধিত — ${monthLbl}` : `Rent paid — ${monthLbl}`,
+          detail: `${property} • ৳${fmtAmount(r.totalPaid || 0, bn)}`,
+          resolvedOn: r.date || (bn ? 'পরিশোধিত' : 'Paid'),
+        });
+      }
+      continue;
+    }
+
+    // Outstanding balance (unpaid / partial)
+    const amountStr = fmtAmount(balance, bn);
+    const isPast = r.monthKey < curKey;
+    const isCurrent = r.monthKey === curKey;
+    let type, iconType, title, subtitle, detail;
+    if (isPast) {
+      type = 'urgent'; iconType = 'overdue';
+      title = bn ? `ভাড়া বকেয়া — ${monthLbl}` : `Rent overdue — ${monthLbl}`;
+      subtitle = bn ? `${property} • ৳${amountStr} বাকি` : `${property} • ৳${amountStr} due`;
+      detail = bn
+        ? `${property}-এর ${monthLbl} মাসের ভাড়া ৳${amountStr} এখনো বাকি। দেরি হলে বিলম্ব ফি লাগতে পারে — দ্রুত পরিশোধ করুন বা মালিকের সাথে কথা বলুন।`
+        : `৳${amountStr} rent for ${monthLbl} (${property}) is still outstanding. Late payment may add a fee — pay soon or talk to your landlord.`;
+    } else if (isCurrent) {
+      type = 'medium'; iconType = 'dueToday';
+      title = bn ? `এ মাসের ভাড়া বাকি — ${monthLbl}` : `This month's rent due — ${monthLbl}`;
+      subtitle = `${property} • ৳${amountStr}`;
+      detail = bn
+        ? `${property}-এর ${monthLbl} মাসের ভাড়া ৳${amountStr} বাকি আছে। সময়মতো পরিশোধ করলে ঝামেলা এড়ানো যায়।`
+        : `৳${amountStr} rent for ${monthLbl} (${property}) is due. Paying on time keeps things smooth.`;
+    } else {
+      type = 'low'; iconType = 'upcoming';
+      title = bn ? `আসন্ন ভাড়া — ${monthLbl}` : `Upcoming rent — ${monthLbl}`;
+      subtitle = `${property} • ৳${amountStr}`;
+      detail = bn
+        ? `${property}-এর ${monthLbl} মাসের ভাড়া ৳${amountStr} আসছে।`
+        : `৳${amountStr} rent for ${monthLbl} (${property}) is coming up.`;
+    }
+    alerts.push({
+      id: `trent-${idTail}`, category: 'payment', type, iconType,
+      title, subtitle, detail, amount: amountStr, daysLeft: null,
+      actionType: 'view_receipt', actionLabel: bn ? 'দেখুন' : 'View', monthKey: r.monthKey,
+    });
+  }
+
+  // ── Inquiry status ──
+  for (const q of (inquiries || [])) {
+    if (!q) continue;
+    const property = q.propTitle || (bn ? 'একটি বাসা' : 'a property');
+    const phone = q.landlordPhone || q.ownerPhone || '';
+    const base = {
+      category: 'inquiry', tenant: property, phone,
+      inquiryId: q.id || q._id, propertyId: q.propertyId, daysLeft: null,
+      actionType: 'contact_landlord', actionLabel: bn ? 'যোগাযোগ করুন' : 'Contact',
+    };
+    if (q.status === 'accepted') {
+      alerts.push({
+        ...base, id: `tinq-acc-${q.id || q._id}`, type: 'medium', iconType: 'accepted',
+        title: bn ? 'ইনকোয়ারি গৃহীত! 🎉' : 'Inquiry accepted! 🎉',
+        subtitle: property,
+        detail: bn
+          ? `"${property}"-এর জন্য আপনার ইনকোয়ারি মালিক গ্রহণ করেছেন। পরবর্তী ধাপ ঠিক করতে মালিকের সাথে যোগাযোগ করুন।`
+          : `The landlord accepted your inquiry for "${property}". Contact them to arrange the next steps.`,
+      });
+    } else if (q.status === 'replied') {
+      alerts.push({
+        ...base, id: `tinq-rep-${q.id || q._id}`, type: 'medium', iconType: 'inquiry',
+        title: bn ? 'মালিক রিপ্লাই দিয়েছেন' : 'Landlord replied',
+        subtitle: property,
+        detail: bn
+          ? `"${property}" নিয়ে মালিক উত্তর দিয়েছেন। কথা চালিয়ে যেতে যোগাযোগ করুন।`
+          : `The landlord replied about "${property}". Reach out to continue the conversation.`,
+      });
+    }
+  }
+
+  const rank = { urgent: 0, medium: 1, low: 2 };
+  alerts.sort((a, b) => (rank[a.type] - rank[b.type]) || ((a.daysLeft ?? 999) - (b.daysLeft ?? 999)));
+  return { alerts, resolved };
+}

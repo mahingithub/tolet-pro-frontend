@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
 import { uploadVerificationDoc, uploadAvatar, getCurrentToken } from '../services/authService';
 import { listMyInquiries, deleteInquiry } from '../services/inquiryService.js';
 import { listTenantReceipts } from '../services/receiptService.js';
 import { listNotifications, getUnreadCount, markRead } from '../services/notificationService.js';
 import { propertyService } from '../services/Propertyservice.js';
+import { buildTenantAlerts } from '../utils/rentAlerts';
+import SmartAlertsPage from './Smartalertspage';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Building2, Search, Bell, Globe, LayoutDashboard, Heart,
@@ -453,7 +455,7 @@ const TenantDashboard = () => {
       setActiveTab(location.state.activeTab);
     }
     const tab = new URLSearchParams(location.search).get('tab');
-    if (tab && ['overview', 'saved', 'applications', 'payments', 'settings', 'profile'].includes(tab)) {
+    if (tab && ['overview', 'saved', 'applications', 'alerts', 'payments', 'settings', 'profile'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [location]);
@@ -1115,6 +1117,26 @@ const handleWizardSubmit = async (payload) => {
 
   const unreadReceiptsCount = paymentReceipts.filter(r => !r.read).length;
 
+  // 🟢 NEW: Smart Alerts for the tenant — derived from their inquiries + rent ledger.
+  const { alerts: tenantAlerts, resolved: tenantResolved } = useMemo(
+    () => buildTenantAlerts(myInquiries, paymentReceipts, new Date(), language),
+    [myInquiries, paymentReceipts, language],
+  );
+  const tenantAlertCount = tenantAlerts.filter(a => a.type !== 'low').length;
+
+  // Dispatch an alert's action: open the relevant receipt, or call the landlord.
+  const handleAlertAction = (alert) => {
+    if (!alert) return;
+    if (alert.actionType === 'view_receipt') {
+      const r = paymentReceipts.find(x => x.monthKey === alert.monthKey);
+      if (r) { setActiveReceipt(r); markReceiptRead(r.id); }
+      else { setActiveTab('payments'); }
+    } else if (alert.actionType === 'contact_landlord') {
+      if (alert.phone) { window.location.href = `tel:${alert.phone}`; }
+      else { setActiveTab('applications'); }
+    }
+  };
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (notifRef.current && !notifRef.current.contains(event.target)) setIsNotifOpen(false);
@@ -1145,6 +1167,8 @@ const handleWizardSubmit = async (payload) => {
     // tenant flow: tenants don't apply, they inquire. Mirrors the host's
     // 'Inquiries' tab so both sides of the conversation use the same word.
     { id: 'applications', icon: MessageCircle, label: language === 'বাংলা' ? 'আমার ইনকোয়ারি' : 'My Inquiries' },
+    // 🟢 NEW: Smart Alerts — rent due/overdue + inquiry updates, all in one place.
+    { id: 'alerts', icon: Bell, label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts', badge: tenantAlertCount },
     // 🟢 NEW: Payments tab — receipts pushed by the landlord live here.
     { id: 'payments', icon: Receipt, label: t.payments || (language === 'বাংলা' ? 'পেমেন্ট' : 'Payments'), badge: unreadReceiptsCount },
     // Messages lives inside each inquiry thread — no separate route is
@@ -2372,6 +2396,14 @@ const handleWizardSubmit = async (payload) => {
             </div>
           );
         })()}
+
+        {activeTab === 'alerts' && (
+          <SmartAlertsPage
+            alerts={tenantAlerts}
+            resolved={tenantResolved}
+            onMessageTenant={handleAlertAction}
+          />
+        )}
 
         {/* 🟢 PAYMENTS TAB — rebuilt as a "month navigator" so the
             tenant can jump to any month in 1 tap instead of scrolling
