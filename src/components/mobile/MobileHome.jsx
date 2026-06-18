@@ -630,6 +630,24 @@ const mobBuildCollage = (property) => {
   return { cover, thumbs: remaining.slice(0, 3) };
 };
 
+const PropertyCardSkeleton = () => (
+  <div className="mx-4 mb-4 bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden shadow-sm animate-pulse">
+    <div className="w-full h-[200px] bg-gray-200" />
+    <div className="p-4">
+      <div className="flex justify-between items-start mb-3">
+        <div className="h-6 w-1/3 bg-gray-200 rounded-md" />
+        <div className="h-5 w-16 bg-gray-200 rounded-full" />
+      </div>
+      <div className="h-4 w-2/3 bg-gray-200 rounded mb-4" />
+      <div className="flex gap-2">
+        <div className="h-7 w-16 bg-gray-100 rounded-md" />
+        <div className="h-7 w-16 bg-gray-100 rounded-md" />
+        <div className="h-7 w-20 bg-gray-100 rounded-md" />
+      </div>
+    </div>
+  </div>
+);
+
 const PropertyCard = ({ property, t, landlord }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
@@ -896,9 +914,12 @@ const MobileHome = () => {
   // (e.g. Add Property writes to localStorage → subscribeUserProperties fires).
   const [properties, setProperties] = useState([]);
   const [landlordsById, setLandlordsById] = useState({});
+  const [isLoadingProps, setIsLoadingProps] = useState(true);
+
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
+      setIsLoadingProps(true);
       try {
         const list = await propertyService.getProperties({}, 'Newest Listings');
         if (cancelled) return;
@@ -913,6 +934,8 @@ const MobileHome = () => {
         }
       } catch {
         if (!cancelled) { setProperties([]); setLandlordsById({}); }
+      } finally {
+        if (!cancelled) setIsLoadingProps(false);
       }
     };
     load();
@@ -1239,7 +1262,13 @@ const MobileHome = () => {
       </div>
 
       {/* ───────── FEED ───────── */}
-      {filteredFeed.length === 0 ? (
+      {isLoadingProps ? (
+        <>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <PropertyCardSkeleton key={i} />
+          ))}
+        </>
+      ) : filteredFeed.length === 0 ? (
         <div className="mx-4 my-6 p-6 bg-white rounded-3xl border border-gray-100 text-center">
           <div className="w-12 h-12 rounded-2xl bg-red-50 text-[#ba0036] mx-auto flex items-center justify-center mb-3">
             <Search size={20} />
