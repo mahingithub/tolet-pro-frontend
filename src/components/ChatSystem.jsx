@@ -1783,6 +1783,23 @@ const ChatSystem = () => {
                         className="max-w-[240px] sm:max-w-[260px]"
                         style={{ height: 40 }}
                       />
+                    ) : m.type === 'document' && m.mediaUrl ? (
+                      <a href={m.mediaUrl} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-3 p-3 rounded-xl border ${mine ? 'bg-white/10 border-white/20 hover:bg-white/20' : fromBot ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'} transition-all max-w-[240px] sm:max-w-[280px] group`}>
+                        <div className={`w-10 h-10 shrink-0 rounded-lg flex items-center justify-center ${mine || fromBot ? 'bg-white/20 text-white' : 'bg-[#ba0036]/10 text-[#ba0036]'}`}>
+                          <FileText size={20} className="group-hover:scale-110 transition-transform"/>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-[12px] font-bold truncate leading-tight mb-0.5 ${mine || fromBot ? 'text-white' : 'text-gray-800'}`}>
+                            {m.mediaMeta?.originalName || 'Document.pdf'}
+                          </p>
+                          <div className="flex items-center justify-between mt-1">
+                            <p className={`text-[9px] font-black uppercase tracking-widest ${mine || fromBot ? 'text-white/60' : 'text-gray-400'}`}>
+                              {m.mediaMeta?.bytes ? (m.mediaMeta.bytes / 1024 / 1024).toFixed(2) + ' MB' : 'PDF FILE'}
+                            </p>
+                            <Download size={12} className={`${mine || fromBot ? 'text-white/80' : 'text-gray-400'} group-hover:-translate-y-0.5 transition-transform`} />
+                          </div>
+                        </div>
+                      </a>
                     ) : null}
                     {(m.type === 'text' || !m.type) ? (
                       <p className="text-[13px] sm:text-sm font-medium whitespace-pre-line leading-relaxed">{m.text}</p>
