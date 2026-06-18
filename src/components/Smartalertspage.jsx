@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, BellRing, AlertTriangle, Clock, CheckCircle2, 
@@ -7,20 +7,25 @@ import {
   CheckCheck, RefreshCw, MapPin, Phone, User, Building
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { buildRentAlerts, buildLeaseAlerts, buildInquiryAlerts } from '../utils/rentAlerts';
 
-// ─── Alert Data ───────────────────────────────────────────────────────────────
-// No demo alerts. Real alerts come from /api/host/alerts (once wired) or are
-// derived from a host's actual leases, payments, and inquiries. New hosts
-// start with an empty inbox + "all caught up" state.
-const allAlerts = [];
-const resolvedAlerts = [];
+// ─── Severity → colour + icon mapping (presentation only) ───────────────────
+// Real alerts are derived from the host's bookings/ledger in buildRentAlerts().
+const COLOR = {
+  urgent: { border: 'border-rose-100',  glow: 'shadow-[0_4px_20px_rgba(244,63,94,0.08)]',   bg: 'bg-rose-50/40',  text: 'text-rose-600',  badge: 'bg-rose-100 text-rose-700' },
+  medium: { border: 'border-amber-100', glow: 'shadow-[0_4px_20px_rgba(245,158,11,0.08)]',  bg: 'bg-amber-50/40', text: 'text-amber-600', badge: 'bg-amber-100 text-amber-700' },
+  low:    { border: 'border-blue-100',  glow: 'shadow-[0_4px_20px_rgba(59,130,246,0.08)]',  bg: 'bg-blue-50/40',  text: 'text-blue-600',  badge: 'bg-blue-100 text-blue-700' },
+};
+const colorFor = (type) => COLOR[type] || COLOR.low;
+const ICONS = { overdue: AlertTriangle, dueToday: Hourglass, dueSoon: Clock, upcoming: Calendar, collected: CheckCircle2, leaseEnding: RefreshCw, leaseExpired: Building, inquiry: MessageSquare, hot: Home };
+const iconFor = (k) => ICONS[k] || Bell;
 
 const FILTERS = ['all', 'urgent', 'medium', 'low'];
 const CATEGORIES = ['all', 'payment', 'lease', 'maintenance', 'inquiry'];
 
 const categoryLabel = { all: 'All', payment: 'Payment', lease: 'Lease', maintenance: 'Maintenance', inquiry: 'Inquiry' };
 
-export default function SmartAlertsPage() {
+export default function SmartAlertsPage({ bookings = [], inquiries = [], today, onMessageTenant }) {
   const navigate = useNavigate();
   const { language = 'English' } = useLanguage() || {};
   const bn = language === 'বাংলা';
@@ -33,6 +38,21 @@ export default function SmartAlertsPage() {
 
   const showToast = (msg) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
   const dismiss = (id) => { setDismissed(prev => [...prev, id]); showToast(bn ? 'অ্যালার্ট সরানো হয়েছে' : 'Alert dismissed'); };
+
+  // Real alerts derived from the host's data: rent (payment) + lease lifecycle + inquiries/leads.
+  const { alerts: rawAlerts, resolved: rawResolved } = useMemo(() => {
+    const now = today || new Date();
+    const rent = buildRentAlerts(bookings, now, language);
+    const lease = buildLeaseAlerts(bookings, now, language);
+    const inquiry = buildInquiryAlerts(inquiries, now, language);
+    const rank = { urgent: 0, medium: 1, low: 2 };
+    const merged = [...rent.alerts, ...lease.alerts, ...inquiry.alerts].sort(
+      (a, b) => (rank[a.type] - rank[b.type]) || ((a.daysLeft ?? 999) - (b.daysLeft ?? 999)),
+    );
+    return { alerts: merged, resolved: rent.resolved };
+  }, [bookings, inquiries, today, language]);
+  const allAlerts = rawAlerts.map(a => ({ ...a, color: colorFor(a.type), icon: iconFor(a.iconType) }));
+  const resolvedAlerts = rawResolved.map(r => ({ ...r, color: colorFor(r.type).text, icon: iconFor(r.iconType) }));
 
   const visible = allAlerts.filter(a =>
     !dismissed.includes(a.id) &&
@@ -238,7 +258,7 @@ export default function SmartAlertsPage() {
                     {/* Actions */}
                     <div className="flex gap-2">
                       <button
-                        onClick={() => showToast(bn ? 'মেসেজ পাঠানো হচ্ছে...' : 'Opening chat...')}
+                        onClick={() => { if (onMessageTenant) onMessageTenant(alert); else showToast(bn ? 'রিমাইন্ডার পাঠানো হয়েছে' : 'Reminder sent'); }}
                         className={`flex-1 py-2.5 rounded-xl text-[11px] font-black text-white transition-all active:scale-95 ${alert.type === 'urgent' ? 'bg-[#ba0036] shadow-[0_4px_12px_rgba(186,0,54,0.25)]' : 'bg-gray-800'} hover:opacity-90`}
                       >
                         {bn ? 'মেসেজ করুন' : 'Message Tenant'}
