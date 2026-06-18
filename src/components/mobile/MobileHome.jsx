@@ -1183,14 +1183,16 @@ const MobileHome = () => {
               onClick={() => setTypeOpen(true)}
               className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2.5 active:scale-[0.99] transition-transform text-left"
             >
-              {searchType === 'commercial' ? (
-                <Building2 size={14} className="text-[#ba0036] shrink-0" />
-              ) : searchType === 'buy' ? (
-                <Wallet size={14} className="text-[#ba0036] shrink-0" />
-              ) : (
-                <HomeIcon size={14} className="text-[#ba0036] shrink-0" />
-              )}
-              <span className="flex-1 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                {searchType === 'commercial' ? (
+                  <Building2 size={15} strokeWidth={2.5} />
+                ) : searchType === 'buy' ? (
+                  <Wallet size={15} strokeWidth={2.5} />
+                ) : (
+                  <HomeIcon size={15} strokeWidth={2.5} />
+                )}
+              </span>
+              <span className="flex-1 min-w-0 ml-1">
                 <span className="block text-[9px] font-black text-gray-500 uppercase tracking-widest leading-tight">
                   {t.mobTypeLabel}
                 </span>
@@ -1205,8 +1207,10 @@ const MobileHome = () => {
               onClick={() => setBudgetOpen(true)}
               className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2.5 active:scale-[0.99] transition-transform text-left"
             >
-              <Wallet size={14} className="text-[#ba0036] shrink-0" />
-              <span className="flex-1 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
+                <Wallet size={15} strokeWidth={2.5} />
+              </span>
+              <span className="flex-1 min-w-0 ml-1">
                 <span className="block text-[9px] font-black text-gray-500 uppercase tracking-widest leading-tight">
                   {t.mobBudgetLabel}
                 </span>
