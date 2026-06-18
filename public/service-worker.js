@@ -109,7 +109,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(STATIC_CACHE).then((c) => c.put('/index.html', copy)).catch(() => {});
           return res;
         })
-        .catch(() => caches.match(req).then((r) => r || caches.match('/offline.html')))
+        .catch(() => caches.match(req).then((r) => r || caches.match('/offline.html')).then((r) => r || new Response('Offline', { status: 503 })))
     );
     return;
   }
@@ -142,7 +142,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(STATIC_CACHE).then((c) => c.put(req, copy)).catch(() => {});
         }
         return res;
-      }).catch(() => cached);
+      }).catch(() => cached || new Response('Offline or missing resource', { status: 503 }));
     })
   );
 });
