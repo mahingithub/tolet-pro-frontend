@@ -39,7 +39,7 @@ export const submitLandlordVerification = (payload, { onProgress } = {}) =>
   new Promise((resolve, reject) => {
     const token = window.localStorage.getItem(KEY_TOKEN);
     if (!token) {
-      const err = new Error('আপনি লগইন নন। আবার লগইন করুন।');
+      const err = new Error('NOT_LOGGED_IN');
       err.code = 'unauthenticated';
       return reject(err);
     }
@@ -92,7 +92,7 @@ export const submitLandlordVerification = (payload, { onProgress } = {}) =>
       }
     };
     xhr.onerror = () => {
-      const err = new Error('নেটওয়ার্ক সমস্যা — পরে আবার চেষ্টা করুন।');
+      const err = new Error('NETWORK_ERROR');
       err.code = 'network_error';
       reject(err);
     };

@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { submitLandlordVerification } from '../services/landlordVerificationService.js';
+import { useLanguage } from '../context/LanguageContext.jsx';
 
 // ─── File slot config — drives both UI rendering AND validation ──────
 const PATH_A_SLOTS = [
@@ -135,7 +136,8 @@ const FileTile = ({ slot, value, onPick, onRemove, isBn }) => {
   );
 };
 
-const LandlordOnboardingModal = ({ open, onClose, onSuccess, language = 'বাংলা' }) => {
+const LandlordOnboardingModal = ({ open, onClose, onSuccess }) => {
+  const { language, t } = useLanguage();
   const isBn = language === 'বাংলা';
   const { user, refresh } = useAuth();
 
@@ -199,11 +201,16 @@ const LandlordOnboardingModal = ({ open, onClose, onSuccess, language = 'বা�
         onClose?.();
       }, 1400);
     } catch (err) {
-      const msg = err?.missing?.length
-        ? (isBn
-            ? `কিছু ডকুমেন্ট মিসিং: ${err.missing.join(', ')}`
-            : `Missing documents: ${err.missing.join(', ')}`)
-        : (err?.message || (isBn ? 'সাবমিট ব্যর্থ — আবার চেষ্টা করুন।' : 'Submit failed — please retry.'));
+      let msg = err?.message;
+      if (err?.missing?.length) {
+        msg = isBn 
+          ? `কিছু ডকুমেন্ট মিসিং: ${err.missing.join(', ')}`
+          : `Missing documents: ${err.missing.join(', ')}`;
+      } else {
+        // Translate known error codes or fallback
+        const translated = t[msg];
+        msg = translated ? translated : (msg || (isBn ? 'সাবমিট ব্যর্থ — আবার চেষ্টা করুন।' : 'Submit failed — please retry.'));
+      }
       setError(msg);
     } finally {
       setSubmitting(false);

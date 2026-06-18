@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { User, Phone, Lock, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useLanguage } from '../context/LanguageContext.jsx';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import {
@@ -35,23 +36,23 @@ function firebaseErrToMsg(err) {
   const code = err?.code || '';
   switch (code) {
     case 'auth/invalid-phone-number':
-      return 'ফোন নম্বর সঠিক নয়। +880 ছাড়া ১০ ডিজিট লিখুন।';
+      return 'INVALID_PHONE_NUMBER';
     case 'auth/missing-phone-number':
-      return 'ফোন নম্বর দিন।';
+      return 'MISSING_PHONE_NUMBER';
     case 'auth/quota-exceeded':
-      return 'আজকের SMS লিমিট শেষ। Firebase প্ল্যান বা টেস্ট নম্বর ব্যবহার করুন।';
+      return 'QUOTA_EXCEEDED';
     case 'auth/captcha-check-failed':
-      return 'reCAPTCHA চেক ব্যর্থ। পেইজ রিলোড করে আবার চেষ্টা করুন।';
+      return 'CAPTCHA_CHECK_FAILED';
     case 'auth/too-many-requests':
-      return 'অনেক বেশি চেষ্টা। কিছুক্ষণ পরে আবার চেষ্টা করুন।';
+      return 'TOO_MANY_REQUESTS';
     case 'auth/invalid-verification-code':
-      return 'OTP কোড ভুল হয়েছে।';
+      return 'INVALID_OTP';
     case 'auth/code-expired':
-      return 'OTP কোড মেয়াদ শেষ। নতুন OTP নিন।';
+      return 'OTP_EXPIRED';
     case 'auth/missing-app-credential':
-      return 'reCAPTCHA সেটআপে সমস্যা। পেইজ রিলোড করুন।';
+      return 'RECAPTCHA_SETUP_ERROR';
     default:
-      return err?.message || 'OTP প্রক্রিয়ায় সমস্যা হয়েছে।';
+      return err?.message || 'OTP_PROCESS_ERROR';
   }
 }
 
@@ -70,6 +71,14 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { login, refresh } = useAuth();
+  const { t, language } = useLanguage();
+  const isBn = language === 'বাংলা';
+
+  const handleError = (err, defaultBn, defaultEn) => {
+    const key = err?.code?.startsWith?.('auth/') ? firebaseErrToMsg(err) : err?.message;
+    const translated = t[key];
+    setErrorMsg(translated || key || (isBn ? defaultBn : defaultEn));
+  };
 
   const nextUrl = searchParams.get('next');
 
@@ -170,7 +179,7 @@ const LoginPage = () => {
         goToNextOrDashboard(role);
       }
     } catch (err) {
-      setErrorMsg(err.message || 'লগইন ব্যর্থ হয়েছে।');
+      handleError(err, 'লগইন ব্যর্থ হয়েছে।', 'Login failed.');
     } finally {
       setIsLoading(false);
     }
@@ -194,7 +203,7 @@ const LoginPage = () => {
       setStep(STEPS.OTP);
     } catch (err) {
       // err here can be a backend ApiError or a Firebase error
-      setErrorMsg(err.code?.startsWith?.('auth/') ? firebaseErrToMsg(err) : (err.message || 'সাইনআপ শুরু করা যায়নি।'));
+      handleError(err, 'সাইনআপ শুরু করা যায়নি।', 'Failed to start signup.');
     } finally {
       setIsLoading(false);
     }
@@ -220,7 +229,7 @@ const LoginPage = () => {
       );
       goToNextOrDashboard(role);
     } catch (err) {
-      setErrorMsg(err.code?.startsWith?.('auth/') ? firebaseErrToMsg(err) : (err.message || 'অ্যাকাউন্ট তৈরি করা যায়নি।'));
+      handleError(err, 'অ্যাকাউন্ট তৈরি করা যায়নি।', 'Failed to create account.');
     } finally {
       setIsLoading(false);
     }
@@ -235,7 +244,7 @@ const LoginPage = () => {
       await sendFirebaseOtp();
       setStep(STEPS.OTP);
     } catch (err) {
-      setErrorMsg(err.code?.startsWith?.('auth/') ? firebaseErrToMsg(err) : (err.message || 'OTP পাঠানো যায়নি।'));
+      handleError(err, 'OTP পাঠানো যায়নি।', 'Failed to send OTP.');
     } finally {
       setIsLoading(false);
     }
@@ -250,9 +259,9 @@ const LoginPage = () => {
       const { resetToken: t } = await forgotVerify({ idToken });
       setResetToken(t);
       setStep(STEPS.NEW_PASSWORD);
-      setInfoMsg('OTP যাচাই হয়েছে। এখন নতুন পাসওয়ার্ড দিন।');
+      setInfoMsg(isBn ? 'OTP যাচাই হয়েছে। এখন নতুন পাসওয়ার্ড দিন।' : 'OTP verified. Now enter a new password.');
     } catch (err) {
-      setErrorMsg(err.code?.startsWith?.('auth/') ? firebaseErrToMsg(err) : (err.message || 'OTP যাচাই ব্যর্থ।'));
+      handleError(err, 'OTP যাচাই ব্যর্থ।', 'OTP verification failed.');
     } finally {
       setIsLoading(false);
     }
@@ -263,10 +272,10 @@ const LoginPage = () => {
     setIsLoading(true); setErrorMsg(''); setInfoMsg('');
     try {
       await resetPassword({ resetToken, password: newPassword });
-      setInfoMsg('পাসওয়ার্ড পরিবর্তন সফল। এবার লগইন করুন।');
+      setInfoMsg(isBn ? 'পাসওয়ার্ড পরিবর্তন সফল। এবার লগইন করুন।' : 'Password changed successfully. Please log in.');
       switchMode(MODES.LOGIN);
     } catch (err) {
-      setErrorMsg(err.message || 'পাসওয়ার্ড পরিবর্তন ব্যর্থ।');
+      handleError(err, 'পাসওয়ার্ড পরিবর্তন ব্যর্থ।', 'Failed to change password.');
     } finally {
       setIsLoading(false);
     }
@@ -278,9 +287,9 @@ const LoginPage = () => {
     try {
       await sendFirebaseOtp();
       setOtp(['', '', '', '', '', '']);
-      setInfoMsg('নতুন OTP পাঠানো হয়েছে।');
+      setInfoMsg(isBn ? 'নতুন OTP পাঠানো হয়েছে।' : 'New OTP sent.');
     } catch (err) {
-      setErrorMsg(firebaseErrToMsg(err));
+      handleError(err, 'OTP পাঠানো যায়নি।', 'Failed to send OTP.');
     } finally {
       setIsLoading(false);
     }

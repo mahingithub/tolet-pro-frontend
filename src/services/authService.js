@@ -52,7 +52,7 @@ async function api(path, { method = 'POST', body, auth: useAuth = false } = {}) 
   let data;
   try { data = await res.json(); } catch { data = {}; }
   if (!res.ok) {
-    const err = new Error(data.message || 'অনুরোধে সমস্যা হয়েছে।');
+    const err = new Error(data.code || 'REQUEST_FAILED');
     err.code = data.code;
     err.details = data.details;
     err.status = res.status;
@@ -201,7 +201,7 @@ export const uploadVerificationDoc = (kind, file, { onProgress } = {}) => {
   return new Promise((resolve, reject) => {
     const token = getCurrentToken();
     if (!token) {
-      const err = new Error('আপনি লগইন নন। আবার লগইন করুন।');
+      const err = new Error('NOT_LOGGED_IN');
       err.code = 'unauthenticated';
       return reject(err);
     }
@@ -241,7 +241,7 @@ export const uploadVerificationDoc = (kind, file, { onProgress } = {}) => {
       }
     };
     xhr.onerror = () => {
-      const err = new Error('নেটওয়ার্ক সমস্যা — পরে আবার চেষ্টা করুন।');
+      const err = new Error('NETWORK_ERROR');
       err.code = 'network_error';
       reject(err);
     };
@@ -264,7 +264,7 @@ export const uploadAvatar = (file, { onProgress } = {}) => {
   return new Promise((resolve, reject) => {
     const token = getCurrentToken();
     if (!token) {
-      const err = new Error('আপনি লগইন নন। আবার লগইন করুন।');
+      const err = new Error('NOT_LOGGED_IN');
       err.code = 'unauthenticated';
       return reject(err);
     }
@@ -304,7 +304,7 @@ export const uploadAvatar = (file, { onProgress } = {}) => {
       }
     };
     xhr.onerror = () => {
-      const err = new Error('নেটওয়ার্ক সমস্যা — পরে আবার চেষ্টা করুন।');
+      const err = new Error('NETWORK_ERROR');
       err.code = 'network_error';
       reject(err);
     };
@@ -328,7 +328,7 @@ export const uploadAvatarFallback = (file, { onProgress } = {}) => {
     }
     if (file.size > 5 * 1024 * 1024) {
       return reject(Object.assign(
-        new Error('ফাইল অনেক বড় (সর্বোচ্চ ৫ MB)।'),
+        new Error('FILE_TOO_LARGE'),
         { code: 'file_too_large' },
       ));
     }
@@ -350,7 +350,7 @@ export const uploadAvatarFallback = (file, { onProgress } = {}) => {
       }
     };
     reader.onerror = () => reject(
-      Object.assign(new Error('ফাইল পড়তে সমস্যা।'), { code: 'read_error' }),
+      Object.assign(new Error('FILE_READ_ERROR'), { code: 'read_error' }),
     );
     reader.readAsDataURL(file);
   });
@@ -362,5 +362,5 @@ export const uploadAvatarFallback = (file, { onProgress } = {}) => {
 export const login = loginWithPassword;
 
 export const loginAsDemoAdmin = async () => {
-  throw new Error('ডেমো লগইন বন্ধ আছে।');
+  throw new Error('DEMO_LOGIN_DISABLED');
 };

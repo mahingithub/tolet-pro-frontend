@@ -34,7 +34,7 @@ async function call(path, { method = 'GET', body } = {}) {
   let data;
   try { data = await res.json(); } catch { data = {}; }
   if (!res.ok) {
-    const err = new Error(data.message || 'অনুরোধে সমস্যা হয়েছে।');
+    const err = new Error(data.code || 'REQUEST_FAILED');
     err.code = data.code;
     err.details = data.details;
     err.status = res.status;
@@ -114,7 +114,7 @@ export const sendMediaMessage = async (conversationId, file, { kind, caption = '
   let data;
   try { data = await res.json(); } catch { data = {}; }
   if (!res.ok) {
-    const err = new Error(data.message || 'আপলোডে সমস্যা হয়েছে।');
+    const err = new Error(data.code || 'UPLOAD_FAILED');
     err.code = data.code;
     err.status = res.status;
     throw err;
