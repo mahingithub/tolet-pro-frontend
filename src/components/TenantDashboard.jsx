@@ -876,6 +876,20 @@ const TenantDashboard = () => {
   const [verifModalOpen, setVerifModalOpen] = useState(false);
   const [landlordOnboardingOpen, setLandlordOnboardingOpen] = useState(false);
 
+  const [hideUpcomingTours, setHideUpcomingTours] = useState(
+    () => localStorage.getItem('hideUpcomingTours') === 'true'
+  );
+  const [hideBecomeLandlord, setHideBecomeLandlord] = useState(
+    () => localStorage.getItem('hideBecomeLandlord') === 'true'
+  );
+  const [hideVerificationBanner, setHideVerificationBanner] = useState(
+    () => localStorage.getItem('hideVerificationBanner') === 'true'
+  );
+
+  const dismissUpcomingTours = () => { setHideUpcomingTours(true); localStorage.setItem('hideUpcomingTours', 'true'); };
+  const dismissBecomeLandlord = () => { setHideBecomeLandlord(true); localStorage.setItem('hideBecomeLandlord', 'true'); };
+  const dismissVerificationBanner = () => { setHideVerificationBanner(true); localStorage.setItem('hideVerificationBanner', 'true'); };
+
   // Auto-open the verification wizard when the user lands here with
   // `?openVerify=1` — currently fired by the Navbar's "Switch to Host"
   // path when the backend reports `verification_required`. We strip the
@@ -1441,8 +1455,14 @@ const handleWizardSubmit = async (payload) => {
                 server and flips them into host mode. Verified tenants get
                 a subtle "your trust score carries over" line so they know
                 they don't lose progress when switching modes. */}
-            {!isAlsoLandlord && (
+            {!isAlsoLandlord && !hideBecomeLandlord && (
               <div className="mb-5 md:mb-7 rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 bg-gradient-to-br from-[#ba0036] via-[#7c0026] to-[#3a0011] text-white shadow-[0_20px_50px_-20px_rgba(186,0,54,0.5)] relative overflow-hidden">
+                <button
+                  onClick={dismissBecomeLandlord}
+                  className="absolute top-4 right-4 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors z-20"
+                >
+                  <X size={16} strokeWidth={2.5} />
+                </button>
                 <div className="absolute -top-16 -right-16 w-56 h-56 bg-white/10 rounded-full blur-3xl pointer-events-none" />
                 <div className="relative flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
                   <div className="shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-white/15 flex items-center justify-center backdrop-blur-md border border-white/15">
@@ -1485,8 +1505,14 @@ const handleWizardSubmit = async (payload) => {
                   - not started / in progress (default)
                   - submitted for review (`verifPending`)
                   - verified (`isVerified`) — flips to a green success row */}
-            {!isVerified ? (
+            {hideVerificationBanner ? null : !isVerified ? (
               <div className="mb-5 md:mb-7 relative overflow-hidden rounded-[1.5rem] md:rounded-[2rem] p-[1px] bg-gradient-to-br from-[#ba0036]/40 via-rose-400/20 to-indigo-500/30 shadow-[0_20px_60px_-20px_rgba(186,0,54,0.35)]">
+                <button
+                  onClick={dismissVerificationBanner}
+                  className="absolute top-5 right-5 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors z-30"
+                >
+                  <X size={16} strokeWidth={2.5} />
+                </button>
                 {/* Inline keyframes for shimmer + breathing pulse rings. */}
                 <style>{`
                   @keyframes tolet-shimmer {
@@ -1599,7 +1625,13 @@ const handleWizardSubmit = async (payload) => {
                 </div>
               </div>
             ) : (
-              <div className="mb-5 md:mb-7 rounded-[1.5rem] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/60 p-4 md:p-5 flex items-center gap-3 shadow-[0_10px_30px_-15px_rgba(16,185,129,0.4)]">
+              <div className="mb-5 md:mb-7 rounded-[1.5rem] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/60 p-4 md:p-5 flex items-center gap-3 shadow-[0_10px_30px_-15px_rgba(16,185,129,0.4)] relative">
+                <button
+                  onClick={dismissVerificationBanner}
+                  className="absolute top-4 right-4 p-1.5 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-600 hover:text-emerald-800 transition-colors z-20"
+                >
+                  <X size={14} strokeWidth={2.5} />
+                </button>
                 <div className="relative shrink-0">
                   <span className="absolute inset-0 rounded-2xl bg-emerald-400/40 blur-md animate-pulse" />
                   <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-white flex items-center justify-center shadow">
@@ -1712,7 +1744,14 @@ const handleWizardSubmit = async (payload) => {
             </div>
 
             {/* ── UPCOMING TOURS ─────────────────────────────────────── */}
+            {(!hideUpcomingTours && myInquiries.some(inq => inq.visitSchedule?.date && inq.status !== 'rejected')) && (
             <div className="relative bg-white/95 backdrop-blur-sm p-5 md:p-7 rounded-[1.5rem] md:rounded-[2rem] border border-white shadow-[0_4px_20px_rgba(15,23,42,0.04)] overflow-hidden">
+              <button
+                onClick={dismissUpcomingTours}
+                className="absolute top-4 right-4 p-1.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors z-20"
+              >
+                <X size={16} strokeWidth={2.5} />
+              </button>
               <div className="relative z-10 flex items-center justify-between mb-5 md:mb-6">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#ba0036] to-rose-500 text-white flex items-center justify-center shadow-md">
@@ -1729,38 +1768,52 @@ const handleWizardSubmit = async (payload) => {
                 </div>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest border border-emerald-100">
                   <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                  {language === 'বাংলা' ? 'এই সপ্তাহে' : 'This week'}
+                  {language === 'বাংলা' ? 'নির্ধারিত' : 'Scheduled'}
                 </span>
               </div>
 
               <div className="relative z-10 flex flex-col gap-3">
-                {/* Tour row — gradient date chip, property + location, time pill */}
-                <div className="flex items-center gap-3 md:gap-4 p-4 md:p-5 bg-white border border-gray-100 rounded-2xl">
-                  <div className="bg-gradient-to-br from-[#ba0036] via-rose-500 to-orange-500 text-center p-3 rounded-2xl shadow-[0_6px_16px_rgba(186,0,54,0.22)] min-w-[60px] md:min-w-[72px]">
-                    <p className="text-[9px] font-black text-white/90 uppercase tracking-[0.16em]">OCT</p>
-                    <p className="text-2xl md:text-3xl font-black text-white leading-none mt-0.5 tabular-nums">25</p>
-                    <p className="text-[8px] font-black text-white/80 uppercase tracking-widest mt-0.5">SUN</p>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="text-sm md:text-base font-black text-gray-900 truncate">Elegant 3BHK with Skyline View</h4>
-                    <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] font-bold text-gray-500">
-                      <span className="inline-flex items-center gap-1.5">
-                        <MapPin size={11} className="text-gray-400" /> Gulshan 2, Dhaka
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                        <Clock size={10} /> 5:00 PM
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => { toast.error("Unable to open chat. Landlord info missing."); }}
-                  className="w-full inline-flex items-center justify-center gap-2 py-3 bg-white text-[#ba0036] border border-[#ba0036]/20 rounded-2xl font-black text-xs hover:bg-[#ba0036] hover:text-white hover:border-[#ba0036] transition-all"
-                >
-                  <MessageSquare size={14} /> {t.contactHost || (language === 'বাংলা' ? 'যোগাযোগ' : 'Contact')}
-                </button>
+                {myInquiries
+                  .filter(inq => inq.visitSchedule?.date && inq.status !== 'rejected')
+                  .sort((a, b) => new Date(a.visitSchedule.date) - new Date(b.visitSchedule.date))
+                  .map((inq) => {
+                    const d = new Date(inq.visitSchedule.date);
+                    const isInvalid = isNaN(d.getTime());
+                    const month = isInvalid ? 'TBD' : d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+                    const dateNum = isInvalid ? '--' : d.getDate();
+                    const day = isInvalid ? 'TBD' : d.toLocaleString('en-US', { weekday: 'short' }).toUpperCase();
+                    return (
+                      <div key={inq.id || inq._id} className="flex flex-col gap-3 border-b border-gray-100 pb-4 last:border-0 last:pb-0">
+                        <div className="flex items-center gap-3 md:gap-4 p-4 md:p-5 bg-white border border-gray-100 rounded-2xl">
+                          <div className="bg-gradient-to-br from-[#ba0036] via-rose-500 to-orange-500 text-center p-3 rounded-2xl shadow-[0_6px_16px_rgba(186,0,54,0.22)] min-w-[60px] md:min-w-[72px]">
+                            <p className="text-[9px] font-black text-white/90 uppercase tracking-[0.16em]">{month}</p>
+                            <p className="text-2xl md:text-3xl font-black text-white leading-none mt-0.5 tabular-nums">{dateNum}</p>
+                            <p className="text-[8px] font-black text-white/80 uppercase tracking-widest mt-0.5">{day}</p>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="text-sm md:text-base font-black text-gray-900 truncate">{inq.propTitle || 'Property Tour'}</h4>
+                            <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] font-bold text-gray-500">
+                              <span className="inline-flex items-center gap-1.5">
+                                <MapPin size={11} className="text-gray-400" /> {inq.visitSchedule.location || 'See message for details'}
+                              </span>
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                                <Clock size={10} /> {inq.visitSchedule.time || 'TBD'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => navigate('/messages', { state: { peerUserId: inq.propertyOwnerId } })}
+                          className="w-full inline-flex items-center justify-center gap-2 py-3 bg-white text-[#ba0036] border border-[#ba0036]/20 rounded-2xl font-black text-xs hover:bg-[#ba0036] hover:text-white hover:border-[#ba0036] transition-all"
+                        >
+                          <MessageSquare size={14} /> {t.contactHost || (language === 'বাংলা' ? 'যোগাযোগ' : 'Contact')}
+                        </button>
+                      </div>
+                    );
+                })}
               </div>
             </div>
+            )}
           </>
         )}
 
