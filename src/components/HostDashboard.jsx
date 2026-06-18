@@ -4658,7 +4658,7 @@ const HostDashboard = () => {
             ───────────────────────────────────────────────────────────────── */}
         {activeTab === 'smartAlerts' && (
           <div className="w-full h-[calc(100vh-120px)] animate-in fade-in zoom-in-95 duration-500 overflow-y-auto">
-             <Smartalertspage />
+             <Smartalertspage bookings={bookings} today={today} />
           </div>
         )}
 
