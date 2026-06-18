@@ -350,8 +350,19 @@ const ChatSystem = () => {
   const peerUserId = location.state?.peerUserId;
 
   // Chat list = AI bot (local-only) + real backend conversations (polled).
-  // We no longer hydrate from localStorage — conversations live in Mongo.
-  const [chats, setChats] = useState(initialChats);
+  // We hydrate from localStorage for instant perceived load (SWR pattern),
+  // then conversations are synced from Mongo.
+  const [chats, setChats] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(CHAT_THREADS_KEY));
+      if (stored && Array.isArray(stored) && stored.length > 0) {
+        // Ensure AI bot is present
+        const hasAi = stored.some(c => c.id === 'ai-bot');
+        return hasAi ? stored : [initialChats[0], ...stored];
+      }
+    } catch { /* ignore */ }
+    return initialChats;
+  });
   // Latest message timestamp per backend conversation — used for delta polling.
   const latestMessageIso = useRef({});
 
@@ -395,7 +406,32 @@ const ChatSystem = () => {
 
   // Local message store keyed by chatId. For the AI bot this is the only
   // store. For backend conversations it's a cache populated by the poll.
-  const [messages, setMessages] = useState({ 'ai-bot': [] });
+  // Hydrated from localStorage for instant perceived load.
+  const [messages, setMessages] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY));
+      if (stored && typeof stored === 'object') {
+        if (!stored['ai-bot']) stored['ai-bot'] = [];
+        return stored;
+      }
+    } catch { /* ignore */ }
+    return { 'ai-bot': [] };
+  });
+
+  // Sync to localStorage for instant hydration on next mount
+  useEffect(() => {
+    localStorage.setItem(CHAT_THREADS_KEY, JSON.stringify(chats));
+  }, [chats]);
+
+  useEffect(() => {
+    const slim = {};
+    for (const key in messages) {
+      if (Array.isArray(messages[key])) {
+        slim[key] = messages[key].slice(-50); // Keep last 50 per chat
+      }
+    }
+    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(slim));
+  }, [messages]);
 
   // ─── Socket.IO Call Connection ──────────────────────────────────────────────
   // The main connection and ringing UI is now fully handled by GlobalCallUI.jsx.
