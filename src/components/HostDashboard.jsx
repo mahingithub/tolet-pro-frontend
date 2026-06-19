@@ -606,6 +606,9 @@ const HostDashboard = () => {
   })();
 
   const [verifModalOpen, setVerifModalOpen] = useState(false);
+  const [hideHostVerifBanner, setHideHostVerifBanner] = useState(
+    () => window.localStorage.getItem('tolet_hide_host_verif_banner') === '1'
+  );
 
   const handleHostWizardSubmit = async (picks) => {
     setVerificationStatus((prev) => ({
@@ -1786,7 +1789,7 @@ const HostDashboard = () => {
           aggressive; click → opens the Profile tab where verification
           lives. The chip stays out of the way of toasts (z-[80] vs
           z-[100] for toasts) and never blocks input. */}
-      {!(verificationStatus.nidUploaded && verificationStatus.faceVerified) && (
+      {!(verificationStatus.nidUploaded && verificationStatus.faceVerified) ? (
         <button
           onClick={() => { setActiveTab('profile'); setIsProfileDrawerOpen(false); }}
           className="fixed z-[80] right-4 md:right-6 bottom-[5.5rem] md:bottom-6 group flex items-center gap-2.5 pl-2.5 pr-4 py-2 rounded-full text-white shadow-[0_18px_40px_rgba(186,0,54,0.35)] hover:shadow-[0_24px_50px_rgba(186,0,54,0.5)] hover:-translate-y-0.5 transition-all backdrop-blur-xl"
@@ -1807,7 +1810,25 @@ const HostDashboard = () => {
             {language === 'বাংলা' ? 'ভেরিফাই' : 'Verify'}
           </span>
         </button>
-      )}
+      ) : !hideHostVerifBanner ? (
+        <div className="fixed z-[80] right-4 md:right-6 bottom-[5.5rem] md:bottom-6 flex items-center gap-3 pl-3 pr-2 py-2 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-[0_15px_30px_rgba(16,185,129,0.35)] backdrop-blur-xl border border-white/20">
+          <div className="flex items-center justify-center w-7 h-7 rounded-full bg-white/20">
+            <CheckCircle2 size={15} className="text-white" />
+          </div>
+          <span className="text-[11px] font-black uppercase tracking-widest">
+            {language === 'বাংলা' ? 'আপনি ভেরিফাইড' : "You're verified"}
+          </span>
+          <button 
+            onClick={() => {
+              setHideHostVerifBanner(true);
+              window.localStorage.setItem('tolet_hide_host_verif_banner', '1');
+            }}
+            className="ml-1 p-1.5 rounded-full hover:bg-white/20 transition-colors"
+          >
+            <X size={14} strokeWidth={2.5} />
+          </button>
+        </div>
+      ) : null}
 
       {/* TOAST NOTIFICATION (supports undo + error/success types) */}
       {(() => {

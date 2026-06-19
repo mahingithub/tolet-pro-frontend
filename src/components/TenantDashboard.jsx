@@ -1491,7 +1491,7 @@ const handleWizardSubmit = async (payload) => {
                 server and flips them into host mode. Verified tenants get
                 a subtle "your trust score carries over" line so they know
                 they don't lose progress when switching modes. */}
-            {!isAlsoLandlord && !hideBecomeLandlord && (
+            {!isAlsoLandlord && !hideBecomeLandlord && !authUser?.landlordProfile?.verification?.status && (
               <div className="mb-5 md:mb-7 rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 bg-gradient-to-br from-[#ba0036] via-[#7c0026] to-[#3a0011] text-white shadow-[0_20px_50px_-20px_rgba(186,0,54,0.5)] relative overflow-hidden">
                 <button
                   onClick={dismissBecomeLandlord}
