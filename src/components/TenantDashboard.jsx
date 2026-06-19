@@ -12,8 +12,13 @@ import {
   Building2, Search, Bell, Globe, LayoutDashboard, Heart,
   MessageSquare, MessageCircle, Settings, HelpCircle,
   ArrowRight, Trash2, MapPin, Receipt, CheckCheck, Download,
-  FolderOpen, Lock, Share2, Calendar, Info,
-  LogOut, Wallet, ShieldCheck, HeartPulse, Sparkles, Link2
+  CreditCard, Hourglass, X, UserCircle, BadgeCheck, ShieldAlert,
+  Camera, ScanFace, Upload, Check, Edit3, User, Phone, Mail,
+  Briefcase, GraduationCap, Building, Shield, ShieldCheck, FileText, AlertCircle, Award,
+  LogOut, CheckCircle2, Calendar, Clock, Eye, Send, ThumbsUp, ThumbsDown,
+  Inbox, Home, Sparkles, KeyRound, CalendarCheck, DollarSign, Navigation,
+  ChevronLeft, Filter, Zap, RefreshCw, Share2,
+  FolderOpen, Lock, Info, Wallet, HeartPulse, Link2
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
