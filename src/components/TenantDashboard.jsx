@@ -34,7 +34,7 @@ import InquiryModal from './InquiryModal';
 // (Landlords still use the older modal until the next session ships a host
 // version with the same design language.)
 import VerificationModal from './VerificationModal';
-import LandlordOnboardingModal from './LandlordOnboardingModal';
+import { submitLandlordVerification } from '../services/landlordVerificationService.js';
 // 🆕 Session 2: shared profile primitives. ProfileSection is the
 // new role-aware card that replaces the old "Personal Information"
 // + header block. It handles avatar, inline-edit fields, and the
@@ -1047,6 +1047,18 @@ const handleWizardSubmit = async (payload) => {
     throw err;
   }
 };
+
+  const handleLandlordWizardSubmit = async (payload) => {
+    try {
+      await submitLandlordVerification(payload);
+      toast.success(language === 'বাংলা' ? 'আপনার আবেদন সফলভাবে জমা হয়েছে। অ্যাডমিন পর্যালোচনার জন্য অপেক্ষা করুন।' : 'Application submitted successfully. Please wait for admin review.');
+      setLandlordOnboardingOpen(false);
+    } catch (err) {
+      console.error('[handleLandlordWizardSubmit] failed:', err);
+      toast.error(err.message || (language === 'বাংলা' ? 'জমা দিতে সমস্যা হয়েছে।' : 'Submission failed.'));
+      throw err;
+    }
+  };
 
   const submitVerification = async () => {
     persistProfile({
@@ -2828,14 +2840,13 @@ const handleWizardSubmit = async (payload) => {
         initialData={tenantProfile}
       />
 
-      <LandlordOnboardingModal
+      <VerificationModal
+        role="landlord_onboarding"
         open={landlordOnboardingOpen}
         onClose={() => setLandlordOnboardingOpen(false)}
-        onSuccess={() => {
-          setLandlordOnboardingOpen(false);
-          // showProfileToast handles the success feedback
-        }}
+        onSubmit={handleLandlordWizardSubmit}
         language={language}
+        initialData={{ isTenantVerified: isVerified }}
       />
 
 

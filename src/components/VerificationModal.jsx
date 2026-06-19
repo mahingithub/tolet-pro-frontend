@@ -33,6 +33,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  MapPin, FileText, Home,
   X, ChevronLeft, ChevronRight, Check, CheckCircle2,
   Sparkles, Briefcase, GraduationCap, Store, Users,
   Building2, Phone, IdCard, ShieldCheck,
@@ -126,6 +127,14 @@ const LANDLORD_STEPS = [
   { key: 'photo',            icon: Camera,         required: true,  optional: false },
   { key: 'nid',              icon: IdCard,         required: true,  optional: false },
   { key: 'review',           icon: Sparkles,       required: false, optional: false },
+];
+
+const LANDLORD_ONBOARDING_STEPS = [
+  { key: 'propertyAddress', icon: MapPin,      required: true,  optional: false },
+  { key: 'utilityBill',     icon: FileText,    required: true,  optional: false },
+  { key: 'photo',           icon: Camera,      required: true,  optional: false },
+  { key: 'nid',             icon: IdCard,      required: true,  optional: false },
+  { key: 'review',          icon: Sparkles,    required: false, optional: false },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -295,9 +304,9 @@ const StepFrame = ({ icon: Icon, titleBn, titleEn, hintBn, hintEn, optional, isB
 );
 
 // ── Image Upload Card ───────────────────────────────────────────────────
-const ImageUploadCard = ({ value, inputRef, onPick, onRemove, emptyLabelBn, emptyLabelEn, aspect, isBn }) => (
+const ImageUploadCard = ({ value, inputRef, onPick, onRemove, emptyLabelBn, emptyLabelEn, aspect, isBn, capture }) => (
   <div>
-    <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={onPick} />
+    <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" capture={capture} className="hidden" onChange={onPick} />
     {value?.dataUrl ? (
       <div className={`relative ${aspect} rounded-2xl overflow-hidden border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.15)] group`}>
         <img src={value.dataUrl} alt="" className="w-full h-full object-cover" />
@@ -416,6 +425,7 @@ const TenantFields = ({ stepKey, data, setData, isBn, photoInputRef, handleFileP
           emptyLabelBn="ছবি আপলোড করুন" emptyLabelEn="Upload photo"
           isBn={isBn}
           aspect="aspect-square max-w-[200px] mx-auto"
+          capture="user"
         />
         <div className="mt-4 p-3.5 rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/10 flex gap-2.5 items-start">
           <Lock size={14} className="text-emerald-400 shrink-0 mt-0.5" />
@@ -580,6 +590,7 @@ const HostFields = ({ stepKey, data, setData, isBn, photoInputRef, handleFilePic
           emptyLabelBn="সেলফি আপলোড করুন" emptyLabelEn="Upload selfie"
           isBn={isBn}
           aspect="aspect-square max-w-[200px] mx-auto"
+          capture="user"
         />
         <div className="mt-4 p-3.5 rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/10 flex gap-2.5 items-start">
           <ShieldCheck size={14} className="text-emerald-400 shrink-0 mt-0.5" />
@@ -647,6 +658,120 @@ const HostReview = ({ data, isBn }) => (
 
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  <OnboardingFields> — renders step bodies for landlord onboarding
+// ═══════════════════════════════════════════════════════════════════════════
+const OnboardingFields = ({ stepKey, data, setData, isBn, photoInputRef, nidFrontInputRef, nidBackInputRef, utilityBillInputRef, handleFilePick, removeFile }) => {
+  if (stepKey === 'propertyAddress') {
+    return (
+      <StepFrame
+        key="propertyAddress"
+        icon={MapPin}
+        titleBn="প্রপার্টির ঠিকানা" titleEn="Property Address"
+        hintBn="বিদ্যুৎ বিলে যে ঠিকানা আছে সেটাই লিখুন।"
+        hintEn="Match the address shown on the utility bill."
+        isBn={isBn}
+      >
+        <div className="relative">
+          <MapPin size={18} className="absolute left-4 top-4 text-white/25" />
+          <textarea
+            value={data.propertyAddress}
+            onChange={(e) => setData((d) => ({ ...d, propertyAddress: e.target.value }))}
+            placeholder={isBn ? 'যেমন: বাড়ি #১২, রোড #৭, ধানমন্ডি, ঢাকা' : 'e.g. House #12, Road #7, Dhanmondi, Dhaka'}
+            rows={3}
+            className="w-full pl-12 pr-4 py-4 bg-white/[0.03] hover:bg-white/[0.05] focus:bg-white/[0.06] border border-white/[0.08] focus:border-[#ff4d6d]/40 rounded-2xl text-sm font-bold text-white placeholder:text-white/20 transition-all outline-none focus:shadow-[0_0_20px_rgba(255,77,109,0.1)] focus:ring-1 focus:ring-[#ff4d6d]/20 resize-none"
+            autoFocus
+          />
+        </div>
+      </StepFrame>
+    );
+  }
+
+  if (stepKey === 'utilityBill') {
+    return (
+      <StepFrame
+        key="utilityBill"
+        icon={FileText}
+        titleBn="বিদ্যুৎ বিল" titleEn="Utility Bill"
+        hintBn="প্রপার্টির ঠিকানার প্রমাণের জন্য।"
+        hintEn="Used to confirm the property address."
+        isBn={isBn}
+      >
+        <ImageUploadCard
+          value={data.utilityBill}
+          inputRef={utilityBillInputRef}
+          onPick={(e) => handleFilePick('utilityBill', e)}
+          onRemove={() => removeFile('utilityBill')}
+          emptyLabelBn="বিল আপলোড করুন" emptyLabelEn="Upload bill"
+          isBn={isBn}
+          aspect="aspect-[4/3] max-w-[300px] mx-auto"
+        />
+      </StepFrame>
+    );
+  }
+
+  if (stepKey === 'photo') {
+    return (
+      <StepFrame
+        key="photo"
+        icon={Camera}
+        titleBn="সেলফি ভেরিফিকেশন" titleEn="Selfie verification"
+        hintBn="একটি পরিষ্কার সেলফি আপলোড করুন — এটি পরিচয়ের প্রমাণ হিসেবে ব্যবহৃত হবে।"
+        hintEn="Upload a clear selfie — this will be used as proof of identity."
+        isBn={isBn}
+      >
+        <ImageUploadCard
+          value={data.photo}
+          inputRef={photoInputRef}
+          onPick={(e) => handleFilePick('photo', e)}
+          onRemove={() => removeFile('photo')}
+          emptyLabelBn="সেলফি আপলোড করুন" emptyLabelEn="Upload selfie"
+          isBn={isBn}
+          aspect="aspect-square max-w-[200px] mx-auto"
+          capture="user"
+        />
+        <div className="mt-4 p-3.5 rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/10 flex gap-2.5 items-start">
+          <ShieldCheck size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+          <p className="text-[11px] font-bold text-emerald-300/70 leading-relaxed">
+            {isBn
+              ? 'শুধু অ্যাডমিন দেখবে। এটি public দেখানো হবে না।'
+              : 'Only our admin team sees this. It is never shown publicly.'}
+          </p>
+        </div>
+      </StepFrame>
+    );
+  }
+
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  <OnboardingReview> — review summary rows for landlord onboarding
+// ═══════════════════════════════════════════════════════════════════════════
+const OnboardingReview = ({ data, isBn }) => (
+  <div className="space-y-2.5">
+    <SummaryRow icon={MapPin} labelBn="প্রপার্টির ঠিকানা" labelEn="Property Address" isBn={isBn}
+      value={data.propertyAddress}
+      muted={!data.propertyAddress} />
+    <SummaryRow icon={FileText} labelBn="বিদ্যুৎ বিল" labelEn="Utility Bill" isBn={isBn}
+      value={data.utilityBill ? (isBn ? 'যোগ করা হয়েছে' : 'Added') : (isBn ? 'যোগ করা হয়নি' : 'Not added')}
+      muted={!data.utilityBill} />
+    {data.isTenantVerified ? null : (
+      <>
+        <SummaryRow icon={Camera} labelBn="সেলফি" labelEn="Selfie" isBn={isBn}
+          value={data.photo ? (isBn ? 'যোগ করা হয়েছে' : 'Added') : (isBn ? 'যোগ করা হয়নি' : 'Not added')}
+          muted={!data.photo} />
+        <SummaryRow icon={IdCard} labelBn="NID" labelEn="NID" isBn={isBn}
+          value={(data.nidFront && data.nidBack) || data.nidVerified
+            ? (isBn ? 'যোগ করা হয়েছে' : 'Added')
+            : (isBn ? 'আবশ্যক' : 'Required')}
+          muted={!(data.nidFront && data.nidBack) && !data.nidVerified} />
+      </>
+    )}
+  </div>
+);
+
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  MAIN MODAL
 // ═══════════════════════════════════════════════════════════════════════════
 const VerificationModal = ({
@@ -660,8 +785,9 @@ const VerificationModal = ({
 }) => {
   const isBn        = language === 'বাংলা';
   const isLandlord  = role === 'landlord';
+  const isOnboarding = role === 'landlord_onboarding';
   const POINTS      = isLandlord ? LANDLORD_POINTS : TENANT_POINTS;
-  const BASE_STEPS  = isLandlord ? LANDLORD_STEPS  : TENANT_STEPS;
+  const BASE_STEPS  = isOnboarding ? LANDLORD_ONBOARDING_STEPS : (isLandlord ? LANDLORD_STEPS  : TENANT_STEPS);
 
   // ─── State (only trust-scoring fields) ─────────────────────────────
   const buildTenantState = () => ({
@@ -681,7 +807,16 @@ const VerificationModal = ({
     nidBack:          null,
   });
 
-  const buildEmptyState = isLandlord ? buildHostState : buildTenantState;
+  const buildOnboardingState = () => ({
+    propertyAddress:  '',
+    utilityBill:      null,
+    photo:            null,
+    nidFront:         null,
+    nidBack:          null,
+    isTenantVerified: false,
+  });
+
+  const buildEmptyState = isOnboarding ? buildOnboardingState : (isLandlord ? buildHostState : buildTenantState);
 
   const [activeSteps, setActiveSteps] = useState(BASE_STEPS);
   const [stepIdx, setStepIdx]         = useState(0);
@@ -696,7 +831,13 @@ const VerificationModal = ({
     let seed = buildEmptyState();
 
     if (initialData && typeof initialData === 'object') {
-      if (isLandlord) {
+      if (isOnboarding) {
+        seed = {
+          ...seed,
+          propertyAddress: initialData.propertyAddress || '',
+          isTenantVerified: initialData.isTenantVerified || false,
+        };
+      } else if (isLandlord) {
         seed = {
           ...seed,
           preferredTenants: initialData.preferredTenants || [],
@@ -718,7 +859,8 @@ const VerificationModal = ({
     // Skip already-completed steps
     const filtered = BASE_STEPS.filter((step) => {
       if (step.key === 'review') return true;
-      if (step.key === 'nid') return !seed.nidVerified;
+      if (step.key === 'nid') return !seed.nidVerified && !(isOnboarding && seed.isTenantVerified);
+      if (step.key === 'photo' && isOnboarding && seed.isTenantVerified) return false;
       if (step.key === 'profession'       && seed.profession)                            return false;
       if (step.key === 'preferredTenants'  && (seed.preferredTenants || []).length > 0)   return false;
       if (step.key === 'communication'     && (seed.communication || []).length > 0)      return false;
@@ -756,6 +898,9 @@ const VerificationModal = ({
     const step = activeSteps[stepIdx];
     if (!step) return false;
     switch (step.key) {
+      // Onboarding
+      case 'propertyAddress':  return !!data.propertyAddress?.trim();
+      case 'utilityBill':      return !!data.utilityBill;
       // Tenant
       case 'profession':       return !!data.profession;
       // Landlord
@@ -765,19 +910,21 @@ const VerificationModal = ({
       case 'serviceCharge':    return data.serviceCharge !== '' && data.serviceCharge != null;
       // Shared
       case 'photo':            return !!data.photo;
-      case 'nid':              return data.nidVerified || (isLandlord
+      case 'nid':              return data.nidVerified || (isLandlord || isOnboarding
                                   ? !!(data.nidFront && data.nidBack)
                                   : true); // optional for tenant
       case 'review':           return true;
       default:                 return false;
     }
-  }, [activeSteps, stepIdx, data, isLandlord]);
+  }, [activeSteps, stepIdx, data, isLandlord, isOnboarding]);
 
   // ─── Completion map (step rail) ────────────────────────────────────
   const completedMap = useMemo(() => {
     const map = {};
     activeSteps.forEach((s) => {
       map[s.key] =
+        (s.key === 'propertyAddress'  && !!data.propertyAddress?.trim()) ||
+        (s.key === 'utilityBill'      && !!data.utilityBill) ||
         (s.key === 'profession'       && !!data.profession) ||
         (s.key === 'photo'            && !!data.photo) ||
         (s.key === 'preferredTenants' && (data.preferredTenants || []).length > 0) ||
@@ -794,6 +941,8 @@ const VerificationModal = ({
     if (!isStepValid()) {
       const step = activeSteps[stepIdx];
       const msgs = {
+        propertyAddress:  isBn ? 'প্রপার্টির ঠিকানা দিন।'                   : 'Enter property address.',
+        utilityBill:      isBn ? 'বিদ্যুৎ বিল আপলোড করুন।'                  : 'Upload utility bill.',
         profession:       isBn ? 'একটি পেশা বাছাই করুন।'                     : 'Pick a profession to continue.',
         photo:            isBn ? 'একটি ছবি আপলোড করুন।'                     : 'Upload a photo to continue.',
         preferredTenants: isBn ? 'অন্তত একটি ভাড়াটিয়ার ধরন বাছাই করুন।'    : 'Select at least one tenant type.',
@@ -815,6 +964,7 @@ const VerificationModal = ({
   const nidFrontInputRef      = useRef(null);
   const nidBackInputRef       = useRef(null);
   const photoInputRef         = useRef(null);
+  const utilityBillInputRef   = useRef(null);
 
   const handleFilePick = async (slot, e) => {
     const file = e.target.files?.[0];
@@ -844,8 +994,18 @@ const VerificationModal = ({
     setError('');
     setSubmitting(true);
     try {
-      const payload = isLandlord
-        ? {
+      let payload;
+      if (isOnboarding) {
+        payload = {
+          role: 'landlord_onboarding',
+          propertyAddress: data.propertyAddress,
+          utilityBill:     data.utilityBill?.file,
+          photo:           data.photo?.file,
+          nidFront:        data.nidFront?.file,
+          nidBack:         data.nidBack?.file,
+        };
+      } else if (isLandlord) {
+        payload = {
             role: 'landlord',
             preferredTenants: data.preferredTenants,
             communication:    data.communication,
@@ -855,8 +1015,9 @@ const VerificationModal = ({
             nidFront:         data.nidFront,
             nidBack:          data.nidBack,
             liveScore,
-          }
-        : {
+          };
+      } else {
+        payload = {
             role: 'tenant',
             professionType:  data.profession,
             photo:           data.photo,
@@ -864,6 +1025,7 @@ const VerificationModal = ({
             nidBack:         data.nidBack,
             liveScore,
           };
+      }
       await onSubmit?.(payload);
     } catch (err) {
       setError(err?.message || (isBn ? 'জমা দিতে সমস্যা হয়েছে।' : 'Submission failed.'));
@@ -951,7 +1113,22 @@ const VerificationModal = ({
           <AnimatePresence mode="wait">
 
             {/* ── Role-specific steps ── */}
-            {!isLandlord && !['nid', 'review'].includes(current.key) && (
+            {isOnboarding && !['nid', 'review'].includes(current.key) && (
+              <OnboardingFields
+                stepKey={current.key}
+                data={data}
+                setData={setData}
+                isBn={isBn}
+                photoInputRef={photoInputRef}
+                nidFrontInputRef={nidFrontInputRef}
+                nidBackInputRef={nidBackInputRef}
+                utilityBillInputRef={utilityBillInputRef}
+                handleFilePick={handleFilePick}
+                removeFile={removeFile}
+              />
+            )}
+
+            {!isOnboarding && !isLandlord && !['nid', 'review'].includes(current.key) && (
               <TenantFields
                 stepKey={current.key}
                 data={data}
@@ -963,7 +1140,7 @@ const VerificationModal = ({
               />
             )}
 
-            {isLandlord && !['nid', 'review'].includes(current.key) && (
+            {!isOnboarding && isLandlord && !['nid', 'review'].includes(current.key) && (
               <HostFields
                 stepKey={current.key}
                 data={data}
@@ -1034,8 +1211,16 @@ const VerificationModal = ({
                 hintEn="Looks good? Submit when ready."
                 isBn={isBn}
               >
-                {initialData && (
-                  <div className="flex justify-end mb-3">
+                {isOnboarding ? (
+                  <OnboardingReview data={data} isBn={isBn} />
+                ) : isLandlord ? (
+                  <HostReview data={data} isBn={isBn} />
+                ) : (
+                  <TenantReview data={data} isBn={isBn} />
+                )}
+
+                {initialData && !isOnboarding && (
+                  <div className="flex justify-end mb-3 mt-3">
                     <button
                       type="button"
                       onClick={() => { onClose?.(); onEditProfile?.(); }}
@@ -1047,10 +1232,8 @@ const VerificationModal = ({
                   </div>
                 )}
 
-                {isLandlord ? <HostReview data={data} isBn={isBn} /> : <TenantReview data={data} isBn={isBn} />}
-
                 {/* Trust booster nudge — only for tenants missing NID */}
-                {!data.nidFront && !isLandlord && (
+                {!data.nidFront && !isLandlord && !isOnboarding && (
                   <div className="mt-5 p-4 rounded-2xl bg-gradient-to-br from-emerald-500/[0.06] to-[#ff4d6d]/[0.04] border border-emerald-500/10">
                     <div className="flex items-start gap-3">
                       <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/15 flex items-center justify-center shrink-0">
