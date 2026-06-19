@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import usePropertyStore from '../store/usePropertyStore';
+import { DIVISIONS, POPULAR_AREA_SUBZONES, buildSearchUrl } from '../data/searchData';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTEXT DATA
@@ -139,6 +140,33 @@ const HeroSection = () => {
 
   const [activeIndex,       setActiveIndex]       = useState(-1);
   const [mobileActiveIndex, setMobileActiveIndex] = useState(-1);
+
+  const [openDivision,          setOpenDivision]          = useState(null);
+  const [openArea,              setOpenArea]              = useState(null);
+  const [pendingLocation,       setPendingLocation]       = useState('');
+  const [isCategoryPromptOpen,  setIsCategoryPromptOpen]  = useState(false);
+
+  const handleDistrictPick = (districtName) => {
+    setOpenDivision(null);
+    setPendingLocation(districtName);
+    setIsCategoryPromptOpen(true);
+  };
+
+  const handleAreaSubzonePick = (loc) => {
+    setOpenArea(null);
+    setPendingLocation(loc);
+    setIsCategoryPromptOpen(true);
+  };
+
+  const handleCategoryChoice = (purpose) => {
+    setIsCategoryPromptOpen(false);
+    navigate(buildSearchUrl({
+      location: pendingLocation,
+      purpose: purpose,
+      categoryId: 'any',
+      budgetId: 'any',
+    }));
+  };
 
   const locationRef       = useRef(null);
   const mobileLocationRef = useRef(null);
@@ -822,7 +850,14 @@ const HeroSection = () => {
               {sliderItems.map((div, idx) => (
                 <div
                   key={idx}
-                  onClick={() => navigate(`/properties/${div.id}`)}
+                  onClick={() => {
+                    const divData = DIVISIONS.find(d => d.id === div.id);
+                    if (divData) {
+                      setOpenDivision(divData);
+                    } else {
+                      navigate(`/properties/${div.id}`);
+                    }
+                  }}
                   className="group w-[260px] md:w-[320px] h-[300px] md:h-[360px] rounded-[1.5rem] md:rounded-[2rem] overflow-hidden relative cursor-pointer shadow-[0_10px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgba(186,0,54,0.15)] transition-all duration-500 shrink-0 bg-white"
                 >
                   <div className="absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-700 ease-out" style={{ backgroundImage: `url(${div.image})` }} />
@@ -1229,6 +1264,109 @@ const HeroSection = () => {
               </div>
               <button onClick={() => setIsMobileBudgetOpen(false)} className="w-full bg-slate-900 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors shadow-md">
                 {t?.applyRange || 'Apply Range'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* DESKTOP MODALS for Division/Area/Category                       */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+
+      {openDivision && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setOpenDivision(null)}>
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="relative h-32">
+              <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${openDivision.image})` }} />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+              <button onClick={() => setOpenDivision(null)} className="absolute top-4 right-4 text-white/80 hover:text-white bg-white/20 hover:bg-white/30 rounded-full p-2 transition-colors">
+                <X size={18} />
+              </button>
+              <div className="absolute bottom-4 left-5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-white/80">{openDivision.tagline}</p>
+                <h3 className="text-2xl font-black text-white leading-none mt-1">{openDivision.name}</h3>
+              </div>
+            </div>
+            <div className="p-5">
+              <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">{t?.mobPickDistrict || 'Choose a district'}</h4>
+              <div className="grid grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto">
+                {openDivision.districts.map(district => (
+                  <button key={district} onClick={() => handleDistrictPick(district)} className="text-left px-4 py-3 rounded-xl border border-slate-100 hover:border-[#ba0036]/40 hover:bg-red-50 transition-all group">
+                    <span className="block text-sm font-black text-slate-800 group-hover:text-[#ba0036]">{district}</span>
+                    <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{t?.mobViewHomes || 'View homes'}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {openArea && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setOpenArea(null)}>
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">{openArea}</h3>
+                <p className="text-xs font-bold text-slate-500">{t?.mobChooseSubzone || 'Choose a sub-zone'}</p>
+              </div>
+              <button onClick={() => setOpenArea(null)} className="text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full p-2 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-5">
+              <div className="grid grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto">
+                {(POPULAR_AREA_SUBZONES[openArea] || []).map(sub => (
+                  <button key={sub.id} onClick={() => handleAreaSubzonePick(sub.name)} className="text-left px-4 py-3 rounded-xl border border-slate-100 hover:border-[#ba0036]/40 hover:bg-red-50 transition-all group">
+                    <span className="block text-sm font-black text-slate-800 group-hover:text-[#ba0036]">{sub.name}</span>
+                    <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{t?.mobBrowseHomes || 'Browse homes'}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isCategoryPromptOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setIsCategoryPromptOpen(false)}>
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1">{pendingLocation}</h3>
+                <h2 className="text-xl font-black text-slate-900 leading-tight">{t?.mobWhatAreYouLookingFor || 'What are you looking for?'}</h2>
+              </div>
+              <button onClick={() => setIsCategoryPromptOpen(false)} className="text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full p-2 transition-colors shrink-0">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button onClick={() => handleCategoryChoice('rent')} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-[#ba0036]/50 hover:bg-red-50 transition-all group text-left">
+                <div className="w-12 h-12 rounded-full bg-red-50 text-[#ba0036] flex items-center justify-center shrink-0">
+                  <HomeIcon size={22} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <h4 className="text-base font-black text-slate-900 group-hover:text-[#ba0036]">{t?.rentMenu || 'Rent'}</h4>
+                  <p className="text-xs font-bold text-slate-500">{t?.mobRentDesc || 'Apartments, sublets, bachelor flats'}</p>
+                </div>
+              </button>
+              <button onClick={() => handleCategoryChoice('buy')} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-blue-500/50 hover:bg-blue-50 transition-all group text-left">
+                <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <Wallet size={22} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <h4 className="text-base font-black text-slate-900 group-hover:text-blue-600">{t?.buyMenu || 'Buy'}</h4>
+                  <p className="text-xs font-bold text-slate-500">{t?.mobBuyDesc || 'Houses, flats, land'}</p>
+                </div>
+              </button>
+              <button onClick={() => handleCategoryChoice('commercial')} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-amber-500/50 hover:bg-amber-50 transition-all group text-left">
+                <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                  <Building size={22} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <h4 className="text-base font-black text-slate-900 group-hover:text-amber-600">{t?.commercialMenu || 'Commercial'}</h4>
+                  <p className="text-xs font-bold text-slate-500">{t?.mobCommercialDesc || 'Offices, shops, restaurants'}</p>
+                </div>
               </button>
             </div>
           </div>
