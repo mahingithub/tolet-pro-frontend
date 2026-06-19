@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import usePropertyStore from '../store/usePropertyStore';
-import { DIVISIONS, POPULAR_AREA_SUBZONES, buildSearchUrl } from '../data/searchData';
+import { DIVISIONS, POPULAR_AREAS, POPULAR_AREA_IMAGES, POPULAR_AREA_SUBZONES, buildSearchUrl } from '../data/searchData';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTEXT DATA
@@ -959,29 +959,77 @@ const HeroSection = () => {
             </button>
           </div>
 
-          <div className="flex overflow-x-auto gap-4 md:gap-6 pb-6 px-4 md:px-6 snap-x snap-mandatory scroll-px-4 md:scroll-px-6 custom-scrollbar md:grid md:grid-cols-2 lg:grid-cols-3 md:pb-0 md:overflow-visible">
-            {dhakaFinest.map((area, idx) => (
-              <div
-                key={idx}
-                onClick={() => navigate(`/properties/${area.id}`)}
-                className="shrink-0 w-[85vw] snap-center md:w-auto group relative h-[300px] md:h-[320px] rounded-[2rem] overflow-hidden cursor-pointer bg-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgba(186,0,54,0.1)] transition-all duration-500 hover:-translate-y-1 border border-slate-100"
+          <div className="flex overflow-x-auto gap-4 md:gap-6 pb-6 px-4 md:px-6 snap-x snap-mandatory scroll-px-4 md:scroll-px-6 custom-scrollbar md:grid md:grid-cols-2 lg:grid-cols-4 md:pb-0 md:overflow-visible">
+            {POPULAR_AREAS.map((area, idx) => (
+              <button
+                key={area}
+                onClick={() => {
+                  const subzones = POPULAR_AREA_SUBZONES[area] || [];
+                  if (subzones.length > 0) {
+                    setOpenArea(area);
+                  } else {
+                    setPendingLocation(area);
+                    setIsCategoryPromptOpen(true);
+                  }
+                }}
+                className="snap-start shrink-0 relative w-[260px] md:w-auto h-[300px] md:h-[320px] rounded-[2rem] overflow-hidden active:scale-[0.98] transition-transform group shadow-[0_20px_50px_-22px_rgba(15,23,42,0.55)] border-[1px] border-slate-100"
               >
-                <div className="absolute inset-0 bg-cover bg-center group-hover:scale-105 transition-transform duration-700 ease-out" style={{ backgroundImage: `url(${area.image})` }} />
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80" />
-                <div className="absolute top-5 right-5 bg-white/90 backdrop-blur-md text-slate-900 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm">
-                  {area.tag}
+                {POPULAR_AREA_IMAGES[area] ? (
+                  <div
+                    className="absolute inset-0 bg-cover bg-center group-hover:scale-105 transition-transform duration-700 ease-out"
+                    style={{ backgroundImage: `url(${POPULAR_AREA_IMAGES[area]})` }}
+                  />
+                ) : (
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background: 'linear-gradient(135deg, #1f2937 0%, #4c1d95 45%, #831843 100%)',
+                    }}
+                  />
+                )}
+
+                {/* Holographic vignette */}
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/10 to-black/85" />
+                <div
+                  className="absolute inset-0 mix-blend-overlay opacity-50 pointer-events-none"
+                  style={{
+                    background: 'conic-gradient(from 200deg at 70% 20%, rgba(186,0,54,0.55), rgba(168,85,247,0.45), rgba(34,211,238,0.45), rgba(186,0,54,0.55))',
+                  }}
+                />
+                <div className="absolute inset-0 rounded-[2rem] ring-1 ring-inset ring-white/25 pointer-events-none" />
+
+                {/* TOP-LEFT: rank chip */}
+                <div className="absolute top-4 left-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/40 text-white text-[10px] font-black uppercase tracking-[0.18em]">
+                  <Sparkles size={12} /> #{String(idx + 1).padStart(2, '0')}
                 </div>
-                <div className="absolute bottom-4 left-4 right-4 bg-white/20 backdrop-blur-xl border border-white/30 p-4 rounded-3xl flex items-center justify-between group-hover:bg-white/30 transition-colors">
-                  <div>
-                    <h3 className="text-xl font-black text-white">{t?.districtNames?.[area.id] || area.name}</h3>
-                    <p className="text-xs font-bold text-white/80 mt-0.5">{area.properties} {t?.properties || 'Properties'}</p>
+
+                {/* TOP-RIGHT: sub-zone count chip */}
+                {POPULAR_AREA_SUBZONES[area]?.length > 0 && (
+                  <div className="absolute top-4 right-4 inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-[10px] font-black uppercase tracking-[0.16em]">
+                    {POPULAR_AREA_SUBZONES[area].length} {t?.mobZones || 'zones'}
                   </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest mb-0.5">{t?.avgRent || 'Avg. Rent'}</p>
-                    <p className="text-sm font-black text-white">{area.price}</p>
+                )}
+
+                {/* BOTTOM: area name + arrow */}
+                <div className="absolute bottom-0 inset-x-0 p-5 text-left">
+                  <span className="block text-[10px] font-black uppercase tracking-[0.22em] text-white/80 mb-1">
+                    {t?.mobPopularAreas || 'Popular Areas'}
+                  </span>
+                  <h4 className="text-white text-2xl font-black tracking-tight leading-none drop-shadow-md">
+                    {area}
+                  </h4>
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="inline-flex items-baseline gap-1 px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/30">
+                      <span className="text-white text-sm font-black leading-none">
+                        Explore
+                      </span>
+                    </div>
+                    <span className="w-8 h-8 rounded-full bg-white text-crimson-600 flex items-center justify-center shadow-md">
+                      <ArrowRight size={14} strokeWidth={2.5} />
+                    </span>
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </section>

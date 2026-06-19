@@ -31,6 +31,7 @@ import {
   ALL_SUGGESTIONS,
   RESIDENTIAL_TYPES,
   BUDGET_RANGES,
+  POPULAR_AREA_IMAGES,
   getPropertyTypesFor,
   localizedLabel,
   filterLocationSuggestions,
@@ -340,15 +341,8 @@ const DivisionDistrictsSheet = ({ division, onClose, onPickDistrict, t }) => {
  *    page, all the houses in that sub-zone will be shown."
  */
 
-const POPULAR_AREA_IMAGES = {
-  Dhanmondi: 'https://greatruns.com/wp-content/uploads/2020/12/Dhanmondi_Lake_Dhaka_BD.jpg',
-  Gulshan: 'https://thumbs.dreamstime.com/b/gulshan-dhaka-bangladesh-traffics-crossing-signal-busy-circle-evening-high-buildings-background-280740296.jpg',
-  Banani: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRrmLre9dcvRHKLjGX3e5NLY27tjItA8HsZ4g&s',
-  Uttara: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/RAJUK_Uttara_Apartment_Project_%28cropped%29.jpg/330px-RAJUK_Uttara_Apartment_Project_%28cropped%29.jpg',
-  Bashundhara: 'https://www.bashundharahousing.com/api/assets/Several%20Nice%20Location%20of%20Bashundhara%20RA%202.jpeg',
-  Mirpur: 'https://dscdn.daily-sun.com/english/uploads/news_photos/2025/07/21/1753105721-78de7f89e9acf2851f429b382a631c18.jpeg',
-  Mohammadpur: 'https://thumbs.dreamstime.com/b/aerial-view-buildings-capital-city-dhaka-bangladesh-view-mohammadpur-bright-sunny-day-aerial-view-buildings-229193615.jpg'
-};
+// Images moved to searchData.js
+
 
 
 
