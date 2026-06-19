@@ -12,16 +12,15 @@ import {
   Building2, Search, Bell, Globe, LayoutDashboard, Heart,
   MessageSquare, MessageCircle, Settings, HelpCircle,
   ArrowRight, Trash2, MapPin, Receipt, CheckCheck, Download,
-  CreditCard, Hourglass, X, UserCircle, BadgeCheck, ShieldAlert,
-  Camera, ScanFace, Upload, Check, Edit3, User, Phone, Mail,
-  Briefcase, GraduationCap, Building, Shield, ShieldCheck, FileText, AlertCircle, Award,
-  LogOut, CheckCircle2, Calendar, Clock, Eye, Send, ThumbsUp, ThumbsDown,
-  Inbox, Home, Sparkles, KeyRound, CalendarCheck, DollarSign, Navigation,
-  ChevronLeft, Filter, Zap, RefreshCw, Share2
+  FolderOpen, Lock, Share2, Calendar, Info,
+  LogOut, Wallet, ShieldCheck, HeartPulse, Sparkles, Link2
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
 import callProvider from '../services/callProvider';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import PdfReceiptTemplate from './shared/PdfReceiptTemplate';
 // InquiryModal is the same shared modal used by PropertyDetails / PropertyListing.
 // Adjust the import path if your file lives elsewhere — the API is unchanged.
 import InquiryModal from './InquiryModal';
@@ -341,6 +340,7 @@ const TenantDashboard = () => {
   // 🟢 NEW: Payment receipts pushed in by the landlord from HostDashboard.
   const [paymentReceipts, setPaymentReceipts] = useState([]);
   const [activeReceipt, setActiveReceipt] = useState(null);
+  const pdfReceiptRef = useRef(null);
 
   // 🟢 Payments filter state — drives the futuristic month/year/property
   // navigator at the top of the Payments tab. We do NOT persist these to
@@ -1128,6 +1128,33 @@ const handleWizardSubmit = async (payload) => {
   };
 
   const unreadReceiptsCount = paymentReceipts.filter(r => !r.read).length;
+
+  const downloadModernPdf = async (receipt) => {
+    if (!pdfReceiptRef.current) return;
+    const toastId = toast.loading(language === 'বাংলা' ? 'PDF জেনারেট হচ্ছে...' : 'Generating PDF...');
+    try {
+      const canvas = await html2canvas(pdfReceiptRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      const pdfWidth = canvas.width / 2;
+      const pdfHeight = canvas.height / 2;
+      const pdf = new jsPDF({
+        orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [pdfWidth, pdfHeight] // Scale down for crispness
+      });
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Receipt-${receipt.id}.pdf`);
+      toast.success(language === 'বাংলা' ? 'PDF ডাউনলোড সম্পন্ন' : 'PDF Downloaded', { id: toastId });
+    } catch (err) {
+      console.error('PDF Generation Error:', err);
+      toast.error(language === 'বাংলা' ? 'PDF জেনারেট করতে সমস্যা হয়েছে' : 'Failed to generate PDF', { id: toastId });
+    }
+  };
 
   // 🟢 NEW: Smart Alerts for the tenant — derived from their inquiries + rent ledger.
   const { alerts: tenantAlerts, resolved: tenantResolved } = useMemo(
@@ -2994,24 +3021,7 @@ const handleWizardSubmit = async (payload) => {
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
-                      const text = [
-                        `${language === 'বাংলা' ? 'TO-LET PRO রেন্ট রিসিট' : 'TO-LET PRO Rent Receipt'}`,
-                        `Property: ${activeReceipt.propertyTitle}`,
-                        `Month: ${activeReceipt.monthLabel || activeReceipt.monthKey}`,
-                        `Total Due: ৳${(activeReceipt.totalDue || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}`,
-                        `Total Paid: ৳${(activeReceipt.totalPaid || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}`,
-                        `Balance: ${activeReceipt.balance > 0 ? '৳' + activeReceipt.balance.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN') : 'Cleared'}`,
-                        `Method: ${activeReceipt.method || '—'}${activeReceipt.txnId ? ' · Txn ' + activeReceipt.txnId : ''}`,
-                        `Date: ${activeReceipt.date}`,
-                        `Receipt ID: ${activeReceipt.id}`,
-                      ].join('\n');
-                      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `receipt-${activeReceipt.id}.txt`;
-                      a.click();
-                      URL.revokeObjectURL(url);
+                      downloadModernPdf(activeReceipt);
                     }}
                     className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[11px] font-black transition-all active:scale-95 flex items-center justify-center gap-1.5"
                   >
@@ -3029,6 +3039,11 @@ const handleWizardSubmit = async (payload) => {
           </div>
         </div>
       )}
+
+      {/* Hidden container for PDF rendering */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+        <PdfReceiptTemplate ref={pdfReceiptRef} receipt={activeReceipt} language={language} />
+      </div>
 
       {/* (Toast moved to the top of the shell — top-center pill mirroring HostDashboard.) */}
     </div>
