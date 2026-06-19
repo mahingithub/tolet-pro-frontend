@@ -874,7 +874,7 @@ const VerificationModal = ({
     setStepIdx(0);
     setError('');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialData, role]);
+  }, [open, role]);
 
   // ─── Live trust score ──────────────────────────────────────────────
   const liveScore = useMemo(() => {
