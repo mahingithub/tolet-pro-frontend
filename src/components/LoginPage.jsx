@@ -136,9 +136,20 @@ const LoginPage = () => {
   // RecaptchaVerifier is single-use; clear + recreate on every OTP send so
   // resend works and re-entering the flow after success doesn't fail silently.
   const buildRecaptcha = useCallback(() => {
+    // Tear down any previous verifier instance.
     if (recaptchaVerifierRef.current) {
       try { recaptchaVerifierRef.current.clear(); } catch { /* noop */ }
       recaptchaVerifierRef.current = null;
+    }
+    // Firebase leaves its widget markup inside the container div even after
+    // clear(), so a second attempt throws "reCAPTCHA has already been rendered
+    // in this element". Replace the div with a fresh empty one each time so the
+    // next RecaptchaVerifier always gets a clean mount point.
+    const old = document.getElementById('recaptcha-container');
+    if (old) {
+      const fresh = document.createElement('div');
+      fresh.id = 'recaptcha-container';
+      old.replaceWith(fresh);
     }
     recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
       size: 'invisible',
