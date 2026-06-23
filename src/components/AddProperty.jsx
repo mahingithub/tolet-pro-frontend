@@ -903,10 +903,20 @@ const GpsPanel = ({ form, set, isBn }) => {
               set('district', distMatch.id);
               const thanaList = THANAS_BY_DISTRICT[distMatch.id] || [];
               thMatch = matchGeo(g.thana, thanaList, (t) => t, (t) => thanaBn(distMatch.id, t)) || matchGeo(g.district, thanaList, (t) => t, (t) => thanaBn(distMatch.id, t));
+              
+              if (!thMatch && g.thana) {
+                thMatch = String(g.thana).trim();
+              }
+
               if (thMatch) {
                 set('thana', thMatch);
                 const areaList = (AREAS_BY_THANA[distMatch.id] || {})[thMatch] || [];
-                const areaMatch = matchGeo(g.union || g.road, areaList, (a) => a, (a) => areaBn(distMatch.id, thMatch, a));
+                let areaMatch = matchGeo(g.union || g.road, areaList, (a) => a, (a) => areaBn(distMatch.id, thMatch, a));
+                
+                if (!areaMatch && (g.union || g.road)) {
+                  areaMatch = String(g.union || g.road).trim();
+                }
+                
                 if (areaMatch) set('area', areaMatch);
                 unionObj = matchUnion(g.union, distMatch.id, thMatch);
               }
@@ -1878,15 +1888,19 @@ const AddProperty = () => {
                     <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
                       <Field label={isBn ? 'থানা / উপজেলা' : 'Thana / Upazila'}
                         hint={isBn ? 'নির্দিষ্ট থানা — ভাড়াটিয়া এটা দিয়েই বাসা খুঁজে পাবে' : 'The specific thana — tenants find your place by this'}>
-                        {(THANAS_BY_DISTRICT[form.district] || []).length > 0 ? (
+                        {(THANAS_BY_DISTRICT[form.district] || []).length > 0 || (form.thana && (THANAS_BY_DISTRICT[form.district] || []).includes(form.thana)) ? (
                           <div className="relative">
                             <select className={`${inputCls} appearance-none pr-10`}
                               value={form.thana}
                               onChange={e => { set('thana', e.target.value); set('area', ''); }}>
                               <option value="">{isBn ? 'থানা নির্বাচন করুন' : 'Select Thana'}</option>
-                              {(THANAS_BY_DISTRICT[form.district] || []).map(th => (
-                                <option key={th} value={th}>{th}</option>
-                              ))}
+                              {(() => {
+                                const list = [...(THANAS_BY_DISTRICT[form.district] || [])];
+                                if (form.thana && !list.includes(form.thana)) list.unshift(form.thana);
+                                return list.map(th => (
+                                  <option key={th} value={th}>{isBn ? (thanaBn(form.district, th) || th) : th}</option>
+                                ));
+                              })()}
                             </select>
                             <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                           </div>
@@ -1906,28 +1920,48 @@ const AddProperty = () => {
 
                 {/* Area / neighborhood (cascades from District) */}
                 <AnimatePresence>
-                  {form.district && form.thana && areasForThana(form.district, form.thana).length > 0 && (
+                  {form.district && form.thana && (
                     <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
                       <Field label={isBn ? 'এলাকা / পাড়া' : 'Area / Neighborhood'}
                         hint={isBn ? 'যেমন: ধানমন্ডি ৩, গুলশান ২, উত্তরা সেক্টর ৭' : 'e.g. Dhanmondi 3, Gulshan 2, Uttara Sector 7'}>
-                        <div className="relative">
-                          <select className={`${inputCls} appearance-none pr-10`}
-                            value={form.area}
-                            onChange={e => {
-                              const value = e.target.value;
-                              set('area', value);
-                              // Auto-prefill the address field on first area pick.
-                              if (value && !form.location.trim()) {
-                                set('location', value);
-                              }
-                            }}>
-                            <option value="">{isBn ? 'এলাকা নির্বাচন করুন (ঐচ্ছিক)' : 'Select Area (optional)'}</option>
-                            {areasForThana(form.district, form.thana).map(a => (
-                              <option key={a} value={a}>{a}</option>
-                            ))}
-                          </select>
-                          <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                        </div>
+                        {areasForThana(form.district, form.thana).length > 0 ? (
+                          <div className="relative">
+                            <select className={`${inputCls} appearance-none pr-10`}
+                              value={form.area}
+                              onChange={e => {
+                                const value = e.target.value;
+                                set('area', value);
+                                // Auto-prefill the address field on first area pick.
+                                if (value && !form.location.trim()) {
+                                  set('location', value);
+                                }
+                              }}>
+                              <option value="">{isBn ? 'এলাকা নির্বাচন করুন (ঐচ্ছিক)' : 'Select Area (optional)'}</option>
+                              {(() => {
+                                const list = [...areasForThana(form.district, form.thana)];
+                                if (form.area && !list.includes(form.area)) list.unshift(form.area);
+                                return list.map(a => (
+                                  <option key={a} value={a}>{isBn ? (areaBn(form.district, form.thana, a) || a) : a}</option>
+                                ));
+                              })()}
+                            </select>
+                            <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <MapPin size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+                            <input type="text" className={`${inputCls} pl-10`}
+                              placeholder={isBn ? 'যেমন: দত্তপাড়া' : 'e.g. Dattapara'}
+                              value={form.area}
+                              onChange={e => {
+                                const value = e.target.value;
+                                set('area', value);
+                                if (value && !form.location.trim()) {
+                                  set('location', value);
+                                }
+                              }} />
+                          </div>
+                        )}
                       </Field>
                     </motion.div>
                   )}
