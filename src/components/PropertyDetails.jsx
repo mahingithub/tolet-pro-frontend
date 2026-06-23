@@ -1443,6 +1443,9 @@ const PropertyDetails = () => {
   // fetch is in flight we render an empty stub so hooks below don't blow up.
   const [property, setProperty] = useState(null);
   const group = property ? (TYPE_GROUP_MAP[property.rentalCategory || property.type] || 'residential') : 'residential';
+  if (property && property.specificDetails) {
+    Object.assign(property, property.specificDetails);
+  }
   const [landlord, setLandlord] = useState(null);
   const [loadingProperty, setLoadingProperty] = useState(true);
   const [loadingLandlord, setLoadingLandlord] = useState(true);

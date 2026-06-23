@@ -172,6 +172,9 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 		: 0;
 	const catEntry = RENTAL_CATEGORIES.find((c) => c.id === property.rentalCategory);
 	const group = TYPE_GROUP_MAP[property.rentalCategory || property.type] || 'residential';
+  if (property && property.specificDetails) {
+    Object.assign(property, property.specificDetails);
+  }
 	const badgeLabel = GROUP_BADGE_MAP[group] || GROUP_BADGE_MAP.residential;
 	let priceLabelStr = property.intent === 'rent' || property.intent === 'commercial' ? 'মাসিক ভাড়া' : (group === 'land' ? 'প্রতি শতক' : 'বিক্রয় মূল্য');
 	const extraRoomCount = Math.max(0, totalRoomCategories - 1 - collageThumbs.length);

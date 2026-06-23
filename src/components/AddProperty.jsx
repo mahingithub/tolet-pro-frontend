@@ -1651,7 +1651,7 @@ const AddProperty = () => {
     try {
       // propertyService pulls the current host from auth state and stamps
       // the listing with their id/name.
-      await propertyService.createProperty(form);
+      await propertyService.createProperty(payload);
       clearDraft();
       setIsSubmitting(false);
       setSubmitted(true);
