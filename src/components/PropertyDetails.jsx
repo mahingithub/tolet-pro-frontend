@@ -371,30 +371,6 @@ const fetchNearbyPlaces = async (lat, lng) => {
   }
 };
 
-// ─── TYPE GROUP MAP ───────────────────────────────────────────────────────────
-const TYPE_GROUP_MAP = {
-  flat: 'residential', apartment: 'residential', house: 'residential', mess: 'residential', villa: 'residential', other_buy: 'residential', sublet: 'residential', hostel: 'residential', single_room: 'residential', building: 'residential',
-  office: 'office', office_room: 'office', office_space: 'office',
-  land: 'land', plot: 'land',
-  shop: 'commercial_shop', mall_shop: 'commercial_shop', showroom: 'commercial_shop', other_commercial: 'commercial_shop',
-  restaurant: 'restaurant', restaurant_space: 'restaurant',
-  warehouse: 'warehouse', shed: 'warehouse'
-};
-const GROUP_BADGE_MAP = {
-  residential: '🏠 আবাসিক', land: '🌿 জমি/প্লট', commercial_shop: '🏪 দোকান/শপ',
-  restaurant: '🍽 রেস্টুরেন্ট', office: '💼 অফিস', warehouse: '🏗 গোডাউন'
-};
-const GroupBadge = ({ group }) => {
-  const label = GROUP_BADGE_MAP[group] || GROUP_BADGE_MAP.residential;
-  return (
-    <span style={{ background: '#f8fafc', border: '1px solid rgba(15,23,42,0.08)', color: '#475569' }}
-      className="inline-flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest">
-      <span className="text-sm leading-none">{label.split(' ')[0]}</span>
-      {label.split(' ').slice(1).join(' ')}
-    </span>
-  );
-};
-
 // ─── ROOM TYPES ───────────────────────────────────────────────────────────────
 // Each room now carries BOTH a futuristic lucide Icon (used in the gallery
 // overlays + stats cards) and an emoji (used by the Photo tour modal where
@@ -689,41 +665,27 @@ const FullscreenPhoto = ({ src, onClose }) => (
 // ─────────────────────────────────────────────────────────────────────────────
 // GALLERY BUILDER
 // ─────────────────────────────────────────────────────────────────────────────
+const GALLERY_ROOM_ORDER = ['bedroom', 'bathroom', 'living', 'kitchen', 'other'];
 
-
-function buildGallery(property, group) {
+function buildGallery(property) {
   if (!property) return [];
   const items = [];
   if (property.coverPhoto) {
     items.push({ url: property.coverPhoto, room: 'cover', label: 'Cover Photo', emoji: '🏠', Icon: Home });
   }
-
-  const groupTabs = {
-    residential: [{ id: 'bedroom', label: 'বেডরুম' }, { id: 'bathroom', label: 'বাথরুম' }, { id: 'kitchen', label: 'রান্নাঘর' }, { id: 'living', label: 'বসার ঘর' }, { id: 'balcony', label: 'বারান্দা' }, { id: 'front_view', label: 'সামনের ভিউ' }],
-    land: [{ id: 'front_view', label: 'জমির সামনের দিক' }, { id: 'surroundings', label: 'চারপাশের ভিউ' }, { id: 'road_view', label: 'সামনের রাস্তা' }, { id: 'map', label: 'দলিল/মৌজা ম্যাপ' }],
-    commercial_shop: [{ id: 'front_view', label: 'শাটার/ফ্রন্ট ভিউ' }, { id: 'inside_floor', label: 'ভেতরের ফ্লোর' }, { id: 'washroom', label: 'ওয়াশরুম' }, { id: 'electric_panel', label: 'ইলেকট্রিক্যাল প্যানেল' }],
-    restaurant: [{ id: 'front_view', label: 'শাটার/ফ্রন্ট ভিউ' }, { id: 'inside_hall', label: 'ভেতরের হল' }, { id: 'kitchen_area', label: 'কিচেন এরিয়া' }, { id: 'washroom', label: 'ওয়াশরুম' }],
-    office: [{ id: 'reception', label: 'রিসেপশন' }, { id: 'workspace', label: 'কর্মক্ষেত্র' }, { id: 'cabin', label: 'কেবিন/বস রুম' }, { id: 'meeting_room', label: 'মিটিং রুম' }, { id: 'washroom', label: 'ওয়াশরুম' }],
-    warehouse: [{ id: 'inside_view', label: 'ভেতরের ভিউ' }, { id: 'entrance', label: 'প্রবেশপথ/গেট' }, { id: 'loading_area', label: 'লোডিং এরিয়া' }]
-  };
-  const tabs = groupTabs[group] || groupTabs.residential;
-
-  for (const tab of tabs) {
-    const photos = (property.roomPhotos || []).filter(p => p.room === tab.id);
+  // Accept BOTH the form-time shape `{ room, preview }` AND the persisted /
+  // API shape `{ room, url }`. The room category is preserved through the
+  // entire pipeline so the gallery groups by bedroom / bathroom / kitchen
+  // / living / other instead of dumping all photos in one bucket.
+  for (const roomId of GALLERY_ROOM_ORDER) {
+    const rt = ROOM_TYPES.find(r => r.id === roomId);
+    const photos = (property.roomPhotos || []).filter(p => (p.room || 'other') === roomId);
     photos.forEach(p => {
       const url = p.preview || p.url;
       if (!url) return;
-      items.push({ url, room: tab.id, label: tab.label, emoji: '📷', Icon: Camera });
+      items.push({ url, room: roomId, label: rt?.label || roomId, emoji: rt?.emoji || '📷', Icon: rt?.Icon || Camera });
     });
   }
-  
-  const knownIds = new Set(tabs.map(t => t.id));
-  const otherPhotos = (property.roomPhotos || []).filter(p => !knownIds.has(p.room) && p.room !== 'cover');
-  otherPhotos.forEach(p => {
-    const url = p.preview || p.url;
-    if (!url) return;
-    items.push({ url, room: 'other', label: 'অন্যান্য', emoji: '📷', Icon: Camera });
-  });
   return items;
 }
 
@@ -1080,22 +1042,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property }) => 
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Rooms</p>
                 <div className="flex flex-col gap-1">
                   {orderedRooms.map((room) => {
-                    let label = room === 'cover' ? 'Cover Photo' : room;
-                    if (room === 'other') label = 'অন্যান্য';
-                    else {
-                      const groupTabs = {
-                        residential: [{ id: 'bedroom', label: 'বেডরুম' }, { id: 'bathroom', label: 'বাথরুম' }, { id: 'kitchen', label: 'রান্নাঘর' }, { id: 'living', label: 'বসার ঘর' }, { id: 'balcony', label: 'বারান্দা' }, { id: 'front_view', label: 'সামনের ভিউ' }],
-                        land: [{ id: 'front_view', label: 'জমির সামনের দিক' }, { id: 'surroundings', label: 'চারপাশের ভিউ' }, { id: 'road_view', label: 'সামনের রাস্তা' }, { id: 'map', label: 'দলিল/মৌজা ম্যাপ' }],
-                        commercial_shop: [{ id: 'front_view', label: 'শাটার/ফ্রন্ট ভিউ' }, { id: 'inside_floor', label: 'ভেতরের ফ্লোর' }, { id: 'washroom', label: 'ওয়াশরুম' }, { id: 'electric_panel', label: 'ইলেকট্রিক্যাল প্যানেল' }],
-                        restaurant: [{ id: 'front_view', label: 'শাটার/ফ্রন্ট ভিউ' }, { id: 'inside_hall', label: 'ভেতরের হল' }, { id: 'kitchen_area', label: 'কিচেন এরিয়া' }, { id: 'washroom', label: 'ওয়াশরুম' }],
-                        office: [{ id: 'reception', label: 'রিসেপশন' }, { id: 'workspace', label: 'কর্মক্ষেত্র' }, { id: 'cabin', label: 'কেবিন/বস রুম' }, { id: 'meeting_room', label: 'মিটিং রুম' }, { id: 'washroom', label: 'ওয়াশরুম' }],
-                        warehouse: [{ id: 'inside_view', label: 'ভেতরের ভিউ' }, { id: 'entrance', label: 'প্রবেশপথ/গেট' }, { id: 'loading_area', label: 'লোডিং এরিয়া' }]
-                      };
-                      const gt = groupTabs[group] || groupTabs.residential;
-                      const f = gt.find(t => t.id === room);
-                      if (f) label = f.label;
-                    }
-                    const rt = { label, emoji: '📷' };
+                    const rt = ROOM_TYPES.find(r => r.id === room) || { label: room === 'cover' ? 'Cover Photo' : room, emoji: '📷' };
                     const isActive = activeRoom === room;
                     return (
                       <button key={room}
@@ -1141,22 +1088,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property }) => 
               <div className="md:hidden absolute top-[68px] left-0 right-0 z-[5] px-4 py-2.5 flex gap-2 overflow-x-auto"
                 style={{ borderBottom: '1px solid rgba(15,23,42,0.05)', background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(16px)', scrollbarWidth: 'none' }}>
                 {orderedRooms.map((room) => {
-                  let label = room === 'cover' ? 'Cover Photo' : room;
-                    if (room === 'other') label = 'অন্যান্য';
-                    else {
-                      const groupTabs = {
-                        residential: [{ id: 'bedroom', label: 'বেডরুম' }, { id: 'bathroom', label: 'বাথরুম' }, { id: 'kitchen', label: 'রান্নাঘর' }, { id: 'living', label: 'বসার ঘর' }, { id: 'balcony', label: 'বারান্দা' }, { id: 'front_view', label: 'সামনের ভিউ' }],
-                        land: [{ id: 'front_view', label: 'জমির সামনের দিক' }, { id: 'surroundings', label: 'চারপাশের ভিউ' }, { id: 'road_view', label: 'সামনের রাস্তা' }, { id: 'map', label: 'দলিল/মৌজা ম্যাপ' }],
-                        commercial_shop: [{ id: 'front_view', label: 'শাটার/ফ্রন্ট ভিউ' }, { id: 'inside_floor', label: 'ভেতরের ফ্লোর' }, { id: 'washroom', label: 'ওয়াশরুম' }, { id: 'electric_panel', label: 'ইলেকট্রিক্যাল প্যানেল' }],
-                        restaurant: [{ id: 'front_view', label: 'শাটার/ফ্রন্ট ভিউ' }, { id: 'inside_hall', label: 'ভেতরের হল' }, { id: 'kitchen_area', label: 'কিচেন এরিয়া' }, { id: 'washroom', label: 'ওয়াশরুম' }],
-                        office: [{ id: 'reception', label: 'রিসেপশন' }, { id: 'workspace', label: 'কর্মক্ষেত্র' }, { id: 'cabin', label: 'কেবিন/বস রুম' }, { id: 'meeting_room', label: 'মিটিং রুম' }, { id: 'washroom', label: 'ওয়াশরুম' }],
-                        warehouse: [{ id: 'inside_view', label: 'ভেতরের ভিউ' }, { id: 'entrance', label: 'প্রবেশপথ/গেট' }, { id: 'loading_area', label: 'লোডিং এরিয়া' }]
-                      };
-                      const gt = groupTabs[group] || groupTabs.residential;
-                      const f = gt.find(t => t.id === room);
-                      if (f) label = f.label;
-                    }
-                    const rt = { label, emoji: '📷' };
+                  const rt = ROOM_TYPES.find(r => r.id === room) || { label: room === 'cover' ? 'Cover' : room, emoji: '📷' };
                   const isActive = activeRoom === room;
                   return (
                     <button key={room} onClick={() => scrollToRoom(room)}
@@ -1190,22 +1122,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property }) => 
                 style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 #ffffff' }}>
 
                 {orderedRooms.map((room, sIdx) => {
-                  let label = room === 'cover' ? 'Cover Photo' : room;
-                    if (room === 'other') label = 'অন্যান্য';
-                    else {
-                      const groupTabs = {
-                        residential: [{ id: 'bedroom', label: 'বেডরুম' }, { id: 'bathroom', label: 'বাথরুম' }, { id: 'kitchen', label: 'রান্নাঘর' }, { id: 'living', label: 'বসার ঘর' }, { id: 'balcony', label: 'বারান্দা' }, { id: 'front_view', label: 'সামনের ভিউ' }],
-                        land: [{ id: 'front_view', label: 'জমির সামনের দিক' }, { id: 'surroundings', label: 'চারপাশের ভিউ' }, { id: 'road_view', label: 'সামনের রাস্তা' }, { id: 'map', label: 'দলিল/মৌজা ম্যাপ' }],
-                        commercial_shop: [{ id: 'front_view', label: 'শাটার/ফ্রন্ট ভিউ' }, { id: 'inside_floor', label: 'ভেতরের ফ্লোর' }, { id: 'washroom', label: 'ওয়াশরুম' }, { id: 'electric_panel', label: 'ইলেকট্রিক্যাল প্যানেল' }],
-                        restaurant: [{ id: 'front_view', label: 'শাটার/ফ্রন্ট ভিউ' }, { id: 'inside_hall', label: 'ভেতরের হল' }, { id: 'kitchen_area', label: 'কিচেন এরিয়া' }, { id: 'washroom', label: 'ওয়াশরুম' }],
-                        office: [{ id: 'reception', label: 'রিসেপশন' }, { id: 'workspace', label: 'কর্মক্ষেত্র' }, { id: 'cabin', label: 'কেবিন/বস রুম' }, { id: 'meeting_room', label: 'মিটিং রুম' }, { id: 'washroom', label: 'ওয়াশরুম' }],
-                        warehouse: [{ id: 'inside_view', label: 'ভেতরের ভিউ' }, { id: 'entrance', label: 'প্রবেশপথ/গেট' }, { id: 'loading_area', label: 'লোডিং এরিয়া' }]
-                      };
-                      const gt = groupTabs[group] || groupTabs.residential;
-                      const f = gt.find(t => t.id === room);
-                      if (f) label = f.label;
-                    }
-                    const rt = { label, emoji: '📷' };
+                  const rt = ROOM_TYPES.find(r => r.id === room) || { label: room === 'cover' ? 'Cover Photo' : room, emoji: '📷' };
                   const roomImages = grouped[room] || [];
                   if (!roomImages.length) return null;
                   const [hero, ...rest] = roomImages;
@@ -1442,10 +1359,6 @@ const PropertyDetails = () => {
   // Both come from propertyService (backend → localStorage fallback). While the
   // fetch is in flight we render an empty stub so hooks below don't blow up.
   const [property, setProperty] = useState(null);
-  const group = property ? (TYPE_GROUP_MAP[property.rentalCategory || property.type] || 'residential') : 'residential';
-  if (property && property.specificDetails) {
-    Object.assign(property, property.specificDetails);
-  }
   const [landlord, setLandlord] = useState(null);
   const [loadingProperty, setLoadingProperty] = useState(true);
   const [loadingLandlord, setLoadingLandlord] = useState(true);
@@ -1498,7 +1411,7 @@ const PropertyDetails = () => {
   const isUnavailable = property?.status === 'rented' || property?.status === 'sold';
   const isOwnProperty = auth?.user && (String(auth.user.id || auth.user._id) === String(landlord?.id || property?.landlordId || property?.ownerUserId));
   const priceLabel = INTENT_CONFIG[property?.intent]?.priceLabel || '/mo';
-  const galleryImages = useMemo(() => buildGallery(property, group), [property, group]);
+  const galleryImages = useMemo(() => buildGallery(property), [property]);
 
   const [isSaved, setIsSaved] = useState(false);
   const [activeModal, setActiveModal] = useState(null);
@@ -1789,7 +1702,8 @@ const PropertyDetails = () => {
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="mb-6">
           <div className="flex flex-wrap items-center gap-2 mb-3">
-            <GroupBadge group={group} />
+            <IntentBadge intent={property.intent} />
+            <CategoryBadge category={property.category} />
             <StatusBadge status={property.status} intent={property.intent} />
             {property.verified && (
               <span className="inline-flex items-center gap-1.5 text-emerald-700 text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest"
@@ -1826,7 +1740,7 @@ const PropertyDetails = () => {
           <div className="flex items-center gap-2 flex-wrap">
             <span className="md:hidden inline-flex items-center text-[11px] font-black text-[#ba0036] px-2 py-0.5 rounded-md leading-none"
               style={{ background: 'rgba(186,0,54,0.07)', border: '1px solid rgba(186,0,54,0.2)', fontFamily: 'Oxanium, sans-serif' }}>
-              ৳{Number(property.price).toLocaleString('en-IN')}
+              ৳{Number(property.price).toLocaleString('en-IN')}{priceLabel && <span className="text-[9px] text-[#ba0036]/70 font-bold ml-0.5">{priceLabel}</span>}
             </span>
             <p className="flex items-center gap-1.5 text-slate-600 font-bold text-sm min-w-0">
               <MapPin size={14} className="text-[#ba0036] shrink-0" />
@@ -1843,83 +1757,73 @@ const PropertyDetails = () => {
           {/* ── LEFT COLUMN ── */}
           <div className="lg:col-span-8 flex flex-col gap-5">
 
-            {/* STATS INFO GRID */}
+            {/* STATS BAR — 4 futuristic tiles (Bedrooms / Bathrooms / SQFT / Floor)
+                Each tile has its own motion entrance + a constantly-pulsing
+                radial glow + an animated corner sparkle. Hover scales the
+                whole tile and amplifies the glow. */}
             <GlassCard className="p-4 md:p-7">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {(() => {
-                  const items = [];
-                  if (group === 'residential') {
-                    if (property.beds) items.push({ label: 'বেডরুম', value: property.beds });
-                    if (property.baths) items.push({ label: 'বাথরুম', value: property.baths });
-                    if (property.sqft) items.push({ label: 'আয়তন', value: property.sqft, unit: 'বর্গফুট' });
-                    if (property.floor) items.push({ label: 'ফ্লোর', value: property.floor });
-                    if (property.totalFloors) items.push({ label: 'মোট ফ্লোর', value: property.totalFloors });
-                    if (property.furnishing) items.push({ label: 'ফার্নিশিং', value: property.furnishing });
-                    if (property.age) items.push({ label: 'বাড়ির বয়স', value: property.age });
-                    if (property.facing) items.push({ label: 'ফেসিং দিক', value: property.facing });
-                  } else if (group === 'land') {
-                    if (property.landAmount) items.push({ label: 'জমির পরিমাণ', value: property.landAmount, unit: property.landUnit || 'কাঠা' });
-                    if (property.landType) items.push({ label: 'জমির ধরন', value: property.landType });
-                    if (property.deedType) items.push({ label: 'দলিলের ধরন', value: property.deedType });
-                    if (property.khatianNo) items.push({ label: 'খতিয়ান নম্বর', value: property.khatianNo });
-                    if (property.dagNo) items.push({ label: 'দাগ নম্বর', value: property.dagNo });
-                    if (property.roadWidth) items.push({ label: 'রাস্তার প্রশস্ততা', value: property.roadWidth });
-                    if (property.facing) items.push({ label: 'ফেসিং দিক', value: property.facing });
-                    if (property.cornerPlot) items.push({ label: 'কর্নার প্লট', value: 'হ্যাঁ' });
-                  } else if (group === 'commercial_shop') {
-                    if (property.sqft) items.push({ label: 'আয়তন', value: property.sqft, unit: 'বর্গফুট' });
-                    if (property.floor) items.push({ label: 'ফ্লোর নম্বর', value: property.floor });
-                    if (property.shopNo) items.push({ label: 'শপ নম্বর', value: property.shopNo });
-                    if (property.frontage) items.push({ label: 'ফ্রন্টেজ প্রশস্ততা', value: property.frontage });
-                    if (property.shutters) items.push({ label: 'শাটার সংখ্যা', value: property.shutters });
-                    if (property.storeroom) items.push({ label: 'স্টোররুম', value: 'হ্যাঁ' });
-                    if (property.mezzanine) items.push({ label: 'মেজানিন ফ্লোর', value: 'হ্যাঁ' });
-                    if (property.electricityLoad) items.push({ label: 'বিদ্যুৎ লোড', value: property.electricityLoad });
-                  } else if (group === 'restaurant') {
-                    if (property.sqft) items.push({ label: 'আয়তন', value: property.sqft, unit: 'বর্গফুট' });
-                    if (property.floor) items.push({ label: 'ফ্লোর সংখ্যা', value: property.floor });
-                    if (property.seats) items.push({ label: 'আসন ক্ষমতা', value: property.seats });
-                    if (property.kitchenSetup) items.push({ label: 'কিচেন সেটআপ', value: 'হ্যাঁ' });
-                    if (property.ductSystem) items.push({ label: 'ডাক্ট সিস্টেম', value: 'হ্যাঁ' });
-                    if (property.gasLine) items.push({ label: 'গ্যাস লাইন', value: 'হ্যাঁ' });
-                    if (property.parking) items.push({ label: 'পার্কিং', value: property.parking });
-                    if (property.electricityLoad) items.push({ label: 'বিদ্যুৎ লোড', value: property.electricityLoad });
-                  } else if (group === 'office') {
-                    if (property.sqft) items.push({ label: 'আয়তন', value: property.sqft, unit: 'বর্গফুট' });
-                    if (property.floor) items.push({ label: 'ফ্লোর নম্বর', value: property.floor });
-                    if (property.cabins) items.push({ label: 'কেবিন সংখ্যা', value: property.cabins });
-                    if (property.conferenceRoom) items.push({ label: 'কনফারেন্স রুম', value: property.conferenceRoom });
-                    if (property.receptionArea) items.push({ label: 'রিসেপশন এরিয়া', value: property.receptionArea });
-                    if (property.partitions) items.push({ label: 'পার্টিশন', value: property.partitions });
-                    if (property.internet) items.push({ label: 'ইন্টারনেট সংযোগ', value: 'হ্যাঁ' });
-                  } else if (group === 'warehouse') {
-                    if (property.sqft) items.push({ label: 'আয়তন', value: property.sqft, unit: 'বর্গফুট' });
-                    if (property.height) items.push({ label: 'ছাদের উচ্চতা', value: property.height });
-                    if (property.loadingBay) items.push({ label: 'লোডিং বে', value: 'হ্যাঁ' });
-                    if (property.truckAccess) items.push({ label: 'ট্রাক প্রবেশ', value: 'হ্যাঁ' });
-                    if (property.fireSafety) items.push({ label: 'ফায়ার সেফটি', value: 'হ্যাঁ' });
-                    if (property.securityRoom) items.push({ label: 'সিকিউরিটি রুম', value: 'হ্যাঁ' });
-                  }
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
+                {[
+                  { icon: Bed,       label: lt('bedrooms'),  value: `${property.beds}`,  unit: 'Beds' },
+                  { icon: Bath,      label: lt('bathrooms'), value: `${property.baths}`, unit: 'Baths' },
+                  { icon: Maximize2, label: lt('area'),      value: Number(property.sqft).toLocaleString(), unit: 'sqft' },
+                  { icon: Building2, label: lt('floor'),     value: `${property.floor ?? '—'}`, unit: lt('floorUnit') || 'Fl' },
+                ].map((stat, i) => (
+                  <motion.div key={i}
+                    initial={{ opacity: 0, y: 14, scale: 0.94 }}
+                    whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                    viewport={{ once: true, margin: '-40px' }}
+                    transition={{ delay: i * 0.07, type: 'spring', damping: 16, stiffness: 220 }}
+                    whileHover={{ y: -2 }}
+                    className="group flex flex-col items-center sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 sm:p-3.5 rounded-2xl relative overflow-hidden"
+                    style={{
+                      background: 'linear-gradient(160deg, rgba(186,0,54,0.04) 0%, rgba(186,0,54,0.01) 60%, transparent 100%)',
+                      border: '1px solid rgba(186,0,54,0.10)',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.7)'
+                    }}
+                  >
+                    {/* Diagonal shimmer sweep on hover */}
+                    <span className="pointer-events-none absolute -inset-y-2 -left-12 w-12 rotate-12 opacity-0 group-hover:opacity-100 group-hover:translate-x-[150%] transition-all duration-700"
+                      style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(186,0,54,0.18) 50%, transparent 100%)' }} />
 
-                  return items.filter(i => i.value !== undefined && i.value !== null && i.value !== '' && i.value !== false && i.value !== 'false').map((stat, i) => (
-                    <motion.div key={i}
-                      initial={{ opacity: 0, y: 14, scale: 0.94 }}
-                      whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                      viewport={{ once: true, margin: '-40px' }}
-                      transition={{ delay: i * 0.05, type: 'spring', damping: 16, stiffness: 220 }}
-                      className="group flex flex-col p-3 rounded-2xl relative overflow-hidden"
+                    {/* Icon tile */}
+                    <motion.div
+                      className="relative w-12 h-12 sm:w-13 sm:h-13 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden"
                       style={{
-                        background: 'linear-gradient(160deg, rgba(186,0,54,0.04) 0%, rgba(186,0,54,0.01) 60%, transparent 100%)',
-                        border: '1px solid rgba(186,0,54,0.10)',
+                        width: '52px', height: '52px',
+                        background: 'linear-gradient(135deg, rgba(186,0,54,0.16) 0%, rgba(186,0,54,0.06) 100%)',
+                        border: '1px solid rgba(186,0,54,0.30)',
+                        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.55), 0 6px 14px rgba(186,0,54,0.14)'
                       }}
+                      whileHover={{ rotate: 4, scale: 1.05 }}
+                      transition={{ type: 'spring', damping: 14, stiffness: 260 }}
                     >
-                      <p className="text-[10px] font-black text-slate-500 mb-1">{stat.label}</p>
-                      <p className="text-sm md:text-base font-bold text-slate-900">
-                        {stat.value} {stat.unit && <span className="text-xs text-slate-500">{stat.unit}</span>}
-                      </p>
+                      {/* Pulsing radial glow */}
+                      <motion.span aria-hidden
+                        className="absolute inset-0 pointer-events-none"
+                        style={{ background: 'radial-gradient(circle at 30% 25%, rgba(186,0,54,0.30) 0%, transparent 60%)' }}
+                        animate={{ opacity: [0.35, 0.75, 0.35] }}
+                        transition={{ duration: 3 + i * 0.3, repeat: Infinity, ease: 'easeInOut' }}
+                      />
+                      {/* Top-right sparkle */}
+                      <motion.span aria-hidden
+                        className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full"
+                        style={{ background: '#ba0036', boxShadow: '0 0 6px rgba(186,0,54,0.8)' }}
+                        animate={{ opacity: [0, 1, 0], scale: [0.5, 1.3, 0.5] }}
+                        transition={{ duration: 2.4, repeat: Infinity, delay: i * 0.6, ease: 'easeInOut' }}
+                      />
+                      <stat.icon className="text-[#ba0036] relative" size={22} strokeWidth={2.4} />
                     </motion.div>
-                  ));
-                })()}
+
+                    {/* Label + value */}
+                    <div className="text-center sm:text-left min-w-0 relative">
+                      <p className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest">{stat.label}</p>
+                      <p className="text-base md:text-lg font-black text-slate-900 leading-tight" style={{ fontFamily: 'Oxanium, sans-serif' }}>
+                        {stat.value} <span className="text-[10px] md:text-xs font-bold text-slate-500">{stat.unit}</span>
+                      </p>
+                    </div>
+                  </motion.div>
+                ))}
               </div>
             </GlassCard>
 
@@ -1953,22 +1857,23 @@ const PropertyDetails = () => {
             </GlassCard>
 
             {/* AMENITIES */}
-            {amenities && amenities.length > 0 && amenities.some(Boolean) && (
-              <GlassCard className="p-5 md:p-7">
-                <h3 className="text-xl font-black text-slate-900 mb-5" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('amenities')}</h3>
-                <div className="flex flex-wrap gap-2">
-                  {amenities.filter(Boolean).map((amenity, i) => {
-                    const cfg = amenityConfig[amenity] || { icon: CheckCircle2, color: 'text-[#ba0036]', bg: 'bg-red-50' };
-                    return (
-                      <span key={i} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black ${cfg.bg} ${cfg.color}`}>
-                        <cfg.icon size={12} strokeWidth={2.5} />
-                        {amenity}
-                      </span>
-                    );
-                  })}
-                </div>
-              </GlassCard>
-            )}
+            <GlassCard className="p-5 md:p-7">
+              <h3 className="text-xl font-black text-slate-900 mb-5" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('amenities')}</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {amenities.map((amenity, i) => {
+                  const cfg = amenityConfig[amenity] || { icon: CheckCircle2, color: 'text-[#ba0036]', bg: 'bg-red-50' };
+                  return (
+                    <div key={i} className="flex items-center gap-3 p-3 md:p-4 rounded-2xl transition-all group cursor-default"
+                      style={{ background: '#fafbfc', border: '1px solid rgba(15,23,42,0.06)' }}>
+                      <div className={`w-9 h-9 rounded-xl ${cfg.bg} flex items-center justify-center shrink-0`}>
+                        <cfg.icon size={16} className={cfg.color} />
+                      </div>
+                      <span className="text-xs font-bold text-slate-700 leading-tight">{amenity}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </GlassCard>
 
             {/* MAP + NEARBY */}
             <GlassCard className="p-5 md:p-7">
@@ -2200,26 +2105,20 @@ const PropertyDetails = () => {
                 {/* Price */}
                 <div className="mt-1 mb-5">
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
-                    {property.intent === 'rent' ? 'মাসিক ভাড়া | নিরাপত্তা জামানত' : 
-                     property.intent === 'commercial' ? 'মাসিক ভাড়া | অগ্রিম/সিকিউরিটি' :
-                     property.intent === 'buy' && group === 'land' ? 'প্রতি শতক মূল্য | মোট জমির মূল্য' :
-                     'মোট বিক্রয় মূল্য | বায়না/অগ্রিম'}
+                    {property.intent === 'purchase' ? lt('salePrice') : lt('monthlyRent')}
                   </p>
                   <h2 className="text-4xl font-black text-slate-900 tracking-tighter" style={{ fontFamily: 'Oxanium, sans-serif' }}>
                     ৳{Number(property.price).toLocaleString('en-IN')}
+                    {priceLabel && <span className="text-sm font-bold text-slate-500">{priceLabel}</span>}
                   </h2>
-                  {property.advance && (
-                    <p className="text-sm font-bold text-slate-600 mt-1">
-                      + ৳{Number(property.advance).toLocaleString('en-IN')} {property.intent === 'rent' || property.intent === 'commercial' ? 'Advance/Security' : 'Booking/Advance'}
-                    </p>
-                  )}
                   {landlord?.serviceCharge > 0 && (
                     <p className="text-xs font-bold text-slate-500 mt-1">
                       + ৳{Number(landlord.serviceCharge).toLocaleString('en-IN')} Service Charge
                     </p>
                   )}
                   <div className="flex flex-wrap gap-2 mt-2">
-                    <GroupBadge group={group} />
+                    <IntentBadge intent={property.intent} />
+                    <CategoryBadge category={property.category} />
                   </div>
                 </div>
 
@@ -2357,14 +2256,11 @@ const PropertyDetails = () => {
           }}>
           <div className="flex-1 min-w-0 pl-1">
             <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none">
-              {property.intent === 'rent' ? 'মাসিক ভাড়া | নিরাপত্তা জামানত' : 
-               property.intent === 'commercial' ? 'মাসিক ভাড়া | অগ্রিম/সিকিউরিটি' :
-               property.intent === 'buy' && group === 'land' ? 'প্রতি শতক মূল্য | মোট জমির মূল্য' :
-               'মোট বিক্রয় মূল্য | বায়না/অগ্রিম'}
+              {property.intent === 'purchase' ? lt('salePrice') : lt('monthlyRent')}
             </p>
             <p className="text-base font-black text-slate-900 leading-tight mt-0.5 truncate" style={{ fontFamily: 'Oxanium, sans-serif' }}>
               ৳{Number(property.price).toLocaleString('en-IN')}
-              
+              {priceLabel && <span className="text-[10px] text-slate-500 font-bold ml-0.5">{priceLabel}</span>}
             </p>
             {landlord?.serviceCharge > 0 && (
               <p className="text-[9px] font-bold text-slate-500 mt-0.5">+ ৳{Number(landlord.serviceCharge).toLocaleString('en-IN')} SC</p>
