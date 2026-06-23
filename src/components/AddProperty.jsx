@@ -778,6 +778,28 @@ const THANA_BN = {
 };
 const thanaBn = (districtId, thanaLabel) => (THANA_BN[districtId] || {})[thanaLabel] || '';
 
+// Bengali area labels (district -> thana -> area)
+const AREA_BN = {
+  dhaka: {
+    'Savar': {
+      'Savar Bazar': 'সাভার বাজার',
+      'Hemayetpur': 'হেমায়েতপুর',
+      'Amin Bazar': 'আমিন বাজার',
+      'Bank Town': 'ব্যাংক টাউন',
+      'Radio Colony': 'রেডিও কলোনি',
+      'Dattapara': 'দত্তপাড়া',
+      'Jahangirnagar University': 'জাহাঙ্গীরনগর বিশ্ববিদ্যালয়',
+      'Nabinagar': 'নবীনগর',
+      'Gakulnagar': 'গোকুলনগর',
+      'Anandapur': 'আনন্দপুর',
+      'Majidpur': 'মজিদপুর',
+      'Savar DOHS': 'সাভার ডিওএইচএস',
+      'Enam Medical': 'এনাম মেডিকেল',
+    }
+  }
+};
+const areaBn = (districtId, thanaLabel, areaLabel) => ((AREA_BN[districtId] || {})[thanaLabel] || {})[areaLabel] || '';
+
 // Match a geocoded union name (English) to our numbered union list for a thana.
 const matchUnion = (raw, districtId, thanaLabel) => {
   const list = (UNIONS_BY_THANA[districtId] || {})[thanaLabel] || [];
@@ -884,7 +906,7 @@ const GpsPanel = ({ form, set, isBn }) => {
               if (thMatch) {
                 set('thana', thMatch);
                 const areaList = (AREAS_BY_THANA[distMatch.id] || {})[thMatch] || [];
-                const areaMatch = matchGeo(g.union || g.road, areaList);
+                const areaMatch = matchGeo(g.union || g.road, areaList, (a) => a, (a) => areaBn(distMatch.id, thMatch, a));
                 if (areaMatch) set('area', areaMatch);
                 unionObj = matchUnion(g.union, distMatch.id, thMatch);
               }
