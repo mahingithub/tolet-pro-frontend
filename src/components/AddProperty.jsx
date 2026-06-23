@@ -559,9 +559,9 @@ const STEPS = [
 // ─── INITIAL FORM STATE ───────────────────────────────────────────────────────
 
 const TYPE_GROUP_MAP = {
-  flat: 'residential', house: 'residential', mess: 'residential', villa: 'residential', other_buy: 'residential',
-  office_room: 'office', office_space: 'office',
-  land: 'land',
+  flat: 'residential', apartment: 'residential', house: 'residential', mess: 'residential', villa: 'residential', other_buy: 'residential', sublet: 'residential', hostel: 'residential', single_room: 'residential', building: 'residential',
+  office: 'office', office_room: 'office', office_space: 'office',
+  land: 'land', plot: 'land',
   shop: 'commercial_shop', mall_shop: 'commercial_shop', showroom: 'commercial_shop', other_commercial: 'commercial_shop',
   restaurant: 'restaurant', restaurant_space: 'restaurant',
   warehouse: 'warehouse', shed: 'warehouse'
@@ -1613,6 +1613,19 @@ const AddProperty = () => {
       return;
     }
 
+    const payload = { ...form };
+    payload.specificDetails = {
+      ...(payload.specificDetails || {}),
+      age: payload.age, facing: payload.facing, landAmount: payload.landAmount, landUnit: payload.landUnit,
+      landType: payload.landType, deedType: payload.deedType, khatianNo: payload.khatianNo, dagNo: payload.dagNo,
+      roadWidth: payload.roadWidth, cornerPlot: payload.cornerPlot, frontage: payload.frontage, shutters: payload.shutters,
+      storeroom: payload.storeroom, mezzanine: payload.mezzanine, electricityLoad: payload.electricityLoad, seats: payload.seats,
+      kitchenSetup: payload.kitchenSetup, ductSystem: payload.ductSystem, gasLine: payload.gasLine, parking: payload.parking,
+      cabins: payload.cabins, conferenceRoom: payload.conferenceRoom, receptionArea: payload.receptionArea, partitions: payload.partitions,
+      internet: payload.internet, height: payload.height, loadingBay: payload.loadingBay, truckAccess: payload.truckAccess,
+      fireSafety: payload.fireSafety, securityRoom: payload.securityRoom, advance: payload.advance, totalFloors: payload.totalFloors,
+      shopNo: payload.shopNo,
+    };
     setIsSubmitting(true);
     try {
       // propertyService pulls the current host from auth state and stamps

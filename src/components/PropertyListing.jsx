@@ -58,9 +58,9 @@ const MAP_STYLES = [
 
 // ─── TYPE GROUP MAP ───────────────────────────────────────────────────────────
 const TYPE_GROUP_MAP = {
-  flat: 'residential', house: 'residential', mess: 'residential', villa: 'residential', other_buy: 'residential',
-  office_room: 'office', office_space: 'office',
-  land: 'land',
+  flat: 'residential', apartment: 'residential', house: 'residential', mess: 'residential', villa: 'residential', other_buy: 'residential', sublet: 'residential', hostel: 'residential', single_room: 'residential', building: 'residential',
+  office: 'office', office_room: 'office', office_space: 'office',
+  land: 'land', plot: 'land',
   shop: 'commercial_shop', mall_shop: 'commercial_shop', showroom: 'commercial_shop', other_commercial: 'commercial_shop',
   restaurant: 'restaurant', restaurant_space: 'restaurant',
   warehouse: 'warehouse', shed: 'warehouse'
