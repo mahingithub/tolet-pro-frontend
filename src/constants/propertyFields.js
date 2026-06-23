@@ -111,6 +111,18 @@ const SPECIFIC_FIELDS_BY_TYPE = {
       F_TOTAL_FLOORS,
       F_FRONT_ROAD,
     ],
+    shop: [
+      { key: 'frontageWidth', kind: 'text', label: 'Shutter width (ft)', labelBn: 'শাটার প্রস্থ (ফুট)' },
+      F_MAIN_ROAD,
+      { key: 'mezzanine', kind: 'toggle', label: 'Mezzanine', labelBn: 'মেজানিন' },
+    ],
+    restaurant: [
+      { key: 'gasLine', kind: 'toggle', label: 'Commercial Gas Line', labelBn: 'বাণিজ্যিক গ্যাস লাইন' },
+      { key: 'ducting', kind: 'toggle', label: 'Ducting / Exhaust Space', labelBn: 'ডাক্টিং / এক্সহস্ট স্পেস' },
+      { key: 'kitchenArea', kind: 'text', label: 'Kitchen Area', labelBn: 'রান্নাঘরের আয়তন',
+        placeholder: 'e.g. 200 sqft', placeholderBn: 'যেমন ২০০ বর্গফুট' },
+      { key: 'seatingCapacity', kind: 'number', label: 'Seating Capacity', labelBn: 'আসন সংখ্যা' },
+    ],
   },
   rent: {
     hostel: [

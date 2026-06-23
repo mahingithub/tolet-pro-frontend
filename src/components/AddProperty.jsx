@@ -180,6 +180,8 @@ const INTENT_DATA = {
       { id: 'house',    label: 'House',       labelBn: 'বাড়ি',           icon: Home },
       { id: 'land',     label: 'Land / Plot', labelBn: 'জমি / প্লট',    icon: Map },
       { id: 'building', label: 'Building',   labelBn: 'বিল্ডিং',       icon: Layers },
+      { id: 'shop',     label: 'Shop',        labelBn: 'দোকান',         icon: Store },
+      { id: 'restaurant',label: 'Restaurant', labelBn: 'রেস্তোরাঁ',     icon: Home },
     ],
     categories: [
       { id: 'ready_flat',   label: 'Ready Flat',    labelBn: 'রেডি ফ্ল্যাট',    emoji: '🏢' },
@@ -348,6 +350,7 @@ const AREAS_BY_DISTRICT = {
     'Motijheel', 'Paltan', 'Segunbagicha', 'Bailey Road', 'Eskaton', 'Shantinagar',
     'Wari', 'Old Dhaka', 'Lalbagh', 'Azimpur', 'Nilkhet', 'Jigatola',
     'Cantonment', 'Khilkhet', 'Nikunja 1', 'Nikunja 2', 'Bashabo', 'Demra',
+    'Savar', 'Ashulia', 'Keraniganj', 'Dhamrai', 'Nawabganj', 'Dohar', 'Hemayetpur', 'Dattapara',
   ],
   gazipur:     ['Gazipur Sadar', 'Tongi', 'Joydebpur', 'Konabari', 'Board Bazar', 'Chowrasta'],
   narayanganj: ['Narayanganj Sadar', 'Fatullah', 'Siddhirganj', 'Bandar', 'Sonargaon', 'Rupganj'],
@@ -419,6 +422,12 @@ const AREAS_BY_THANA = {
     'Kadamtali':       ['Kadamtali', 'Dhania', 'Raysaheb Bazar', 'Mir Hazaribagh', 'Shyampur Bazar'],
     'Cantonment':      ['Cantonment', 'Manikdi', 'Matikata', 'MES', 'Ibrahimpur', 'Balughat'],
     'Bhashantek':      ['Bhashantek', 'Damalkot', 'Mirpur Cantonment', 'Kalshi'],
+    'Savar':           ['Savar Bazar', 'Hemayetpur', 'Amin Bazar', 'Bank Town', 'Radio Colony', 'Dattapara', 'Jahangirnagar University', 'Nabinagar', 'Gakulnagar', 'Anandapur', 'Majidpur', 'Savar DOHS', 'Enam Medical'],
+    'Ashulia':         ['Ashulia', 'Bypail', 'Zirabo', 'Jamgora', 'Narsinghapur', 'Sreepur', 'Kathgora', 'Dendabor'],
+    'Keraniganj':      ['Aganagar', 'Jinzira', 'Kalindi', 'Shubhadya', 'Tegharia', 'Konda', 'Basta', 'Rohitpur'],
+    'Dhamrai':         ['Dhamrai', 'Sombhag', 'Jadabpur', 'Balia', 'Kushura'],
+    'Nawabganj':       ['Nawabganj', 'Agla', 'Kalakopa', 'Bandura', 'Sholla'],
+    'Dohar':           ['Dohar', 'Joypara', 'Muksudpur', 'Nayabari'],
   },
   chattogram: {
     'Kotwali':         ['Kotwali', 'Anderkilla', 'Jamalkhan', 'Laldighi', 'Court Building', 'Riazuddin Bazar'],
@@ -452,7 +461,8 @@ const THANAS_BY_DISTRICT = {
     'New Market', 'Ramna', 'Shahbagh', 'Kotwali', 'Sutrapur', 'Gendaria', 'Wari',
     'Lalbagh', 'Chawkbazar', 'Kamrangirchar', 'Khilgaon', 'Sabujbagh', 'Mugda',
     'Motijheel', 'Paltan', 'Shahjahanpur', 'Jatrabari', 'Demra', 'Shyampur',
-    'Kadamtali', 'Cantonment', 'Bhashantek',
+    'Kadamtali', 'Cantonment', 'Bhashantek', 'Savar', 'Ashulia', 'Keraniganj',
+    'Dhamrai', 'Nawabganj', 'Dohar',
   ],
   gazipur:     ['Gazipur Sadar', 'Tongi', 'Kaliakair', 'Kapasia', 'Sreepur', 'Kaliganj'],
   narayanganj: ['Narayanganj Sadar', 'Fatullah', 'Siddhirganj', 'Bandar', 'Sonargaon', 'Rupganj', 'Araihazar'],
@@ -492,7 +502,7 @@ const FURNISHING_OPTIONS = [
   { id: 'Unfurnished',    label: 'Unfurnished',    labelBn: 'আসবাবপত্র ছাড়া',     color: 'text-gray-600',    bg: 'bg-gray-50 border-gray-200'     },
 ];
 
-const AMENITIES_LIST = [
+const AMENITIES_RESIDENTIAL = [
   { id: 'Central AC',       label: 'Central AC',       labelBn: 'সেন্ট্রাল এসি',       icon: Snowflake,  color: 'text-blue-500',    bg: 'bg-blue-50'    },
   { id: 'Parking',          label: 'Parking',          labelBn: 'পার্কিং',              icon: Car,        color: 'text-gray-600',    bg: 'bg-gray-100'   },
   { id: 'High-Speed WiFi',  label: 'High-Speed WiFi',  labelBn: 'হাই-স্পিড ওয়াইফাই',  icon: Wifi,       color: 'text-green-500',   bg: 'bg-green-50'   },
@@ -510,6 +520,32 @@ const AMENITIES_LIST = [
   { id: 'Intercom',         label: 'Intercom',         labelBn: 'ইন্টারকম',              icon: Globe,      color: 'text-sky-500',     bg: 'bg-sky-50'     },
   { id: 'Balcony',          label: 'Balcony',          labelBn: 'বারান্দা',              icon: Eye,        color: 'text-violet-500',  bg: 'bg-violet-50'  },
 ];
+
+const AMENITIES_COMMERCIAL = [
+  { id: 'Generator Backup', label: 'Generator Backup', labelBn: 'জেনারেটর ব্যাকআপ',    icon: Zap,        color: 'text-yellow-500',  bg: 'bg-yellow-50'  },
+  { id: 'Central AC',       label: 'Central AC',       labelBn: 'সেন্ট্রাল এসি',       icon: Snowflake,  color: 'text-blue-500',    bg: 'bg-blue-50'    },
+  { id: 'Elevator',         label: 'Elevator / Lift',  labelBn: 'লিফট',                  icon: Layers,     color: 'text-purple-500',  bg: 'bg-purple-50'  },
+  { id: 'Fire Safety',      label: 'Fire Safety',      labelBn: 'অগ্নি নিরাপত্তা',        icon: ShieldCheck,color: 'text-red-500',     bg: 'bg-red-50'     },
+  { id: 'Parking',          label: 'Parking',          labelBn: 'পার্কিং',              icon: Car,        color: 'text-gray-600',    bg: 'bg-gray-100'   },
+  { id: '24/7 Security',    label: '24/7 Security',    labelBn: '২৪/৭ নিরাপত্তা',     icon: ShieldCheck,color: 'text-[#ba0036]',   bg: 'bg-red-50'     },
+  { id: 'Dedicated Washroom',label: 'Dedicated Washroom',labelBn: 'নিজস্ব ওয়াশরুম',    icon: Bath,       color: 'text-cyan-500',    bg: 'bg-cyan-50'    },
+  { id: 'CCTV',             label: 'CCTV',             labelBn: 'সিসিটিভি',             icon: Eye,        color: 'text-[#ba0036]',   bg: 'bg-red-50'     },
+];
+
+const AMENITIES_LAND = [
+  { id: 'Fenced',           label: 'Fenced / Boundary',labelBn: 'সীমানা প্রাচীর',       icon: Square,     color: 'text-gray-600',    bg: 'bg-gray-100'   },
+  { id: 'Main Road Access', label: 'Main Road Access', labelBn: 'প্রধান রাস্তার সাথে',   icon: Map,        color: 'text-blue-500',    bg: 'bg-blue-50'    },
+  { id: 'Electricity',      label: 'Electricity',      labelBn: 'বিদ্যুৎ সংযোগ',        icon: Zap,        color: 'text-yellow-500',  bg: 'bg-yellow-50'  },
+  { id: 'Gas Line',         label: 'Gas Line',         labelBn: 'গ্যাস লাইন',           icon: Snowflake,  color: 'text-orange-500',  bg: 'bg-orange-50'  },
+  { id: 'Water Supply',     label: 'Water Supply',     labelBn: 'পানি সরবরাহ',          icon: Sparkles,   color: 'text-cyan-500',    bg: 'bg-cyan-50'    },
+  { id: 'Corner Plot',      label: 'Corner Plot',      labelBn: 'কর্নার প্লট',          icon: Star,       color: 'text-indigo-500',  bg: 'bg-indigo-50'  },
+];
+
+const getAmenitiesList = (intent, type) => {
+  if (type === 'land') return AMENITIES_LAND;
+  if (intent === 'commercial' || ['shop', 'restaurant', 'office', 'showroom'].includes(type)) return AMENITIES_COMMERCIAL;
+  return AMENITIES_RESIDENTIAL;
+};
 
 // ─── STEP DEFINITIONS ─────────────────────────────────────────────────────────
 const STEPS = [
@@ -564,13 +600,34 @@ const INITIAL_FORM = {
 };
 
 // Room photo categories
-const ROOM_TYPES = [
+const ROOM_TYPES_RESIDENTIAL = [
   { id: 'bedroom',    label: 'Bedroom',     labelBn: 'শোবার ঘর',  emoji: '🛏️' },
   { id: 'bathroom',   label: 'Bathroom',    labelBn: 'বাথরুম',    emoji: '🚿' },
   { id: 'living',     label: 'Living Room', labelBn: 'বসার ঘর',   emoji: '🛋️' },
   { id: 'kitchen',    label: 'Kitchen',     labelBn: 'রান্নাঘর',  emoji: '🍳' },
   { id: 'other',      label: 'Other',       labelBn: 'অন্যান্য',  emoji: '📷' },
 ];
+
+const ROOM_TYPES_COMMERCIAL = [
+  { id: 'workspace',  label: 'Workspace / Floor', labelBn: 'ওয়ার্কস্পেস / ফ্লোর',  emoji: '🏢' },
+  { id: 'reception',  label: 'Reception / Front', labelBn: 'রিসেপশন / সামনের অংশ',emoji: '🚪' },
+  { id: 'meeting',    label: 'Meeting Room',      labelBn: 'মিটিং রুম',         emoji: '🤝' },
+  { id: 'washroom',   label: 'Washroom',          labelBn: 'ওয়াশরুম',          emoji: '🚿' },
+  { id: 'other',      label: 'Other',             labelBn: 'অন্যান্য',          emoji: '📷' },
+];
+
+const ROOM_TYPES_LAND = [
+  { id: 'plot_area',  label: 'Plot Area',         labelBn: 'প্লটের এরিয়া',      emoji: '🗺️' },
+  { id: 'road_view',  label: 'Road View',         labelBn: 'রাস্তার ছবি',         emoji: '🛣️' },
+  { id: 'surrounding',label: 'Surroundings',      labelBn: 'আশপাশের এলাকা',     emoji: '🌳' },
+  { id: 'other',      label: 'Other',             labelBn: 'অন্যান্য',          emoji: '📷' },
+];
+
+const getRoomTypes = (intent, type) => {
+  if (type === 'land') return ROOM_TYPES_LAND;
+  if (intent === 'commercial' || ['shop', 'restaurant', 'office', 'showroom'].includes(type)) return ROOM_TYPES_COMMERCIAL;
+  return ROOM_TYPES_RESIDENTIAL;
+};
 
 // ─── HELPER: Input Field ──────────────────────────────────────────────────────
 const Field = ({ label, required, children, hint }) => (
@@ -694,6 +751,14 @@ const UNIONS_BY_THANA = {
 // carry BN labels; this fills the thana gap so the form + GPS text show Bengali
 // in Bengali mode. Districts not listed here fall back to the English label.
 const THANA_BN = {
+  dhaka: {
+    'Savar': 'সাভার',
+    'Ashulia': 'আশুলিয়া',
+    'Keraniganj': 'কেরানীগঞ্জ',
+    'Dhamrai': 'ধামরাই',
+    'Nawabganj': 'নবাবগঞ্জ',
+    'Dohar': 'দোহার',
+  },
   bhola: {
     'Bhola Sadar': 'ভোলা সদর',
     'Borhanuddin': 'বোরহানউদ্দিন',
@@ -1909,53 +1974,51 @@ const AddProperty = () => {
                     </p>
                   </Field>
 
-                  <Field label={isBn ? 'কত তলায় — ঐচ্ছিক' : 'Floor Number — Optional'}
-                    hint={isBn
-                      ? '০ = নিচতলা, ১ = প্রথম তলা, ইত্যাদি'
-                      : '0 = ground floor, 1 = 1st floor, etc.'}>
-                    <div className="relative">
-                      <Layers size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
-                      <input type="number"
-                        className={`${inputCls} pl-10`}
-                        placeholder={isBn ? 'যেমন: ৫' : 'e.g. 5'}
-                        value={form.floor}
-                        onChange={e => set('floor', e.target.value)}
-                        min={-5}
-                        max={200}
-                      />
-                    </div>
-                    <p className="text-[10px] font-bold text-gray-300 mt-1">
-                      {isBn ? 'বাড়িটি কত তলায় অবস্থিত?' : 'Which floor is the unit located on?'}
-                    </p>
-                  </Field>
+                  {form.type !== 'land' && (
+                    <Field label={isBn ? 'কত তলায় — ঐচ্ছিক' : 'Floor Number — Optional'}
+                      hint={isBn
+                        ? '০ = নিচতলা, ১ = প্রথম তলা, ইত্যাদি'
+                        : '0 = ground floor, 1 = 1st floor, etc.'}>
+                      <div className="relative">
+                        <Layers size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+                        <input type="number"
+                          className={`${inputCls} pl-10`}
+                          placeholder={isBn ? 'যেমন: ৫' : 'e.g. 5'}
+                          value={form.floor}
+                          onChange={e => set('floor', e.target.value)}
+                          min={-5}
+                          max={200}
+                        />
+                      </div>
+                      <p className="text-[10px] font-bold text-gray-300 mt-1">
+                        {isBn ? 'বাড়িটি কত তলায় অবস্থিত?' : 'Which floor is the unit located on?'}
+                      </p>
+                    </Field>
+                  )}
                 </div>
 
                 {/* Furnishing */}
-                <Field label={isBn ? 'আসবাবপত্রের অবস্থা' : 'Furnishing Status'} required>
-                  <div className="grid grid-cols-3 gap-3">
-                    {FURNISHING_OPTIONS.map(({ id, label, labelBn, color, bg }) => (
-                      <button key={id} type="button"
-                        onClick={() => { set('furnishing', id); setErrors(er => ({ ...er, furnishing: false })); }}
-                        className={`py-3 px-2 rounded-2xl border-2 text-xs font-black transition-all active:scale-95 text-center
-                          ${form.furnishing === id
-                            ? `${bg} border-current ${color} shadow-sm`
-                            : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200'}`}>
-                        {isBn ? labelBn : label}
-                      </button>
-                    ))}
-                  </div>
-                  {err('furnishing') && <ErrMsg text={isBn ? 'অবস্থা বেছে নিন' : 'Furnishing status required'} />}
-                </Field>
+                {form.type !== 'land' && (
+                  <Field label={isBn ? 'আসবাবপত্রের অবস্থা' : 'Furnishing Status'} required>
+                    <div className="grid grid-cols-3 gap-3">
+                      {FURNISHING_OPTIONS.map(({ id, label, labelBn, color, bg }) => (
+                        <button key={id} type="button"
+                          onClick={() => { set('furnishing', id); setErrors(er => ({ ...er, furnishing: false })); }}
+                          className={`py-3 px-2 rounded-2xl border-2 text-xs font-black transition-all active:scale-95 text-center
+                            ${form.furnishing === id
+                              ? `${bg} border-current ${color} shadow-sm`
+                              : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200'}`}>
+                          {isBn ? labelBn : label}
+                        </button>
+                      ))}
+                    </div>
+                    {err('furnishing') && <ErrMsg text={isBn ? 'অবস্থা বেছে নিন' : 'Furnishing status required'} />}
+                  </Field>
+                )}
 
                 {/* ── DYNAMIC INTENT-SPECIFIC DETAILS (Step 2) ── */}
                 {form.intent && form.type && dynamicFields.length > 0 && (
-                  <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_4px_15px_rgba(0,0,0,0.03)] space-y-5">
-                    <div className="flex items-center gap-2">
-                      <Sparkles size={15} className="text-[#ba0036]" />
-                      <h4 className="text-sm font-black text-gray-900">
-                        {isBn ? 'অতিরিক্ত তথ্য' : 'Additional Details'}
-                      </h4>
-                    </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {dynamicFields.map((fld) => {
                       const sval = (form.specificDetails || {})[fld.key];
                       if (fld.kind === 'select') {
@@ -2003,9 +2066,6 @@ const AddProperty = () => {
                         </Field>
                       );
                     })}
-                    <p className="text-[10px] font-bold text-gray-300">
-                      {isBn ? 'এই তথ্যগুলো ঐচ্ছিক, তবে ক্রেতা/ভাড়াটিয়ার সিদ্ধান্তে সাহায্য করে।' : 'Optional — these help buyers/tenants decide.'}
-                    </p>
                   </div>
                 )}
 
@@ -2121,22 +2181,28 @@ const AddProperty = () => {
                   )}
                 </div>
 
-                {/* ── ROOM PHOTOS ── */}
+                {/* ── PHOTOS BY CATEGORY ── */}
                 <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_4px_15px_rgba(0,0,0,0.03)]">
                   <div className="flex items-center gap-2 mb-1">
                     <div className="w-7 h-7 bg-gray-700 rounded-lg flex items-center justify-center">
                       <ImageIcon size={13} className="text-white" />
                     </div>
-                    <p className="text-xs font-black text-gray-900">{isBn ? 'রুম অনুযায়ী ছবি' : 'Room Photos'}</p>
+                    <p className="text-xs font-black text-gray-900">
+                      {isBn 
+                        ? (form.type === 'land' ? 'জমির ছবি' : form.intent === 'commercial' || ['shop', 'restaurant', 'office', 'showroom'].includes(form.type) ? 'স্পেসের ছবি' : 'রুম অনুযায়ী ছবি') 
+                        : (form.type === 'land' ? 'Plot Photos' : form.intent === 'commercial' || ['shop', 'restaurant', 'office', 'showroom'].includes(form.type) ? 'Space Photos' : 'Room Photos')}
+                    </p>
                     <span className="text-[9px] font-bold text-gray-400 ml-auto">{form.roomPhotos.length}/20</span>
                   </div>
                   <p className="text-[11px] font-bold text-gray-400 mb-4">
-                    {isBn ? 'শোবার ঘর, বাথরুম, বসার ঘর ইত্যাদির ছবি আলাদাভাবে যোগ করুন।' : 'Add photos for each room — bedroom, bathroom, living room, etc.'}
+                    {isBn 
+                      ? (form.type === 'land' ? 'জমির বিভিন্ন অংশের ছবি আলাদাভাবে যোগ করুন।' : 'শোবার ঘর, বাথরুম, বসার ঘর ইত্যাদির ছবি আলাদাভাবে যোগ করুন।') 
+                      : (form.type === 'land' ? 'Add photos for each part of the plot.' : 'Add photos for each room — bedroom, bathroom, living room, etc.')}
                   </p>
 
-                  {/* Room type tabs */}
+                  {/* Photo category tabs */}
                   <div className="flex gap-2 flex-wrap mb-4">
-                    {ROOM_TYPES.map(rt => (
+                    {getRoomTypes(form.intent, form.type).map(rt => (
                       <button key={rt.id} type="button"
                         onClick={() => setSelectedRoomType(rt.id)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all
@@ -2164,8 +2230,8 @@ const AddProperty = () => {
                       <div className="text-left">
                         <p className="text-sm font-black text-gray-700">
                           {isBn
-                            ? `${ROOM_TYPES.find(r => r.id === selectedRoomType)?.labelBn} এর ছবি যোগ করুন`
-                            : `Add ${ROOM_TYPES.find(r => r.id === selectedRoomType)?.label} photos`}
+                            ? `${getRoomTypes(form.intent, form.type).find(r => r.id === selectedRoomType)?.labelBn} এর ছবি যোগ করুন`
+                            : `Add ${getRoomTypes(form.intent, form.type).find(r => r.id === selectedRoomType)?.label} photos`}
                         </p>
                         <p className="text-[11px] font-bold text-gray-300">{isBn ? 'একাধিক ছবি একসাথে যোগ করতে পারবেন' : 'Multiple photos at once'}</p>
                       </div>
