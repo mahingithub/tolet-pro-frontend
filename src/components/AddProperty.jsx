@@ -557,6 +557,51 @@ const STEPS = [
 ];
 
 // ─── INITIAL FORM STATE ───────────────────────────────────────────────────────
+
+const TYPE_GROUP_MAP = {
+  flat: 'residential', house: 'residential', mess: 'residential', villa: 'residential', other_buy: 'residential',
+  office_room: 'office', office_space: 'office',
+  land: 'land',
+  shop: 'commercial_shop', mall_shop: 'commercial_shop', showroom: 'commercial_shop', other_commercial: 'commercial_shop',
+  restaurant: 'restaurant', restaurant_space: 'restaurant',
+  warehouse: 'warehouse', shed: 'warehouse'
+};
+
+const AMENITIES_BY_GROUP = {
+  residential: ['পার্কিং', 'লিফট', 'জেনারেটর', 'পাইপড গ্যাস', '২৪/৭ নিরাপত্তা', 'ইন্টারকম', 'CCTV', 'ওয়াইফাই', 'সেন্ট্রাল AC', 'জিম', 'সুইমিং পুল', 'ছাদ ব্যবহার', 'সার্ভিস লিফট', 'কমিউনিটি হল'],
+  land: ['সীমানা প্রাচীর', 'মেইন রোড সংযোগ', 'বিদ্যুৎ সংযোগ', 'গ্যাস লাইন', 'পানির সংযোগ', 'ড্রেনেজ ব্যবস্থা', 'কর্নার প্লট', 'ভরাট জমি', 'মাটি পরীক্ষিত'],
+  commercial_shop: ['জেনারেটর ব্যাকআপ', 'সেন্ট্রাল AC', 'লিফট', 'ফায়ার সেফটি', 'পার্কিং', 'CCTV', 'ডেডিকেটেড ওয়াশরুম', 'ইন্টারনেট', 'লোডিং জোন', 'সিকিউরিটি গার্ড', 'ক্যান্টিন'],
+  restaurant: ['জেনারেটর', 'সেন্ট্রাল AC', 'গ্যাস লাইন', 'ডাক্ট সিস্টেম', 'ফায়ার সেফটি', 'CCTV', 'পার্কিং', 'ওয়াশরুম', 'ইন্টারনেট', 'লোডিং এরিয়া'],
+  office: ['হাই-স্পিড ইন্টারনেট', 'সেন্ট্রাল AC', 'লিফট', 'জেনারেটর', 'পার্কিং', 'CCTV', 'ফায়ার সেফটি', 'সার্ভার রুম', 'রিসেপশন সার্ভিস', 'প্রার্থনা কক্ষ', 'ক্যাফেটেরিয়া'],
+  warehouse: ['ফায়ার সেফটি', 'CCTV', 'ট্রাক প্রবেশ পথ', '২৪/৭ নিরাপত্তা', 'লোডিং ডক', 'ওজন মাপার যন্ত্র', 'রেফ্রিজারেশন সুবিধা']
+};
+
+const PHOTO_TABS_BY_GROUP = {
+  residential: [
+    { id: 'bedroom', label: 'বেডরুম' }, { id: 'bathroom', label: 'বাথরুম' }, { id: 'kitchen', label: 'রান্নাঘর' },
+    { id: 'living', label: 'বসার ঘর' }, { id: 'balcony', label: 'বারান্দা' }, { id: 'front_view', label: 'বাড়ির সামনের ভিউ' }
+  ],
+  land: [
+    { id: 'front_view', label: 'জমির সামনের দিক' }, { id: 'surroundings', label: 'চারপাশের ভিউ' }, 
+    { id: 'road_view', label: 'সামনের রাস্তা' }, { id: 'map', label: 'দলিল/মৌজা ম্যাপ' }
+  ],
+  commercial_shop: [
+    { id: 'front_view', label: 'শাটার/ফ্রন্ট ভিউ' }, { id: 'inside_floor', label: 'ভেতরের ফ্লোর' }, 
+    { id: 'washroom', label: 'ওয়াশরুম' }, { id: 'electric_panel', label: 'ইলেকট্রিক্যাল প্যানেল' }
+  ],
+  restaurant: [
+    { id: 'front_view', label: 'শাটার/ফ্রন্ট ভিউ' }, { id: 'inside_hall', label: 'ভেতরের হল' }, 
+    { id: 'kitchen_area', label: 'কিচেন এরিয়া' }, { id: 'washroom', label: 'ওয়াশরুম' }
+  ],
+  office: [
+    { id: 'reception', label: 'রিসেপশন/প্রবেশপথ' }, { id: 'workspace', label: 'মূল কর্মক্ষেত্র' }, 
+    { id: 'cabin', label: 'কেবিন/বস রুম' }, { id: 'meeting_room', label: 'মিটিং রুম' }, { id: 'washroom', label: 'ওয়াশরুম' }
+  ],
+  warehouse: [
+    { id: 'inside_view', label: 'ভেতরের সম্পূর্ণ ভিউ' }, { id: 'entrance', label: 'প্রবেশপথ/গেট' }, { id: 'loading_area', label: 'লোডিং এরিয়া' }
+  ]
+};
+
 const INITIAL_FORM = {
   intent: '',
   type: '',
@@ -597,6 +642,11 @@ const INITIAL_FORM = {
   // Intent-specific details (rent/sale/commercial). Populated by the dynamic
   // Step-2 section below and stored as Mixed on the backend.
   specificDetails: {},
+
+  age: '', facing: '', landAmount: '', landUnit: 'শতক', landType: '', deedType: '', khatianNo: '', dagNo: '', roadWidth: '', cornerPlot: false,
+  frontage: '', shutters: '', storeroom: false, mezzanine: false, electricityLoad: '', seats: '', kitchenSetup: false, ductSystem: false,
+  gasLine: false, parking: false, cabins: '', conferenceRoom: false, receptionArea: false, partitions: false, internet: false, height: '',
+  loadingBay: false, truckAccess: false, fireSafety: false, securityRoom: false, advance: '', totalFloors: '', shopNo: '',
 };
 
 // Room photo categories
@@ -985,6 +1035,43 @@ const GpsPanel = ({ form, set, isBn }) => {
   const lat = parseFloat(form.gpsLat) || 23.7925;
   const lng = parseFloat(form.gpsLng) || 90.4078;
 
+
+  let dynamicPriceLabelBn = currentIntentData.priceLabelBn;
+  let dynamicPriceLabel = currentIntentData.priceLabel;
+  
+  if (form.intent === 'rent' || form.intent === 'commercial') {
+    dynamicPriceLabelBn = 'মাসিক ভাড়া';
+    dynamicPriceLabel = 'Monthly Rent';
+  } else if (form.intent === 'purchase') {
+    if (group === 'land') {
+      dynamicPriceLabelBn = 'জমির মোট মূল্য';
+      dynamicPriceLabel = 'Total Land Price';
+    } else {
+      dynamicPriceLabelBn = 'বিক্রয় মূল্য';
+      dynamicPriceLabel = 'Selling Price';
+    }
+  }
+
+  let descPlaceholderBn = 'কমপক্ষে ৩০ অক্ষর লিখুন';
+  let descPlaceholder = 'Minimum 30 characters required';
+  
+  if (group === 'residential') {
+    descPlaceholderBn = "যেমন: দক্ষিণমুখী, প্রচুর আলো-বাতাস, স্কুল/বাজারের কাছে...";
+    descPlaceholder = "e.g. South facing, plenty of light/air, near school/market...";
+  } else if (group === 'land') {
+    descPlaceholderBn = "যেমন: কর্নার প্লট, মেইন রোডের সাথে, বাউন্ডারি করা...";
+    descPlaceholder = "e.g. Corner plot, next to main road, bounded...";
+  } else if (group === 'commercial_shop' || group === 'restaurant') {
+    descPlaceholderBn = "যেমন: চলন্ত রাস্তা, প্রচুর কাস্টমার সমাগম...";
+    descPlaceholder = "e.g. Busy street, high foot traffic...";
+  } else if (group === 'office') {
+    descPlaceholderBn = "যেমন: কর্পোরেট পরিবেশ, হাই-স্পিড লিফট, পার্কিং সুবিধা...";
+    descPlaceholder = "e.g. Corporate environment, high-speed elevator, parking...";
+  } else if (group === 'warehouse') {
+    descPlaceholderBn = "যেমন: বড় ট্রাক প্রবেশের সুবিধা, নিরাপত্তা ব্যবস্থা...";
+    descPlaceholder = "e.g. Large truck access, high security...";
+  }
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_4px_15px_rgba(0,0,0,0.03)] overflow-hidden">
       <div className="p-5">
@@ -1138,7 +1225,7 @@ const GpsPanelMap = ({ lat, lng }) => {
 };
 
 // ─── AI DESCRIPTION HELPER ────────────────────────────────────────────────────
-const AiDescriptionHelper = ({ form, value, onChange, isBn, err: hasError }) => {
+const AiDescriptionHelper = ({ form, value, onChange, isBn, err: hasError, placeholderBn, placeholder }) => {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState('');
   const intentData = INTENT_DATA[form.intent] || {};
@@ -1305,6 +1392,7 @@ const AddProperty = () => {
     } catch (_) { /* swallow — fall back to a blank wizard */ }
     return INITIAL_FORM;
   });
+  const group = TYPE_GROUP_MAP[form?.type] || 'residential';
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -2079,6 +2167,180 @@ const AddProperty = () => {
                   </Field>
                 )}
 
+                
+                {/* ── DYNAMIC GROUP-SPECIFIC DETAILS ── */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">
+                  {group === 'residential' && (
+                    <>
+                      <Field label="বাড়ির বয়স (Age of House)">
+                        <select className={inputCls} value={form.age || ''} onChange={e => set('age', e.target.value)}>
+                          <option value="">নির্বাচন করুন</option>
+                          <option value="নতুন">নতুন (New)</option>
+                          <option value="১-৫ বছর">১-৫ বছর (1-5 years)</option>
+                          <option value="৫-১০ বছর">৫-১০ বছর (5-10 years)</option>
+                          <option value="১০+ বছর">১০+ বছর (10+ years)</option>
+                        </select>
+                      </Field>
+                      <Field label="ফেসিং দিক (Facing)">
+                        <select className={inputCls} value={form.facing || ''} onChange={e => set('facing', e.target.value)}>
+                          <option value="">নির্বাচন করুন</option>
+                          <option value="উত্তর">উত্তর (North)</option>
+                          <option value="দক্ষিণ">দক্ষিণ (South)</option>
+                          <option value="পূর্ব">পূর্ব (East)</option>
+                          <option value="পশ্চিম">পশ্চিম (West)</option>
+                        </select>
+                      </Field>
+                    </>
+                  )}
+
+                  {group === 'land' && (
+                    <>
+                      <Field label="জমির পরিমাণ (Land Amount)">
+                        <div className="flex gap-2">
+                          <input type="number" className={inputCls} value={form.landAmount || ''} onChange={e => set('landAmount', e.target.value)} />
+                          <select className={inputCls} style={{width: '100px'}} value={form.landUnit || 'শতক'} onChange={e => set('landUnit', e.target.value)}>
+                            <option value="শতক">শতক</option>
+                            <option value="কাঠা">কাঠা</option>
+                            <option value="বিঘা">বিঘা</option>
+                            <option value="বর্গফুট">বর্গফুট</option>
+                          </select>
+                        </div>
+                      </Field>
+                      <Field label="জমির ধরন (Land Type)">
+                        <select className={inputCls} value={form.landType || ''} onChange={e => set('landType', e.target.value)}>
+                          <option value="">নির্বাচন করুন</option>
+                          <option value="আবাসিক">আবাসিক</option>
+                          <option value="বাণিজ্যিক">বাণিজ্যিক</option>
+                          <option value="কৃষি">কৃষি</option>
+                          <option value="মিশ্র">মিশ্র</option>
+                        </select>
+                      </Field>
+                      <Field label="দলিলের ধরন (Deed Type)">
+                        <select className={inputCls} value={form.deedType || ''} onChange={e => set('deedType', e.target.value)}>
+                          <option value="">নির্বাচন করুন</option>
+                          <option value="রেজিস্ট্রি">রেজিস্ট্রি</option>
+                          <option value="বায়না">বায়না</option>
+                          <option value="মৌজা">মৌজা</option>
+                          <option value="অন্যান্য">অন্যান্য</option>
+                        </select>
+                      </Field>
+                      <Field label="খতিয়ান নম্বর (Khatian No.) — ঐচ্ছিক">
+                        <input type="text" className={inputCls} value={form.khatianNo || ''} onChange={e => set('khatianNo', e.target.value)} />
+                      </Field>
+                      <Field label="দাগ নম্বর (Dag No.) — ঐচ্ছিক">
+                        <input type="text" className={inputCls} value={form.dagNo || ''} onChange={e => set('dagNo', e.target.value)} />
+                      </Field>
+                      <Field label="সামনের রাস্তার প্রশস্ততা (Road Width in ft)">
+                        <input type="number" className={inputCls} value={form.roadWidth || ''} onChange={e => set('roadWidth', e.target.value)} />
+                      </Field>
+                      <Field label="ফেসিং দিক (Facing)">
+                        <select className={inputCls} value={form.facing || ''} onChange={e => set('facing', e.target.value)}>
+                          <option value="">নির্বাচন করুন</option>
+                          <option value="উত্তর">উত্তর (North)</option>
+                          <option value="দক্ষিণ">দক্ষিণ (South)</option>
+                          <option value="পূর্ব">পূর্ব (East)</option>
+                          <option value="পশ্চিম">পশ্চিম (West)</option>
+                        </select>
+                      </Field>
+                      <label className="flex items-center gap-2 text-sm font-bold text-gray-700 p-2">
+                        <input type="checkbox" className="w-5 h-5 accent-[#ba0036]" checked={form.cornerPlot || false} onChange={e => set('cornerPlot', e.target.checked)} />
+                        কর্নার প্লট? (Corner Plot)
+                      </label>
+                    </>
+                  )}
+
+                  {group === 'commercial_shop' && (
+                    <>
+                      <Field label="আয়তন বর্গফুট (Area sqft)">
+                        <input type="number" className={inputCls} value={form.sqft || ''} onChange={e => set('sqft', e.target.value)} />
+                      </Field>
+                      <Field label="ফ্লোর নম্বর (Floor No)">
+                        <input type="number" className={inputCls} value={form.floor || ''} onChange={e => set('floor', e.target.value)} />
+                      </Field>
+                      <Field label="শপ নম্বর (Shop No) — ঐচ্ছিক">
+                        <input type="text" className={inputCls} value={form.shopNo || ''} onChange={e => set('shopNo', e.target.value)} />
+                      </Field>
+                      <Field label="ফ্রন্টেজ প্রশস্ততা (Frontage Width in ft)">
+                        <input type="number" className={inputCls} value={form.frontage || ''} onChange={e => set('frontage', e.target.value)} />
+                      </Field>
+                      <Field label="শাটার সংখ্যা (No of Shutters)">
+                        <input type="number" className={inputCls} value={form.shutters || ''} onChange={e => set('shutters', e.target.value)} />
+                      </Field>
+                      <Field label="বিদ্যুৎ লোড KW (Electricity Load) — ঐচ্ছিক">
+                        <input type="number" className={inputCls} value={form.electricityLoad || ''} onChange={e => set('electricityLoad', e.target.value)} />
+                      </Field>
+                      <div className="flex flex-col gap-3">
+                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
+                          <input type="checkbox" className="w-5 h-5 accent-[#ba0036]" checked={form.storeroom || false} onChange={e => set('storeroom', e.target.checked)} /> স্টোররুম আছে?
+                        </label>
+                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
+                          <input type="checkbox" className="w-5 h-5 accent-[#ba0036]" checked={form.mezzanine || false} onChange={e => set('mezzanine', e.target.checked)} /> মেজানিন ফ্লোর আছে?
+                        </label>
+                      </div>
+                    </>
+                  )}
+
+                  {group === 'restaurant' && (
+                    <>
+                      <Field label="আয়তন বর্গফুট (Area sqft)">
+                        <input type="number" className={inputCls} value={form.sqft || ''} onChange={e => set('sqft', e.target.value)} />
+                      </Field>
+                      <Field label="কতটি ফ্লোর জুড়ে (Total Floors)">
+                        <input type="number" className={inputCls} value={form.totalFloors || ''} onChange={e => set('totalFloors', e.target.value)} />
+                      </Field>
+                      <Field label="আসন ক্ষমতা (Seating Capacity)">
+                        <input type="number" className={inputCls} value={form.seats || ''} onChange={e => set('seats', e.target.value)} />
+                      </Field>
+                      <Field label="বিদ্যুৎ লোড KW (Electricity Load)">
+                        <input type="number" className={inputCls} value={form.electricityLoad || ''} onChange={e => set('electricityLoad', e.target.value)} />
+                      </Field>
+                      <div className="flex flex-col gap-3 col-span-1 md:col-span-2 sm:flex-row sm:flex-wrap">
+                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700"><input type="checkbox" className="w-5 h-5 accent-[#ba0036]" checked={form.kitchenSetup || false} onChange={e => set('kitchenSetup', e.target.checked)} /> কিচেন সেটআপ আছে?</label>
+                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700"><input type="checkbox" className="w-5 h-5 accent-[#ba0036]" checked={form.ductSystem || false} onChange={e => set('ductSystem', e.target.checked)} /> ডাক্ট/এগজস্ট সিস্টেম আছে?</label>
+                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700"><input type="checkbox" className="w-5 h-5 accent-[#ba0036]" checked={form.gasLine || false} onChange={e => set('gasLine', e.target.checked)} /> গ্যাস লাইন আছে?</label>
+                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700"><input type="checkbox" className="w-5 h-5 accent-[#ba0036]" checked={form.parking || false} onChange={e => set('parking', e.target.checked)} /> পার্কিং আছে?</label>
+                      </div>
+                    </>
+                  )}
+
+                  {group === 'office' && (
+                    <>
+                      <Field label="আয়তন বর্গফুট (Area sqft)">
+                        <input type="number" className={inputCls} value={form.sqft || ''} onChange={e => set('sqft', e.target.value)} />
+                      </Field>
+                      <Field label="ফ্লোর নম্বর (Floor No)">
+                        <input type="number" className={inputCls} value={form.floor || ''} onChange={e => set('floor', e.target.value)} />
+                      </Field>
+                      <Field label="কেবিন/রুম সংখ্যা (No of Cabins)">
+                        <input type="number" className={inputCls} value={form.cabins || ''} onChange={e => set('cabins', e.target.value)} />
+                      </Field>
+                      <div className="flex flex-col gap-3 col-span-1 md:col-span-2 sm:flex-row sm:flex-wrap">
+                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700"><input type="checkbox" className="w-5 h-5 accent-[#ba0036]" checked={form.conferenceRoom || false} onChange={e => set('conferenceRoom', e.target.checked)} /> কনফারেন্স রুম আছে?</label>
+                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700"><input type="checkbox" className="w-5 h-5 accent-[#ba0036]" checked={form.receptionArea || false} onChange={e => set('receptionArea', e.target.checked)} /> রিসেপশন এরিয়া আছে?</label>
+                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700"><input type="checkbox" className="w-5 h-5 accent-[#ba0036]" checked={form.partitions || false} onChange={e => set('partitions', e.target.checked)} /> পার্টিশন করা?</label>
+                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700"><input type="checkbox" className="w-5 h-5 accent-[#ba0036]" checked={form.internet || false} onChange={e => set('internet', e.target.checked)} /> ইন্টারনেট/ফাইবার সংযোগ?</label>
+                      </div>
+                    </>
+                  )}
+
+                  {group === 'warehouse' && (
+                    <>
+                      <Field label="আয়তন বর্গফুট (Area sqft)">
+                        <input type="number" className={inputCls} value={form.sqft || ''} onChange={e => set('sqft', e.target.value)} />
+                      </Field>
+                      <Field label="ছাদের উচ্চতা ফুটে (Height in ft)">
+                        <input type="number" className={inputCls} value={form.height || ''} onChange={e => set('height', e.target.value)} />
+                      </Field>
+                      <div className="flex flex-col gap-3 col-span-1 md:col-span-2 sm:flex-row sm:flex-wrap">
+                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700"><input type="checkbox" className="w-5 h-5 accent-[#ba0036]" checked={form.loadingBay || false} onChange={e => set('loadingBay', e.target.checked)} /> লোডিং/আনলোডিং বে আছে?</label>
+                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700"><input type="checkbox" className="w-5 h-5 accent-[#ba0036]" checked={form.truckAccess || false} onChange={e => set('truckAccess', e.target.checked)} /> ট্রাক প্রবেশের সুবিধা?</label>
+                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700"><input type="checkbox" className="w-5 h-5 accent-[#ba0036]" checked={form.fireSafety || false} onChange={e => set('fireSafety', e.target.checked)} /> ফায়ার সেফটি সিস্টেম?</label>
+                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700"><input type="checkbox" className="w-5 h-5 accent-[#ba0036]" checked={form.securityRoom || false} onChange={e => set('securityRoom', e.target.checked)} /> সিকিউরিটি রুম আছে?</label>
+                      </div>
+                    </>
+                  )}
+                </div>
+
                 {/* ── DYNAMIC INTENT-SPECIFIC DETAILS (Step 2) ── */}
                 {form.intent && form.type && dynamicFields.length > 0 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -2154,7 +2416,13 @@ const AddProperty = () => {
                     <span className="text-[10px] font-black text-[#ba0036] bg-red-50 px-2 py-1 rounded-full">{form.amenities.length} {isBn ? 'টি নির্বাচিত' : 'selected'}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    {AMENITIES_LIST.map(({ id, label, labelBn, icon: Icon, color, bg }) => {
+                    {(AMENITIES_BY_GROUP[group] || AMENITIES_BY_GROUP.residential).map((amLabel) => {
+                      const id = amLabel;
+                      const label = amLabel;
+                      const labelBn = amLabel;
+                      const Icon = CheckCircle2;
+                      const color = 'text-[#ba0036]';
+                      const bg = 'bg-red-50';
                       const isSelected = form.amenities.includes(id);
                       return (
                         <motion.button key={id} type="button"
@@ -2265,15 +2533,15 @@ const AddProperty = () => {
 
                   {/* Photo category tabs */}
                   <div className="flex gap-2 flex-wrap mb-4">
-                    {getRoomTypes(form.intent, form.type).map(rt => (
+                    {(PHOTO_TABS_BY_GROUP[group] || PHOTO_TABS_BY_GROUP.residential).map(rt => (
                       <button key={rt.id} type="button"
                         onClick={() => setSelectedRoomType(rt.id)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all
                           ${selectedRoomType === rt.id
                             ? 'bg-gray-900 text-white shadow-sm'
                             : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
-                        <span>{rt.emoji}</span>
-                        {isBn ? rt.labelBn : rt.label}
+                        <span>{(rt.emoji || '📸')}</span>
+                        {isBn ? (rt.labelBn || rt.label) : rt.label}
                         <span className="text-[9px] font-black opacity-60">
                           ({form.roomPhotos.filter(p => p.room === rt.id).length})
                         </span>
@@ -2293,8 +2561,8 @@ const AddProperty = () => {
                       <div className="text-left">
                         <p className="text-sm font-black text-gray-700">
                           {isBn
-                            ? `${getRoomTypes(form.intent, form.type).find(r => r.id === selectedRoomType)?.labelBn} এর ছবি যোগ করুন`
-                            : `Add ${getRoomTypes(form.intent, form.type).find(r => r.id === selectedRoomType)?.label} photos`}
+                            ? `${(PHOTO_TABS_BY_GROUP[group] || PHOTO_TABS_BY_GROUP.residential).find(r => r.id === selectedRoomType)?.label} এর ছবি যোগ করুন`
+                            : `Add ${(PHOTO_TABS_BY_GROUP[group] || PHOTO_TABS_BY_GROUP.residential).find(r => r.id === selectedRoomType)?.label} photos`}
                         </p>
                         <p className="text-[11px] font-bold text-gray-300">{isBn ? 'একাধিক ছবি একসাথে যোগ করতে পারবেন' : 'Multiple photos at once'}</p>
                       </div>
@@ -2438,7 +2706,7 @@ const AddProperty = () => {
                 {/* Pricing */}
                 <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_4px_15px_rgba(0,0,0,0.03)] space-y-4">
                   <Field
-                    label={isBn ? currentIntentData.priceLabelBn : currentIntentData.priceLabel}
+                    label={isBn ? dynamicPriceLabelBn : dynamicPriceLabel}
                     required>
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-gray-400">৳</span>
@@ -2485,8 +2753,10 @@ const AddProperty = () => {
                     other field is filled by this point so the AI helper
                     can analyse the whole listing before drafting copy). */}
                 <Field label={isBn ? 'বিস্তারিত বিবরণ' : 'Detailed Description'} required
-                  hint={isBn ? 'কমপক্ষে ৩০ অক্ষর লিখুন' : 'Minimum 30 characters required'}>
+                  hint={isBn ? descPlaceholderBn : descPlaceholder}>
                   <AiDescriptionHelper
+                    placeholderBn={descPlaceholderBn}
+                    placeholder={descPlaceholder}
                     form={form}
                     value={form.description}
                     onChange={(val) => { set('description', val); setErrors(er => ({ ...er, description: false })); }}

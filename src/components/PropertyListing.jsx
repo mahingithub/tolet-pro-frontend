@@ -56,6 +56,19 @@ const MAP_STYLES = [
 // Empty array = no host has uploaded yet, which is exactly the "fresh install"
 // state we want to show new users.
 
+// ─── TYPE GROUP MAP ───────────────────────────────────────────────────────────
+const TYPE_GROUP_MAP = {
+  flat: 'residential', house: 'residential', mess: 'residential', villa: 'residential', other_buy: 'residential',
+  office_room: 'office', office_space: 'office',
+  land: 'land',
+  shop: 'commercial_shop', mall_shop: 'commercial_shop', showroom: 'commercial_shop', other_commercial: 'commercial_shop',
+  restaurant: 'restaurant', restaurant_space: 'restaurant',
+  warehouse: 'warehouse', shed: 'warehouse'
+};
+const GROUP_BADGE_MAP = {
+  residential: '🏠 আবাসিক', land: '🌿 জমি/প্লট', commercial_shop: '🏪 দোকান/শপ',
+  restaurant: '🍽 রেস্টুরেন্ট', office: '💼 অফিস', warehouse: '🏗 গোডাউন'
+};
 // ─── RENTAL CATEGORY CONFIG ──────────────────────────────────────────────────
 // ⚠️  IDs must match `rentalCategory` values in demo data + propertyService.js
 //     AND the category IDs used by HeroSection / Navbar dropdowns.
@@ -158,7 +171,9 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 		? Math.round(((property.originalPrice - property.price) / property.originalPrice) * 100)
 		: 0;
 	const catEntry = RENTAL_CATEGORIES.find((c) => c.id === property.rentalCategory);
-	const catLabel = (catEntry?.tKey && t[catEntry.tKey]) || catEntry?.label || "Others";
+	const group = TYPE_GROUP_MAP[property.rentalCategory || property.type] || 'residential';
+	const badgeLabel = GROUP_BADGE_MAP[group] || GROUP_BADGE_MAP.residential;
+	let priceLabelStr = property.intent === 'rent' || property.intent === 'commercial' ? 'মাসিক ভাড়া' : (group === 'land' ? 'প্রতি শতক' : 'বিক্রয় মূল্য');
 	const extraRoomCount = Math.max(0, totalRoomCategories - 1 - collageThumbs.length);
 
 	return (
@@ -193,7 +208,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 									<ShieldCheck size={12} /> {t.verified || "Verified"}
 								</div>
 							)}
-							<span className="bg-brandRed/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm">{catLabel}</span>
+							<span className="bg-brandRed/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm">{badgeLabel}</span>
 						</div>
 						<button onClick={handleSave} className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur-md rounded-full hover:bg-white hover:scale-110 active:scale-95 transition-all z-20 shadow-sm">
 							<Heart size={16} className={isSaved ? "fill-brandRed text-brandRed" : "text-gray-700"} />
@@ -247,22 +262,46 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 						<MapPin size={14} className="text-gray-400" /> {property.location}
 					</p>
 					<div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] font-bold text-gray-600 bg-gray-50 p-2.5 rounded-xl">
-						<span className="flex items-center gap-1.5">
-							<BedDouble size={14} className="text-gray-400" /> {property.beds} {t.beds || "Beds"}
-						</span>
-						<span className="flex items-center gap-1.5">
-							<Bath size={14} className="text-gray-400" /> {property.baths} {t.baths || "Baths"}
-						</span>
-						<span className="flex items-center gap-1.5">
-							<Square size={14} className="text-gray-400" /> {property.sqft} {t.sqft || "sqft"}
-						</span>
-						<span className="flex items-center gap-1.5">
-							<Layers size={14} className="text-gray-400" /> {(property.floor || property.floorNumber) ? `${t.floorLabel || "Floor"} ${property.floor || property.floorNumber}` : (t.groundFloor || "Ground")}
-						</span>
-						<span className="hidden sm:flex items-center gap-1.5">
-							<Building size={14} className="text-gray-400" />
-							{property.furnishing === "Furnished" ? t.furnished || "Furnished" : property.furnishing === "Semi-Furnished" ? t.semiFurnished || "Semi-Furnished" : t.unfurnished || "Unfurnished"}
-						</span>
+						{group === 'residential' && (
+							<>
+								<span className="flex items-center gap-1.5"><BedDouble size={14} className="text-gray-400" /> {property.beds} বেড</span>
+								<span className="flex items-center gap-1.5"><Bath size={14} className="text-gray-400" /> {property.baths} বাথ</span>
+								<span className="flex items-center gap-1.5"><Square size={14} className="text-gray-400" /> {property.sqft} বর্গফুট</span>
+							</>
+						)}
+						{group === 'land' && (
+							<>
+								<span className="flex items-center gap-1.5"><Square size={14} className="text-gray-400" /> {property.landAmount} {property.landUnit || 'কাঠা'} জমি</span>
+								{property.facing && <span className="flex items-center gap-1.5"><Navigation size={14} className="text-gray-400" /> {property.facing} মুখী</span>}
+							</>
+						)}
+						{group === 'commercial_shop' && (
+							<>
+								<span className="flex items-center gap-1.5"><Square size={14} className="text-gray-400" /> {property.sqft} বর্গফুট</span>
+								{property.shutters && <span className="flex items-center gap-1.5"><Layers size={14} className="text-gray-400" /> {property.shutters} শাটার</span>}
+								{property.floor && <span className="flex items-center gap-1.5"><Building size={14} className="text-gray-400" /> ফ্লোর {property.floor}</span>}
+							</>
+						)}
+						{group === 'restaurant' && (
+							<>
+								<span className="flex items-center gap-1.5"><Square size={14} className="text-gray-400" /> {property.sqft} বর্গফুট</span>
+								{property.seats && <span className="flex items-center gap-1.5"><Users size={14} className="text-gray-400" /> {property.seats} আসন</span>}
+								{property.floor && <span className="flex items-center gap-1.5"><Building size={14} className="text-gray-400" /> ফ্লোর {property.floor}</span>}
+							</>
+						)}
+						{group === 'office' && (
+							<>
+								<span className="flex items-center gap-1.5"><Square size={14} className="text-gray-400" /> {property.sqft} বর্গফুট</span>
+								{property.cabins && <span className="flex items-center gap-1.5"><Users size={14} className="text-gray-400" /> {property.cabins} কেবিন</span>}
+								{property.floor && <span className="flex items-center gap-1.5"><Building size={14} className="text-gray-400" /> ফ্লোর {property.floor}</span>}
+							</>
+						)}
+						{group === 'warehouse' && (
+							<>
+								<span className="flex items-center gap-1.5"><Square size={14} className="text-gray-400" /> {property.sqft} বর্গফুট</span>
+								{property.height && <span className="flex items-center gap-1.5"><Layers size={14} className="text-gray-400" /> উচ্চতা {property.height} ফুট</span>}
+							</>
+						)}
 					</div>
 				</div>
 				<div className="flex flex-col sm:flex-row justify-between items-center gap-2.5 pt-3 mt-3 border-t border-gray-100">
@@ -278,7 +317,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 								</div>
 							)}
 						</div>
-						<p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">{t.perMonth || "Per Month"}</p>
+						<p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">{priceLabelStr}</p>
 					</div>
 					<div className="flex items-center gap-3 w-full sm:w-auto">
 						<button onClick={() => navigate(`/property/${property.id}`)} className="flex-1 sm:flex-none px-4 py-2 rounded-lg text-[11px] font-black text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all">
@@ -724,7 +763,11 @@ const PropertyListing = () => {
 	// load, so a shared ?intent= link wins over the persisted mode.
 	const selectedIntent = usePropertyStore((s) => s.activeMode);
 	const setActiveMode  = usePropertyStore((s) => s.setActiveMode);
-	const [selectedTypes, setSelectedTypes] = useState([]);
+	const [localIntent, setLocalIntent] = useState('all');
+  const [selectedTypes, setSelectedTypes] = useState([]);
+  const [minLandSize, setMinLandSize] = useState('');
+  const [maxLandSize, setMaxLandSize] = useState('');
+  const [landSizeUnit, setLandSizeUnit] = useState('শতক');
 	const [selectedCategories, setSelectedCategories] = useState([]);
 	const [selectedBeds, setSelectedBeds] = useState("any");
 	const [selectedBaths, setSelectedBaths] = useState("any");
@@ -754,7 +797,7 @@ const PropertyListing = () => {
 			}
 			try {
 				const list = await propertyService.getProperties(
-					{ activeDivision, searchArea: debouncedSearch, nearMeLabel: t.nearMe || "Nearby Location", intent: selectedIntent, selectedCategories, selectedTypes, minPrice, maxPrice },
+					{ activeDivision, searchArea: debouncedSearch, nearMeLabel: t.nearMe || "Nearby Location", intent: localIntent === "all" ? "" : localIntent, selectedCategories, selectedTypes, minPrice, maxPrice },
 					sortBy,
 				);
 				if (!cancelled) setProperties(Array.isArray(list) ? list : []);
@@ -1264,19 +1307,27 @@ const PropertyListing = () => {
 							</div>
 						</FilterSection>
 
-						<FilterSection title={t.filterPropType || "Property Type"}>
-							<div className="grid grid-cols-1 gap-2">
-								{[
-									{ id: "apartment",   label: t.propApartment   || "Apartment" },
-									{ id: "independent", label: t.propIndependent || "Independent House" },
-									{ id: "duplex",      label: t.propDuplex      || "Duplex" },
-									{ id: "studio",      label: t.propStudio      || "Studio" },
-									{ id: "penthouse",   label: t.propPenthouse   || "Penthouse" },
-								].map((type) => (
-									<label key={type.id} className={`flex items-center gap-3 cursor-pointer px-3 py-2 rounded-lg border-2 text-xs font-bold transition-all ${selectedTypes.includes(type.id) ? 'border-gray-900 bg-gray-50' : 'border-transparent hover:border-gray-300'}`}>
-										<input type="checkbox" checked={selectedTypes.includes(type.id)} onChange={() => handleTypeToggle(type.id)} className="w-4 h-4 rounded accent-gray-900" /> {type.label}
-									</label>
-								))}
+						<FilterSection title="Property Type">
+							<div className="grid grid-cols-2 gap-2">
+								{(() => {
+									let options = [];
+									if (localIntent === 'rent') options = [{id:'flat',label:'ফ্ল্যাট'},{id:'house',label:'বাড়ি'},{id:'mess',label:'মেস/সিট'},{id:'office_room',label:'অফিস রুম'}];
+									else if (localIntent === 'buy') options = [{id:'flat',label:'ফ্ল্যাট'},{id:'house',label:'বাড়ি/ভিলা'},{id:'land',label:'প্লট/জমি'},{id:'shop',label:'দোকান'},{id:'restaurant',label:'রেস্টুরেন্ট'},{id:'warehouse',label:'গোডাউন'}];
+									else if (localIntent === 'commercial') options = [{id:'office_space',label:'অফিস স্পেস'},{id:'restaurant_space',label:'রেস্টুরেন্ট স্পেস'},{id:'shop',label:'শপ/দোকান'},{id:'mall_shop',label:'শপিং মল শপ'},{id:'warehouse',label:'গোডাউন'},{id:'showroom',label:'শোরুম'}];
+									else options = [{id:'flat',label:'ফ্ল্যাট'}];
+
+									return options.map((type) => (
+										<label key={type.id} className={`flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border-2 text-xs font-bold transition-all ${selectedTypes.includes(type.id) ? 'border-gray-900 bg-gray-50' : 'border-transparent bg-white hover:border-gray-300'}`}>
+											<input type="checkbox" checked={selectedTypes.includes(type.id)}
+												onChange={() => {
+													if (selectedTypes.includes(type.id)) setSelectedTypes(selectedTypes.filter(t => t !== type.id));
+													else setSelectedTypes([...selectedTypes, type.id]);
+												}}
+												className="hidden" />
+											{type.label}
+										</label>
+									));
+								})()}
 							</div>
 						</FilterSection>
 
@@ -1307,7 +1358,8 @@ const PropertyListing = () => {
 							</div>
 						</FilterSection>
 
-						<FilterSection title={t.bedrooms || "Bedrooms"}>
+						{(!selectedTypes.length || selectedTypes.some(t => TYPE_GROUP_MAP[t] === 'residential' || !TYPE_GROUP_MAP[t])) && (
+							<FilterSection title={t.bedrooms || "Bedrooms"}>
 							<div className="flex gap-2">
 								{[
 									{ id: "any", text: t.any || "Any" },
@@ -1322,6 +1374,7 @@ const PropertyListing = () => {
 								))}
 							</div>
 						</FilterSection>
+						)}
 
 						<FilterSection title={t.bathrooms || "Bathrooms"}>
 							<div className="flex gap-2">
@@ -1349,17 +1402,31 @@ const PropertyListing = () => {
 							</div>
 						</FilterSection>
 
-						<FilterSection title={t.filterSize || "Size (Area Sqft)"}>
-							<div className="px-2">
-								<div className="flex items-center justify-between mb-4 text-xs font-bold text-gray-600">
-									<span className="flex items-center gap-2">
-										<Ruler size={14} className="text-brandRed" /> {t.maxSize || "Max Size:"}
-									</span>
-									<span className="text-brandRed">{maxSqft} sqft</span>
+						{(!selectedTypes.includes('land')) && (
+							<FilterSection title={t.filterSize || "Size (Area Sqft)"}>
+								<div className="px-2">
+									<div className="flex items-center justify-between mb-4 text-xs font-bold text-gray-600">
+										<span className="flex items-center gap-2">
+											<Ruler size={14} className="text-brandRed" /> {t.maxSize || "Max Size:"}
+										</span>
+										<span className="text-brandRed">{maxSqft} sqft</span>
+									</div>
+									<input type="range" min="500" max="4000" step="100" value={maxSqft} onChange={(e) => setMaxSqft(Number(e.target.value))} className="w-full accent-brandRed cursor-pointer" />
 								</div>
-								<input type="range" min="500" max="4000" step="100" value={maxSqft} onChange={(e) => setMaxSqft(Number(e.target.value))} className="w-full accent-brandRed cursor-pointer" />
-							</div>
-						</FilterSection>
+							</FilterSection>
+						)}\n\n\t\t\t\t\t\t{selectedTypes.includes('land') && (
+							<FilterSection title="Land Size">
+								<div className="flex items-center gap-2">
+									<input type="number" placeholder="Min" value={minLandSize} onChange={(e) => setMinLandSize(e.target.value)} className="w-1/3 bg-gray-50 border border-gray-100 rounded-lg p-2 text-xs font-bold outline-none" />
+									<input type="number" placeholder="Max" value={maxLandSize} onChange={(e) => setMaxLandSize(e.target.value)} className="w-1/3 bg-gray-50 border border-gray-100 rounded-lg p-2 text-xs font-bold outline-none" />
+									<select value={landSizeUnit} onChange={(e) => setLandSizeUnit(e.target.value)} className="w-1/3 bg-gray-50 border border-gray-100 rounded-lg p-2 text-xs font-bold outline-none">
+										<option value="শতক">শতক</option>
+										<option value="কাঠা">কাঠা</option>
+										<option value="বিঘা">বিঘা</option>
+									</select>
+								</div>
+							</FilterSection>
+						)}
 
 						<FilterSection title={t.filterUtilities || "Utilities Included"}>
 							<div className="grid grid-cols-2 gap-3">
