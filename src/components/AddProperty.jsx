@@ -696,7 +696,8 @@ const _geoNorm = (s) =>
   String(s || '')
     .toLowerCase()
     .replace(/\b(division|district|sub-?district|upazil[al]+|thana|metropolitan|paurashava|union|ward)\b/g, ' ')
-    .replace(/[^a-z0-9]+/g, '');
+    .replace(/(বিভাগ|জেলা|উপজেলা|থানা|পৌরসভা|সিটি\s*কর্পোরেশন|ইউনিয়ন|ওয়ার্ড)/g, ' ')
+    .replace(/[^a-z0-9\u0980-\u09FF]+/g, '');
 const _geoCanon = (s) => { const n = _geoNorm(s); return _GEO_ALIASES[n] || n; };
 const _geoLev = (a, b) => {
   const m = a.length, n = b.length;
@@ -713,16 +714,22 @@ const _geoLev = (a, b) => {
 };
 // Returns the best-matching option (exact/substring on canonical form, else edit
 // distance ≤ 2), or null when nothing is close enough.
-const matchGeo = (raw, options, getLabel = (o) => o) => {
+const matchGeo = (raw, options, getLabelEn = (o) => o, getLabelBn = (o) => (typeof o === 'object' ? o.labelBn : '')) => {
   const target = _geoCanon(raw);
   if (!target) return null;
   let best = null, bestDist = Infinity;
   for (const opt of options) {
-    const cand = _geoCanon(getLabel(opt));
-    if (!cand) continue;
-    if (cand === target || (target.length >= 4 && (cand.includes(target) || target.includes(cand)))) return opt;
-    const d = _geoLev(cand, target);
-    if (d < bestDist) { bestDist = d; best = opt; }
+    const enLabel = getLabelEn(opt);
+    const bnLabel = getLabelBn(opt);
+    
+    for (const v of [enLabel, bnLabel]) {
+      if (!v) continue;
+      const cand = _geoCanon(v);
+      if (!cand) continue;
+      if (cand === target || (target.length >= 4 && (cand.includes(target) || target.includes(cand)))) return opt;
+      const d = _geoLev(cand, target);
+      if (d < bestDist) { bestDist = d; best = opt; }
+    }
   }
   return bestDist <= 2 ? best : null;
 };
@@ -864,16 +871,16 @@ const GpsPanel = ({ form, set, isBn }) => {
         const applyGeo = (g) => {
           // Resolve the Division → District → Thana → Area cascade first (English
           // matching, spelling-tolerant), setting each dropdown on a confident match.
-          const divMatch = matchGeo(g.division, DIVISIONS, (d) => d.label);
+          const divMatch = matchGeo(g.division, DIVISIONS, (d) => d.label, (d) => d.labelBn);
           let distMatch = null, thMatch = null, unionObj = null;
           if (divMatch) {
             set('division', divMatch.id);
             const distList = DISTRICTS_BY_DIVISION[divMatch.id] || [];
-            distMatch = matchGeo(g.district, distList, (d) => d.label) || matchGeo(g.thana, distList, (d) => d.label);
+            distMatch = matchGeo(g.district, distList, (d) => d.label, (d) => d.labelBn) || matchGeo(g.thana, distList, (d) => d.label, (d) => d.labelBn);
             if (distMatch) {
               set('district', distMatch.id);
               const thanaList = THANAS_BY_DISTRICT[distMatch.id] || [];
-              thMatch = matchGeo(g.thana, thanaList) || matchGeo(g.district, thanaList);
+              thMatch = matchGeo(g.thana, thanaList, (t) => t, (t) => thanaBn(distMatch.id, t)) || matchGeo(g.district, thanaList, (t) => t, (t) => thanaBn(distMatch.id, t));
               if (thMatch) {
                 set('thana', thMatch);
                 const areaList = (AREAS_BY_THANA[distMatch.id] || {})[thMatch] || [];
