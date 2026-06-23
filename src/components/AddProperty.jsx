@@ -1413,7 +1413,7 @@ const AddProperty = () => {
       if (!form.intent)          e.intent    = true;
       if (!form.type)            e.type      = true;
       if (!form.category)        e.category  = true;
-      if (!form.title.trim())    e.title     = true;
+      if (!form.title.trim() || form.title.trim().length < 3)     e.title     = true;
       if (!form.division)        e.division  = true;
       // District only mandatory when the chosen division actually has
       // districts wired up — keeps the wizard future-proof if a region's

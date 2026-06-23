@@ -576,7 +576,7 @@ export const propertyService = {
     // No localStorage fallback. If we reach here the server create failed (or
     // there's no auth token) — surface a real error instead of silently saving
     // the listing to this device only.
-    throw new Error('Could not save the property to the server. Please check your connection and try again.');
+    const txt = await res.text(); throw new Error(`Backend error: ${res.status} - ${txt}`);
   },
 
   /**
