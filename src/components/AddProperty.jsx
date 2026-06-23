@@ -1036,41 +1036,7 @@ const GpsPanel = ({ form, set, isBn }) => {
   const lng = parseFloat(form.gpsLng) || 90.4078;
 
 
-  let dynamicPriceLabelBn = currentIntentData.priceLabelBn;
-  let dynamicPriceLabel = currentIntentData.priceLabel;
   
-  if (form.intent === 'rent' || form.intent === 'commercial') {
-    dynamicPriceLabelBn = 'মাসিক ভাড়া';
-    dynamicPriceLabel = 'Monthly Rent';
-  } else if (form.intent === 'purchase') {
-    if (group === 'land') {
-      dynamicPriceLabelBn = 'জমির মোট মূল্য';
-      dynamicPriceLabel = 'Total Land Price';
-    } else {
-      dynamicPriceLabelBn = 'বিক্রয় মূল্য';
-      dynamicPriceLabel = 'Selling Price';
-    }
-  }
-
-  let descPlaceholderBn = 'কমপক্ষে ৩০ অক্ষর লিখুন';
-  let descPlaceholder = 'Minimum 30 characters required';
-  
-  if (group === 'residential') {
-    descPlaceholderBn = "যেমন: দক্ষিণমুখী, প্রচুর আলো-বাতাস, স্কুল/বাজারের কাছে...";
-    descPlaceholder = "e.g. South facing, plenty of light/air, near school/market...";
-  } else if (group === 'land') {
-    descPlaceholderBn = "যেমন: কর্নার প্লট, মেইন রোডের সাথে, বাউন্ডারি করা...";
-    descPlaceholder = "e.g. Corner plot, next to main road, bounded...";
-  } else if (group === 'commercial_shop' || group === 'restaurant') {
-    descPlaceholderBn = "যেমন: চলন্ত রাস্তা, প্রচুর কাস্টমার সমাগম...";
-    descPlaceholder = "e.g. Busy street, high foot traffic...";
-  } else if (group === 'office') {
-    descPlaceholderBn = "যেমন: কর্পোরেট পরিবেশ, হাই-স্পিড লিফট, পার্কিং সুবিধা...";
-    descPlaceholder = "e.g. Corporate environment, high-speed elevator, parking...";
-  } else if (group === 'warehouse') {
-    descPlaceholderBn = "যেমন: বড় ট্রাক প্রবেশের সুবিধা, নিরাপত্তা ব্যবস্থা...";
-    descPlaceholder = "e.g. Large truck access, high security...";
-  }
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_4px_15px_rgba(0,0,0,0.03)] overflow-hidden">
@@ -1726,6 +1692,43 @@ const AddProperty = () => {
         </motion.div>
       </div>
     );
+  }
+
+
+  let dynamicPriceLabelBn = currentIntentData.priceLabelBn;
+  let dynamicPriceLabel = currentIntentData.priceLabel;
+  
+  if (form.intent === 'rent' || form.intent === 'commercial') {
+    dynamicPriceLabelBn = 'মাসিক ভাড়া';
+    dynamicPriceLabel = 'Monthly Rent';
+  } else if (form.intent === 'purchase') {
+    if (group === 'land') {
+      dynamicPriceLabelBn = 'জমির মোট মূল্য';
+      dynamicPriceLabel = 'Total Land Price';
+    } else {
+      dynamicPriceLabelBn = 'বিক্রয় মূল্য';
+      dynamicPriceLabel = 'Selling Price';
+    }
+  }
+
+  let descPlaceholderBn = 'কমপক্ষে ৩০ অক্ষর লিখুন';
+  let descPlaceholder = 'Minimum 30 characters required';
+  
+  if (group === 'residential') {
+    descPlaceholderBn = "যেমন: দক্ষিণমুখী, প্রচুর আলো-বাতাস, স্কুল/বাজারের কাছে...";
+    descPlaceholder = "e.g. South facing, plenty of light/air, near school/market...";
+  } else if (group === 'land') {
+    descPlaceholderBn = "যেমন: কর্নার প্লট, মেইন রোডের সাথে, বাউন্ডারি করা...";
+    descPlaceholder = "e.g. Corner plot, next to main road, bounded...";
+  } else if (group === 'commercial_shop' || group === 'restaurant') {
+    descPlaceholderBn = "যেমন: চলন্ত রাস্তা, প্রচুর কাস্টমার সমাগম...";
+    descPlaceholder = "e.g. Busy street, high foot traffic...";
+  } else if (group === 'office') {
+    descPlaceholderBn = "যেমন: কর্পোরেট পরিবেশ, হাই-স্পিড লিফট, পার্কিং সুবিধা...";
+    descPlaceholder = "e.g. Corporate environment, high-speed elevator, parking...";
+  } else if (group === 'warehouse') {
+    descPlaceholderBn = "যেমন: বড় ট্রাক প্রবেশের সুবিধা, নিরাপত্তা ব্যবস্থা...";
+    descPlaceholder = "e.g. Large truck access, high security...";
   }
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
