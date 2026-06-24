@@ -1249,8 +1249,24 @@ const HostDashboard = () => {
     setActiveModal(null);
     setDeleteTarget(null);
 
-    // Optimistically remove from state
-    setProperties((prev) => prev.filter((p) => p.id !== prop.id));
+    // Smooth fade-out animation before removing from state
+    const cardEl = document.querySelector(`[data-property-id="${prop.id}"]`);
+    if (cardEl) {
+      cardEl.style.transition = 'opacity 0.4s ease-out, transform 0.4s ease-out, max-height 0.5s ease-out 0.2s';
+      cardEl.style.opacity = '0';
+      cardEl.style.transform = 'scale(0.95) translateY(-10px)';
+      cardEl.style.overflow = 'hidden';
+      setTimeout(() => {
+        cardEl.style.maxHeight = '0';
+        cardEl.style.padding = '0';
+        cardEl.style.margin = '0';
+      }, 300);
+    }
+
+    // Remove from state after animation finishes
+    setTimeout(() => {
+      setProperties((prev) => prev.filter((p) => p.id !== prop.id));
+    }, cardEl ? 600 : 0);
 
     // Schedule the real API call
     const tid = setTimeout(async () => {
@@ -4545,7 +4561,7 @@ const HostDashboard = () => {
                     .slice(0, 2)
                     .toUpperCase();
                   return (
-                  <div key={prop.id} className="bg-white rounded-[1.5rem] md:rounded-[2rem] p-3 shadow-[0_4px_15px_rgba(0,0,0,0.02)] hover:shadow-[0_15px_35px_rgba(0,0,0,0.06)] transition-all duration-500 group flex flex-col cursor-default">
+                  <div key={prop.id} data-property-id={prop.id} className="bg-white rounded-[1.5rem] md:rounded-[2rem] p-3 shadow-[0_4px_15px_rgba(0,0,0,0.02)] hover:shadow-[0_15px_35px_rgba(0,0,0,0.06)] transition-all duration-500 group flex flex-col cursor-default" style={{ animation: 'fadeSlideIn 0.4s ease-out' }}>
                     {/* Cover + side-thumbnail strip (listing-card style) */}
                     <div className="relative h-52 sm:h-56 lg:h-64 overflow-hidden bg-gray-100 rounded-[1.2rem] md:rounded-[1.5rem]">
                       {thumbs.length > 0 ? (
@@ -4595,6 +4611,18 @@ const HostDashboard = () => {
                           </div>
                         )}
                       </div>
+                      {/* ── Intent badge (ভাড়া / বিক্রি / কমার্শিয়াল) ── */}
+                      {prop.intent && (
+                        <div className={`absolute top-3 right-3 z-10 backdrop-blur-md px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-sm ${
+                          prop.intent === 'sale' ? 'bg-blue-600 text-white' :
+                          prop.intent === 'commercial' ? 'bg-purple-600 text-white' :
+                          'bg-green-600 text-white'
+                        }`}>
+                          {prop.intent === 'sale' ? (language === 'বাংলা' ? 'বিক্রির জন্য' : 'For Sale') :
+                           prop.intent === 'commercial' ? (language === 'বাংলা' ? 'কমার্শিয়াল' : 'Commercial') :
+                           (language === 'বাংলা' ? 'ভাড়ার জন্য' : 'For Rent')}
+                        </div>
+                      )}
                       <div className="absolute bottom-3 right-3 bg-gray-900/90 backdrop-blur-xl px-4 py-2 md:px-5 md:py-2.5 rounded-[1rem] md:rounded-[1.2rem] font-black text-white shadow-lg text-sm md:text-[15px] z-10">
                         ৳ {prop.price}
                       </div>

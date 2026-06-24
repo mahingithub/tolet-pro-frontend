@@ -77,7 +77,12 @@ function probeFetch(key, url, init = {}) {
   const p = (async () => {
     try {
       const res = await fetch(url, init);
-      if (res.status === 404) {
+      // Only treat 404 as "route truly missing" for GET requests.
+      // For DELETE / POST / PATCH a 404 means the *resource* wasn't found
+      // (e.g. property already deleted) — that's a valid response, not a
+      // signal that the route itself is absent.
+      const method = (init.method || 'GET').toUpperCase();
+      if (res.status === 404 && method === 'GET') {
         apiAvailability[key] = false;
         return null;
       }

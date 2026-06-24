@@ -194,6 +194,17 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 								</div>
 							)}
 							<span className="bg-brandRed/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm">{catLabel}</span>
+							{property.intent && (
+								<span className={`backdrop-blur-md text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm ${
+									property.intent === 'sale' ? 'bg-blue-600/90 text-white' :
+									property.intent === 'commercial' ? 'bg-purple-600/90 text-white' :
+									'bg-green-600/90 text-white'
+								}`}>
+									{property.intent === 'sale' ? (t.forSale || 'বিক্রির জন্য') :
+									 property.intent === 'commercial' ? (t.commercial || 'কমার্শিয়াল') :
+									 (t.forRent || 'ভাড়ার জন্য')}
+								</span>
+							)}
 						</div>
 						<button onClick={handleSave} className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur-md rounded-full hover:bg-white hover:scale-110 active:scale-95 transition-all z-20 shadow-sm">
 							<Heart size={16} className={isSaved ? "fill-brandRed text-brandRed" : "text-gray-700"} />
@@ -278,7 +289,11 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 								</div>
 							)}
 						</div>
-						<p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">{t.perMonth || "Per Month"}</p>
+						<p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
+							{property.intent === 'sale' ? (t.totalPrice || 'মোট মূল্য') :
+							 property.intent === 'commercial' ? (t.perMonth || 'প্রতি মাসে') :
+							 (t.perMonth || 'প্রতি মাসে')}
+						</p>
 					</div>
 					<div className="flex items-center gap-3 w-full sm:w-auto">
 						<button onClick={() => navigate(`/property/${property.id}`)} className="flex-1 sm:flex-none px-4 py-2 rounded-lg text-[11px] font-black text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all">
