@@ -1359,6 +1359,9 @@ const PropertyDetails = () => {
   // Both come from propertyService (backend → localStorage fallback). While the
   // fetch is in flight we render an empty stub so hooks below don't blow up.
   const [property, setProperty] = useState(null);
+  if (property && property.specificDetails) {
+    Object.assign(property, property.specificDetails);
+  }
   const [landlord, setLandlord] = useState(null);
   const [loadingProperty, setLoadingProperty] = useState(true);
   const [loadingLandlord, setLoadingLandlord] = useState(true);
@@ -1411,6 +1414,39 @@ const PropertyDetails = () => {
   const isUnavailable = property?.status === 'rented' || property?.status === 'sold';
   const isOwnProperty = auth?.user && (String(auth.user.id || auth.user._id) === String(landlord?.id || property?.landlordId || property?.ownerUserId));
   const priceLabel = INTENT_CONFIG[property?.intent]?.priceLabel || '/mo';
+  const group = property ? (TYPE_GROUP_MAP[property.rentalCategory || property.type] || 'residential') : 'residential';
+  
+  const getPremiumStats = () => {
+    const stats = [];
+    if (group === 'residential') {
+      stats.push({ icon: Bed,       label: lt('bedrooms'),  value: `${property.beds}`,  unit: 'Beds' });
+      stats.push({ icon: Bath,      label: lt('bathrooms'), value: `${property.baths}`, unit: 'Baths' });
+      stats.push({ icon: Maximize2, label: lt('area'),      value: Number(property.sqft).toLocaleString(), unit: 'sqft' });
+      stats.push({ icon: Building2, label: lt('floor'),     value: `${property.floor ?? '—'}`, unit: lt('floorUnit') || 'Fl' });
+    } else if (group === 'land') {
+      stats.push({ icon: Maximize2, label: 'জমির পরিমাণ', value: property.landAmount || '—', unit: property.landUnit || 'Katha' });
+      stats.push({ icon: MapPin, label: 'রাস্তার প্রশস্ততা', value: property.roadWidth || '—', unit: 'ft' });
+      stats.push({ icon: ShieldCheck, label: 'খতিয়ান নং', value: property.khatianNo || '—', unit: '' });
+      stats.push({ icon: Layers, label: 'দাগ নং', value: property.dagNo || '—', unit: '' });
+    } else if (group === 'commercial_shop' || group === 'restaurant') {
+      stats.push({ icon: Maximize2, label: 'মোট আয়তন', value: Number(property.sqft).toLocaleString(), unit: 'sqft' });
+      stats.push({ icon: Building2, label: 'ফ্লোর লেভেল', value: `${property.floor ?? '—'}`, unit: 'Fl' });
+      stats.push({ icon: Store, label: 'শাটার/গেট', value: property.shutters || '—', unit: 'টি' });
+      stats.push({ icon: Zap, label: 'বিদ্যুৎ সংযোগ', value: property.electricityLoad || '—', unit: 'KW' });
+    } else if (group === 'office') {
+      stats.push({ icon: Maximize2, label: 'মোট আয়তন', value: Number(property.sqft).toLocaleString(), unit: 'sqft' });
+      stats.push({ icon: Building2, label: 'ফ্লোর লেভেল', value: `${property.floor ?? '—'}`, unit: 'Fl' });
+      stats.push({ icon: Briefcase, label: 'কেবিন', value: property.cabins || '—', unit: 'টি' });
+      stats.push({ icon: Users, label: 'মিটিং রুম', value: property.conferenceRoom || '—', unit: 'টি' });
+    } else if (group === 'warehouse') {
+      stats.push({ icon: Maximize2, label: 'মোট আয়তন', value: Number(property.sqft).toLocaleString(), unit: 'sqft' });
+      stats.push({ icon: Building, label: 'ভিতরের উচ্চতা', value: property.height || '—', unit: 'ft' });
+      stats.push({ icon: Car, label: 'ট্রাক এন্ট্রি', value: property.truckAccess === 'Yes' ? 'হ্যাঁ' : 'না', unit: '' });
+      stats.push({ icon: Store, label: 'লোডিং বে', value: property.loadingBay || '—', unit: 'টি' });
+    }
+    return stats;
+  };
+
   const galleryImages = useMemo(() => buildGallery(property), [property]);
 
   const [isSaved, setIsSaved] = useState(false);
@@ -1763,12 +1799,7 @@ const PropertyDetails = () => {
                 whole tile and amplifies the glow. */}
             <GlassCard className="p-4 md:p-7">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
-                {[
-                  { icon: Bed,       label: lt('bedrooms'),  value: `${property.beds}`,  unit: 'Beds' },
-                  { icon: Bath,      label: lt('bathrooms'), value: `${property.baths}`, unit: 'Baths' },
-                  { icon: Maximize2, label: lt('area'),      value: Number(property.sqft).toLocaleString(), unit: 'sqft' },
-                  { icon: Building2, label: lt('floor'),     value: `${property.floor ?? '—'}`, unit: lt('floorUnit') || 'Fl' },
-                ].map((stat, i) => (
+                {getPremiumStats().map((stat, i) => (
                   <motion.div key={i}
                     initial={{ opacity: 0, y: 14, scale: 0.94 }}
                     whileInView={{ opacity: 1, y: 0, scale: 1 }}
