@@ -384,6 +384,16 @@ const ROOM_TYPES = [
 ];
 
 // ─── INTENT CONFIG ────────────────────────────────────────────────────────────
+
+const TYPE_GROUP_MAP = {
+  flat: 'residential', apartment: 'residential', house: 'residential', mess: 'residential', villa: 'residential', other_buy: 'residential', sublet: 'residential', hostel: 'residential', single_room: 'residential', building: 'residential',
+  office: 'office', office_room: 'office', office_space: 'office',
+  land: 'land', plot: 'land',
+  shop: 'commercial_shop', mall_shop: 'commercial_shop', showroom: 'commercial_shop', other_commercial: 'commercial_shop',
+  restaurant: 'restaurant', restaurant_space: 'restaurant',
+  warehouse: 'warehouse', shed: 'warehouse'
+};
+
 const INTENT_CONFIG = {
   rent:       { label: 'For Rent',   icon: Home,        bg: 'bg-blue-50',    text: 'text-blue-700',    accent: '#2563eb', priceLabel: '/mo' },
   purchase:   { label: 'For Sale',   icon: ShoppingBag, bg: 'bg-emerald-50', text: 'text-emerald-700', accent: '#059669', priceLabel: ''    },
