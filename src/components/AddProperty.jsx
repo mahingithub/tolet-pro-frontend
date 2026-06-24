@@ -1361,6 +1361,7 @@ const AddProperty = () => {
   // Step-2 dynamic fields = intent-common base + the selected type's extras
   // (shared config — see src/constants/propertyFields.js).
   const dynamicFields = getDynamicFields(form.intent, form.type);
+  const group = TYPE_GROUP_MAP[form.type];
 
   // Beds / baths only make sense for somewhere people live: all rentals, plus
   // flats & houses for sale. Land, buildings, and every commercial type
