@@ -102,7 +102,7 @@ export const POPULAR_AREAS = [
 ];
 
 export const POPULAR_AREA_IMAGES = {
-  Dhanmondi: 'https://greatruns.com/wp-content/uploads/2020/12/Dhanmondi_Lake_Dhaka_BD.jpg',
+  Dhanmondi: '/image/dhanmondi.png',
   Gulshan: 'https://thumbs.dreamstime.com/b/gulshan-dhaka-bangladesh-traffics-crossing-signal-busy-circle-evening-high-buildings-background-280740296.jpg',
   Banani: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRrmLre9dcvRHKLjGX3e5NLY27tjItA8HsZ4g&s',
   Uttara: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/RAJUK_Uttara_Apartment_Project_%28cropped%29.jpg/330px-RAJUK_Uttara_Apartment_Project_%28cropped%29.jpg',
