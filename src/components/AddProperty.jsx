@@ -2131,7 +2131,7 @@ const AddProperty = () => {
                     </p>
                   </Field>
 
-                  {form.type !== 'land' && (
+                  {!['land', 'house', 'building'].includes(form.type) && (
                     <Field label={isBn ? 'কত তলায় — ঐচ্ছিক' : 'Floor Number — Optional'}
                       hint={isBn
                         ? '০ = নিচতলা, ১ = প্রথম তলা, ইত্যাদি'
@@ -2170,79 +2170,10 @@ const AddProperty = () => {
                           </select>
                         </div>
                       </Field>
-                      <Field label={isBn ? 'ফেসিং দিক' : 'Facing'}>
-                        <div className="relative">
-                          <select className={inputCls} value={form.facing || ''} onChange={e => set('facing', e.target.value)}>
-                            <option value="">{isBn ? 'নির্বাচন করুন' : 'Select'}</option>
-                            <option value="উত্তর">{isBn ? 'উত্তর' : 'North'}</option>
-                            <option value="দক্ষিণ">{isBn ? 'দক্ষিণ' : 'South'}</option>
-                            <option value="পূর্ব">{isBn ? 'পূর্ব' : 'East'}</option>
-                            <option value="পশ্চিম">{isBn ? 'পশ্চিম' : 'West'}</option>
-                          </select>
-                        </div>
-                      </Field>
                     </>
                   )}
 
-                  {group === 'land' && (
-                    <>
-                      <Field label={isBn ? 'জমির পরিমাণ' : 'Land Amount'}>
-                        <div className="flex gap-2">
-                          <input type="number" className={inputCls} value={form.landAmount || ''} onChange={e => set('landAmount', e.target.value)} placeholder="0" />
-                          <select className={inputCls} style={{width: '120px'}} value={form.landUnit || 'শতক'} onChange={e => set('landUnit', e.target.value)}>
-                            <option value="শতক">শতক</option>
-                            <option value="কাঠা">কাঠা</option>
-                            <option value="বিঘা">বিঘা</option>
-                          </select>
-                        </div>
-                      </Field>
-                      <Field label={isBn ? 'রাস্তার প্রশস্ততা (ফুট)' : 'Road Width (ft)'}>
-                        <input type="number" className={inputCls} value={form.roadWidth || ''} onChange={e => set('roadWidth', e.target.value)} placeholder="e.g. 20" />
-                      </Field>
-                      <Field label={isBn ? 'খতিয়ান নম্বর (ঐচ্ছিক)' : 'Khatian No (Optional)'}>
-                        <input type="text" className={inputCls} value={form.khatianNo || ''} onChange={e => set('khatianNo', e.target.value)} />
-                      </Field>
-                      <Field label={isBn ? 'দাগ নম্বর (ঐচ্ছিক)' : 'Dag No (Optional)'}>
-                        <input type="text" className={inputCls} value={form.dagNo || ''} onChange={e => set('dagNo', e.target.value)} />
-                      </Field>
-                    </>
-                  )}
 
-                  {(group === 'commercial_shop' || group === 'restaurant') && (
-                    <>
-                      <Field label={isBn ? 'শাটার/গেট সংখ্যা' : 'Number of Shutters'}>
-                        <input type="number" className={inputCls} value={form.shutters || ''} onChange={e => set('shutters', e.target.value)} placeholder="e.g. 2" />
-                      </Field>
-                      <Field label={isBn ? 'বিদ্যুৎ সংযোগ (KW)' : 'Electricity Load (KW)'}>
-                        <input type="number" className={inputCls} value={form.electricityLoad || ''} onChange={e => set('electricityLoad', e.target.value)} placeholder="e.g. 5" />
-                      </Field>
-                    </>
-                  )}
-
-                  {group === 'office' && (
-                    <>
-                      <Field label={isBn ? 'কেবিন সংখ্যা' : 'Number of Cabins'}>
-                        <input type="number" className={inputCls} value={form.cabins || ''} onChange={e => set('cabins', e.target.value)} placeholder="e.g. 3" />
-                      </Field>
-                      <Field label={isBn ? 'মিটিং রুম' : 'Conference Rooms'}>
-                        <input type="number" className={inputCls} value={form.conferenceRoom || ''} onChange={e => set('conferenceRoom', e.target.value)} placeholder="e.g. 1" />
-                      </Field>
-                    </>
-                  )}
-
-                  {group === 'warehouse' && (
-                    <>
-                      <Field label={isBn ? 'ভিতরের উচ্চতা (ফুট)' : 'Internal Height (ft)'}>
-                        <input type="number" className={inputCls} value={form.height || ''} onChange={e => set('height', e.target.value)} placeholder="e.g. 15" />
-                      </Field>
-                      <Field label={isBn ? 'ট্রাক এন্ট্রি' : 'Truck Access'}>
-                        <select className={inputCls} value={form.truckAccess || 'Yes'} onChange={e => set('truckAccess', e.target.value)}>
-                          <option value="Yes">{isBn ? 'হ্যাঁ' : 'Yes'}</option>
-                          <option value="No">{isBn ? 'না' : 'No'}</option>
-                        </select>
-                      </Field>
-                    </>
-                  )}
                 </div>
 
                 {/* Furnishing */}
