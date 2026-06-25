@@ -61,6 +61,8 @@ const SPECIFIC_FIELDS_BY_TYPE = {
       { key: 'kitchenArea', kind: 'text', label: 'Kitchen Area', labelBn: 'রান্নাঘরের আয়তন',
         placeholder: 'e.g. 200 sqft', placeholderBn: 'যেমন ২০০ বর্গফুট' },
       { key: 'seatingCapacity', kind: 'number', label: 'Seating Capacity', labelBn: 'আসন সংখ্যা' },
+      { key: 'shutters', kind: 'number', label: 'Number of Shutters', labelBn: 'শাটার/গেট সংখ্যা', placeholder: 'e.g. 2', placeholderBn: 'যেমন ২' },
+      { key: 'electricityLoad', kind: 'number', label: 'Electricity Load (KW)', labelBn: 'বিদ্যুৎ সংযোগ (KW)' },
     ],
     office: [
       { key: 'floorPlan', kind: 'select', label: 'Floor Plan', labelBn: 'ফ্লোর প্ল্যান',
@@ -69,6 +71,7 @@ const SPECIFIC_FIELDS_BY_TYPE = {
           { id: 'cabin', label: 'Cabin', labelBn: 'কেবিন' },
           { id: 'mixed', label: 'Mixed', labelBn: 'মিশ্র' },
         ] },
+      { key: 'cabins', kind: 'number', label: 'Number of Cabins', labelBn: 'কেবিন সংখ্যা' },
       { key: 'meetingRooms', kind: 'number', label: 'Meeting Rooms', labelBn: 'মিটিং রুম' },
       { key: 'washrooms',    kind: 'number', label: 'Washrooms',     labelBn: 'ওয়াশরুম' },
       { key: 'backupPower',  kind: 'toggle', label: 'Generator / IPS', labelBn: 'জেনারেটর / IPS' },
@@ -77,11 +80,17 @@ const SPECIFIC_FIELDS_BY_TYPE = {
       { key: 'frontageWidth', kind: 'text', label: 'Shutter width (ft)', labelBn: 'শাটার প্রস্থ (ফুট)' },
       F_MAIN_ROAD,
       { key: 'mezzanine', kind: 'toggle', label: 'Mezzanine', labelBn: 'মেজানিন' },
+      { key: 'shutters', kind: 'number', label: 'Number of Shutters', labelBn: 'শাটার/গেট সংখ্যা', placeholder: 'e.g. 2', placeholderBn: 'যেমন ২' },
+      { key: 'electricityLoad', kind: 'number', label: 'Electricity Load (KW)', labelBn: 'বিদ্যুৎ সংযোগ (KW)' },
     ],
     showroom: [
       { key: 'frontageWidth', kind: 'text', label: 'Frontage Width', labelBn: 'সামনের প্রস্থ' },
       F_MAIN_ROAD,
       { key: 'glassFront', kind: 'toggle', label: 'Glass Front', labelBn: 'গ্লাস ফ্রন্ট' },
+    ],
+    warehouse: [
+      { key: 'height', kind: 'number', label: 'Internal Height (ft)', labelBn: 'ভিতরের উচ্চতা (ফুট)', placeholder: 'e.g. 15', placeholderBn: 'যেমন ১৫' },
+      { key: 'truckAccess', kind: 'select', label: 'Truck Access', labelBn: 'ট্রাক এন্ট্রি', options: [{id: 'Yes', label: 'Yes', labelBn: 'হ্যাঁ'}, {id: 'No', label: 'No', labelBn: 'না'}] },
     ],
   },
   purchase: {

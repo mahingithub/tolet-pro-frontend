@@ -694,26 +694,26 @@ const INITIAL_FORM = {
 
 // Room photo categories
 const ROOM_TYPES_RESIDENTIAL = [
-  { id: 'bedroom',    label: 'Bedroom',     labelBn: 'শোবার ঘর',  emoji: '🛏️' },
-  { id: 'bathroom',   label: 'Bathroom',    labelBn: 'বাথরুম',    emoji: '🚿' },
-  { id: 'living',     label: 'Living Room', labelBn: 'বসার ঘর',   emoji: '🛋️' },
-  { id: 'kitchen',    label: 'Kitchen',     labelBn: 'রান্নাঘর',  emoji: '🍳' },
-  { id: 'other',      label: 'Other',       labelBn: 'অন্যান্য',  emoji: '📷' },
+  { id: 'bedroom',    label: 'Bedroom',     labelBn: 'শোবার ঘর',  icon: BedDouble },
+  { id: 'bathroom',   label: 'Bathroom',    labelBn: 'বাথরুম',    icon: Bath },
+  { id: 'living',     label: 'Living Room', labelBn: 'বসার ঘর',   icon: Home },
+  { id: 'kitchen',    label: 'Kitchen',     labelBn: 'রান্নাঘর',  icon: Utensils },
+  { id: 'other',      label: 'Other',       labelBn: 'অন্যান্য',  icon: Camera },
 ];
 
 const ROOM_TYPES_COMMERCIAL = [
-  { id: 'workspace',  label: 'Workspace / Floor', labelBn: 'ওয়ার্কস্পেস / ফ্লোর',  emoji: '🏢' },
-  { id: 'reception',  label: 'Reception / Front', labelBn: 'রিসেপশন / সামনের অংশ',emoji: '🚪' },
-  { id: 'meeting',    label: 'Meeting Room',      labelBn: 'মিটিং রুম',         emoji: '🤝' },
-  { id: 'washroom',   label: 'Washroom',          labelBn: 'ওয়াশরুম',          emoji: '🚿' },
-  { id: 'other',      label: 'Other',             labelBn: 'অন্যান্য',          emoji: '📷' },
+  { id: 'workspace',  label: 'Workspace / Floor', labelBn: 'ওয়ার্কস্পেস / ফ্লোর',  icon: Building },
+  { id: 'reception',  label: 'Reception / Front', labelBn: 'রিসেপশন / সামনের অংশ',icon: Users },
+  { id: 'meeting',    label: 'Meeting Room',      labelBn: 'মিটিং রুম',         icon: Coffee },
+  { id: 'washroom',   label: 'Washroom',          labelBn: 'ওয়াশরুম',          icon: Bath },
+  { id: 'other',      label: 'Other',             labelBn: 'অন্যান্য',          icon: Camera },
 ];
 
 const ROOM_TYPES_LAND = [
-  { id: 'plot_area',  label: 'Plot Area',         labelBn: 'প্লটের এরিয়া',      emoji: '🗺️' },
-  { id: 'road_view',  label: 'Road View',         labelBn: 'রাস্তার ছবি',         emoji: '🛣️' },
-  { id: 'surrounding',label: 'Surroundings',      labelBn: 'আশপাশের এলাকা',     emoji: '🌳' },
-  { id: 'other',      label: 'Other',             labelBn: 'অন্যান্য',          emoji: '📷' },
+  { id: 'plot_area',  label: 'Plot Area',         labelBn: 'প্লটের এরিয়া',      icon: Map },
+  { id: 'road_view',  label: 'Road View',         labelBn: 'রাস্তার ছবি',         icon: MapPin },
+  { id: 'surrounding',label: 'Surroundings',      labelBn: 'আশপাশের এলাকা',     icon: Leaf },
+  { id: 'other',      label: 'Other',             labelBn: 'অন্যান্য',          icon: Camera },
 ];
 
 const getRoomTypes = (intent, type) => {
@@ -2460,7 +2460,7 @@ const AddProperty = () => {
                           ${selectedRoomType === rt.id
                             ? 'bg-gray-900 text-white shadow-sm'
                             : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
-                        <span>{rt.emoji}</span>
+                        {rt.icon && <rt.icon size={15} />}
                         {isBn ? rt.labelBn : rt.label}
                         <span className="text-[9px] font-black opacity-60">
                           ({form.roomPhotos.filter(p => p.room === rt.id).length})
