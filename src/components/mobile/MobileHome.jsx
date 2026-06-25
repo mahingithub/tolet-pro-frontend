@@ -419,11 +419,6 @@ const PopularAreasBento = ({ t, onPickArea, properties = [] }) => {
               />
               <div className="absolute inset-0 rounded-[28px] ring-1 ring-inset ring-white/25 pointer-events-none" />
 
-              {/* TOP-LEFT: rank chip with the area's number */}
-              <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/40 text-white text-[9.5px] font-black uppercase tracking-[0.18em]">
-                <Sparkles size={10} /> #{String(idx + 1).padStart(2, '0')}
-              </div>
-
               {/* TOP-CENTER: Logo (100% Match) */}
               <div className="absolute top-3 inset-x-0 flex justify-center pointer-events-none">
                 <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/40 backdrop-blur-md border border-white/50 shadow-sm">
@@ -435,13 +430,6 @@ const PopularAreasBento = ({ t, onPickArea, properties = [] }) => {
                   </span>
                 </div>
               </div>
-
-              {/* TOP-RIGHT: sub-zone count chip */}
-              {subzoneCount > 0 && (
-                <div className="absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-[9.5px] font-black uppercase tracking-[0.16em]">
-                  {subzoneCount} {t.mobZones || 'zones'}
-                </div>
-              )}
 
               {/* BOTTOM LEFT: Area Name & Tagline */}
               <div className="absolute bottom-3 left-3 flex flex-col items-start text-left">

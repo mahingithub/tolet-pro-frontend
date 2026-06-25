@@ -998,29 +998,17 @@ const HeroSection = () => {
                 />
                 <div className="absolute inset-0 rounded-[2rem] ring-1 ring-inset ring-white/25 pointer-events-none" />
 
-                {/* TOP-LEFT: rank chip */}
-                <div className="absolute top-4 left-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/40 text-white text-[10px] font-black uppercase tracking-[0.18em]">
-                  <Sparkles size={12} /> #{String(idx + 1).padStart(2, '0')}
-                </div>
-
                 {/* TOP-CENTER: Logo (100% Match) */}
                 <div className="absolute top-4 inset-x-0 flex justify-center pointer-events-none">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/40 backdrop-blur-md border border-white/50 shadow-sm">
-                    <div className="bg-crimson-600 rounded-[6px] flex items-center justify-center w-[24px] h-[24px]">
-                      <Building size={14} className="text-white" />
+                  <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/40 backdrop-blur-md border border-white/50 shadow-sm">
+                    <div className="bg-[#e11d48] rounded-[6px] flex items-center justify-center w-[20px] h-[20px]">
+                      <Building size={12} className="text-white" />
                     </div>
-                    <span className="text-[11px] font-black text-slate-900 mr-1 tracking-wide">
-                      TO-LET <span className="text-crimson-600">PRO</span>
+                    <span className="text-[10px] font-black text-slate-900 mr-1 tracking-wide">
+                      TO-LET <span className="text-[#e11d48]">PRO</span>
                     </span>
                   </div>
                 </div>
-
-                {/* TOP-RIGHT: sub-zone count chip */}
-                {POPULAR_AREA_SUBZONES[area]?.length > 0 && (
-                  <div className="absolute top-4 right-4 inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-[10px] font-black uppercase tracking-[0.16em]">
-                    {POPULAR_AREA_SUBZONES[area].length} {t?.mobZones || 'zones'}
-                  </div>
-                )}
 
                 {/* BOTTOM LEFT: Area Name & Tagline */}
                 <div className="absolute bottom-5 left-5 flex flex-col items-start text-left">
