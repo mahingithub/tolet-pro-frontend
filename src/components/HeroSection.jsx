@@ -147,23 +147,23 @@ const ACCORD_CSS = `
 .tlp-overlay {
   position:absolute; inset:0;
   background:linear-gradient(to top,
-    rgba(6,10,22,.93) 0%, rgba(6,10,22,.42) 52%, rgba(6,10,22,.16) 100%);
+    rgba(6,10,22,.85) 0%, rgba(6,10,22,.2) 40%, transparent 100%);
 }
 .tlp-card:hover .tlp-overlay,
 .tlp-card.tlp-active .tlp-overlay {
   background:linear-gradient(to top,
-    rgba(6,10,22,.97) 0%, rgba(6,10,22,.58) 55%, rgba(6,10,22,.24) 100%);
+    rgba(6,10,22,.9) 0%, rgba(6,10,22,.3) 45%, rgba(6,10,22,.05) 100%);
 }
 .tlp-shimmer {
   position:absolute; inset:0; mix-blend-mode:overlay;
-  opacity:.32; pointer-events:none;
+  opacity:.15; pointer-events:none;
   background:conic-gradient(from 200deg at 70% 20%,
     rgba(186,0,54,.55),rgba(168,85,247,.45),
     rgba(34,211,238,.45),rgba(186,0,54,.55));
   transition:opacity .4s ease;
 }
 .tlp-card:hover .tlp-shimmer,
-.tlp-card.tlp-active .tlp-shimmer { opacity:.58; }
+.tlp-card.tlp-active .tlp-shimmer { opacity:.25; }
 
 .tlp-scan {
   position:absolute; left:0; right:0; height:2px;
