@@ -122,24 +122,30 @@ const ACCORD_CSS = `
   50%      { opacity:.35; transform:scale(.72); }
 }
 .tlp-wrap {
-  display:flex; gap:6px; width:100%; overflow:hidden;
+  display:flex; align-items:stretch; gap:6px; width:100%; overflow:hidden;
 }
 .tlp-card {
   position:relative; flex:1; min-width:50px;
+  height:100%;
   border-radius:20px; overflow:hidden; cursor:pointer;
   border:1px solid rgba(255,255,255,.07);
   transition: flex .55s cubic-bezier(.4,0,.2,1),
               border-color .3s ease;
   -webkit-tap-highlight-color:transparent;
   outline:none;
+  isolation:isolate;
 }
 .tlp-card:hover, .tlp-card:focus-visible, .tlp-card.tlp-active {
   flex:5.2; border-color:rgba(255,255,255,.18);
 }
 .tlp-bg {
-  position:absolute; inset:0; width:100%; height:100%;
-  object-fit:cover;
+  position:absolute; inset:0;
+  width:100%; height:100%;
+  background-size:cover;
+  background-position:center center;
+  background-repeat:no-repeat;
   transition:transform .55s cubic-bezier(.4,0,.2,1);
+  will-change:transform;
 }
 .tlp-card:hover .tlp-bg,
 .tlp-card.tlp-active .tlp-bg { transform:scale(1.05); }
@@ -147,23 +153,23 @@ const ACCORD_CSS = `
 .tlp-overlay {
   position:absolute; inset:0;
   background:linear-gradient(to top,
-    rgba(6,10,22,.85) 0%, rgba(6,10,22,.2) 40%, transparent 100%);
+    rgba(6,10,22,.93) 0%, rgba(6,10,22,.42) 52%, rgba(6,10,22,.16) 100%);
 }
 .tlp-card:hover .tlp-overlay,
 .tlp-card.tlp-active .tlp-overlay {
   background:linear-gradient(to top,
-    rgba(6,10,22,.9) 0%, rgba(6,10,22,.3) 45%, rgba(6,10,22,.05) 100%);
+    rgba(6,10,22,.97) 0%, rgba(6,10,22,.58) 55%, rgba(6,10,22,.24) 100%);
 }
 .tlp-shimmer {
   position:absolute; inset:0; mix-blend-mode:overlay;
-  opacity:.15; pointer-events:none;
+  opacity:.32; pointer-events:none;
   background:conic-gradient(from 200deg at 70% 20%,
     rgba(186,0,54,.55),rgba(168,85,247,.45),
     rgba(34,211,238,.45),rgba(186,0,54,.55));
   transition:opacity .4s ease;
 }
 .tlp-card:hover .tlp-shimmer,
-.tlp-card.tlp-active .tlp-shimmer { opacity:.25; }
+.tlp-card.tlp-active .tlp-shimmer { opacity:.58; }
 
 .tlp-scan {
   position:absolute; left:0; right:0; height:2px;
@@ -244,13 +250,14 @@ const ACCORD_CSS = `
 
 /* ── Mobile: vertical stack ── */
 @media (max-width:767px) {
-  .tlp-wrap { flex-direction:column; gap:8px; height:auto !important; }
-  .tlp-card { flex:none !important; min-width:unset; height:88px; border-radius:16px;
+  .tlp-wrap { flex-direction:column; gap:8px; height:auto !important; align-items:stretch; }
+  .tlp-card { flex:none !important; min-width:unset; width:100%; height:90px; border-radius:16px;
     transition:height .48s cubic-bezier(.4,0,.2,1); }
-  .tlp-card.tlp-active { height:260px; }
+  .tlp-card.tlp-active { height:270px; }
+  .tlp-bg { height:100% !important; }
   .tlp-vlabel {
-    transform:translate(-50%,-50%); top:50%; bottom:unset; rotate:none;
-    font-size:11px;
+    transform:translateX(-50%) translateY(-50%); top:50%; bottom:unset;
+    font-size:11px; rotate:unset;
   }
 }
 `;
@@ -294,9 +301,9 @@ const PopularAreasAccordion = ({
         </button>
       </div>
 
-      {/* accordion strip (desktop) */}
+      {/* accordion strip */}
       <div
-        className="tlp-wrap hidden md:flex"
+        className="tlp-wrap"
         style={{ height: 440 }}
         onMouseLeave={() => setActiveIdx(null)}
       >
@@ -321,14 +328,16 @@ const PopularAreasAccordion = ({
               }}
             >
               {/* bg */}
-              {images[area] ? (
-                <img src={images[area]} alt={area} className="tlp-bg" />
-              ) : (
-                <div
-                  className="tlp-bg"
-                  style={{ background: 'linear-gradient(135deg,#1f2937 0%,#4c1d95 45%,#831843 100%)' }}
-                />
-              )}
+              <div
+                className="tlp-bg"
+                style={images[area]
+                  ? { backgroundImage: `url(${images[area]})` }
+                  : {
+                      backgroundImage: 'linear-gradient(135deg,#1f2937 0%,#4c1d95 45%,#831843 100%)',
+                      backgroundSize: '100% 100%',
+                    }
+                }
+              />
               {/* overlays */}
               <div className="tlp-overlay" />
               <div className="tlp-shimmer" />
@@ -361,54 +370,6 @@ const PopularAreasAccordion = ({
                 </button>
               </div>
             </div>
-          );
-        })}
-      </div>
-
-      {/* mobile horizontal strip */}
-      <div className="flex md:hidden overflow-x-auto gap-4 pb-4 snap-x snap-mandatory scroll-px-4 custom-scrollbar">
-        {areas.map((area) => {
-          const tagline = taglines[area] || 'residential area';
-          return (
-            <button
-              key={area}
-              onClick={() => handleClick(area)}
-              className="snap-start shrink-0 relative w-[240px] h-[300px] rounded-[2rem] overflow-hidden active:scale-[0.98] transition-transform shadow-lg border border-slate-100"
-            >
-              {images[area] ? (
-                <img src={images[area]} alt={area} className="absolute inset-0 w-full h-full object-cover" />
-              ) : (
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-rose-900" />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-              
-              {/* Logo */}
-              <div className="absolute top-4 inset-x-0 flex justify-center pointer-events-none">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-[16px] bg-[#f8fafc]/95 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.1)] border border-white/40">
-                  <div className="bg-[#e11d48] rounded-[6px] flex items-center justify-center w-[22px] h-[22px]">
-                    <Building size={12} className="text-white" />
-                  </div>
-                  <span className="text-[11px] font-black text-[#0f172a] mr-1 tracking-wide">
-                    TO-LET <span className="text-[#e11d48]">PRO</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* Bottom Text */}
-              <div className="absolute bottom-4 left-4 right-4 text-left pr-10">
-                <span className="text-white/90 text-[10px] tracking-wide mb-0.5 font-medium lowercase line-clamp-1 drop-shadow-sm">
-                  {tagline}
-                </span>
-                <h4 className="text-white text-[22px] leading-tight font-black tracking-tight drop-shadow-md break-words line-clamp-2">
-                  {area}
-                </h4>
-              </div>
-              
-              {/* Arrow */}
-              <div className="absolute bottom-4 right-4 w-9 h-9 rounded-full bg-white text-crimson-600 flex items-center justify-center shadow-lg">
-                <ArrowRight size={14} strokeWidth={2.5} />
-              </div>
-            </button>
           );
         })}
       </div>
