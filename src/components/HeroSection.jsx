@@ -198,11 +198,12 @@ const ACCORD_CSS = `
   animation:tlp-pulse-dot 2s ease-in-out infinite;
 }
 .tlp-vlabel {
-  position:absolute; bottom:26px; left:50%;
+  position:absolute; bottom:60px; left:50%;
   transform:translateX(-50%) rotate(-90deg);
-  white-space:nowrap; font-size:10px; font-weight:600;
-  letter-spacing:.13em; text-transform:uppercase;
-  color:rgba(255,255,255,.58); pointer-events:none;
+  white-space:nowrap; font-size:11px; font-weight:800;
+  letter-spacing:.15em; text-transform:uppercase;
+  color:rgba(255,255,255,.95); pointer-events:none;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.6);
   transition:opacity .2s ease; transform-origin:center center;
 }
 .tlp-card:hover .tlp-vlabel,
