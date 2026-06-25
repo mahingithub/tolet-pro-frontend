@@ -35,9 +35,6 @@ const SPECIFIC_FIELDS = {
         { id: 'bachelor', label: 'Bachelor', labelBn: 'ব্যাচেলর' },
         { id: 'any',      label: 'Any',      labelBn: 'যেকোনো' },
       ] },
-    { key: 'floorLevel', kind: 'text',
-      label: 'Floor Level', labelBn: 'কোন তলা',
-      placeholder: 'e.g. 3rd of 6', placeholderBn: 'যেমন: ৬ তলার ৩য়' },
     { key: 'utilities', kind: 'text',
       label: 'Utilities Included', labelBn: 'অন্তর্ভুক্ত ইউটিলিটি',
       placeholder: 'Gas, water, service charge…', placeholderBn: 'গ্যাস, পানি, সার্ভিস চার্জ…' },
@@ -109,8 +106,6 @@ const SPECIFIC_FIELDS_BY_TYPE = {
       F_TOTAL_FLOORS,
     ],
     flat: [
-      { key: 'floorLevel', kind: 'text', label: 'Floor Level', labelBn: 'কোন তলা',
-        placeholder: 'e.g. 3rd of 6', placeholderBn: 'যেমন: ৬ তলার ৩য়' },
       F_TOTAL_FLOORS,
       F_FACING,
       { key: 'parking', kind: 'toggle', label: 'Parking', labelBn: 'পার্কিং' },
@@ -165,6 +160,19 @@ export function getDynamicFields(intent, type, category) {
     ...(SPECIFIC_FIELDS[key] || []),
     ...(SPECIFIC_FIELDS_BY_TYPE[key]?.[type] || []),
   ];
+  
+  // If the category implicitly defines the tenant preference (e.g. 'family', 'bachelor_male'),
+  // we do not need to ask the 'tenantPreference' question again in Step 2.
+  const implicitTenantCategories = ['family', 'bachelor_male', 'bachelor_female', 'student_male', 'student_female', 'working_professional'];
+  if (category && implicitTenantCategories.includes(category)) {
+    fields = fields.filter(f => f.key !== 'tenantPreference');
+  }
+  
+  // Similarly, for Hostels, 'genderPolicy' is redundant if the category implies the gender
+  const implicitGenderCategories = ['bachelor_male', 'student_male', 'bachelor_female', 'student_female'];
+  if (category && implicitGenderCategories.includes(category)) {
+    fields = fields.filter(f => f.key !== 'genderPolicy');
+  }
   
   if (category && CATEGORY_FIELD_OVERRIDES[category]) {
     fields = CATEGORY_FIELD_OVERRIDES[category](fields);
