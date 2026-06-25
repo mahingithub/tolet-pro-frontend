@@ -1003,14 +1003,14 @@ const HeroSection = () => {
                   <Sparkles size={12} /> #{String(idx + 1).padStart(2, '0')}
                 </div>
 
-                {/* TOP-CENTER: Logo */}
+                {/* TOP-CENTER: Logo (100% Match) */}
                 <div className="absolute top-4 inset-x-0 flex justify-center pointer-events-none">
-                  <div className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 shadow-sm">
-                    <div className="bg-crimson-600 rounded-[4px] flex items-center justify-center w-[22px] h-[22px]">
-                      <Building size={12} className="text-white" />
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/40 backdrop-blur-md border border-white/50 shadow-sm">
+                    <div className="bg-crimson-600 rounded-[6px] flex items-center justify-center w-[24px] h-[24px]">
+                      <Building size={14} className="text-white" />
                     </div>
-                    <span className="text-[10px] font-black text-white mr-1 tracking-wide">
-                      TO-LET <span className="text-crimson-500">PRO</span>
+                    <span className="text-[11px] font-black text-slate-900 mr-1 tracking-wide">
+                      TO-LET <span className="text-crimson-600">PRO</span>
                     </span>
                   </div>
                 </div>
@@ -1022,22 +1022,18 @@ const HeroSection = () => {
                   </div>
                 )}
 
-                {/* BOTTOM CENTER: Area Name */}
-                <div className="absolute bottom-16 w-full text-center px-4">
-                  <h4 className="text-white text-[32px] md:text-[36px] font-black tracking-tight leading-none drop-shadow-lg">
+                {/* BOTTOM LEFT: Area Name & Tagline */}
+                <div className="absolute bottom-5 left-5 flex flex-col items-start text-left">
+                  <span className="text-white/90 text-xs tracking-wide mb-1 font-medium lowercase">
+                    residential area
+                  </span>
+                  <h4 className="text-white text-[32px] font-black tracking-tight leading-none drop-shadow-md">
                     {area}
                   </h4>
                 </div>
 
-                {/* BOTTOM LEFT: Explore pill */}
-                <div className="absolute bottom-4 left-4">
-                  <div className="inline-flex items-center gap-1 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/40">
-                    <span className="text-white text-sm font-black leading-none uppercase tracking-wider">Explore</span>
-                  </div>
-                </div>
-
                 {/* BOTTOM RIGHT: Arrow button */}
-                <div className="absolute bottom-4 right-4 w-10 h-10 rounded-full bg-white text-crimson-600 flex items-center justify-center shadow-lg transition-transform group-hover:translate-x-1">
+                <div className="absolute bottom-5 right-5 w-10 h-10 rounded-full bg-white text-crimson-600 flex items-center justify-center shadow-lg transition-transform group-hover:translate-x-1">
                   <ArrowRight size={16} strokeWidth={2.5} />
                 </div>
               </button>
