@@ -9,7 +9,8 @@ import {
   Building, Sparkles, DollarSign, FileText, Camera,
   ChevronDown, Globe, Star, Play, Layers, Eye,
   LayoutDashboard, Navigation, Map, Wand2, RefreshCw,
-  ShoppingBag, Briefcase, Store
+  ShoppingBag, Briefcase, Store,
+  User, GraduationCap, Leaf, Utensils, Coffee, Rocket
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -159,12 +160,6 @@ const INTENT_DATA = {
       { id: 'hostel',      label: 'Hostel',       labelBn: 'হোস্টেল',         icon: Users },
       { id: 'single_room', label: 'Single Room',  labelBn: 'একক রুম',         icon: Square },
     ],
-    categories: [
-      { id: 'family',          label: 'Family',          labelBn: 'পারিবারিক',        emoji: '👨‍👩‍👧‍👦' },
-      { id: 'bachelor_male',   label: 'Bachelor (Male)', labelBn: 'ব্যাচেলর (পুরুষ)', emoji: '👨' },
-      { id: 'bachelor_female', label: 'Bachelor (Female)',labelBn: 'ব্যাচেলর (মহিলা)',emoji: '👩' },
-      { id: 'student',         label: 'Student',         labelBn: 'ছাত্র / ছাত্রী',   emoji: '🎓' },
-    ],
     typeLabel: 'Property Type',
     typeLabelBn: 'প্রপার্টির ধরন',
     catLabel: 'Property Category',
@@ -183,12 +178,6 @@ const INTENT_DATA = {
       { id: 'shop',     label: 'Shop',        labelBn: 'দোকান',         icon: Store },
       { id: 'restaurant',label: 'Restaurant', labelBn: 'রেস্তোরাঁ',     icon: Home },
     ],
-    categories: [
-      { id: 'ready_flat',   label: 'Ready Flat',    labelBn: 'রেডি ফ্ল্যাট',    emoji: '🏢' },
-      { id: 'used',         label: 'Used Property', labelBn: 'ব্যবহৃত প্রপার্টি',emoji: '🏠' },
-      { id: 'new_project',  label: 'New Project',   labelBn: 'নতুন প্রজেক্ট',   emoji: '🏗️' },
-      { id: 'investment',   label: 'Investment',    labelBn: 'বিনিয়োগ',          emoji: '💹' },
-    ],
     typeLabel: 'Property Type',
     typeLabelBn: 'প্রপার্টির ধরন',
     catLabel: 'Property Category',
@@ -205,12 +194,6 @@ const INTENT_DATA = {
       { id: 'showroom',    label: 'Showroom',   labelBn: 'শোরুম',      icon: Building },
       { id: 'restaurant',  label: 'Restaurant', labelBn: 'রেস্তোরাঁ',  icon: Home },
     ],
-    categories: [
-      { id: 'corporate', label: 'Corporate', labelBn: 'কর্পোরেট',  emoji: '🏛️' },
-      { id: 'startup',   label: 'Startup',   labelBn: 'স্টার্টআপ', emoji: '🚀' },
-      { id: 'retail',    label: 'Retail',    labelBn: 'খুচরা',     emoji: '🛍️' },
-      { id: 'warehouse', label: 'Warehouse', labelBn: 'গুদামঘর',   emoji: '🏭' },
-    ],
     typeLabel: 'Commercial Type',
     typeLabelBn: 'বাণিজ্যিক ধরন',
     catLabel: 'Business Category',
@@ -220,6 +203,80 @@ const INTENT_DATA = {
     pricePlaceholder: 'e.g. 50000',
     pricePlaceholderBn: 'যেমন: ৫০০০০',
   },
+};
+
+const CATEGORIES_BY_TYPE = {
+  // Rent
+  apartment: [
+    { id: 'family', label: 'Family', labelBn: 'পারিবারিক', icon: Users },
+    { id: 'bachelor_male', label: 'Bachelor (Male)', labelBn: 'ব্যাচেলর (পুরুষ)', icon: User },
+    { id: 'bachelor_female', label: 'Bachelor (Female)', labelBn: 'ব্যাচেলর (মহিলা)', icon: User },
+    { id: 'student_male', label: 'Student (Male)', labelBn: 'ছাত্র', icon: GraduationCap },
+    { id: 'student_female', label: 'Student (Female)', labelBn: 'ছাত্রী', icon: GraduationCap },
+  ],
+  sublet: [
+    { id: 'family',          label: 'Family',           labelBn: 'পারিবারিক',        icon: Users },
+    { id: 'bachelor_male',   label: 'Bachelor (Male)',   labelBn: 'ব্যাচেলর (পুরুষ)', icon: User },
+    { id: 'bachelor_female', label: 'Bachelor (Female)', labelBn: 'ব্যাচেলর (মহিলা)', icon: User },
+    { id: 'student_male',    label: 'Student (Male)',    labelBn: 'ছাত্র',             icon: GraduationCap },
+    { id: 'student_female',  label: 'Student (Female)',  labelBn: 'ছাত্রী',            icon: GraduationCap },
+  ],
+  hostel: [
+    { id: 'student_male',         label: 'Student (Male)',       labelBn: 'ছাত্র',             icon: GraduationCap },
+    { id: 'student_female',       label: 'Student (Female)',     labelBn: 'ছাত্রী',            icon: GraduationCap },
+    { id: 'working_professional', label: 'Working Professional', labelBn: 'চাকরিজীবী',         icon: Briefcase },
+    { id: 'co_ed',                label: 'Mixed / All',         labelBn: 'মিশ্র, সকলের জন্য', icon: Users },
+  ],
+  single_room: [
+    { id: 'bachelor_male', label: 'Bachelor (Male)', labelBn: 'ব্যাচেলর (পুরুষ)', icon: User },
+    { id: 'bachelor_female', label: 'Bachelor (Female)', labelBn: 'ব্যাচেলর (মহিলা)', icon: User },
+    { id: 'student_male', label: 'Student (Male)', labelBn: 'ছাত্র', icon: GraduationCap },
+    { id: 'student_female', label: 'Student (Female)', labelBn: 'ছাত্রী', icon: GraduationCap },
+  ],
+
+  // Purchase
+  flat: [
+    { id: 'ready_flat', label: 'Ready Flat', labelBn: 'রেডি ফ্ল্যাট', icon: Building },
+    { id: 'used_flat', label: 'Used Flat', labelBn: 'ব্যবহৃত ফ্ল্যাট', icon: Home },
+    { id: 'new_project', label: 'New Project', labelBn: 'নতুন প্রজেক্ট', icon: Layers },
+  ],
+  house: [
+    { id: 'duplex', label: 'Duplex', labelBn: 'ডুপ্লেক্স', icon: Layers },
+    { id: 'triplex', label: 'Triplex', labelBn: 'ট্রিপ্লেক্স', icon: Layers },
+    { id: 'single_story', label: 'Single Story', labelBn: 'এক তলা', icon: Home },
+  ],
+  land: [
+    { id: 'residential', label: 'Residential', labelBn: 'আবাসিক', icon: Home },
+    { id: 'commercial', label: 'Commercial', labelBn: 'বাণিজ্যিক', icon: Briefcase },
+    { id: 'agricultural', label: 'Agricultural', labelBn: 'কৃষি', icon: Leaf },
+    { id: 'road_side', label: 'Road Side', labelBn: 'রোড সাইড', icon: MapPin },
+  ],
+  building: [
+    { id: 'commercial_building', label: 'Commercial Building', labelBn: 'বাণিজ্যিক বিল্ডিং', icon: Briefcase },
+    { id: 'residential_building', label: 'Residential Building', labelBn: 'আবাসিক বিল্ডিং', icon: Building },
+  ],
+
+  // Commercial & Purchase Commercial Shared
+  shop: [
+    { id: 'retail', label: 'Retail', labelBn: 'খুচরা', icon: ShoppingBag },
+    { id: 'wholesale', label: 'Wholesale', labelBn: 'পাইকারি', icon: Store },
+    { id: 'showroom', label: 'Showroom', labelBn: 'শোরুম', icon: Store },
+  ],
+  restaurant: [
+    { id: 'fast_food', label: 'Fast Food', labelBn: 'ফাস্ট ফুড', icon: Coffee },
+    { id: 'dine_in', label: 'Dine-in', labelBn: 'ডাইন-ইন', icon: Utensils },
+    { id: 'cafe', label: 'Cafe', labelBn: 'ক্যাফে', icon: Coffee },
+    { id: 'fine_dining', label: 'Fine Dining', labelBn: 'ফাইন ডাইনিং', icon: Utensils },
+  ],
+  office: [
+    { id: 'corporate', label: 'Corporate', labelBn: 'কর্পোরেট', icon: Briefcase },
+    { id: 'startup', label: 'Startup', labelBn: 'স্টার্টআপ', icon: Rocket },
+    { id: 'co_working', label: 'Co-working Space', labelBn: 'কো-ওয়ার্কিং স্পেস', icon: Users },
+  ],
+  showroom: [
+    { id: 'brand_outlet', label: 'Brand Outlet', labelBn: 'ব্র্যান্ড আউটলেট', icon: Store },
+    { id: 'vehicle_showroom', label: 'Vehicle Showroom', labelBn: 'গাড়ির শোরুম', icon: Car },
+  ],
 };
 
 // ─── INTENT-SPECIFIC DETAIL FIELDS (Dynamic Tab Architecture) ─────────────────
@@ -541,7 +598,7 @@ const AMENITIES_LAND = [
   { id: 'Corner Plot',      label: 'Corner Plot',      labelBn: 'কর্নার প্লট',          icon: Star,       color: 'text-indigo-500',  bg: 'bg-indigo-50'  },
 ];
 
-const getAmenitiesList = (intent, type) => {
+const getAmenitiesList = (intent, type, category) => {
   if (type === 'land') return AMENITIES_LAND;
   if (intent === 'commercial' || ['shop', 'restaurant', 'office', 'showroom'].includes(type)) return AMENITIES_COMMERCIAL;
   return AMENITIES_RESIDENTIAL;
@@ -1360,7 +1417,7 @@ const AddProperty = () => {
   const currentIntentData = INTENT_DATA[form.intent] || {};
   // Step-2 dynamic fields = intent-common base + the selected type's extras
   // (shared config — see src/constants/propertyFields.js).
-  const dynamicFields = getDynamicFields(form.intent, form.type);
+  const dynamicFields = getDynamicFields(form.intent, form.type, form.category);
   const group = TYPE_GROUP_MAP[form.type];
 
   // Beds / baths only make sense for somewhere people live: all rentals, plus
@@ -1809,7 +1866,7 @@ const AddProperty = () => {
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                           {(currentIntentData.types || []).map(({ id, label, labelBn, icon: Icon }) => (
                             <button key={id} type="button"
-                              onClick={() => { set('type', id); set('specificDetails', {}); setErrors(e => ({ ...e, type: false })); }}
+                              onClick={() => { set('type', id); set('category', ''); set('specificDetails', {}); setErrors(e => ({ ...e, type: false, category: false })); }}
                               className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-200 active:scale-95
                                 ${form.type === id
                                   ? 'bg-[#ba0036] border-[#ba0036] text-white shadow-[0_8px_20px_rgba(186,0,54,0.25)]'
@@ -1827,13 +1884,13 @@ const AddProperty = () => {
                   )}
                 </AnimatePresence>
 
-                {/* ── PROPERTY CATEGORY (conditional on intent) ── */}
+                {/* ── PROPERTY CATEGORY (conditional on type) ── */}
                 <AnimatePresence>
-                  {form.intent && (
+                  {form.type && CATEGORIES_BY_TYPE[form.type] && (
                     <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
                       <Field label={isBn ? currentIntentData.catLabelBn : currentIntentData.catLabel} required>
                         <div className="grid grid-cols-2 gap-3">
-                          {(currentIntentData.categories || []).map(({ id, label, labelBn, emoji }) => (
+                          {CATEGORIES_BY_TYPE[form.type].map(({ id, label, labelBn, icon: Icon }) => (
                             <button key={id} type="button"
                               onClick={() => { set('category', id); setErrors(e => ({ ...e, category: false })); }}
                               className={`flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all duration-200 active:scale-95
@@ -1841,7 +1898,7 @@ const AddProperty = () => {
                                   ? 'bg-[#ba0036] border-[#ba0036] text-white shadow-[0_8px_20px_rgba(186,0,54,0.25)]'
                                   : 'bg-white border-gray-100 text-gray-500 hover:border-[#ba0036]/30'}
                               `}>
-                              <span className="text-xl">{emoji}</span>
+                              <Icon size={20} className={form.category === id ? 'text-white' : 'text-gray-400'} />
                               <span className="text-xs font-black leading-tight">{isBn ? labelBn : label}</span>
                             </button>
                           ))}
@@ -2282,9 +2339,11 @@ const AddProperty = () => {
                     <span className="text-[10px] font-black text-[#ba0036] bg-red-50 px-2 py-1 rounded-full">{form.amenities.length} {isBn ? 'টি নির্বাচিত' : 'selected'}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    {AMENITIES_LIST.map(({ id, label, labelBn, icon: Icon, color, bg }) => {
-                      const isSelected = form.amenities.includes(id);
-                      return (
+                    {(() => {
+                      const AMENITIES_LIST = getAmenitiesList(form.intent, form.type, form.category);
+                      return AMENITIES_LIST.map(({ id, label, labelBn, icon: Icon, color, bg }) => {
+                        const isSelected = form.amenities.includes(id);
+                        return (
                         <motion.button key={id} type="button"
                           whileTap={{ scale: 0.96 }}
                           onClick={() => toggleAmenity(id)}
@@ -2300,7 +2359,8 @@ const AddProperty = () => {
                           {isSelected && <Check size={13} className="ml-auto shrink-0 text-white/80" strokeWidth={3} />}
                         </motion.button>
                       );
-                    })}
+                      });
+                    })()}
                   </div>
                 </div>
 

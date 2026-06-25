@@ -141,14 +141,27 @@ const SPECIFIC_FIELDS_BY_TYPE = {
   },
 };
 
+// CATEGORY_FIELD_OVERRIDES: Inject or modify fields based on the specific category chosen.
+const CATEGORY_FIELD_OVERRIDES = {
+  co_working: (fields) => {
+    return [...fields, { key: 'numberOfDesks', kind: 'number', label: 'Number of Desks', labelBn: 'ডেস্ক সংখ্যা' }];
+  }
+};
+
 // Merge the intent-common base fields with the selected type's extras.
 // Accepts canonical 'sale' as well as the wizard's legacy 'purchase' key.
-export function getDynamicFields(intent, type) {
+export function getDynamicFields(intent, type, category) {
   const key = intent === 'sale' ? 'purchase' : intent;
-  return [
+  let fields = [
     ...(SPECIFIC_FIELDS[key] || []),
     ...(SPECIFIC_FIELDS_BY_TYPE[key]?.[type] || []),
   ];
+  
+  if (category && CATEGORY_FIELD_OVERRIDES[category]) {
+    fields = CATEGORY_FIELD_OVERRIDES[category](fields);
+  }
+  
+  return fields;
 }
 
 export { SPECIFIC_FIELDS, SPECIFIC_FIELDS_BY_TYPE, FACING_OPTIONS };
