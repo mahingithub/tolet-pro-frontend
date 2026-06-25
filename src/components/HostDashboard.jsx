@@ -5709,19 +5709,24 @@ const HostDashboard = () => {
                     showToast(language === 'বাংলা' ? 'নাম এবং মূল্য আবশ্যক!' : 'Title and price are required!');
                     return;
                   }
-                  const priceNumber = Number(String(editForm.price).replace(/[^\d.]/g, '')) || 0;
+
+                  const parseSafeNum = (val) => {
+                    if (!val && val !== 0) return 0;
+                    const bnToEn = str => String(str).replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
+                    const cleaned = bnToEn(val).replace(/[^\d.]/g, '');
+                    return Number(cleaned) || 0;
+                  };
+
+                  const priceNumber = parseSafeNum(editForm.price);
                   const cover = editForm.img || (editForm.images || [])[0] || '';
-                  // Backend stores the cover as `coverPhoto` and validates the
-                  // PATCH with a STRICT schema — sending `img`/`images` (not
-                  // schema fields) bounces the whole update, so edits only ever
-                  // survived in local state. Send `coverPhoto` instead.
+                  
                   const patch = {
                     title: editForm.title.trim(),
                     location: editForm.location.trim(),
-                    beds: Number(editForm.beds) || 0,
-                    baths: Number(editForm.baths) || 0,
-                    sqft: Number(editForm.sqft) || 0,
-                    floor: Number(editForm.floor) || 0,
+                    beds: parseSafeNum(editForm.beds),
+                    baths: parseSafeNum(editForm.baths),
+                    sqft: parseSafeNum(editForm.sqft),
+                    floor: parseSafeNum(editForm.floor),
                     furnishing: editForm.furnishing,
                     description: editForm.description,
                     status: editForm.status,
