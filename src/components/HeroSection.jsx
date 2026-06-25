@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import usePropertyStore from '../store/usePropertyStore';
-import { DIVISIONS, POPULAR_AREAS, POPULAR_AREA_IMAGES, POPULAR_AREA_SUBZONES, buildSearchUrl } from '../data/searchData';
+import { DIVISIONS, POPULAR_AREAS, POPULAR_AREA_IMAGES, POPULAR_AREA_TAGLINES, POPULAR_AREA_SUBZONES, buildSearchUrl } from '../data/searchData';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTEXT DATA
@@ -1000,11 +1000,11 @@ const HeroSection = () => {
 
                 {/* TOP-CENTER: Logo (100% Match) */}
                 <div className="absolute top-4 inset-x-0 flex justify-center pointer-events-none">
-                  <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/40 backdrop-blur-md border border-white/50 shadow-sm">
-                    <div className="bg-[#e11d48] rounded-[6px] flex items-center justify-center w-[20px] h-[20px]">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-[16px] bg-[#f8fafc]/95 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.1)] border border-white/40">
+                    <div className="bg-[#e11d48] rounded-[6px] flex items-center justify-center w-[22px] h-[22px]">
                       <Building size={12} className="text-white" />
                     </div>
-                    <span className="text-[10px] font-black text-slate-900 mr-1 tracking-wide">
+                    <span className="text-[11px] font-black text-[#0f172a] mr-1 tracking-wide">
                       TO-LET <span className="text-[#e11d48]">PRO</span>
                     </span>
                   </div>
@@ -1012,8 +1012,8 @@ const HeroSection = () => {
 
                 {/* BOTTOM LEFT: Area Name & Tagline */}
                 <div className="absolute bottom-5 left-5 flex flex-col items-start text-left">
-                  <span className="text-white/90 text-xs tracking-wide mb-1 font-medium lowercase">
-                    residential area
+                  <span className="text-white/90 text-xs tracking-wide mb-1 font-medium lowercase drop-shadow-sm">
+                    {POPULAR_AREA_TAGLINES[area] || 'residential area'}
                   </span>
                   <h4 className="text-white text-[32px] font-black tracking-tight leading-none drop-shadow-md">
                     {area}

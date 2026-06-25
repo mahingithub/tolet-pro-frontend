@@ -112,6 +112,17 @@ export const POPULAR_AREA_IMAGES = {
   'Purbachal New Town': '/image/Purbachal New Town.png'
 };
 
+export const POPULAR_AREA_TAGLINES = {
+  Dhanmondi: 'Lakeside Residential',
+  Gulshan: 'Commercial Hub',
+  Banani: 'Luxury Living',
+  Uttara: 'Planned City',
+  Bashundhara: 'Modern Township',
+  Mirpur: 'Budget Friendly',
+  Mohammadpur: 'Family Hub',
+  'Purbachal New Town': 'Upcoming Megacity'
+};
+
 // ─── POPULAR-AREA SUB-ZONES ──────────────────────────────────────────────────
 // A futuristic bottom-sheet opens when the user taps a popular area on the
 // mobile home and lists every sub-zone inside it (Dhanmondi 1, 2, …, Lalmatia,

@@ -32,6 +32,7 @@ import {
   RESIDENTIAL_TYPES,
   BUDGET_RANGES,
   POPULAR_AREA_IMAGES,
+  POPULAR_AREA_TAGLINES,
   getPropertyTypesFor,
   localizedLabel,
   filterLocationSuggestions,
@@ -421,11 +422,11 @@ const PopularAreasBento = ({ t, onPickArea, properties = [] }) => {
 
               {/* TOP-CENTER: Logo (100% Match) */}
               <div className="absolute top-3 inset-x-0 flex justify-center pointer-events-none">
-                <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/40 backdrop-blur-md border border-white/50 shadow-sm">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-[16px] bg-[#f8fafc]/95 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.1)] border border-white/40">
                   <div className="bg-[#e11d48] rounded-[6px] flex items-center justify-center w-[20px] h-[20px]">
                     <Building2 size={12} className="text-white" />
                   </div>
-                  <span className="text-[10px] font-black text-slate-900 mr-1 tracking-wide">
+                  <span className="text-[11px] font-black text-[#0f172a] mr-1 tracking-wide">
                     TO-LET <span className="text-[#e11d48]">PRO</span>
                   </span>
                 </div>
@@ -433,8 +434,8 @@ const PopularAreasBento = ({ t, onPickArea, properties = [] }) => {
 
               {/* BOTTOM LEFT: Area Name & Tagline */}
               <div className="absolute bottom-3 left-3 flex flex-col items-start text-left">
-                <span className="text-white/90 text-[10px] tracking-wide mb-0.5 font-medium lowercase">
-                  residential area
+                <span className="text-white/90 text-[10px] tracking-wide mb-0.5 font-medium lowercase drop-shadow-sm">
+                  {POPULAR_AREA_TAGLINES[area] || 'residential area'}
                 </span>
                 <h4 className="text-white text-[24px] font-black tracking-tight leading-none drop-shadow-md">
                   {area}
