@@ -592,34 +592,23 @@ const LandlordCTA = ({ t }) => {
  *   Location · price/mo · beds · baths · sqft
  */
 // Build a tiny per-room collage (one photo per category) so the right-hand
-// thumb strip doesn't end up showing four bedrooms in a row when the host
-// uploaded multiple. Falls back to the flat `images` list for older records.
-const MOB_ROOM_ORDER = ['bedroom', 'bathroom', 'living', 'kitchen', 'other'];
+// Dynamically builds the collage using the actual room photos uploaded by the user.
 const mobBuildCollage = (property) => {
   const seen = new Set();
   const tiles = [];
   if (Array.isArray(property.roomPhotos)) {
-    for (const roomId of MOB_ROOM_ORDER) {
-      const hit = property.roomPhotos.find(
-        (p) => (p.room || 'other') === roomId && (p.url || p.preview),
-      );
-      if (hit) {
-        tiles.push(hit.url || hit.preview);
-        seen.add(roomId);
-      }
-    }
     for (const p of property.roomPhotos) {
-      const r = p.room || 'other';
+      const r = (p.room || 'other').toLowerCase();
       if (!seen.has(r) && (p.url || p.preview)) {
-        tiles.push(p.url || p.preview);
+        tiles.push({ url: p.url || p.preview, room: r });
         seen.add(r);
       }
     }
   }
-  const cover = property.coverPhoto || property.img || tiles[0] || (property.images || [])[0] || '';
-  const remaining = tiles.filter((u) => u !== cover);
+  const cover = property.coverPhoto || property.img || tiles[0]?.url || (property.images || [])[0] || '';
+  const remaining = tiles.filter((t) => t.url !== cover);
   if (remaining.length === 0 && Array.isArray(property.images)) {
-    remaining.push(...property.images.filter((u) => u && u !== cover));
+    remaining.push(...property.images.filter((u) => u && u !== cover).map(u => ({ url: u, room: null })));
   }
   return { cover, thumbs: remaining.slice(0, 3) };
 };
@@ -659,7 +648,9 @@ const PropertyCard = ({ property, t, landlord }) => {
   // (legacy base64). SafeImg renders a clean placeholder for any empty/dead
   // tile instead.
   const { cover: primary, thumbs: rawThumbs } = mobBuildCollage(property);
-  const thumbs = [...rawThumbs, primary, primary].slice(0, 3);
+  // Ensure we have 3 thumbs for the layout (pad with empty objects if needed)
+  const padThumbs = [{ url: primary, room: null }, { url: primary, room: null }];
+  const thumbs = [...rawThumbs, ...padThumbs].slice(0, 3);
   const extraImages = Array.isArray(property.images) ? property.images.length : 0;
 
   const go = () => navigate(`/property/${property.id}`);
@@ -720,23 +711,35 @@ const PropertyCard = ({ property, t, landlord }) => {
 
           {/* Right column — 3 stacked thumbs */}
           <div className="grid grid-rows-3 gap-1">
-            {thumbs.map((src, i) => (
-              <div key={i} className="relative rounded-[16px] overflow-hidden bg-gray-100">
-                <SafeImg
-                  src={src}
-                  alt={src ? `${property.title} ${i + 2}` : ''}
-                  showIconOnError={false}
-                  className="absolute inset-0 w-full h-full object-cover"
-                />
-                {i === 2 && extraImages > 4 && (
-                  <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
-                    <span className="text-white text-[12px] font-black">
-                      +{extraImages - 4}
+            {thumbs.map((shot, i) => {
+              // Convert shot string (fallback) to object just in case
+              const s = typeof shot === 'string' ? { url: shot, room: null } : shot;
+              const ROOM_LABEL_FALLBACK = {
+                bedroom: "Bedroom", bathroom: "Bathroom", living: "Living", kitchen: "Kitchen", other: "Other"
+              };
+              return (
+                <div key={i} className="relative rounded-[16px] overflow-hidden bg-gray-100">
+                  <SafeImg
+                    src={s?.url}
+                    alt={s?.url ? `${property.title} ${i + 2}` : ''}
+                    showIconOnError={false}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  {s?.room && (
+                    <span className="absolute bottom-1.5 left-1.5 px-1.5 py-[2px] rounded-md bg-black/60 text-white text-[8px] font-black uppercase tracking-wider shadow-sm z-10">
+                      {ROOM_LABEL_FALLBACK[s.room] || s.room}
                     </span>
-                  </div>
-                )}
-              </div>
-            ))}
+                  )}
+                  {i === 2 && extraImages > 4 && (
+                    <div className="absolute inset-0 bg-black/45 flex items-center justify-center z-20">
+                      <span className="text-white text-[12px] font-black">
+                        +{extraImages - 4}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 

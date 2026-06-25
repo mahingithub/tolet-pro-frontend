@@ -73,18 +73,6 @@ const RENTAL_CATEGORIES = [
 // ─── VALID DIVISIONS (To catch custom area searches) ──────────────────────────
 const validDivisions = ["dhaka", "chittagong", "sylhet", "rajshahi", "khulna", "barishal", "rangpur", "mymensingh"];
 
-// ─── ROOM COLLAGE HELPER ──────────────────────────────────────────────────────
-// Builds the listing-card collage: one photo per room category so a card with
-// 4 bedroom photos doesn't fill all four tiles with bedrooms. Order is fixed:
-// cover photo first, then bedroom, bathroom, living room, kitchen, and other.
-const ROOM_COLLAGE_ORDER = ["bedroom", "bathroom", "living", "kitchen", "other"];
-const ROOM_MATCHERS = {
-	bedroom:  (room) => room.includes("bed"),
-	bathroom: (room) => room.includes("bath") || room.includes("toilet") || room.includes("wash"),
-	living:   (room) => room.includes("living") || room.includes("drawing") || room.includes("hall"),
-	kitchen:  (room) => room.includes("kitchen") || room.includes("cook"),
-	other:    (room) => room.includes("other"),
-};
 const ROOM_LABEL_FALLBACK = {
 	bedroom:  "Bedroom",
 	bathroom: "Bathroom",
@@ -92,17 +80,22 @@ const ROOM_LABEL_FALLBACK = {
 	kitchen:  "Kitchen",
 	other:    "Other",
 };
+
+// ─── ROOM COLLAGE HELPER ──────────────────────────────────────────────────────
+// Dynamically builds the listing-card collage using the actual room photos uploaded by the user.
+// It extracts up to 3 unique room categories (e.g. workspace, meeting, cabin, bedroom).
 function buildRoomCollage(property) {
 	const uniqueRoomShots = [];
-	const usedPhotos = new Set();
-	const hasRoomPhotos = Array.isArray(property.roomPhotos) && property.roomPhotos.some(p => p?.url || p?.preview);
+	const usedRooms = new Set();
+	const hasRoomPhotos = Array.isArray(property.roomPhotos) && property.roomPhotos.length > 0;
+
 	if (hasRoomPhotos) {
-		for (const roomId of ROOM_COLLAGE_ORDER) {
-			const matches = ROOM_MATCHERS[roomId];
-			const hit = property.roomPhotos.find(p => !usedPhotos.has(p) && matches(String(p.room || "").toLowerCase()) && (p.url || p.preview));
-			if (hit) {
-				uniqueRoomShots.push({ url: hit.url || hit.preview, room: roomId });
-				usedPhotos.add(hit);
+		for (const p of property.roomPhotos) {
+			const roomKey = (p.room || "other").toLowerCase();
+			const url = p.url || p.preview;
+			if (url && !usedRooms.has(roomKey)) {
+				uniqueRoomShots.push({ url, room: roomKey });
+				usedRooms.add(roomKey);
 			}
 		}
 	}
@@ -110,8 +103,7 @@ function buildRoomCollage(property) {
 	const cover = property.coverPhoto || property.img || (uniqueRoomShots[0]?.url) || (property.images || [])[0] || "";
 	const thumbs = uniqueRoomShots.filter(s => s.url !== cover).slice(0, 3);
 
-	// If we have no real per-room photos at all, fall back to the flat `images`
-	// array so older API records still render something.
+	// If we have no real per-room photos at all, fall back to the flat `images` array
 	if (!thumbs.length && !hasRoomPhotos && Array.isArray(property.images)) {
 		const extras = property.images
 			.filter(u => u && u !== cover)

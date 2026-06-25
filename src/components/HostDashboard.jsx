@@ -4554,6 +4554,7 @@ const HostDashboard = () => {
                   const thumbs = gallery.length > 1 ? gallery.slice(1, 4) : [];
                   const hasSpecs = prop.beds || prop.baths || prop.sqft || prop.furnishing;
                   const ownerLabel = prop.ownerName || userData.fullName;
+                  const ownerAvatar = prop.hostAvatar || userData?.avatar;
                   const ownerInitials = (ownerLabel || 'H')
                     .split(' ')
                     .map(s => s.charAt(0))
@@ -4660,9 +4661,13 @@ const HostDashboard = () => {
 
                       {/* Landlord row */}
                       <div className="flex items-center gap-2 mb-4 pt-3 border-t border-gray-50">
-                        <div className="w-9 h-9 rounded-full bg-[#ba0036]/10 text-[#ba0036] flex items-center justify-center font-black text-[11px] shrink-0">
-                          {ownerInitials}
-                        </div>
+                        {ownerAvatar ? (
+                          <img src={ownerAvatar} alt={ownerLabel} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-[#ba0036]/10 text-[#ba0036] flex items-center justify-center font-black text-[11px] shrink-0">
+                            {ownerInitials}
+                          </div>
+                        )}
                         <div className="min-w-0">
                           <p className="text-[11px] font-black text-gray-900 truncate">{ownerLabel}</p>
                           <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'হোস্ট' : 'Listed by host'}</p>
@@ -5668,19 +5673,23 @@ const HostDashboard = () => {
                   // and live only in component state.
                   try {
                     await propertyService.updateProperty(modalData.id, patch);
-                  } catch (_) { /* demo seed or not signed in — ignore */ }
-                  setProperties(prev => prev.map(p => p.id === modalData.id ? {
-                    ...p,
-                    ...patch,
-                    // Mirror the cover to the display aliases the card reads.
-                    img: cover,
-                    coverPhoto: cover,
-                    images: editForm.images,
-                    // Keep the display-formatted price string on the card.
-                    price: priceNumber.toLocaleString('en-IN'),
-                  } : p));
-                  showToast(language === 'বাংলা' ? 'প্রপার্টি আপডেট হয়েছে!' : 'Property Saved Successfully!');
-                  setActiveModal(null);
+                    
+                    setProperties(prev => prev.map(p => p.id === modalData.id ? {
+                      ...p,
+                      ...patch,
+                      // Mirror the cover to the display aliases the card reads.
+                      img: cover,
+                      coverPhoto: cover,
+                      images: editForm.images,
+                      // Keep the display-formatted price string on the card.
+                      price: priceNumber.toLocaleString('en-IN'),
+                    } : p));
+                    showToast(language === 'বাংলা' ? 'প্রপার্টি আপডেট হয়েছে!' : 'Property Saved Successfully!');
+                    setActiveModal(null);
+                  } catch (err) {
+                    console.error('[EditProperty] Failed to update:', err);
+                    showToast(language === 'বাংলা' ? 'আপডেট ব্যর্থ হয়েছে!' : 'Failed to update property.');
+                  }
                 };
                 const coverPreview = editForm.img || editForm.images?.[0] || '';
                 return (
