@@ -105,6 +105,280 @@ const budgetRanges = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
+// POPULAR AREAS — Futuristic Hover Accordion
+// ─────────────────────────────────────────────────────────────────────────────
+const ACCORD_ACCENTS = [
+  '#ff4d6d','#3b82f6','#a855f7','#f59e0b',
+  '#10b981','#06b6d4','#f97316','#ec4899',
+];
+
+const ACCORD_CSS = `
+@keyframes tlp-scan {
+  0%   { top:0%;   }
+  100% { top:100%; }
+}
+@keyframes tlp-pulse-dot {
+  0%,100% { opacity:1;   transform:scale(1);    }
+  50%      { opacity:.35; transform:scale(.72); }
+}
+.tlp-wrap {
+  display:flex; gap:6px; width:100%; overflow:hidden;
+}
+.tlp-card {
+  position:relative; flex:1; min-width:50px;
+  border-radius:20px; overflow:hidden; cursor:pointer;
+  border:1px solid rgba(255,255,255,.07);
+  transition: flex .55s cubic-bezier(.4,0,.2,1),
+              border-color .3s ease;
+  -webkit-tap-highlight-color:transparent;
+  outline:none;
+}
+.tlp-card:hover, .tlp-card:focus-visible, .tlp-card.tlp-active {
+  flex:5.2; border-color:rgba(255,255,255,.18);
+}
+.tlp-bg {
+  position:absolute; inset:0;
+  background-size:cover; background-position:center;
+  transition:transform .55s cubic-bezier(.4,0,.2,1);
+}
+.tlp-card:hover .tlp-bg,
+.tlp-card.tlp-active .tlp-bg { transform:scale(1.05); }
+
+.tlp-overlay {
+  position:absolute; inset:0;
+  background:linear-gradient(to top,
+    rgba(6,10,22,.93) 0%, rgba(6,10,22,.42) 52%, rgba(6,10,22,.16) 100%);
+}
+.tlp-card:hover .tlp-overlay,
+.tlp-card.tlp-active .tlp-overlay {
+  background:linear-gradient(to top,
+    rgba(6,10,22,.97) 0%, rgba(6,10,22,.58) 55%, rgba(6,10,22,.24) 100%);
+}
+.tlp-shimmer {
+  position:absolute; inset:0; mix-blend-mode:overlay;
+  opacity:.32; pointer-events:none;
+  background:conic-gradient(from 200deg at 70% 20%,
+    rgba(186,0,54,.55),rgba(168,85,247,.45),
+    rgba(34,211,238,.45),rgba(186,0,54,.55));
+  transition:opacity .4s ease;
+}
+.tlp-card:hover .tlp-shimmer,
+.tlp-card.tlp-active .tlp-shimmer { opacity:.58; }
+
+.tlp-scan {
+  position:absolute; left:0; right:0; height:2px;
+  opacity:0; pointer-events:none; transition:opacity .3s ease;
+}
+.tlp-card:hover .tlp-scan,
+.tlp-card.tlp-active .tlp-scan {
+  opacity:1;
+  animation:tlp-scan 2.2s ease-in-out infinite;
+}
+.tlp-num {
+  position:absolute; top:14px; right:14px;
+  font-size:10px; font-weight:600; letter-spacing:.13em;
+  color:rgba(255,255,255,.28); font-family:ui-monospace,monospace;
+  transition:opacity .25s ease;
+}
+.tlp-card:hover .tlp-num,
+.tlp-card.tlp-active .tlp-num { opacity:0; }
+
+.tlp-dot-wrap {
+  position:absolute; top:16px; left:16px;
+  opacity:0; transition:opacity .3s ease .18s;
+}
+.tlp-card:hover .tlp-dot-wrap,
+.tlp-card.tlp-active .tlp-dot-wrap { opacity:1; }
+.tlp-dot {
+  display:block; width:7px; height:7px; border-radius:50%;
+  animation:tlp-pulse-dot 2s ease-in-out infinite;
+}
+.tlp-vlabel {
+  position:absolute; bottom:26px; left:50%;
+  transform:translateX(-50%) rotate(-90deg);
+  white-space:nowrap; font-size:10px; font-weight:600;
+  letter-spacing:.13em; text-transform:uppercase;
+  color:rgba(255,255,255,.58); pointer-events:none;
+  transition:opacity .2s ease; transform-origin:center center;
+}
+.tlp-card:hover .tlp-vlabel,
+.tlp-card.tlp-active .tlp-vlabel { opacity:0; }
+
+.tlp-content {
+  position:absolute; bottom:0; left:0; right:0;
+  padding:24px 20px 22px;
+  opacity:0; transform:translateY(12px);
+  transition:opacity .3s ease .13s, transform .3s ease .13s;
+  pointer-events:none;
+}
+.tlp-card:hover .tlp-content,
+.tlp-card.tlp-active .tlp-content {
+  opacity:1; transform:translateY(0); pointer-events:auto;
+}
+.tlp-tag {
+  display:inline-block; font-size:9px; font-weight:600;
+  letter-spacing:.15em; text-transform:uppercase;
+  border:1px solid; border-radius:4px; padding:3px 9px; margin-bottom:8px;
+}
+.tlp-title {
+  font-size:21px; font-weight:800; color:#fff;
+  margin:0 0 6px; line-height:1.2;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.tlp-sub {
+  font-size:12px; color:rgba(255,255,255,.56);
+  margin:0 0 16px; line-height:1.5;
+  overflow:hidden; display:-webkit-box;
+  -webkit-line-clamp:2; -webkit-box-orient:vertical;
+}
+.tlp-cta {
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:12px; font-weight:600; letter-spacing:.05em;
+  color:rgba(255,255,255,.9); border:1px solid rgba(255,255,255,.26);
+  border-radius:7px; padding:7px 13px;
+  background:rgba(255,255,255,.07); cursor:pointer;
+  transition:background .2s, border-color .2s;
+  text-decoration:none; font-family:inherit;
+}
+.tlp-cta:hover { background:rgba(255,255,255,.14); border-color:rgba(255,255,255,.5); }
+
+/* ── Mobile: vertical stack ── */
+@media (max-width:767px) {
+  .tlp-wrap { flex-direction:column; gap:8px; height:auto !important; }
+  .tlp-card { flex:none !important; min-width:unset; height:88px; border-radius:16px;
+    transition:height .48s cubic-bezier(.4,0,.2,1); }
+  .tlp-card.tlp-active { height:260px; }
+  .tlp-vlabel {
+    transform:translate(-50%,-50%); top:50%; bottom:unset; rotate:none;
+    font-size:11px;
+  }
+}
+`;
+
+const PopularAreasAccordion = ({
+  areas = [], images = {}, taglines = {}, subzones = {},
+  t = {}, language = 'English', navigate,
+  setOpenArea, setPendingLocation, setIsCategoryPromptOpen,
+}) => {
+  const [activeIdx, setActiveIdx] = React.useState(null);
+  const isBn = language === 'বাংলা';
+
+  const handleClick = (area) => {
+    const hasSubs = (subzones[area] || []).length > 0;
+    if (hasSubs) { setOpenArea(area); }
+    else { setPendingLocation(area); setIsCategoryPromptOpen(true); }
+  };
+
+  return (
+    <section className="w-full max-w-[1400px] mx-auto mt-16 md:mt-24 px-4 md:px-6">
+      <style dangerouslySetInnerHTML={{ __html: ACCORD_CSS }} />
+
+      {/* header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+        <div>
+          <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+            {t?.popularAreas || (isBn ? 'জনপ্রিয় এলাকা' : 'Popular Areas')}
+          </h2>
+          <p className="text-sm md:text-base font-bold text-slate-500 mt-2">
+            {t?.popularAreasDesc || (isBn
+              ? 'ঢাকার সেরা আবাসিক ও বাণিজ্যিক এলাকা আবিষ্কার করুন'
+              : "Explore Dhaka's most sought-after neighbourhoods")}
+          </p>
+        </div>
+        <button
+          onClick={() => navigate('/properties/dhaka')}
+          className="hidden md:flex items-center gap-2 text-sm font-bold text-[#ba0036] hover:text-[#d4004a] transition-colors"
+        >
+          {t?.exploreAll || (isBn ? 'সব দেখুন' : 'Explore All')}
+          <ArrowRight size={16} />
+        </button>
+      </div>
+
+      {/* accordion strip */}
+      <div
+        className="tlp-wrap"
+        style={{ height: 440 }}
+        onMouseLeave={() => setActiveIdx(null)}
+      >
+        {areas.map((area, idx) => {
+          const accent = ACCORD_ACCENTS[idx % ACCORD_ACCENTS.length];
+          const isActive = activeIdx === idx;
+          const tagline = taglines[area] || 'residential area';
+
+          return (
+            <div
+              key={area}
+              role="button"
+              tabIndex={0}
+              aria-label={area}
+              className={`tlp-card${isActive ? ' tlp-active' : ''}`}
+              onMouseEnter={() => setActiveIdx(idx)}
+              onFocus={() => setActiveIdx(idx)}
+              onBlur={() => setActiveIdx(null)}
+              onClick={() => handleClick(area)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(area); }
+              }}
+            >
+              {/* bg */}
+              <div
+                className="tlp-bg"
+                style={images[area]
+                  ? { backgroundImage: `url(${images[area]})` }
+                  : { background: 'linear-gradient(135deg,#1f2937 0%,#4c1d95 45%,#831843 100%)' }
+                }
+              />
+              {/* overlays */}
+              <div className="tlp-overlay" />
+              <div className="tlp-shimmer" />
+              {/* scan line */}
+              <div className="tlp-scan" style={{ background: `linear-gradient(90deg,transparent,${accent}cc,transparent)` }} />
+              {/* serial */}
+              <span className="tlp-num">{String(idx + 1).padStart(2, '0')}</span>
+              {/* live dot */}
+              <span className="tlp-dot-wrap">
+                <span className="tlp-dot" style={{ background: accent }} />
+              </span>
+              {/* collapsed label */}
+              <span className="tlp-vlabel">{area}</span>
+              {/* expanded content */}
+              <div className="tlp-content">
+                <span className="tlp-tag" style={{ color: accent, borderColor: `${accent}55` }}>
+                  {isBn ? 'এলাকা' : 'Area'}
+                </span>
+                <p className="tlp-title" style={{ fontSize: area.length > 12 ? 17 : 21 }}>
+                  {area}
+                </p>
+                <p className="tlp-sub">{tagline}</p>
+                <button
+                  className="tlp-cta"
+                  style={{ borderColor: `${accent}44` }}
+                  onClick={e => { e.stopPropagation(); handleClick(area); }}
+                >
+                  <ArrowRight size={13} />
+                  {isBn ? 'বিস্তারিত দেখুন' : 'Browse homes'}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* mobile explore all */}
+      <div className="flex md:hidden justify-center mt-6">
+        <button
+          onClick={() => navigate('/properties/dhaka')}
+          className="flex items-center gap-2 text-sm font-bold text-[#ba0036] hover:text-[#d4004a] transition-colors"
+        >
+          {t?.exploreAll || (isBn ? 'সব দেখুন' : 'Explore All')}
+          <ArrowRight size={16} />
+        </button>
+      </div>
+    </section>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 const HeroSection = () => {
@@ -946,92 +1220,20 @@ const HeroSection = () => {
         </section>
 
         {/* ═══════════════════════════════════════════════════════════════ */}
-        {/* 4. DHAKA'S FINEST DISTRICTS                                   */}
+        {/* 4. POPULAR AREAS — Futuristic Hover Accordion                 */}
         {/* ═══════════════════════════════════════════════════════════════ */}
-        <section className="w-full max-w-[1400px] mx-auto mt-16 md:mt-24">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 px-4 md:px-6 gap-4">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">{t?.dhakasFinest || "Dhaka's Finest"}</h2>
-              <p className="text-sm md:text-base font-bold text-slate-500 mt-2">{t?.dhakasFinestDesc || 'Premium living spaces in top-tier neighborhoods'}</p>
-            </div>
-            <button onClick={() => navigate('/properties/dhaka')} className="hidden md:flex items-center gap-2 text-sm font-bold text-crimson-500 hover:text-crimson-600 transition-colors">
-              {t?.exploreAll || 'Explore All'} <ArrowRight size={16} />
-            </button>
-          </div>
-
-          <div className="flex overflow-x-auto gap-4 md:gap-6 pb-6 px-4 md:px-6 snap-x snap-mandatory scroll-px-4 md:scroll-px-6 custom-scrollbar md:grid md:grid-cols-2 lg:grid-cols-4 lg:auto-rows-[300px] md:pb-0 md:overflow-visible group/bento">
-            {POPULAR_AREAS.map((area, idx) => (
-              <button
-                key={area}
-                onClick={() => {
-                  const subzones = POPULAR_AREA_SUBZONES[area] || [];
-                  if (subzones.length > 0) {
-                    setOpenArea(area);
-                  } else {
-                    setPendingLocation(area);
-                    setIsCategoryPromptOpen(true);
-                  }
-                }}
-                className={`snap-start shrink-0 relative w-[260px] md:w-auto h-[300px] md:h-[320px] lg:h-full rounded-[2rem] overflow-hidden active:scale-[0.98] transition-all duration-500 ease-out group shadow-[0_20px_50px_-22px_rgba(15,23,42,0.55)] hover:shadow-[0_30px_60px_-15px_rgba(225,29,72,0.4)] hover:scale-[1.02] hover:z-10 hover:!opacity-100 lg:group-hover/bento:opacity-70 border-[1px] border-slate-100 ${
-                  idx === 0 ? 'lg:col-span-2 lg:row-span-2' :
-                  idx === 6 ? 'lg:col-span-2 lg:row-span-1' :
-                  'lg:col-span-1 lg:row-span-1'
-                }`}
-              >
-                {POPULAR_AREA_IMAGES[area] ? (
-                  <div
-                    className="absolute inset-0 bg-cover bg-center group-hover:scale-105 transition-transform duration-700 ease-out"
-                    style={{ backgroundImage: `url(${POPULAR_AREA_IMAGES[area]})` }}
-                  />
-                ) : (
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      background: 'linear-gradient(135deg, #1f2937 0%, #4c1d95 45%, #831843 100%)',
-                    }}
-                  />
-                )}
-
-                {/* Holographic vignette */}
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/10 to-black/85" />
-                <div
-                  className="absolute inset-0 mix-blend-overlay opacity-50 pointer-events-none"
-                  style={{
-                    background: 'conic-gradient(from 200deg at 70% 20%, rgba(186,0,54,0.55), rgba(168,85,247,0.45), rgba(34,211,238,0.45), rgba(186,0,54,0.55))',
-                  }}
-                />
-                <div className="absolute inset-0 rounded-[2rem] ring-1 ring-inset ring-white/25 pointer-events-none" />
-
-                {/* TOP-CENTER: Logo (100% Match) */}
-                <div className="absolute top-4 inset-x-0 flex justify-center pointer-events-none">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-[16px] bg-[#f8fafc]/95 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.1)] border border-white/40">
-                    <div className="bg-[#e11d48] rounded-[6px] flex items-center justify-center w-[22px] h-[22px]">
-                      <Building size={12} className="text-white" />
-                    </div>
-                    <span className="text-[11px] font-black text-[#0f172a] mr-1 tracking-wide">
-                      TO-LET <span className="text-[#e11d48]">PRO</span>
-                    </span>
-                  </div>
-                </div>
-
-                {/* BOTTOM TEXT CONTAINER */}
-                <div className="absolute bottom-5 left-5 right-5 flex flex-col items-start text-left pr-12">
-                  <span className="text-white/90 text-xs tracking-wide mb-1 font-medium lowercase drop-shadow-sm line-clamp-1">
-                    {POPULAR_AREA_TAGLINES[area] || 'residential area'}
-                  </span>
-                  <h4 className={`text-white leading-tight font-black tracking-tight drop-shadow-md break-words line-clamp-2 ${idx === 0 ? 'text-[32px] lg:text-[48px]' : 'text-[28px]'}`}>
-                    {area}
-                  </h4>
-                </div>
-
-                {/* BOTTOM RIGHT: Arrow button */}
-                <div className="absolute bottom-5 right-5 w-10 h-10 rounded-full bg-white text-crimson-600 flex items-center justify-center shadow-lg transition-transform group-hover:translate-x-1">
-                  <ArrowRight size={16} strokeWidth={2.5} />
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
+        <PopularAreasAccordion
+          areas={POPULAR_AREAS}
+          images={POPULAR_AREA_IMAGES}
+          taglines={POPULAR_AREA_TAGLINES}
+          subzones={POPULAR_AREA_SUBZONES}
+          t={t}
+          language={language}
+          navigate={navigate}
+          setOpenArea={setOpenArea}
+          setPendingLocation={setPendingLocation}
+          setIsCategoryPromptOpen={setIsCategoryPromptOpen}
+        />
 
         {/* ═══════════════════════════════════════════════════════════════ */}
         {/* 5. SOCIAL PROOF — stats + testimonials                        */}
