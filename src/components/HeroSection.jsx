@@ -137,8 +137,8 @@ const ACCORD_CSS = `
   flex:5.2; border-color:rgba(255,255,255,.18);
 }
 .tlp-bg {
-  position:absolute; inset:0;
-  background-size:cover; background-position:center;
+  position:absolute; inset:0; width:100%; height:100%;
+  object-fit:cover;
   transition:transform .55s cubic-bezier(.4,0,.2,1);
 }
 .tlp-card:hover .tlp-bg,
@@ -294,9 +294,9 @@ const PopularAreasAccordion = ({
         </button>
       </div>
 
-      {/* accordion strip */}
+      {/* accordion strip (desktop) */}
       <div
-        className="tlp-wrap"
+        className="tlp-wrap hidden md:flex"
         style={{ height: 440 }}
         onMouseLeave={() => setActiveIdx(null)}
       >
@@ -321,13 +321,14 @@ const PopularAreasAccordion = ({
               }}
             >
               {/* bg */}
-              <div
-                className="tlp-bg"
-                style={images[area]
-                  ? { backgroundImage: `url(${images[area]})` }
-                  : { background: 'linear-gradient(135deg,#1f2937 0%,#4c1d95 45%,#831843 100%)' }
-                }
-              />
+              {images[area] ? (
+                <img src={images[area]} alt={area} className="tlp-bg" />
+              ) : (
+                <div
+                  className="tlp-bg"
+                  style={{ background: 'linear-gradient(135deg,#1f2937 0%,#4c1d95 45%,#831843 100%)' }}
+                />
+              )}
               {/* overlays */}
               <div className="tlp-overlay" />
               <div className="tlp-shimmer" />
@@ -360,6 +361,54 @@ const PopularAreasAccordion = ({
                 </button>
               </div>
             </div>
+          );
+        })}
+      </div>
+
+      {/* mobile horizontal strip */}
+      <div className="flex md:hidden overflow-x-auto gap-4 pb-4 snap-x snap-mandatory scroll-px-4 custom-scrollbar">
+        {areas.map((area) => {
+          const tagline = taglines[area] || 'residential area';
+          return (
+            <button
+              key={area}
+              onClick={() => handleClick(area)}
+              className="snap-start shrink-0 relative w-[240px] h-[300px] rounded-[2rem] overflow-hidden active:scale-[0.98] transition-transform shadow-lg border border-slate-100"
+            >
+              {images[area] ? (
+                <img src={images[area]} alt={area} className="absolute inset-0 w-full h-full object-cover" />
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-rose-900" />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+              
+              {/* Logo */}
+              <div className="absolute top-4 inset-x-0 flex justify-center pointer-events-none">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-[16px] bg-[#f8fafc]/95 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.1)] border border-white/40">
+                  <div className="bg-[#e11d48] rounded-[6px] flex items-center justify-center w-[22px] h-[22px]">
+                    <Building size={12} className="text-white" />
+                  </div>
+                  <span className="text-[11px] font-black text-[#0f172a] mr-1 tracking-wide">
+                    TO-LET <span className="text-[#e11d48]">PRO</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Bottom Text */}
+              <div className="absolute bottom-4 left-4 right-4 text-left pr-10">
+                <span className="text-white/90 text-[10px] tracking-wide mb-0.5 font-medium lowercase line-clamp-1 drop-shadow-sm">
+                  {tagline}
+                </span>
+                <h4 className="text-white text-[22px] leading-tight font-black tracking-tight drop-shadow-md break-words line-clamp-2">
+                  {area}
+                </h4>
+              </div>
+              
+              {/* Arrow */}
+              <div className="absolute bottom-4 right-4 w-9 h-9 rounded-full bg-white text-crimson-600 flex items-center justify-center shadow-lg">
+                <ArrowRight size={14} strokeWidth={2.5} />
+              </div>
+            </button>
           );
         })}
       </div>
