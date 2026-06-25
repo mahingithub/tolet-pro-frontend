@@ -5720,6 +5720,12 @@ const HostDashboard = () => {
                   const priceNumber = parseSafeNum(editForm.price);
                   const cover = editForm.img || (editForm.images || [])[0] || '';
                   
+                  const existingRoomPhotos = modalData.roomPhotos || [];
+                  const roomPhotos = (editForm.images || []).map(url => {
+                    const existing = existingRoomPhotos.find(rp => rp.url === url || rp.preview === url);
+                    return existing ? { url: existing.url, room: existing.room || 'other' } : { url, room: 'other' };
+                  });
+                  
                   const patch = {
                     title: editForm.title.trim(),
                     location: editForm.location.trim(),
@@ -5732,6 +5738,7 @@ const HostDashboard = () => {
                     status: editForm.status,
                     coverPhoto: cover,
                     price: priceNumber,
+                    roomPhotos: roomPhotos,
                     specificDetails: editForm.specificDetails || {},
                   };
                   // Persist host-owned listings; demo seed entries fall through
