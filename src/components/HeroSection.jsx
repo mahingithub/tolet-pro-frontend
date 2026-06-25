@@ -959,7 +959,7 @@ const HeroSection = () => {
             </button>
           </div>
 
-          <div className="flex overflow-x-auto gap-4 md:gap-6 pb-6 px-4 md:px-6 snap-x snap-mandatory scroll-px-4 md:scroll-px-6 custom-scrollbar md:grid md:grid-cols-2 lg:grid-cols-4 md:pb-0 md:overflow-visible">
+          <div className="flex overflow-x-auto gap-4 md:gap-6 pb-6 px-4 md:px-6 snap-x snap-mandatory scroll-px-4 md:scroll-px-6 custom-scrollbar md:grid md:grid-cols-2 lg:grid-cols-4 lg:auto-rows-[300px] md:pb-0 md:overflow-visible group/bento">
             {POPULAR_AREAS.map((area, idx) => (
               <button
                 key={area}
@@ -972,7 +972,11 @@ const HeroSection = () => {
                     setIsCategoryPromptOpen(true);
                   }
                 }}
-                className="snap-start shrink-0 relative w-[260px] md:w-auto h-[300px] md:h-[320px] rounded-[2rem] overflow-hidden active:scale-[0.98] transition-transform group shadow-[0_20px_50px_-22px_rgba(15,23,42,0.55)] border-[1px] border-slate-100"
+                className={`snap-start shrink-0 relative w-[260px] md:w-auto h-[300px] md:h-[320px] lg:h-full rounded-[2rem] overflow-hidden active:scale-[0.98] transition-all duration-500 ease-out group shadow-[0_20px_50px_-22px_rgba(15,23,42,0.55)] hover:shadow-[0_30px_60px_-15px_rgba(225,29,72,0.4)] hover:scale-[1.02] hover:z-10 hover:!opacity-100 lg:group-hover/bento:opacity-70 border-[1px] border-slate-100 ${
+                  idx === 0 ? 'lg:col-span-2 lg:row-span-2' :
+                  idx === 6 ? 'lg:col-span-2 lg:row-span-1' :
+                  'lg:col-span-1 lg:row-span-1'
+                }`}
               >
                 {POPULAR_AREA_IMAGES[area] ? (
                   <div
@@ -1015,7 +1019,7 @@ const HeroSection = () => {
                   <span className="text-white/90 text-xs tracking-wide mb-1 font-medium lowercase drop-shadow-sm line-clamp-1">
                     {POPULAR_AREA_TAGLINES[area] || 'residential area'}
                   </span>
-                  <h4 className="text-white text-[28px] leading-tight font-black tracking-tight drop-shadow-md break-words line-clamp-2">
+                  <h4 className={`text-white leading-tight font-black tracking-tight drop-shadow-md break-words line-clamp-2 ${idx === 0 ? 'text-[32px] lg:text-[48px]' : 'text-[28px]'}`}>
                     {area}
                   </h4>
                 </div>
