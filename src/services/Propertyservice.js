@@ -37,6 +37,9 @@ const apiHeaders = () => ({
 // localStorage key
 const KEY_USER_PROPERTIES = 'properties:user';
 
+// Bengali numeral → English numeral converter. Converts ০-৯ to 0-9.
+const bnToEn = (s) => String(s || '').replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
+
 // ─── API ROUTE PROBE ──────────────────────────────────────────────────────────
 // We used to persist availability flags to sessionStorage so a missing route
 // wasn't re-probed within a tab session. That was actively harmful in
@@ -529,7 +532,6 @@ export const propertyService = {
         uploadToCloudinary(form.mainVideo?.file || form.mainVideo?.preview || '', 'video'),
       ]);
 
-      const bnToEn = (s) => String(s || '').replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
 
       const body = {
         title:       form.title,
@@ -579,6 +581,8 @@ export const propertyService = {
         return _normaliseApiProperty(data.property);
       }
 
+      // probeFetch can return null on network failure
+      if (!res) throw new Error('Could not reach the server. Please check your connection and try again.');
       // If we reach here the server create failed — surface a real error
       const txt = await res.text();
       let errorMsg = txt;
@@ -658,6 +662,8 @@ export const propertyService = {
         return _normaliseApiProperty(data.property);
       }
 
+      // probeFetch can return null on network failure
+      if (!res) throw new Error('Could not reach the server. Please check your connection and try again.');
       // If the server update failed, surface a real error
       const txt = await res.text();
       let errorMsg = txt;

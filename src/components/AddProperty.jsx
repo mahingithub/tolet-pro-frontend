@@ -670,6 +670,7 @@ const INITIAL_FORM = {
   // an integer; 0 means ground floor. Backend `Property.floor` already
   // accepts -5..200 so we keep this purely numeric.
   floor: '',
+  age: '',
   furnishing: '',
   amenities: [],
   // Step 4 – Media (structured)
@@ -1452,7 +1453,7 @@ const AddProperty = () => {
     if (targetStep >= 1) {
       if (!form.intent)          e.intent    = true;
       if (!form.type)            e.type      = true;
-      if (!form.category)        e.category  = true;
+      if (!form.category && CATEGORIES_BY_TYPE[form.type]) e.category = true;
       if (!form.title.trim() || form.title.trim().length < 3)     e.title     = true;
       if (!form.division)        e.division  = true;
       // District only mandatory when the chosen division actually has
@@ -1464,7 +1465,7 @@ const AddProperty = () => {
       if (!form.location.trim()) e.location  = true;
     }
     if (targetStep >= 2) {
-      if (!form.furnishing)      e.furnishing = true;
+      if (form.type !== 'land' && !form.furnishing) e.furnishing = true;
     }
     if (targetStep >= 4) {
       if (!form.coverPhoto)      e.coverPhoto = true;
