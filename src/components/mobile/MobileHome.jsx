@@ -432,12 +432,12 @@ const PopularAreasBento = ({ t, onPickArea, properties = [] }) => {
                 </div>
               </div>
 
-              {/* BOTTOM LEFT: Area Name & Tagline */}
-              <div className="absolute bottom-3 left-3 flex flex-col items-start text-left">
-                <span className="text-white/90 text-[10px] tracking-wide mb-0.5 font-medium lowercase drop-shadow-sm">
+              {/* BOTTOM TEXT CONTAINER */}
+              <div className="absolute bottom-3 left-3 right-3 flex flex-col items-start text-left pr-10">
+                <span className="text-white/90 text-[10px] tracking-wide mb-0.5 font-medium lowercase drop-shadow-sm line-clamp-1">
                   {POPULAR_AREA_TAGLINES[area] || 'residential area'}
                 </span>
-                <h4 className="text-white text-[24px] font-black tracking-tight leading-none drop-shadow-md">
+                <h4 className="text-white text-[20px] leading-tight font-black tracking-tight drop-shadow-md break-words line-clamp-2">
                   {area}
                 </h4>
               </div>

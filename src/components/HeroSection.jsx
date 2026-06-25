@@ -1010,12 +1010,12 @@ const HeroSection = () => {
                   </div>
                 </div>
 
-                {/* BOTTOM LEFT: Area Name & Tagline */}
-                <div className="absolute bottom-5 left-5 flex flex-col items-start text-left">
-                  <span className="text-white/90 text-xs tracking-wide mb-1 font-medium lowercase drop-shadow-sm">
+                {/* BOTTOM TEXT CONTAINER */}
+                <div className="absolute bottom-5 left-5 right-5 flex flex-col items-start text-left pr-12">
+                  <span className="text-white/90 text-xs tracking-wide mb-1 font-medium lowercase drop-shadow-sm line-clamp-1">
                     {POPULAR_AREA_TAGLINES[area] || 'residential area'}
                   </span>
-                  <h4 className="text-white text-[32px] font-black tracking-tight leading-none drop-shadow-md">
+                  <h4 className="text-white text-[28px] leading-tight font-black tracking-tight drop-shadow-md break-words line-clamp-2">
                     {area}
                   </h4>
                 </div>

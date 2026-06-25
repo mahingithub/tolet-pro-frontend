@@ -109,7 +109,7 @@ export const POPULAR_AREA_IMAGES = {
   Bashundhara: '/image/populer-area/Bashundhara.png',
   Mirpur: '/image/populer-area/Mirpur.png',
   Mohammadpur: '/image/populer-area/mohammadpur.png',
-  'Purbachal New Town': '/image/populer-area/Purbachal New Town.png'
+  'Purbachal New Town': '/image/populer-area/PurbachalNewTown.png'
 };
 
 export const POPULAR_AREA_TAGLINES = {
