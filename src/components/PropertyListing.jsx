@@ -149,8 +149,40 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 	const discountPercent = property.originalPrice && property.originalPrice > property.price
 		? Math.round(((property.originalPrice - property.price) / property.originalPrice) * 100)
 		: 0;
-	const catEntry = RENTAL_CATEGORIES.find((c) => c.id === property.rentalCategory);
-	const catLabel = (catEntry?.tKey && t[catEntry.tKey]) || catEntry?.label || "Others";
+
+	const CATEGORY_LABELS = {
+		family: { en: 'Family Flat', bn: 'ফ্যামিলি ফ্ল্যাট' },
+		bachelor_male: { en: 'Bachelor (Male)', bn: 'ব্যাচেলর (পুরুষ)' },
+		bachelor_female: { en: 'Bachelor (Female)', bn: 'ব্যাচেলর (মহিলা)' },
+		sublet: { en: 'Sublet / Room', bn: 'সাবলেট / রুম' },
+		student_male: { en: 'Student (Male)', bn: 'ছাত্র' },
+		student_female: { en: 'Student (Female)', bn: 'ছাত্রী' },
+		working_professional: { en: 'Working Professional', bn: 'চাকরিজীবী' },
+		hostel: { en: 'Hostel', bn: 'হোস্টেল' },
+		apartment: { en: 'Apartment', bn: 'অ্যাপার্টমেন্ট' },
+		duplex: { en: 'Duplex', bn: 'ডুপ্লেক্স' },
+		triplex: { en: 'Triplex', bn: 'ট্রিপ্লেক্স' },
+		plot: { en: 'Plot / Land', bn: 'প্লট / জমি' },
+		building: { en: 'Building', bn: 'পুরো বিল্ডিং' },
+		commercial_space: { en: 'Commercial Space', bn: 'কমার্শিয়াল স্পেস' },
+		office: { en: 'Office Space', bn: 'অফিস স্পেস' },
+		co_working: { en: 'Co-working Space', bn: 'কো-ওয়ার্কিং স্পেস' },
+		shop: { en: 'Shop', bn: 'দোকান' },
+		showroom: { en: 'Showroom', bn: 'শোরুম' },
+		restaurant: { en: 'Restaurant', bn: 'রেস্টুরেন্ট' },
+		fast_food: { en: 'Fast Food', bn: 'ফাস্ট ফুড' },
+		warehouse: { en: 'Warehouse', bn: 'গুদামঘর' },
+		garage: { en: 'Garage', bn: 'গ্যারেজ' },
+		student: { en: 'Student', bn: 'ছাত্র' },
+		other: { en: 'Others', bn: 'অন্যান্য' }
+	};
+	const currentLang = typeof t?.language === 'string' ? t.language : 'en'; // Usually passed inside t or just fallback to en if not available.
+	// We check if language object has it, wait, useLanguage returns { language, t } but PropertyCard only gets t.
+	// Actually we can just check if t.forRent is in Bengali.
+	const isBn = t?.forRent === 'ভাড়ার জন্য';
+	const catDict = CATEGORY_LABELS[property.rentalCategory];
+	const catLabel = catDict ? (isBn ? catDict.bn : catDict.en) : (property.rentalCategory || "Others");
+
 	const extraRoomCount = Math.max(0, totalRoomCategories - 1 - collageThumbs.length);
 
 	return (

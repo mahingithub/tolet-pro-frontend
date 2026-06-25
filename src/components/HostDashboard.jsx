@@ -4549,9 +4549,59 @@ const HostDashboard = () => {
               // listing card. 2-up from sm:, 3-up from lg:.
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 lg:gap-8">
                 {filteredPropertiesByStatus.map((prop) => {
-                  const gallery = Array.isArray(prop.images) ? prop.images.filter(Boolean) : [];
-                  const coverImg = prop.img || gallery[0] || '';
-                  const thumbs = gallery.length > 1 ? gallery.slice(1, 4) : [];
+                  const CATEGORY_LABELS = {
+                    family: { en: 'Family Flat', bn: 'ফ্যামিলি ফ্ল্যাট' },
+                    bachelor_male: { en: 'Bachelor (Male)', bn: 'ব্যাচেলর (পুরুষ)' },
+                    bachelor_female: { en: 'Bachelor (Female)', bn: 'ব্যাচেলর (মহিলা)' },
+                    sublet: { en: 'Sublet / Room', bn: 'সাবলেট / রুম' },
+                    student_male: { en: 'Student (Male)', bn: 'ছাত্র' },
+                    student_female: { en: 'Student (Female)', bn: 'ছাত্রী' },
+                    working_professional: { en: 'Working Professional', bn: 'চাকরিজীবী' },
+                    hostel: { en: 'Hostel', bn: 'হোস্টেল' },
+                    apartment: { en: 'Apartment', bn: 'অ্যাপার্টমেন্ট' },
+                    duplex: { en: 'Duplex', bn: 'ডুপ্লেক্স' },
+                    triplex: { en: 'Triplex', bn: 'ট্রিপ্লেক্স' },
+                    plot: { en: 'Plot / Land', bn: 'প্লট / জমি' },
+                    building: { en: 'Building', bn: 'পুরো বিল্ডিং' },
+                    commercial_space: { en: 'Commercial Space', bn: 'কমার্শিয়াল স্পেস' },
+                    office: { en: 'Office Space', bn: 'অফিস স্পেস' },
+                    co_working: { en: 'Co-working Space', bn: 'কো-ওয়ার্কিং স্পেস' },
+                    shop: { en: 'Shop', bn: 'দোকান' },
+                    showroom: { en: 'Showroom', bn: 'শোরুম' },
+                    restaurant: { en: 'Restaurant', bn: 'রেস্টুরেন্ট' },
+                    fast_food: { en: 'Fast Food', bn: 'ফাস্ট ফুড' },
+                    warehouse: { en: 'Warehouse', bn: 'গুদামঘর' },
+                    garage: { en: 'Garage', bn: 'গ্যারেজ' },
+                    student: { en: 'Student', bn: 'ছাত্র' },
+                    other: { en: 'Others', bn: 'অন্যান্য' }
+                  };
+                  const catDict = CATEGORY_LABELS[prop.rentalCategory];
+                  const catLabel = catDict ? (language === 'বাংলা' ? catDict.bn : catDict.en) : (prop.rentalCategory || "Others");
+
+                  const uniqueRoomShots = [];
+                  const usedRooms = new Set();
+                  const hasRoomPhotos = Array.isArray(prop.roomPhotos) && prop.roomPhotos.length > 0;
+                  if (hasRoomPhotos) {
+                    for (const p of prop.roomPhotos) {
+                      const roomKey = (p.room || "other").toLowerCase();
+                      const url = p.url || p.preview;
+                      if (url && !usedRooms.has(roomKey)) {
+                        uniqueRoomShots.push({ url, room: roomKey });
+                        usedRooms.add(roomKey);
+                      }
+                    }
+                  }
+                  
+                  const coverImg = prop.coverPhoto || prop.img || (uniqueRoomShots[0]?.url) || (prop.images || [])[0] || '';
+                  let thumbs = uniqueRoomShots.filter(s => s.url !== coverImg).slice(0, 3);
+                  
+                  if (!thumbs.length && !hasRoomPhotos && Array.isArray(prop.images)) {
+                    thumbs = prop.images.filter(u => u && u !== coverImg).slice(0, 3).map(u => ({ url: u, room: null }));
+                  }
+                  
+                  const extraRoomCount = Math.max(0, uniqueRoomShots.length - 1 - thumbs.length);
+                  const ROOM_LABEL_FALLBACK = { bedroom: "Bedroom", bathroom: "Bathroom", living: "Living", kitchen: "Kitchen", other: "Other" };
+
                   const hasSpecs = prop.beds || prop.baths || prop.sqft || prop.furnishing;
                   const ownerLabel = prop.ownerName || userData.fullName;
                   const ownerAvatar = prop.hostAvatar || userData?.avatar;
@@ -4575,12 +4625,17 @@ const HostDashboard = () => {
                             />
                           </div>
                           <div className="w-[28%] h-full flex flex-col gap-1.5">
-                            {thumbs.map((src, i) => (
+                            {thumbs.map((shot, i) => (
                               <div key={i} className="relative flex-1 overflow-hidden bg-gray-200">
-                                <img src={src} alt="" className="w-full h-full object-cover" />
-                                {i === 2 && gallery.length > 4 && (
-                                  <div className="absolute inset-0 bg-[#ba0036]/85 backdrop-blur-sm flex items-center justify-center text-white text-xs font-black">
-                                    +{gallery.length - 4}
+                                <img src={shot.url} alt="" className="w-full h-full object-cover" />
+                                {shot.room && (
+                                  <span className="absolute bottom-1 left-1 px-1.5 py-[2px] rounded-md bg-black/55 text-white text-[8px] font-black uppercase tracking-wider z-10">
+                                    {ROOM_LABEL_FALLBACK[shot.room] || shot.room}
+                                  </span>
+                                )}
+                                {i === 2 && extraRoomCount > 0 && (
+                                  <div className="absolute inset-0 bg-[#ba0036]/85 backdrop-blur-sm flex items-center justify-center text-white text-xs font-black z-20">
+                                    +{extraRoomCount}
                                   </div>
                                 )}
                               </div>
@@ -4612,18 +4667,23 @@ const HostDashboard = () => {
                           </div>
                         )}
                       </div>
-                      {/* ── Intent badge (ভাড়া / বিক্রি / কমার্শিয়াল) ── */}
-                      {prop.intent && (
-                        <div className={`absolute top-3 right-3 z-10 backdrop-blur-md px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-sm ${
-                          prop.intent === 'sale' ? 'bg-blue-600 text-white' :
-                          prop.intent === 'commercial' ? 'bg-purple-600 text-white' :
-                          'bg-green-600 text-white'
-                        }`}>
-                          {prop.intent === 'sale' ? (language === 'বাংলা' ? 'বিক্রির জন্য' : 'For Sale') :
-                           prop.intent === 'commercial' ? (language === 'বাংলা' ? 'কমার্শিয়াল' : 'Commercial') :
-                           (language === 'বাংলা' ? 'ভাড়ার জন্য' : 'For Rent')}
-                        </div>
-                      )}
+                      {/* ── Category & Intent badges (PropertyListing style) ── */}
+                      <div className="absolute top-3 right-3 flex flex-col gap-2 items-end z-10">
+                        <span className="bg-[#ba0036]/90 backdrop-blur-md text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest px-2.5 py-1 md:px-3 md:py-1.5 rounded-lg shadow-sm">
+                          {catLabel}
+                        </span>
+                        {prop.intent && (
+                          <div className={`backdrop-blur-md px-2.5 py-1 md:px-3 md:py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-sm ${
+                            prop.intent === 'sale' ? 'bg-blue-600/90 text-white' :
+                            prop.intent === 'commercial' ? 'bg-purple-600/90 text-white' :
+                            'bg-green-600/90 text-white'
+                          }`}>
+                            {prop.intent === 'sale' ? (language === 'বাংলা' ? 'বিক্রির জন্য' : 'For Sale') :
+                             prop.intent === 'commercial' ? (language === 'বাংলা' ? 'কমার্শিয়াল' : 'Commercial') :
+                             (language === 'বাংলা' ? 'ভাড়ার জন্য' : 'For Rent')}
+                          </div>
+                        )}
+                      </div>
                       <div className="absolute bottom-3 right-3 bg-gray-900/90 backdrop-blur-xl px-4 py-2 md:px-5 md:py-2.5 rounded-[1rem] md:rounded-[1.2rem] font-black text-white shadow-lg text-sm md:text-[15px] z-10">
                         ৳ {prop.price}
                       </div>
