@@ -424,34 +424,43 @@ const PopularAreasBento = ({ t, onPickArea, properties = [] }) => {
                 <Sparkles size={10} /> #{String(idx + 1).padStart(2, '0')}
               </div>
 
+              {/* TOP-CENTER: Logo */}
+              <div className="absolute top-3 inset-x-0 flex justify-center pointer-events-none">
+                <div className="inline-flex items-center gap-1 px-1.5 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/30 shadow-sm">
+                  <div className="bg-[#ba0036] rounded-[4px] flex items-center justify-center w-[18px] h-[18px]">
+                    <Building2 size={10} className="text-white" />
+                  </div>
+                  <span className="text-[8px] font-black text-white mr-1 tracking-wide">
+                    TO-LET <span className="text-[#ba0036]">PRO</span>
+                  </span>
+                </div>
+              </div>
+
               {/* TOP-RIGHT: sub-zone count chip */}
               {subzoneCount > 0 && (
-                <div className="absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 h-7 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-[9.5px] font-black uppercase tracking-[0.16em]">
+                <div className="absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-[9.5px] font-black uppercase tracking-[0.16em]">
                   {subzoneCount} {t.mobZones || 'zones'}
                 </div>
               )}
 
-              {/* BOTTOM: area name + homes count + arrow */}
-              <div className="absolute bottom-0 inset-x-0 p-3.5">
-                <span className="block text-[9px] font-black uppercase tracking-[0.22em] text-white/80 mb-1">
-                  {t.mobPopularAreas}
-                </span>
-                <h4 className="text-white text-[20px] font-black tracking-tight leading-none drop-shadow-md">
+              {/* BOTTOM CENTER: Area Name */}
+              <div className="absolute bottom-12 w-full text-center px-2">
+                <h4 className="text-white text-[28px] font-black tracking-tight leading-none drop-shadow-lg">
                   {area}
                 </h4>
-                <div className="mt-2 flex items-center justify-between">
-                  <div className="inline-flex items-baseline gap-1 px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/30">
-                    <span className="text-white text-[12px] font-black leading-none">
-                      {homeCount}+
-                    </span>
-                    <span className="text-white/80 text-[8.5px] font-semibold leading-none">
-                      {t.mobHomesShort || 'homes'}
-                    </span>
-                  </div>
-                  <span className="w-7 h-7 rounded-full bg-white text-[#ba0036] flex items-center justify-center shadow-md">
-                    <ArrowRight size={13} strokeWidth={2.5} />
-                  </span>
+              </div>
+
+              {/* BOTTOM LEFT: Homes count */}
+              <div className="absolute bottom-3 left-3">
+                <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/40">
+                  <span className="text-white text-[12px] font-black leading-none">{homeCount}+</span>
+                  <span className="text-white/90 text-[10px] font-semibold leading-none lowercase">homes</span>
                 </div>
+              </div>
+
+              {/* BOTTOM RIGHT: Arrow button */}
+              <div className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-white text-[#ba0036] flex items-center justify-center shadow-lg">
+                <ArrowRight size={14} strokeWidth={2.5} />
               </div>
             </button>
           );
