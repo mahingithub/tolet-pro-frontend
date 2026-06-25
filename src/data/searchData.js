@@ -113,14 +113,14 @@ export const POPULAR_AREA_IMAGES = {
 };
 
 export const POPULAR_AREA_IMAGES_DESKTOP = {
-  Dhanmondi: '/image/populer-area/desktop/Dhanmondi.png',
-  Gulshan: '/image/populer-area/desktop/Gulshan.png',
-  Banani: '/image/populer-area/desktop/Banani.png',
-  Uttara: '/image/populer-area/desktop/Uttara.png',
-  Bashundhara: '/image/populer-area/desktop/Bashundhara.png',
-  Mirpur: '/image/populer-area/desktop/Mirpur.png',
-  Mohammadpur: '/image/populer-area/desktop/Mohammadpur.png',
-  'Purbachal New Town': '/image/populer-area/desktop/Purbachal.png'
+  Dhanmondi: '/image/populer-area/desktop/DhanmondiD.png',
+  Gulshan: '/image/populer-area/desktop/GulshanD.png',
+  Banani: '/image/populer-area/desktop/BananiD.png',
+  Uttara: '/image/populer-area/desktop/UttaraD.png',
+  Bashundhara: '/image/populer-area/desktop/BashundharaD.png',
+  Mirpur: '/image/populer-area/desktop/MirpurD.png',
+  Mohammadpur: '/image/populer-area/desktop/MohammadpurD.png',
+  'Purbachal New Town': '/image/populer-area/desktop/PurbachalD.png'
 };
 
 export const POPULAR_AREA_TAGLINES = {
