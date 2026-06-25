@@ -102,14 +102,14 @@ export const POPULAR_AREAS = [
 ];
 
 export const POPULAR_AREA_IMAGES = {
-  Dhanmondi: '/image/dhanmondi.png',
-  Gulshan: '/image/Gulshan.png',
-  Banani: '/image/Banani.png',
-  Uttara: '/image/Uttara.png',
-  Bashundhara: '/image/Bashundhara,.png',
-  Mirpur: '/image/Mirpur.png',
-  Mohammadpur: '/image/mohammadpur.png',
-  'Purbachal New Town': '/image/Purbachal New Town.png'
+  Dhanmondi: '/image/populer-area/dhanmondi.png',
+  Gulshan: '/image/populer-area/Gulshan.png',
+  Banani: '/image/populer-area/Banani.png',
+  Uttara: '/image/populer-area/Uttara.png',
+  Bashundhara: '/image/populer-area/Bashundhara.png',
+  Mirpur: '/image/populer-area/Mirpur.png',
+  Mohammadpur: '/image/populer-area/mohammadpur.png',
+  'Purbachal New Town': '/image/populer-area/Purbachal New Town.png'
 };
 
 export const POPULAR_AREA_TAGLINES = {
