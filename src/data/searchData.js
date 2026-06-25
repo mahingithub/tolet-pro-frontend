@@ -98,17 +98,18 @@ export const ALL_SUGGESTIONS = [
 // Shown on the mobile "Popular Areas" section. Same list the desktop hero
 // uses for its `rentBuyChips`.
 export const POPULAR_AREAS = [
-  'Dhanmondi', 'Gulshan', 'Banani', 'Uttara', 'Bashundhara', 'Mirpur', 'Mohammadpur',
+  'Dhanmondi', 'Gulshan', 'Banani', 'Uttara', 'Bashundhara', 'Mirpur', 'Mohammadpur', 'Purbachal New Town',
 ];
 
 export const POPULAR_AREA_IMAGES = {
   Dhanmondi: '/image/dhanmondi.png',
-  Gulshan: 'https://thumbs.dreamstime.com/b/gulshan-dhaka-bangladesh-traffics-crossing-signal-busy-circle-evening-high-buildings-background-280740296.jpg',
-  Banani: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRrmLre9dcvRHKLjGX3e5NLY27tjItA8HsZ4g&s',
-  Uttara: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/RAJUK_Uttara_Apartment_Project_%28cropped%29.jpg/330px-RAJUK_Uttara_Apartment_Project_%28cropped%29.jpg',
-  Bashundhara: 'https://www.bashundharahousing.com/api/assets/Several%20Nice%20Location%20of%20Bashundhara%20RA%202.jpeg',
-  Mirpur: 'https://dscdn.daily-sun.com/english/uploads/news_photos/2025/07/21/1753105721-78de7f89e9acf2851f429b382a631c18.jpeg',
-  Mohammadpur: 'https://thumbs.dreamstime.com/b/aerial-view-buildings-capital-city-dhaka-bangladesh-view-mohammadpur-bright-sunny-day-aerial-view-buildings-229193615.jpg'
+  Gulshan: '/image/Gulshan.png',
+  Banani: '/image/Banani.png',
+  Uttara: '/image/Uttara.png',
+  Bashundhara: '/image/Bashundhara,.png',
+  Mirpur: '/image/Mirpur.png',
+  Mohammadpur: '/image/mohammadpur.png',
+  'Purbachal New Town': '/image/Purbachal New Town.png'
 };
 
 // ─── POPULAR-AREA SUB-ZONES ──────────────────────────────────────────────────
@@ -214,6 +215,38 @@ export const POPULAR_AREA_SUBZONES = {
     { id: 'mohammadpur-iqbal-road', name: 'Iqbal Road',        tagline: 'Budget' },
     { id: 'mohammadpur-tajmahal-road', name: 'Tajmahal Road',  tagline: 'Connectivity' },
     { id: 'mohammadpur-katasur',  name: 'Katasur',             tagline: 'Calm lanes' },
+  ],
+  'Purbachal New Town': [
+    { id: 'purbachal-sector-1',   name: 'Sector 1',  tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-2',   name: 'Sector 2',  tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-3',   name: 'Sector 3',  tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-4',   name: 'Sector 4',  tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-5',   name: 'Sector 5',  tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-6',   name: 'Sector 6',  tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-7',   name: 'Sector 7',  tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-8',   name: 'Sector 8',  tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-9',   name: 'Sector 9',  tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-10',  name: 'Sector 10', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-11',  name: 'Sector 11', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-12',  name: 'Sector 12', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-13',  name: 'Sector 13', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-14',  name: 'Sector 14', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-15',  name: 'Sector 15', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-16',  name: 'Sector 16', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-17',  name: 'Sector 17', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-18',  name: 'Sector 18', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-19',  name: 'Sector 19', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-20',  name: 'Sector 20', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-21',  name: 'Sector 21', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-22',  name: 'Sector 22', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-23',  name: 'Sector 23', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-24',  name: 'Sector 24', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-25',  name: 'Sector 25', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-26',  name: 'Sector 26', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-27',  name: 'Sector 27', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-28',  name: 'Sector 28', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-29',  name: 'Sector 29', tagline: 'Upcoming Megacity' },
+    { id: 'purbachal-sector-30',  name: 'Sector 30', tagline: 'Upcoming Megacity' },
   ],
 };
 
