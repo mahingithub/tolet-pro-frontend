@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import usePropertyStore from '../store/usePropertyStore';
-import { DIVISIONS, POPULAR_AREAS, POPULAR_AREA_IMAGES, POPULAR_AREA_TAGLINES, POPULAR_AREA_SUBZONES, buildSearchUrl } from '../data/searchData';
+import { DIVISIONS, POPULAR_AREAS, POPULAR_AREA_IMAGES, POPULAR_AREA_IMAGES_DESKTOP, POPULAR_AREA_TAGLINES, POPULAR_AREA_SUBZONES, buildSearchUrl } from '../data/searchData';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTEXT DATA
@@ -261,7 +261,7 @@ const ACCORD_CSS = `
 `;
 
 const PopularAreasAccordion = ({
-  areas = [], images = {}, taglines = {}, subzones = {},
+  areas = [], images = {}, desktopImages = {}, taglines = {}, subzones = {},
   t = {}, language = 'English', navigate,
   setOpenArea, setPendingLocation, setIsCategoryPromptOpen,
 }) => {
@@ -326,7 +326,9 @@ const PopularAreasAccordion = ({
               }}
             >
               {/* bg */}
-              {images[area] ? (
+              {desktopImages[area] ? (
+                <img src={desktopImages[area]} alt={area} className="tlp-bg" onError={(e) => { e.target.onerror = null; e.target.src = images[area] || ''; }} />
+              ) : images[area] ? (
                 <img src={images[area]} alt={area} className="tlp-bg" />
               ) : (
                 <div
@@ -1279,6 +1281,7 @@ const HeroSection = () => {
         <PopularAreasAccordion
           areas={POPULAR_AREAS}
           images={POPULAR_AREA_IMAGES}
+          desktopImages={POPULAR_AREA_IMAGES_DESKTOP}
           taglines={POPULAR_AREA_TAGLINES}
           subzones={POPULAR_AREA_SUBZONES}
           t={t}

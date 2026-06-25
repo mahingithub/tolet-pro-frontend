@@ -112,6 +112,17 @@ export const POPULAR_AREA_IMAGES = {
   'Purbachal New Town': '/image/populer-area/Purbachal.png?v=2'
 };
 
+export const POPULAR_AREA_IMAGES_DESKTOP = {
+  Dhanmondi: '/image/populer-area/desktop/Dhanmondi.png',
+  Gulshan: '/image/populer-area/desktop/Gulshan.png',
+  Banani: '/image/populer-area/desktop/Banani.png',
+  Uttara: '/image/populer-area/desktop/Uttara.png',
+  Bashundhara: '/image/populer-area/desktop/Bashundhara.png',
+  Mirpur: '/image/populer-area/desktop/Mirpur.png',
+  Mohammadpur: '/image/populer-area/desktop/Mohammadpur.png',
+  'Purbachal New Town': '/image/populer-area/desktop/Purbachal.png'
+};
+
 export const POPULAR_AREA_TAGLINES = {
   Dhanmondi: 'Lakeside Residential',
   Gulshan: 'Commercial Hub',
