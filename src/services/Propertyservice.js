@@ -529,6 +529,8 @@ export const propertyService = {
         uploadToCloudinary(form.mainVideo?.file || form.mainVideo?.preview || '', 'video'),
       ]);
 
+      const bnToEn = (s) => String(s || '').replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
+
       const body = {
         title:       form.title,
         intent:      form.intent      || 'rent',
@@ -542,14 +544,14 @@ export const propertyService = {
         gpsLat:      form.gpsLat      || null,
         gpsLng:      form.gpsLng      || null,
         gpsAddress:  form.gpsAddress  || '',
-        beds:        Number(form.beds)  || 1,
-        baths:       Number(form.baths) || 1,
-        sqft:        Number(form.sqft)  || 0,
-        floor:       Number(form.floor ?? form.floorNumber) || 0,
+        beds:        Number(bnToEn(form.beds))  || 1,
+        baths:       Number(bnToEn(form.baths)) || 1,
+        sqft:        Number(bnToEn(form.sqft))  || 0,
+        floor:       Number(bnToEn(form.floor ?? form.floorNumber)) || 0,
         furnishing:  form.furnishing,
         description: form.description,
         amenities:   form.amenities   || [],
-        price:       Number(String(form.price ?? '').replace(/[^\d.]/g, '')) || 0,
+        price:       Number(bnToEn(form.price).replace(/[^\d.]/g, '')) || 0,
         status:      form.status      || 'active',
         coverPhoto,
         // Card-size cover is derived from the Cloudinary URL on the fly, so we
@@ -576,12 +578,20 @@ export const propertyService = {
         broadcast(KEY_USER_PROPERTIES);
         return _normaliseApiProperty(data.property);
       }
+
+      // If we reach here the server create failed — surface a real error
+      const txt = await res.text();
+      let errorMsg = txt;
+      try {
+        const parsed = JSON.parse(txt);
+        errorMsg = parsed.message || JSON.stringify(parsed);
+      } catch (e) {
+        // Not JSON
+      }
+      throw new Error(`Backend error: ${res.status} - ${errorMsg}`);
     }
 
-    // No localStorage fallback. If we reach here the server create failed (or
-    // there's no auth token) — surface a real error instead of silently saving
-    // the listing to this device only.
-    const txt = await res.text(); throw new Error(`Backend error: ${res.status} - ${txt}`);
+    throw new Error('Authentication token missing. Please sign in again.');
   },
 
   /**
@@ -647,10 +657,20 @@ export const propertyService = {
         broadcast(KEY_USER_PROPERTIES);
         return _normaliseApiProperty(data.property);
       }
+
+      // If the server update failed, surface a real error
+      const txt = await res.text();
+      let errorMsg = txt;
+      try {
+        const parsed = JSON.parse(txt);
+        errorMsg = parsed.message || JSON.stringify(parsed);
+      } catch (e) {
+        // Not JSON
+      }
+      throw new Error(`Backend error: ${res.status} - ${errorMsg}`);
     }
 
-    // No localStorage fallback — surface a real error if the server update failed.
-    throw new Error('Could not update the property on the server. Please try again.');
+    throw new Error('Authentication token missing. Please sign in again.');
   },
 
   /**
