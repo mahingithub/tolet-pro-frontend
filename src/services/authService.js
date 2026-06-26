@@ -73,21 +73,33 @@ function clearSession() {
   broadcast(KEY_USER);
 }
 
-// 🧹 Purge every per-user TenantDashboard cache slot + the legacy global
-// key + the older `userName` / `userPhone` keys. Called on logout AND
-// right before persisting a fresh signup session so account B can never
+// 🧹 Purge every per-user cache slot.
+// Called on logout AND right before persisting a fresh signup session so account B can never
 // inherit account A's cached profile data from the same browser. We
 // scan all localStorage keys because we don't know the previous user
 // id at this point.
-function purgeTenantProfileCaches() {
+function purgeUserCaches() {
   try {
-    localStorage.removeItem('tolet_tenant_profile');
-    localStorage.removeItem('userName');
-    localStorage.removeItem('userPhone');
+    const keysToRemove = [
+      'tolet_tenant_profile',
+      'userName',
+      'userPhone',
+      'tolet_chat_history',
+      'tolet_chat_threads',
+      'tolet_offline_messages',
+      'tolet_payment_receipts',
+      'tolet_host_receipts',
+      'savedProperties',
+      'ai_chat_history'
+    ];
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+
     const toDelete = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && k.startsWith('tolet_tenant_profile:')) toDelete.push(k);
+      if (k && (k.startsWith('tolet_tenant_profile:') || k.startsWith('tolet_host_profile:'))) {
+        toDelete.push(k);
+      }
     }
     toDelete.forEach((k) => localStorage.removeItem(k));
   } catch { /* ignore */ }
@@ -102,7 +114,7 @@ export const signupVerify = async ({ idToken }) => {
   // Purge any previous account's TenantDashboard cache BEFORE persisting
   // the new session, otherwise the freshly-mounted dashboard reads stale
   // fullName/phone from the prior user's storage slot.
-  purgeTenantProfileCaches();
+  purgeUserCaches();
   persistSession(data);
   return data.user;
 };
@@ -119,7 +131,7 @@ export const loginWithPassword = async ({ phone, password }) => {
   const prevId = prev?.id || prev?._id;
   const nextId = data.user?.id || data.user?._id;
   if (!prevId || String(prevId) !== String(nextId)) {
-    purgeTenantProfileCaches();
+    purgeUserCaches();
   }
   persistSession(data);
   return data.user;
@@ -137,7 +149,7 @@ export const fetchMe = () => api('/me', { method: 'GET', auth: true }).then((d) 
 export const logout = async () => {
   try { await unsubscribeFromPushNotifications(); } catch { /* ignore */ }
   try { await api('/logout', { auth: true }); } catch { /* ignore */ }
-  purgeTenantProfileCaches();
+  purgeUserCaches();
   clearSession();
   return { ok: true };
 };

@@ -353,6 +353,7 @@ const ChatSystem = () => {
   // We hydrate from localStorage for instant perceived load (SWR pattern),
   // then conversations are synced from Mongo.
   const [chats, setChats] = useState(() => {
+    if (!getCurrentUser()) return initialChats;
     try {
       const stored = JSON.parse(localStorage.getItem(CHAT_THREADS_KEY));
       if (stored && Array.isArray(stored) && stored.length > 0) {
@@ -408,6 +409,7 @@ const ChatSystem = () => {
   // store. For backend conversations it's a cache populated by the poll.
   // Hydrated from localStorage for instant perceived load.
   const [messages, setMessages] = useState(() => {
+    if (!getCurrentUser()) return { 'ai-bot': [] };
     try {
       const stored = JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY));
       if (stored && typeof stored === 'object') {
@@ -420,17 +422,21 @@ const ChatSystem = () => {
 
   // Sync to localStorage for instant hydration on next mount
   useEffect(() => {
-    localStorage.setItem(CHAT_THREADS_KEY, JSON.stringify(chats));
+    if (getCurrentUser()) {
+      localStorage.setItem(CHAT_THREADS_KEY, JSON.stringify(chats));
+    }
   }, [chats]);
 
   useEffect(() => {
-    const slim = {};
-    for (const key in messages) {
-      if (Array.isArray(messages[key])) {
-        slim[key] = messages[key].slice(-50); // Keep last 50 per chat
+    if (getCurrentUser()) {
+      const slim = {};
+      for (const key in messages) {
+        if (Array.isArray(messages[key])) {
+          slim[key] = messages[key].slice(-50); // Keep last 50 per chat
+        }
       }
+      localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(slim));
     }
-    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(slim));
   }, [messages]);
 
   // ─── Socket.IO Call Connection ──────────────────────────────────────────────
