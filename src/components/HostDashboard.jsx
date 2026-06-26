@@ -1367,7 +1367,7 @@ const HostDashboard = () => {
         furnishing: data.furnishing || 'Unfurnished',
         description: data.description || '',
         status: data.status || 'active',
-        img: data.img || gallery[0] || '',
+        img: data.coverPhoto || data.img || gallery[0] || '',
         images: gallery,
         roomPhotos: Array.isArray(data.roomPhotos) ? data.roomPhotos : [],
         specificDetails: (data.specificDetails && typeof data.specificDetails === 'object' && !Array.isArray(data.specificDetails)) ? data.specificDetails : {},
@@ -5749,7 +5749,7 @@ const HostDashboard = () => {
                   };
 
                   const priceNumber = parseSafeNum(editForm.price);
-                  const cover = editForm.img || (editForm.roomPhotos || [])[0]?.preview || '';
+                  const cover = editForm.img || (editForm.roomPhotos || [])[0]?.preview || (editForm.roomPhotos || [])[0]?.url || '';
                   
                   const existingRoomPhotos = modalData.roomPhotos || [];
                   const roomPhotos = editForm.roomPhotos || [];
@@ -5772,15 +5772,17 @@ const HostDashboard = () => {
                   // Persist host-owned listings; demo seed entries fall through
                   // and live only in component state.
                   try {
-                    await propertyService.updateProperty(modalData.id, patch);
+                    const updatedProperty = await propertyService.updateProperty(modalData.id, patch);
                     
                     setProperties(prev => prev.map(p => p.id === modalData.id ? {
                       ...p,
-                      ...patch,
+                      ...updatedProperty,
                       // Mirror the cover to the display aliases the card reads.
-                      img: cover,
-                      coverPhoto: cover,
-                      images: (editForm.roomPhotos || []).map(p => p.preview || p.url),
+                      img: updatedProperty.coverPhoto || cover,
+                      coverPhoto: updatedProperty.coverPhoto || cover,
+                      images: Array.isArray(updatedProperty.roomPhotos) 
+                        ? updatedProperty.roomPhotos.map(rp => rp.url).filter(Boolean)
+                        : (editForm.roomPhotos || []).map(p => p.preview || p.url),
                       // Keep the display-formatted price string on the card.
                       price: priceNumber.toLocaleString('en-IN'),
                     } : p));
@@ -5852,11 +5854,12 @@ const HostDashboard = () => {
                                 const files = Array.from(e.target.files || []);
                                 if (files.length === 0) return;
                                 const urls = await Promise.all(files.map(readFileAsDataUrl));
-                                const newPhotos = urls.filter(Boolean).map(url => ({
+                                const newPhotos = urls.filter(Boolean).map((url, index) => ({
                                    id: Date.now() + Math.random(),
                                    url: url,
                                    preview: url,
-                                   room: selectedRoomType
+                                   room: selectedRoomType,
+                                   file: files[index]
                                 }));
                                 setEditForm(f => ({ ...f, roomPhotos: [...(f.roomPhotos || []), ...newPhotos] }));
                                 e.target.value = '';
