@@ -13,7 +13,7 @@ import {
   XCircle, AlertCircle, RefreshCw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, MinusCircle,
   Banknote, ArrowRight, ArrowUpRight, Clock, Smartphone,
   BellOff, CalendarRange, BarChart3,
-  Bed, Bath, Maximize2, Sofa, Trash, ImagePlus
+  Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Map, Leaf
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -49,6 +49,35 @@ const toPortfolioCard = (p) => ({
   addedDate: p.addedDate || (p.createdAt ? String(p.createdAt).slice(0, 10) : ''),
   inquiries: p.inquiries ?? 0,
 });
+
+const ROOM_TYPES_RESIDENTIAL = [
+  { id: 'bedroom',    label: 'Bedroom',     labelBn: 'শোবার ঘর',  icon: BedDouble },
+  { id: 'bathroom',   label: 'Bathroom',    labelBn: 'বাথরুম',    icon: Bath },
+  { id: 'living',     label: 'Living Room', labelBn: 'বসার ঘর',   icon: Home },
+  { id: 'kitchen',    label: 'Kitchen',     labelBn: 'রান্নাঘর',  icon: Utensils },
+  { id: 'other',      label: 'Other',       labelBn: 'অন্যান্য',  icon: Camera },
+];
+
+const ROOM_TYPES_COMMERCIAL = [
+  { id: 'workspace',  label: 'Workspace / Floor', labelBn: 'ওয়ার্কস্পেস / ফ্লোর',  icon: Building },
+  { id: 'reception',  label: 'Reception / Front', labelBn: 'রিসেপশন / সামনের অংশ',icon: Users },
+  { id: 'meeting',    label: 'Meeting Room',      labelBn: 'মিটিং রুম',         icon: Coffee },
+  { id: 'washroom',   label: 'Washroom',          labelBn: 'ওয়াশরুম',          icon: Bath },
+  { id: 'other',      label: 'Other',             labelBn: 'অন্যান্য',          icon: Camera },
+];
+
+const ROOM_TYPES_LAND = [
+  { id: 'plot_area',  label: 'Plot Area',         labelBn: 'প্লটের এরিয়া',      icon: Map },
+  { id: 'road_view',  label: 'Road View',         labelBn: 'রাস্তার ছবি',         icon: MapPin },
+  { id: 'surrounding',label: 'Surroundings',      labelBn: 'আশপাশের এলাকা',     icon: Leaf },
+  { id: 'other',      label: 'Other',             labelBn: 'অন্যান্য',          icon: Camera },
+];
+
+const getRoomTypes = (intent, type) => {
+  if (type === 'land') return ROOM_TYPES_LAND;
+  if (intent === 'commercial' || ['shop', 'restaurant', 'office', 'showroom'].includes(type)) return ROOM_TYPES_COMMERCIAL;
+  return ROOM_TYPES_RESIDENTIAL;
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CROSS-MODULE DATA CONTRACT (frontend stub — backend wires it together later)
@@ -655,10 +684,11 @@ const HostDashboard = () => {
     title: '', price: '', location: '',
     beds: 1, baths: 1, sqft: 0, floor: 0, furnishing: 'Unfurnished',
     description: '', status: 'active',
-    img: '', images: [],
+    img: '', images: [], roomPhotos: [],
     specificDetails: {},
   };
   const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM);
+  const [selectedRoomType, setSelectedRoomType] = useState('bedroom');
   const [activeDropdownId, setActiveDropdownId] = useState(null);
   // NOTE: in-dashboard chat panel removed — all message CTAs now route to
   // /messages (the standalone ChatSystem) so there's a single source of
@@ -1339,6 +1369,7 @@ const HostDashboard = () => {
         status: data.status || 'active',
         img: data.img || gallery[0] || '',
         images: gallery,
+        roomPhotos: Array.isArray(data.roomPhotos) ? data.roomPhotos : [],
         specificDetails: (data.specificDetails && typeof data.specificDetails === 'object' && !Array.isArray(data.specificDetails)) ? data.specificDetails : {},
       });
     } else if (type === 'update_inquiry' && data) {
@@ -5718,13 +5749,10 @@ const HostDashboard = () => {
                   };
 
                   const priceNumber = parseSafeNum(editForm.price);
-                  const cover = editForm.img || (editForm.images || [])[0] || '';
+                  const cover = editForm.img || (editForm.roomPhotos || [])[0]?.preview || '';
                   
                   const existingRoomPhotos = modalData.roomPhotos || [];
-                  const roomPhotos = (editForm.images || []).map(url => {
-                    const existing = existingRoomPhotos.find(rp => rp.url === url || rp.preview === url);
-                    return existing ? { url: existing.url, room: existing.room || 'other' } : { url, room: 'other' };
-                  });
+                  const roomPhotos = editForm.roomPhotos || [];
                   
                   const patch = {
                     title: editForm.title.trim(),
@@ -5752,7 +5780,7 @@ const HostDashboard = () => {
                       // Mirror the cover to the display aliases the card reads.
                       img: cover,
                       coverPhoto: cover,
-                      images: editForm.images,
+                      images: (editForm.roomPhotos || []).map(p => p.preview || p.url),
                       // Keep the display-formatted price string on the card.
                       price: priceNumber.toLocaleString('en-IN'),
                     } : p));
@@ -5763,7 +5791,7 @@ const HostDashboard = () => {
                     showToast(language === 'বাংলা' ? 'আপডেট ব্যর্থ হয়েছে!' : 'Failed to update property.');
                   }
                 };
-                const coverPreview = editForm.img || editForm.images?.[0] || '';
+                const coverPreview = editForm.img || editForm.roomPhotos?.[0]?.preview || '';
                 return (
                   <div className="space-y-5">
                     {/* Cover photo swap */}
@@ -5784,35 +5812,82 @@ const HostDashboard = () => {
                       </div>
                     </div>
 
-                    {/* Gallery management */}
+                    {/* Room Photos */}
                     <div>
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'গ্যালারি' : 'Gallery'}</label>
-                        <label className="cursor-pointer inline-flex items-center gap-1.5 bg-gray-900 text-white px-3 py-1.5 rounded-full text-[10px] font-black hover:bg-gray-800">
-                          <ImagePlus size={12}/> {language === 'বাংলা' ? 'ছবি যোগ' : 'Add Photos'}
-                          <input type="file" accept="image/*" multiple className="hidden" onChange={onGalleryAdd} />
-                        </label>
+                      <div className="flex items-center justify-between mb-4">
+                         <div>
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'রুম অনুযায়ী ছবি' : 'Room Photos'}</label>
+                            <p className="text-[11px] font-bold text-gray-400 mt-1">
+                               {language === 'বাংলা' 
+                                 ? 'শোবার ঘর, বাথরুম, বসার ঘর ইত্যাদির ছবি আলাদাভাবে যোগ করুন।' 
+                                 : 'Add photos for each room separately.'}
+                            </p>
+                         </div>
+                         <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-md">{(editForm.roomPhotos || []).length}/20</span>
                       </div>
-                      <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 gap-2">
-                        {(editForm.images || []).map((src, i) => (
-                          <div key={`${src.slice(0, 32)}-${i}`} className="relative group aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-100">
-                            <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                            {editForm.img === src && (
+
+                      {/* Room Photo Tabs */}
+                      <div className="flex gap-2 flex-wrap mb-4">
+                        {getRoomTypes(modalData.intent, modalData.type).map(rt => (
+                          <button key={rt.id} type="button"
+                            onClick={() => setSelectedRoomType(rt.id)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all
+                              ${selectedRoomType === rt.id
+                                ? 'bg-gray-900 text-white shadow-sm'
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                            {rt.icon && <rt.icon size={15} />}
+                            {language === 'বাংলা' ? rt.labelBn : rt.label}
+                            <span className="text-[9px] font-black opacity-60">
+                              ({(editForm.roomPhotos || []).filter(p => p.room === rt.id).length})
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        {/* Upload Button specific for room */}
+                        {(editForm.roomPhotos || []).length < 20 && (
+                          <label className="aspect-square border-2 border-dashed border-gray-200 hover:border-[#ba0036] hover:bg-red-50/20 rounded-xl flex flex-col items-center justify-center text-center transition-all cursor-pointer group">
+                             <input type="file" accept="image/*" multiple className="hidden" onChange={async (e) => {
+                                const files = Array.from(e.target.files || []);
+                                if (files.length === 0) return;
+                                const urls = await Promise.all(files.map(readFileAsDataUrl));
+                                const newPhotos = urls.filter(Boolean).map(url => ({
+                                   id: Date.now() + Math.random(),
+                                   url: url,
+                                   preview: url,
+                                   room: selectedRoomType
+                                }));
+                                setEditForm(f => ({ ...f, roomPhotos: [...(f.roomPhotos || []), ...newPhotos] }));
+                                e.target.value = '';
+                             }} />
+                             <Plus size={20} className="text-gray-400 group-hover:text-[#ba0036] mb-1" />
+                             <span className="text-[9px] font-bold text-gray-400 group-hover:text-[#ba0036] px-2">{language === 'বাংলা' ? 'ছবি যোগ' : 'Add Photos'}</span>
+                          </label>
+                        )}
+                        
+                        {/* Filtered Photos */}
+                        {(editForm.roomPhotos || []).filter(p => p.room === selectedRoomType).map((photo) => (
+                          <div key={photo.id || photo.preview || photo.url} className="relative group aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-100 shadow-sm">
+                            <img src={photo.preview || photo.url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                            {editForm.img === (photo.preview || photo.url) && (
                               <div className="absolute top-1 left-1 bg-[#ba0036] text-white text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-widest">{language === 'বাংলা' ? 'কভার' : 'Cover'}</div>
                             )}
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
-                              {editForm.img !== src && (
-                                <button type="button" onClick={() => makeCover(i)} className="bg-white text-gray-900 px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest">{language === 'বাংলা' ? 'কভার' : 'Cover'}</button>
+                              {editForm.img !== (photo.preview || photo.url) && (
+                                <button type="button" onClick={() => setEditForm(f => ({...f, img: (photo.preview || photo.url)}))} className="bg-white text-gray-900 px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest">{language === 'বাংলা' ? 'কভার' : 'Cover'}</button>
                               )}
-                              <button type="button" onClick={() => removeGalleryAt(i)} className="bg-red-500 text-white p-1.5 rounded-md"><Trash size={12}/></button>
+                              <button type="button" onClick={() => {
+                                setEditForm(f => {
+                                  const next = (f.roomPhotos || []).filter(p => p !== photo);
+                                  const removedUrl = photo.preview || photo.url;
+                                  const img = f.img === removedUrl ? (next[0]?.preview || next[0]?.url || '') : f.img;
+                                  return { ...f, roomPhotos: next, img };
+                                });
+                              }} className="bg-red-500 text-white p-1.5 rounded-md"><Trash size={12}/></button>
                             </div>
                           </div>
                         ))}
-                        {(editForm.images || []).length === 0 && (
-                          <p className="col-span-3 sm:col-span-4 text-[11px] font-bold text-gray-400 text-center py-6 bg-gray-50 rounded-xl">
-                            {language === 'বাংলা' ? 'কোনো ছবি নেই — উপরের বোতাম দিয়ে যোগ করুন।' : 'No photos yet — add some with the button above.'}
-                          </p>
-                        )}
                       </div>
                     </div>
 
