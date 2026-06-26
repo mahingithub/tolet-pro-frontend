@@ -13,10 +13,10 @@ import { DIVISIONS, POPULAR_AREAS, POPULAR_AREA_IMAGES, POPULAR_AREA_IMAGES_DESK
 // CONTEXT DATA
 // ─────────────────────────────────────────────────────────────────────────────
 const popularCities = [
-  { id: 'dhaka',      name: 'Dhaka',      desc: 'Central Hub',       image: '/image/Divition/Dhaka-Division.png' },
-  { id: 'chittagong', name: 'Chattogram', desc: 'Port City',         image: '/image/Divition/Chattogram.png' },
-  { id: 'sylhet',     name: 'Sylhet',     desc: 'Tea Gardens',       image: '/image/Divition/Sylhet-Division.png' },
-  { id: 'rajshahi',   name: 'Rajshahi',   desc: 'Silk City',         image: '/image/Divition/Rajshahi-Division.png' },
+  { id: 'dhaka',      name: 'Dhaka',      desc: 'Central Hub',       image: '/image/Divition/Dhaka-Division.png?v=3' },
+  { id: 'chittagong', name: 'Chattogram', desc: 'Port City',         image: '/image/Divition/Chattogram.png?v=3' },
+  { id: 'sylhet',     name: 'Sylhet',     desc: 'Tea Gardens',       image: '/image/Divition/Sylhet-Division.png?v=3' },
+  { id: 'rajshahi',   name: 'Rajshahi',   desc: 'Silk City',         image: '/image/Divition/Rajshahi-Division.png?v=3' },
   { id: 'khulna',     name: 'Khulna',     desc: 'Mangrove Forest',   image: 'https://images.unsplash.com/photo-1479839672679-a46483c0e7c8?w=800&q=80' },
   { id: 'barishal',   name: 'Barishal',   desc: 'City of Rivers',    image: 'https://images.unsplash.com/photo-1588600878108-578307a3cc9d?w=800&q=80' },
 ];
