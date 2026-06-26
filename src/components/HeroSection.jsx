@@ -19,6 +19,8 @@ const popularCities = [
   { id: 'rajshahi',   name: 'Rajshahi',   desc: 'Silk City',         image: '/image/Divition/Rajshahi.png?v=4' },
   { id: 'khulna',     name: 'Khulna',     desc: 'Mangrove Forest',   image: '/image/Divition/Khulna.png?v=4' },
   { id: 'barishal',   name: 'Barishal',   desc: 'City of Rivers',    image: '/image/Divition/Barishal.png?v=4' },
+  { id: 'rangpur',    name: 'Rangpur',    desc: 'Northern Hub',      image: '/image/Divition/Rangpur.png?v=4' },
+  { id: 'mymensingh', name: 'Mymensingh', desc: 'Heritage City',     image: '/image/Divition/Mymensingh.png?v=4' },
 ];
 
 const dhakaFinest = [
