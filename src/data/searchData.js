@@ -23,28 +23,28 @@
 // Used by the mobile "Explore Divisions" strip and the Navbar drawer.
 export const DIVISIONS = [
   { id: 'dhaka',      name: 'Dhaka',      tagline: 'Capital',     hot: true,
-    image: '/image/Divition/Dhaka.png?v=4',
+    image: '/image/Divition/Dhaka.png?v=5',
     districts: ['Dhaka','Faridpur','Gazipur','Gopalganj','Kishoreganj','Madaripur','Manikganj','Munshiganj','Narayanganj','Narsingdi','Rajbari','Shariatpur','Tangail'] },
   { id: 'chittagong', name: 'Chattogram', tagline: 'Port City',
-    image: '/image/Divition/Chattogram.png?v=4',
+    image: '/image/Divition/Chattogram.png?v=5',
     districts: ['Chattogram','Bandarban','Brahmanbaria','Chandpur','Comilla',"Cox's Bazar",'Feni','Khagrachari','Lakshmipur','Noakhali','Rangamati'] },
   { id: 'sylhet',     name: 'Sylhet',     tagline: 'Tea Gardens',
-    image: '/image/Divition/Sylhet.png?v=4',
+    image: '/image/Divition/Sylhet.png?v=5',
     districts: ['Sylhet','Habiganj','Moulvibazar','Sunamganj'] },
   { id: 'rajshahi',   name: 'Rajshahi',   tagline: 'Silk City',
-    image: '/image/Divition/Rajshahi.png?v=4',
+    image: '/image/Divition/Rajshahi.png?v=5',
     districts: ['Rajshahi','Bogura','Chapainawabganj','Joypurhat','Naogaon','Natore','Pabna','Sirajganj'] },
   { id: 'khulna',     name: 'Khulna',     tagline: 'Mangrove',
-    image: '/image/Divition/Khulna.png?v=4',
+    image: '/image/Divition/Khulna.png?v=5',
     districts: ['Khulna','Bagerhat','Chuadanga','Jashore','Jhenaidah','Kushtia','Magura','Meherpur','Narail','Satkhira'] },
   { id: 'barishal',   name: 'Barishal',   tagline: 'Rivers',
-    image: '/image/Divition/Barishal.png?v=4',
+    image: '/image/Divition/Barishal.png?v=5',
     districts: ['Barishal','Barguna','Bhola','Jhalokati','Patuakhali','Pirojpur'] },
   { id: 'rangpur',    name: 'Rangpur',    tagline: 'North',
-    image: '/image/Divition/Rangpur.png?v=4',
+    image: '/image/Divition/Rangpur.png?v=5',
     districts: ['Rangpur','Dinajpur','Gaibandha','Kurigram','Lalmonirhat','Nilphamari','Panchagarh','Thakurgaon'] },
   { id: 'mymensingh', name: 'Mymensingh', tagline: 'Heritage',
-    image: '/image/Divition/Mymensingh.png?v=4',
+    image: '/image/Divition/Mymensingh.png?v=5',
     districts: ['Mymensingh','Jamalpur','Netrokona','Sherpur'] },
 ];
 
@@ -102,14 +102,14 @@ export const POPULAR_AREAS = [
 ];
 
 export const POPULAR_AREA_IMAGES = {
-  Dhanmondi: '/image/populer-area/Dhanmondi.png?v=2',
-  Gulshan: '/image/populer-area/Gulshan.png?v=2',
-  Banani: '/image/populer-area/Banani.png?v=2',
-  Uttara: '/image/populer-area/Uttara.png?v=2',
-  Bashundhara: '/image/populer-area/Bashundhara.png?v=2',
-  Mirpur: '/image/populer-area/Mirpur.png?v=2',
-  Mohammadpur: '/image/populer-area/Mohammadpur.png?v=2',
-  'Purbachal New Town': '/image/populer-area/Purbachal.png?v=2'
+  Dhanmondi: '/image/populer-area/Dhanmondi.png?v=3',
+  Gulshan: '/image/populer-area/Gulshan.png?v=3',
+  Banani: '/image/populer-area/Banani.png?v=3',
+  Uttara: '/image/populer-area/Uttara.png?v=3',
+  Bashundhara: '/image/populer-area/Bashundhara.png?v=3',
+  Mirpur: '/image/populer-area/Mirpur.png?v=3',
+  Mohammadpur: '/image/populer-area/Mohammadpur.png?v=3',
+  'Purbachal New Town': '/image/populer-area/Purbachal.png?v=3'
 };
 
 export const POPULAR_AREA_IMAGES_DESKTOP = {
