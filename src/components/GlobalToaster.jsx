@@ -76,10 +76,25 @@ export default function GlobalToaster() {
       );
     };
 
+    const handleNewNotification = (n) => {
+      if (!shouldPlayChimeOrToast()) return;
+      if (soundEnabled) playChime();
+
+      toast(
+        <div className="flex flex-col gap-1 w-full">
+          <h4 className="text-sm font-semibold text-gray-900">{n.title || 'New Notification'}</h4>
+          <p className="text-xs text-gray-500 line-clamp-2">{n.body}</p>
+        </div>,
+        { duration: 5000, position: 'top-center' }
+      );
+    };
+
     socket.on('RECEIVE_MESSAGE', handleReceiveMessage);
+    socket.on('new_notification', handleNewNotification);
 
     return () => {
       socket.off('RECEIVE_MESSAGE', handleReceiveMessage);
+      socket.off('new_notification', handleNewNotification);
     };
   }, [location.pathname, navigate, playChime, shouldPlayChimeOrToast, soundEnabled]);
 
