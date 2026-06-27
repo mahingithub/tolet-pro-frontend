@@ -249,7 +249,7 @@ const WelcomeRobotOverlay = () => {
      বাটন এমনিতেই দেখাবে না, বাকি রোবট ঠিকঠাক চলবে। */
   useEffect(() => {
     if (!eventInfo) {
-      setWelcomeGuide(null);
+      setWelcomeGuides([]);
       return undefined;
     }
     const aud = (eventInfo.role || activeRole) === 'landlord' ? 'landlord' : 'tenant';
