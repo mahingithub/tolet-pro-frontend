@@ -157,34 +157,36 @@ const PropertyModeration = () => {
                 key={id}
                 className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow duration-300"
               >
-                {/* Images */}
-                <div className="relative w-full h-[240px] bg-gray-100 rounded-xl mb-5 overflow-hidden flex overflow-x-auto snap-x snap-mandatory hide-scrollbar group border border-gray-100">
+                {/* Images Grid for Moderation */}
+                <div className="mb-5">
                   {allImages.length > 0 ? (
-                    allImages.map((url, idx) => (
-                      <div key={idx} className="w-full h-full flex-shrink-0 snap-center relative">
-                        <img src={url} alt={`${property.title} - ${idx + 1}`} className="w-full h-full object-cover" />
-                        {allImages.length > 1 && (
-                          <div className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-md z-10">
-                            {idx + 1} / {allImages.length}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                      {allImages.map((url, idx) => (
+                        <a 
+                          key={idx} 
+                          href={url} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="relative aspect-[4/3] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 shadow-sm group block"
+                        >
+                          <img src={url} alt={`${property.title} - ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none"></div>
+                          <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-black px-2 py-1 rounded-md z-10 pointer-events-none">
+                            {idx + 1}/{allImages.length}
                           </div>
-                        )}
-                      </div>
-                    ))
+                          {idx === 0 && (
+                            <div className="absolute top-2 left-2 z-10 bg-black/60 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md pointer-events-none">
+                              {property.status || 'unknown'}
+                            </div>
+                          )}
+                        </a>
+                      ))}
+                    </div>
                   ) : (
-                    <div className="w-full h-full flex-shrink-0 flex items-center justify-center text-gray-400 font-bold text-sm">
+                    <div className="w-full h-32 bg-gray-50 rounded-xl border border-dashed border-gray-200 flex items-center justify-center text-gray-400 font-bold text-sm">
                       No photos available
                     </div>
                   )}
-                  
-                  {allImages.length > 1 && (
-                    <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-md text-white text-[10px] font-black px-3 py-1.5 rounded-lg z-10 pointer-events-none opacity-80 hidden sm:block">
-                      Scroll for more photos ↔
-                    </div>
-                  )}
-
-                  <div className="absolute top-3 left-3 z-10 bg-black/50 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg pointer-events-none">
-                    {property.status || 'unknown'}
-                  </div>
                 </div>
 
                 {/* Info + actions */}
