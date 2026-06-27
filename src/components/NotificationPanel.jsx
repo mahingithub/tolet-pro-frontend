@@ -102,6 +102,17 @@ export default function NotificationPanel({ onClose }) {
           });
           break;
 
+        case 'kyc_tenant':
+        case 'kyc_landlord':
+        case 'support_ticket':
+        case 'support_message':
+          if (n.data && n.data.path) {
+            navigate(n.data.path);
+          } else {
+            navigate('/admin');
+          }
+          break;
+
         default:
           navigate('/notifications');
           break;

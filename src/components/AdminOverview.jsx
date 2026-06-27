@@ -3,6 +3,7 @@ import {
   Users, Building, DollarSign, Activity, TrendingUp,
   ShieldAlert, CheckCircle2, ArrowUpRight, AlertCircle, Clock, Ban
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { getOverviewStats } from '../services/adminService';
 
 // Formatter for big counts. We do NOT abbreviate small numbers — a
@@ -18,6 +19,7 @@ const fmtCount = (n) => {
 };
 
 const AdminOverview = () => {
+  const navigate = useNavigate();
   const [stats, setStats]   = useState(null);
   const [error, setError]   = useState('');
   const [loading, setLoading] = useState(true);
@@ -166,7 +168,10 @@ const AdminOverview = () => {
           </h3>
 
           <div className="space-y-3 flex-1">
-            <div className="bg-gray-50 hover:bg-red-50 border border-gray-100 hover:border-red-100 p-4 rounded-xl cursor-pointer transition-colors group">
+            <div 
+              onClick={() => navigate('/admin/users?tab=pending')}
+              className="bg-gray-50 hover:bg-red-50 border border-gray-100 hover:border-red-100 p-4 rounded-xl cursor-pointer transition-colors group"
+            >
               <div className="flex items-center gap-3 mb-1.5">
                 <div className="w-7 h-7 bg-white rounded-lg border border-gray-200 flex items-center justify-center group-hover:border-red-200">
                   <AlertCircle size={14} className="text-amber-500" />
@@ -178,7 +183,10 @@ const AdminOverview = () => {
               <p className="text-[11px] text-gray-500 font-bold ml-10">Identity submissions awaiting your approval.</p>
             </div>
 
-            <div className="bg-gray-50 hover:bg-red-50 border border-gray-100 hover:border-red-100 p-4 rounded-xl cursor-pointer transition-colors group">
+            <div 
+              onClick={() => navigate('/admin/users?tab=pending-landlord')}
+              className="bg-gray-50 hover:bg-red-50 border border-gray-100 hover:border-red-100 p-4 rounded-xl cursor-pointer transition-colors group"
+            >
               <div className="flex items-center gap-3 mb-1.5">
                 <div className="w-7 h-7 bg-white rounded-lg border border-gray-200 flex items-center justify-center group-hover:border-red-200">
                   <ShieldAlert size={14} className="text-indigo-500" />
@@ -190,7 +198,10 @@ const AdminOverview = () => {
               <p className="text-[11px] text-gray-500 font-bold ml-10">Address + utility bill submissions to review.</p>
             </div>
 
-            <div className="bg-gray-50 hover:bg-gray-100 border border-gray-100 p-4 rounded-xl cursor-pointer transition-colors group">
+            <div 
+              onClick={() => navigate('/admin/users?tab=all')}
+              className="bg-gray-50 hover:bg-gray-100 border border-gray-100 p-4 rounded-xl cursor-pointer transition-colors group"
+            >
               <div className="flex items-center gap-3 mb-1.5">
                 <div className="w-7 h-7 bg-white rounded-lg border border-gray-200 flex items-center justify-center">
                   <Ban size={14} className="text-gray-400" />

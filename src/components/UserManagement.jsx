@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import {
   Users, Search, ShieldCheck, ShieldAlert, ShieldX, CheckCircle2,
   XCircle, AlertTriangle, Ban, RotateCcw, FileImage, Eye, Clock,
@@ -15,6 +17,7 @@ import {
   banUser,
   unbanUser,
   deleteAdminUser,
+  updateUserRole,
 } from '../services/adminService';
 
 /**
@@ -297,9 +300,10 @@ const PendingCard = ({ user, busyId, onApprove, onReject }) => {
 };
 
 // ─── User directory row ─────────────────────────────────────────────
-const UserRow = ({ user, busyId, onBan, onUnban }) => {
+const UserRow = ({ user, busyId, onBan, onUnban, currentUser, onChangeRole }) => {
   const status = user.tenantProfile?.verification?.status || 'unverified';
   const busy   = busyId === user.id;
+  const isSuperAdmin = currentUser?.role === 'super_admin' || currentUser?.roles?.includes('super_admin');
 
   return (
     <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all flex items-center gap-4">
@@ -362,6 +366,21 @@ const UserRow = ({ user, busyId, onBan, onUnban }) => {
           {busy ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
           Delete
         </button>
+        {isSuperAdmin && (
+          <select
+            value={user.role || 'tenant'}
+            onChange={(e) => onChangeRole(user.id, e.target.value)}
+            disabled={busy || user.role === 'super_admin'}
+            title={user.role === 'super_admin' ? "Cannot change role of a super admin" : "Change User Role"}
+            className="ml-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 outline-none focus:border-[#ba0036] transition-all disabled:opacity-50 cursor-pointer"
+          >
+            <option value="tenant">Tenant</option>
+            <option value="landlord">Landlord</option>
+            <option value="support_agent">Support Agent</option>
+            <option value="moderator">Moderator</option>
+            <option value="super_admin">Super Admin</option>
+          </select>
+        )}
       </div>
     </div>
   );
@@ -536,7 +555,11 @@ const LandlordPendingCard = ({ user, busyId, onApprove, onReject }) => {
 
 // ─── Page ───────────────────────────────────────────────────────────
 const UserManagement = () => {
-  const [activeTab, setActiveTab] = useState('pending');
+  const location = useLocation();
+  const { user: currentUser } = useAuth();
+  
+  const initialTab = new URLSearchParams(location.search).get('tab') || 'pending';
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [pending,        setPending]        = useState([]);
   const [pendingLandlord, setPendingLandlord] = useState([]);
   const [allUsers,       setAllUsers]       = useState([]);
@@ -596,6 +619,19 @@ const UserManagement = () => {
       showToast('Submission rejected. User has been notified.');
     } catch (err) {
       showToast(err?.message || 'Rejection failed.', 'error');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleChangeRole = async (id, newRole) => {
+    setBusyId(id);
+    try {
+      const updated = await updateUserRole(id, newRole);
+      setAllUsers((prev) => prev.map((u) => (u.id === id ? updated : u)));
+      showToast(`User role updated to ${newRole}.`);
+    } catch (err) {
+      showToast(err?.message || 'Failed to update role.', 'error');
     } finally {
       setBusyId(null);
     }
@@ -816,6 +852,8 @@ const UserManagement = () => {
                 busyId={busyId}
                 onBan={handleBan}
                 onUnban={handleUnban}
+                currentUser={currentUser}
+                onChangeRole={handleChangeRole}
               />
             ))}
           </div>

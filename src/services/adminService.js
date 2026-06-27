@@ -94,6 +94,12 @@ export const banUser = async (userId, reason) =>
 export const unbanUser = async (userId) =>
   (await api(`/users/${encodeURIComponent(userId)}/unban`, { method: 'POST' })).user;
 
+export const updateUserRole = async (userId, role) =>
+  (await api(`/users/${encodeURIComponent(userId)}/role`, {
+    method: 'PUT',
+    body: { role },
+  })).user;
+
 // ─── Properties (moderation) ────────────────────────────────────────────────
 export const listAdminProperties = async (filter = {}) => {
   const qs = new URLSearchParams();

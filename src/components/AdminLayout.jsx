@@ -5,12 +5,15 @@ import {
   BellRing, LogOut, Search, ChevronDown, Menu, X, Home
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
+import NotificationBell from './NotificationBell';
 
 const AdminLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleExit = async () => {
     await logout();
@@ -119,7 +122,14 @@ const AdminLayout = () => {
               <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
               <input 
                 type="text" 
-                placeholder="Search properties, users, or reports..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && searchQuery.trim()) {
+                    navigate(`/admin/users?tab=all&search=${encodeURIComponent(searchQuery.trim())}`);
+                  }
+                }}
+                placeholder="Search users by name, phone, or email..." 
                 className="w-full bg-gray-50 py-2.5 pl-11 pr-4 rounded-xl border border-transparent focus:border-gray-200 focus:bg-white outline-none font-bold text-sm text-gray-800 transition-all"
               />
             </div>
@@ -132,25 +142,54 @@ const AdminLayout = () => {
             </button>
 
             {/* Notification */}
-            <div className="w-10 h-10 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl flex items-center justify-center relative cursor-pointer transition-colors">
-              <BellRing size={18} className="text-gray-600" />
-              <span className="absolute top-2 right-2.5 w-2 h-2 bg-[#ba0036] border-2 border-white rounded-full"></span>
-            </div>
+            <NotificationBell isAuthed={!!user} />
             
             {/* Admin Profile */}
-            <div className="flex items-center gap-3 bg-white hover:bg-gray-50 p-1.5 pr-3 rounded-xl border border-gray-200 cursor-pointer transition-colors">
-              <div className="w-8 h-8 bg-gradient-to-br from-[#ba0036] to-[#d11147] rounded-lg flex items-center justify-center text-white font-black shadow-sm">
-                <Users size={16} />
+            <div className="relative">
+              <div 
+                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                className="flex items-center gap-3 bg-white hover:bg-gray-50 p-1.5 pr-3 rounded-xl border border-gray-200 cursor-pointer transition-colors"
+              >
+                <div className="w-8 h-8 bg-gradient-to-br from-[#ba0036] to-[#d11147] rounded-lg flex items-center justify-center text-white font-black shadow-sm overflow-hidden">
+                  {user?.avatar ? (
+                    <img src={user.avatar} alt="Admin" className="w-full h-full object-cover" />
+                  ) : (
+                    <Users size={16} />
+                  )}
+                </div>
+                <div className="hidden md:block">
+                  <p className="text-[13px] font-black text-gray-900 truncate max-w-[120px] leading-tight">
+                    {user?.name ?? 'Admin Control'}
+                  </p>
+                  <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest leading-none mt-0.5">
+                    {user?.role === 'super_admin' ? 'Super Admin' : user?.role === 'moderator' ? 'Moderator' : user?.role === 'support_agent' ? 'Support Agent' : 'Head of Ops'}
+                  </p>
+                </div>
+                <ChevronDown size={14} className="text-gray-400 ml-1 hidden sm:block" />
               </div>
-              <div className="hidden md:block">
-                <p className="text-[13px] font-black text-gray-900 truncate max-w-[120px] leading-tight">
-                  {user?.name ?? 'Admin Control'}
-                </p>
-                <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest leading-none mt-0.5">
-                  {user?.role === 'super_admin' ? 'Super Admin' : user?.role === 'moderator' ? 'Moderator' : user?.role === 'support_agent' ? 'Support Agent' : 'Head of Ops'}
-                </p>
-              </div>
-              <ChevronDown size={14} className="text-gray-400 ml-1 hidden sm:block" />
+
+              {/* Dropdown */}
+              {isProfileOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsProfileOpen(false)}></div>
+                  <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                    <div className="p-2">
+                      <button
+                        onClick={() => { setIsProfileOpen(false); navigate('/settings'); }}
+                        className="w-full text-left px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-colors"
+                      >
+                        Account Settings
+                      </button>
+                      <button
+                        onClick={() => { setIsProfileOpen(false); handleExit(); }}
+                        className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50 rounded-lg transition-colors mt-1"
+                      >
+                        <LogOut size={16} /> Sign out
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>
