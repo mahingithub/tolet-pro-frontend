@@ -137,7 +137,7 @@ const PendingCard = ({ user, busyId, onApprove, onReject }) => {
   const hasLandlordData = !!(lp.fullName || lp.city || lp.address || (lp.preferredTenants || []).length);
 
   return (
-    <div className="bg-white rounded-[2rem] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_30px_rgba(186,0,54,0.06)] transition-all">
+    <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <div className="w-14 h-14 rounded-2xl overflow-hidden bg-gray-100 flex items-center justify-center shrink-0">
@@ -266,7 +266,7 @@ const PendingCard = ({ user, busyId, onApprove, onReject }) => {
             <button
               onClick={() => onReject(user.id, reason.trim())}
               disabled={busy || !reason.trim()}
-              className="flex-1 px-6 py-3 bg-[#ba0036] hover:bg-[#90002a] text-white rounded-xl font-black text-sm shadow-[0_4px_15px_rgba(186,0,54,0.2)] disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+              className="flex-1 px-6 py-2.5 bg-[#ba0036] hover:bg-[#90002a] text-white rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {busy ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
               Send Rejection
@@ -284,7 +284,7 @@ const PendingCard = ({ user, busyId, onApprove, onReject }) => {
             <button
               onClick={() => onApprove(user.id)}
               disabled={busy}
-              className="flex-1 px-6 py-3 bg-gradient-to-r from-[#ba0036] to-[#d11147] text-white rounded-xl font-black text-sm shadow-[0_8px_20px_rgba(186,0,54,0.25)] hover:shadow-[0_12px_30px_rgba(186,0,54,0.35)] disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+              className="flex-1 px-6 py-2.5 bg-[#ba0036] hover:bg-[#90002a] text-white rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
               Approve & Verify
@@ -302,8 +302,8 @@ const UserRow = ({ user, busyId, onBan, onUnban }) => {
   const busy   = busyId === user.id;
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_25px_rgba(186,0,54,0.05)] transition-all flex items-center gap-4">
-      <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center shrink-0">
+    <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all flex items-center gap-4">
+      <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center shrink-0">
         {user.avatar ? (
           <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
         ) : (
@@ -389,7 +389,7 @@ const LandlordPendingCard = ({ user, busyId, onApprove, onReject }) => {
     : '—';
 
   return (
-    <div className="bg-white rounded-[2rem] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_30px_rgba(186,0,54,0.06)] transition-all">
+    <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <div className="w-14 h-14 rounded-2xl overflow-hidden bg-gray-100 flex items-center justify-center shrink-0">
@@ -504,7 +504,7 @@ const LandlordPendingCard = ({ user, busyId, onApprove, onReject }) => {
             <button
               onClick={() => onReject(user.id, reason.trim())}
               disabled={busy || !reason.trim()}
-              className="flex-1 px-6 py-3 bg-[#ba0036] hover:bg-[#90002a] text-white rounded-xl font-black text-sm shadow-[0_4px_15px_rgba(186,0,54,0.2)] disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+              className="flex-1 px-6 py-2.5 bg-[#ba0036] hover:bg-[#90002a] text-white rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {busy ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
               Send Rejection
@@ -522,7 +522,7 @@ const LandlordPendingCard = ({ user, busyId, onApprove, onReject }) => {
             <button
               onClick={() => onApprove(user.id)}
               disabled={busy}
-              className="flex-1 px-6 py-3 bg-gradient-to-r from-[#ba0036] to-[#d11147] text-white rounded-xl font-black text-sm shadow-[0_8px_20px_rgba(186,0,54,0.25)] hover:shadow-[0_12px_30px_rgba(186,0,54,0.35)] disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+              className="flex-1 px-6 py-2.5 bg-[#ba0036] hover:bg-[#90002a] text-white rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
               Approve as Landlord
@@ -688,7 +688,7 @@ const UserManagement = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 bg-white rounded-2xl p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] w-fit">
+      <div className="flex gap-2 bg-white rounded-xl p-1.5 border border-gray-200 shadow-sm w-fit overflow-x-auto max-w-full hide-scrollbar">
         {TABS.map((tab) => {
           const active = activeTab === tab.id;
           let badge = null;
@@ -700,14 +700,14 @@ const UserManagement = () => {
               onClick={() => setActiveTab(tab.id)}
               className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
                 active
-                  ? 'bg-[#ba0036] text-white shadow-[0_4px_15px_rgba(186,0,54,0.25)]'
-                  : 'text-gray-500 hover:text-gray-900'
+                  ? 'bg-gray-100 text-gray-900 shadow-sm border border-gray-200'
+                  : 'text-gray-500 hover:text-gray-900 border border-transparent'
               }`}
             >
               {tab.label}
               {badge !== null && (
-                <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-black ${
-                  active ? 'bg-white text-[#ba0036]' : 'bg-[#ba0036]/10 text-[#ba0036]'
+                <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-md text-[10px] font-black ${
+                  active ? 'bg-[#ba0036] text-white' : 'bg-gray-200 text-gray-600'
                 }`}>
                   {badge}
                 </span>
@@ -719,7 +719,7 @@ const UserManagement = () => {
 
       {/* Filters — only on All Users tab */}
       {activeTab === 'all' && (
-        <div className="bg-white rounded-2xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col md:flex-row gap-3">
+        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm flex flex-col md:flex-row gap-3">
           <div className="relative flex-1">
             <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -735,10 +735,10 @@ const UserManagement = () => {
               <button
                 key={r || 'all'}
                 onClick={() => setRoleFilter(r)}
-                className={`px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                className={`px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
                   roleFilter === r
-                    ? 'bg-[#ba0036] text-white shadow-[0_4px_15px_rgba(186,0,54,0.2)]'
-                    : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                    ? 'bg-gray-800 text-white shadow-sm'
+                    : 'bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-200'
                 }`}
               >
                 {r || 'All'}

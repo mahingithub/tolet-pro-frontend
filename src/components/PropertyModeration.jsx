@@ -125,99 +125,130 @@ const PropertyModeration = () => {
       {/* ── List ── */}
       <div className="space-y-6">
         {!loading && items.length === 0 ? (
-          <div className="bg-white rounded-[2rem] p-12 text-center shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
-            <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 size={40} />
+          <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-sm">
+            <div className="w-16 h-16 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 size={32} />
             </div>
             <h3 className="text-xl font-black text-gray-900">All Caught Up!</h3>
-            <p className="text-gray-500 font-bold mt-2">No properties in this tab.</p>
+            <p className="text-gray-500 font-bold mt-2 text-sm">No properties in this tab.</p>
           </div>
         ) : (
           items.map((property) => {
-            const id    = String(property._id || property.id);
-            const cover = property.coverPhoto
-              || (Array.isArray(property.roomPhotos) && property.roomPhotos[0]?.url)
-              || (Array.isArray(property.images)     && property.images[0]?.url)
-              || '';
+            const id = String(property._id || property.id);
+            const allImages = [];
+            if (property.coverPhoto && typeof property.coverPhoto === 'string') {
+              allImages.push(property.coverPhoto);
+            }
+            const extractImages = (source) => {
+              if (Array.isArray(source)) {
+                source.forEach(img => {
+                  const url = typeof img === 'string' ? img : img?.url;
+                  if (url && typeof url === 'string' && !allImages.includes(url)) {
+                    allImages.push(url);
+                  }
+                });
+              }
+            };
+            extractImages(property.images);
+            extractImages(property.roomPhotos);
+
             return (
               <div
                 key={id}
-                className="bg-white rounded-[2rem] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_30px_rgba(186,0,54,0.06)] transition-all duration-300"
+                className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow duration-300"
               >
-                {/* Cover */}
-                <div className="relative w-full h-[240px] bg-gray-900 rounded-2xl mb-4 overflow-hidden">
-                  {cover ? (
-                    <img src={cover} alt={property.title} className="w-full h-full object-cover" />
+                {/* Images */}
+                <div className="relative w-full h-[240px] bg-gray-100 rounded-xl mb-5 overflow-hidden flex overflow-x-auto snap-x snap-mandatory hide-scrollbar group border border-gray-100">
+                  {allImages.length > 0 ? (
+                    allImages.map((url, idx) => (
+                      <div key={idx} className="w-full h-full flex-shrink-0 snap-center relative">
+                        <img src={url} alt={`${property.title} - ${idx + 1}`} className="w-full h-full object-cover" />
+                        {allImages.length > 1 && (
+                          <div className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-md z-10">
+                            {idx + 1} / {allImages.length}
+                          </div>
+                        )}
+                      </div>
+                    ))
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-500 font-bold">
-                      No cover photo
+                    <div className="w-full h-full flex-shrink-0 flex items-center justify-center text-gray-400 font-bold text-sm">
+                      No photos available
                     </div>
                   )}
-                  <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg">
+                  
+                  {allImages.length > 1 && (
+                    <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-md text-white text-[10px] font-black px-3 py-1.5 rounded-lg z-10 pointer-events-none opacity-80 hidden sm:block">
+                      Scroll for more photos ↔
+                    </div>
+                  )}
+
+                  <div className="absolute top-3 left-3 z-10 bg-black/50 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg pointer-events-none">
                     {property.status || 'unknown'}
                   </div>
                 </div>
 
                 {/* Info + actions */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 bg-[#eaeff5]/50 p-6 rounded-2xl">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                   <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-3 mb-2">
-                      <span className="bg-white shadow-sm px-3 py-1 rounded-lg text-xs font-black text-[#ba0036] flex items-center gap-1.5">
-                        <DollarSign size={14} /> {fmtMoney(property.price)}/mo
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <span className="bg-red-50 border border-red-100 px-2.5 py-1 rounded-md text-[11px] font-black text-[#ba0036] flex items-center gap-1.5 uppercase tracking-wide">
+                        <DollarSign size={12} /> {fmtMoney(property.price)}/mo
                       </span>
-                      <span className="bg-white shadow-sm px-3 py-1 rounded-lg text-xs font-bold text-gray-600 flex items-center gap-1.5">
-                        <User size={14} className="text-gray-400" /> Host: {property.ownerName || '—'}
+                      <span className="bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-md text-[11px] font-bold text-gray-600 flex items-center gap-1.5">
+                        <User size={12} className="text-gray-400" /> Host: {property.ownerName || '—'}
                       </span>
                       {Number(property.inquiries) > 0 ? (
-                        <span className="bg-white shadow-sm px-3 py-1 rounded-lg text-xs font-bold text-gray-600">
+                        <span className="bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-md text-[11px] font-bold text-gray-600">
                           {property.inquiries} inquiries
                         </span>
                       ) : null}
                     </div>
 
-                    <h3 className="text-xl font-black text-gray-900 mb-2">{property.title}</h3>
-                    <p className="flex items-center gap-1.5 text-sm font-bold text-gray-500 mb-4">
-                      <MapPin size={16} className="text-gray-400" /> {property.location || property.address || '—'}
+                    <h3 className="text-lg font-black text-gray-900 mb-1">{property.title}</h3>
+                    <p className="flex items-center gap-1.5 text-xs font-bold text-gray-500 mb-4">
+                      <MapPin size={14} className="text-gray-400" /> {property.location || property.address || '—'}
                     </p>
 
-                    <div className="flex items-center gap-6 text-sm font-bold text-gray-600">
-                      <span className="flex items-center gap-2"><BedDouble size={18} className="text-[#ba0036]/70" /> {property.beds ?? '—'} Beds</span>
-                      <span className="flex items-center gap-2"><Bath size={18} className="text-[#ba0036]/70" /> {property.baths ?? '—'} Baths</span>
-                      <span className="flex items-center gap-2"><Square size={18} className="text-[#ba0036]/70" /> {property.sqft ?? '—'} sqft</span>
+                    <div className="flex items-center gap-4 text-xs font-bold text-gray-600 bg-gray-50 w-max px-4 py-2 rounded-lg border border-gray-100">
+                      <span className="flex items-center gap-1.5"><BedDouble size={14} className="text-gray-400" /> {property.beds ?? '—'} Beds</span>
+                      <div className="w-px h-3 bg-gray-300"></div>
+                      <span className="flex items-center gap-1.5"><Bath size={14} className="text-gray-400" /> {property.baths ?? '—'} Baths</span>
+                      <div className="w-px h-3 bg-gray-300"></div>
+                      <span className="flex items-center gap-1.5"><Square size={14} className="text-gray-400" /> {property.sqft ?? '—'} sqft</span>
                     </div>
 
                     {property.moderationReason ? (
-                      <p className="text-xs font-bold text-orange-600 mt-3 flex items-center gap-1.5">
+                      <p className="text-[11px] font-bold text-amber-600 mt-3 flex items-center gap-1.5 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100 w-max">
                         <ShieldAlert size={12} /> Reason: {property.moderationReason}
                       </p>
                     ) : null}
                   </div>
 
-                  <div className="flex items-center gap-3 w-full md:w-auto">
+                  <div className="flex items-center gap-2 w-full md:w-auto pt-4 md:pt-0 border-t md:border-t-0 border-gray-100 mt-4 md:mt-0">
                     {property.status === 'active' ? (
                       <button
                         onClick={() => handleAction(id, 'remove')}
                         disabled={actingId === id}
-                        className="flex-1 md:flex-none px-6 py-3 bg-white text-gray-700 rounded-xl font-black text-sm shadow-sm hover:text-[#ba0036] hover:shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="flex-1 md:flex-none px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-lg font-black text-xs hover:border-gray-300 hover:bg-gray-50 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                       >
-                        {actingId === id ? <Loader2 size={18} className="animate-spin" /> : <XCircle size={18} />} Remove from public
+                        {actingId === id ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />} Remove from public
                       </button>
                     ) : (
                       <button
                         onClick={() => handleAction(id, 'approve')}
                         disabled={actingId === id}
-                        className="flex-1 md:flex-none px-6 py-3 bg-gradient-to-r from-[#ba0036] to-[#d11147] text-white rounded-xl font-black text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="flex-1 md:flex-none px-4 py-2.5 bg-[#ba0036] text-white rounded-lg font-black text-xs hover:bg-[#90002a] transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm"
                       >
-                        {actingId === id ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />} Restore to active
+                        {actingId === id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Restore to active
                       </button>
                     )}
                     <button
                       onClick={() => handleAction(id, 'delete')}
                       disabled={actingId === id}
-                      className="flex-1 md:flex-none px-4 py-3 bg-red-50 text-red-600 rounded-xl font-black text-sm shadow-sm hover:bg-red-100 hover:text-red-700 hover:shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      className="flex-none px-3 py-2.5 bg-white border border-red-200 text-red-600 rounded-lg font-black hover:bg-red-50 transition-all flex items-center justify-center disabled:opacity-50"
                       title="Permanently Delete Property"
                     >
-                      <Trash2 size={18} /> Delete
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </div>

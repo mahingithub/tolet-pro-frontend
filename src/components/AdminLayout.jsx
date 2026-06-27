@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Building, Users, MessageSquare, 
-  BellRing, LogOut, Search, ChevronDown 
+  BellRing, LogOut, Search, ChevronDown, Menu, X, Home
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -10,14 +10,13 @@ const AdminLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // "Exit Admin" actually clears the session now (was navigate-only before).
   const handleExit = async () => {
     await logout();
     navigate('/', { replace: true });
   };
 
-  // অ্যাডমিন প্যানেলের নেভিগেশন মেনু
   const menuItems = [
     { path: '/admin', icon: LayoutDashboard, label: 'Overview' },
     { path: '/admin/properties', icon: Building, label: 'Property Moderation' },
@@ -26,102 +25,152 @@ const AdminLayout = () => {
   ];
 
   return (
-    // নো-লাইন গ্লোবাল ক্যানভাস
-    <div className="min-h-screen bg-[#eaeff5] flex relative overflow-hidden font-sans text-gray-900 selection:bg-[#ba0036] selection:text-white">
+    <div className="min-h-screen bg-[#f8fafc] flex relative font-sans text-gray-900 selection:bg-[#ba0036] selection:text-white overflow-hidden">
       
-      {/* গ্লোয়িং অর্বস (Premium Feel) */}
-      <div className="absolute top-0 left-[-10%] w-[50vw] h-[50vw] bg-gradient-to-br from-[#ba0036]/5 to-transparent rounded-full blur-[120px] pointer-events-none z-0"></div>
-      
-      {/* ── লেফট সাইডবার (No borders, Tonal Layering) ── */}
-      <aside className="w-72 bg-white m-4 rounded-[2rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col z-10">
-        <div className="p-8">
-          <h1 className="text-2xl font-black text-[#ba0036] tracking-tighter">TO-LET PRO</h1>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Super Admin Center</p>
+      {/* ── Mobile Sidebar Overlay ── */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-40 lg:hidden transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* ── Sidebar ── */}
+      <aside className={`
+        fixed lg:static inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-200 
+        flex flex-col transform transition-transform duration-300 ease-in-out
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        {/* Logo Header */}
+        <div className="h-20 flex items-center justify-between px-6 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#ba0036] to-[#d11147] flex items-center justify-center shadow-sm">
+              <Home size={18} strokeWidth={2.5} className="text-white" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-lg font-black tracking-tight leading-none">
+                TO-LET <span className="text-[#ba0036]">PRO</span>
+              </span>
+              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1 leading-none">
+                Super Admin Center
+              </span>
+            </div>
+          </div>
+          {/* Mobile Close Button */}
+          <button 
+            onClick={() => setIsSidebarOpen(false)}
+            className="p-2 -mr-2 text-gray-400 hover:bg-gray-100 hover:text-gray-900 rounded-lg lg:hidden transition-colors"
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2">
+        {/* Navigation */}
+        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto custom-scrollbar">
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path || (location.pathname.startsWith(item.path) && item.path !== '/admin');
             return (
               <Link 
                 key={item.path} 
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all ${
+                onClick={() => setIsSidebarOpen(false)} // close on mobile navigation
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${
                   isActive 
-                    ? 'bg-[#ba0036]/10 text-[#ba0036] font-black shadow-[0_4px_15px_rgba(186,0,54,0.05)]' 
-                    : 'text-gray-500 font-bold hover:bg-gray-50 hover:text-gray-800'
+                    ? 'bg-[#ba0036]/5 text-[#ba0036] border-l-4 border-[#ba0036]' 
+                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'
                 }`}
               >
-                <item.icon size={20} className={isActive ? 'text-[#ba0036]' : 'text-gray-400'} />
+                <item.icon size={18} className={isActive ? 'text-[#ba0036]' : 'text-gray-400'} />
                 {item.label}
               </Link>
             );
           })}
         </nav>
 
-        {/* এক্সিট বাটন */}
-        <div className="p-4">
+        {/* Footer / Exit */}
+        <div className="p-4 border-t border-gray-100">
           <button
             onClick={handleExit}
-            className="w-full flex items-center gap-3 px-4 py-3.5 text-gray-500 font-bold hover:bg-red-50 hover:text-[#ba0036] rounded-2xl transition-all"
+            className="w-full flex items-center gap-3 px-4 py-3 text-gray-500 font-bold hover:bg-red-50 hover:text-[#ba0036] rounded-xl transition-all text-sm"
           >
-            <LogOut size={20} />
+            <LogOut size={18} />
             Exit Admin
           </button>
         </div>
       </aside>
 
-      {/* ── মেইন কন্টেন্ট এরিয়া ── */}
-      <main className="flex-1 flex flex-col z-10 h-screen overflow-hidden">
+      {/* ── Main Content Area ── */}
+      <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
         
-        {/* টপবার */}
-        <header className="h-24 px-8 flex items-center justify-between">
-          <div className="relative w-96">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="Search properties, users, or reports..." 
-              className="w-full bg-white py-3.5 pl-12 pr-4 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] outline-none font-bold text-sm text-gray-800 focus:shadow-[0_8px_25px_rgba(186,0,54,0.08)] transition-all"
-            />
+        {/* Topbar */}
+        <header className="h-20 bg-white border-b border-gray-200 px-4 sm:px-8 flex items-center justify-between z-10 shrink-0">
+          
+          <div className="flex items-center gap-4 flex-1">
+            {/* Mobile Menu Toggle */}
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-lg lg:hidden transition-colors"
+            >
+              <Menu size={24} />
+            </button>
+
+            {/* Search */}
+            <div className="relative w-full max-w-md hidden sm:block">
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input 
+                type="text" 
+                placeholder="Search properties, users, or reports..." 
+                className="w-full bg-gray-50 py-2.5 pl-11 pr-4 rounded-xl border border-transparent focus:border-gray-200 focus:bg-white outline-none font-bold text-sm text-gray-800 transition-all"
+              />
+            </div>
           </div>
 
-          <div className="flex items-center gap-5">
-            {/* নোটিফিকেশন */}
-            <div className="w-12 h-12 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center justify-center relative cursor-pointer hover:shadow-[0_8px_25px_rgba(186,0,54,0.08)] hover:-translate-y-0.5 transition-all">
-              <BellRing size={20} className="text-gray-600" />
-              <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-[#ba0036] border-2 border-white rounded-full"></span>
+          <div className="flex items-center gap-3 sm:gap-5">
+            {/* Search icon (mobile only) */}
+            <button className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg sm:hidden transition-colors">
+              <Search size={20} />
+            </button>
+
+            {/* Notification */}
+            <div className="w-10 h-10 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl flex items-center justify-center relative cursor-pointer transition-colors">
+              <BellRing size={18} className="text-gray-600" />
+              <span className="absolute top-2 right-2.5 w-2 h-2 bg-[#ba0036] border-2 border-white rounded-full"></span>
             </div>
             
-            {/* অ্যাডমিন প্রোফাইল */}
-            <div className="flex items-center gap-3 bg-white p-2 pr-4 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] cursor-pointer hover:shadow-[0_8px_25px_rgba(186,0,54,0.08)] hover:-translate-y-0.5 transition-all">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#ba0036] to-[#E12127] rounded-xl flex items-center justify-center text-white font-black shadow-[0_4px_10px_rgba(186,0,54,0.3)]">
-                <Users size={18} />
+            {/* Admin Profile */}
+            <div className="flex items-center gap-3 bg-white hover:bg-gray-50 p-1.5 pr-3 rounded-xl border border-gray-200 cursor-pointer transition-colors">
+              <div className="w-8 h-8 bg-gradient-to-br from-[#ba0036] to-[#d11147] rounded-lg flex items-center justify-center text-white font-black shadow-sm">
+                <Users size={16} />
               </div>
-              <div>
-                <p className="text-sm font-black text-gray-800 truncate max-w-[140px]">{user?.name ?? 'Admin Control'}</p>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              <div className="hidden md:block">
+                <p className="text-[13px] font-black text-gray-900 truncate max-w-[120px] leading-tight">
+                  {user?.name ?? 'Admin Control'}
+                </p>
+                <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest leading-none mt-0.5">
                   {user?.role === 'super_admin' ? 'Super Admin' : user?.role === 'moderator' ? 'Moderator' : user?.role === 'support_agent' ? 'Support Agent' : 'Head of Ops'}
                 </p>
               </div>
-              <ChevronDown size={16} className="text-gray-400 ml-2" />
+              <ChevronDown size={14} className="text-gray-400 ml-1 hidden sm:block" />
             </div>
           </div>
         </header>
 
-        {/* ── ডাইনামিক পেজ এরিয়া (Scrollable) ── */}
-        <div className="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar">
-          {/* এখানে Outlet এর মাধ্যমে রাউটার থেকে অন্যান্য পেজ (Overview, Moderation) লোড হবে। 
-          */}
-          <Outlet />
+        {/* ── Dynamic Page Area (Scrollable) ── */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#f8fafc]">
+          <div className="p-4 sm:p-8 min-h-full">
+            <Outlet />
+          </div>
         </div>
       </main>
 
-      {/* কাস্টম স্ক্রলবার স্টাইলিং */}
+      {/* Global Scrollbar Styling */}
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(186,0,54,0.15); border-radius: 20px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgba(186,0,54,0.3); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
   );

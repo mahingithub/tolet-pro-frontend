@@ -115,21 +115,21 @@ const AdminOverview = () => {
       </div>
 
       {/* ── ১. স্ট্যাটস গ্রিড (Top Row) ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {statCards.map((stat) => (
-          <div key={stat.id} className="bg-white p-6 rounded-[2rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_30px_rgba(186,0,54,0.06)] transition-all duration-300 group">
+          <div key={stat.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-300 group">
             <div className="flex items-start justify-between mb-4">
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${stat.bg}`}>
-                <stat.icon size={22} className={stat.color} />
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${stat.bg}`}>
+                <stat.icon size={20} className={stat.color} />
               </div>
               {stat.sub ? (
-                <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest ${stat.urgent ? 'bg-[#ba0036]/10 text-[#ba0036]' : 'bg-gray-50 text-gray-500'}`}>
+                <span className={`text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-widest ${stat.urgent ? 'bg-red-50 text-[#ba0036] border border-red-100' : 'bg-gray-50 text-gray-500 border border-gray-100'}`}>
                   {stat.sub}
                 </span>
               ) : null}
             </div>
-            <h3 className="text-3xl font-black text-gray-900 mb-1">{stat.value}</h3>
-            <p className="text-sm font-bold text-gray-500">{stat.label}</p>
+            <h3 className="text-2xl font-black text-gray-900 mb-1">{stat.value}</h3>
+            <p className="text-xs font-bold text-gray-500">{stat.label}</p>
           </div>
         ))}
       </div>
@@ -138,72 +138,68 @@ const AdminOverview = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Revenue & Growth Chart Placeholder (Spans 2 columns) */}
-        <div className="lg:col-span-2 bg-white rounded-[2rem] p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col">
-          <div className="flex items-center justify-between mb-8">
+        <div className="lg:col-span-2 bg-white border border-gray-200 rounded-2xl p-6 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-xl font-black text-gray-900">Revenue Growth</h3>
-              <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-widest">Premium Subscriptions & Fees</p>
+              <h3 className="text-lg font-black text-gray-900">Revenue Growth</h3>
+              <p className="text-[11px] font-bold text-gray-400 mt-0.5 uppercase tracking-widest">Premium Subscriptions & Fees</p>
             </div>
-            <button className="flex items-center gap-2 text-[#ba0036] bg-[#ba0036]/5 hover:bg-[#ba0036]/10 px-4 py-2 rounded-xl text-xs font-black transition-all">
+            <button className="flex items-center gap-2 text-gray-600 hover:text-[#ba0036] hover:bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg text-xs font-black transition-all">
               Detailed Report <ArrowUpRight size={14} />
             </button>
           </div>
 
-          {/* Revenue chart placeholder. Once the subscription pipeline
-              lands, this becomes a real time-series chart driven by the
-              monthlyRevenue values returned from the API. */}
-          <div className="flex-1 w-full bg-[#eaeff5]/50 rounded-2xl flex items-end justify-center p-6 min-h-[250px]">
-            <p className="text-sm font-bold text-gray-400 text-center max-w-xs">
-              Revenue charting will activate once the subscription pipeline
-              starts collecting payments. Live total currently shows in the
-              "Monthly Revenue" card above.
+          <div className="flex-1 w-full bg-gray-50 border border-dashed border-gray-200 rounded-xl flex items-center justify-center p-6 min-h-[200px]">
+            <p className="text-xs font-bold text-gray-400 text-center max-w-sm">
+              Revenue charting will activate once the subscription pipeline starts collecting payments.
             </p>
           </div>
         </div>
 
         {/* Action Center & Alerts (1 column) */}
-        <div className="bg-[#ba0036] rounded-[2rem] p-8 shadow-[0_10px_30px_rgba(186,0,54,0.2)] text-white relative overflow-hidden flex flex-col">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/20 blur-3xl rounded-full"></div>
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm flex flex-col relative overflow-hidden">
+          {/* Subtle top accent border */}
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#ba0036] to-[#d11147]"></div>
 
-          <h3 className="text-xl font-black mb-6 relative z-10 flex items-center gap-2">
-            <Activity size={22} className="text-white/80" /> Action Center
+          <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2 mt-2">
+            <Activity size={18} className="text-[#ba0036]" /> Action Center
           </h3>
 
-          <div className="space-y-4 relative z-10 flex-1">
-            <div className="bg-white/10 hover:bg-white/20 backdrop-blur-md p-4 rounded-2xl cursor-pointer transition-all border border-white/5">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                  <AlertCircle size={16} />
+          <div className="space-y-3 flex-1">
+            <div className="bg-gray-50 hover:bg-red-50 border border-gray-100 hover:border-red-100 p-4 rounded-xl cursor-pointer transition-colors group">
+              <div className="flex items-center gap-3 mb-1.5">
+                <div className="w-7 h-7 bg-white rounded-lg border border-gray-200 flex items-center justify-center group-hover:border-red-200">
+                  <AlertCircle size={14} className="text-amber-500" />
                 </div>
-                <h4 className="font-bold text-sm">
+                <h4 className="font-bold text-sm text-gray-800">
                   {stats ? `${fmtCount(stats.pendingKyc ?? 0)} pending tenant KYC` : 'Pending tenant KYC'}
                 </h4>
               </div>
-              <p className="text-xs text-white/70 font-bold">Identity submissions awaiting your approval.</p>
+              <p className="text-[11px] text-gray-500 font-bold ml-10">Identity submissions awaiting your approval.</p>
             </div>
 
-            <div className="bg-white/10 hover:bg-white/20 backdrop-blur-md p-4 rounded-2xl cursor-pointer transition-all border border-white/5">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                  <ShieldAlert size={16} />
+            <div className="bg-gray-50 hover:bg-red-50 border border-gray-100 hover:border-red-100 p-4 rounded-xl cursor-pointer transition-colors group">
+              <div className="flex items-center gap-3 mb-1.5">
+                <div className="w-7 h-7 bg-white rounded-lg border border-gray-200 flex items-center justify-center group-hover:border-red-200">
+                  <ShieldAlert size={14} className="text-indigo-500" />
                 </div>
-                <h4 className="font-bold text-sm">
+                <h4 className="font-bold text-sm text-gray-800">
                   {stats ? `${fmtCount(stats.pendingLandlordKyc ?? 0)} pending landlord KYC` : 'Pending landlord KYC'}
                 </h4>
               </div>
-              <p className="text-xs text-white/70 font-bold">Address + utility bill submissions to review.</p>
+              <p className="text-[11px] text-gray-500 font-bold ml-10">Address + utility bill submissions to review.</p>
             </div>
 
-            <div className="bg-white/10 hover:bg-white/20 backdrop-blur-md p-4 rounded-2xl cursor-pointer transition-all border border-white/5">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                  <CheckCircle2 size={16} />
+            <div className="bg-gray-50 hover:bg-gray-100 border border-gray-100 p-4 rounded-xl cursor-pointer transition-colors group">
+              <div className="flex items-center gap-3 mb-1.5">
+                <div className="w-7 h-7 bg-white rounded-lg border border-gray-200 flex items-center justify-center">
+                  <Ban size={14} className="text-gray-400" />
                 </div>
-                <h4 className="font-bold text-sm">
+                <h4 className="font-bold text-sm text-gray-800">
                   {stats ? `${fmtCount(stats.bannedUsers ?? 0)} banned accounts` : 'Banned accounts'}
                 </h4>
               </div>
-              <p className="text-xs text-white/70 font-bold">Refused all mutations until lifted.</p>
+              <p className="text-[11px] text-gray-500 font-bold ml-10">Refused all mutations until lifted.</p>
             </div>
           </div>
         </div>
