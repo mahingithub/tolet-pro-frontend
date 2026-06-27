@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Users, Building, DollarSign, Activity, TrendingUp,
-  ShieldAlert, CheckCircle2, ArrowUpRight, AlertCircle, Clock,
+  ShieldAlert, CheckCircle2, ArrowUpRight, AlertCircle, Clock, Ban
 } from 'lucide-react';
 import { getOverviewStats } from '../services/adminService';
 
