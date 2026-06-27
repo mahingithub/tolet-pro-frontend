@@ -155,7 +155,10 @@ const CATEGORY_FIELD_OVERRIDES = {
 // Merge the intent-common base fields with the selected type's extras.
 // Accepts canonical 'sale' as well as the wizard's legacy 'purchase' key.
 export function getDynamicFields(intent, type, category) {
-  const key = intent === 'sale' ? 'purchase' : intent;
+  let key = intent;
+  if (intent === 'sale' || intent === 'buy' || intent === 'sell' || intent === 'purchase') {
+    key = 'purchase';
+  }
   let fields = [
     ...(SPECIFIC_FIELDS[key] || []),
     ...(SPECIFIC_FIELDS_BY_TYPE[key]?.[type] || []),

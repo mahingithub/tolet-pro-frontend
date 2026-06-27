@@ -5794,6 +5794,7 @@ const HostDashboard = () => {
                   }
                 };
                 const coverPreview = editForm.img || editForm.roomPhotos?.[0]?.preview || '';
+                const showBedsBaths = modalData.intent !== 'commercial' && !['land', 'building'].includes(modalData.type);
                 return (
                   <div className="space-y-5">
                     {/* Cover photo swap */}
@@ -5910,15 +5911,19 @@ const HostDashboard = () => {
                       <input type="text" value={editForm.location} onChange={e => setEditForm(f => ({...f, location: e.target.value}))} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বেডরুম' : 'Beds'}</label>
-                        <input type="number" min="0" value={editForm.beds} onChange={e => setEditForm(f => ({...f, beds: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বাথরুম' : 'Baths'}</label>
-                        <input type="number" min="0" value={editForm.baths} onChange={e => setEditForm(f => ({...f, baths: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
-                      </div>
+                    <div className={`grid ${showBedsBaths ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2'} gap-3`}>
+                      {showBedsBaths && (
+                        <>
+                          <div>
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বেডরুম' : 'Beds'}</label>
+                            <input type="number" min="0" value={editForm.beds} onChange={e => setEditForm(f => ({...f, beds: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বাথরুম' : 'Baths'}</label>
+                            <input type="number" min="0" value={editForm.baths} onChange={e => setEditForm(f => ({...f, baths: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
+                          </div>
+                        </>
+                      )}
                       <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বর্গফুট' : 'Sqft'}</label>
                         <input type="number" min="0" value={editForm.sqft} onChange={e => setEditForm(f => ({...f, sqft: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
