@@ -47,17 +47,27 @@ export default function NotificationPanel({ onClose }) {
       
       switch (n.type) {
         case 'message':
-        case 'message_new':
-          navigate('/messages', {
-            state: {
-              peerUserId: peerId,
-              peerName: peerName,
-              peerAvatar: peerAvatar,
-              conversationId: targetId || (n.data && n.data.conversationId),
-              autoOpen: true
-            }
-          });
+        case 'message_new': {
+          const state = {
+            peerUserId: peerId,
+            peerName: peerName,
+            peerAvatar: peerAvatar,
+            conversationId: targetId || (n.data && n.data.conversationId),
+            autoOpen: true
+          };
+          if (window.location.pathname.startsWith('/admin')) {
+            // If in admin panel, open chat in new tab to avoid breaking admin context
+            const queryParams = new URLSearchParams({
+              peerUserId: state.peerUserId || '',
+              conversationId: state.conversationId || '',
+              autoOpen: 'true'
+            }).toString();
+            window.open(`/messages?${queryParams}`, '_blank');
+          } else {
+            navigate('/messages', { state });
+          }
           break;
+        }
 
         case 'inquiry':
         case 'inquiry_new':

@@ -978,11 +978,24 @@ const ChatSystem = () => {
   //   → we no longer know who that maps to without peerUserId, so we just
   //     surface the context banner without activating a thread.
   useEffect(() => {
-    if (!location.state) return;
-    if (handledStateRef.current === location.key) return;
-    handledStateRef.current = location.key;
+    const searchParams = new URLSearchParams(location.search);
+    const hasQueryParams = searchParams.has('peerUserId') || searchParams.has('chatId');
+    
+    if (!location.state && !hasQueryParams) return;
+    
+    // Use search as key if state is empty, to prevent double-firing
+    const stateKey = location.key || location.search;
+    if (handledStateRef.current === stateKey) return;
+    handledStateRef.current = stateKey;
 
-    const s = location.state;
+    const s = {
+      ...(location.state || {}),
+      peerUserId: location.state?.peerUserId || searchParams.get('peerUserId'),
+      chatId: location.state?.chatId || searchParams.get('chatId'),
+      source: location.state?.source || searchParams.get('source'),
+      autoOpen: location.state?.autoOpen || searchParams.get('autoOpen') === 'true',
+      prefillMessage: location.state?.prefillMessage || searchParams.get('prefillMessage')
+    };
 
     if (s.source === 'host-bookings' || s.source === 'tenant-receipt') {
       setContextBanner({

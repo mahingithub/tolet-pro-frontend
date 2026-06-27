@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import NotificationBell from './NotificationBell';
+import toast from 'react-hot-toast';
 
 const AdminLayout = () => {
   const location = useLocation();
@@ -179,7 +180,7 @@ const AdminLayout = () => {
                   <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
                     <div className="p-2">
                       <button
-                        onClick={() => { setIsProfileOpen(false); navigate('/settings'); }}
+                        onClick={() => { setIsProfileOpen(false); toast('Account Settings coming soon.', { icon: '🛠️' }); }}
                         className="w-full text-left px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-colors"
                       >
                         Account Settings
