@@ -83,12 +83,25 @@ export const AuthProvider = ({ children }) => {
       activeRole,
       hasRole: (r) => roles.includes(r),
       // ──────────────────────────────────────────────────────────────────
-      login: async (input) => {
-        const u = await svcLogin(input);
+      login: async (input, requestedRole) => {
+        let u = await svcLogin(input);
+        
+        const loggedInRoles = Array.isArray(u?.roles) && u.roles.length ? u.roles : (u?.role ? [u.role] : []);
+        
+        // If the user requested a specific role on the login screen, and they have that role,
+        // but it's not their active role, switch them to the requested role.
+        if (requestedRole && loggedInRoles.includes(requestedRole) && u.role !== requestedRole) {
+           try {
+             u = await svcSetActiveRole(requestedRole);
+           } catch (e) {
+             console.warn('Failed to set active role on login:', e);
+           }
+        }
+        
         setUser(u);
+        
         // ওয়েলকাম রোবট শুধু tenant/landlord-এর জন্য — admin-জাতীয় role
         // (super_admin / moderator / support_agent) হলে dispatch-ই হবে না।
-        const loggedInRoles = Array.isArray(u?.roles) && u.roles.length ? u.roles : (u?.role ? [u.role] : []);
         if (u && !loggedInRoles.some(isAdminRole)) {
           window.dispatchEvent(
             new CustomEvent('triggerWelcomeRobot', {

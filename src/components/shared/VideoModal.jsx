@@ -40,7 +40,7 @@ const VideoModal = ({ isOpen, onClose, videoUrl, title }) => {
 	const isYouTube = embedUrl.includes('youtube.com/embed');
 
 	return (
-		<div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300 p-4">
+		<div className="fixed inset-0 z-[100001] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300 p-4">
 			<div className="bg-white w-full max-w-4xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col relative animate-in zoom-in-95 duration-300">
 				
 				{/* Header */}

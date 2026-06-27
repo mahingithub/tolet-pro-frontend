@@ -216,7 +216,7 @@ const LoginPage = () => {
     e.preventDefault();
     setIsLoading(true); setErrorMsg(''); setInfoMsg('');
     try {
-      const loggedInUser = await login({ phone: toE164(formData.phone), password: formData.password });
+      const loggedInUser = await login({ phone: toE164(formData.phone), password: formData.password }, role);
       if (['super_admin', 'moderator', 'support_agent'].includes(loggedInUser?.role)) {
         goToNextOrDashboard('admin');
       } else {

@@ -119,7 +119,7 @@ const WelcomeRobotOverlay = () => {
   const [eventInfo, setEventInfo] = useState(null); // { role, name, type }
   const [fly, setFly] = useState(null);             // { from:{x,y}, to:{x,y} }
   const [activeVideo, setActiveVideo] = useState({ isOpen: false, url: '', title: '' });
-  const [welcomeGuide, setWelcomeGuide] = useState(null); // অ্যাডমিন থেকে আসা ভিডিও (role-অনুযায়ী)
+  const [welcomeGuides, setWelcomeGuides] = useState([]); // অ্যাডমিন থেকে আসা ভিডিও (role-অনুযায়ী)
 
   const phaseRef = useRef(phase);
   const headRef = useRef(null);          // রোবটের মাথা — উড়ান শুরুর পজিশন মাপতে
@@ -260,10 +260,10 @@ const WelcomeRobotOverlay = () => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (!cancelled) {
-          setWelcomeGuide(Array.isArray(data) && data.length ? data[0] : null);
+          setWelcomeGuides(Array.isArray(data) ? data : []);
         }
       } catch (err) {
-        if (!cancelled) setWelcomeGuide(null);
+        if (!cancelled) setWelcomeGuides([]);
         console.warn('[WelcomeRobot] welcome ভিডিও আনা যায়নি:', err);
       }
     })();
@@ -342,10 +342,10 @@ const WelcomeRobotOverlay = () => {
                     }}
                   />
                   {/* পালস রিং */}
-                  <span className="absolute inset-0 rounded-[2rem] border-2 border-[#ff4d6d]/50 animate-ping" />
+                  <span className="absolute inset-0 rounded-full border-2 border-[#ff4d6d]/50 animate-ping" />
                   <div className="absolute inset-0 bg-[#ba0036] blur-[40px] opacity-40 rounded-full scale-150 animate-pulse" />
                   {/* রোবটের মাথা */}
-                  <div className="relative w-28 h-28 bg-gradient-to-br from-[#ba0036] to-[#7a0026] rounded-[2rem] flex items-center justify-center shadow-2xl border-4 border-white/20 overflow-hidden">
+                  <div className="relative w-28 h-28 bg-gradient-to-br from-[#ba0036] to-[#7a0026] rounded-full flex items-center justify-center shadow-2xl border-4 border-white/20 overflow-hidden">
                     <Bot size={56} className="text-white relative z-10" />
                     <motion.div
                       className="absolute left-3 right-3 h-[2px] bg-white/40 rounded"
@@ -379,7 +379,7 @@ const WelcomeRobotOverlay = () => {
                     }}
                   />
                   <div className="absolute inset-0 bg-[#ba0036] blur-[40px] opacity-40 rounded-full scale-150 animate-pulse" />
-                  <div className="relative w-28 h-28 bg-gradient-to-br from-[#ba0036] to-[#7a0026] rounded-[2rem] flex items-center justify-center shadow-2xl border-4 border-white/20 overflow-hidden">
+                  <div className="relative w-28 h-28 bg-gradient-to-br from-[#ba0036] to-[#7a0026] rounded-full flex items-center justify-center shadow-2xl border-4 border-white/20 overflow-hidden">
                     <Bot size={56} className="text-white relative z-10" />
                     <motion.div
                       className="absolute left-3 right-3 h-[2px] bg-white/40 rounded"
@@ -442,20 +442,25 @@ const WelcomeRobotOverlay = () => {
                           ))}
                         </div>
 
-                        {welcomeGuide?.videoUrl && (
-                          <button
-                            onClick={() =>
-                              setActiveVideo({
-                                isOpen: true,
-                                url: welcomeGuide.videoUrl,
-                                title: welcomeGuide.title || copy.videoLabel,
-                              })
-                            }
-                            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-[1.2rem] bg-white/[0.07] border border-white/15 text-white font-bold text-[13px] hover:bg-white/[0.13] transition-all"
-                          >
-                            <Video size={16} />
-                            {welcomeGuide.suggestionText || copy.videoLabel}
-                          </button>
+                        {welcomeGuides.length > 0 && (
+                          <div className="flex flex-col gap-2 max-h-[140px] overflow-y-auto custom-scrollbar pr-1 w-full">
+                            {welcomeGuides.map((guide, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() =>
+                                  setActiveVideo({
+                                    isOpen: true,
+                                    url: guide.videoUrl,
+                                    title: guide.title || copy.videoLabel,
+                                  })
+                                }
+                                className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-[1.2rem] bg-white/[0.07] border border-white/15 text-white font-bold text-[13px] hover:bg-white/[0.13] transition-all shrink-0"
+                              >
+                                <Video size={16} />
+                                {guide.suggestionText || copy.videoLabel}
+                              </button>
+                            ))}
+                          </div>
                         )}
 
                         <button
@@ -496,9 +501,9 @@ const WelcomeRobotOverlay = () => {
             transition={{ type: 'spring', damping: 17, stiffness: 110 }}
           >
             <div className="relative" style={{ width: MINI_ICON_SIZE, height: MINI_ICON_SIZE }}>
-              <span className="absolute inset-0 rounded-2xl bg-[#ba0036] blur-xl opacity-50 animate-pulse" />
-              <span className="absolute -inset-1.5 rounded-2xl border-2 border-[#ff4d6d]/60 animate-ping" />
-              <div className="relative w-full h-full rounded-2xl bg-gradient-to-br from-[#ba0036] to-[#7a0026] border-2 border-white/25 shadow-xl flex items-center justify-center">
+              <span className="absolute inset-0 rounded-full bg-[#ba0036] blur-xl opacity-50 animate-pulse" />
+              <span className="absolute -inset-1.5 rounded-full border-2 border-[#ff4d6d]/60 animate-ping" />
+              <div className="relative w-full h-full rounded-full bg-gradient-to-br from-[#ba0036] to-[#7a0026] border-2 border-white/25 shadow-xl flex items-center justify-center">
                 <Bot size={26} className="text-white" />
               </div>
 
