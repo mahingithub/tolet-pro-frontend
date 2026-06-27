@@ -30,7 +30,7 @@ export default function NotificationPanel({ onClose }) {
   const navigate = useNavigate();
   const { items, unreadCount, loading, markAsRead, markAllRead } = useNotificationContext();
   const { user } = useAuth();
-  const isLandlord = user?.role === 'landlord' || user?.role === 'host';
+  const isLandlord = user?.roles?.includes('landlord') || user?.roles?.includes('host') || user?.role === 'landlord';
 
   const handleRowClick = async (n) => {
     try {

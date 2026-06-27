@@ -146,9 +146,13 @@ const AdminLayout = () => {
             
             {/* Admin Profile */}
             <div className="relative">
-              <div 
-                onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="flex items-center gap-3 bg-white hover:bg-gray-50 p-1.5 pr-3 rounded-xl border border-gray-200 cursor-pointer transition-colors"
+              <button 
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsProfileOpen(!isProfileOpen);
+                }}
+                className="flex items-center gap-3 bg-white hover:bg-gray-50 p-1.5 pr-3 rounded-xl border border-gray-200 cursor-pointer transition-colors text-left"
               >
                 <div className="w-8 h-8 bg-gradient-to-br from-[#ba0036] to-[#d11147] rounded-lg flex items-center justify-center text-white font-black shadow-sm overflow-hidden">
                   {user?.avatar ? (
@@ -166,7 +170,7 @@ const AdminLayout = () => {
                   </p>
                 </div>
                 <ChevronDown size={14} className="text-gray-400 ml-1 hidden sm:block" />
-              </div>
+              </button>
 
               {/* Dropdown */}
               {isProfileOpen && (
