@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import NotificationBell from './NotificationBell';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 const AdminLayout = () => {
   const location = useLocation();
