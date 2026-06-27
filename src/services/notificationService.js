@@ -62,9 +62,14 @@ export const markAllRead = async () => {
   return call('/notifications/read-all', { method: 'POST' });
 };
 
+export const deleteNotification = async (id) => {
+  return call(`/notifications/${id}`, { method: 'DELETE' });
+};
+
 export default {
   listNotifications,
   getUnreadCount,
   markRead,
   markAllRead,
+  deleteNotification,
 };

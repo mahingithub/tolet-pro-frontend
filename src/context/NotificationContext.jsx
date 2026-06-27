@@ -201,6 +201,22 @@ export function NotificationProvider({ children }) {
     return true;
   }, [isDNDActive]);
 
+  const removeNotification = useCallback(async (id) => {
+    if (!isAuthed) return;
+    try {
+      await notificationService.deleteNotification(id);
+      setItems((prev) => {
+        const item = prev.find(i => i.id === id);
+        if (item && !item.read) {
+          setUnreadCount(c => Math.max(0, c - 1));
+        }
+        return prev.filter(i => i.id !== id);
+      });
+    } catch {
+      toast.error('Failed to remove notification');
+    }
+  }, [isAuthed]);
+
   return (
     <NotificationContext.Provider value={{
       items,
@@ -208,6 +224,7 @@ export function NotificationProvider({ children }) {
       loading,
       markAsRead,
       markAllRead,
+      removeNotification,
       soundEnabled,
       setSoundEnabled,
       dndSchedule,

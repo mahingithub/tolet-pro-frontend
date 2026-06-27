@@ -4,6 +4,7 @@ import {
   Send, Sparkles, CheckCircle2, RefreshCcw, AlertCircle, FileText,
   ShieldCheck, BadgeCheck, ChevronDown, ChevronRight, Inbox, Video
 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 
 import {
   listAllTickets,
@@ -45,6 +46,7 @@ const REPLY_TEMPLATES = [
 
 const SupportAndAI = () => {
   const { user: adminUser } = useAuth();
+  const location = useLocation();
   const [activeMainTab, setActiveMainTab] = useState('tickets');
 
   // ── data + ui state ──────────────────────────────────────────────────
@@ -97,6 +99,21 @@ const SupportAndAI = () => {
   useEffect(() => {
     setLoadingList(true);
     refreshList();
+    
+    // Auto open ticket from location state
+    if (location.state?.ticketId) {
+      setActiveId(location.state.ticketId);
+      
+      // Optionally remove it from state so it doesn't re-trigger on reload
+      if (window.history.replaceState) {
+        const state = { ...window.history.state };
+        if (state.usr?.ticketId) {
+          delete state.usr.ticketId;
+          window.history.replaceState(state, '');
+        }
+      }
+    }
+
     return onTicketsChanged(() => {
       refreshList();
       refreshActive();

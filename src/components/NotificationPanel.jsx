@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, MessageCircle, Inbox, CheckCheck, X } from 'lucide-react';
+import { Bell, MessageCircle, Inbox, CheckCheck, X, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationContext } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -28,7 +28,7 @@ const formatTime = (iso) => {
 
 export default function NotificationPanel({ onClose }) {
   const navigate = useNavigate();
-  const { items, unreadCount, loading, markAsRead, markAllRead } = useNotificationContext();
+  const { items, unreadCount, loading, markAsRead, markAllRead, removeNotification } = useNotificationContext();
   const { user } = useAuth();
   const isLandlord = user?.roles?.includes('landlord') || user?.roles?.includes('host') || user?.role === 'landlord';
 
@@ -117,7 +117,7 @@ export default function NotificationPanel({ onClose }) {
         case 'support_ticket':
         case 'support_message':
           if (n.data && n.data.path) {
-            navigate(n.data.path);
+            navigate(n.data.path, { state: { ticketId: n.data.ticketId || targetId } });
           } else {
             navigate('/admin');
           }
@@ -165,23 +165,30 @@ export default function NotificationPanel({ onClose }) {
           </div>
         ) : (
           items.map((n) => (
-            <button
-              type="button"
+            <div
               key={n.id}
-              onClick={() => handleRowClick(n)}
-              className={`w-full text-left flex gap-3 px-4 py-3 border-b border-gray-50 last:border-b-0 hover:bg-gray-50 transition-colors ${!n.read ? 'bg-red-50/30' : ''}`}
+              className={`w-full flex items-start gap-3 px-4 py-3 border-b border-gray-50 last:border-b-0 hover:bg-gray-50 transition-colors ${!n.read ? 'bg-red-50/30' : ''}`}
             >
-              <div className="mt-0.5 shrink-0">
+              <div className="mt-0.5 shrink-0 cursor-pointer" onClick={() => handleRowClick(n)}>
                 {n.data?.avatar || n.data?.senderAvatar ? (
                   <img src={n.data.avatar || n.data.senderAvatar} alt={n.title} className="w-8 h-8 rounded-full object-cover" />
                 ) : (
                   typeIcon(n.type)
                 )}
               </div>
-              <div className="min-w-0 flex-1">
-                <p className={`text-[12px] truncate ${!n.read ? 'font-black text-gray-900' : 'font-bold text-gray-700'}`}>
-                  {n.title || 'Notification'}
-                </p>
+              <button 
+                type="button" 
+                className="w-full min-w-0 flex-1 text-left"
+                onClick={() => handleRowClick(n)}
+              >
+                <div className="flex justify-between items-start">
+                  <p className={`text-[12px] truncate ${!n.read ? 'font-black text-gray-900' : 'font-bold text-gray-700'}`}>
+                    {n.title || 'Notification'}
+                  </p>
+                  {!n.read && (
+                    <span className="w-2 h-2 rounded-full bg-[#ba0036] shrink-0 ml-2" />
+                  )}
+                </div>
                 {n.body ? (
                   <p className="text-[11px] text-gray-500 line-clamp-2 mt-0.5" style={{ maxWidth: '60ch' }}>
                     {n.body.length > 60 ? n.body.substring(0, 60) + '...' : n.body}
@@ -190,11 +197,19 @@ export default function NotificationPanel({ onClose }) {
                 <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 mt-1">
                   {formatTime(n.createdAt)}
                 </p>
-              </div>
-              {!n.read && (
-                <span className="w-2 h-2 mt-1.5 rounded-full bg-[#ba0036] shrink-0" />
-              )}
-            </button>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeNotification(n.id);
+                }}
+                className="shrink-0 text-gray-300 hover:text-red-500 transition-colors p-2 rounded-md hover:bg-red-50 self-start"
+                title="Remove notification"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
           ))
         )}
       </div>
