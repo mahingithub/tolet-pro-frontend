@@ -42,6 +42,7 @@ import {
   Edit3, Camera, MessageSquare, DollarSign, ScrollText,
   UserCog, HandHeart,
 } from 'lucide-react';
+import NIDCameraCapture from './NIDCameraCapture';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  CONSTANTS
@@ -1170,24 +1171,20 @@ const VerificationModal = ({
                 }
                 optional={!isLandlord} isBn={isBn}
               >
-                <div className="grid grid-cols-2 gap-3">
-                  <ImageUploadCard
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <NIDCameraCapture
                     value={data.nidFront}
-                    inputRef={nidFrontInputRef}
-                    onPick={(e) => handleFilePick('nidFront', e)}
-                    onRemove={() => removeFile('nidFront')}
-                    emptyLabelBn="NID — সামনে" emptyLabelEn="NID — Front"
+                    onCapture={(val) => setData((d) => ({ ...d, nidFront: val }))}
                     isBn={isBn}
-                    aspect="aspect-[4/3]"
+                    labelBn="NID — সামনে" 
+                    labelEn="NID — Front"
                   />
-                  <ImageUploadCard
+                  <NIDCameraCapture
                     value={data.nidBack}
-                    inputRef={nidBackInputRef}
-                    onPick={(e) => handleFilePick('nidBack', e)}
-                    onRemove={() => removeFile('nidBack')}
-                    emptyLabelBn="NID — পিছনে" emptyLabelEn="NID — Back"
+                    onCapture={(val) => setData((d) => ({ ...d, nidBack: val }))}
                     isBn={isBn}
-                    aspect="aspect-[4/3]"
+                    labelBn="NID — পিছনে" 
+                    labelEn="NID — Back"
                   />
                 </div>
                 <div className="mt-4 p-3.5 rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/10 flex gap-2.5 items-start">
