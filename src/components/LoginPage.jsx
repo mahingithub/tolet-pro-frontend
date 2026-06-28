@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import {
   User, Phone, Lock, ArrowLeft, Loader2, CheckCircle2,
   Home, ShieldCheck, Building2, MessageCircle,
@@ -205,9 +207,17 @@ const LoginPage = () => {
   // ─── Send (or resend) the Firebase OTP ────────────────────────────────────
   const sendFirebaseOtp = async () => {
     const phoneE164 = toE164(formData.phone);
-    const verifier = buildRecaptcha();
-    const result = await signInWithPhoneNumber(auth, phoneE164, verifier);
-    confirmationResultRef.current = result;
+    if (Capacitor.isNativePlatform()) {
+      // Native: no reCAPTCHA, Firebase handles SMS verification natively.
+      await FirebaseAuthentication.signInWithPhoneNumber({ phoneNumber: phoneE164 });
+      // Store a sentinel so the OTP verify step knows which path we took.
+      confirmationResultRef.current = { __native: true };
+    } else {
+      // Web: existing RecaptchaVerifier flow — unchanged.
+      const verifier = buildRecaptcha();
+      const result = await signInWithPhoneNumber(auth, phoneE164, verifier);
+      confirmationResultRef.current = result;
+    }
     setResendIn(RESEND_COOLDOWN_S);
   };
 
@@ -258,8 +268,17 @@ const LoginPage = () => {
     setIsLoading(true); setErrorMsg(''); setInfoMsg('');
     const code = otp.join('');
     try {
-      const credential = await confirmationResultRef.current.confirm(code);
-      const idToken = await credential.user.getIdToken();
+      let idToken;
+      if (confirmationResultRef.current?.__native) {
+        // Native path: confirm via Capacitor plugin, get idToken from Firebase JS SDK.
+        await FirebaseAuthentication.confirmVerificationCode({ verificationCode: code });
+        const { token } = await FirebaseAuthentication.getIdToken();
+        idToken = token;
+      } else {
+        // Web path: unchanged.
+        const credential = await confirmationResultRef.current.confirm(code);
+        idToken = await credential.user.getIdToken();
+      }
       await signupVerify({ idToken });
       const newUser = refresh ? await refresh() : null;
       window.dispatchEvent(
@@ -298,8 +317,18 @@ const LoginPage = () => {
     e.preventDefault();
     setIsLoading(true); setErrorMsg(''); setInfoMsg('');
     try {
-      const credential = await confirmationResultRef.current.confirm(otp.join(''));
-      const idToken = await credential.user.getIdToken();
+      const code = otp.join('');
+      let idToken;
+      if (confirmationResultRef.current?.__native) {
+        // Native path: confirm via Capacitor plugin, get idToken from Firebase JS SDK.
+        await FirebaseAuthentication.confirmVerificationCode({ verificationCode: code });
+        const { token } = await FirebaseAuthentication.getIdToken();
+        idToken = token;
+      } else {
+        // Web path: unchanged.
+        const credential = await confirmationResultRef.current.confirm(code);
+        idToken = await credential.user.getIdToken();
+      }
       const { resetToken: t } = await forgotVerify({ idToken });
       setResetToken(t);
       setStep(STEPS.NEW_PASSWORD);
