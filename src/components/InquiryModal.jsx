@@ -116,22 +116,13 @@ const useAiSuggestions = (property, t) => {
 	}, [property, t]);
 };
 
-// Compose the message text from the user's manual input + selected chips.
-// The chips are appended in insertion order, separated by a blank line, so
-// the landlord sees a clean, readable enquiry.
-const composeMessage = (manual, selectedChips) => {
-	const parts = [];
-	if (manual && manual.trim()) parts.push(manual.trim());
-	selectedChips.forEach((c) => parts.push(c.message));
-	return parts.join('\n\n');
-};
 
 // ─── component ──────────────────────────────────────────────────────────────
 const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 	const { t } = useLanguage();
 	const [step, setStep] = useState('form');           // 'form' | 'success'
 	const [phone, setPhone] = useState('');
-	const [manualMessage, setManualMessage] = useState('');
+	const [message, setMessage] = useState('');
 	const [selectedIds, setSelectedIds] = useState([]); // ordered chip ids
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [submitError, setSubmitError] = useState('');
@@ -152,10 +143,10 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 		[selectedIds, aiSuggestions],
 	);
 
-	// Final message = whatever the user typed + every chip they tapped.
-	const finalMessage = useMemo(
-		() => composeMessage(manualMessage, selectedChips),
-		[manualMessage, selectedChips],
+	// selectedChips is only used to compute MeetsMinimum, or we could just use selectedIds.length
+	const selectedChips = useMemo(
+		() => selectedIds.map((id) => aiSuggestions.find((c) => c.id === id)).filter(Boolean),
+		[selectedIds, aiSuggestions],
 	);
 
 	// Reset everything ~after~ the close animation finishes.
@@ -164,7 +155,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 			const timer = setTimeout(() => {
 				setStep('form');
 				setPhone('');
-				setManualMessage('');
+				setMessage('');
 				setSelectedIds([]);
 				setIsSubmitting(false);
 				setSubmitError('');
@@ -184,12 +175,35 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isOpen]);
 
-	const toggleChip = useCallback((id) => {
-		setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-	}, []);
+	const toggleChip = useCallback((chipId) => {
+		const chip = aiSuggestions.find(c => c.id === chipId);
+		if (!chip) return;
+
+		setSelectedIds((prev) => {
+			if (prev.includes(chip.id)) {
+				// Try to remove from message if it hasn't been edited
+				setMessage((current) => {
+					if (current.includes(chip.message)) {
+						return current.replace(chip.message, '').trim().replace(/\n{3,}/g, '\n\n');
+					}
+					return current;
+				});
+				return prev.filter((x) => x !== chip.id);
+			} else {
+				// Insert text
+				setMessage((current) => {
+					const parts = [];
+					if (current.trim()) parts.push(current.trim());
+					parts.push(chip.message);
+					return parts.join('\n\n');
+				});
+				return [...prev, chip.id];
+			}
+		});
+	}, [aiSuggestions]);
 
 	const phoneOk = isValidPhone(phone);
-	const messageOk = finalMessage.trim().length > 0;
+	const messageOk = message.trim().length > 0;
 	const canSubmit = phoneOk && messageOk && !isSubmitting;
 
 	const handleSubmit = async () => {
@@ -210,7 +224,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 		try {
 			await createInquiryApi({
 				propertyId: String(propertyId),
-				message: finalMessage,
+				message: message,
 			});
 			setStep('success');
 		} catch (err) {
@@ -383,33 +397,14 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 													{t.yourMessage}
 												</p>
 												<p className="text-[9px] font-bold text-gray-400">
-													{finalMessage.length} {t.chars}
+													{message.length} {t.chars}
 												</p>
 											</div>
 
-											{/* Selected chip chips also appear inline above the textarea so the
-											    user can see + remove what the AI added without scrolling up. */}
-											{selectedChips.length > 0 && (
-												<div className="flex flex-wrap gap-1 mb-2">
-													{selectedChips.map((chip) => (
-														<button
-															key={chip.id}
-															type="button"
-															onClick={() => toggleChip(chip.id)}
-															className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#ba0036]/10 text-[#ba0036] text-[10px] font-black"
-															aria-label={`Remove ${chip.label}`}
-														>
-															<Sparkles size={9} /> {chip.label}
-															<X size={10} className="ml-0.5 opacity-70" />
-														</button>
-													))}
-												</div>
-											)}
-
 											<textarea
 												placeholder={t.messageOptionalNote}
-												value={manualMessage}
-												onChange={(e) => setManualMessage(e.target.value)}
+												value={message}
+												onChange={(e) => setMessage(e.target.value)}
 												className="w-full bg-transparent text-sm font-bold text-gray-900 placeholder-gray-300 outline-none resize-none h-20 leading-relaxed"
 											/>
 										</div>
