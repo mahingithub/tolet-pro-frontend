@@ -52,13 +52,12 @@ const maskPhone = (raw) => {
 // would return ({ id, icon, label, message }). Each suggestion is composed
 // from the property the user is inquiring about, so two listings produce
 // different chip text — i.e. the "AI" feels live, not boilerplate.
-const useAiSuggestions = (property, language = 'en') => {
-	const isBn = language === 'bn';
+const useAiSuggestions = (property, t) => {
 	return useMemo(() => {
 		if (!property) return [];
 
-		const priceFmt = property.price ? `৳${Number(property.price).toLocaleString('en-IN')}` : (isBn ? 'উল্লেখিত ভাড়া' : 'the listed rent');
-		const location = property.location || (isBn ? 'এই এলাকা' : 'this area');
+		const priceFmt = property.price ? `৳${Number(property.price).toLocaleString('en-IN')}` : t.listedRentFallback;
+		const location = property.location || t.thisAreaFallback;
 		const beds = property.beds ?? null;
 		const baths = property.baths ?? null;
 		const sqft = property.sqft ?? null;
@@ -69,42 +68,32 @@ const useAiSuggestions = (property, language = 'en') => {
 			{
 				id: 'rent',
 				icon: BadgePercent,
-				label: isBn ? 'ভাড়া কমানোর অনুরোধ' : 'Negotiate rent',
-				message: isBn
-					? `নমস্কার! আমি আপনার প্রপার্টিটিতে আগ্রহী। ${priceFmt} ভাড়া কি কিছুটা কমানো সম্ভব, বিশেষ করে যদি আমি দীর্ঘমেয়াদী চুক্তিতে থাকি?`
-					: `Hi! I'm interested in your property. Is there any flexibility on the monthly rent of ${priceFmt}, especially if I sign for a longer-term lease?`,
+				label: t.aiChipRentReq,
+				message: t.aiChipRentMsg.replace('{price}', priceFmt),
 			},
 			{
 				id: 'facilities',
 				icon: Wrench,
-				label: isBn ? 'সুবিধাগুলো নিশ্চিত করুন' : 'Confirm facilities',
-				message: isBn
-					? `অনুগ্রহ করে নিশ্চিত করবেন কি প্রপার্টিটিতে গ্যাস, জল, পার্কিং, লিফট, জেনারেটর এবং ইন্টারনেট সুবিধা আছে কিনা? ইউটিলিটি বিল কি ভাড়ার সাথে অন্তর্ভুক্ত নাকি আলাদা?`
-					: `Could you confirm what's included with the property — gas, water, parking, lift, generator and internet? Are utility bills part of the rent or paid separately?`,
+				label: t.aiChipFacilReq,
+				message: t.aiChipFacilMsg,
 			},
 			{
 				id: 'location',
 				icon: MapPin,
-				label: isBn ? 'অবস্থান ও যাতায়াত' : 'Location & access',
-				message: isBn
-					? `${location} যাতায়াতের সুবিধা কেমন? আমি জানতে চাই প্রপার্টিটি থেকে নিকটস্থ বাসস্ট্যান্ড, স্কুল এবং বাজার কতটা দূরে, এবং রাতে এলাকার পরিবেশ কেমন থাকে।`
-					: `How accessible is ${location}? I'd like to know roughly how far the property is from the nearest bus stop, school and grocery market, and how the area feels at night.`,
+				label: t.aiChipLocReq,
+				message: t.aiChipLocMsg.replace('{location}', location),
 			},
 			{
 				id: 'visit',
 				icon: CalendarClock,
-				label: isBn ? 'ভিজিটের সময় নির্ধারণ' : 'Schedule a visit',
-				message: isBn
-					? `আমি কি এই সপ্তাহে প্রপার্টিটি দেখতে আসতে পারি? আমি সপ্তাহের দিনগুলোতে সন্ধ্যায় বা ছুটির দিনে সকালে আসতে পারব — অনুগ্রহ করে আপনার সুবিধামতো একটি সময় জানান।`
-					: `When could I come by for a tour this week? I'm flexible on weekday evenings and weekend mornings — please share a slot that works for you.`,
+				label: t.aiChipVisitReq,
+				message: t.aiChipVisitMsg,
 			},
 			{
 				id: 'move-in',
 				icon: KeyRound,
-				label: isBn ? 'ওঠার তারিখ ও চুক্তি' : 'Move-in & lease',
-				message: isBn
-					? `সবচেয়ে তাড়াতাড়ি কবে ওঠা যাবে এবং সর্বনিম্ন চুক্তির মেয়াদ কত? এছাড়াও — সিকিউরিটি ডিপোজিট এবং অগ্রিম ভাড়ার বিষয়ে বিস্তারিত জানাবেন।`
-					: `What's the earliest move-in date, and what's the minimum lease length? Also — security deposit and advance rent expectations, please.`,
+				label: t.aiChipMoveReq,
+				message: t.aiChipMoveMsg,
 			},
 		];
 
@@ -112,21 +101,19 @@ const useAiSuggestions = (property, language = 'en') => {
 		// pattern an LLM would use — pivot questions on whatever data we have.
 		if (beds || baths || sqft) {
 			const parts = [];
-			if (beds) parts.push(isBn ? `${beds} বেড` : `${beds} bed`);
-			if (baths) parts.push(isBn ? `${baths} বাথ` : `${baths} bath`);
-			if (sqft) parts.push(isBn ? `${sqft} স্কয়ার ফিট` : `${sqft} sqft`);
+			if (beds) parts.push(`${beds} ${t.bedLabel}`);
+			if (baths) parts.push(`${baths} ${t.bathLabel}`);
+			if (sqft) parts.push(`${sqft} ${t.sqftLabel}`);
 			chips.push({
 				id: 'spec',
 				icon: Sparkles,
-				label: isBn ? 'স্পেসিফিকেশন নিশ্চিত করুন' : 'Confirm spec',
-				message: isBn
-					? `নিশ্চিত করার জন্য — লিস্টিং-এ বলা হয়েছে ${parts.join(', ')}। আমি ভিজিট করার আগে আপনি কি রুমগুলোর ছবি বা ছোট ভিডিও পাঠাতে পারবেন?`
-					: `Just to confirm — the listing says ${parts.join(', ')}. Could you also share photos or a quick video walkthrough of the rooms before I visit?`,
+				label: t.aiChipSpecReq,
+				message: t.aiChipSpecMsg.replace('{parts}', parts.join(', ')),
 			});
 		}
 
 		return chips;
-	}, [property]);
+	}, [property, t]);
 };
 
 // Compose the message text from the user's manual input + selected chips.
@@ -141,8 +128,7 @@ const composeMessage = (manual, selectedChips) => {
 
 // ─── component ──────────────────────────────────────────────────────────────
 const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
-	const { language } = useLanguage();
-	const isBn = language === 'bn';
+	const { t } = useLanguage();
 	const [step, setStep] = useState('form');           // 'form' | 'success'
 	const [phone, setPhone] = useState('');
 	const [manualMessage, setManualMessage] = useState('');
@@ -160,7 +146,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 	const displayProperty = property || persistedData.property;
 	const displayLandlord = landlord || persistedData.landlord;
 
-	const aiSuggestions = useAiSuggestions(displayProperty, language);
+	const aiSuggestions = useAiSuggestions(displayProperty, t);
 	const selectedChips = useMemo(
 		() => selectedIds.map((id) => aiSuggestions.find((c) => c.id === id)).filter(Boolean),
 		[selectedIds, aiSuggestions],
@@ -215,7 +201,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 			return;
 		}
 		if (!getCurrentToken()) {
-			setSubmitError(isBn ? 'Inquiry পাঠাতে আগে লগইন করুন।' : 'Please login first to send an inquiry.');
+			setSubmitError(t.inquiryLoginError);
 			return;
 		}
 
@@ -229,7 +215,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 			setStep('success');
 		} catch (err) {
 			setSubmitError(
-				err?.message || (isBn ? 'Inquiry পাঠাতে সমস্যা হয়েছে। পরে আবার চেষ্টা করুন।' : 'Failed to send inquiry. Please try again later.'),
+				err?.message || t.inquiryFailError,
 			);
 		} finally {
 			setIsSubmitting(false);
@@ -286,9 +272,9 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 											<MessageCircle size={26} className="text-[#ba0036]" />
 										</div>
 										<div>
-											<h3 className="text-xl font-black text-gray-900 leading-tight">{isBn ? "ইনকোয়ারি পাঠান" : "Send Inquiry"}</h3>
+											<h3 className="text-xl font-black text-gray-900 leading-tight">{t.inquiryModalTitle}</h3>
 											<p className="text-gray-400 font-bold text-sm mt-0.5">
-												{isBn ? "প্রতি " : "to "}<span className="text-[#ba0036]">{displayLandlord.name}</span>
+												{t.inquiryModalTo}<span className="text-[#ba0036]">{displayLandlord.name}</span>
 											</p>
 										</div>
 									</div>
@@ -304,7 +290,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 											<p className="font-black text-gray-900 text-sm truncate">{displayProperty.title}</p>
 											<p className="text-[#ba0036] font-black text-sm mt-0.5">
 												৳{Number(displayProperty.price).toLocaleString('en-IN')}
-												<span className="text-gray-400 font-bold text-xs">{isBn ? "/মাস" : "/mo"}</span>
+												<span className="text-gray-400 font-bold text-xs">{t.perMonthShort}</span>
 											</p>
 											<p className="text-gray-400 text-xs font-bold flex items-center gap-1 mt-0.5 truncate">
 												<MapPin size={10} className="shrink-0" /> {displayProperty.location}
@@ -322,7 +308,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 											}`}
 										>
 											<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
-												<Phone size={10} /> {isBn ? "আপনার মোবাইল নম্বর" : "Your Phone Number"}
+												<Phone size={10} /> {t.yourPhoneNum}
 											</p>
 											<input
 												type="tel"
@@ -335,7 +321,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 											/>
 											{phone && !phoneOk && (
 												<p className="text-[10px] font-black text-red-500 mt-1">
-													{isBn ? "নম্বরটি ছোট মনে হচ্ছে — অনুগ্রহ করে সম্পূর্ণ নম্বর দিন।" : "Looks short — please enter a full mobile number."}
+													{t.phoneShortError}
 												</p>
 											)}
 										</div>
@@ -348,7 +334,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 														<Wand2 size={12} className="text-[#ba0036]" />
 													</div>
 													<p className="text-[10px] font-black text-gray-700 uppercase tracking-widest">
-														{isBn ? "এআই সাজেশন" : "AI Suggestions"}
+														{t.aiSuggestionsTitle}
 													</p>
 												</div>
 												<span
@@ -356,13 +342,13 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 														meetsMinimum ? 'text-green-600' : 'text-gray-400'
 													}`}
 												>
-													{isBn ? `${suggestionCount}/৩ যোগ করা হয়েছে` : `${suggestionCount}/3 added`}
+													{`${suggestionCount}/${t.aiSuggestText2} ${t.aiAdded}`}
 												</span>
 											</div>
 
 											<p className="text-[11px] font-bold text-gray-500 leading-relaxed mb-3">
-												{isBn ? "আপনার বার্তায় প্রস্তুত করা প্রশ্ন যোগ করতে ট্যাপ করুন। আমরা অন্তত" : "Tap to add ready-made questions to your message. We recommend at least"}
-												<span className="text-gray-800"> {isBn ? "৩টি" : "three"}</span> {isBn ? "সুপারিশ করছি যাতে মালিক একবারে উত্তর দিতে পারেন।" : "so the landlord can answer in one go."}
+												{t.aiSuggestText1}
+												<span className="text-gray-800"> {t.aiSuggestText2}</span> {t.aiSuggestText3}
 											</p>
 
 											<div className="flex flex-wrap gap-1.5">
@@ -394,10 +380,10 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 										<div className="bg-gray-50 rounded-2xl px-4 py-3.5 border border-gray-100 focus-within:border-[#ba0036] focus-within:bg-white transition-all">
 											<div className="flex items-center justify-between mb-1">
 												<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-													{isBn ? "আপনার বার্তা" : "Your Message"}
+													{t.yourMessage}
 												</p>
 												<p className="text-[9px] font-bold text-gray-400">
-													{finalMessage.length} {isBn ? "অক্ষর" : "chars"}
+													{finalMessage.length} {t.chars}
 												</p>
 											</div>
 
@@ -421,7 +407,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 											)}
 
 											<textarea
-												placeholder={isBn ? "ঐচ্ছিক — আপনার নিজস্ব নোট যোগ করুন। উপরে ট্যাপ করা এআই প্রশ্নগুলো স্বয়ংক্রিয়ভাবে যুক্ত হবে।" : "Optional — add your own note. AI questions you tap above will be appended automatically."}
+												placeholder={t.messageOptionalNote}
 												value={manualMessage}
 												onChange={(e) => setManualMessage(e.target.value)}
 												className="w-full bg-transparent text-sm font-bold text-gray-900 placeholder-gray-300 outline-none resize-none h-20 leading-relaxed"
@@ -431,7 +417,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 										<div className="flex items-center gap-2 px-1">
 											<Clock size={12} className="text-green-500 shrink-0" />
 											<p className="text-xs font-bold text-gray-400">
-												{displayLandlord.name} {isBn ? "সাধারণত উত্তর দেন " : "typically responds in "}{' '}
+												{displayLandlord.name} {t.typicallyRespondsIn}{' '}
 												<span className="text-green-600">{displayLandlord.responseTime}</span>
 											</p>
 										</div>
@@ -457,11 +443,11 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 														transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
 														className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
 													/>
-													{isBn ? "পাঠানো হচ্ছে..." : "Sending..."}
+													{t.sending}
 												</>
 											) : (
 												<>
-													<Send size={16} /> {isBn ? "ইনকোয়ারি পাঠান" : "Send Inquiry"}
+													<Send size={16} /> {t.inquiryModalTitle}
 												</>
 											)}
 										</button>
@@ -502,12 +488,12 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 
 									<motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
 										<h3 className="text-2xl font-black text-gray-900 tracking-tight">
-											{isBn ? "ইনকোয়ারি পাঠানো হয়েছে!" : "Inquiry sent!"}
+											{t.inquirySentTitle}
 										</h3>
 										<p className="text-gray-500 font-bold text-sm mt-2 leading-relaxed">
-											{isBn ? 'আমরা আপনার বার্তা শেয়ার করেছি' : "We've shared your message with "}{' '}
-											<span className="text-gray-800">{displayLandlord.name}</span>.{isBn ? ' এর সাথে।' : '.'}<br />
-											{isBn ? 'তারা শীঘ্রই আপনাকে কল বা টেক্সট করবে ' : "They'll call or text "}<span className="text-gray-800">{maskPhone(phone)}</span> {isBn ? 'নম্বরে।' : 'shortly.'}
+											{t.inquirySentDesc1}{' '}
+											<span className="text-gray-800">{displayLandlord.name}</span>{t.inquirySentDesc2}<br />
+											{t.inquirySentDesc3}<span className="text-gray-800">{maskPhone(phone)}</span> {t.inquirySentDesc4}
 										</p>
 									</motion.div>
 
@@ -515,11 +501,11 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 										className="mt-6 bg-gray-50 rounded-2xl p-4 text-left border border-gray-100"
 										initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
 									>
-										<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">{isBn ? 'এরপর কী হবে' : 'What happens next'}</p>
+										<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">{t.whatHappensNext}</p>
 										{[
-											{ icon: '📩', text: isBn ? `${displayLandlord.name} আপনার বার্তা দেখবেন` : `${displayLandlord.name} reviews your message` },
-											{ icon: '📞', text: isBn ? `তারা যোগাযোগ করবেন ${maskPhone(phone)} নম্বরে` : `They reach out on ${maskPhone(phone)}` },
-											{ icon: '🏠', text: isBn ? 'প্রপার্টি ভিজিট শিডিউল করবেন' : 'Schedule a property visit' },
+											{ icon: '📩', text: `${displayLandlord.name} ${t.reviewsYourMessage}` },
+											{ icon: '📞', text: `${t.reachOutOn} ${maskPhone(phone)}` },
+											{ icon: '🏠', text: t.scheduleVisitStep },
 										].map((s, i) => (
 											<motion.div key={i} className="flex items-center gap-3 py-2" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + i * 0.1 }}>
 												<span className="text-lg shrink-0">{s.icon}</span>
@@ -530,10 +516,10 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 
 									<motion.div className="flex flex-col gap-2 mt-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.65 }}>
 										<button onClick={onClose} className="w-full bg-[#ba0036] text-white py-3.5 rounded-2xl font-black shadow-lg hover:bg-[#90002a] active:scale-95 transition-all flex items-center justify-center gap-2">
-											<Sparkles size={15} /> {isBn ? 'সম্পন্ন' : 'Done'}
+											<Sparkles size={15} /> {t.doneBtn}
 										</button>
 										<button onClick={onClose} className="w-full py-3 rounded-2xl font-black text-sm text-gray-500 hover:text-gray-700 transition-colors">
-											{isBn ? 'প্রপার্টিতে ফিরে যান' : 'Back to property'}
+											{t.backToPropBtn}
 										</button>
 									</motion.div>
 								</motion.div>
