@@ -25,6 +25,7 @@ import GlobalToaster from "./components/GlobalToaster";
 import SmartAlertsPage from "./components/Smartalertspage";
 import AIInsightsPage from "./components/Aiinsightspage";
 import LandlordProfile from "./components/LandlordProfile";
+import PublicTenantProfile from "./components/PublicTenantProfile";
 import TenantProfile from "./components/TenantProfile";
 import PrivacyCenter from "./components/PrivacyCenter.jsx";
 import SubscriptionPage from "./components/SubscriptionPage";
@@ -170,6 +171,7 @@ const AppLayout = () => {
 				/>
 				<Route path="/ai-insights" element={<AIInsightsPage />} />
 				<Route path="/landlord/:id" element={<LandlordProfile />} />
+				<Route path="/tenant/:id" element={<PublicTenantProfile />} />
 				<Route path="/tenant/:id" element={<TenantProfile />} />
 
 				<Route

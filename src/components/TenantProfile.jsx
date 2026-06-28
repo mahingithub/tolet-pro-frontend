@@ -234,21 +234,26 @@ const TenantProfile = () => {
               </div>
 
               <div className="hidden md:flex gap-3">
+                {/* Trust Score Highlight in Header */}
+                <div className="mr-6 flex flex-col items-end justify-center">
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-0.5">Trust Score</p>
+                  <div className="flex items-center gap-1.5 text-blue-600 bg-blue-50 px-3 py-1 rounded-xl border border-blue-100">
+                    <ShieldCheck size={20} />
+                    <span className="text-2xl font-black">{trustScore}</span>
+                    <span className="text-xs font-bold text-blue-400 mt-1">/ 100</span>
+                  </div>
+                </div>
+
                 <button
-                  disabled={!phone}
                   onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } })}
-                  className={`py-3 px-6 rounded-2xl font-black text-sm transition-all flex items-center gap-2 ${
-                    phone
-                      ? 'bg-gray-100 text-gray-800 hover:bg-green-50 hover:text-green-600'
-                      : 'bg-gray-50 text-gray-300 cursor-not-allowed'
-                  }`}
+                  className="bg-gray-100 text-gray-800 py-3 px-6 rounded-2xl font-black text-sm hover:bg-green-50 hover:text-green-600 transition-all flex items-center gap-2"
                 >
-                  {phone ? <Phone size={16} /> : <Lock size={16} />}
-                  {phone ? 'Call' : 'Locked'}
+                  <Phone size={16} /> Call
                 </button>
                 <button
                   onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar } })}
-                  className="bg-blue-500 text-white py-3 px-6 rounded-2xl font-black text-sm shadow-lg hover:bg-blue-600 active:scale-95 transition-all flex items-center gap-2">
+                  className="bg-blue-500 text-white py-3 px-6 rounded-2xl font-black text-sm shadow-lg hover:bg-blue-600 active:scale-95 transition-all flex items-center gap-2"
+                >
                   <MessageCircle size={16} /> Send Message
                 </button>
               </div>
@@ -282,38 +287,38 @@ const TenantProfile = () => {
                 )}
               </div>
 
-              <div className="flex md:hidden gap-3 w-full">
-                <button
-                  disabled={!phone}
-                  onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } })}
-                  className={`flex-1 py-3.5 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 ${
-                    phone
-                      ? 'bg-gray-50 border border-gray-200 text-gray-800 active:scale-95'
-                      : 'bg-gray-50 border border-gray-200 text-gray-300'
-                  }`}
-                >
-                  {phone ? <Phone size={16} /> : <Lock size={16} />} {phone ? 'Call' : 'Locked'}
-                </button>
-                <button
-                  onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar } })}
-                  className="flex-1 bg-blue-500 text-white py-3.5 rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
-                  <MessageCircle size={16} /> Message
-                </button>
+              <div className="flex flex-col md:hidden gap-4 w-full">
+                {/* Mobile Trust Score */}
+                <div className="flex items-center justify-between bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                  <p className="text-xs font-black text-blue-800 uppercase tracking-widest">Trust Score</p>
+                  <div className="flex items-center gap-1.5 text-blue-600">
+                    <ShieldCheck size={20} />
+                    <span className="text-2xl font-black">{trustScore}</span>
+                    <span className="text-xs font-bold text-blue-400">/ 100</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 w-full">
+                  <button
+                    onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } })}
+                    className="flex-1 py-3.5 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 bg-gray-50 border border-gray-200 text-gray-800 active:scale-95"
+                  >
+                    <Phone size={16} /> Call
+                  </button>
+                  <button
+                    onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar } })}
+                    className="flex-1 bg-blue-500 text-white py-3.5 rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    <MessageCircle size={16} /> Message
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* Stats grid — only what makes sense for a tenant. Trust score
                 + member-since are universal; employment and contact reveal
                 only when the caller has unlocked the card. */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 pt-8 border-t border-gray-100">
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-center">
-                <div className="flex items-center justify-center gap-1 mb-1 text-blue-600">
-                  <ShieldCheck size={18} />
-                  <span className="text-xl font-black">{trustScore}</span>
-                </div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Trust Score</p>
-              </div>
-
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 pt-8 border-t border-gray-100">
               <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-center">
                 <div className="flex items-center justify-center gap-1 mb-1 text-gray-900">
                   <Calendar size={18} />
