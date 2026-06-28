@@ -150,7 +150,7 @@ const toInquiryRow = (raw = {}) => {
     phone:          raw.phone || raw.inquirerPhone || raw.userPhone || '',
     propTitle:      raw.propTitle || raw.propertyTitle || raw.property || '',
     propertyId:     raw.propertyId || raw.property || '',
-    msg:            raw.msg || raw.message || raw.text || '',
+    msg:            raw.msg || raw.message || raw.text || (Array.isArray(raw.messages) && raw.messages.length > 0 ? (typeof raw.messages[0] === 'string' ? raw.messages[0] : (raw.messages[0].text || raw.messages[0].message || raw.messages[0].content)) : '') || '',
     status:         raw.status || 'new',
     chatId:         raw.chatId || raw.conversationId || raw.threadId || '',
     messages:       Array.isArray(raw.messages) ? raw.messages : [],
@@ -3353,67 +3353,61 @@ const HostDashboard = () => {
                       <div id={`inquiry-${inquiry.id}`} key={inquiry.id} className="bg-white rounded-[2rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_15px_40px_rgba(0,0,0,0.06)] p-6 md:p-8 transition-all duration-500 border-none">
                         <div className="flex flex-col xl:flex-row gap-6 xl:gap-8 items-stretch">
                           
-                          <div className="flex-1 w-full flex flex-col justify-between">
+                      <div className="flex-1 w-full flex flex-col justify-between">
                             <div>
-                              <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-4">
-                                  <div className="w-12 h-12 md:w-14 md:h-14 bg-red-50 rounded-2xl flex items-center justify-center text-[#ba0036] font-black text-lg md:text-xl border-none shadow-sm">
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 md:w-12 md:h-12 bg-red-50 rounded-xl flex items-center justify-center text-[#ba0036] font-black text-sm md:text-lg border-none shadow-sm">
                                     {inquiry.init}
                                   </div>
                                   <div>
-                                    {/* Tenant name → public profile link.
-                                        Roadmap-v2 §3 / tenant-roadmap §T3 —
-                                        only when the inquiry was actually
-                                        submitted by a signed-in user (so
-                                        `inquirerUserId` is present). Guest
-                                        inquiries stay as plain text. */}
                                     {inquiry.inquirerUserId ? (
                                       <Link
                                         to={`/tenant/${inquiry.inquirerUserId}`}
-                                        className="text-lg md:text-xl font-black text-gray-900 hover:text-[#ba0036] transition-colors leading-tight mb-1 block"
+                                        className="text-base md:text-xl font-black text-gray-900 hover:text-[#ba0036] transition-colors leading-tight mb-0.5 block"
                                       >
                                         {inquiry.user}
                                       </Link>
                                     ) : (
-                                      <h4 className="text-lg md:text-xl font-black text-gray-900 leading-tight mb-1">{inquiry.user}</h4>
+                                      <h4 className="text-base md:text-xl font-black text-gray-900 leading-tight mb-0.5">{inquiry.user}</h4>
                                     )}
-                                    <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest">{inquiry.timeAgo}</p>
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{inquiry.timeAgo}</p>
                                   </div>
                                 </div>
-                                <span className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border-none shadow-sm">
+                                <span className="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border-none shadow-sm">
                                   {t?.new || (language === 'বাংলা' ? 'নতুন' : 'New')}
                                 </span>
                               </div>
 
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                                <div className="bg-gray-50/80 p-5 rounded-2xl border-none">
-                                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{t?.phoneNumber || (language === 'বাংলা' ? 'ফোন নাম্বার' : 'Phone Number')}</p>
-                                  <p className="text-sm md:text-base font-black text-gray-900">{inquiry.phone}</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                                <div className="bg-gray-50/80 p-3 md:p-4 rounded-xl border-none">
+                                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{t?.phoneNumber || (language === 'বাংলা' ? 'ফোন নাম্বার' : 'Phone Number')}</p>
+                                  <p className="text-xs md:text-base font-black text-gray-900">{inquiry.phone}</p>
                                 </div>
-                                <div className="bg-gray-50/80 p-5 rounded-2xl border-none">
-                                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{t?.propertyInterested || (language === 'বাংলা' ? 'প্রপার্টি' : 'Property')}</p>
-                                  <p className="text-sm md:text-base font-black text-[#ba0036] truncate">{inquiry.propTitle}</p> 
+                                <div className="bg-gray-50/80 p-3 md:p-4 rounded-xl border-none">
+                                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{t?.propertyInterested || (language === 'বাংলা' ? 'প্রপার্টি' : 'Property')}</p>
+                                  <p className="text-xs md:text-base font-black text-[#ba0036] truncate">{inquiry.propTitle}</p> 
                                 </div>
                               </div>
                               
-                              <div className="bg-gray-50/80 p-5 rounded-2xl border-none mb-6">
-                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{language === 'বাংলা' ? 'বার্তা' : 'Message'}</p>
-                                <p className="text-sm md:text-base font-bold text-gray-700 whitespace-pre-wrap leading-relaxed">{inquiry.msg || (language === 'বাংলা' ? 'কোনো বার্তা নেই' : 'No message provided')}</p>
+                              <div className="bg-gray-50/80 p-3 md:p-4 rounded-xl border-none mb-4">
+                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'বার্তা' : 'Message'}</p>
+                                <p className="text-xs md:text-sm font-bold text-gray-700 whitespace-pre-wrap leading-relaxed">{inquiry.msg || (language === 'বাংলা' ? 'কোনো বার্তা নেই' : 'No message provided')}</p>
                               </div>
                             </div>
 
                             {/* Inline Reply — থ্রেডে যোগ হয়, tenant টাইমলাইনে দেখে */}
-                            <div className="mt-3 flex items-center gap-2">
-                              <input type="text" value={inquiryReplies[inquiry.id] || ''} onChange={e => setInquiryReplies(prev => ({ ...prev, [inquiry.id]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') sendInquiryReply(inquiry); }} placeholder={language === 'বাংলা' ? 'রিপ্লাই লিখুন...' : 'Write a reply...'} className="flex-1 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white border border-transparent focus:border-[#ba0036]/20 transition-all" />
-                              <button onClick={() => sendInquiryReply(inquiry)} disabled={replyingId === inquiry.id || !(inquiryReplies[inquiry.id] || '').trim()} className="shrink-0 w-11 h-11 rounded-xl bg-[#ba0036] hover:bg-[#90002a] disabled:opacity-40 text-white flex items-center justify-center transition-colors"><Send size={16} /></button>
+                            <div className="mt-2 flex items-center gap-2">
+                              <input type="text" value={inquiryReplies[inquiry.id] || ''} onChange={e => setInquiryReplies(prev => ({ ...prev, [inquiry.id]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') sendInquiryReply(inquiry); }} placeholder={language === 'বাংলা' ? 'রিপ্লাই লিখুন...' : 'Write a reply...'} className="flex-1 p-2.5 md:p-3 bg-gray-50 rounded-xl text-xs md:text-sm font-bold text-gray-900 outline-none focus:bg-white border border-transparent focus:border-[#ba0036]/20 transition-all" />
+                              <button onClick={() => sendInquiryReply(inquiry)} disabled={replyingId === inquiry.id || !(inquiryReplies[inquiry.id] || '').trim()} className="shrink-0 w-10 h-10 rounded-xl bg-[#ba0036] hover:bg-[#90002a] disabled:opacity-40 text-white flex items-center justify-center transition-colors"><Send size={14} /></button>
                             </div>
 
                             {inquiry.visitSchedule?.status === 'pending' && inquiry.visitSchedule?.proposedBy === 'tenant' && (
-                              <div className="mt-3 bg-amber-50 border border-amber-100 rounded-2xl p-3 flex items-center justify-between gap-2">
-                                <span className="text-[11px] font-bold text-amber-800">{language === 'বাংলা' ? 'ভাড়াটিয়া ভিজিট চেয়েছে:' : 'Tenant proposed:'} {inquiry.visitSchedule.date} {inquiry.visitSchedule.time}</span>
+                              <div className="mt-2 bg-amber-50 border border-amber-100 rounded-xl p-2.5 flex items-center justify-between gap-2">
+                                <span className="text-[10px] md:text-[11px] font-bold text-amber-800">{language === 'বাংলা' ? 'ভাড়াটিয়া ভিজিট চেয়েছে:' : 'Tenant proposed:'} {inquiry.visitSchedule.date} {inquiry.visitSchedule.time}</span>
                                 <span className="flex gap-1.5 shrink-0">
-                                  <button onClick={() => hostRespondVisit(inquiry, 'accept')} className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-[11px] font-black">{language === 'বাংলা' ? 'গ্রহণ' : 'Accept'}</button>
-                                  <button onClick={() => hostRespondVisit(inquiry, 'reject')} className="px-3 py-1.5 rounded-lg bg-white border border-red-200 text-red-600 text-[11px] font-black">{language === 'বাংলা' ? 'বাতিল' : 'Reject'}</button>
+                                  <button onClick={() => hostRespondVisit(inquiry, 'accept')} className="px-2.5 py-1 md:py-1.5 rounded-lg bg-green-600 text-white text-[10px] md:text-[11px] font-black">{language === 'বাংলা' ? 'গ্রহণ' : 'Accept'}</button>
+                                  <button onClick={() => hostRespondVisit(inquiry, 'reject')} className="px-2.5 py-1 md:py-1.5 rounded-lg bg-white border border-red-200 text-red-600 text-[10px] md:text-[11px] font-black">{language === 'বাংলা' ? 'বাতিল' : 'Reject'}</button>
                                 </span>
                               </div>
                             )}
