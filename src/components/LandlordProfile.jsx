@@ -170,13 +170,13 @@ const LandlordProfile = () => {
           </div>
 
           <div className="px-6 md:px-12 pb-10 relative">
-            <div className="flex justify-between items-end -mt-20 md:-mt-24 mb-6 relative z-10">
+            <div className="flex justify-between items-end -mt-16 md:-mt-24 mb-4 md:mb-6 relative z-10">
               <div className="relative group">
-                <div className="absolute -inset-1 bg-gradient-to-tr from-[#ba0036] to-pink-500 rounded-[2.2rem] opacity-70 group-hover:opacity-100 blur transition-opacity duration-300"></div>
+                <div className="absolute -inset-1 bg-gradient-to-tr from-[#ba0036] to-pink-500 rounded-full md:rounded-[2.2rem] opacity-70 group-hover:opacity-100 blur transition-opacity duration-300"></div>
                 <img
                   src={avatar}
                   alt={landlord.name}
-                  className="relative w-36 h-36 md:w-44 md:h-44 rounded-[2rem] border-[6px] border-white bg-white object-cover shadow-xl"
+                  className="relative w-28 h-28 md:w-44 md:h-44 rounded-full md:rounded-[2rem] border-[4px] md:border-[6px] border-white bg-white object-cover shadow-xl"
                 />
                 {landlord.verified && (
                   <div className="absolute -bottom-2 -right-2 bg-gradient-to-tr from-blue-600 to-blue-400 text-white p-2.5 rounded-full border-4 border-white shadow-lg">
@@ -199,29 +199,29 @@ const LandlordProfile = () => {
               </div>
             </div>
 
-            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 md:gap-6">
               <div className="flex-1">
                 <div className="flex items-center gap-2.5">
-                  <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">{landlord.name}</h1>
-                  {landlord.verified && <BadgeCheck size={28} className="text-blue-500 drop-shadow-sm" />}
+                  <h1 className="text-2xl md:text-4xl font-black text-gray-900 tracking-tight">{landlord.name}</h1>
+                  {landlord.verified && <BadgeCheck size={24} className="text-blue-500 drop-shadow-sm md:w-7 md:h-7" />}
                 </div>
                 {tagline && <p className="text-gray-500 font-bold text-sm md:text-base mt-1.5">{tagline}</p>}
 
                 {(landlord.verified || (isNewHost && !landlord.verified) || badges.length > 0) && (
                   <div className="flex flex-wrap gap-2.5 mt-5">
                     {landlord.verified && (
-                      <span className="text-xs font-black px-4 py-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 flex items-center gap-2 uppercase tracking-widest shadow-sm">
-                        <BadgeCheck size={14} /> Verified Landlord
+                      <span className="text-[10px] md:text-xs font-black px-3 md:px-4 py-1.5 md:py-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 flex items-center gap-1.5 md:gap-2 uppercase tracking-widest shadow-sm">
+                        <BadgeCheck size={12} className="md:w-3.5 md:h-3.5" /> Verified Landlord
                       </span>
                     )}
                     {isNewHost && !landlord.verified && (
-                      <span className="text-xs font-black px-4 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-2 uppercase tracking-widest shadow-sm">
-                        <Award size={14} /> New landlord
+                      <span className="text-[10px] md:text-xs font-black px-3 md:px-4 py-1.5 md:py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1.5 md:gap-2 uppercase tracking-widest shadow-sm">
+                        <Award size={12} className="md:w-3.5 md:h-3.5" /> New landlord
                       </span>
                     )}
                     {badges.map((badge, i) => (
-                      <span key={i} className="text-xs font-black px-4 py-2 rounded-xl bg-red-50 text-[#ba0036] border border-red-100 flex items-center gap-2 uppercase tracking-widest shadow-sm">
-                        <Award size={14} /> {badge}
+                      <span key={i} className="text-[10px] md:text-xs font-black px-3 md:px-4 py-1.5 md:py-2 rounded-xl bg-red-50 text-[#ba0036] border border-red-100 flex items-center gap-1.5 md:gap-2 uppercase tracking-widest shadow-sm">
+                        <Award size={12} className="md:w-3.5 md:h-3.5" /> {badge}
                       </span>
                     ))}
                   </div>
@@ -245,49 +245,49 @@ const LandlordProfile = () => {
             </div>
 
             {/* Trust Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-10 pt-8 border-t border-gray-100/50">
-              <div className="p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-center gap-1.5 mb-2 text-yellow-500 bg-yellow-50/80 w-10 h-10 mx-auto rounded-full">
-                  <Star size={18} className="fill-yellow-500" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mt-8 md:mt-10 pt-6 md:pt-8 border-t border-gray-100/50">
+              <div className="p-4 md:p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-center gap-1.5 mb-2 text-yellow-500 bg-yellow-50/80 w-8 h-8 md:w-10 md:h-10 mx-auto rounded-full">
+                  <Star size={16} className="fill-yellow-500 md:w-[18px] md:h-[18px]" />
                 </div>
-                <span className="block text-xl font-black text-gray-900 mb-1">{rating}</span>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">({totalReviews} Reviews)</p>
+                <span className="block text-lg md:text-xl font-black text-gray-900 mb-1">{rating}</span>
+                <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest">({totalReviews} Reviews)</p>
               </div>
 
-              <div className="p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-center gap-1.5 mb-2 text-green-600 bg-green-50/80 w-10 h-10 mx-auto rounded-full">
-                  <MessageCircle size={18} />
+              <div className="p-4 md:p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-center gap-1.5 mb-2 text-green-600 bg-green-50/80 w-8 h-8 md:w-10 md:h-10 mx-auto rounded-full">
+                  <MessageCircle size={16} className="md:w-[18px] md:h-[18px]" />
                 </div>
-                <span className="block text-xl font-black text-gray-900 mb-1">{responseRate}%</span>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Response Rate</p>
+                <span className="block text-lg md:text-xl font-black text-gray-900 mb-1">{responseRate}%</span>
+                <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest">Response Rate</p>
               </div>
 
-              <div className="p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-center gap-1.5 mb-2 text-indigo-600 bg-indigo-50/80 w-10 h-10 mx-auto rounded-full">
-                  <Clock size={18} />
+              <div className="p-4 md:p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-center gap-1.5 mb-2 text-indigo-600 bg-indigo-50/80 w-8 h-8 md:w-10 md:h-10 mx-auto rounded-full">
+                  <Clock size={16} className="md:w-[18px] md:h-[18px]" />
                 </div>
-                <span className="block text-xl font-black text-gray-900 mb-1">{responseTime}</span>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Avg. Reply</p>
+                <span className="block text-lg md:text-xl font-black text-gray-900 mb-1">{responseTime}</span>
+                <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest">Avg. Reply</p>
               </div>
 
-              <div className="p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-center gap-1.5 mb-2 text-violet-600 bg-violet-50/80 w-10 h-10 mx-auto rounded-full">
-                  <Calendar size={18} />
+              <div className="p-4 md:p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-center gap-1.5 mb-2 text-violet-600 bg-violet-50/80 w-8 h-8 md:w-10 md:h-10 mx-auto rounded-full">
+                  <Calendar size={16} className="md:w-[18px] md:h-[18px]" />
                 </div>
-                <span className="block text-xl font-black text-gray-900 mb-1">{memberSince}</span>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Member Since</p>
+                <span className="block text-lg md:text-xl font-black text-gray-900 mb-1">{memberSince}</span>
+                <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest">Member Since</p>
               </div>
             </div>
           </div>
         </motion.div>
 
         {/* ── SECTIONS ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
-          <div className="lg:col-span-7 space-y-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 mb-8 md:mb-12">
+          <div className="lg:col-span-7 space-y-6 md:space-y-8">
             {bio && (
-              <motion.div variants={fadeInUp} className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.03)] p-8">
-                <h3 className="text-xl font-black text-gray-900 mb-4">About the Landlord</h3>
-                <p className="text-gray-600 font-medium leading-relaxed text-base">
+              <motion.div variants={fadeInUp} className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.03)] p-6 md:p-8">
+                <h3 className="text-lg md:text-xl font-black text-gray-900 mb-4">About the Landlord</h3>
+                <p className="text-gray-600 font-medium leading-relaxed text-sm md:text-base">
                   {bio}
                 </p>
               </motion.div>
@@ -297,15 +297,15 @@ const LandlordProfile = () => {
             {(landlord.preferredTenants?.length > 0 || landlord.houseRules?.length > 0 || landlord.serviceCharge !== null || landlord.communication?.length > 0) && (
               <motion.div variants={fadeInUp} className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {(landlord.preferredTenants?.length > 0 || landlord.communication?.length > 0) && (
-                  <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 p-8 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
-                    <h3 className="text-lg font-black text-gray-900 mb-6">Landlord Preferences</h3>
+                  <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 p-6 md:p-8 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
+                    <h3 className="text-base md:text-lg font-black text-gray-900 mb-5 md:mb-6">Landlord Preferences</h3>
                     
                     {landlord.preferredTenants?.length > 0 && (
-                      <div className="mb-6">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Preferred Tenants</p>
-                        <div className="flex flex-wrap gap-2.5">
+                      <div className="mb-5 md:mb-6">
+                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2.5 md:mb-3">Preferred Tenants</p>
+                        <div className="flex flex-wrap gap-2 md:gap-2.5">
                           {landlord.preferredTenants.map((pt, i) => (
-                            <span key={i} className="bg-blue-50/80 text-blue-700 border border-blue-100 px-3.5 py-1.5 rounded-xl text-xs font-bold capitalize shadow-sm">
+                            <span key={i} className="bg-blue-50/80 text-blue-700 border border-blue-100 px-3 py-1.5 md:px-3.5 md:py-1.5 rounded-xl text-[11px] md:text-xs font-bold capitalize shadow-sm">
                               {pt.replace('_', ' ')}
                             </span>
                           ))}
@@ -315,10 +315,10 @@ const LandlordProfile = () => {
                     
                     {landlord.communication?.length > 0 && (
                       <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Preferred Contact</p>
-                        <div className="flex flex-wrap gap-2.5">
+                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2.5 md:mb-3">Preferred Contact</p>
+                        <div className="flex flex-wrap gap-2 md:gap-2.5">
                           {landlord.communication.map((cm, i) => (
-                            <span key={i} className="bg-gray-50/80 text-gray-600 border border-gray-200 px-3.5 py-1.5 rounded-xl text-xs font-bold capitalize shadow-sm">
+                            <span key={i} className="bg-gray-50/80 text-gray-600 border border-gray-200 px-3 py-1.5 md:px-3.5 md:py-1.5 rounded-xl text-[11px] md:text-xs font-bold capitalize shadow-sm">
                               {cm.replace('_', ' ')}
                             </span>
                           ))}
@@ -329,8 +329,8 @@ const LandlordProfile = () => {
                 )}
                 
                 {(landlord.houseRules?.length > 0 || landlord.serviceCharge !== null) && (
-                  <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 p-8 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
-                    <h3 className="text-lg font-black text-gray-900 mb-6">House Rules & Fees</h3>
+                  <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 p-6 md:p-8 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
+                    <h3 className="text-base md:text-lg font-black text-gray-900 mb-5 md:mb-6">House Rules & Fees</h3>
                     
                     {landlord.houseRules?.length > 0 && (
                       <div className="mb-6">
@@ -365,7 +365,7 @@ const LandlordProfile = () => {
           <div className="lg:col-span-5">
             {/* ── Trust + Verification ──────── */}
             <motion.div variants={fadeInUp} className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.03)] p-6 md:p-8 sticky top-24">
-              <div className="flex justify-center mb-8 pb-8 border-b border-gray-100/80">
+              <div className="flex justify-center mb-6 md:mb-8 pb-6 md:pb-8 border-b border-gray-100/80">
                 <TrustGauge score={trustScore} tier={trustTier} label="Landlord Trust" />
               </div>
               <div className="space-y-4">
@@ -406,8 +406,8 @@ const LandlordProfile = () => {
 
         {/* ── ACTIVE LISTINGS ── */}
         <motion.div variants={fadeInUp} className="mb-10 pt-4">
-          <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-8 flex items-center gap-3">
-            Active Properties <span className="text-gray-400 text-lg font-bold bg-gray-100 px-3 py-1 rounded-full">{totalProperties}</span>
+          <h2 className="text-xl md:text-3xl font-black text-gray-900 mb-6 md:mb-8 flex items-center gap-2 md:gap-3">
+            Active Properties <span className="text-gray-400 text-sm md:text-lg font-bold bg-gray-100 px-2 md:px-3 py-1 rounded-full">{totalProperties}</span>
           </h2>
 
           {properties.length === 0 ? (
