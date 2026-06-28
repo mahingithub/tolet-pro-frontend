@@ -1666,25 +1666,39 @@ const ChatSystem = () => {
                   <ArrowLeft size={20} className="text-gray-700"/>
                 </button>
               )}
-              <div className="w-11 h-11 rounded-2xl overflow-hidden shrink-0 shadow-sm">
-                {activeChat.isAI ? (
-                  <div className="w-full h-full bg-gradient-to-br from-[#ba0036] to-[#7a0024] flex items-center justify-center text-white">
-                    <Bot size={22}/>
-                  </div>
-                ) : activeChat.avatar ? (
-                  <img src={activeChat.avatar} className="w-full h-full object-cover" alt={activeChat.name}/>
-                ) : (
-                  <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-700 font-black text-sm">
-                    {(activeChat.name || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase()}
-                  </div>
-                )}
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-base sm:text-lg font-black text-gray-900 truncate">{activeChat.name}</h3>
-                <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 text-green-600 truncate">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shrink-0"></span>
-                  {activeChat.role || 'Online'}{activeChat.tenantPhone ? ` · ${activeChat.tenantPhone}` : ''}
-                </p>
+              <div 
+                className={`flex items-center gap-3 ${!activeChat.isAI && activeChat.peerUserId ? 'cursor-pointer group' : ''}`}
+                onClick={() => {
+                  if (activeChat.isAI || !activeChat.peerUserId) return;
+                  if (activeChat.role === 'Property Owner' || activeChat.role === 'Landlord') {
+                    navigate(`/host/${activeChat.peerUserId}`);
+                  } else {
+                    navigate(`/tenant/${activeChat.peerUserId}`);
+                  }
+                }}
+              >
+                <div className={`w-11 h-11 rounded-2xl overflow-hidden shrink-0 shadow-sm ${!activeChat.isAI && activeChat.peerUserId ? 'group-hover:scale-105 transition-transform' : ''}`}>
+                  {activeChat.isAI ? (
+                    <div className="w-full h-full bg-gradient-to-br from-[#ba0036] to-[#7a0024] flex items-center justify-center text-white">
+                      <Bot size={22}/>
+                    </div>
+                  ) : activeChat.avatar ? (
+                    <img src={activeChat.avatar} className="w-full h-full object-cover" alt={activeChat.name}/>
+                  ) : (
+                    <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-700 font-black text-sm">
+                      {(activeChat.name || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <h3 className={`text-base sm:text-lg font-black text-gray-900 truncate ${!activeChat.isAI && activeChat.peerUserId ? 'group-hover:text-blue-600 transition-colors' : ''}`}>
+                    {activeChat.name}
+                  </h3>
+                  <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 text-green-600 truncate">
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shrink-0"></span>
+                    {activeChat.role || 'Online'}{activeChat.tenantPhone ? ` · ${activeChat.tenantPhone}` : ''}
+                  </p>
+                </div>
               </div>
             </div>
             <div className="flex gap-1.5 sm:gap-2 shrink-0">
