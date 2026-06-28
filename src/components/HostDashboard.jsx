@@ -542,19 +542,50 @@ const HostDashboard = () => {
     return next;
   };
 
-  const persistLandlordProfile = async (next) => {
+  const persistLandlordProfile = async (next, patch = null) => {
     setLandlordProfile(next);
     try {
       localStorage.setItem(landlordProfileKey(authUser?.id), JSON.stringify(next));
     } catch {}
+    
     setUserData((prev) => ({
       ...prev,
       fullName: next.fullName || prev.fullName,
+      phone:    next.phone    || prev.phone,
+      email:    next.email    || prev.email,
       city:     next.city     || prev.city,
       address:  next.address  || prev.address,
     }));
-    if (authUpdateMe) {
-      await authUpdateMe({ landlordProfile: next });
+    
+    if (authUpdateMe && patch) {
+      const topLevel = {};
+      const nested   = {};
+      
+      for (const [path, value] of Object.entries(patch || {})) {
+        if (path === 'fullName' || path === 'name') { topLevel.name = value; continue; }
+        if (path === 'email')                       { topLevel.email = value; continue; }
+        if (path === 'phone')                       { topLevel.phone = value; continue; }
+        
+        const parts = path.split('.');
+        let cursor = nested;
+        for (let i = 0; i < parts.length - 1; i++) {
+          const k = parts[i];
+          if (!cursor[k] || typeof cursor[k] !== 'object') cursor[k] = {};
+          cursor = cursor[k];
+        }
+        cursor[parts[parts.length - 1]] = value;
+      }
+      
+      const payload = { ...topLevel };
+      if (Object.keys(nested).length > 0) payload.landlordProfile = nested;
+      
+      if (Object.keys(payload).length > 0) {
+        try {
+          await authUpdateMe(payload);
+        } catch (err) {
+          console.warn('[ProfileSection.onUpdate] backend sync failed:', err);
+        }
+      }
     }
   };
 
@@ -2121,7 +2152,7 @@ const HostDashboard = () => {
                   language={language}
                   onUpdate={async (patch) => {
                     const next = applyLandlordPatch(landlordProfile, patch);
-                    await persistLandlordProfile(next);
+                    await persistLandlordProfile(next, patch);
                     showToast(language === 'বাংলা' ? 'প্রোফাইল আপডেট হয়েছে' : 'Profile updated');
                   }}
                   onAvatarUpload={async (file, _source, onProgress) => {
