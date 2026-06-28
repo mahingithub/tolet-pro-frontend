@@ -3390,9 +3390,38 @@ const HostDashboard = () => {
                                 </div>
                               </div>
                               
-                              <div className="bg-gray-50/80 p-3 md:p-4 rounded-xl border-none mb-4">
-                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'বার্তা' : 'Message'}</p>
-                                <p className="text-xs md:text-sm font-bold text-gray-700 whitespace-pre-wrap leading-relaxed">{inquiry.msg || (language === 'বাংলা' ? 'কোনো বার্তা নেই' : 'No message provided')}</p>
+                              <div className="bg-gray-50/80 p-3 md:p-4 rounded-xl border-none mb-4 flex flex-col gap-3 max-h-[250px] overflow-y-auto">
+                                {(() => {
+                                  const msgs = (Array.isArray(inquiry.messages) && inquiry.messages.length > 0)
+                                    ? inquiry.messages.map(m => typeof m === 'string' ? { text: m, sender: 'tenant' } : m)
+                                    : (inquiry.msg ? [{ text: inquiry.msg, sender: 'tenant' }] : []);
+                                  
+                                  if (msgs.length === 0) {
+                                    return (
+                                      <div>
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'বার্তা' : 'Message'}</p>
+                                        <p className="text-xs md:text-sm font-bold text-gray-700 whitespace-pre-wrap leading-relaxed">{language === 'বাংলা' ? 'কোনো বার্তা নেই' : 'No message provided'}</p>
+                                      </div>
+                                    );
+                                  }
+
+                                  return msgs.map((m, idx) => {
+                                    const isHost = m.sender === 'host' || m.sender === 'landlord';
+                                    const text = m.text || m.message || m.content || '';
+                                    if (!text) return null;
+                                    
+                                    return (
+                                      <div key={idx} className={`flex flex-col ${isHost ? 'items-end' : 'items-start'}`}>
+                                        <div className={`px-3.5 py-2.5 rounded-2xl text-xs md:text-sm font-bold max-w-[90%] whitespace-pre-wrap leading-relaxed shadow-sm ${isHost ? 'bg-[#ba0036] text-white rounded-tr-sm' : 'bg-white text-gray-700 border border-gray-100 rounded-tl-sm'}`}>
+                                          {text}
+                                        </div>
+                                        <span className="text-[8px] md:text-[9px] font-black text-gray-400 mt-1 uppercase tracking-widest">
+                                          {isHost ? (language === 'বাংলা' ? 'আপনি' : 'You') : inquiry.user}
+                                        </span>
+                                      </div>
+                                    );
+                                  });
+                                })()}
                               </div>
                             </div>
 
