@@ -3385,7 +3385,7 @@ const HostDashboard = () => {
                                 </span>
                               </div>
 
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                                 <div className="bg-gray-50/80 p-5 rounded-2xl border-none">
                                   <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{t?.phoneNumber || (language === 'বাংলা' ? 'ফোন নাম্বার' : 'Phone Number')}</p>
                                   <p className="text-sm md:text-base font-black text-gray-900">{inquiry.phone}</p>
@@ -3394,6 +3394,11 @@ const HostDashboard = () => {
                                   <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{t?.propertyInterested || (language === 'বাংলা' ? 'প্রপার্টি' : 'Property')}</p>
                                   <p className="text-sm md:text-base font-black text-[#ba0036] truncate">{inquiry.propTitle}</p> 
                                 </div>
+                              </div>
+                              
+                              <div className="bg-gray-50/80 p-5 rounded-2xl border-none mb-6">
+                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{language === 'বাংলা' ? 'বার্তা' : 'Message'}</p>
+                                <p className="text-sm md:text-base font-bold text-gray-700 whitespace-pre-wrap leading-relaxed">{inquiry.msg || (language === 'বাংলা' ? 'কোনো বার্তা নেই' : 'No message provided')}</p>
                               </div>
                             </div>
 
