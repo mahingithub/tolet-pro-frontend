@@ -86,6 +86,23 @@ export const TENANT_FIELDS = [
     required:    true,
     placeholder: { bn: 'আপনার পূর্ণ নাম',  en: 'Your full name' },
   },
+  // 1a. Email address
+  {
+    key:         'email',
+    label:       { bn: 'ইমেইল',            en: 'Email' },
+    icon:        UserCheck, // Or a Mail icon if available, UserCheck works for now
+    type:        'email',
+    validator:   validators.email,
+    placeholder: { bn: 'example@email.com', en: 'example@email.com' },
+  },
+  // 1b. Date of Birth
+  {
+    key:         'dateOfBirth',
+    label:       { bn: 'জন্ম তারিখ',         en: 'Date of Birth' },
+    icon:        UserCheck, // Or a Calendar icon if available
+    type:        'date',
+    placeholder: { bn: 'DD/MM/YYYY',        en: 'DD/MM/YYYY' },
+  },
   // 2. Profession bucket — drives doc-type prompts downstream
   {
     key:         'professionType',

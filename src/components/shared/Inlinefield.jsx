@@ -188,7 +188,12 @@ const InlineField = ({
           {!editing && !savedFlash && (
             <button
               type="button"
-              onClick={() => setEditing(true)}
+              onClick={() => {
+                setEditing(true);
+                if (type === 'tel' && !draft) {
+                  setDraft('+880');
+                }
+              }}
               className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 rounded-lg hover:bg-gray-100 transition-opacity"
               aria-label={isBn ? 'সম্পাদনা করুন' : 'Edit'}
             >

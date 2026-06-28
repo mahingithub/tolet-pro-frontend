@@ -92,6 +92,23 @@ export const LANDLORD_FIELDS = [
     required:    true,
     placeholder: { bn: 'আপনার পূর্ণ নাম',  en: 'Your full name' },
   },
+  // 1a. Email address
+  {
+    key:         'email',
+    label:       { bn: 'ইমেইল',            en: 'Email' },
+    icon:        UserCheck,
+    type:        'email',
+    validator:   validators.email,
+    placeholder: { bn: 'example@email.com', en: 'example@email.com' },
+  },
+  // 1b. Date of Birth
+  {
+    key:         'dateOfBirth',
+    label:       { bn: 'জন্ম তারিখ',         en: 'Date of Birth' },
+    icon:        UserCheck,
+    type:        'date',
+    placeholder: { bn: 'DD/MM/YYYY',        en: 'DD/MM/YYYY' },
+  },
   // 2. City — single chip group. Decides which area-based matching
   //    bucket the listings will land in.
   {
