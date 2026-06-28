@@ -180,9 +180,13 @@ const PendingCard = ({ user, busyId, onApprove, onReject }) => {
             {(() => {
               const v = tp.verification || {};
               const items = [
-                { pts: 20, done: !!user.phone },
-                { pts: 30, done: !!v.photo },
-                { pts: 50, done: !!(v.nidFront && v.nidBack) },
+                { pts: 15, done: !!user.phone },
+                { pts: 15, done: !!v.photo },
+                { pts: 30, done: !!(v.nidFront && v.nidBack) },
+                { pts: 10, done: !!tp.professionType },
+                { pts: 10, done: !!tp.workPlace },
+                { pts: 5,  done: !!tp.familySize },
+                { pts: 15, done: !!(tp.emergencyContact && tp.emergencyContact.phone) },
               ];
               const score = items.filter((i) => i.done).reduce((sum, i) => sum + i.pts, 0);
               let tier = 'bronze';

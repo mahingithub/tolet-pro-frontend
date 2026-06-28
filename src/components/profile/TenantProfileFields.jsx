@@ -95,14 +95,6 @@ export const TENANT_FIELDS = [
     validator:   validators.email,
     placeholder: { bn: 'example@email.com', en: 'example@email.com' },
   },
-  // 1b. Date of Birth
-  {
-    key:         'dateOfBirth',
-    label:       { bn: 'জন্ম তারিখ',         en: 'Date of Birth' },
-    icon:        UserCheck, // Or a Calendar icon if available
-    type:        'date',
-    placeholder: { bn: 'DD/MM/YYYY',        en: 'DD/MM/YYYY' },
-  },
   // 2. Profession bucket — drives doc-type prompts downstream
   {
     key:         'professionType',

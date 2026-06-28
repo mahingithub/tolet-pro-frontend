@@ -138,9 +138,13 @@ const computeTrustScore = (p) => {
   if (!p) return { score: 0, tier: 'bronze', breakdown: [] };
   const v = p.verification || {};
   const items = [
-    { key: 'phone',      labelEn: 'Phone OTP verified', labelBn: 'ফোন OTP ভেরিফাইড', pts: 20, done: !!p.phone },
-    { key: 'photo',      labelEn: 'Profile photo',      labelBn: 'প্রোফাইল ছবি',     pts: 30, done: !!v.photo },
-    { key: 'nid',        labelEn: 'NID verified',       labelBn: 'NID ভেরিফাইড',     pts: 50, done: !!(v.nidFront && v.nidBack) },
+    { key: 'phone',      labelEn: 'Phone OTP verified', labelBn: 'ফোন OTP ভেরিফাইড', pts: 15, done: !!p.phone },
+    { key: 'photo',      labelEn: 'Profile photo',      labelBn: 'প্রোফাইল ছবি',     pts: 15, done: !!v.photo },
+    { key: 'nid',        labelEn: 'NID verified',       labelBn: 'NID ভেরিফাইড',     pts: 30, done: !!(v.nidFront && v.nidBack) },
+    { key: 'profession', labelEn: 'Profession added',   labelBn: 'পেশা যুক্ত',        pts: 10, done: !!p.professionType },
+    { key: 'workPlace',  labelEn: 'Workplace added',    labelBn: 'প্রতিষ্ঠান যুক্ত',       pts: 10, done: !!p.workPlace },
+    { key: 'family',     labelEn: 'Family size added',  labelBn: 'সদস্য সংখ্যা যুক্ত',     pts: 5,  done: !!p.familySize },
+    { key: 'emergency',  labelEn: 'Emergency phone',    labelBn: 'জরুরি ফোন',         pts: 15, done: !!(p.emergencyContact && p.emergencyContact.phone) },
   ];
   const score = items.filter((i) => i.done).reduce((sum, i) => sum + i.pts, 0);
   let tier = 'bronze';
