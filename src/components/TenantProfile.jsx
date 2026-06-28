@@ -301,25 +301,29 @@ const TenantProfile = () => {
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Member Since</p>
               </div>
 
-              <div className="p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow relative overflow-hidden">
-                <div className="flex items-center justify-center gap-2 mb-2 text-indigo-600 bg-indigo-50 w-10 h-10 mx-auto rounded-full">
-                  {phone ? <Phone size={18} /> : <Lock size={18} className="text-gray-400" />}
+              {(!isUnlocked || phone) && (
+                <div className="p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow relative overflow-hidden">
+                  <div className="flex items-center justify-center gap-2 mb-2 text-indigo-600 bg-indigo-50 w-10 h-10 mx-auto rounded-full">
+                    {phone ? <Phone size={18} /> : <Lock size={18} className="text-gray-400" />}
+                  </div>
+                  <p className={`text-sm font-bold truncate ${phone ? 'text-gray-900' : 'text-gray-400'}`}>
+                    {phone || 'Locked'}
+                  </p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Phone</p>
                 </div>
-                <p className={`text-sm font-bold truncate ${phone ? 'text-gray-900' : 'text-gray-400'}`}>
-                  {phone || 'Locked'}
-                </p>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Phone</p>
-              </div>
+              )}
 
-              <div className="p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow relative overflow-hidden">
-                <div className="flex items-center justify-center gap-2 mb-2 text-violet-600 bg-violet-50 w-10 h-10 mx-auto rounded-full">
-                  {email ? <Mail size={18} /> : <Lock size={18} className="text-gray-400" />}
+              {(!isUnlocked || email) && (
+                <div className="p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow relative overflow-hidden">
+                  <div className="flex items-center justify-center gap-2 mb-2 text-violet-600 bg-violet-50 w-10 h-10 mx-auto rounded-full">
+                    {email ? <Mail size={18} /> : <Lock size={18} className="text-gray-400" />}
+                  </div>
+                  <p className={`text-sm font-bold truncate ${email ? 'text-gray-900' : 'text-gray-400'}`}>
+                    {email || 'Locked'}
+                  </p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Email</p>
                 </div>
-                <p className={`text-sm font-bold truncate ${email ? 'text-gray-900' : 'text-gray-400'}`}>
-                  {email || 'Locked'}
-                </p>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Email</p>
-              </div>
+              )}
             </div>
 
             {!isUnlocked && (
@@ -362,38 +366,50 @@ const TenantProfile = () => {
                   
                   {isUnlocked && tenant.professionType === 'student' && (
                     <>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                        <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Institution</span>
-                        <span className="text-[15px] font-bold text-gray-900">{professionDetails.institution || '—'}</span>
-                      </div>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                        <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Student ID</span>
-                        <span className="text-[15px] font-bold text-gray-900">{professionDetails.studentId || '—'}</span>
-                      </div>
+                      {professionDetails.institution && (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Institution</span>
+                          <span className="text-[15px] font-bold text-gray-900">{professionDetails.institution}</span>
+                        </div>
+                      )}
+                      {professionDetails.studentId && (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Student ID</span>
+                          <span className="text-[15px] font-bold text-gray-900">{professionDetails.studentId}</span>
+                        </div>
+                      )}
                     </>
                   )}
                   {isUnlocked && tenant.professionType === 'employed' && (
                     <>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                        <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Company</span>
-                        <span className="text-[15px] font-bold text-gray-900">{professionDetails.company || '—'}</span>
-                      </div>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                        <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Designation</span>
-                        <span className="text-[15px] font-bold text-gray-900">{professionDetails.designation || '—'}</span>
-                      </div>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                        <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Office ID</span>
-                        <span className="text-[15px] font-bold text-gray-900">{professionDetails.officeId || '—'}</span>
-                      </div>
+                      {professionDetails.company && (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Company</span>
+                          <span className="text-[15px] font-bold text-gray-900">{professionDetails.company}</span>
+                        </div>
+                      )}
+                      {professionDetails.designation && (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Designation</span>
+                          <span className="text-[15px] font-bold text-gray-900">{professionDetails.designation}</span>
+                        </div>
+                      )}
+                      {professionDetails.officeId && (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Office ID</span>
+                          <span className="text-[15px] font-bold text-gray-900">{professionDetails.officeId}</span>
+                        </div>
+                      )}
                     </>
                   )}
                   {isUnlocked && tenant.professionType === 'self-employed' && (
                     <>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                        <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Business</span>
-                        <span className="text-[15px] font-bold text-gray-900">{professionDetails.company || '—'}</span>
-                      </div>
+                      {professionDetails.company && (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Business</span>
+                          <span className="text-[15px] font-bold text-gray-900">{professionDetails.company}</span>
+                        </div>
+                      )}
                     </>
                   )}
                   {!isUnlocked && (
@@ -418,18 +434,18 @@ const TenantProfile = () => {
                     <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Name</span>
                     <span className="text-base font-bold text-gray-900">{emergencyContact.name}</span>
                   </div>
-                  <div className="p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                    <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Relation</span>
-                    <span className="text-base font-bold text-gray-900">{emergencyContact.relation || '—'}</span>
-                  </div>
-                  <div className="p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                    <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Phone</span>
-                    <span className="text-base font-bold text-gray-900">{emergencyContact.phone || '—'}</span>
-                  </div>
-                  <div className="p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                    <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Address</span>
-                    <span className="text-base font-bold text-gray-900">{emergencyContact.address || '—'}</span>
-                  </div>
+                  {emergencyContact.relation && (
+                    <div className="p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                      <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Relation</span>
+                      <span className="text-base font-bold text-gray-900">{emergencyContact.relation}</span>
+                    </div>
+                  )}
+                  {emergencyContact.phone && (
+                    <div className="p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                      <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Phone</span>
+                      <span className="text-base font-bold text-gray-900">{emergencyContact.phone}</span>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
