@@ -28,11 +28,26 @@ import {
   ArrowLeft, BadgeCheck, MessageCircle, Phone, Mail,
   Calendar, Briefcase, ShieldCheck, Share2, Lock, Award,
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 import { tenantService } from '../services/tenantService';
 import { useAuth } from '../context/AuthContext.jsx';
 import TrustGauge from './shared/TrustGauge';
 import VerifStep  from './shared/VerifStep';
+
+const fadeInUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }
+};
+
+const staggerContainer = {
+  animate: {
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
 
 const TenantProfile = () => {
   const { id } = useParams();
@@ -42,19 +57,11 @@ const TenantProfile = () => {
   const [tenant, setTenant]   = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // `isSelf` — viewer তার নিজেরই profile দেখছে কিনা। `id` URL param একই
-  // কিনা authUser-এর id / _id-এর সাথে সেটা check করি দুই form-এ কারণ
-  // backend route `_id` রিটার্ন করে কিন্তু frontend serializer `id` virtual
-  // ব্যবহার করে।
+  // `isSelf` — viewer তার নিজেরই profile দেখছে কিনা।
   const isSelf =
     !!authUser &&
     (String(authUser.id) === String(id) || String(authUser._id) === String(id));
 
-  // Initial fetch — runs whenever the URL id changes. We still hit the
-  // API even for self-view because the public route returns the right
-  // "unlocked" flags + verification timeline shape that AuthContext's
-  // user object doesn't carry. Then we overlay live AuthContext fields
-  // in a separate effect (below) so optimistic updates show up instantly.
   useEffect(() => {
     window.scrollTo(0, 0);
     let cancelled = false;
@@ -69,24 +76,10 @@ const TenantProfile = () => {
     return () => { cancelled = true; };
   }, [id]);
 
-  // 🆕 Self-view overlay — when the viewer is this user, mirror the live
-  // AuthContext fields (avatar, name, phone) into the displayed tenant
-  // object. This is what fixes the "I uploaded a new avatar but my
-  // profile page still shows the old one" bug — the API may have cached
-  // the old URL, but AuthContext is always fresh (broadcast-subscribed
-  // to authService writes).
-  //
-  // We intentionally only overlay user-editable identity fields. The
-  // server-computed bits (trustScore, verification timeline, unlocked
-  // flag) stay whatever `getTenant` returned — those are authoritative
-  // server-side anyway.
   useEffect(() => {
     if (!isSelf || !authUser || !tenant) return;
     setTenant((prev) => {
       if (!prev) return prev;
-      // Cheap equality check — if nothing actually changed, skip the
-      // setState so we don't trigger a render storm when authUser
-      // updates frequently (e.g. trust score animations).
       const same =
         prev.avatar === (authUser.avatar || prev.avatar) &&
         prev.name   === (authUser.name   || authUser.fullName || prev.name);
@@ -115,24 +108,22 @@ const TenantProfile = () => {
   if (!id || !tenant) {
     return (
       <div className="w-full min-h-[50vh] flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white rounded-2xl p-8 text-center shadow-xl border border-gray-100">
-          <h2 className="text-xl font-black text-slate-900 mb-2">Tenant not found</h2>
-          <p className="text-sm text-slate-600 mb-5">
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-md w-full bg-white rounded-3xl p-8 text-center shadow-2xl shadow-blue-500/5 border border-gray-100">
+          <h2 className="text-2xl font-black text-slate-900 mb-2">Tenant not found</h2>
+          <p className="text-sm text-slate-600 mb-6">
             This tenant profile is unavailable or has been removed.
           </p>
           <button
             onClick={() => navigate(-1)}
-            className="px-5 py-2.5 rounded-full bg-blue-500 text-white text-sm font-black hover:bg-blue-600 transition-colors"
+            className="px-6 py-3 rounded-full bg-blue-500 text-white text-sm font-black hover:bg-blue-600 hover:shadow-lg hover:shadow-blue-500/30 transition-all active:scale-95"
           >
             Go back
           </button>
-        </div>
+        </motion.div>
       </div>
     );
   }
 
-  // Defensive fallbacks — same pattern as LandlordProfile.jsx so the page
-  // never crashes on an older record that doesn't carry every field yet.
   const coverImage  = tenant.coverImage  || 'https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2000';
   const avatar      = tenant.avatar      || `https://ui-avatars.com/api/?name=${encodeURIComponent(tenant.name || 'Tenant')}&background=dbeafe&color=2563eb&size=256`;
   const tagline     = tenant.tagline     || '';
@@ -142,15 +133,6 @@ const TenantProfile = () => {
   const trustTier   = tenant.trustTier   || '';
   const verif       = tenant.verification || {};
 
-  // ── Verification status resolvers ──────────────────────────────────────
-  // Same logic as LandlordProfile — see comments there. We honour the
-  // explicit server flag first, then fall back to top-level flags / the
-  // presence of a phone number so that a phone-OTP signup is never
-  // reported as "NOT VERIFIED" just because the verification block was
-  // empty. For locked viewers the phone field comes back as '' (privacy
-  // gate), so the final fallback uses the tenant id — every account on
-  // the platform is OTP-verified at signup, so an existing record is
-  // proof of a verified phone.
   const phoneStatus =
     verif.phoneVerified === true ||
     tenant.phoneVerified === true ||
@@ -166,24 +148,14 @@ const TenantProfile = () => {
 
   const idStatus =
     verif.idStatus
-    || verif.status                  // tenantProfile.verification.status enum
+    || verif.status
     || (verif.idVerified ? 'verified' : 'unverified');
 
   const employmentStatus =
     verif.employmentStatus
     || (verif.employmentVerified ? 'verified' : 'unverified');
 
-  // Roadmap-v2 §6 / Q4 approved answer — "Show 'New host' badge for the
-  // first 30 days." Backend mirrors the same `isNew` flag on the tenant
-  // card so the public profile is symmetric with `LandlordProfile.jsx`.
-  // Tenants don't currently carry a rating signal, so the badge simply
-  // turns off after the 30-day window expires.
   const isNewTenant = !!tenant.isNew;
-
-  // Backend signals whether the caller has unlocked the private fields by
-  // dropping the actual values (phone/email/etc.) when they don't. We keep
-  // the chip behaviour explicit so a future revision that *does* send the
-  // value to an unauthorized viewer is still treated as locked.
   const isUnlocked = tenant.unlocked === true;
   const phone = isUnlocked ? (tenant.phone || '') : '';
   const email = isUnlocked ? (tenant.email || '') : '';
@@ -191,105 +163,108 @@ const TenantProfile = () => {
   const emergencyContact  = isUnlocked ? (tenant.emergencyContact || {}) : {};
 
   return (
-    <div className="w-full bg-[#f4f7fb] min-h-screen font-sans relative pb-20">
+    <div className="w-full bg-[#f4f7fb] min-h-screen font-sans relative pb-20 selection:bg-blue-500 selection:text-white">
+
+      {/* ── AMBIENT GLOW ── */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80vw] h-[300px] bg-blue-500/10 blur-[100px] pointer-events-none z-0" />
 
       {/* ── TOP NAV ── */}
-      <div className="bg-white/85 backdrop-blur-xl border-b border-gray-100 sticky top-0 z-50 shadow-sm">
+      <div className="bg-white/70 backdrop-blur-2xl border-b border-white/50 sticky top-0 z-50 shadow-[0_4px_30px_rgba(0,0,0,0.03)]">
         <div className="max-w-[1200px] mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-sm font-black text-blue-600 bg-blue-50 px-4 py-2 rounded-full hover:bg-blue-600 hover:text-white transition-all active:scale-95"
+            className="flex items-center gap-2 text-sm font-black text-blue-600 bg-white/50 border border-blue-100/50 px-4 py-2 rounded-full hover:bg-blue-50 hover:border-blue-200 transition-all active:scale-95 shadow-sm"
           >
             <ArrowLeft size={15} /> Back
           </button>
           <p className="font-black text-gray-900 truncate">Tenant Profile</p>
-          <button className="p-2.5 rounded-full border-2 border-gray-200 text-gray-500 hover:border-blue-500 hover:text-blue-500 transition-all active:scale-90">
+          <button className="p-2.5 rounded-full border border-gray-200 bg-white/50 text-gray-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 transition-all active:scale-90 shadow-sm">
             <Share2 size={16} />
           </button>
         </div>
       </div>
 
-      <div className="max-w-[1200px] mx-auto px-4 mt-6">
-
+      <motion.div 
+        variants={staggerContainer}
+        initial="initial"
+        animate="animate"
+        className="max-w-[1200px] mx-auto px-4 mt-6 md:mt-8 relative z-10"
+      >
         {/* ── HEADER CARD ── */}
-        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden mb-8">
-          <div className="w-full h-48 md:h-64 bg-gray-200 relative">
-            <img src={coverImage} alt="Cover" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+        <motion.div variants={fadeInUp} className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] border border-white/80 shadow-[0_8px_40px_rgba(0,0,0,0.04)] overflow-hidden mb-8">
+          <div className="w-full h-48 md:h-72 bg-gray-200 relative group overflow-hidden">
+            <img src={coverImage} alt="Cover" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
+            <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-gray-900/20 to-transparent" />
           </div>
 
-          <div className="px-5 md:px-10 pb-8 relative">
-            <div className="flex justify-between items-end -mt-16 md:-mt-20 mb-4 relative z-10">
-              <div className="relative">
+          <div className="px-6 md:px-12 pb-10 relative">
+            <div className="flex justify-between items-end -mt-20 md:-mt-24 mb-6 relative z-10">
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-tr from-blue-500 to-cyan-400 rounded-[2.2rem] opacity-70 group-hover:opacity-100 blur transition-opacity duration-300"></div>
                 <img
                   src={avatar}
                   alt={tenant.name}
-                  className="w-32 h-32 md:w-40 md:h-40 rounded-[2rem] border-4 border-white shadow-xl bg-white object-cover"
+                  className="relative w-36 h-36 md:w-44 md:h-44 rounded-[2rem] border-[6px] border-white bg-white object-cover shadow-xl"
                 />
                 {verif.idVerified && (
-                  <div className="absolute -bottom-2 -right-2 bg-blue-500 text-white p-2 rounded-full border-4 border-white shadow-md">
+                  <div className="absolute -bottom-2 -right-2 bg-gradient-to-tr from-blue-600 to-blue-400 text-white p-2.5 rounded-full border-4 border-white shadow-lg">
                     <ShieldCheck size={20} />
                   </div>
                 )}
               </div>
 
-              <div className="hidden md:flex gap-3">
+              <div className="hidden md:flex items-center gap-4">
                 {/* Trust Score Highlight in Header */}
-                <div className="mr-6 flex flex-col items-end justify-center">
-                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-0.5">Trust Score</p>
-                  <div className="flex items-center gap-1.5 text-blue-600 bg-blue-50 px-3 py-1 rounded-xl border border-blue-100">
-                    <ShieldCheck size={20} />
-                    <span className="text-2xl font-black">{trustScore}</span>
+                <div className="mr-4 flex flex-col items-end justify-center">
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Trust Score</p>
+                  <div className="flex items-center gap-1.5 text-blue-600 bg-gradient-to-r from-blue-50 to-white px-4 py-1.5 rounded-2xl border border-blue-100 shadow-sm">
+                    <ShieldCheck size={20} className="text-blue-500" />
+                    <span className="text-2xl font-black bg-gradient-to-br from-blue-700 to-blue-500 bg-clip-text text-transparent">{trustScore}</span>
                     <span className="text-xs font-bold text-blue-400 mt-1">/ 100</span>
                   </div>
                 </div>
 
                 <button
                   onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } })}
-                  className="bg-gray-100 text-gray-800 py-3 px-6 rounded-2xl font-black text-sm hover:bg-green-50 hover:text-green-600 transition-all flex items-center gap-2"
+                  className="bg-white text-gray-800 py-3.5 px-6 rounded-2xl font-black text-sm border border-gray-200 hover:border-green-300 hover:bg-green-50 hover:text-green-600 shadow-sm transition-all flex items-center gap-2 group"
                 >
-                  <Phone size={16} /> Call
+                  <Phone size={18} className="group-hover:rotate-12 transition-transform" /> Call
                 </button>
                 <button
                   onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar } })}
-                  className="bg-blue-500 text-white py-3 px-6 rounded-2xl font-black text-sm shadow-lg hover:bg-blue-600 active:scale-95 transition-all flex items-center gap-2"
+                  className="bg-gradient-to-r from-blue-600 to-blue-500 text-white py-3.5 px-7 rounded-2xl font-black text-sm shadow-[0_8px_20px_rgba(37,99,235,0.25)] hover:shadow-[0_12px_25px_rgba(37,99,235,0.35)] hover:-translate-y-0.5 active:scale-95 transition-all flex items-center gap-2"
                 >
-                  <MessageCircle size={16} /> Send Message
+                  <MessageCircle size={18} /> Send Message
                 </button>
               </div>
             </div>
 
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
               <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-3xl font-black text-gray-900">{tenant.name}</h1>
-                  {verif.idVerified && <BadgeCheck size={24} className="text-blue-500" />}
+                <div className="flex items-center gap-2.5">
+                  <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">{tenant.name}</h1>
+                  {verif.idVerified && <BadgeCheck size={28} className="text-blue-500 drop-shadow-sm" />}
                 </div>
-                {tagline && <p className="text-gray-500 font-bold text-sm md:text-base mt-1">{tagline}</p>}
+                {tagline && <p className="text-gray-500 font-bold text-sm md:text-base mt-1.5">{tagline}</p>}
 
-                {/* Badges row. Verified Tenant is the headline trust
-                    signal once the tenant queue is approved; New tenant
-                    is suppressed in that case because the two would send
-                    a confusing mixed message — verified wins. */}
                 {(verif.idVerified || isNewTenant) && (
-                  <div className="flex flex-wrap gap-2 mt-4">
+                  <div className="flex flex-wrap gap-2.5 mt-5">
                     {verif.idVerified && (
-                      <span className="text-[11px] font-black px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 flex items-center gap-1.5 uppercase tracking-widest">
-                        <BadgeCheck size={12} /> Verified Tenant
+                      <span className="text-xs font-black px-4 py-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 flex items-center gap-2 uppercase tracking-widest shadow-sm">
+                        <BadgeCheck size={14} /> Verified Tenant
                       </span>
                     )}
                     {isNewTenant && !verif.idVerified && (
-                      <span className="text-[11px] font-black px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1.5 uppercase tracking-widest">
-                        <Award size={12} /> New tenant
+                      <span className="text-xs font-black px-4 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-2 uppercase tracking-widest shadow-sm">
+                        <Award size={14} /> New tenant
                       </span>
                     )}
                   </div>
                 )}
               </div>
 
-              <div className="flex flex-col md:hidden gap-4 w-full">
-                {/* Mobile Trust Score */}
-                <div className="flex items-center justify-between bg-blue-50 p-4 rounded-2xl border border-blue-100">
+              <div className="flex flex-col md:hidden gap-4 w-full mt-2">
+                <div className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-white p-5 rounded-2xl border border-blue-100 shadow-sm">
                   <p className="text-xs font-black text-blue-800 uppercase tracking-widest">Trust Score</p>
                   <div className="flex items-center gap-1.5 text-blue-600">
                     <ShieldCheck size={20} />
@@ -301,158 +276,171 @@ const TenantProfile = () => {
                 <div className="flex gap-3 w-full">
                   <button
                     onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } })}
-                    className="flex-1 py-3.5 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 bg-gray-50 border border-gray-200 text-gray-800 active:scale-95"
+                    className="flex-1 py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-800 shadow-sm active:scale-95"
                   >
-                    <Phone size={16} /> Call
+                    <Phone size={18} /> Call
                   </button>
                   <button
                     onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar } })}
-                    className="flex-1 bg-blue-500 text-white py-3.5 rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 text-white py-4 rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
                   >
-                    <MessageCircle size={16} /> Message
+                    <MessageCircle size={18} /> Message
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Stats grid — only what makes sense for a tenant. Trust score
-                + member-since are universal; employment and contact reveal
-                only when the caller has unlocked the card. */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 pt-8 border-t border-gray-100">
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-center">
-                <div className="flex items-center justify-center gap-1 mb-1 text-gray-900">
+            {/* Stats grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-10 pt-8 border-t border-gray-100/50">
+              <div className="p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-center gap-2 mb-2 text-blue-600 bg-blue-50 w-10 h-10 mx-auto rounded-full">
                   <Calendar size={18} />
-                  <span className="text-xl font-black">{memberSince}</span>
                 </div>
+                <span className="block text-xl font-black text-gray-900 mb-1">{memberSince}</span>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Member Since</p>
               </div>
 
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-center">
-                <div className="flex items-center justify-center gap-1 mb-1 text-gray-900">
-                  {phone ? <Phone size={16} /> : <Lock size={16} className="text-gray-300" />}
+              <div className="p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow relative overflow-hidden">
+                <div className="flex items-center justify-center gap-2 mb-2 text-indigo-600 bg-indigo-50 w-10 h-10 mx-auto rounded-full">
+                  {phone ? <Phone size={18} /> : <Lock size={18} className="text-gray-400" />}
                 </div>
-                <p className="text-[11px] font-bold text-gray-700 truncate">
-                  {phone || 'Phone locked'}
+                <p className={`text-sm font-bold truncate ${phone ? 'text-gray-900' : 'text-gray-400'}`}>
+                  {phone || 'Locked'}
                 </p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Phone</p>
               </div>
 
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-center">
-                <div className="flex items-center justify-center gap-1 mb-1 text-gray-900">
-                  {email ? <Mail size={16} /> : <Lock size={16} className="text-gray-300" />}
+              <div className="p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow relative overflow-hidden">
+                <div className="flex items-center justify-center gap-2 mb-2 text-violet-600 bg-violet-50 w-10 h-10 mx-auto rounded-full">
+                  {email ? <Mail size={18} /> : <Lock size={18} className="text-gray-400" />}
                 </div>
-                <p className="text-[11px] font-bold text-gray-700 truncate">
-                  {email || 'Email locked'}
+                <p className={`text-sm font-bold truncate ${email ? 'text-gray-900' : 'text-gray-400'}`}>
+                  {email || 'Locked'}
                 </p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Email</p>
               </div>
             </div>
 
             {!isUnlocked && (
-              <div className="mt-6 p-4 rounded-2xl bg-blue-50 border border-blue-100 text-[12px] font-bold text-blue-700 flex items-center gap-2">
-                <Lock size={14} />
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-6 p-5 rounded-2xl bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border border-blue-100/80 text-[13px] font-bold text-blue-800 flex items-center justify-center gap-3 shadow-inner">
+                <div className="p-2 bg-white rounded-full shadow-sm">
+                  <Lock size={16} className="text-blue-500" />
+                </div>
                 Contact details unlock once this tenant submits an inquiry on one of your listings.
-              </div>
+              </motion.div>
             )}
+          </div>
+        </motion.div>
 
+        {/* ── SECTIONS ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-7 space-y-8">
+            
             {bio && (
-              <div className="mt-8">
-                <h3 className="text-lg font-black text-gray-900 mb-3">About the Tenant</h3>
-                <p className="text-gray-600 font-medium leading-relaxed text-sm md:text-base">
+              <motion.div variants={fadeInUp} className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.03)] p-8">
+                <h3 className="text-xl font-black text-gray-900 mb-4">About</h3>
+                <p className="text-gray-600 font-medium leading-relaxed text-base">
                   {bio}
                 </p>
-              </div>
+              </motion.div>
             )}
 
             {tenant.professionType && (
-              <div className="mt-8">
-                <h3 className="text-lg font-black text-gray-900 mb-3 flex items-center gap-2">
-                  <Briefcase size={18} /> Professional Details
-                </h3>
-                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex gap-2 items-start">
-                      <span className="w-24 text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0">Status</span>
-                      <span className="text-sm font-medium text-gray-900 capitalize">{tenant.professionType}</span>
-                    </div>
-                    {isUnlocked && tenant.professionType === 'student' && (
-                      <>
-                        <div className="flex gap-2 items-start">
-                          <span className="w-24 text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0">Institution</span>
-                          <span className="text-sm font-medium text-gray-900">{professionDetails.institution || '—'}</span>
-                        </div>
-                        <div className="flex gap-2 items-start">
-                          <span className="w-24 text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0">Student ID</span>
-                          <span className="text-sm font-medium text-gray-900">{professionDetails.studentId || '—'}</span>
-                        </div>
-                      </>
-                    )}
-                    {isUnlocked && tenant.professionType === 'job' && (
-                      <>
-                        <div className="flex gap-2 items-start">
-                          <span className="w-24 text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0">Company</span>
-                          <span className="text-sm font-medium text-gray-900">{professionDetails.company || '—'}</span>
-                        </div>
-                        <div className="flex gap-2 items-start">
-                          <span className="w-24 text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0">Designation</span>
-                          <span className="text-sm font-medium text-gray-900">{professionDetails.designation || '—'}</span>
-                        </div>
-                        <div className="flex gap-2 items-start">
-                          <span className="w-24 text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0">Office ID</span>
-                          <span className="text-sm font-medium text-gray-900">{professionDetails.officeId || '—'}</span>
-                        </div>
-                      </>
-                    )}
-                    {isUnlocked && tenant.professionType === 'businessman' && (
-                      <>
-                        <div className="flex gap-2 items-start">
-                          <span className="w-24 text-xs font-bold text-gray-400 uppercase tracking-wider shrink-0">Business</span>
-                          <span className="text-sm font-medium text-gray-900">{professionDetails.company || '—'}</span>
-                        </div>
-                      </>
-                    )}
-                    {!isUnlocked && (
-                      <div className="mt-2 p-3 bg-blue-50 border border-blue-100 rounded-xl flex gap-2 items-center text-xs font-bold text-blue-700">
-                        <Lock size={14} /> Full professional details are locked
-                      </div>
-                    )}
+              <motion.div variants={fadeInUp} className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.03)] p-8">
+                <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-3">
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                    <Briefcase size={20} />
                   </div>
+                  Professional Details
+                </h3>
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                    <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Status</span>
+                    <span className="text-[15px] font-bold text-gray-900 capitalize">{tenant.professionType}</span>
+                  </div>
+                  
+                  {isUnlocked && tenant.professionType === 'student' && (
+                    <>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                        <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Institution</span>
+                        <span className="text-[15px] font-bold text-gray-900">{professionDetails.institution || '—'}</span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                        <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Student ID</span>
+                        <span className="text-[15px] font-bold text-gray-900">{professionDetails.studentId || '—'}</span>
+                      </div>
+                    </>
+                  )}
+                  {isUnlocked && tenant.professionType === 'job' && (
+                    <>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                        <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Company</span>
+                        <span className="text-[15px] font-bold text-gray-900">{professionDetails.company || '—'}</span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                        <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Designation</span>
+                        <span className="text-[15px] font-bold text-gray-900">{professionDetails.designation || '—'}</span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                        <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Office ID</span>
+                        <span className="text-[15px] font-bold text-gray-900">{professionDetails.officeId || '—'}</span>
+                      </div>
+                    </>
+                  )}
+                  {isUnlocked && tenant.professionType === 'businessman' && (
+                    <>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                        <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Business</span>
+                        <span className="text-[15px] font-bold text-gray-900">{professionDetails.company || '—'}</span>
+                      </div>
+                    </>
+                  )}
+                  {!isUnlocked && (
+                    <div className="mt-2 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100/50 rounded-2xl flex gap-3 items-center text-sm font-bold text-blue-800 shadow-sm">
+                      <div className="bg-white p-1.5 rounded-full shadow-sm"><Lock size={14} className="text-blue-500" /></div> Full professional details are locked
+                    </div>
+                  )}
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {isUnlocked && emergencyContact.name && (
-              <div className="mt-8">
-                <h3 className="text-lg font-black text-gray-900 mb-3 flex items-center gap-2">
-                  <ShieldCheck size={18} /> Emergency Contact
+              <motion.div variants={fadeInUp} className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.03)] p-8">
+                <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-3">
+                  <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">
+                    <ShieldCheck size={20} />
+                  </div>
+                  Emergency Contact
                 </h3>
-                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Name</span>
-                      <span className="text-sm font-medium text-gray-900">{emergencyContact.name}</span>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Relation</span>
-                      <span className="text-sm font-medium text-gray-900">{emergencyContact.relation || '—'}</span>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Phone</span>
-                      <span className="text-sm font-medium text-gray-900">{emergencyContact.phone || '—'}</span>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Address</span>
-                      <span className="text-sm font-medium text-gray-900">{emergencyContact.address || '—'}</span>
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                    <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Name</span>
+                    <span className="text-base font-bold text-gray-900">{emergencyContact.name}</span>
+                  </div>
+                  <div className="p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                    <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Relation</span>
+                    <span className="text-base font-bold text-gray-900">{emergencyContact.relation || '—'}</span>
+                  </div>
+                  <div className="p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                    <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Phone</span>
+                    <span className="text-base font-bold text-gray-900">{emergencyContact.phone || '—'}</span>
+                  </div>
+                  <div className="p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                    <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Address</span>
+                    <span className="text-base font-bold text-gray-900">{emergencyContact.address || '—'}</span>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             )}
+          </div>
 
-            {/* ── Trust + Verification (mirrors LandlordProfile) ──────── */}
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-[auto,1fr] gap-6 md:gap-8 items-start">
-              <div className="flex md:block justify-center">
+          <div className="lg:col-span-5">
+            {/* ── Trust + Verification ──────── */}
+            <motion.div variants={fadeInUp} className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.03)] p-6 md:p-8 sticky top-24">
+              <div className="flex justify-center mb-8 pb-8 border-b border-gray-100/80">
                 <TrustGauge score={trustScore} tier={trustTier} label="Tenant Trust" />
               </div>
-              <div className="flex-1 space-y-2.5">
+              <div className="space-y-4">
                 {emailStatus !== 'none' && (
                   <VerifStep
                     title="Email"
@@ -480,11 +468,10 @@ const TenantProfile = () => {
                   readOnly
                 />
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
-
-      </div>
+      </motion.div>
     </div>
   );
 };
