@@ -143,12 +143,6 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 		[selectedIds, aiSuggestions],
 	);
 
-	// selectedChips is only used to compute MeetsMinimum, or we could just use selectedIds.length
-	const selectedChips = useMemo(
-		() => selectedIds.map((id) => aiSuggestions.find((c) => c.id === id)).filter(Boolean),
-		[selectedIds, aiSuggestions],
-	);
-
 	// Reset everything ~after~ the close animation finishes.
 	useEffect(() => {
 		if (!isOpen) {
