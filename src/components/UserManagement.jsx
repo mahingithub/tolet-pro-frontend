@@ -176,7 +176,24 @@ const PendingCard = ({ user, busyId, onApprove, onReject }) => {
             <InfoRow label="Email"          value={user.email} />
             <InfoRow label="Date of Birth"  value={user.dateOfBirth ? new Date(user.dateOfBirth).toLocaleDateString('en-GB') : ''} />
             <InfoRow label="Roles"          value={(user.roles || [user.role]).join(' · ')} />
-            <InfoRow label="Trust Score"    value={`${tp.trustScore ?? 0}/100 · ${tp.trustTier || 'bronze'}`} />
+            
+            {(() => {
+              const v = tp.verification || {};
+              const items = [
+                { pts: 20, done: !!user.phone },
+                { pts: 30, done: !!v.photo },
+                { pts: 50, done: !!(v.nidFront && v.nidBack) },
+              ];
+              const score = items.filter((i) => i.done).reduce((sum, i) => sum + i.pts, 0);
+              let tier = 'bronze';
+              if (score >= 90) tier = 'platinum';
+              else if (score >= 70) tier = 'gold';
+              else if (score >= 40) tier = 'silver';
+              
+              return (
+                <InfoRow label="Trust Score" value={`${score}/100 · ${tier}`} />
+              );
+            })()}
           </div>
 
           <h4 className="text-[10px] font-black uppercase tracking-widest text-[#ba0036] mt-5 mb-3">
