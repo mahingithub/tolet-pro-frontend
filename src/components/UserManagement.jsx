@@ -179,11 +179,12 @@ const PendingCard = ({ user, busyId, onApprove, onReject }) => {
             
             {(() => {
               const v = tp.verification || {};
+              const adminApproved = v.status === 'verified';
               const isFilled = (val) => Array.isArray(val) ? val.length > 0 : val !== '' && val != null;
               const items = [
                 { pts: 15, done: !!user.phone },
                 { pts: 15, done: !!v.photo },
-                { pts: 30, done: !!(v.nidFront && v.nidBack) },
+                { pts: 30, done: adminApproved && !!(v.nidFront && v.nidBack) },
                 { pts: 10, done: isFilled(tp.professionType) },
                 { pts: 10, done: isFilled(tp.workPlace) },
                 { pts: 5,  done: isFilled(tp.familySize) },
