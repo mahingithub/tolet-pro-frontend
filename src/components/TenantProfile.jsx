@@ -161,6 +161,7 @@ const TenantProfile = () => {
   const email = isUnlocked ? (tenant.email || '') : '';
   const professionDetails = isUnlocked ? (tenant.professionDetails || {}) : {};
   const emergencyContact  = isUnlocked ? (tenant.emergencyContact || {}) : {};
+  const familySize        = isUnlocked ? (tenant.familySize || '') : '';
 
   return (
     <div className="w-full bg-[#f4f7fb] min-h-screen font-sans relative pb-20 selection:bg-blue-500 selection:text-white">
@@ -371,7 +372,7 @@ const TenantProfile = () => {
                       </div>
                     </>
                   )}
-                  {isUnlocked && tenant.professionType === 'job' && (
+                  {isUnlocked && tenant.professionType === 'employed' && (
                     <>
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
                         <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Company</span>
@@ -387,7 +388,7 @@ const TenantProfile = () => {
                       </div>
                     </>
                   )}
-                  {isUnlocked && tenant.professionType === 'businessman' && (
+                  {isUnlocked && tenant.professionType === 'self-employed' && (
                     <>
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
                         <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Business</span>
@@ -429,6 +430,21 @@ const TenantProfile = () => {
                     <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Address</span>
                     <span className="text-base font-bold text-gray-900">{emergencyContact.address || '—'}</span>
                   </div>
+                </div>
+              </motion.div>
+            )}
+
+            {isUnlocked && familySize && (
+              <motion.div variants={fadeInUp} className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.03)] p-8">
+                <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-3">
+                  <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                    <Briefcase size={20} />
+                  </div>
+                  Family Information
+                </h3>
+                <div className="p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50 flex flex-col sm:flex-row sm:items-center justify-between">
+                  <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Family Size</span>
+                  <span className="text-[15px] font-bold text-gray-900">{familySize} {familySize === '1' ? 'Person' : 'People'}</span>
                 </div>
               </motion.div>
             )}
