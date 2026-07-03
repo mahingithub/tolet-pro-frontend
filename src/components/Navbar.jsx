@@ -574,12 +574,11 @@ useEffect(() => {
             {/* List Property Desktop Button (Always Visible) */}
             <button
               onClick={() => handleProtected('/list-property')}
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/30 shrink-0 transition-all duration-300 group-hover:bg-white/30 group-hover:scale-105">
-                  <PlusCircle size={15} className="text-white" strokeWidth={2.5} />
-                </span>
-                {t?.listProperty || 'Post Property'}
-                <span className="rounded-full bg-white px-2 py-[3px] text-[10px] font-extrabold leading-none tracking-wider text-[#ba0036] shadow-sm">FREE</span>
-              </span>
+              className="text-gray-700 bg-transparent hover:text-[#ba0036] flex items-center gap-2 font-bold text-xs lg:text-sm transition-all border-none"
+            >
+              <PlusCircle size={16} /> 
+              {t?.listProperty || 'Post Property'}
+              <span className="rounded-full bg-red-50 px-2 py-[3px] text-[10px] font-extrabold leading-none tracking-wider text-[#ba0036]">FREE</span>
             </button>
 
             <div className="relative" ref={langRef}>
