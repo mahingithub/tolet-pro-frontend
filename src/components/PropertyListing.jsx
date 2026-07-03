@@ -37,7 +37,12 @@ import {
 // ║    • If the key is missing → graceful iframe fallback so dev work isn't ║
 // ║      blocked. This uses the public /maps embed (no key required).       ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
-import { GoogleMap, OverlayView, OverlayViewF, useJsApiLoader } from "@react-google-maps/api";
+import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
+import useSupercluster from "use-supercluster";
+// ─── MODERNISED MAP UI (clustering + animated markers + bottom sheet) ─────────
+import MapMarker from "./MapMarker";
+import ClusterMarker from "./ClusterMarker";
+import BottomSheetCard from "./BottomSheetCard";
 
 // Pull the API key from whichever bundler the host project uses. Comment the
 // line that does NOT match your build tool — the other line stays.
@@ -78,6 +83,20 @@ const RENTAL_CATEGORIES = [
 	{ id: "bachelor_female", label: "Bachelor (Female)", tKey: "catBachelorFemale", icon: Users },
 	{ id: "sublet",          label: "Sublet / Room",     tKey: "catSubletRoom",     icon: Share2 },
 	{ id: "student",         label: "Student",           tKey: "catStudent",        icon: BookOpen },
+];
+
+// ─── MAP FILTER CHIPS (floating bar over the map) ─────────────────────────────
+// Horizontally-scrolling tenant-type chips shown over the map. Each chip drives
+// the SAME `selectedCategories` filter state the sidebar "Who's moving in?"
+// section uses (matched against `prop.rentalCategory` by propertyMatchesFilters),
+// so the floating bar and the full filter panel stay in sync. "All" clears the
+// category filter. Single-select: tapping a chip replaces the selection; tapping
+// the active chip clears it back to "All".
+const MAP_FILTER_CHIPS = [
+	{ id: "all", labelBn: "সব", labelEn: "All", categories: [] },
+	{ id: "student", labelBn: "স্টুডেন্ট", labelEn: "Student", categories: ["student_male", "student_female"] },
+	{ id: "family", labelBn: "ফ্যামিলি", labelEn: "Family", categories: ["family"] },
+	{ id: "professional", labelBn: "প্রফেশনাল", labelEn: "Professional", categories: ["working_professional"] },
 ];
 
 // ─── ICON MAP (string key → lucide component) ─────────────────────────────────
@@ -440,16 +459,30 @@ const FilterSection = ({ title, children }) => (
 	</div>
 );
 
-// ─── MAP VIEW (Google Maps) ──────────────────────────────────────────────────
-// Renders an interactive Google Map with custom price-chip markers. A marker
-// click bubbles up via `onMarkerClick(property)` so the parent can pop the
-// MapMiniCard. Hover/highlight stay in sync with the listing rail on the left.
+// ─── MAP VIEW (Google Maps + clustering) ─────────────────────────────────────
+// Interactive Google Map that clusters nearby listings with supercluster and
+// renders each one as either a price pill (MapMarker) or a grouped count bubble
+// (ClusterMarker). A marker click bubbles up via `onMarkerClick(property)` after
+// the camera smoothly pans to it; a cluster click zooms in to break it apart.
 //
-// The `properties` array is fetched by the parent from `propertyService` —
-// there is no demo data layer. This component is purely presentational.
-const MapView = ({ properties, highlightedId, onMarkerHover, onMarkerHoverEnd, onMarkerClick, searchArea, defaultCenter = DEFAULT_MAP_CENTER, defaultZoom = DEFAULT_MAP_ZOOM }) => {
-	const [hoveredId, setHoveredId] = useState(null);
+// `properties` is the already-filtered set from the parent — this component is
+// presentational apart from the camera + clustering maths. `activeId` is the id
+// of the currently-selected listing (drives the inverted pill), and
+// `bottomSheetHeight` is the rendered height of the bottom sheet so the camera
+// can keep the active marker centred in the area above the card.
+const MapView = ({ properties, activeId, onMarkerClick, defaultCenter = DEFAULT_MAP_CENTER, defaultZoom = DEFAULT_MAP_ZOOM, bottomSheetHeight = 0 }) => {
 	const [mapInstance, setMapInstance] = useState(null);
+	// Viewport state feeding supercluster. `bounds` is a supercluster BBox
+	// [westLng, southLat, eastLng, northLat]; `zoom` is the rounded map zoom.
+	const [bounds, setBounds] = useState(null);
+	const [zoom, setZoom] = useState(defaultZoom);
+
+	// Keep the latest bottom-sheet height in a ref so the click handler reads the
+	// current value without being re-created on every height change.
+	const paddingRef = useRef(bottomSheetHeight);
+	useEffect(() => {
+		paddingRef.current = bottomSheetHeight;
+	}, [bottomSheetHeight]);
 
 	// Memoised options so GoogleMap doesn't re-init on every parent re-render.
 	const mapOptions = useMemo(
@@ -473,39 +506,107 @@ const MapView = ({ properties, highlightedId, onMarkerHover, onMarkerHoverEnd, o
 		googleMapsApiKey: GOOGLE_MAPS_API_KEY,
 	});
 
-	// TODO (backend): when the user pans/zooms the map, refetch properties
-	// inside the new viewport bounds:
-	//
-	//   <GoogleMap onIdle={() => {
-	//     const b = mapInstance.getBounds();
-	//     if (!b) return;
-	//     const ne = b.getNorthEast(), sw = b.getSouthWest();
-	//     api.get('/api/properties', { params: {
-	//       neLat: ne.lat(), neLng: ne.lng(), swLat: sw.lat(), swLng: sw.lng()
-	//     }}).then(r => setProperties(r.data));
-	//   }} ... />
-	//
-	// Hook is intentionally left commented so the demo data still works as-is.
+	// ── SUPERCLUSTER INPUT ──
+	// One GeoJSON point per listing that has real coordinates. Each carries the
+	// whole property on `properties.property` so a leaf marker can show its price.
+	const points = useMemo(
+		() =>
+			(properties || [])
+				.filter((p) => p.lat && p.lng)
+				.map((p) => ({
+					type: "Feature",
+					properties: { cluster: false, propertyId: p.id, property: p },
+					geometry: { type: "Point", coordinates: [Number(p.lng), Number(p.lat)] },
+				})),
+		[properties]
+	);
 
-	// When the search area or property set changes, fit the map to the matches.
+	const { clusters, supercluster } = useSupercluster({
+		points,
+		bounds,
+		zoom,
+		options: { radius: 60, maxZoom: 18 },
+	});
+
+	// Sync bounds + zoom from the map after every idle (pan/zoom has settled) so
+	// supercluster re-groups for the current viewport.
+	const syncBounds = useCallback(() => {
+		if (!mapInstance) return;
+		const z = mapInstance.getZoom();
+		if (typeof z === "number") setZoom(Math.round(z));
+		const b = mapInstance.getBounds();
+		if (b) {
+			const ne = b.getNorthEast();
+			const sw = b.getSouthWest();
+			setBounds([sw.lng(), sw.lat(), ne.lng(), ne.lat()]);
+		}
+	}, [mapInstance]);
+
+	// When the property set changes, fit the map to the matches — but never while
+	// a marker is selected, which would yank the camera away from the open card.
+	// `activeId` is intentionally NOT a dependency: we only re-fit when the
+	// results change, honouring whatever selection is active at that moment (so
+	// selecting/deselecting a marker never triggers a re-fit on its own).
 	useEffect(() => {
-		if (!mapInstance || !window.google) return;
-		// `properties` is already the (server-side) search-filtered set — fit the
-		// map to all of them instead of re-filtering by the raw search text.
-		const points = properties.filter((p) => p.lat && p.lng);
-		if (points.length === 0) return;
-		if (points.length === 1) {
-			mapInstance.panTo({ lat: points[0].lat, lng: points[0].lng });
+		if (!mapInstance || !window.google || activeId) return;
+		const pts = (properties || []).filter((p) => p.lat && p.lng);
+		if (pts.length === 0) return;
+		if (pts.length === 1) {
+			mapInstance.panTo({ lat: pts[0].lat, lng: pts[0].lng });
 			mapInstance.setZoom(14);
 			return;
 		}
-		const bounds = new window.google.maps.LatLngBounds();
-		points.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
-		mapInstance.fitBounds(bounds, 64);
+		const b = new window.google.maps.LatLngBounds();
+		pts.forEach((p) => b.extend({ lat: p.lat, lng: p.lng }));
+		mapInstance.fitBounds(b, 64);
 	}, [properties, mapInstance]);
 
 	const onLoad = useCallback((map) => setMapInstance(map), []);
 	const onUnmount = useCallback(() => setMapInstance(null), []);
+
+	// ── DYNAMIC BOTTOM PADDING ──
+	// GoogleMap exposes no native `padding` prop, so we emulate it: when a
+	// listing is selected we pan the camera so the marker sits centred in the
+	// area ABOVE the bottom sheet — shifting the target centre south by half the
+	// sheet height (converted from screen pixels to world units at the current
+	// zoom). This keeps the active marker visible and the Google logo unobscured.
+	const panToWithPadding = useCallback((map, position) => {
+		// Fall back to an estimate before the sheet has reported its real height
+		// (e.g. the very first marker tap) so the marker still lifts above the card.
+		const pad = paddingRef.current || 320;
+		const proj = map.getProjection && map.getProjection();
+		const z = map.getZoom();
+		if (!proj || typeof z !== "number" || !window.google) {
+			map.panTo(position);
+			return;
+		}
+		const scale = Math.pow(2, z);
+		const worldPoint = proj.fromLatLngToPoint(new window.google.maps.LatLng(position.lat, position.lng));
+		const shifted = new window.google.maps.Point(worldPoint.x, worldPoint.y + pad / 2 / scale);
+		map.panTo(proj.fromPointToLatLng(shifted));
+	}, []);
+
+	// Camera animation (Requirement 1.4): smooth pan to the marker, then tell the
+	// parent to select it (which springs up the bottom sheet + inverts the pill).
+	const handleMarkerClick = useCallback(
+		(property) => {
+			if (mapInstance) panToWithPadding(mapInstance, { lat: property.lat, lng: property.lng });
+			onMarkerClick && onMarkerClick(property);
+		},
+		[mapInstance, onMarkerClick, panToWithPadding]
+	);
+
+	// Cluster click: zoom to the level that breaks the cluster apart, re-centred
+	// on the cluster's coordinates (supercluster.getClusterExpansionZoom).
+	const handleClusterClick = useCallback(
+		(clusterId, lat, lng) => {
+			if (!supercluster || !mapInstance) return;
+			const expansionZoom = Math.min(supercluster.getClusterExpansionZoom(clusterId), 20);
+			mapInstance.setZoom(expansionZoom);
+			mapInstance.panTo({ lat, lng });
+		},
+		[supercluster, mapInstance]
+	);
 
 	// ── Fallback: no API key → public iframe embed (no key required) ──────────
 	// Lets the page keep rendering before the key is provisioned.
@@ -554,80 +655,51 @@ const MapView = ({ properties, highlightedId, onMarkerHover, onMarkerHoverEnd, o
 		);
 	}
 
+	// Until the first idle sets `bounds`, supercluster returns nothing — fall back
+	// to the raw points (same GeoJSON shape) so markers never flash empty on load.
+	const renderItems = bounds ? clusters : points;
+
 	return (
-		<div className="relative w-full h-full rounded-[2rem] overflow-hidden bg-gray-100">
+		<div className="relative w-full h-full overflow-hidden bg-gray-100">
 			<GoogleMap
-				mapContainerStyle={{ width: "100%", height: "100%", minHeight: 400 }}
+				mapContainerStyle={{ width: "100%", height: "100%" }}
 				center={defaultCenter}
 				zoom={defaultZoom}
 				options={mapOptions}
 				onLoad={onLoad}
 				onUnmount={onUnmount}
+				onIdle={syncBounds}
 			>
-				{properties.map((prop) => {
-					if (!prop.lat || !prop.lng) return null;
-					const isActive = highlightedId === prop.id || hoveredId === prop.id;
+				{renderItems.map((item) => {
+					const [lng, lat] = item.geometry.coordinates;
+					const { cluster: isCluster, point_count: pointCount } = item.properties;
+
+					// Grouped listings → count bubble that zooms in on click.
+					if (isCluster) {
+						return (
+							<ClusterMarker
+								key={`cluster-${item.id}`}
+								lat={lat}
+								lng={lng}
+								count={pointCount}
+								totalPoints={points.length}
+								onClick={() => handleClusterClick(item.id, lat, lng)}
+							/>
+						);
+					}
+
+					// Individual listing → price pill.
+					const prop = item.properties.property;
 					return (
-						<OverlayViewF
+						<MapMarker
 							key={prop.id}
-							position={{ lat: prop.lat, lng: prop.lng }}
-							mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-							getPixelPositionOffset={(width, height) => ({ x: -width / 2, y: -height + 6 })}
-						>
-							{/* OYO-style price pill: dark by default, brand red when active, with a
-							    downward pointer that anchors the chip on the marker coordinate. */}
-							<button
-								type="button"
-								onMouseEnter={() => {
-									setHoveredId(prop.id);
-									onMarkerHover && onMarkerHover(prop.id);
-								}}
-								onMouseLeave={() => {
-									setHoveredId(null);
-									onMarkerHoverEnd && onMarkerHoverEnd();
-								}}
-								onClick={() => onMarkerClick && onMarkerClick(prop)}
-								aria-label={`${prop.title} — ৳${prop.price.toLocaleString("en-IN")}`}
-								className="map-price-marker relative"
-								style={{
-									background: isActive ? "#BA0036" : "#111827",
-									color: "#ffffff",
-									fontSize: 11,
-									fontWeight: 900,
-									padding: "6px 11px",
-									borderRadius: 9999,
-									whiteSpace: "nowrap",
-									boxShadow: isActive
-										? "0 6px 22px rgba(186,0,54,0.45)"
-										: "0 6px 18px rgba(17,24,39,0.32)",
-									cursor: "pointer",
-									border: "2px solid #ffffff",
-									transition: "transform 0.18s ease, background 0.18s ease",
-									transform: isActive ? "scale(1.12)" : "scale(1)",
-									transformOrigin: "center bottom",
-									zIndex: isActive ? 9999 : 1,
-									outline: "none",
-								}}
-							>
-								৳{(prop.price / 1000).toFixed(0)}k
-								{/* Downward pointer (chat-bubble style, matches OYO markers) */}
-								<span
-									aria-hidden
-									style={{
-										position: "absolute",
-										left: "50%",
-										bottom: -5,
-										transform: "translateX(-50%)",
-										width: 0,
-										height: 0,
-										borderLeft: "6px solid transparent",
-										borderRight: "6px solid transparent",
-										borderTop: `7px solid ${isActive ? "#BA0036" : "#111827"}`,
-										filter: "drop-shadow(0 2px 1px rgba(0,0,0,0.18))",
-									}}
-								/>
-							</button>
-						</OverlayViewF>
+							lat={lat}
+							lng={lng}
+							price={prop.price}
+							title={prop.title}
+							isActive={activeId === prop.id}
+							onClick={() => handleMarkerClick(prop)}
+						/>
 					);
 				})}
 			</GoogleMap>
@@ -635,110 +707,15 @@ const MapView = ({ properties, highlightedId, onMarkerHover, onMarkerHoverEnd, o
 	);
 };
 
-// ─── MAP MINI CARD (bottom card on map marker click) ──────────────────────────
-// Matches the OYO map reference: a slim horizontal card with the property
-// photo on the left and a compact title/price/rating block on the right.
-// Used by both mobile and desktop map views — the bottom dock with Filter/List
-// renders below it.
-//   • Tap the card body  → navigate to the full property page.
-//   • Tap "Inquire"      → open the global inquiry modal.
-//   • Tap the × button   → close the preview, keep the map state.
-const MapMiniCard = ({ property, navigate, onClose, onInquire, t }) => {
-	if (!property) return null;
-	return (
-		<AnimatePresence>
-			<motion.div
-				key={property.id}
-				initial={{ opacity: 0, y: 40 }}
-				animate={{ opacity: 1, y: 0 }}
-				exit={{ opacity: 0, y: 40 }}
-				transition={{ type: "spring", damping: 28, stiffness: 240 }}
-				className="
-					relative bg-white shadow-[0_18px_40px_rgba(0,0,0,0.18)] rounded-2xl
-					overflow-hidden border border-gray-100 max-w-[560px] mx-auto
-				"
-				role="dialog"
-				aria-label={`${property.title} preview`}
-			>
-				<div
-					onClick={() => navigate(`/property/${property.id}`)}
-					className="flex cursor-pointer"
-				>
-					{/* Photo */}
-					<div className="relative w-[130px] sm:w-[150px] h-[130px] sm:h-[140px] shrink-0 bg-gray-100">
-						<img
-							src={property.images[0] || property.img || property.coverPhoto || ""}
-							alt={property.title}
-							className="absolute inset-0 w-full h-full object-cover"
-							loading="lazy"
-							decoding="async"
-						/>
-						<div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur px-1.5 py-0.5 rounded-md flex items-center gap-1 text-[10px] font-black">
-							<Star size={10} className="fill-yellow-400 text-yellow-400" />
-							{property.rating}
-							<span className="text-gray-400 font-bold">({property.reviews})</span>
-						</div>
-					</div>
-
-					{/* Info */}
-					<div className="flex-1 min-w-0 p-3 sm:p-4 pr-9 flex flex-col">
-						{(() => {
-							const cat = RENTAL_CATEGORIES.find((c) => c.id === property.rentalCategory);
-							const label = (cat?.tKey && t[cat.tKey]) || cat?.label || "Property";
-							return (
-								<p className="text-[10px] font-black text-brandRed uppercase tracking-widest mb-1 line-clamp-1">{label}</p>
-							);
-						})()}
-						<p className="text-sm sm:text-[15px] font-black text-gray-900 leading-tight line-clamp-2 mb-1">
-							{property.title}
-						</p>
-						<p className="text-[11px] text-gray-500 font-bold flex items-center gap-1 line-clamp-1 mb-2">
-							<MapPin size={10} className="shrink-0" />
-							<span className="truncate">{property.location}</span>
-						</p>
-						<div className="mt-auto flex items-baseline gap-2 flex-wrap">
-							<span className="text-base sm:text-lg font-black text-gray-900">
-								৳{property.price.toLocaleString("en-IN")}
-							</span>
-							<span className="text-[10px] text-gray-500 font-bold">/{t?.monthText || "month"}</span>
-						</div>
-						<div className="mt-2 flex items-center gap-3 text-[10px] font-bold text-gray-500">
-							<span className="flex items-center gap-1"><BedDouble size={11} /> {property.beds}</span>
-							<span className="flex items-center gap-1"><Bath size={11} /> {property.baths}</span>
-							<span className="flex items-center gap-1"><Square size={11} /> {property.sqft}</span>
-						</div>
-					</div>
-				</div>
-
-				{/* Inquire CTA — anchored bottom-right inside the card */}
-				<button
-					onClick={(e) => {
-						e.stopPropagation();
-						onClose();
-						onInquire(property);
-					}}
-					className="absolute bottom-3 right-3 px-3 py-1.5 rounded-lg bg-brandRed text-white text-[11px] font-black active:scale-95 transition-transform flex items-center gap-1 shadow-md"
-				>
-					<MessageCircle size={11} /> {t?.inquireBtn || "INQUIRE"}
-				</button>
-
-				{/* Close */}
-				<button
-					onClick={onClose}
-					aria-label="Close preview"
-					className="absolute top-2 right-2 z-10 p-1.5 bg-white/95 backdrop-blur rounded-full hover:bg-gray-100 active:scale-95 transition-all shadow-sm border border-gray-100"
-				>
-					<X size={13} className="text-gray-600" />
-				</button>
-			</motion.div>
-		</AnimatePresence>
-	);
-};
+// ─── (MAP MINI CARD removed) ─────────────────────────────────────────────────
+// The old slim marker preview has been replaced by the floating BottomSheetCard
+// (./BottomSheetCard.jsx) — a springed-up card with an image carousel, which the
+// map overlay renders directly.
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 const PropertyListing = () => {
 	const navigate = useNavigate();
-	const { t } = useLanguage();
+	const { t, language } = useLanguage();
 	const [searchParams, setSearchParams] = useSearchParams();
 	const { scrollY } = useScroll();
 
@@ -788,6 +765,9 @@ const PropertyListing = () => {
 	const [viewMode, setViewMode] = useState("list");
 	const [highlightedId, setHighlightedId] = useState(null);
 	const [selectedMapProperty, setSelectedMapProperty] = useState(null);
+	// Measured height of the floating bottom sheet → fed to MapView so the camera
+	// keeps the active marker centred above the card (dynamic map padding).
+	const [bottomSheetHeight, setBottomSheetHeight] = useState(0);
 	const [openSections, setOpenSections] = useState([]);
 
 	// ── FILTER STATES ───────────────────────────────────────────────────────────
@@ -1015,6 +995,22 @@ const PropertyListing = () => {
 	const handleTypeToggle = (typeId) => setSelectedTypes((prev) => (prev.includes(typeId) ? prev.filter((t) => t !== typeId) : [...prev, typeId]));
 	const toggleArrayState = (setter, item) => setter((prev) => (prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]));
 
+	// ── MAP FILTER CHIPS (floating bar) ──
+	// A chip is active when its category set exactly equals the current selection
+	// ("All" = nothing selected). Tapping toggles: the active chip clears back to
+	// "All", any other chip replaces the selection. Uses the same
+	// `selectedCategories` state as the sidebar so both stay in sync.
+	const isMapChipActive = (chip) =>
+		chip.categories.length === selectedCategories.length &&
+		chip.categories.every((c) => selectedCategories.includes(c));
+	const handleMapChipClick = (chip) => {
+		// Changing the filter dismisses any open preview so the map can re-frame
+		// to the new results without a stale sheet floating over a gone marker.
+		setSelectedMapProperty(null);
+		setBottomSheetHeight(0);
+		setSelectedCategories(isMapChipActive(chip) ? [] : chip.categories);
+	};
+
 	const handleSave = (e, property) => {
 		e.preventDefault();
 		e.stopPropagation();
@@ -1084,6 +1080,16 @@ const PropertyListing = () => {
 		});
 		return list;
 	}, [properties, activeDivision, selectedIntent, minPrice, maxPrice, selectedTypes, selectedCategories, selectedSubCategories, selectedFireSafety, selectedBeds, selectedBaths, maxSqft, selectedFurnish, minRating, selectedFloor, sortBy, userLocation, searchArea, t.nearMe]);
+
+	// If the active filters remove the currently-previewed listing from the map
+	// (e.g. a sidebar filter change), dismiss the bottom sheet so it never floats
+	// over a marker that's no longer there — and reset the map padding.
+	useEffect(() => {
+		if (selectedMapProperty && !filteredProperties.some((p) => p.id === selectedMapProperty.id)) {
+			setSelectedMapProperty(null);
+			setBottomSheetHeight(0);
+		}
+	}, [filteredProperties, selectedMapProperty]);
 
 	// ── LOCATION AUTOCOMPLETE ────────────────────────────────────────────────
 	// Distinct, human-readable place labels pulled from the loaded listings'
@@ -1696,100 +1702,121 @@ const PropertyListing = () => {
 						role="dialog"
 						aria-label="Map view"
 					>
-						{/* Floating search bar — back + search + clear (matches OYO). */}
-						<div className="absolute top-0 inset-x-0 z-30 px-3 pt-3 pb-2 pointer-events-none">
-							<div className="max-w-[640px] mx-auto bg-white rounded-xl shadow-[0_8px_28px_rgba(0,0,0,0.18)] flex items-center gap-1 px-2 py-1.5 pointer-events-auto border border-gray-100">
-								<button
-									onClick={() => setViewMode("list")}
-									aria-label="Back to list"
-									className="p-2 rounded-lg hover:bg-gray-100 active:scale-95 transition-all">
-									<ArrowLeft size={18} className="text-gray-800" />
-								</button>
-								<input
-									type="text"
-									value={searchArea}
-									onChange={(e) => setSearchArea(e.target.value)}
-									placeholder={searchArea ? "" : (t.searchAreaPlaceholder || "Search area...")}
-									className="flex-1 outline-none bg-transparent text-sm font-bold text-gray-900 placeholder:text-gray-400"
-								/>
-								{searchArea && (
+						{/* ── FLOATING FILTER BAR (replaces the old breadcrumb/count header) ──
+						    A sticky bar that floats over the map (absolute z-10) — it never
+						    pushes the map container down. Row 1: back · search · Filters.
+						    Row 2: horizontally-scrolling tenant-type chips wired to the same
+						    `selectedCategories` filter state as the sidebar. */}
+						<motion.div
+							initial={{ y: -24, opacity: 0 }}
+							animate={{ y: 0, opacity: 1 }}
+							transition={{ type: "spring", damping: 26, stiffness: 260 }}
+							className="absolute top-0 inset-x-0 z-10 px-3 pt-3 pb-1 pointer-events-none"
+						>
+							<div className="max-w-[640px] mx-auto flex flex-col gap-2">
+								{/* Row 1 — back · search · filters */}
+								<div className="bg-white rounded-2xl shadow-[0_8px_28px_rgba(0,0,0,0.18)] flex items-center gap-1 px-2 py-1.5 pointer-events-auto border border-gray-100">
 									<button
-										onClick={() => setSearchArea("")}
-										aria-label="Clear search"
-										className="p-2 rounded-lg hover:bg-gray-100 active:scale-95 transition-all">
-										<X size={16} className="text-gray-600" />
+										onClick={() => setViewMode("list")}
+										aria-label="Back to list"
+										className="p-2 rounded-xl hover:bg-gray-100 active:scale-95 transition-all shrink-0">
+										<ArrowLeft size={18} className="text-gray-800" />
 									</button>
+									<input
+										type="text"
+										value={searchArea}
+										onChange={(e) => setSearchArea(e.target.value)}
+										placeholder={searchArea ? "" : (t.searchAreaPlaceholder || "Search area...")}
+										className="flex-1 min-w-0 outline-none bg-transparent text-sm font-bold text-gray-900 placeholder:text-gray-400"
+									/>
+									{searchArea && (
+										<button
+											onClick={() => setSearchArea("")}
+											aria-label="Clear search"
+											className="p-2 rounded-xl hover:bg-gray-100 active:scale-95 transition-all shrink-0">
+											<X size={16} className="text-gray-600" />
+										</button>
+									)}
+									<button
+										onClick={() => setIsMobileFilterOpen(true)}
+										aria-label={t.filtersBtn || "Filters"}
+										className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-900 text-white text-[12px] font-black active:scale-95 transition-transform shrink-0">
+										<SlidersHorizontal size={14} /> {t.filtersBtn || "Filters"}
+									</button>
+								</div>
+
+								{/* Row 2 — horizontally-scrolling tenant-type chips.
+								    Tenant categories only exist for RENT (mirrors the sidebar's
+								    showWhoLives), so the chips are hidden for Buy / Commercial. */}
+								{selectedIntent === "rent" && (
+									<div className="flex gap-2 overflow-x-auto pb-1 pointer-events-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+										{MAP_FILTER_CHIPS.map((chip) => {
+											const active = isMapChipActive(chip);
+											return (
+												<button
+													key={chip.id}
+													type="button"
+													onClick={() => handleMapChipClick(chip)}
+													aria-pressed={active}
+													className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-full text-[12px] font-black border transition-all active:scale-95 shadow-sm ${
+														active
+															? "bg-gray-900 text-white border-gray-900"
+															: "bg-white text-gray-700 border-gray-200 hover:border-gray-900"
+													}`}
+												>
+													{language === "বাংলা" ? chip.labelBn : chip.labelEn}
+												</button>
+											);
+										})}
+									</div>
 								)}
 							</div>
-							{/* Property count pill */}
-							<div className="max-w-[640px] mx-auto mt-2 pointer-events-auto flex">
-								<span className="bg-white/95 backdrop-blur px-3 py-1.5 rounded-full text-[11px] font-black text-gray-900 shadow-md flex items-center gap-1.5 border border-gray-100">
-									<MapPin size={11} className="text-brandRed" />
-									{resultCountLabel} {t.properties || "Properties"}
-								</span>
-							</div>
-						</div>
+						</motion.div>
 
 						{/* Map fills the whole screen */}
 						<div className="absolute inset-0">
 							<div className="w-full h-full">
 								<MapView
 									properties={filteredProperties}
-									highlightedId={highlightedId}
-									onMarkerHover={setHighlightedId}
-									onMarkerHoverEnd={() => setHighlightedId(null)}
+									activeId={selectedMapProperty?.id}
 									onMarkerClick={(prop) => setSelectedMapProperty(prop)}
-									searchArea={searchArea}
+									bottomSheetHeight={bottomSheetHeight}
 								/>
 							</div>
 						</div>
 
-						{/* Bottom card — appears just above the dock when a marker is tapped. */}
-						{selectedMapProperty && (
-							<div className="absolute inset-x-0 bottom-[64px] z-30 px-3 pb-2 pointer-events-none">
-								<div className="pointer-events-auto">
-									<MapMiniCard
+						{/* ── FLOATING BOTTOM SHEET (springs up on marker tap) ──
+						    Sits at the bottom with margins on every side. The map camera
+						    pads its viewport by the card's measured height (onHeightChange)
+						    so the active marker stays centred above the card. Closing it
+						    deselects the marker (resets the inverted pill + padding). */}
+						<div className="absolute inset-x-0 bottom-0 z-20 pointer-events-none">
+							<AnimatePresence>
+								{selectedMapProperty && (
+									<BottomSheetCard
+										key="map-bottom-sheet"
 										property={selectedMapProperty}
-										navigate={navigate}
-										onClose={() => setSelectedMapProperty(null)}
-										onInquire={openInquiry}
-										t={t}
+										onOpen={(p) => navigate(`/property/${p.id}`)}
+										onClose={() => {
+											setSelectedMapProperty(null);
+											setBottomSheetHeight(0);
+										}}
+										onHeightChange={setBottomSheetHeight}
 									/>
-								</div>
-							</div>
-						)}
-
-						{/* Bottom dock: Filter | Sort | List (matches OYO black bar). */}
-						<div className="absolute inset-x-0 bottom-0 z-30 bg-gray-900 text-white shadow-[0_-8px_24px_rgba(0,0,0,0.25)]">
-							<div className="max-w-[640px] mx-auto flex items-stretch divide-x divide-white/10">
-								<button
-									onClick={() => setIsMobileFilterOpen(true)}
-									className="flex-1 py-4 flex items-center justify-center gap-2 text-sm font-black active:bg-white/10 transition-colors">
-									<SlidersHorizontal size={16} /> {t.filtersBtn || "Filter"}
-								</button>
-								<div className="flex-1 relative">
-									<select
-										value={sortBy}
-										onChange={(e) => setSortBy(e.target.value)}
-										aria-label={t.sortBy || "Sort by"}
-										className="absolute inset-0 opacity-0 cursor-pointer text-white"
-									>
-										<option value="Newest Listings">{t.sortNewest || "Newest Listings"}</option>
-										<option value="Price: Low to High">{t.sortPriceLowHigh || "Price: Low to High"}</option>
-										<option value="Price: High to Low">{t.sortPriceHighLow || "Price: High to Low"}</option>
-										<option value="Popular">{t.sortPopular || "Popular"}</option>
-									</select>
-									<div className="py-4 flex items-center justify-center gap-2 text-sm font-black pointer-events-none">
-										<ArrowUpDown size={16} /> {t.sortBy?.replace(":", "") || "Sort"}
-									</div>
-								</div>
-								<button
-									onClick={() => setViewMode("list")}
-									className="flex-1 py-4 flex items-center justify-center gap-2 text-sm font-black active:bg-white/10 transition-colors">
-									<List size={16} /> List
-								</button>
-							</div>
+								)}
+							</AnimatePresence>
 						</div>
+
+						{/* Floating "back to list" pill — hidden while the bottom sheet is up
+						    so the card (and the map's Google attribution) stay clear. */}
+						{!selectedMapProperty && (
+							<button
+								onClick={() => setViewMode("list")}
+								aria-label={language === "বাংলা" ? "তালিকা দেখুন" : "Show list"}
+								className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10 bg-gray-900 text-white px-5 py-2.5 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.3)] flex items-center gap-2 text-sm font-black active:scale-95 transition-transform">
+								<List size={16} /> {language === "বাংলা" ? "তালিকা" : "List"}
+							</button>
+						)}
 					</motion.div>
 				)}
 			</AnimatePresence>

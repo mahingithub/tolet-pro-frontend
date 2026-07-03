@@ -360,7 +360,13 @@ export const propertyService = {
       if (filters.minPrice !== undefined) params.set('minPrice', filters.minPrice);
       if (filters.maxPrice !== undefined) params.set('maxPrice', filters.maxPrice);
       if (filters.selectedTypes?.length) params.set('type', filters.selectedTypes[0]);
-      if (filters.selectedCategories?.length) params.set('category', filters.selectedCategories[0]);
+      // The backend `category` param is a single exact match. Only send it when
+      // exactly ONE category is selected. For a multi-category selection (e.g.
+      // "Student" = student_male + student_female, or a multi-select in the
+      // sidebar) we deliberately omit it and let the client-side filters
+      // (applyFilters / propertyMatchesFilters, which use `.includes()`) narrow
+      // the full result set — otherwise only the first category would ever load.
+      if (filters.selectedCategories?.length === 1) params.set('category', filters.selectedCategories[0]);
       
       return `${API}/properties?${params}`;
     };
