@@ -9,6 +9,16 @@ import InquiryModal from "./InquiryModal";
 import { propertyService, subscribeUserProperties, propertyLocationHaystack } from "../services/Propertyservice.js";
 import usePropertyStore from "../store/usePropertyStore";
 import { normaliseIntent } from "../constants/listingIntents";
+// ─── INTENT-AWARE FILTER CONFIG (single source of truth for all filter data) ──
+import {
+	getFilterConfig,
+	getSubCategories,
+	getFilterDefaults,
+	formatBudget,
+	propertyMatchesFilters,
+	resolveSections,
+	isPillActive,
+} from "../constants/filterConfig";
 
 // ╔══════════════════════════════════════════════════════════════════════════╗
 // ║  GOOGLE MAPS                                                            ║
@@ -69,6 +79,47 @@ const RENTAL_CATEGORIES = [
 	{ id: "sublet",          label: "Sublet / Room",     tKey: "catSubletRoom",     icon: Share2 },
 	{ id: "student",         label: "Student",           tKey: "catStudent",        icon: BookOpen },
 ];
+
+// ─── ICON MAP (string key → lucide component) ─────────────────────────────────
+// filterConfig.js stores category icons as UI-agnostic string keys ("home",
+// "user", …) so it never imports a UI library. We resolve them to lucide
+// components here, at the presentation layer.
+const ICON_MAP = { home: Home, user: User, users: Users, book: BookOpen };
+
+// ─── INTENT TABS (Filter_Panel header) ────────────────────────────────────────
+const INTENT_TABS = [
+	{ intent: "rent",       labelBn: "ভাড়া" },
+	{ intent: "sale",       labelBn: "ক্রয়" },
+	{ intent: "commercial", labelBn: "বাণিজ্যিক" },
+];
+
+// Three-up tab row at the very top of the filter panel (shown in BOTH the
+// desktop sidebar and the mobile bottom-sheet). The tab matching the active
+// intent is visually selected and carries aria-selected for accessibility.
+// (Requirement 2)
+const IntentTabBar = ({ activeIntent, onChange }) => (
+	<div role="tablist" aria-label="Listing intent" className="grid grid-cols-3 gap-2 mb-6">
+		{INTENT_TABS.map((tab) => {
+			const active = activeIntent === tab.intent;
+			return (
+				<button
+					key={tab.intent}
+					type="button"
+					role="tab"
+					aria-selected={active}
+					onClick={() => onChange(tab.intent)}
+					className={`py-2.5 rounded-xl text-xs font-black border-2 transition-all ${
+						active
+							? "bg-gray-900 text-white border-gray-900 shadow-[2px_2px_0_0_#ba0036]"
+							: "bg-white text-gray-700 border-gray-200 hover:border-gray-900"
+					}`}
+				>
+					{tab.labelBn}
+				</button>
+			);
+		})}
+	</div>
+);
 
 // ─── VALID DIVISIONS (To catch custom area searches) ──────────────────────────
 const validDivisions = ["dhaka", "chittagong", "sylhet", "rajshahi", "khulna", "barishal", "rangpur", "mymensingh"];
@@ -765,14 +816,15 @@ const PropertyListing = () => {
 	const setActiveMode  = usePropertyStore((s) => s.setActiveMode);
 	const [selectedTypes, setSelectedTypes] = useState([]);
 	const [selectedCategories, setSelectedCategories] = useState([]);
+	// sale/commercial second-level option (e.g. ready_flat / duplex / corporate).
+	const [selectedSubCategories, setSelectedSubCategories] = useState([]);
 	const [selectedBeds, setSelectedBeds] = useState("any");
 	const [selectedBaths, setSelectedBaths] = useState("any");
-	const [selectedBathType, setSelectedBathType] = useState([]);
 	const [maxSqft, setMaxSqft] = useState(4000);
-	const [selectedUtilities, setSelectedUtilities] = useState([]);
-	const [selectedTenants, setSelectedTenants] = useState([]);
 	const [selectedFurnish, setSelectedFurnish] = useState("");
 	const [selectedAmenities, setSelectedAmenities] = useState([]);
+	// commercial-only fire-safety gate: '' (any) | 'yes' | 'no' (filters on 'yes').
+	const [selectedFireSafety, setSelectedFireSafety] = useState("");
 	const [selectedFloor, setSelectedFloor] = useState(t.anyFloor || "Any Floor");
 	const [minRating, setMinRating] = useState(0);
 	const [sortBy, setSortBy] = useState("Newest Listings");
@@ -916,21 +968,40 @@ const PropertyListing = () => {
 		setTimeout(() => setToastMessage(null), 3000);
 	};
 
+	// Apply a Filter_Defaults object (from getFilterDefaults) to every filter
+	// setter at once. Shared by intent-tab switching AND Clear All so both paths
+	// land on exactly the same reset state (Requirement 3).
+	const applyFilterDefaults = (d) => {
+		setMinPrice(d.minPrice);
+		setMaxPrice(d.maxPrice);
+		setMaxSqft(d.maxSqft);
+		setSelectedTypes(d.selectedTypes);
+		setSelectedCategories(d.selectedCategories);
+		setSelectedSubCategories(d.selectedSubCategories);
+		setSelectedBeds(d.selectedBeds);
+		setSelectedBaths(d.selectedBaths);
+		setSelectedFurnish(d.selectedFurnish);
+		setSelectedAmenities(d.selectedAmenities);
+		setSelectedFireSafety(d.selectedFireSafety);
+	};
+
+	// Requirement 2.3, 3.1–3.3 — user tapped a different intent tab: push the new
+	// intent into the global store and reset every filter section to that
+	// intent's defaults. No-op when already on the tab, so URL-driven filters
+	// applied at mount aren't wiped by a redundant reset.
+	const handleIntentChange = (nextIntent) => {
+		const next = normaliseIntent(nextIntent);
+		if (next === selectedIntent) return;
+		setActiveMode(next);
+		applyFilterDefaults(getFilterDefaults(next));
+	};
+
 	const handleClearAll = () => {
 		setSearchArea("");
 		setUserLocation(null);
-		setMinPrice(0);
-		setMaxPrice(300000);
-		setSelectedTypes([]);
-		setSelectedCategories([]);
-		setSelectedBeds("any");
-		setSelectedBaths("any");
-		setSelectedBathType([]);
-		setMaxSqft(4000);
-		setSelectedUtilities([]);
-		setSelectedTenants([]);
-		setSelectedFurnish("");
-		setSelectedAmenities([]);
+		// Requirement 3.4 — reset all config-driven filters to the CURRENT intent's defaults.
+		applyFilterDefaults(getFilterDefaults(selectedIntent));
+		// Intent-neutral controls that live outside Filter_Defaults.
 		setSelectedFloor(t.anyFloor || "Any Floor");
 		setMinRating(0);
 		setSortBy("Newest Listings");
@@ -967,23 +1038,28 @@ const PropertyListing = () => {
 		// over the rich haystack). We deliberately do NOT re-filter by the
 		// search term here — that would undo the server's alias / multi-word
 		// matches. Everything else (price/beds/sqft/floor/…) stays client-side.
+		// Config-driven gate: intent + type(alias) + price + category/sub-category
+		// + commercial fire-safety, all in one pure predicate (Requirement 12).
+		const filterState = {
+			intent: selectedIntent,
+			selectedTypes,
+			minPrice,
+			maxPrice,
+			selectedCategories,
+			selectedSubCategories,
+			selectedFireSafety,
+		};
 		const list = (properties || []).filter((prop) => {
 			if (activeDivision !== "all" && prop.division !== activeDivision) return false;
-			if (prop.price < minPrice || prop.price > maxPrice) return false;
-			if (selectedTypes.length > 0 && !selectedTypes.includes(prop.type)) return false;
-			if (selectedCategories.length > 0 && !selectedCategories.includes(prop.rentalCategory)) return false;
+			if (!propertyMatchesFilters(prop, filterState)) return false;
+			// Remaining intent-neutral client-side conditions (unchanged behaviour).
 			if (selectedBeds !== "any") {
 				if (selectedBeds === "4+" && prop.beds < 4) return false;
 				if (selectedBeds !== "4+" && prop.beds !== Number(selectedBeds)) return false;
 			}
 			if (selectedBaths !== "any") {
-				if (selectedBaths === "4+" && prop.baths < 4) return false;
-				if (selectedBaths !== "4+" && prop.baths !== Number(selectedBaths)) return false;
-			}
-			if (selectedBathType.length > 0) {
-				// E.g. if prop.bathroomType is 'Attached' or 'Shared'
-				// If prop doesn't have bathroomType, we might want to let it pass or not, but strictly:
-				if (!prop.bathroomType || !selectedBathType.includes(prop.bathroomType)) return false;
+				if (selectedBaths === "3+" && prop.baths < 3) return false;
+				if (selectedBaths !== "3+" && prop.baths !== Number(selectedBaths)) return false;
 			}
 			if ((prop.sqft || 0) > maxSqft) return false;
 			if (selectedFurnish && prop.furnishing !== selectedFurnish) return false;
@@ -1007,7 +1083,7 @@ const PropertyListing = () => {
 			return new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0);
 		});
 		return list;
-	}, [properties, activeDivision, minPrice, maxPrice, selectedTypes, selectedCategories, selectedBeds, selectedBaths, selectedBathType, maxSqft, selectedFurnish, minRating, selectedFloor, sortBy, userLocation, searchArea, t.nearMe]);
+	}, [properties, activeDivision, selectedIntent, minPrice, maxPrice, selectedTypes, selectedCategories, selectedSubCategories, selectedFireSafety, selectedBeds, selectedBaths, maxSqft, selectedFurnish, minRating, selectedFloor, sortBy, userLocation, searchArea, t.nearMe]);
 
 	// ── LOCATION AUTOCOMPLETE ────────────────────────────────────────────────
 	// Distinct, human-readable place labels pulled from the loaded listings'
@@ -1049,6 +1125,19 @@ const PropertyListing = () => {
 
 	const isMapMode = viewMode === "map";
 	const resultCountLabel = isPropertiesLoading ? "..." : filteredProperties.length;
+
+	// ── CONFIG-DRIVEN FILTER PANEL (intent-aware) ──────────────────────────────
+	// The whole Filter_Panel is derived from the active intent's config plus a
+	// pure section-visibility resolver. `selectedType` is only meaningful when
+	// exactly ONE type is chosen — that's when sub-categories and the sale→land
+	// override apply (multi-select keeps the broader behaviour).
+	const cfg = getFilterConfig(selectedIntent);
+	const selectedType = selectedTypes.length === 1 ? selectedTypes[0] : null;
+	const sections = resolveSections(selectedIntent, selectedType);
+	const subCategories = getSubCategories(selectedIntent, selectedType);
+	const sliderMin = cfg.budgetSlider.min;
+	const sliderMax = cfg.budgetSlider.max;
+	const sliderStep = cfg.budgetSlider.step;
 
 	return (
 		<div className="w-full bg-[#f8f9fa] min-h-screen font-sans pb-20 relative">
@@ -1221,6 +1310,9 @@ const PropertyListing = () => {
 							</button>
 						</div>
 
+						{/* Intent tabs — top of the shared filter panel (desktop + mobile). */}
+						<IntentTabBar activeIntent={selectedIntent} onChange={handleIntentChange} />
+
 						<FilterSection title={t.filterLocation || "Location"}>
 							{/* Search input — desktop sidebar only.
 							    On mobile the top bar search already handles this. */}
@@ -1256,39 +1348,40 @@ const PropertyListing = () => {
 
 						<FilterSection title={t.filterPrice || "Price Range"}>
 							<div className="px-2 pb-4">
-								{/* Quick budget pills — one tap sets the min/max range. */}
+								{/* Intent-specific price meaning (per month / total). */}
+								<p className="text-[10px] font-black text-brandRed mb-3 uppercase tracking-wider">{cfg.priceLabel}</p>
+								{/* Quick budget pills — one tap sets the min/max range (Requirement 4.1, 4.2, 4.7). */}
 								<div className="mb-5">
 									<p className="text-[10px] font-black text-gray-400 mb-2 uppercase tracking-wider">{t.quickBudgetLabel || "Quick budget"}</p>
 									<div className="flex flex-wrap gap-1.5">
-										{[
-											{ id: "u15", min: 5000,  max: 15000,  tKey: "budgetUpto15k",  fallback: "Under ৳15k" },
-											{ id: "u25", min: 15000, max: 25000,  tKey: "budgetUpto25k",  fallback: "৳15k–৳25k" },
-											{ id: "u40", min: 25000, max: 40000,  tKey: "budgetUpto40k",  fallback: "৳25k–৳40k" },
-											{ id: "u60", min: 40000, max: 60000,  tKey: "budgetUpto60k",  fallback: "৳40k–৳60k" },
-											{ id: "a60", min: 60000, max: 300000, tKey: "budgetAbove60k", fallback: "Above ৳60k" },
-										].map((b) => {
-											const active = minPrice === b.min && maxPrice === b.max;
+										{cfg.budgetPills.map((pill) => {
+											const active = isPillActive(pill, minPrice, maxPrice);
 											return (
 												<button
-													key={b.id}
+													key={pill.id}
 													type="button"
-													onClick={() => { setMinPrice(b.min); setMaxPrice(b.max); }}
+													onClick={() => { setMinPrice(pill.min); setMaxPrice(pill.max); }}
 													className={`px-2.5 py-1.5 rounded-full text-[11px] font-black border-2 transition-all ${
 														active
 															? "bg-gray-900 text-white border-gray-900"
 															: "bg-white text-gray-700 border-gray-200 hover:border-gray-900"
 													}`}
 												>
-													{t[b.tKey] || b.fallback}
+													{pill.labelBn}
 												</button>
 											);
 										})}
 									</div>
 								</div>
+								{/* Selected range readout — lakh/crore aware (Requirement 5). */}
+								<div className="flex items-center justify-between mb-2 text-xs font-black text-brandRed">
+									<span>{formatBudget(minPrice, selectedIntent)}</span>
+									<span>{formatBudget(maxPrice, selectedIntent)}</span>
+								</div>
 								<div className="relative h-2 bg-gray-200 rounded-full mb-10 mt-6 mx-2">
-									<div className="absolute h-full bg-brandRed rounded-full z-10" style={{ left: `${(minPrice / 300000) * 100}%`, right: `${((300000 - maxPrice) / 300000) * 100}%` }}></div>
-									<input type="range" min="0" max="300000" step="1000" value={minPrice} onChange={(e) => setMinPrice(Math.min(Number(e.target.value), maxPrice - 1000))} className="absolute w-full -top-3 h-8 appearance-none bg-transparent pointer-events-none z-20 [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-[5px] [&::-webkit-slider-thumb]:border-brandRed [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg cursor-pointer" />
-									<input type="range" min="0" max="300000" step="1000" value={maxPrice} onChange={(e) => setMaxPrice(Math.max(Number(e.target.value), minPrice + 1000))} className="absolute w-full -top-3 h-8 appearance-none bg-transparent pointer-events-none z-30 [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-[5px] [&::-webkit-slider-thumb]:border-brandRed [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg cursor-pointer" />
+									<div className="absolute h-full bg-brandRed rounded-full z-10" style={{ left: `${((minPrice - sliderMin) / (sliderMax - sliderMin)) * 100}%`, right: `${((sliderMax - maxPrice) / (sliderMax - sliderMin)) * 100}%` }}></div>
+									<input type="range" min={sliderMin} max={sliderMax} step={sliderStep} value={minPrice} onChange={(e) => setMinPrice(Math.min(Number(e.target.value), maxPrice - sliderStep))} className="absolute w-full -top-3 h-8 appearance-none bg-transparent pointer-events-none z-20 [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-[5px] [&::-webkit-slider-thumb]:border-brandRed [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg cursor-pointer" />
+									<input type="range" min={sliderMin} max={sliderMax} step={sliderStep} value={maxPrice} onChange={(e) => setMaxPrice(Math.max(Number(e.target.value), minPrice + sliderStep))} className="absolute w-full -top-3 h-8 appearance-none bg-transparent pointer-events-none z-30 [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-[5px] [&::-webkit-slider-thumb]:border-brandRed [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg cursor-pointer" />
 								</div>
 								<div className="flex gap-4">
 									<div className="flex-1">
@@ -1303,91 +1396,143 @@ const PropertyListing = () => {
 							</div>
 						</FilterSection>
 
+						{/* Property Type — driven by the active intent's config (Requirement 6). */}
 						<FilterSection title={t.filterPropType || "Property Type"}>
 							<div className="grid grid-cols-1 gap-2">
-								{[
-									{ id: "apartment",   label: t.propApartment   || "Apartment" },
-									{ id: "independent", label: t.propIndependent || "Independent House" },
-									{ id: "duplex",      label: t.propDuplex      || "Duplex" },
-									{ id: "studio",      label: t.propStudio      || "Studio" },
-									{ id: "penthouse",   label: t.propPenthouse   || "Penthouse" },
-								].map((type) => (
+								{cfg.propertyTypes.map((type) => (
 									<label key={type.id} className={`flex items-center gap-3 cursor-pointer px-3 py-2 rounded-lg border-2 text-xs font-bold transition-all ${selectedTypes.includes(type.id) ? 'border-gray-900 bg-gray-50' : 'border-transparent hover:border-gray-300'}`}>
-										<input type="checkbox" checked={selectedTypes.includes(type.id)} onChange={() => handleTypeToggle(type.id)} className="w-4 h-4 rounded accent-gray-900" /> {type.label}
+										<input type="checkbox" checked={selectedTypes.includes(type.id)} onChange={() => handleTypeToggle(type.id)} className="w-4 h-4 rounded accent-gray-900" /> {type.labelBn}
 									</label>
 								))}
 							</div>
 						</FilterSection>
 
-						<FilterSection title={t.filterWhoMovesIn || "Who's moving in?"}>
-							{/* 2-column chip grid. Each chip toggles a category id —
-							    multi-select supported so e.g. "Family + Sublet" works. */}
-							<div className="grid grid-cols-2 gap-2">
-								{RENTAL_CATEGORIES.map((cat) => {
-									const Icon = cat.icon;
-									const active = selectedCategories.includes(cat.id);
-									const label = (cat.tKey && t[cat.tKey]) || cat.label;
-									return (
-										<button
-											key={cat.id}
-											type="button"
-											onClick={() => toggleArrayState(setSelectedCategories, cat.id)}
-											className={`flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border-2 text-[11px] font-black leading-tight text-center transition-all ${
-												active
-													? "bg-gray-900 text-white border-gray-900 shadow-[2px_2px_0_0_#ba0036]"
-													: "bg-white text-gray-700 border-gray-200 hover:border-gray-900 hover:text-gray-900"
-											}`}
-										>
-											<Icon size={18} className={active ? "text-white" : "text-brandRed"} />
-											<span>{label}</span>
+						{/* "Who lives" — rent only (Requirement 7.1, 8). */}
+						{sections.showWhoLives && (
+							<FilterSection title={t.filterWhoMovesIn || "Who's moving in?"}>
+								{/* 2-column chip grid. Each chip toggles a category id — multi-select supported. */}
+								<div className="grid grid-cols-2 gap-2">
+									{cfg.categories.map((cat) => {
+										const Icon = ICON_MAP[cat.icon] || Home;
+										const active = selectedCategories.includes(cat.id);
+										return (
+											<button
+												key={cat.id}
+												type="button"
+												onClick={() => toggleArrayState(setSelectedCategories, cat.id)}
+												className={`flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border-2 text-[11px] font-black leading-tight text-center transition-all ${
+													active
+														? "bg-gray-900 text-white border-gray-900 shadow-[2px_2px_0_0_#ba0036]"
+														: "bg-white text-gray-700 border-gray-200 hover:border-gray-900 hover:text-gray-900"
+												}`}
+											>
+												<Icon size={18} className={active ? "text-white" : "text-brandRed"} />
+												<span>{cat.labelBn}</span>
+											</button>
+										);
+									})}
+								</div>
+							</FilterSection>
+						)}
+
+						{/* Sub-Category — sale/commercial, only when exactly one type is picked (Requirement 7.2–7.4). */}
+						{subCategories.length > 0 && (
+							<FilterSection title={t.filterSubCategory || "Sub-Category"}>
+								<div className="grid grid-cols-2 gap-2">
+									{subCategories.map((sub) => {
+										const active = selectedSubCategories.includes(sub.id);
+										return (
+											<button
+												key={sub.id}
+												type="button"
+												onClick={() => toggleArrayState(setSelectedSubCategories, sub.id)}
+												className={`py-2.5 px-2 rounded-xl border-2 text-[11px] font-black leading-tight text-center transition-all ${
+													active
+														? "bg-gray-900 text-white border-gray-900 shadow-[2px_2px_0_0_#ba0036]"
+														: "bg-white text-gray-700 border-gray-200 hover:border-gray-900 hover:text-gray-900"
+												}`}
+											>
+												{sub.labelBn}
+											</button>
+										);
+									})}
+								</div>
+							</FilterSection>
+						)}
+
+						{/* Bedrooms — hidden for commercial and for sale→land (Requirement 9). */}
+						{sections.showBedBath && (
+							<FilterSection title={t.bedrooms || "Bedrooms"}>
+								<div className="flex gap-2">
+									{[
+										{ id: "any", text: t.any || "Any" },
+										{ id: "1", text: "1" },
+										{ id: "2", text: "2" },
+										{ id: "3", text: "3" },
+										{ id: "4+", text: "4+" },
+									].map((num) => (
+										<button key={num.id} onClick={() => setSelectedBeds(num.id)} className={`flex-1 py-2 text-xs font-black rounded-lg border transition-all ${selectedBeds === num.id ? "bg-brandRed text-white border-brandRed" : "border-gray-100 text-gray-500 hover:border-brandRed"}`}>
+											{num.text}
 										</button>
-									);
-								})}
-							</div>
-						</FilterSection>
+									))}
+								</div>
+							</FilterSection>
+						)}
 
-						<FilterSection title={t.bedrooms || "Bedrooms"}>
-							<div className="flex gap-2">
-								{[
-									{ id: "any", text: t.any || "Any" },
-									{ id: "1", text: "1" },
-									{ id: "2", text: "2" },
-									{ id: "3", text: "3" },
-									{ id: "4+", text: "4+" },
-								].map((num) => (
-									<button key={num.id} onClick={() => setSelectedBeds(num.id)} className={`flex-1 py-2 text-xs font-black rounded-lg border transition-all ${selectedBeds === num.id ? "bg-brandRed text-white border-brandRed" : "border-gray-100 text-gray-500 hover:border-brandRed"}`}>
-										{num.text}
-									</button>
-								))}
-							</div>
-						</FilterSection>
+						{/* Bathrooms — options any/1/2/3+ (Requirement 9.6). */}
+						{sections.showBedBath && (
+							<FilterSection title={t.bathrooms || "Bathrooms"}>
+								<div className="flex gap-2">
+									{[
+										{ id: "any", text: t.any || "Any" },
+										{ id: "1", text: "1" },
+										{ id: "2", text: "2" },
+										{ id: "3+", text: "3+" },
+									].map((num) => (
+										<button key={num.id} onClick={() => setSelectedBaths(num.id)} className={`flex-1 py-2 text-xs font-black rounded-lg border transition-all ${selectedBaths === num.id ? "bg-brandRed text-white border-brandRed" : "border-gray-100 text-gray-500 hover:border-brandRed"}`}>
+											{num.text}
+										</button>
+									))}
+								</div>
+							</FilterSection>
+						)}
 
-						<FilterSection title={t.bathrooms || "Bathrooms"}>
-							<div className="flex gap-2">
-								{[
-									{ id: "any", text: t.any || "Any" },
-									{ id: "1", text: "1" },
-									{ id: "2", text: "2" },
-									{ id: "3", text: "3" },
-									{ id: "4+", text: "4+" },
-								].map((num) => (
-									<button key={num.id} onClick={() => setSelectedBaths(num.id)} className={`flex-1 py-2 text-xs font-black rounded-lg border transition-all ${selectedBaths === num.id ? "bg-brandRed text-white border-brandRed" : "border-gray-100 text-gray-500 hover:border-brandRed"}`}>
-										{num.text}
-									</button>
-								))}
-							</div>
-						</FilterSection>
+						{/* Furnishing — hidden for commercial and for sale→land (Requirement 9.2, 9.4). */}
+						{sections.showFurnishing && (
+							<FilterSection title={t.furnishing || "Furnishing"}>
+								<div className="grid grid-cols-1 gap-2">
+									{[
+										{ id: "", label: t.any || "Any" },
+										{ id: "Furnished", label: t.furnished || "Furnished" },
+										{ id: "Semi-Furnished", label: t.semiFurnished || "Semi-Furnished" },
+										{ id: "Unfurnished", label: t.unfurnished || "Unfurnished" },
+									].map((f) => (
+										<label key={f.id} className="flex items-center gap-2 text-[11px] font-bold text-gray-600">
+											<input type="radio" name="furnish" checked={selectedFurnish === f.id} onChange={() => setSelectedFurnish(f.id)} className="accent-brandRed w-4 h-4" /> {f.label}
+										</label>
+									))}
+								</div>
+							</FilterSection>
+						)}
 
-						<FilterSection title={t.bathroomType || "Bathroom Type"}>
-							<div className="grid grid-cols-2 gap-3">
-								{[t.attachedBath || "Attached", t.sharedBath || "Shared"].map((b) => (
-									<label key={b} className="flex items-center gap-2 text-xs font-bold text-gray-600">
-										<input type="checkbox" checked={selectedBathType.includes(b)} onChange={() => toggleArrayState(setSelectedBathType, b)} className="accent-brandRed w-4 h-4" /> {b}
-									</label>
-								))}
-							</div>
-						</FilterSection>
+						{/* Fire Safety — commercial only (Requirement 10). */}
+						{sections.showFireSafety && (
+							<FilterSection title={t.fireSafety || "Fire Safety"}>
+								<div className="flex gap-2">
+									{[
+										{ id: "", label: t.any || "Any" },
+										{ id: "yes", label: t.yes || "Yes" },
+										{ id: "no", label: t.no || "No" },
+									].map((opt) => (
+										<button key={opt.id || "any"} type="button" onClick={() => setSelectedFireSafety(opt.id)} className={`flex-1 py-2 text-xs font-black rounded-lg border transition-all ${selectedFireSafety === opt.id ? "bg-brandRed text-white border-brandRed" : "border-gray-100 text-gray-500 hover:border-brandRed"}`}>
+											{opt.label}
+										</button>
+									))}
+								</div>
+							</FilterSection>
+						)}
 
+						{/* Size (sqft) — slider bounds from the intent config (Requirement 11.1–11.4). */}
 						<FilterSection title={t.filterSize || "Size (Area Sqft)"}>
 							<div className="px-2">
 								<div className="flex items-center justify-between mb-4 text-xs font-bold text-gray-600">
@@ -1396,59 +1541,30 @@ const PropertyListing = () => {
 									</span>
 									<span className="text-brandRed">{maxSqft} sqft</span>
 								</div>
-								<input type="range" min="500" max="4000" step="100" value={maxSqft} onChange={(e) => setMaxSqft(Number(e.target.value))} className="w-full accent-brandRed cursor-pointer" />
+								<input type="range" min={cfg.sqftSlider.min} max={cfg.sqftSlider.max} step={cfg.sqftSlider.step} value={maxSqft} onChange={(e) => setMaxSqft(Number(e.target.value))} className="w-full accent-brandRed cursor-pointer" />
 							</div>
 						</FilterSection>
 
-						<FilterSection title={t.filterUtilities || "Utilities Included"}>
-							<div className="grid grid-cols-2 gap-3">
-								{[t.waterBill || "Water", t.electricityBill || "Electricity", t.gasSupply || "Gas", t.internetWifi || "WiFi", t.serviceCharge || "Service Charge"].map((u) => (
-									<label key={u} className="flex items-center gap-2 text-[11px] font-bold text-gray-600">
-										<input type="checkbox" checked={selectedUtilities.includes(u)} onChange={() => toggleArrayState(setSelectedUtilities, u)} className="accent-brandRed w-4 h-4 rounded" /> {u}
-									</label>
-								))}
-							</div>
-						</FilterSection>
-
-						<FilterSection title={t.filterTenant || "Tenant & Furnishing"}>
-							<p className="text-[10px] font-black text-gray-400 mb-2 uppercase">{t.tenantType || "Tenant Type"}</p>
-							<div className="grid grid-cols-2 gap-3 mb-5">
-								{[t.family || "Family", t.bachelor || "Bachelor", t.students || "Students", t.petsAllowed || "Pets Allowed"].map((tn) => (
-									<label key={tn} className="flex items-center gap-2 text-[11px] font-bold text-gray-600">
-										<input type="checkbox" checked={selectedTenants.includes(tn)} onChange={() => toggleArrayState(setSelectedTenants, tn)} className="accent-brandRed w-4 h-4 rounded" /> {tn}
-									</label>
-								))}
-							</div>
-							<p className="text-[10px] font-black text-gray-400 mb-2 uppercase">{t.furnishing || "Furnishing"}</p>
-							<div className="grid grid-cols-1 gap-2">
-								{[
-									{ id: "", label: t.any || "Any" },
-									{ id: "Furnished", label: t.furnished || "Furnished" },
-									{ id: "Semi-Furnished", label: t.semiFurnished || "Semi-Furnished" },
-									{ id: "Unfurnished", label: t.unfurnished || "Unfurnished" },
-								].map((f) => (
-									<label key={f.id} className="flex items-center gap-2 text-[11px] font-bold text-gray-600">
-										<input type="radio" name="furnish" checked={selectedFurnish === f.id} onChange={() => setSelectedFurnish(f.id)} className="accent-brandRed w-4 h-4" /> {f.label}
-									</label>
-								))}
-							</div>
-						</FilterSection>
-
+						{/* Amenities (config-driven) + Floor (hidden for sale→land) — Requirement 11.5–11.8. */}
 						<FilterSection title={t.filterAmenities || "Amenities & Floor"}>
 							<p className="text-[10px] font-black text-gray-400 mb-2 uppercase">{t.amenities || "Amenities"}</p>
 							<div className="grid grid-cols-2 gap-3 mb-5">
-								{[t.parking || "Parking", t.elevator || "Elevator", t.securityCctv || "CCTV", t.generator || "Generator", t.ac || "AC"].map((a) => (
-									<label key={a} className="flex items-center gap-2 text-[11px] font-bold text-gray-600">
-										<input type="checkbox" checked={selectedAmenities.includes(a)} onChange={() => toggleArrayState(setSelectedAmenities, a)} className="accent-brandRed w-4 h-4 rounded" /> {a}
+								{cfg.amenities.map((a) => (
+									<label key={a.id} className="flex items-center gap-2 text-[11px] font-bold text-gray-600">
+										<input type="checkbox" checked={selectedAmenities.includes(a.id)} onChange={() => toggleArrayState(setSelectedAmenities, a.id)} className="accent-brandRed w-4 h-4 rounded" /> {a.labelBn}
 									</label>
 								))}
 							</div>
-							<p className="text-[10px] font-black text-gray-400 mb-2 uppercase">{t.floorLevel || "Floor Level"}</p>
-							<select value={selectedFloor} onChange={(e) => setSelectedFloor(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-lg p-2.5 text-xs font-bold outline-none focus:border-brandRed">
-								<option>{t.anyFloor || "Any Floor"}</option>
-								<option>{t.groundFloor || "Ground Floor"}</option>
-								<option>{t.floor1to3 || "1st to 3rd Floor"}</option>
-							</select>
+							{sections.showFloor && (
+								<>
+									<p className="text-[10px] font-black text-gray-400 mb-2 uppercase">{t.floorLevel || "Floor Level"}</p>
+									<select value={selectedFloor} onChange={(e) => setSelectedFloor(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-lg p-2.5 text-xs font-bold outline-none focus:border-brandRed">
+										<option>{t.anyFloor || "Any Floor"}</option>
+										<option>{t.groundFloor || "Ground Floor"}</option>
+										<option>{t.floor1to3 || "1st to 3rd Floor"}</option>
+									</select>
+								</>
+							)}
 						</FilterSection>
 
 						<FilterSection title={t.filterRating || "Property Rating"}>

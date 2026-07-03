@@ -8,6 +8,7 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 import usePropertyStore from '../store/usePropertyStore';
 import { DIVISIONS, POPULAR_AREAS, POPULAR_AREA_IMAGES, POPULAR_AREA_IMAGES_DESKTOP, POPULAR_AREA_TAGLINES, POPULAR_AREA_SUBZONES, buildSearchUrl } from '../data/searchData';
+import LocationSearchModal from './shared/LocationSearchModal';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTEXT DATA
@@ -464,15 +465,11 @@ const HeroSection = () => {
   const [customMin,      setCustomMin]      = useState('');
   const [customMax,      setCustomMax]      = useState('');
 
-  const [isLocationOpen,      setIsLocationOpen]      = useState(false);
-  const [isMobileLocationOpen, setIsMobileLocationOpen] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isTypeOpen,          setIsTypeOpen]          = useState(false);
   const [isBudgetOpen,        setIsBudgetOpen]        = useState(false);
   const [isMobileTypeOpen,    setIsMobileTypeOpen]    = useState(false);
   const [isMobileBudgetOpen,  setIsMobileBudgetOpen]  = useState(false);
-
-  const [activeIndex,       setActiveIndex]       = useState(-1);
-  const [mobileActiveIndex, setMobileActiveIndex] = useState(-1);
 
   const [openDivision,          setOpenDivision]          = useState(null);
   const [openArea,              setOpenArea]              = useState(null);
@@ -501,8 +498,6 @@ const HeroSection = () => {
     }));
   };
 
-  const locationRef       = useRef(null);
-  const mobileLocationRef = useRef(null);
   const typeRef           = useRef(null);
   const budgetRef         = useRef(null);
 
@@ -533,81 +528,10 @@ const HeroSection = () => {
     }
   }, [searchType]);
 
-  const [liveSuggestions, setLiveSuggestions] = useState([]);
-
-  useEffect(() => {
-    const raw = location.trim();
-    if (raw.length < 2) {
-      setLiveSuggestions([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      try {
-        const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-        const res = await fetch(`${API}/properties/suggestions?q=${encodeURIComponent(raw)}`);
-        if (res.ok) {
-          const data = await res.json();
-          setLiveSuggestions(data.suggestions || []);
-        }
-      } catch (err) {
-        console.error('Autocomplete fetch error:', err);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [location]);
-
-  const filteredSuggestions = useCallback((properties = []) => {
-    const raw = location.trim();
-    if (!raw) return allSuggestions.slice(0, 7);
-
-    const q = raw.toLowerCase();
-    const staticMatches = allSuggestions.filter(s =>
-      s.title.toLowerCase().includes(q)
-    );
-
-    const propMatches = properties.flatMap(p => {
-      const entries = [];
-      if (p?.location && p.location.toLowerCase().includes(q))
-        entries.push({ id: `ploc-${p.id}`, title: p.location, type: 'Property Area', category: 'area' });
-      if (p?.area && p.area.toLowerCase().includes(q))
-        entries.push({ id: `parea-${p.id}`, title: p.area, type: 'Area', category: 'area' });
-      if (p?.title && p.title.toLowerCase().includes(q))
-        entries.push({ id: `ptitle-${p.id}`, title: p.title, type: 'Property', category: 'search' });
-      return entries;
-    });
-
-    const merged = [...staticMatches, ...propMatches].filter(
-      (s, i, arr) => arr.findIndex(x => x.title.toLowerCase() === s.title.toLowerCase()) === i
-    );
-
-    if (merged.length === 0) {
-      return [
-        {
-          id: `dynamic-${q}`,
-          title: raw,
-          type: t?.searchAnywhere || 'Search Anywhere',
-          category: 'search',
-        },
-        {
-          id: `dynamic-bd-${q}`,
-          title: `${raw}, Bangladesh`,
-          type: t?.locationText || 'Location',
-          category: 'city',
-        },
-      ];
-    }
-
-    return merged.slice(0, 9);
-  }, [location, t]);
-
-  const suggestions = filteredSuggestions(liveSuggestions);
-
   useEffect(() => {
     const handleClickOutside = e => {
-      if (locationRef.current       && !locationRef.current.contains(e.target))       { setIsLocationOpen(false); setActiveIndex(-1); }
-      if (mobileLocationRef.current && !mobileLocationRef.current.contains(e.target)) { setIsMobileLocationOpen(false); setMobileActiveIndex(-1); }
-      if (typeRef.current           && !typeRef.current.contains(e.target))           setIsTypeOpen(false);
-      if (budgetRef.current         && !budgetRef.current.contains(e.target))         setIsBudgetOpen(false);
+      if (typeRef.current   && !typeRef.current.contains(e.target))   setIsTypeOpen(false);
+      if (budgetRef.current && !budgetRef.current.contains(e.target)) setIsBudgetOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -642,12 +566,8 @@ const HeroSection = () => {
 
   const handleSearch = e => {
     e?.preventDefault();
-    setIsLocationOpen(false);
-    setIsMobileLocationOpen(false);
     setIsTypeOpen(false);
     setIsBudgetOpen(false);
-    setActiveIndex(-1);
-    setMobileActiveIndex(-1);
     const queryParams = new URLSearchParams({
       // Canonical listing intent ('rent' | 'sale' | 'commercial') — the primary
       // filter the listing page + backend key off. `purpose` is kept for now so
@@ -662,44 +582,6 @@ const HeroSection = () => {
     }).toString();
     const targetLocation = location.trim() ? location.toLowerCase().replace(/,?\s+/g, '-') : 'all';
     navigate(`/properties/${targetLocation}?${queryParams}`);
-  };
-
-  const handleLocationSelect = title => {
-    setLocation(title);
-    setIsLocationOpen(false);
-    setIsMobileLocationOpen(false);
-    setActiveIndex(-1);
-    setMobileActiveIndex(-1);
-  };
-
-  const handleDesktopKeyDown = e => {
-    if (!isLocationOpen) { if (e.key === 'ArrowDown') { setIsLocationOpen(true); setActiveIndex(0); } return; }
-    if (e.key === 'ArrowDown')  { e.preventDefault(); setActiveIndex(i => Math.min(i + 1, suggestions.length - 1)); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIndex(i => Math.max(i - 1, -1)); }
-    else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (activeIndex >= 0 && suggestions[activeIndex]) handleLocationSelect(suggestions[activeIndex].title);
-      else handleSearch();
-    }
-    else if (e.key === 'Escape') { setIsLocationOpen(false); setActiveIndex(-1); }
-  };
-
-  const handleMobileKeyDown = e => {
-    if (!isMobileLocationOpen) { if (e.key === 'ArrowDown') { setIsMobileLocationOpen(true); setMobileActiveIndex(0); } return; }
-    if (e.key === 'ArrowDown')  { e.preventDefault(); setMobileActiveIndex(i => Math.min(i + 1, suggestions.length - 1)); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); setMobileActiveIndex(i => Math.max(i - 1, -1)); }
-    else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (mobileActiveIndex >= 0 && suggestions[mobileActiveIndex]) handleLocationSelect(suggestions[mobileActiveIndex].title);
-      else handleSearch();
-    }
-    else if (e.key === 'Escape') { setIsMobileLocationOpen(false); setMobileActiveIndex(-1); }
-  };
-
-  const SuggestionIcon = ({ category }) => {
-    if (category === 'search') return <TrendingUp size={13} className="text-crimson-400" />;
-    if (category === 'city')   return <Building   size={13} className="text-blue-400" />;
-    return                            <MapPin     size={13} className="text-emerald-500" />;
   };
 
   const sliderItems = [...popularCities, ...popularCities];
@@ -754,94 +636,32 @@ const HeroSection = () => {
             </div>
 
             <div className="flex flex-col gap-2">
-              <div className="relative w-full" ref={mobileLocationRef}>
+              <div className="relative w-full">
                 <div className="w-full flex items-center px-3 py-3 bg-white/45 backdrop-blur-md rounded-2xl border border-white/55 ring-1 ring-inset ring-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_4px_14px_rgba(15,23,42,0.08)]">
                   <div className="bg-white p-1.5 rounded-lg shadow-sm mr-2.5 shrink-0">
                     <MapPin size={16} className="text-crimson-500" />
                   </div>
-                  <div className="flex flex-col flex-1 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsLocationModalOpen(true)}
+                    className="flex flex-col flex-1 min-w-0 text-left"
+                  >
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{t?.searchLocation || 'Location'}</span>
-                    <input
-                      type="text"
-                      placeholder={currentPlaceholder}
-                      value={location}
-                      onChange={e => { setLocation(e.target.value); setIsMobileLocationOpen(true); setMobileActiveIndex(-1); }}
-                      onFocus={() => setIsMobileLocationOpen(true)}
-                      onKeyDown={handleMobileKeyDown}
-                      className="bg-transparent border-none outline-none focus:ring-0 font-bold text-sm text-slate-900 placeholder-slate-400 w-full"
-                      autoComplete="off"
-                    />
-                  </div>
+                    <span className={`font-bold text-sm w-full truncate ${location ? 'text-slate-900' : 'text-slate-400'}`}>
+                      {location || currentPlaceholder}
+                    </span>
+                  </button>
                   {location && (
                     <button
-                      onMouseDown={e => e.preventDefault()}
-                      onClick={() => { setLocation(''); setIsMobileLocationOpen(false); setMobileActiveIndex(-1); }}
+                      type="button"
+                      onClick={() => setLocation('')}
                       className="ml-1 shrink-0 p-1"
+                      aria-label="Clear location"
                     >
                       <X size={13} className="text-slate-400" />
                     </button>
                   )}
                 </div>
-
-                {isMobileLocationOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.13)] border border-slate-100 z-[300] overflow-hidden">
-                    {!location && (
-                      <div className="px-3 pt-2.5 pb-1">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{t?.popular || 'Popular'}</p>
-                        <div className="flex flex-wrap gap-1.5 mb-2">
-                          {popularSearchChips.map(chip => (
-                            <button
-                              key={chip}
-                              onMouseDown={e => e.preventDefault()}
-                              onClick={() => handleLocationSelect(chip + ', Dhaka')}
-                              className="text-[10px] font-bold text-slate-700 bg-slate-100 hover:bg-crimson-50 hover:text-crimson-600 px-2.5 py-1 rounded-full transition-colors border border-transparent hover:border-crimson-200"
-                            >
-                              {chip}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    <div className="max-h-[200px] overflow-y-auto overscroll-contain">
-                      {!location && (
-                        <div
-                          onMouseDown={e => e.preventDefault()}
-                          onClick={() => handleLocationSelect(t?.useCurrentLocation || 'Current Location')}
-                          className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-crimson-50 cursor-pointer transition-colors border-b border-slate-50"
-                        >
-                          <div className="bg-crimson-100 p-1.5 rounded-lg text-crimson-600 shrink-0"><Navigation size={14} /></div>
-                          <span className="font-bold text-sm text-crimson-600">{t?.useCurrentLocation || 'Use current location'}</span>
-                        </div>
-                      )}
-                      {location && (
-                        <div
-                          onMouseDown={e => e.preventDefault()}
-                          onClick={() => { setIsMobileLocationOpen(false); handleSearch(); }}
-                          className="flex items-center gap-2.5 px-3 py-2.5 bg-crimson-50/70 cursor-pointer transition-colors border-b border-slate-100"
-                        >
-                          <div className="bg-crimson-500 p-1.5 rounded-lg text-white shrink-0"><Search size={14} /></div>
-                          <span className="font-bold text-sm text-crimson-700 truncate">{t?.searchFor || 'Search for'} "{location}"</span>
-                        </div>
-                      )}
-                      {!location && <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-3 pt-1 pb-1">{t?.allAreas || 'All Areas'}</div>}
-                      {location   && <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-3 pt-1 pb-1">{t?.suggestions || 'Suggestions'}</div>}
-                      {suggestions.map((s, idx) => (
-                        <div
-                          key={s.id}
-                          onMouseDown={e => e.preventDefault()}
-                          onClick={() => handleLocationSelect(s.title)}
-                          className={`flex items-center justify-between px-3 py-2.5 cursor-pointer transition-colors ${mobileActiveIndex === idx ? 'bg-crimson-50' : 'hover:bg-slate-50'}`}
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <SuggestionIcon category={s.category} />
-                            <span className="font-bold text-sm text-slate-800 truncate">{s.title}</span>
-                          </div>
-                          <span className="text-[9px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 ml-2">{s.type}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div className="flex gap-2 w-full">
@@ -900,98 +720,27 @@ const HeroSection = () => {
               <div className="flex flex-row items-center w-full bg-white rounded-full border border-slate-100 shadow-[inset_0_1px_3px_rgba(0,0,0,0.02)] p-1">
                 <div className="flex flex-row flex-1 divide-x-2 divide-slate-50">
 
-                  <div
-                    className="flex-[1.4] flex items-center px-4 w-full relative group min-w-0 hover:bg-slate-50/60 rounded-l-full transition-colors"
-                  ref={locationRef}
-                >
+                  <div className="flex-[1.4] flex items-center px-4 w-full relative group min-w-0 hover:bg-slate-50/60 rounded-l-full transition-colors">
                   <div className="bg-crimson-50 p-2.5 rounded-2xl mr-3 shrink-0 shadow-sm border border-crimson-100"><MapPin size={18} className="text-crimson-500" /></div>
-                  <div className="flex flex-col flex-1 text-left min-w-0">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5">{t?.searchLocation || 'Location'}</label>
-                    <input
-                      type="text"
-                      placeholder={currentPlaceholder}
-                      value={location}
-                      onChange={e => { setLocation(e.target.value); setIsLocationOpen(true); setActiveIndex(-1); }}
-                      onFocus={() => setIsLocationOpen(true)}
-                      onKeyDown={handleDesktopKeyDown}
-                      className="bg-transparent border-none outline-none focus:ring-0 font-bold text-sm text-slate-900 placeholder-slate-400 w-full truncate"
-                      autoComplete="off"
-                    />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsLocationModalOpen(true)}
+                    className="flex flex-col flex-1 text-left min-w-0"
+                  >
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5">{t?.searchLocation || 'Location'}</span>
+                    <span className={`font-bold text-sm w-full truncate ${location ? 'text-slate-900' : 'text-slate-400'}`}>
+                      {location || currentPlaceholder}
+                    </span>
+                  </button>
                   {location && (
                     <button
-                      onMouseDown={e => e.preventDefault()}
-                      onClick={() => { setLocation(''); setIsLocationOpen(true); setActiveIndex(-1); }}
+                      type="button"
+                      onClick={() => setLocation('')}
                       className="ml-1 shrink-0 p-1"
+                      aria-label="Clear location"
                     >
                       <X size={12} className="text-slate-400 hover:text-slate-600 transition-colors" />
                     </button>
-                  )}
-
-                  {isLocationOpen && (
-                    <div className="absolute top-[calc(100%+12px)] left-0 w-[340px] bg-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] rounded-2xl z-[300] border border-slate-100 overflow-hidden">
-                      {!location && (
-                        <div className="px-3 pt-3 pb-2 border-b border-slate-50">
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{t?.popularAreas || 'Popular Areas'}</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {popularSearchChips.map(chip => (
-                              <button
-                                key={chip}
-                                onMouseDown={e => e.preventDefault()}
-                                onClick={() => handleLocationSelect(chip + ', Dhaka')}
-                                className="text-[10px] font-bold text-slate-700 bg-slate-100 hover:bg-crimson-50 hover:text-crimson-600 px-2.5 py-1 rounded-full transition-colors border border-transparent hover:border-crimson-200"
-                              >
-                                {chip}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="max-h-[240px] overflow-y-auto overscroll-contain">
-                        {!location && (
-                          <div
-                            onMouseDown={e => e.preventDefault()}
-                            onClick={() => handleLocationSelect(t?.useCurrentLocation || 'Current Location')}
-                            className="flex items-center gap-3 px-3 py-2.5 hover:bg-crimson-50 cursor-pointer transition-colors"
-                          >
-                            <div className="bg-crimson-100 p-1.5 rounded-lg text-crimson-600 shrink-0"><Navigation size={14} /></div>
-                            <span className="font-bold text-sm text-crimson-600">{t?.useCurrentLocation || 'Use current location'}</span>
-                          </div>
-                        )}
-                        {location && (
-                          <div
-                            onMouseDown={e => e.preventDefault()}
-                            onClick={() => { setIsLocationOpen(false); handleSearch(); }}
-                            className="flex items-center gap-3 px-3 py-2.5 bg-crimson-50/70 cursor-pointer transition-colors"
-                          >
-                            <div className="bg-crimson-500 p-1.5 rounded-lg text-white shrink-0"><Search size={14} /></div>
-                            <span className="font-bold text-sm text-crimson-700 truncate">{t?.searchFor || 'Search for'} "{location}"</span>
-                          </div>
-                        )}
-
-                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-3 pt-2 pb-1">
-                          {location ? (t?.matchingSuggestions || 'Matching Suggestions') : (t?.browseAllAreas || 'Browse All Areas')}
-                        </div>
-                        {suggestions.map((s, idx) => (
-                          <div
-                            key={s.id}
-                            onMouseDown={e => e.preventDefault()}
-                            onClick={() => handleLocationSelect(s.title)}
-                            className={`flex items-center justify-between px-3 py-2.5 cursor-pointer transition-colors ${activeIndex === idx ? 'bg-crimson-50' : 'hover:bg-slate-50'}`}
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <SuggestionIcon category={s.category} />
-                              <span className="font-bold text-sm text-slate-800 truncate">{s.title}</span>
-                            </div>
-                            <span className="text-[9px] font-black text-slate-500 bg-slate-100 px-2 py-1 rounded-md uppercase tracking-wider shrink-0 ml-3">{s.type}</span>
-                          </div>
-                        ))}
-                        {location && suggestions.length === 0 && (
-                          <div className="px-4 py-4 text-sm font-bold text-slate-400 text-center">{t?.noPropsFound || 'No results found'}</div>
-                        )}
-                      </div>
-                    </div>
                   )}
                 </div>
 
@@ -1681,6 +1430,16 @@ const HeroSection = () => {
           </div>
         </div>
       )}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* LOCATION SEARCH MODAL (desktop popup + mobile full-screen)      */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <LocationSearchModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        onSelect={(loc) => { setLocation(loc); setIsLocationModalOpen(false); }}
+        initialValue={location}
+        language={language}
+      />
     </>
   );
 };

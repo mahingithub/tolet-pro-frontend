@@ -35,13 +35,13 @@ import {
   POPULAR_AREA_TAGLINES,
   getPropertyTypesFor,
   localizedLabel,
-  filterLocationSuggestions,
   buildSearchUrl,
 } from '../../data/searchData';
 // Live data source — propertyService aggregates backend + user-uploaded
 // properties. There is NO demo data anywhere; if a host hasn't uploaded yet,
 // the feed is empty and we show an empty-state card.
 import { propertyService, subscribeUserProperties, propertyLocationHaystack } from '../../services/Propertyservice';
+import LocationSearchModal from '../shared/LocationSearchModal';
 
 /**
  * MobileHome — TO-LET PRO mobile (md:hidden) home page.
@@ -159,13 +159,6 @@ const PickerSheet = ({ open, title, options, value, onPick, onClose, langKey }) 
       </div>
     </div>
   );
-};
-
-/** Icon for a suggestion row, matching the desktop hero's vocabulary. */
-const SuggestionIcon = ({ category }) => {
-  if (category === 'search') return <TrendingUp size={13} className="text-[#ba0036]" />;
-  if (category === 'city')   return <Building2  size={13} className="text-blue-500" />;
-  return                            <MapPin    size={13} className="text-emerald-500" />;
 };
 
 // ─── SAFE IMAGE ───────────────────────────────────────────────────────────────
@@ -933,39 +926,11 @@ const MobileHome = () => {
     return () => { cancelled = true; unsub && unsub(); };
   }, []);
 
-  // ── Suggestion dropdown ────────────────────────────────────────────────
-  const [isLocOpen, setIsLocOpen] = useState(false);
-  const locInputRef = useRef(null);
-  const locWrapperRef = useRef(null);
-
-  const suggestions = useMemo(
-    () => filterLocationSuggestions(location, {
-      searchAnywhere: t.mobSearchAnywhere,
-      location:       t.mobLocationLabel,
-    }),
-    [location, t.mobSearchAnywhere, t.mobLocationLabel],
-  );
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    const onClick = (e) => {
-      if (locWrapperRef.current && !locWrapperRef.current.contains(e.target)) {
-        setIsLocOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onClick);
-    document.addEventListener('touchstart', onClick);
-    return () => {
-      document.removeEventListener('mousedown', onClick);
-      document.removeEventListener('touchstart', onClick);
-    };
-  }, []);
-
-  const handleSuggestPick = (title) => {
-    setLocation(title);
-    setIsLocOpen(false);
-    locInputRef.current?.blur();
-  };
+  // ── Location search modal ──────────────────────────────────────────────
+  // The full-screen LocationSearchModal replaces the old inline autocomplete
+  // dropdown. It owns the debounced live API search + static-suggestion merge;
+  // we just receive the chosen location string back through onSelect.
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   // ── Bottom-sheets ──────────────────────────────────────────────────────
   const [typeOpen,   setTypeOpen]   = useState(false);
@@ -1080,33 +1045,29 @@ const MobileHome = () => {
             })}
           </div>
 
-          {/* Inline location input with live autocomplete dropdown
-              (matches the desktop hero pattern — same data source, same
-              behaviour). */}
-          <div ref={locWrapperRef} className="relative mb-2">
-            <div className="w-full flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2.5 focus-within:border-[#ba0036]/50 focus-within:ring-2 focus-within:ring-[#ba0036]/10 transition-all">
+          {/* Location trigger — opens the full-screen LocationSearchModal
+              (replaces the old inline autocomplete dropdown). */}
+          <div className="relative mb-2">
+            <div className="w-full flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2.5">
               <span className="w-9 h-9 rounded-xl bg-red-50 text-[#ba0036] flex items-center justify-center shrink-0">
                 <MapPin size={16} strokeWidth={2.5} />
               </span>
-              <div className="flex-1 min-w-0">
-                <label className="block text-[9.5px] font-black text-gray-500 uppercase tracking-widest leading-tight">
+              <button
+                type="button"
+                onClick={() => setIsLocationModalOpen(true)}
+                className="flex-1 min-w-0 text-left"
+              >
+                <span className="block text-[9.5px] font-black text-gray-500 uppercase tracking-widest leading-tight">
                   {t.mobLocationLabel}
-                </label>
-                <input
-                  ref={locInputRef}
-                  value={location}
-                  onChange={(e) => { setLocation(e.target.value); setIsLocOpen(true); }}
-                  onFocus={() => setIsLocOpen(true)}
-                  placeholder={locationPlaceholder}
-                  className="w-full bg-transparent outline-none text-[13px] font-bold text-gray-900 placeholder-gray-400 leading-tight"
-                  type="text"
-                  inputMode="search"
-                  autoComplete="off"
-                />
-              </div>
+                </span>
+                <span className={`block text-[13px] font-bold leading-tight truncate ${location ? 'text-gray-900' : 'text-gray-400'}`}>
+                  {location || locationPlaceholder}
+                </span>
+              </button>
               {location && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); setLocation(''); locInputRef.current?.focus(); }}
+                  type="button"
+                  onClick={() => setLocation('')}
                   aria-label="Clear"
                   className="text-gray-400 active:scale-90 transition-transform shrink-0"
                 >
@@ -1114,50 +1075,6 @@ const MobileHome = () => {
                 </button>
               )}
             </div>
-
-            {/* Autocomplete dropdown */}
-            {isLocOpen && suggestions.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-[0_20px_50px_-20px_rgba(15,23,42,0.35)] border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                {location.trim() && (
-                  <button
-                    onClick={() => { handleSuggestPick(location.trim()); }}
-                    className="w-full flex items-center gap-3 px-3.5 py-3 text-left bg-red-50/60 hover:bg-red-50 active:bg-red-100 transition-colors border-b border-gray-100"
-                  >
-                    <span className="w-8 h-8 rounded-xl bg-[#ba0036] text-white flex items-center justify-center shrink-0">
-                      <Search size={13} strokeWidth={2.6} />
-                    </span>
-                    <span className="text-[13px] font-black text-gray-900 truncate">
-                      {t.mobSearchAnywhere}: “{location.trim()}”
-                    </span>
-                  </button>
-                )}
-                <p className="px-3.5 pt-2 pb-1 text-[9.5px] font-black uppercase tracking-[0.18em] text-gray-400">
-                  {t.mobMatchingSuggestions}
-                </p>
-                <div className="max-h-[55vh] overflow-y-auto">
-                  {suggestions.map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => handleSuggestPick(s.title)}
-                      className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left hover:bg-gray-50 active:bg-gray-100 transition-colors"
-                    >
-                      <span className="w-7 h-7 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
-                        <SuggestionIcon category={s.category} />
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-black text-gray-900 truncate leading-tight">
-                          {s.title}
-                        </p>
-                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest truncate">
-                          {s.type}
-                        </p>
-                      </div>
-                      <ChevronRight size={13} className="text-gray-300 shrink-0" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Type + Budget row */}
@@ -1334,6 +1251,15 @@ const MobileHome = () => {
         onClose={() => setIsCategoryPromptOpen(false)}
         onPickCategory={handleFinalNavigate}
         t={t}
+      />
+
+      {/* Full-screen location search (replaces the old inline dropdown) */}
+      <LocationSearchModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        onSelect={(loc) => { setLocation(loc); setIsLocationModalOpen(false); }}
+        initialValue={location}
+        language={language}
       />
     </div>
   );

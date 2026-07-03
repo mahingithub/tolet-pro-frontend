@@ -402,6 +402,15 @@ const translations = {
     searchProperties: "Search Properties",
     searchFor: "Search for",
 
+    // Location search modal
+    locSearchTitle: "Search location",
+    locSearchPlaceholder: "Search city, area, or property…",
+    locSearchStartTyping: "Start typing an area or city",
+    locSearchStartTypingSub: "Matching locations appear as you type",
+    locSearchNoResults: "No results found",
+    locSearchClose: "Close",
+    locSearchClear: "Clear",
+
     // Trust badges
     verifiedHosts: "Verified Hosts",
     instantBooking: "Instant Booking",
@@ -954,6 +963,15 @@ const translations = {
     applyRange: "রেঞ্জ প্রয়োগ করুন",
     searchProperties: "বাড়ি খুঁজুন",
     searchFor: "খুঁজুন",
+
+    // Location search modal
+    locSearchTitle: "লোকেশন খুঁজুন",
+    locSearchPlaceholder: "শহর, এলাকা বা বাড়ি লিখুন…",
+    locSearchStartTyping: "একটি এলাকা বা শহরের নাম লিখুন",
+    locSearchStartTypingSub: "টাইপ করলেই মিলে যাওয়া লোকেশন দেখা যাবে",
+    locSearchNoResults: "কোনো ফলাফল পাওয়া যায়নি",
+    locSearchClose: "বন্ধ করুন",
+    locSearchClear: "মুছুন",
 
     // Trust badges
     verifiedHosts: "ভেরিফাইড হোস্ট",
