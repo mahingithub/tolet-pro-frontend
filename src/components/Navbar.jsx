@@ -888,15 +888,22 @@ useEffect(() => {
               </button>
             </div>
           ) : (
-            <div className="bg-white px-1 pt-2 pb-6 border-b border-gray-100 flex gap-3">
-              <button onClick={() => { navigate('/login'); setIsMobileMenuOpen(false); }}
-                className="flex-1 bg-white text-[#ba0036] border border-[#ba0036] py-3 rounded-xl font-bold text-sm active:scale-95 transition-transform">
-                Log In
-              </button>
-              <button onClick={() => { navigate('/login', { state: { isLoginMode: false } }); setIsMobileMenuOpen(false); }}
-                className="flex-1 bg-white text-gray-700 border border-gray-200 py-3 rounded-xl font-bold text-sm active:scale-95 transition-transform hover:border-gray-300">
-                Sign Up
-              </button>
+            <div className="bg-gradient-to-br from-[#ba0036] to-[#e60045] p-6 rounded-[1.75rem] shadow-[0_10px_30px_rgba(186,0,54,0.3)] text-white relative overflow-hidden">
+              <div className="absolute -top-8 -right-8 w-28 h-28 bg-white/10 rounded-full blur-3xl" />
+              <UserCircle size={44} className="mx-auto mb-3 opacity-90 block text-center" />
+              <h3 className="text-xl font-black mb-1 text-center">Join TO-LET PRO</h3>
+              <p className="text-xs font-medium text-red-100 mb-5 text-center leading-relaxed">Dashboards, saved searches, alerts & more</p>
+              
+              <div className="flex gap-3">
+                <button onClick={() => { navigate('/login'); setIsMobileMenuOpen(false); }}
+                  className="flex-1 bg-white text-[#ba0036] py-3 rounded-xl font-black text-sm shadow-lg active:scale-95 transition-transform">
+                  Log In
+                </button>
+                <button onClick={() => { navigate('/login', { state: { isLoginMode: false } }); setIsMobileMenuOpen(false); }}
+                  className="flex-1 bg-white/20 backdrop-blur-md text-white border border-white/30 py-3 rounded-xl font-black text-sm active:scale-95 transition-transform">
+                  Sign Up
+                </button>
+              </div>
             </div>
           )}
 
