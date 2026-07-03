@@ -32,7 +32,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, MapPin, X, TrendingUp, Building2, ArrowLeft } from 'lucide-react';
-import { ALL_SUGGESTIONS, POPULAR_AREAS } from '../../data/searchData';
+import { POPULAR_AREAS } from '../../data/searchData';
+import { searchBdLocations } from '../../data/bdLocations';
 import { useLanguage } from '../../context/LanguageContext';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -49,10 +50,10 @@ const LocationSearchModal = ({
   onClose,
   onSelect,
   initialValue = '',
-  // eslint-disable-next-line no-unused-vars
   language = 'English',
 }) => {
   const { t } = useLanguage() || {};
+  const isBn = language === 'বাংলা';
 
   const [query, setQuery]                     = useState(initialValue || '');
   const [liveSuggestions, setLiveSuggestions] = useState([]);
@@ -76,6 +77,7 @@ const LocationSearchModal = ({
     close:          t?.locSearchClose           || 'Close',
     clear:          t?.locSearchClear           || 'Clear',
     popularAreas:   t?.popularAreas             || 'Popular Areas',
+    listings:       isBn ? 'লিস্টিং আছে'         : 'Has listings',
   };
 
   // ── Sync input with initialValue + auto-focus whenever the modal opens ──
@@ -124,30 +126,35 @@ const LocationSearchModal = ({
     return () => clearTimeout(timer);
   }, [query, isOpen]);
 
-  // ── Merge static + live suggestions — identical to the desktop hero's
-  //    previous `filteredSuggestions`, minus the empty-query fallback (we
-  //    intentionally show nothing until the user types). ──────────────────
+  // ── Build the result list — areas that ACTUALLY have listings (live API)
+  //    first, then the comprehensive Bangladesh location index so ANY area in
+  //    the country is reachable (Uber-style), shown line by line. ───────────
   const buildSuggestions = useCallback((properties = []) => {
     const raw = query.trim();
     if (!raw) return []; // No recent searches — only show suggestions after typing.
 
     const q = raw.toLowerCase();
-    const staticMatches = ALL_SUGGESTIONS.filter(s => s.title.toLowerCase().includes(q));
+    const merged = [];
+    const seen = new Set();
+    const pushUnique = (row) => {
+      const key = (row.title || '').trim().toLowerCase();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      merged.push(row);
+    };
 
-    const propMatches = properties.flatMap(p => {
-      const entries = [];
+    // 1) Live listings — the areas hosts have actually posted in, matched by the
+    //    backend. Tagged so the user sees where properties exist right now.
+    for (const p of properties) {
       if (p?.location && p.location.toLowerCase().includes(q))
-        entries.push({ id: `ploc-${p.id}`,   title: p.location, type: 'Property Area', category: 'area' });
+        pushUnique({ id: `live-loc-${p.id}`, title: p.location, type: L.listings, category: 'area' });
       if (p?.area && p.area.toLowerCase().includes(q))
-        entries.push({ id: `parea-${p.id}`,  title: p.area,     type: 'Area',          category: 'area' });
-      if (p?.title && p.title.toLowerCase().includes(q))
-        entries.push({ id: `ptitle-${p.id}`, title: p.title,    type: 'Property',      category: 'search' });
-      return entries;
-    });
+        pushUnique({ id: `live-area-${p.id}`, title: p.area, type: L.listings, category: 'area' });
+    }
 
-    const merged = [...staticMatches, ...propMatches].filter(
-      (s, i, arr) => arr.findIndex(x => x.title.toLowerCase() === s.title.toLowerCase()) === i
-    );
+    // 2) Full Bangladesh location index (every division/district + exhaustive
+    //    Dhaka areas), bilingual + ranked.
+    for (const g of searchBdLocations(raw, { limit: 25, isBn })) pushUnique(g);
 
     if (merged.length === 0) {
       return [
@@ -155,8 +162,8 @@ const LocationSearchModal = ({
         { id: `dynamic-bd-${q}`, title: `${raw}, Bangladesh`, type: L.location,       category: 'city'   },
       ];
     }
-    return merged.slice(0, 9);
-  }, [query, L.searchAnywhere, L.location]);
+    return merged.slice(0, 30);
+  }, [query, isBn, L.listings, L.searchAnywhere, L.location]);
 
   const suggestions = buildSuggestions(liveSuggestions);
 
