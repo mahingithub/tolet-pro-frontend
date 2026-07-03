@@ -76,45 +76,35 @@ const allSuggestions = [
 ];
 
 const exploreLinks = [
-  { Icon: Home,          color: 'text-[#ba0036]', bg: 'bg-red-50',      label: 'Home',            path: '/' },
-  { Icon: Search,        color: 'text-blue-500',  bg: 'bg-blue-50',     label: 'All Properties',  path: '/properties/all' },
-  { Icon: PlusCircle,    color: 'text-[#ba0036]', bg: 'bg-red-50',      label: 'List a Property', path: '/list-property', protected: true },
+  { Icon: Search,        color: 'text-gray-700', bg: 'bg-transparent',     label: 'Search Properties',  path: '/properties/all' },
+  { Icon: PlusCircle,    color: 'text-gray-700', bg: 'bg-transparent',      label: 'List a Property', path: '/list-property', protected: true },
 ];
 const toolLinks = [
-  { Icon: Sparkles,      color: 'text-[#ba0036]', bg: 'bg-red-50',      label: 'AI Insights',      path: '/ai-insights',  badge: 'NEW' },
-  { Icon: Bell,          color: 'text-amber-500', bg: 'bg-amber-50',    label: 'Smart Alerts',     path: '/smart-alerts' },
-  { Icon: MessageSquare, color: 'text-blue-500',  bg: 'bg-blue-50',     label: 'Chat & Inquiries', path: '/inquiry' },
-  { Icon: BarChart2,     color: 'text-violet-500',bg: 'bg-violet-50',   label: 'Market Insights',  path: '/ai-insights' },
+  { Icon: MessageSquare, color: 'text-gray-700',  bg: 'bg-transparent',     label: 'Messages', path: '/inquiry' },
+  { Icon: Bell,          color: 'text-gray-700', bg: 'bg-transparent',    label: 'Saved Alerts',     path: '/smart-alerts' },
+  { Icon: BarChart2,     color: 'text-gray-700',bg: 'bg-transparent',   label: 'Market Insights',  path: '/ai-insights' },
 ];
 const tenantLinks = [
-  { Icon: LayoutDashboard, color: 'text-blue-600',  bg: 'bg-blue-50',   label: 'Tenant Dashboard',  path: '/tenant-dashboard' },
-  { Icon: Heart,           color: 'text-rose-500',  bg: 'bg-rose-50',   label: 'Saved Properties',  path: '/saved-properties' },
-  { Icon: MessageSquare,   color: 'text-blue-500',  bg: 'bg-blue-50',   label: 'My Inquiries',      path: '/inquiry' },
-  { Icon: Bell,            color: 'text-amber-500', bg: 'bg-amber-50',  label: 'My Alerts',         path: '/smart-alerts' },
+  { Icon: LayoutDashboard, color: 'text-gray-700',  bg: 'bg-transparent',   label: 'Tenant Dashboard',  path: '/tenant-dashboard' },
+  { Icon: Heart,           color: 'text-gray-700',  bg: 'bg-transparent',   label: 'Saved Properties',  path: '/saved-properties' },
+  { Icon: MessageSquare,   color: 'text-gray-700',  bg: 'bg-transparent',   label: 'My Inquiries',      path: '/inquiry' },
+  { Icon: Bell,            color: 'text-gray-700', bg: 'bg-transparent',  label: 'My Alerts',         path: '/smart-alerts' },
 ];
 const hostLinks = [
-  { Icon: LayoutDashboard, color: 'text-[#ba0036]',  bg: 'bg-red-50',    label: 'Host Dashboard',    path: '/host-dashboard' },
-  { Icon: PlusCircle,      color: 'text-emerald-600', bg: 'bg-emerald-50',label: 'Add Property',      path: '/list-property' },
-  { Icon: BarChart2,       color: 'text-violet-500',  bg: 'bg-violet-50', label: 'Listing Analytics', path: '/ai-insights' },
-  { Icon: MessageSquare,   color: 'text-blue-500',    bg: 'bg-blue-50',   label: 'Tenant Messages',   path: '/inquiry' },
+  { Icon: LayoutDashboard, color: 'text-gray-700',  bg: 'bg-transparent',    label: 'Host Dashboard',    path: '/host-dashboard' },
+  { Icon: PlusCircle,      color: 'text-gray-700', bg: 'bg-transparent',label: 'Add Property',      path: '/list-property' },
+  { Icon: BarChart2,       color: 'text-gray-700',  bg: 'bg-transparent', label: 'Listing Analytics', path: '/ai-insights' },
+  { Icon: MessageSquare,   color: 'text-gray-700',    bg: 'bg-transparent',   label: 'Tenant Messages',   path: '/inquiry' },
 ];
 
-// Mobile-only "Footer" rows mirrored from the Canva mockup so the drawer feels
-// like a complete app shell rather than a half-baked menu. These reuse the
-// same Row component (icon + label + chevron). Routes fall back to the
-// homepage where target pages don't exist yet — the drawer still feels complete.
 const footerLinks = [
-  { Icon: FileText,  color: 'text-gray-600',   bg: 'bg-gray-100',    label: 'Guest policy', path: '/' },
-  { Icon: Phone,     color: 'text-emerald-600',bg: 'bg-emerald-50',  label: 'Call us',      path: '/' },
-  { Icon: BookOpen,  color: 'text-blue-500',   bg: 'bg-blue-50',     label: 'Our story',    path: '/' },
-  { Icon: PenLine,   color: 'text-violet-500', bg: 'bg-violet-50',   label: 'Blogs',        path: '/' },
-  { Icon: HelpCircle,color: 'text-amber-600',  bg: 'bg-amber-50',    label: 'FAQs',         path: '/' },
+  { Icon: LifeBuoy,      color: 'text-gray-700', bg: 'bg-transparent',    label: 'Help & Support',         path: '/' },
+  { Icon: Globe,         color: 'text-gray-700', bg: 'bg-transparent',    label: 'Language',               path: '/', isLanguage: true },
+  { Icon: FileText,      color: 'text-gray-400', bg: 'bg-transparent',    label: 'Terms & Policies',       path: '/' },
 ];
 
-// Bottom "Settings" pair the user expects at the very end of every drawer.
 const settingsLinks = [
-  { Icon: SettingsIcon, color: 'text-gray-700', bg: 'bg-gray-100',  label: 'Account Settings', path: '/' },
-  { Icon: LifeBuoy,     color: 'text-[#ba0036]',bg: 'bg-red-50',    label: 'Help & Support',   path: '/' },
+  { Icon: SettingsIcon, color: 'text-gray-700', bg: 'bg-transparent',  label: 'Account Settings', path: '/' },
 ];
 
 const Navbar = () => {
@@ -569,7 +559,7 @@ useEffect(() => {
                   const slug = navLoc.trim() ? navLoc.trim().toLowerCase().replace(/,?\s+/g, '-') : 'all';
                   navigate(`/properties/${slug}?category=${navType.id}`);
                 }}
-                className="shrink-0 m-1.5 bg-[#ba0036] hover:bg-[#a0002d] text-white px-5 py-2 rounded-full font-black text-xs flex items-center gap-1.5 transition-all active:scale-95 whitespace-nowrap shadow-[0_6px_18px_rgba(186,0,54,0.3)] border-none"
+                className="shrink-0 m-1.5 bg-[#ba0036] hover:bg-[#a0002d] text-white px-5 py-2 rounded-full font-black text-xs flex items-center gap-1.5 transition-all active:scale-95 whitespace-nowrap border-none"
               >
                 <Search size={13} /> Search
               </button>
@@ -584,16 +574,6 @@ useEffect(() => {
             {/* List Property Desktop Button (Always Visible) */}
             <button
               onClick={() => handleProtected('/list-property')}
-              className="group relative flex items-center gap-2.5 overflow-hidden rounded-full pl-1.5 pr-4 py-1.5 font-black text-xs whitespace-nowrap text-white transition-all duration-300 active:scale-95 shadow-[0_6px_20px_-4px_rgba(186,0,54,0.5)] hover:shadow-[0_12px_30px_-6px_rgba(186,0,54,0.65)] hover:-translate-y-0.5"
-              style={{ background: 'linear-gradient(135deg,#e8004e 0%,#ba0036 100%)' }}
-            >
-              {/* brighten on hover */}
-              <span className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{ background: 'linear-gradient(135deg,#ff2168 0%,#cc003c 100%)' }} />
-              {/* top gloss highlight for depth */}
-              <span className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent" />
-              {/* subtle shine sweep on hover */}
-              <span className="pointer-events-none absolute -inset-y-3 -left-12 w-10 -skew-x-12 bg-white/25 blur-md transition-all duration-700 ease-out group-hover:left-[115%]" />
-              <span className="relative z-10 flex items-center gap-2.5">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/30 shrink-0 transition-all duration-300 group-hover:bg-white/30 group-hover:scale-105">
                   <PlusCircle size={15} className="text-white" strokeWidth={2.5} />
                 </span>
@@ -688,7 +668,7 @@ useEffect(() => {
                   )}
                 </>
               ) : (
-                <Link to="/login" className="bg-[#ba0036] text-white px-5 py-2 rounded-xl font-bold text-xs lg:text-sm shadow-[0_8px_20px_rgba(186,0,54,0.25)] hover:bg-[#a0002d] hover:shadow-[0_10px_25px_rgba(186,0,54,0.35)] transition-all active:scale-95 flex items-center gap-2 border-none">
+                <Link to="/login" className="text-gray-700 hover:text-[#ba0036] bg-transparent border border-gray-200 hover:border-[#ba0036] px-5 py-2 rounded-xl font-bold text-xs lg:text-sm transition-all active:scale-95 flex items-center gap-2">
                 <User size={16} /> {t?.login || 'Login / Signup'}
               </Link>
               )}
@@ -909,22 +889,15 @@ useEffect(() => {
               </button>
             </div>
           ) : (
-            <div className="bg-gradient-to-br from-[#ba0036] to-[#e60045] p-6 rounded-[1.75rem] shadow-[0_10px_30px_rgba(186,0,54,0.3)] text-white relative overflow-hidden">
-              <div className="absolute -top-8 -right-8 w-28 h-28 bg-white/10 rounded-full blur-3xl" />
-              <UserCircle size={44} className="mx-auto mb-3 opacity-90 block text-center" />
-              <h3 className="text-xl font-black mb-1 text-center">Join TO-LET PRO</h3>
-              <p className="text-xs font-medium text-red-100 mb-5 text-center leading-relaxed">Dashboards, saved searches, alerts & more</p>
-              
-              <div className="flex gap-3">
-                <button onClick={() => { navigate('/login'); setIsMobileMenuOpen(false); }}
-                  className="flex-1 bg-white text-[#ba0036] py-3 rounded-xl font-black text-sm shadow-lg active:scale-95 transition-transform">
-                  Log In
-                </button>
-                <button onClick={() => { navigate('/login', { state: { isLoginMode: false } }); setIsMobileMenuOpen(false); }}
-                  className="flex-1 bg-white/20 backdrop-blur-md text-white border border-white/30 py-3 rounded-xl font-black text-sm active:scale-95 transition-transform">
-                  Sign Up
-                </button>
-              </div>
+            <div className="bg-white px-1 pt-2 pb-6 border-b border-gray-100 flex gap-3">
+              <button onClick={() => { navigate('/login'); setIsMobileMenuOpen(false); }}
+                className="flex-1 bg-white text-[#ba0036] border border-[#ba0036] py-3 rounded-xl font-bold text-sm active:scale-95 transition-transform">
+                Log In
+              </button>
+              <button onClick={() => { navigate('/login', { state: { isLoginMode: false } }); setIsMobileMenuOpen(false); }}
+                className="flex-1 bg-white text-gray-700 border border-gray-200 py-3 rounded-xl font-bold text-sm active:scale-95 transition-transform hover:border-gray-300">
+                Sign Up
+              </button>
             </div>
           )}
 
