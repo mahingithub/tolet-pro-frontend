@@ -17,6 +17,7 @@ import {
   broadcast, subscribe as subscribeKey,
 } from './_storage.js';
 import { getCurrentUser } from './authService.js';
+import { locationQueryMatches } from '../data/locationAliases';
 
 // ─── API CONFIG ───────────────────────────────────────────────────────────────
 const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -174,10 +175,14 @@ export function applyFilters(properties, filters) {
   } = filters;
 
   const needle = (searchArea || '').trim().toLowerCase();
+  const nearMe = (nearMeLabel || '').toLowerCase();
   return properties.filter(prop => {
     if (activeDivision !== "all" && prop.division !== activeDivision) return false;
-    if (needle && needle !== (nearMeLabel || '').toLowerCase() &&
-        !propertyLocationHaystack(prop).includes(needle)) return false;
+    // Bilingual, per-token location match (English↔Bengali) — mirrors the
+    // backend so the client-side fallback finds a Bengali-stored listing for
+    // an English query and vice-versa.
+    if (needle && needle !== nearMe &&
+        !locationQueryMatches(propertyLocationHaystack(prop), needle)) return false;
     if (intent && prop.intent !== intent) return false;
     if (prop.price < minPrice || prop.price > maxPrice) return false;
     if (selectedTypes.length > 0 && !selectedTypes.includes(prop.type)) return false;

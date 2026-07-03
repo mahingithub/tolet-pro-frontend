@@ -42,6 +42,7 @@ import {
 // the feed is empty and we show an empty-state card.
 import { propertyService, subscribeUserProperties, propertyLocationHaystack } from '../../services/Propertyservice';
 import LocationSearchModal from '../shared/LocationSearchModal';
+import { locationQueryMatches } from '../../data/locationAliases';
 
 /**
  * MobileHome — TO-LET PRO mobile (md:hidden) home page.
@@ -990,10 +991,11 @@ const MobileHome = () => {
       .map((p) => ({ ...p, _daysAgo: computeDaysAgo(p.date || p.createdAt) }))
       .filter((p) => {
         if (!needle) return true;
-        // Match against every location-ish field — address line, area
-        // dropdown, district, division, GPS address, title — so Dhanmondi
-        // uploads picked from dropdowns surface when the tile is tapped.
-        return propertyLocationHaystack(p).includes(needle);
+        // Bilingual (English↔Bengali) match against every location-ish field —
+        // address line, area dropdown, district, division, GPS address, title —
+        // so tapping an English area tile (e.g. "Dhanmondi") also surfaces
+        // listings whose location was stored in Bengali.
+        return locationQueryMatches(propertyLocationHaystack(p), needle);
       })
       .sort((a, b) => a._daysAgo - b._daysAgo);
   }, [properties, activeArea]);
