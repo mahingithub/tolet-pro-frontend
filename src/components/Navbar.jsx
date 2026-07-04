@@ -76,20 +76,20 @@ const allSuggestions = [
 ];
 
 const exploreLinks = [
-  { Icon: Search,        color: 'text-gray-700', bg: 'bg-transparent',     label: 'Search Properties',  path: '/properties/all' },
-  { Icon: PlusCircle,    color: 'text-gray-700', bg: 'bg-transparent',      label: 'List a Property', path: '/list-property', protected: true },
+  { Icon: Search,        color: 'text-gray-700', bg: 'bg-transparent',     label: 'Search Properties',  tKey: 'menuSearchProperties', path: '/properties/all' },
+  { Icon: PlusCircle,    color: 'text-gray-700', bg: 'bg-transparent',      label: 'List a Property', tKey: 'menuListProperty', path: '/list-property', protected: true },
 ];
 const tenantLinks = [
-  { Icon: LayoutDashboard, color: 'text-gray-700',  bg: 'bg-transparent',   label: 'Tenant Dashboard',  path: '/tenant-dashboard' },
-  { Icon: Heart,           color: 'text-gray-700',  bg: 'bg-transparent',   label: 'Saved Properties',  path: '/saved-properties' },
-  { Icon: MessageSquare,   color: 'text-gray-700',  bg: 'bg-transparent',   label: 'My Inquiries',      path: '/inquiry' },
-  { Icon: Bell,            color: 'text-gray-700', bg: 'bg-transparent',  label: 'My Alerts',         path: '/smart-alerts' },
+  { Icon: LayoutDashboard, color: 'text-gray-700',  bg: 'bg-transparent',   label: 'Tenant Dashboard',  tKey: 'menuTenantDashboard', path: '/tenant-dashboard' },
+  { Icon: Heart,           color: 'text-gray-700',  bg: 'bg-transparent',   label: 'Saved Properties',  tKey: 'menuSavedProperties', path: '/saved-properties' },
+  { Icon: MessageSquare,   color: 'text-gray-700',  bg: 'bg-transparent',   label: 'My Inquiries',      tKey: 'menuMyInquiries', path: '/inquiry' },
+  { Icon: Bell,            color: 'text-gray-700', bg: 'bg-transparent',  label: 'My Alerts',         tKey: 'menuMyAlerts', path: '/smart-alerts' },
 ];
 const hostLinks = [
-  { Icon: LayoutDashboard, color: 'text-gray-700',  bg: 'bg-transparent',    label: 'Host Dashboard',    path: '/host-dashboard' },
-  { Icon: PlusCircle,      color: 'text-gray-700', bg: 'bg-transparent',label: 'Add Property',      path: '/list-property' },
-  { Icon: BarChart2,       color: 'text-gray-700',  bg: 'bg-transparent', label: 'Listing Analytics', path: '/ai-insights' },
-  { Icon: MessageSquare,   color: 'text-gray-700',    bg: 'bg-transparent',   label: 'Tenant Messages',   path: '/inquiry' },
+  { Icon: LayoutDashboard, color: 'text-gray-700',  bg: 'bg-transparent',    label: 'Host Dashboard',    tKey: 'menuHostDashboard', path: '/host-dashboard' },
+  { Icon: PlusCircle,      color: 'text-gray-700', bg: 'bg-transparent',label: 'Add Property',      tKey: 'menuAddProperty', path: '/list-property' },
+  { Icon: BarChart2,       color: 'text-gray-700',  bg: 'bg-transparent', label: 'Listing Analytics', tKey: 'menuListingAnalytics', path: '/ai-insights' },
+  { Icon: MessageSquare,   color: 'text-gray-700',    bg: 'bg-transparent',   label: 'Tenant Messages',   tKey: 'menuTenantMessages', path: '/inquiry' },
 ];
 
 const footerLinks = [
@@ -887,17 +887,17 @@ useEffect(() => {
               <div className="absolute -top-8 -right-8 w-28 h-28 bg-white/10 rounded-full blur-3xl" />
               <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full blur-2xl" />
               <UserCircle size={44} className="mx-auto mb-3 opacity-90 block text-center" />
-              <h3 className="text-xl font-black mb-1 text-center">Join TO-LET PRO</h3>
-              <p className="text-xs font-medium text-red-100 mb-5 text-center leading-relaxed">Dashboards, saved searches, alerts & more</p>
+              <h3 className="text-xl font-black mb-1 text-center">{t.menuJoinTitle || 'Join TO-LET PRO'}</h3>
+              <p className="text-xs font-medium text-red-100 mb-5 text-center leading-relaxed">{t.menuJoinSubtitle || 'Dashboards, saved searches, alerts & more'}</p>
 
               <div className="flex gap-3">
                 <button onClick={() => { navigate('/login'); closeAll(); }}
                   className="flex-1 bg-white text-[#ba0036] py-3 rounded-xl font-black text-sm shadow-lg active:scale-95 transition-transform">
-                  Log In
+                  {t.menuLogIn || 'Log In'}
                 </button>
                 <button onClick={() => { navigate('/login', { state: { isLoginMode: false } }); closeAll(); }}
                   className="flex-1 bg-white/20 backdrop-blur-md text-white border border-white/30 py-3 rounded-xl font-black text-sm active:scale-95 transition-transform">
-                  Sign Up
+                  {t.menuSignUp || 'Sign Up'}
                 </button>
               </div>
             </div>
@@ -918,14 +918,14 @@ useEffect(() => {
               </div>
               <div className="flex-1 min-w-0 text-left">
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/75 leading-none mb-1">
-                  {userRole === 'landlord' ? 'Host mode active' : 'Tenant mode active'}
+                  {userRole === 'landlord' ? (t.menuHostModeActive || 'Host mode active') : (t.menuTenantModeActive || 'Tenant mode active')}
                 </p>
                 <p className="text-[15px] font-black leading-tight">
-                  Switch to {userRole === 'tenant' ? 'Host' : 'Tenant'}
+                  {userRole === 'tenant' ? (t.menuSwitchToHost || 'Switch to Host') : (t.menuSwitchToTenant || 'Switch to Tenant')}
                 </p>
               </div>
               <span className="flex items-center gap-0.5 text-[11px] font-black bg-white/20 pl-3 pr-2 py-1.5 rounded-full shrink-0">
-                {userRole === 'tenant' ? 'Host' : 'Tenant'}
+                {userRole === 'tenant' ? (t.menuRoleHost || 'Host') : (t.menuRoleTenant || 'Tenant')}
                 <ChevronRight size={14} className="group-active:translate-x-0.5 transition-transform" />
               </span>
             </button>
@@ -941,7 +941,7 @@ useEffect(() => {
                   className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors"
                 >
                   <item.Icon size={20} className="text-gray-600 shrink-0" />
-                  <span className="text-[15px] font-semibold text-gray-900">{item.label}</span>
+                  <span className="text-[15px] font-semibold text-gray-900">{t[item.tKey] || item.label}</span>
                 </button>
               ))}
             </div>
@@ -962,7 +962,7 @@ useEffect(() => {
                 className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors"
               >
                 <item.Icon size={20} className="text-gray-600 shrink-0" />
-                <span className="text-[15px] font-semibold text-gray-900">{item.label}</span>
+                <span className="text-[15px] font-semibold text-gray-900">{t[item.tKey] || item.label}</span>
               </button>
             ))}
           </div>
@@ -974,27 +974,30 @@ useEffect(() => {
               className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors"
             >
               <LifeBuoy size={20} className="text-gray-600 shrink-0" />
-              <span className="text-[15px] font-semibold text-gray-900">Help & Support</span>
+              <span className="text-[15px] font-semibold text-gray-900">{t.menuHelpSupport || 'Help & Support'}</span>
             </button>
             <button
               onClick={() => go('/terms')}
               className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors"
             >
               <FileText size={20} className="text-gray-600 shrink-0" />
-              <span className="text-[15px] font-semibold text-gray-900">Terms & Policies</span>
+              <span className="text-[15px] font-semibold text-gray-900">{t.menuTermsPolicies || 'Terms & Policies'}</span>
             </button>
           </div>
 
-          {/* ─── Language selector ─── */}
+          {/* ─── Language selector ───
+              No closeAll() on select: keeping the drawer open lets the user
+              SEE the whole menu flip language instantly (the previous version
+              closed the drawer before any change was visible). */}
           <div className="py-4 border-b border-gray-100">
             <div className="flex items-center gap-4 px-1 mb-3">
               <Globe size={20} className="text-gray-600 shrink-0" />
-              <span className="text-[15px] font-semibold text-gray-900">Language</span>
+              <span className="text-[15px] font-semibold text-gray-900">{t.menuLanguageLabel || 'Language'}</span>
             </div>
             <div className="flex gap-2 px-1">
               {languages.map(lang => (
                 <button key={lang.code}
-                  onClick={() => { if (setLanguage) setLanguage(lang.name); closeAll(); }}
+                  onClick={() => { if (setLanguage) setLanguage(lang.name); }}
                   className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all border ${language === lang.name ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}>
                   {lang.name}
                 </button>
@@ -1008,7 +1011,7 @@ useEffect(() => {
               <button onClick={async () => { await handleLogout(); closeAll(); }}
                 className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-red-50 rounded-xl transition-colors">
                 <LogOut size={20} className="text-gray-500 shrink-0" />
-                <span className="text-[15px] font-semibold text-gray-500">Log out</span>
+                <span className="text-[15px] font-semibold text-gray-500">{t.menuLogOut || 'Log out'}</span>
               </button>
             </div>
           )}
