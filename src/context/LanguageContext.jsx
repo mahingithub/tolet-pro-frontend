@@ -55,6 +55,9 @@ const translations = {
     menuTermsPolicies: "Terms & Policies",
     menuLanguageLabel: "Language",
     menuLogOut: "Log out",
+    menuSectionAccount: "My Account",
+    menuSectionExplore: "Explore",
+    menuSectionSupport: "Support",
 
     // Hero Section
     heroTagline: "Bangladesh's #1 Property Platform",
@@ -625,8 +628,8 @@ const translations = {
     menuAddProperty: "বাড়ি যোগ করুন",
     menuListingAnalytics: "লিস্টিং অ্যানালিটিক্স",
     menuTenantMessages: "ভাড়াটিয়ার বার্তা",
-    menuSearchProperties: "বাড়ি খুঁজুন",
-    menuListProperty: "বাড়ি দিন",
+    menuSearchProperties: "বাসা খুঁজুন",
+    menuListProperty: "বাসা যোগ করুন",
     menuSwitchToHost: "বাড়িত্তয়ালা মোডে যান",
     menuSwitchToTenant: "ভাড়াটিয়া মোডে যান",
     menuHostModeActive: "হোস্ট মোড চালু",
@@ -637,6 +640,9 @@ const translations = {
     menuTermsPolicies: "শর্তাবলী ও নীতিমালা",
     menuLanguageLabel: "ভাষা",
     menuLogOut: "লগ আউট",
+    menuSectionAccount: "আমার অ্যাকাউন্ট",
+    menuSectionExplore: "অন্বেষণ",
+    menuSectionSupport: "সহায়তা",
 
     // Hero Section
     heroTagline: "বাংলাদেশের ১নং বাড়ি প্ল্যাটফর্ম",

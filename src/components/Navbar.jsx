@@ -81,15 +81,15 @@ const exploreLinks = [
 ];
 const tenantLinks = [
   { Icon: LayoutDashboard, color: 'text-gray-700',  bg: 'bg-transparent',   label: 'Tenant Dashboard',  tKey: 'menuTenantDashboard', path: '/tenant-dashboard' },
-  { Icon: Heart,           color: 'text-gray-700',  bg: 'bg-transparent',   label: 'Saved Properties',  tKey: 'menuSavedProperties', path: '/saved-properties' },
-  { Icon: MessageSquare,   color: 'text-gray-700',  bg: 'bg-transparent',   label: 'My Inquiries',      tKey: 'menuMyInquiries', path: '/inquiry' },
+  { Icon: Heart,           color: 'text-gray-700',  bg: 'bg-transparent',   label: 'Saved Properties',  tKey: 'menuSavedProperties', path: '/tenant-dashboard?tab=saved' },
+  { Icon: MessageSquare,   color: 'text-gray-700',  bg: 'bg-transparent',   label: 'My Inquiries',      tKey: 'menuMyInquiries', path: '/tenant-dashboard?tab=applications' },
   { Icon: Bell,            color: 'text-gray-700', bg: 'bg-transparent',  label: 'My Alerts',         tKey: 'menuMyAlerts', path: '/smart-alerts' },
 ];
 const hostLinks = [
   { Icon: LayoutDashboard, color: 'text-gray-700',  bg: 'bg-transparent',    label: 'Host Dashboard',    tKey: 'menuHostDashboard', path: '/host-dashboard' },
   { Icon: PlusCircle,      color: 'text-gray-700', bg: 'bg-transparent',label: 'Add Property',      tKey: 'menuAddProperty', path: '/list-property' },
   { Icon: BarChart2,       color: 'text-gray-700',  bg: 'bg-transparent', label: 'Listing Analytics', tKey: 'menuListingAnalytics', path: '/ai-insights' },
-  { Icon: MessageSquare,   color: 'text-gray-700',    bg: 'bg-transparent',   label: 'Tenant Messages',   tKey: 'menuTenantMessages', path: '/inquiry' },
+  { Icon: MessageSquare,   color: 'text-gray-700',    bg: 'bg-transparent',   label: 'Tenant Messages',   tKey: 'menuTenantMessages', path: '/messages' },
 ];
 
 const footerLinks = [
@@ -636,8 +636,8 @@ useEffect(() => {
                       ) : (
                         <>
                           <Link to="/tenant-dashboard" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><LayoutDashboard size={17} /> Tenant Dashboard</Link>
-                          <Link to="/saved-properties" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><Heart size={17} /> Saved Properties</Link>
-                          <Link to="/inquiry" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><MessageSquare size={17} /> My Inquiries</Link>
+                          <Link to="/tenant-dashboard?tab=saved" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><Heart size={17} /> Saved Properties</Link>
+                          <Link to="/tenant-dashboard?tab=applications" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><MessageSquare size={17} /> My Inquiries</Link>
                         </>
                       )}
 
@@ -840,13 +840,17 @@ useEffect(() => {
       )}
 
       {/* MOBILE DRAWER */}
-      <div className={`md:hidden fixed inset-x-0 top-0 bg-white h-[100dvh] z-[65] overflow-y-auto overscroll-contain shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="flex flex-col px-5 pt-4 pb-28">
-          {/* Close button — right-aligned, no "Menu" text */}
-          <div className="flex items-center justify-end mb-4">
+      <div className={`md:hidden fixed inset-x-0 top-0 bg-gray-50 h-[100dvh] z-[65] overflow-y-auto overscroll-contain shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className="flex flex-col px-4 pt-4 pb-28">
+          {/* Header — brand + close */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#ba0036] to-[#e60045] flex items-center justify-center text-white font-black text-sm shadow-sm">T</div>
+              <span className="text-base font-black text-gray-900 tracking-tight">TO-LET <span className="text-[#ba0036]">PRO</span></span>
+            </div>
             <button
               onClick={closeAll}
-              className="p-2 rounded-full bg-gray-100 hover:bg-red-50 text-gray-500 hover:text-[#ba0036] transition-all active:scale-90"
+              className="p-2 rounded-full bg-white border border-gray-100 text-gray-500 hover:text-[#ba0036] hover:border-red-100 transition-all active:scale-90"
               aria-label="Close menu"
             >
               <X size={18} />
@@ -854,15 +858,15 @@ useEffect(() => {
           </div>
 
           {isLoggedIn ? (
-            /* ─── LOGGED-IN: Clean flat profile row ─── */
-            <div
+            /* ─── LOGGED-IN: Profile card ─── */
+            <button
               onClick={() => {
                 navigate(userRole === 'landlord' ? '/host-dashboard' : '/tenant-dashboard');
                 closeAll();
               }}
-              className="flex items-center gap-4 pb-5 mb-2 border-b border-gray-100 cursor-pointer active:opacity-80 transition-opacity"
+              className="group flex items-center gap-3.5 w-full bg-white border border-gray-100 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-3.5 mb-4 text-left active:scale-[0.99] transition-transform"
             >
-              <div className={`w-14 h-14 rounded-full overflow-hidden flex items-center justify-center text-white font-black text-lg shrink-0 ${userRole === 'landlord' ? 'bg-[#ba0036]' : 'bg-blue-500'}`}>
+              <div className={`w-12 h-12 rounded-full overflow-hidden flex items-center justify-center text-white font-black text-base shrink-0 ${userRole === 'landlord' ? 'bg-[#ba0036]' : 'bg-blue-500'}`}>
                 {authUser?.avatar ? (
                   <img
                     key={authUser.avatar}
@@ -877,13 +881,14 @@ useEffect(() => {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-black text-gray-900 leading-tight truncate">{userName}</h3>
-                <p className="text-sm text-gray-500 truncate">{userEmail}</p>
+                <h3 className="text-[15px] font-black text-gray-900 leading-tight truncate">{userName}</h3>
+                <p className="text-xs text-gray-500 truncate">{userEmail}</p>
               </div>
-            </div>
+              <ChevronRight size={18} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all shrink-0" />
+            </button>
           ) : (
-            /* ─── LOGGED-OUT: Keep the gradient card (improved) ─── */
-            <div className="bg-gradient-to-br from-[#ba0036] to-[#e60045] p-6 rounded-[1.75rem] shadow-[0_10px_30px_rgba(186,0,54,0.3)] text-white relative overflow-hidden mb-2">
+            /* ─── LOGGED-OUT: Gradient join card ─── */
+            <div className="bg-gradient-to-br from-[#ba0036] to-[#e60045] p-6 rounded-3xl shadow-[0_10px_30px_rgba(186,0,54,0.3)] text-white relative overflow-hidden mb-5">
               <div className="absolute -top-8 -right-8 w-28 h-28 bg-white/10 rounded-full blur-3xl" />
               <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full blur-2xl" />
               <UserCircle size={44} className="mx-auto mb-3 opacity-90 block text-center" />
@@ -910,7 +915,7 @@ useEffect(() => {
           {isLoggedIn && (
             <button
               onClick={handleSwitchRole}
-              className="group relative w-full flex items-center gap-3.5 p-3.5 mt-1 mb-3 rounded-2xl bg-gradient-to-br from-[#ba0036] to-[#e60045] text-white shadow-[0_10px_26px_rgba(186,0,54,0.28)] overflow-hidden active:scale-[0.98] transition-transform"
+              className="group relative w-full flex items-center gap-3.5 p-3.5 mb-5 rounded-2xl bg-gradient-to-br from-[#ba0036] to-[#e60045] text-white shadow-[0_10px_26px_rgba(186,0,54,0.28)] overflow-hidden active:scale-[0.98] transition-transform"
             >
               <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-2xl pointer-events-none" />
               <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center shrink-0">
@@ -931,74 +936,91 @@ useEffect(() => {
             </button>
           )}
 
-          {/* ─── LOGGED-IN: Account links ─── */}
+          {/* ─── MY ACCOUNT section (logged-in) ─── */}
           {isLoggedIn && (
-            <div className="py-2 border-b border-gray-100">
-              {(userRole === 'landlord' ? hostLinks : tenantLinks).map(item => (
-                <button
-                  key={item.label}
-                  onClick={() => go(item.path)}
-                  className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors"
-                >
-                  <item.Icon size={20} className="text-gray-600 shrink-0" />
-                  <span className="text-[15px] font-semibold text-gray-900">{t[item.tKey] || item.label}</span>
-                </button>
-              ))}
+            <div className="mb-5">
+              <p className="text-[11px] font-black uppercase tracking-wider text-gray-400 px-1.5 mb-2">{t.menuSectionAccount || 'My Account'}</p>
+              <div className="bg-white border border-gray-100 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden divide-y divide-gray-50">
+                {(userRole === 'landlord' ? hostLinks : tenantLinks).map(item => (
+                  <button
+                    key={item.label}
+                    onClick={() => go(item.path)}
+                    className="group flex items-center gap-3.5 w-full px-3.5 py-3.5 text-left active:bg-gray-50 transition-colors"
+                  >
+                    <span className="w-9 h-9 rounded-xl bg-gray-100 group-hover:bg-red-50 flex items-center justify-center shrink-0 transition-colors">
+                      <item.Icon size={18} className="text-gray-600 group-hover:text-[#ba0036] transition-colors" />
+                    </span>
+                    <span className="flex-1 text-[15px] font-semibold text-gray-800">{t[item.tKey] || item.label}</span>
+                    <ChevronRight size={16} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all" />
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* ─── Explore links (always visible) ─── */}
-          <div className="py-2 border-b border-gray-100">
-            {exploreLinks.filter(item => {
-              if (isLoggedIn) {
-                if (userRole === 'tenant' && item.label === 'List a Property') return false;
-                if (userRole === 'landlord' && item.label === 'All Properties') return false;
-              }
-              return true;
-            }).map(item => (
-              <button
-                key={item.label}
-                onClick={item.protected ? () => handleProtected(item.path) : () => go(item.path)}
-                className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors"
-              >
-                <item.Icon size={20} className="text-gray-600 shrink-0" />
-                <span className="text-[15px] font-semibold text-gray-900">{t[item.tKey] || item.label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* ─── Help & Support section ─── */}
-          <div className="py-2 border-b border-gray-100">
-            <button
-              onClick={() => go('/')}
-              className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors"
-            >
-              <LifeBuoy size={20} className="text-gray-600 shrink-0" />
-              <span className="text-[15px] font-semibold text-gray-900">{t.menuHelpSupport || 'Help & Support'}</span>
-            </button>
-            <button
-              onClick={() => go('/terms')}
-              className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors"
-            >
-              <FileText size={20} className="text-gray-600 shrink-0" />
-              <span className="text-[15px] font-semibold text-gray-900">{t.menuTermsPolicies || 'Terms & Policies'}</span>
-            </button>
-          </div>
-
-          {/* ─── Language selector ───
-              No closeAll() on select: keeping the drawer open lets the user
-              SEE the whole menu flip language instantly (the previous version
-              closed the drawer before any change was visible). */}
-          <div className="py-4 border-b border-gray-100">
-            <div className="flex items-center gap-4 px-1 mb-3">
-              <Globe size={20} className="text-gray-600 shrink-0" />
-              <span className="text-[15px] font-semibold text-gray-900">{t.menuLanguageLabel || 'Language'}</span>
+          {/* ─── EXPLORE section (always visible) ─── */}
+          <div className="mb-5">
+            <p className="text-[11px] font-black uppercase tracking-wider text-gray-400 px-1.5 mb-2">{t.menuSectionExplore || 'Explore'}</p>
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden divide-y divide-gray-50">
+              {exploreLinks.filter(item => {
+                if (isLoggedIn) {
+                  if (userRole === 'tenant' && item.label === 'List a Property') return false;
+                  if (userRole === 'landlord' && item.label === 'All Properties') return false;
+                }
+                return true;
+              }).map(item => (
+                <button
+                  key={item.label}
+                  onClick={item.protected ? () => handleProtected(item.path) : () => go(item.path)}
+                  className="group flex items-center gap-3.5 w-full px-3.5 py-3.5 text-left active:bg-gray-50 transition-colors"
+                >
+                  <span className="w-9 h-9 rounded-xl bg-gray-100 group-hover:bg-red-50 flex items-center justify-center shrink-0 transition-colors">
+                    <item.Icon size={18} className="text-gray-600 group-hover:text-[#ba0036] transition-colors" />
+                  </span>
+                  <span className="flex-1 text-[15px] font-semibold text-gray-800">{t[item.tKey] || item.label}</span>
+                  <ChevronRight size={16} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all" />
+                </button>
+              ))}
             </div>
-            <div className="flex gap-2 px-1">
+          </div>
+
+          {/* ─── SUPPORT section (always visible) ─── */}
+          <div className="mb-5">
+            <p className="text-[11px] font-black uppercase tracking-wider text-gray-400 px-1.5 mb-2">{t.menuSectionSupport || 'Support'}</p>
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden divide-y divide-gray-50">
+              <button
+                onClick={() => go('/support')}
+                className="group flex items-center gap-3.5 w-full px-3.5 py-3.5 text-left active:bg-gray-50 transition-colors"
+              >
+                <span className="w-9 h-9 rounded-xl bg-gray-100 group-hover:bg-red-50 flex items-center justify-center shrink-0 transition-colors">
+                  <LifeBuoy size={18} className="text-gray-600 group-hover:text-[#ba0036] transition-colors" />
+                </span>
+                <span className="flex-1 text-[15px] font-semibold text-gray-800">{t.menuHelpSupport || 'Help & Support'}</span>
+                <ChevronRight size={16} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all" />
+              </button>
+              <button
+                onClick={() => go('/terms')}
+                className="group flex items-center gap-3.5 w-full px-3.5 py-3.5 text-left active:bg-gray-50 transition-colors"
+              >
+                <span className="w-9 h-9 rounded-xl bg-gray-100 group-hover:bg-red-50 flex items-center justify-center shrink-0 transition-colors">
+                  <FileText size={18} className="text-gray-600 group-hover:text-[#ba0036] transition-colors" />
+                </span>
+                <span className="flex-1 text-[15px] font-semibold text-gray-800">{t.menuTermsPolicies || 'Terms & Policies'}</span>
+                <ChevronRight size={16} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all" />
+              </button>
+            </div>
+          </div>
+
+          {/* ─── LANGUAGE section ───
+              No closeAll() on select: keeping the drawer open lets the user
+              SEE the whole menu flip language instantly. */}
+          <div className="mb-5">
+            <p className="text-[11px] font-black uppercase tracking-wider text-gray-400 px-1.5 mb-2">{t.menuLanguageLabel || 'Language'}</p>
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-2 flex gap-2">
               {languages.map(lang => (
                 <button key={lang.code}
                   onClick={() => { if (setLanguage) setLanguage(lang.name); }}
-                  className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all border ${language === lang.name ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}>
+                  className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all ${language === lang.name ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}>
                   {lang.name}
                 </button>
               ))}
@@ -1007,13 +1029,12 @@ useEffect(() => {
 
           {/* ─── Log Out (logged-in only) ─── */}
           {isLoggedIn && (
-            <div className="pt-2">
-              <button onClick={async () => { await handleLogout(); closeAll(); }}
-                className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-red-50 rounded-xl transition-colors">
-                <LogOut size={20} className="text-gray-500 shrink-0" />
-                <span className="text-[15px] font-semibold text-gray-500">{t.menuLogOut || 'Log out'}</span>
-              </button>
-            </div>
+            <button
+              onClick={async () => { await handleLogout(); closeAll(); }}
+              className="flex items-center justify-center gap-2 w-full bg-white border border-gray-100 hover:border-red-100 hover:bg-red-50 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] py-3.5 text-[15px] font-black text-red-500 active:scale-[0.99] transition-all"
+            >
+              <LogOut size={18} /> {t.menuLogOut || 'Log out'}
+            </button>
           )}
 
         </div>
