@@ -438,7 +438,7 @@ useEffect(() => {
           route-level sticky bar (e.g. the PropertyDetails page nav at z-30),
           regardless of any wrapper that React Router or animation libs may
           add between the navbar and the routed page. */}
-      <header className={`w-full bg-white/95 backdrop-blur-2xl font-sans sticky top-0 z-[60] transition-all duration-300 ease-in-out ${isScrolled ? 'shadow-[0_4px_24px_rgba(0,0,0,0.10)] border-b border-gray-100/80' : 'border-b border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)]'}`}>
+      <header className={`w-full bg-white/95 backdrop-blur-2xl font-sans sticky top-0 z-[60] transition-all duration-300 ease-in-out ${isScrolled ? 'shadow-[0_4px_24px_rgba(0,0,0,0.10)] border-b border-gray-100/80' : 'border-b border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)]'} ${isMobileMenuOpen ? 'md:opacity-100 max-md:opacity-0 max-md:pointer-events-none' : ''}`}>
 
         <div className="w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 flex items-center gap-2.5 md:gap-4 h-[56px] md:h-[64px]">
 
@@ -606,6 +606,7 @@ useEffect(() => {
                     <div className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-white text-xs font-black ${userRole === 'landlord' ? 'bg-[#ba0036]' : 'bg-blue-500'}`}>
                       {authUser?.avatar ? (
                         <img
+                          key={authUser.avatar}
                           src={authUser.avatar}
                           alt={userName}
                           className="w-full h-full object-cover"
@@ -844,8 +845,19 @@ useEffect(() => {
       )}
 
       {/* MOBILE DRAWER */}
-      <div className={`md:hidden fixed inset-x-0 top-[56px] bg-white h-[calc(100dvh-56px)] z-[55] overflow-y-auto overscroll-contain shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="flex flex-col px-5 pt-6 pb-28 gap-5">
+      <div className={`md:hidden fixed inset-x-0 top-0 bg-white h-[100dvh] z-[65] overflow-y-auto overscroll-contain shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className="flex flex-col px-5 pt-4 pb-28 gap-5">
+          {/* Close button */}
+          <div className="flex items-center justify-between">
+            <span className="text-base font-black text-gray-900 tracking-tight">Menu</span>
+            <button
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="p-2 rounded-full bg-gray-100 hover:bg-red-50 text-gray-500 hover:text-[#ba0036] transition-all active:scale-90"
+              aria-label="Close menu"
+            >
+              <X size={18} />
+            </button>
+          </div>
 
           {isLoggedIn ? (
             <div className="flex flex-col gap-2">
@@ -859,6 +871,7 @@ useEffect(() => {
                 <div className={`w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center text-white font-black text-lg shadow-md shrink-0 ${userRole === 'landlord' ? 'bg-[#ba0036]' : 'bg-blue-500'}`}>
                   {authUser?.avatar ? (
                     <img
+                      key={authUser.avatar}
                       src={authUser.avatar}
                       alt={userName}
                       className="w-full h-full object-cover"
