@@ -272,8 +272,8 @@ const LocationSearchModal = ({
         {/* ── Suggestions / empty states ── */}
         <div ref={listRef} className="flex-1 overflow-y-auto overscroll-contain">
           {!hasQuery ? (
-            <div className="px-4 pt-8 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-              <div className="flex flex-col items-center text-center mb-7">
+            <div className="pt-8 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+              <div className="flex flex-col items-center text-center mb-7 px-4">
                 <div className="w-14 h-14 rounded-2xl bg-crimson-50 text-crimson-500 flex items-center justify-center mb-4">
                   <MapPin size={26} />
                 </div>
@@ -281,21 +281,25 @@ const LocationSearchModal = ({
                 <p className="text-xs font-medium text-slate-400 mt-1 max-w-[240px]">{L.startTypingSub}</p>
               </div>
 
-              {/* Popular-area quick buttons — fill the empty state and let users
-                  jump straight to a well-known area without typing. */}
-              <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400 mb-2.5">
+              {/* Popular-area quick buttons — line-by-line list */}
+              <p className="px-4 text-[10px] font-black uppercase tracking-[0.15em] text-slate-400 mb-2.5">
                 {L.popularAreas}
               </p>
-              <div className="flex flex-wrap gap-2">
-                {POPULAR_AREAS.map((area) => (
+              <div className="flex flex-col pb-4">
+                {['Dhanmondi', 'Gulshan', 'Banani', 'Uttara', 'Bashundhara', 'Mirpur', 'Mohammadpur', 'Badda', 'Khilgaon', 'Shyamoli', 'Rampura', 'Motijheel', 'Savar', 'Purbachal New Town'].map((area) => (
                   <button
                     key={area}
                     type="button"
                     onClick={() => handleSelect(`${area}, Dhaka`)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-slate-50 border border-slate-200 text-slate-700 text-[13px] font-bold hover:bg-crimson-50 hover:border-crimson-200 hover:text-crimson-600 active:scale-95 transition-all"
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 border-b border-slate-50 last:border-b-0"
                   >
-                    <MapPin size={13} className="text-crimson-400" />
-                    {area}
+                    <span className="flex items-center gap-3 min-w-0">
+                      <span className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                        <MapPin size={16} className="text-emerald-500" />
+                      </span>
+                      <span className="font-bold text-sm text-slate-800 truncate">{area}, Dhaka</span>
+                    </span>
+                    <span className="text-[9px] font-black text-slate-500 bg-slate-100 px-2 py-1 rounded-md uppercase tracking-wider shrink-0">{isBn ? 'এলাকা' : 'Area'}</span>
                   </button>
                 ))}
               </div>
