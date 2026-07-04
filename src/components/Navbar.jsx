@@ -575,17 +575,18 @@ useEffect(() => {
             {/* Desktop notification bell with unread badge + dropdown. */}
             {isAuthed && <NotificationBell isAuthed={isAuthed} />}
 
-            {/* List Property — logged-in shortcut to post a new listing. */}
-            {isLoggedIn && (
-              <button
-                onClick={() => handleProtected('/list-property')}
-                className="text-gray-700 bg-transparent hover:text-[#ba0036] flex items-center gap-2 font-bold text-xs lg:text-sm transition-all border-none"
-              >
-                <PlusCircle size={16} />
-                {t?.listProperty || 'Post Property'}
-                <span className="rounded-full bg-red-50 px-2 py-[3px] text-[10px] font-extrabold leading-none tracking-wider text-[#ba0036]">FREE</span>
-              </button>
-            )}
+            {/* Post Property — ALWAYS visible so first-time visitors get a
+                clear listing CTA. Guests are sent to landlord signup; a
+                logged-in user goes straight to the listing form. Classic
+                red-outlined button that fills on hover, with a FREE tag. */}
+            <button
+              onClick={() => (isLoggedIn ? handleProtected('/list-property') : navigate('/login?mode=signup&role=landlord'))}
+              className="group flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[#ba0036] bg-white text-[#ba0036] hover:bg-[#ba0036] hover:text-white font-bold text-xs lg:text-sm shadow-sm hover:shadow transition-all active:scale-95 whitespace-nowrap"
+            >
+              <PlusCircle size={16} />
+              {t?.listProperty || 'Post Property'}
+              <span className="rounded-full bg-[#ba0036]/10 text-[#ba0036] group-hover:bg-white/25 group-hover:text-white px-1.5 py-0.5 text-[9px] font-extrabold leading-none tracking-wider transition-colors">FREE</span>
+            </button>
 
             <div className="relative" ref={langRef}>
               <div onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="flex items-center gap-2 cursor-pointer hover:text-[#ba0036] transition-colors">
@@ -677,19 +678,21 @@ useEffect(() => {
                   )}
                 </>
               ) : (
-                <div className="flex items-center gap-2 lg:gap-3">
-                  <Link to="/login?mode=login" className="text-gray-700 hover:text-[#ba0036] font-bold text-xs lg:text-sm transition-colors whitespace-nowrap">
+                <div className="flex items-center gap-2 lg:gap-2.5">
+                  {/* Log in — classic outlined (secondary) button */}
+                  <Link
+                    to="/login?mode=login"
+                    className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:border-[#ba0036] hover:text-[#ba0036] font-bold text-xs lg:text-sm shadow-sm hover:shadow transition-all active:scale-95 whitespace-nowrap"
+                  >
                     {t?.navLogIn || 'Log in'}
                   </Link>
-                  <Link to="/login?mode=signup" className="text-gray-700 hover:text-[#ba0036] font-bold text-xs lg:text-sm transition-colors whitespace-nowrap">
+                  {/* Sign up — classic solid (primary) button */}
+                  <Link
+                    to="/login?mode=signup"
+                    className="px-4 py-2 rounded-lg bg-[#ba0036] text-white border border-[#ba0036] hover:bg-[#a0002d] hover:border-[#a0002d] font-bold text-xs lg:text-sm shadow-[0_2px_8px_rgba(186,0,54,0.25)] transition-all active:scale-95 whitespace-nowrap"
+                  >
                     {t?.navSignUp || 'Sign up'}
                   </Link>
-                  <button
-                    onClick={() => navigate('/login?mode=signup&role=landlord')}
-                    className="text-gray-800 bg-white border border-gray-300 hover:border-[#ba0036] hover:text-[#ba0036] px-4 py-2 rounded-xl font-black text-xs lg:text-sm transition-all active:scale-95 flex items-center gap-1.5 whitespace-nowrap"
-                  >
-                    <Building2 size={15} /> {t?.navImLandlord || "I'm a landlord"}
-                  </button>
                 </div>
               )}
             </div>
