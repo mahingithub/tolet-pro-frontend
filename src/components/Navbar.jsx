@@ -846,10 +846,9 @@ useEffect(() => {
 
       {/* MOBILE DRAWER */}
       <div className={`md:hidden fixed inset-x-0 top-0 bg-white h-[100dvh] z-[65] overflow-y-auto overscroll-contain shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="flex flex-col px-5 pt-4 pb-28 gap-5">
-          {/* Close button */}
-          <div className="flex items-center justify-between">
-            <span className="text-base font-black text-gray-900 tracking-tight">Menu</span>
+        <div className="flex flex-col px-5 pt-4 pb-28">
+          {/* Close button — right-aligned, no "Menu" text */}
+          <div className="flex items-center justify-end mb-4">
             <button
               onClick={closeAll}
               className="p-2 rounded-full bg-gray-100 hover:bg-red-50 text-gray-500 hover:text-[#ba0036] transition-all active:scale-90"
@@ -860,59 +859,48 @@ useEffect(() => {
           </div>
 
           {isLoggedIn ? (
-            <div className="flex flex-col gap-2">
-              <div 
-                onClick={() => {
-                  navigate(userRole === 'landlord' ? '/host-dashboard' : '/tenant-dashboard');
-                  setIsMobileMenuOpen(false);
-                }}
-                className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-[1.75rem] p-5 flex items-center gap-4 shadow-lg relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
-              >
-                <div className={`w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center text-white font-black text-lg shadow-md shrink-0 ${userRole === 'landlord' ? 'bg-[#ba0036]' : 'bg-blue-500'}`}>
-                  {authUser?.avatar ? (
-                    <img
-                      key={authUser.avatar}
-                      src={authUser.avatar}
-                      alt={userName}
-                      className="w-full h-full object-cover"
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                      draggable={false}
-                    />
-                  ) : (
-                    initials(userName)
-                  )}
-                </div>
-                <div className="relative z-10 flex-1 min-w-0">
-                  <p className={`text-[9px] font-black uppercase tracking-widest mb-0.5 ${userRole === 'landlord' ? 'text-[#ba0036]' : 'text-blue-400'}`}>
-                    {userRole === 'landlord' ? '🏠 Host Portal' : '👤 Tenant Portal'}
-                  </p>
-                  <h3 className="text-white font-black text-base leading-tight truncate">{userName}</h3>
-                  <p className="text-gray-400 text-[10px] font-medium truncate">{userEmail}</p>
-                </div>
+            /* ─── LOGGED-IN: Clean flat profile row ─── */
+            <div
+              onClick={() => {
+                navigate(userRole === 'landlord' ? '/host-dashboard' : '/tenant-dashboard');
+                closeAll();
+              }}
+              className="flex items-center gap-4 pb-5 mb-2 border-b border-gray-100 cursor-pointer active:opacity-80 transition-opacity"
+            >
+              <div className={`w-14 h-14 rounded-full overflow-hidden flex items-center justify-center text-white font-black text-lg shrink-0 ${userRole === 'landlord' ? 'bg-[#ba0036]' : 'bg-blue-500'}`}>
+                {authUser?.avatar ? (
+                  <img
+                    key={authUser.avatar}
+                    src={authUser.avatar}
+                    alt={userName}
+                    className="w-full h-full object-cover"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    draggable={false}
+                  />
+                ) : (
+                  initials(userName)
+                )}
               </div>
-              <button onClick={handleSwitchRole}
-                className="flex items-center gap-3 px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl hover:bg-gray-100 transition-all text-left w-full mt-1">
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
-                  <RefreshCw size={15} className="text-gray-600" />
-                </div>
-                <span className="font-bold text-sm text-gray-600 flex-1">
-                  Switch to {userRole === 'tenant' ? 'Host' : 'Tenant'}
-                </span>
-              </button>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-black text-gray-900 leading-tight truncate">{userName}</h3>
+                <p className="text-sm text-gray-500 truncate">{userEmail}</p>
+              </div>
             </div>
           ) : (
-            <div className="bg-gradient-to-br from-[#ba0036] to-[#e60045] p-6 rounded-[1.75rem] shadow-[0_10px_30px_rgba(186,0,54,0.3)] text-white relative overflow-hidden">
+            /* ─── LOGGED-OUT: Keep the gradient card (improved) ─── */
+            <div className="bg-gradient-to-br from-[#ba0036] to-[#e60045] p-6 rounded-[1.75rem] shadow-[0_10px_30px_rgba(186,0,54,0.3)] text-white relative overflow-hidden mb-2">
               <div className="absolute -top-8 -right-8 w-28 h-28 bg-white/10 rounded-full blur-3xl" />
+              <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full blur-2xl" />
               <UserCircle size={44} className="mx-auto mb-3 opacity-90 block text-center" />
               <h3 className="text-xl font-black mb-1 text-center">Join TO-LET PRO</h3>
               <p className="text-xs font-medium text-red-100 mb-5 text-center leading-relaxed">Dashboards, saved searches, alerts & more</p>
-              
+
               <div className="flex gap-3">
-                <button onClick={() => { navigate('/login'); setIsMobileMenuOpen(false); }}
+                <button onClick={() => { navigate('/login'); closeAll(); }}
                   className="flex-1 bg-white text-[#ba0036] py-3 rounded-xl font-black text-sm shadow-lg active:scale-95 transition-transform">
                   Log In
                 </button>
-                <button onClick={() => { navigate('/login', { state: { isLoginMode: false } }); setIsMobileMenuOpen(false); }}
+                <button onClick={() => { navigate('/login', { state: { isLoginMode: false } }); closeAll(); }}
                   className="flex-1 bg-white/20 backdrop-blur-md text-white border border-white/30 py-3 rounded-xl font-black text-sm active:scale-95 transition-transform">
                   Sign Up
                 </button>
@@ -920,79 +908,107 @@ useEffect(() => {
             </div>
           )}
 
-          <div>
-            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1 mb-1.5">Explore</p>
-            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-2 flex flex-col gap-0.5">
-              {exploreLinks.filter(item => {
-                if (isLoggedIn) {
-                  if (userRole === 'tenant' && item.label === 'List a Property') return false;
-                  if (userRole === 'landlord' && item.label === 'All Properties') return false;
-                }
-                return true;
-              }).map(item => (
-                <Row key={item.label} {...item} onClick={item.protected ? () => handleProtected(item.path) : undefined} />
+          {/* ─── LOGGED-IN: Account links ─── */}
+          {isLoggedIn && (
+            <div className="py-2 border-b border-gray-100">
+              {(userRole === 'landlord' ? hostLinks : tenantLinks).map(item => (
+                <button
+                  key={item.label}
+                  onClick={() => go(item.path)}
+                  className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors"
+                >
+                  <item.Icon size={20} className="text-gray-600 shrink-0" />
+                  <span className="text-[15px] font-semibold text-gray-900">{item.label}</span>
+                </button>
+              ))}
+              <button onClick={handleSwitchRole}
+                className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors">
+                <RefreshCw size={20} className="text-gray-600 shrink-0" />
+                <span className="text-[15px] font-semibold text-gray-900">
+                  Switch to {userRole === 'tenant' ? 'Host' : 'Tenant'}
+                </span>
+              </button>
+            </div>
+          )}
+
+          {/* ─── Explore links (always visible) ─── */}
+          <div className="py-2 border-b border-gray-100">
+            {exploreLinks.filter(item => {
+              if (isLoggedIn) {
+                if (userRole === 'tenant' && item.label === 'List a Property') return false;
+                if (userRole === 'landlord' && item.label === 'All Properties') return false;
+              }
+              return true;
+            }).map(item => (
+              <button
+                key={item.label}
+                onClick={item.protected ? () => handleProtected(item.path) : () => go(item.path)}
+                className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors"
+              >
+                <item.Icon size={20} className="text-gray-600 shrink-0" />
+                <span className="text-[15px] font-semibold text-gray-900">{item.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* ─── LOGGED-OUT: AI & Tools links ─── */}
+          {!isLoggedIn && (
+            <div className="py-2 border-b border-gray-100">
+              {toolLinks.map(item => (
+                <button
+                  key={item.label}
+                  onClick={() => go(item.path)}
+                  className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors"
+                >
+                  <item.Icon size={20} className="text-gray-600 shrink-0" />
+                  <span className="text-[15px] font-semibold text-gray-900">{item.label}</span>
+                </button>
               ))}
             </div>
-          </div>
-
-          {!isLoggedIn && (
-            <div>
-              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1 mb-1.5">AI & Tools</p>
-              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-2 flex flex-col gap-0.5">
-                {toolLinks.map(item => <Row key={item.label} {...item} />)}
-              </div>
-            </div>
           )}
 
-          {isLoggedIn && (
-            <div>
-              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1 mb-1.5">My Account</p>
-              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-2 flex flex-col gap-0.5">
-                {(userRole === 'landlord' ? hostLinks : tenantLinks).map(item => <Row key={item.label} {...item} />)}
-              </div>
-            </div>
-          )}
-
-          {/* ─── FOOTER LINKS (Guest policy · Call us · Our story · Blogs · FAQs) ───
-              Mirrors the Canva mockup — gives the drawer a sense of completion
-              and surfaces support / brand pages where users naturally look. */}
-          <div>
-            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-2 flex flex-col gap-0.5">
-              {footerLinks.filter(item => {
-                if (!isLoggedIn && item.label === 'Our story') return false;
-                return true;
-              }).map(item => <Row key={item.label} {...item} />)}
-            </div>
+          {/* ─── Help & Support section ─── */}
+          <div className="py-2 border-b border-gray-100">
+            <button
+              onClick={() => go('/')}
+              className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors"
+            >
+              <LifeBuoy size={20} className="text-gray-600 shrink-0" />
+              <span className="text-[15px] font-semibold text-gray-900">Help & Support</span>
+            </button>
+            <button
+              onClick={() => go('/')}
+              className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors"
+            >
+              <FileText size={20} className="text-gray-600 shrink-0" />
+              <span className="text-[15px] font-semibold text-gray-900">Terms & Policies</span>
+            </button>
           </div>
 
-          {/* ─── SETTINGS + HELP (always visible at the bottom of the drawer) ─── */}
-          <div className="bg-gray-50 border border-gray-100 rounded-2xl p-2 flex flex-col gap-0.5">
-            {settingsLinks.map(item => <Row key={item.label} {...item} />)}
-          </div>
-
-
-
-          <div>
-            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1 mb-1.5">Language</p>
-            <div className="flex gap-3 bg-gray-50 border border-gray-100 p-1.5 rounded-2xl">
+          {/* ─── Language selector ─── */}
+          <div className="py-4 border-b border-gray-100">
+            <div className="flex items-center gap-4 px-1 mb-3">
+              <Globe size={20} className="text-gray-600 shrink-0" />
+              <span className="text-[15px] font-semibold text-gray-900">Language</span>
+            </div>
+            <div className="flex gap-2 px-1">
               {languages.map(lang => (
                 <button key={lang.code}
-                  onClick={() => { if (setLanguage) setLanguage(lang.name); setIsMobileMenuOpen(false); }}
-                  className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${language === lang.name ? 'bg-white text-[#ba0036] border border-gray-200 shadow-sm' : 'text-gray-500'}`}>
+                  onClick={() => { if (setLanguage) setLanguage(lang.name); closeAll(); }}
+                  className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all border ${language === lang.name ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}>
                   {lang.name}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* ─── Log Out (logged-in only) ─── */}
           {isLoggedIn && (
-            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-2 flex flex-col gap-0.5">
-              <button onClick={async () => { await handleLogout(); setIsMobileMenuOpen(false); }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 transition-all text-left w-full">
-                <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
-                  <LogOut size={15} className="text-red-500" />
-                </div>
-                <span className="font-bold text-sm text-red-500 flex-1">Log Out</span>
+            <div className="pt-2">
+              <button onClick={async () => { await handleLogout(); closeAll(); }}
+                className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-red-50 rounded-xl transition-colors">
+                <LogOut size={20} className="text-gray-500 shrink-0" />
+                <span className="text-[15px] font-semibold text-gray-500">Log out</span>
               </button>
             </div>
           )}
