@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { LanguageProvider } from "./context/LanguageContext";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
+import { SettingsProvider } from "./context/SettingsContext.jsx";
 import { NotificationProvider } from "./context/NotificationContext.jsx";
 import callProvider from "./services/callProvider";
 import { getCurrentToken } from "./services/authService";
@@ -230,11 +231,13 @@ function App() {
 		<ErrorBoundary>
 			<AuthProvider>
 				<LanguageProvider>
-					<Router>
-						<NotificationProvider>
-							<AppLayout />
-						</NotificationProvider>
-					</Router>
+					<SettingsProvider>
+						<Router>
+							<NotificationProvider>
+								<AppLayout />
+							</NotificationProvider>
+						</Router>
+					</SettingsProvider>
 				</LanguageProvider>
 			</AuthProvider>
 		</ErrorBoundary>

@@ -13,3 +13,16 @@
     transform: translateY(0) scale(1);
   }
 }
+
+/* ─── Reduced motion (App settings → "Reduce motion") ──────────────────────
+   Applied by SettingsContext, which toggles `.reduce-motion` on <html> when
+   the user opts in. Near-instant durations keep layouts functional while
+   removing the animation/parallax that can cause motion discomfort. */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}

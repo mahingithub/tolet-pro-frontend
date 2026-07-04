@@ -1,47 +1,43 @@
 /**
- * TenantSettings — 7-section preferences block rendered as the
- * "Account settings" tab content inside TenantDashboard. Lives inline
- * (no separate route) so the drawer + tab architecture stays intact.
+ * SharedSettings — the global settings hub.
+ * ──────────────────────────────────────────────────────────────────────────
+ * A single, role-aware settings screen rendered as the "Account settings" tab
+ * inside BOTH the Tenant and Host dashboards. It is organised into three
+ * scopes that mirror the backend `User.preferences` schema:
  *
- * Toggles + preferences persist to localStorage under
- * `tolet_pro::tenant:settings:<userId>` and broadcast via _storage.js
- * so the rest of the app picks up the change.
+ *   • App settings       — apply to the whole account (theme, language,
+ *                          notifications, privacy, AI & data, legal).
+ *   • Tenant settings     — shown when the user has the `tenant` role.
+ *   • Landlord settings   — shown when the user has the `landlord` role.
  *
- * Backend contract (single-file swap when API lands):
- *   GET   /api/tenant/me/settings   -> Settings
- *   PATCH /api/tenant/me/settings   (partial) -> Settings
- *
- * NOTE: Privacy & Security delegates the heavy lifting (2FA, sessions,
- * data export, account delete) to the existing `/account/privacy`
- * surface — we link out rather than duplicate the flows.
+ * Every control is wired to the backend through `useSettings()` (which calls
+ * PATCH /api/users/me/preferences and caches locally). There are no mock
+ * toggles — each change persists and is reflected across the app. Sound + Do
+ * Not Disturb additionally drive the live NotificationContext so the toast
+ * suppression they control keeps working. Theme + reduce-motion are applied
+ * globally by SettingsContext.
  *
  * Props:
- *   onGoToProfile?: () => void  — called from "Edit profile". When the
- *                                  parent dashboard passes a setter, we
- *                                  flip its active tab to Profile;
- *                                  otherwise we route to the dashboard
- *                                  with state.activeTab='profile'.
+ *   onGoToProfile?: () => void  — the parent dashboard flips its own tab to
+ *                                 "Profile"; when absent we route there.
  */
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
-  ChevronDown, User, Shield, Bell, Sliders, CreditCard,
-  Smartphone, Scale, Globe, Lock, Trash2, LogOut, Download, ExternalLink,
+  ChevronDown, User, Shield, ShieldCheck, Bell, CreditCard,
+  Smartphone, Scale, Globe, Trash2, LogOut, Download, ExternalLink,
+  Home, Search, MessageSquare, Eye, Calendar, Building2, Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useLanguage } from '../../context/LanguageContext';
+import { useSettings } from '../../context/SettingsContext.jsx';
 import { useNotificationSettings } from '../../context/NotificationContext';
-import { readJson, writeJson, broadcast } from '../../services/_storage.js';
-import { getPreferences, setPreferences as savePreferences } from '../../services/settingsService.js';
 
-const KEY = (uid) => `tenant:settings:${uid || '_anon'}`;
+// ─── Language mapping (LanguageContext uses labels, backend uses codes) ──────
+const toLangCode = (label) => (label === 'বাংলা' ? 'bn' : 'en');
 
-const DEFAULTS = {
-  notif: { pushEnabled: true, emailEnabled: true, smsEnabled: false, frequency: 'instant' },
-  prefs: { language: 'English', currency: 'BDT', defaultArea: '', defaultBudget: '' },
-  app:   { theme: 'light', autoplayVideos: true },
-};
-
+// ─── Presentational primitives ───────────────────────────────────────────────
 const Card = ({ icon: Icon, title, subtitle, defaultOpen, children }) => {
   const [open, setOpen] = useState(!!defaultOpen);
   return (
@@ -67,25 +63,92 @@ const Card = ({ icon: Icon, title, subtitle, defaultOpen, children }) => {
   );
 };
 
-const Row = ({ label, sublabel, right }) => (
+const Row = ({ label, sublabel, right, children }) => (
   <div className="flex items-center justify-between gap-4 py-3 border-b border-gray-50 last:border-b-0">
     <div className="min-w-0">
       <p className="text-sm font-black text-gray-900 truncate">{label}</p>
       {sublabel && <p className="text-[11px] font-bold text-gray-400 truncate">{sublabel}</p>}
     </div>
-    <div className="shrink-0">{right}</div>
+    <div className="shrink-0">{right ?? children}</div>
   </div>
 );
 
-const Toggle = ({ checked, onChange }) => (
+const Toggle = ({ checked, onChange, disabled }) => (
   <button
     type="button"
-    onClick={() => onChange(!checked)}
-    className={`relative w-11 h-6 rounded-full transition-colors ${checked ? 'bg-[#ba0036]' : 'bg-gray-300'}`}
+    disabled={disabled}
+    onClick={() => !disabled && onChange(!checked)}
+    className={`relative w-11 h-6 rounded-full transition-colors ${checked ? 'bg-[#ba0036]' : 'bg-gray-300'} ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+    aria-pressed={checked}
   >
     <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
   </button>
 );
+
+const SelectInput = ({ value, onChange, options }) => (
+  <select
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-black text-gray-900 focus:outline-none focus:border-[#ba0036]"
+  >
+    {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+  </select>
+);
+
+// Text input that only commits on blur / Enter, so we don't PATCH per keystroke.
+const TextField = ({ value, onCommit, placeholder, multiline, maxLength, className = 'w-40' }) => {
+  const [v, setV] = useState(value ?? '');
+  useEffect(() => { setV(value ?? ''); }, [value]);
+  const commit = () => { if ((v ?? '') !== (value ?? '')) onCommit(v); };
+  const cls = `px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-900 focus:outline-none focus:border-[#ba0036] ${className}`;
+  if (multiline) {
+    return (
+      <textarea
+        rows={3}
+        maxLength={maxLength}
+        value={v}
+        placeholder={placeholder}
+        onChange={(e) => setV(e.target.value)}
+        onBlur={commit}
+        className={`${cls} resize-none`}
+      />
+    );
+  }
+  return (
+    <input
+      maxLength={maxLength}
+      value={v}
+      placeholder={placeholder}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      className={cls}
+    />
+  );
+};
+
+// Numeric input (or null when empty). Commits on blur / Enter.
+const NumberField = ({ value, onCommit, placeholder, className = 'w-28' }) => {
+  const [v, setV] = useState(value == null ? '' : String(value));
+  useEffect(() => { setV(value == null ? '' : String(value)); }, [value]);
+  const commit = () => {
+    const trimmed = String(v).trim();
+    const next = trimmed === '' ? null : Number(trimmed);
+    const clean = next === null ? null : (Number.isFinite(next) ? next : null);
+    if (clean !== (value == null ? null : value)) onCommit(clean);
+  };
+  return (
+    <input
+      inputMode="numeric"
+      value={v}
+      placeholder={placeholder}
+      onChange={(e) => setV(e.target.value.replace(/[^0-9]/g, ''))}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      className={`px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-900 focus:outline-none focus:border-[#ba0036] ${className}`}
+    />
+  );
+};
 
 const LinkAction = ({ to, children }) => (
   <Link to={to} className="inline-flex items-center gap-1.5 text-xs font-black text-[#ba0036] hover:text-[#90002a]">
@@ -93,84 +156,153 @@ const LinkAction = ({ to, children }) => (
   </Link>
 );
 
+const ScopeHeader = ({ icon: Icon, title, subtitle }) => (
+  <div className="flex items-center gap-3 mt-8 mb-3 first:mt-2">
+    <span className="w-8 h-8 rounded-lg bg-[#ba0036] text-white flex items-center justify-center shrink-0">
+      <Icon size={16} />
+    </span>
+    <div className="min-w-0">
+      <h2 className="text-base md:text-lg font-black tracking-tight text-gray-900 truncate">{title}</h2>
+      {subtitle && <p className="text-[11px] font-bold text-gray-400 truncate">{subtitle}</p>}
+    </div>
+  </div>
+);
+
+const TimeRange = ({ from, until, onFrom, onUntil, bn }) => (
+  <div className="flex items-center gap-2">
+    <input type="time" value={from} onChange={(e) => onFrom(e.target.value)} className="text-xs px-2 py-1 border rounded-md" />
+    <span className="text-xs font-bold text-gray-400">{bn ? 'থেকে' : 'to'}</span>
+    <input type="time" value={until} onChange={(e) => onUntil(e.target.value)} className="text-xs px-2 py-1 border rounded-md" />
+  </div>
+);
+
+// ─── Main component ───────────────────────────────────────────────────────────
 const SharedSettings = ({ onGoToProfile } = {}) => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, hasRole, activeRole } = useAuth();
   const { language, setLanguage } = useLanguage();
+  const { settings, update, saving, loading } = useSettings();
   const { soundEnabled, setSoundEnabled, dndSchedule, setDndSchedule } = useNotificationSettings();
   const bn = language === 'বাংলা';
 
+  const isTenant = typeof hasRole === 'function' ? hasRole('tenant') : true;
+  const isLandlord = typeof hasRole === 'function' ? hasRole('landlord') : false;
+
+  // Convenient scoped views (settings is always fully-defaulted by the service).
+  const n = settings.notifications;
+  const app = settings.app;
+  const tn = settings.tenant;
+  const ll = settings.landlord;
+
+  // Persist helper — surfaces validation errors as a toast.
+  const save = useCallback(async (patch) => {
+    try {
+      await update(patch);
+    } catch (e) {
+      toast.error(bn ? 'সেটিং সেভ করা যায়নি।' : 'Could not save that setting.');
+    }
+  }, [update, bn]);
+
+  // ── Mirror Sound + DND from settings → NotificationContext (runtime) ──────
+  // NotificationContext is what actually suppresses chimes/toasts, so keep it
+  // in lock-step with the persisted values once the real settings have loaded.
+  useEffect(() => {
+    if (loading) return;
+    if (typeof n.sound === 'boolean' && n.sound !== soundEnabled) setSoundEnabled(n.sound);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, n.sound]);
+
+  useEffect(() => {
+    if (loading) return;
+    const next = { enabled: !!n.dnd.enabled, from: n.dnd.from, until: n.dnd.until };
+    const cur = { enabled: !!dndSchedule.enabled, from: dndSchedule.from, until: dndSchedule.until };
+    if (JSON.stringify(next) !== JSON.stringify(cur)) setDndSchedule(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, n.dnd.enabled, n.dnd.from, n.dnd.until]);
+
   const goToProfile = () => {
     if (typeof onGoToProfile === 'function') return onGoToProfile();
-    navigate('/tenant-dashboard', { state: { activeTab: 'profile' } });
+    // No callback (e.g. mounted in the Host dashboard) → route to the profile
+    // tab of whichever dashboard matches the active role.
+    const dest = activeRole === 'landlord' ? '/host-dashboard' : '/tenant-dashboard';
+    navigate(dest, { state: { activeTab: 'profile' } });
   };
 
-  const [settings, setSettings] = useState(() => ({ ...DEFAULTS, ...(readJson(KEY(user?.id), null) || {}) }));
-  const apiSyncTimer = useRef(null);
-  const initialLoad = useRef(false);
+  // ── Localised option lists ───────────────────────────────────────────────
+  const opts = useMemo(() => ({
+    theme: [
+      { value: 'light', label: bn ? 'লাইট' : 'Light' },
+      { value: 'dark', label: bn ? 'ডার্ক' : 'Dark' },
+      { value: 'system', label: bn ? 'সিস্টেম' : 'System' },
+    ],
+    language: [
+      { value: 'English', label: 'English' },
+      { value: 'বাংলা', label: 'বাংলা' },
+    ],
+    currency: [
+      { value: 'BDT', label: 'BDT (৳)' },
+      { value: 'USD', label: 'USD ($)' },
+    ],
+    frequency: [
+      { value: 'instant', label: bn ? 'তাৎক্ষণিক' : 'Instant' },
+      { value: 'daily', label: bn ? 'দৈনিক সারসংক্ষেপ' : 'Daily digest' },
+      { value: 'weekly', label: bn ? 'সাপ্তাহিক সারসংক্ষেপ' : 'Weekly digest' },
+    ],
+    landingRole: [
+      { value: 'auto', label: bn ? 'স্বয়ংক্রিয়' : 'Automatic' },
+      { value: 'tenant', label: bn ? 'ভাড়াটিয়া' : 'Tenant' },
+      { value: 'landlord', label: bn ? 'বাড়িওয়ালা' : 'Landlord' },
+    ],
+    visibility: [
+      { value: 'public', label: bn ? 'পাবলিক' : 'Public' },
+      { value: 'private', label: bn ? 'প্রাইভেট' : 'Private' },
+    ],
+    tenantType: [
+      { value: 'any', label: bn ? 'যেকোনো' : 'Any' },
+      { value: 'apartment', label: bn ? 'অ্যাপার্টমেন্ট' : 'Apartment' },
+      { value: 'duplex', label: bn ? 'ডুপ্লেক্স' : 'Duplex' },
+      { value: 'studio', label: bn ? 'স্টুডিও' : 'Studio' },
+      { value: 'sublet', label: bn ? 'সাবলেট' : 'Sublet' },
+      { value: 'commercial', label: bn ? 'বাণিজ্যিক' : 'Commercial' },
+    ],
+    listingType: [
+      { value: 'apartment', label: bn ? 'অ্যাপার্টমেন্ট' : 'Apartment' },
+      { value: 'duplex', label: bn ? 'ডুপ্লেক্স' : 'Duplex' },
+      { value: 'studio', label: bn ? 'স্টুডিও' : 'Studio' },
+      { value: 'sublet', label: bn ? 'সাবলেট' : 'Sublet' },
+      { value: 'commercial', label: bn ? 'বাণিজ্যিক' : 'Commercial' },
+    ],
+  }), [bn]);
 
-  // On mount: fetch from backend and merge with localStorage cache.
-  useEffect(() => {
-    if (initialLoad.current) return;
-    initialLoad.current = true;
-    (async () => {
-      try {
-        const data = await getPreferences();
-        if (data?.preferences) {
-          const p = data.preferences;
-          setSettings((prev) => ({
-            ...prev,
-            notif: {
-              ...prev.notif,
-              pushEnabled: p.callNotifications !== undefined ? p.callNotifications : prev.notif.pushEnabled,
-              emailEnabled: p.marketingEmails !== undefined ? p.marketingEmails : prev.notif.emailEnabled,
-              smsEnabled: p.smsAlerts !== undefined ? p.smsAlerts : prev.notif.smsEnabled,
-            },
-            app: {
-              ...prev.app,
-              theme: p.theme || prev.app.theme,
-            },
-          }));
-        }
-      } catch (e) {
-        // Offline or unauthenticated — localStorage values already loaded.
-      }
-    })();
-  }, []);
-
-  // Persist to localStorage immediately; debounce API sync by 800ms.
-  useEffect(() => {
-    writeJson(KEY(user?.id), settings);
-    broadcast(KEY(user?.id));
-
-    if (apiSyncTimer.current) clearTimeout(apiSyncTimer.current);
-    apiSyncTimer.current = setTimeout(() => {
-      savePreferences({
-        callNotifications: settings.notif.pushEnabled,
-        marketingEmails:   settings.notif.emailEnabled,
-        smsAlerts:         settings.notif.smsEnabled,
-        theme:             settings.app.theme,
-        language:          settings.prefs.language === 'বাংলা' ? 'bn' : 'en',
-      }).catch(() => {}); // silent — offline fallback is localStorage
-    }, 800);
-
-    return () => { if (apiSyncTimer.current) clearTimeout(apiSyncTimer.current); };
-  }, [settings, user?.id]);
-
-  const upd = (section, patch) =>
-    setSettings((s) => ({ ...s, [section]: { ...(s[section] || {}), ...patch } }));
+  const phoneVerified = !!user?.phoneVerified;
 
   return (
     <div className="w-full mb-10 animate-in fade-in zoom-in-95 duration-500">
       <div className="max-w-[900px] mx-auto">
-        <h1 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900">{bn ? 'অ্যাকাউন্ট সেটিংস' : 'Account settings'}</h1>
-        <p className="text-sm font-bold text-gray-500 mb-6">
-          {bn ? 'নোটিফিকেশন, প্রাইভেসি ও অ্যাপের পছন্দ একসাথে।' : 'Notifications, privacy and app preferences in one place.'}
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900">{bn ? 'সেটিংস' : 'Settings'}</h1>
+            <p className="text-sm font-bold text-gray-500 mb-2">
+              {bn ? 'অ্যাপ, ভাড়াটিয়া ও বাড়িওয়ালা — সব সেটিং এক জায়গায়।' : 'App, tenant and landlord preferences in one place.'}
+            </p>
+          </div>
+          {saving && (
+            <span className="text-[11px] font-black text-gray-400 mt-1 shrink-0 animate-pulse">
+              {bn ? 'সেভ হচ্ছে…' : 'Saving…'}
+            </span>
+          )}
+        </div>
+
+        {/* ══════════════════════ APP SETTINGS ══════════════════════ */}
+        <ScopeHeader
+          icon={Globe}
+          title={bn ? 'অ্যাপ সেটিংস' : 'App settings'}
+          subtitle={bn ? 'পুরো অ্যাকাউন্টে প্রযোজ্য' : 'Apply to your whole account'}
+        />
 
         <div className="grid gap-4 md:gap-5">
-          {/* (a) Account */}
-          <Card icon={User} title={bn ? 'অ্যাকাউন্ট' : 'Account'} subtitle={bn ? 'প্রোফাইল, পাসওয়ার্ড, যাচাই' : 'Profile, password, verification'} defaultOpen>
+          {/* Account */}
+          <Card icon={User} title={bn ? 'অ্যাকাউন্ট' : 'Account'} subtitle={bn ? 'প্রোফাইল, পাসওয়ার্ড, সাইন আউট' : 'Profile, password, sign out'} defaultOpen>
             <Row
               label={bn ? 'প্রোফাইল এডিট করুন' : 'Edit profile'}
               sublabel={bn ? 'নাম, ছবি, পরিচয়' : 'Name, photo, identity'}
@@ -180,21 +312,20 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
                 </button>
               }
             />
-            <Row
-              label={bn ? 'ইমেইল' : 'Email'}
-              sublabel={user?.email || '—'}
-              right={<span className="text-[11px] font-black text-emerald-600">{bn ? 'যাচাইকৃত' : 'Verified'}</span>}
-            />
+            <Row label={bn ? 'ইমেইল' : 'Email'} sublabel={user?.email || (bn ? 'যোগ করা হয়নি' : 'Not added')} right={
+              <button onClick={goToProfile} className="text-xs font-black text-[#ba0036] hover:text-[#90002a]">{bn ? 'এডিট' : 'Edit'}</button>
+            } />
             <Row
               label={bn ? 'ফোন নম্বর' : 'Phone number'}
               sublabel={user?.phone || '—'}
-              right={<span className="text-[11px] font-black text-emerald-600">{bn ? 'যাচাইকৃত' : 'Verified'}</span>}
+              right={
+                <span className={`inline-flex items-center gap-1 text-[11px] font-black ${phoneVerified ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {phoneVerified ? <ShieldCheck size={12} /> : null}
+                  {phoneVerified ? (bn ? 'যাচাইকৃত' : 'Verified') : (bn ? 'যাচাই বাকি' : 'Unverified')}
+                </span>
+              }
             />
-            <Row
-              label={bn ? 'পাসওয়ার্ড পরিবর্তন' : 'Change password'}
-              sublabel={bn ? 'সর্বশেষ পরিবর্তিত: ৩ মাস আগে' : 'Last changed 3 months ago'}
-              right={<LinkAction to="/account/privacy">{bn ? 'পরিবর্তন' : 'Change'}</LinkAction>}
-            />
+            <Row label={bn ? 'পাসওয়ার্ড পরিবর্তন' : 'Change password'} sublabel={bn ? 'সিকিউরিটি সেন্টারে' : 'In the security center'} right={<LinkAction to="/account/privacy">{bn ? 'পরিবর্তন' : 'Change'}</LinkAction>} />
             <Row
               label={bn ? 'লগ আউট' : 'Sign out'}
               right={
@@ -208,154 +339,243 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
             />
           </Card>
 
-          {/* (b) Privacy & Security */}
-          <Card icon={Shield} title={bn ? 'প্রাইভেসি ও সিকিউরিটি' : 'Privacy & security'} subtitle={bn ? '2FA, সেশন, ডেটা' : '2FA, sessions, data'}>
-            <Row label={bn ? 'টু-ফ্যাক্টর অথেন্টিকেশন' : 'Two-factor authentication'} right={<LinkAction to="/account/privacy">{bn ? 'কনফিগ' : 'Configure'}</LinkAction>} />
-            <Row label={bn ? 'লগইন অ্যালার্ট' : 'Login alerts'} sublabel={bn ? 'নতুন ডিভাইসে সাইন-ইন হলে ইমেইল' : 'Email me on new device sign-in'} right={<Toggle checked={true} onChange={() => {}} />} />
-            <Row label={bn ? 'সক্রিয় সেশন' : 'Active sessions'} sublabel={bn ? 'অন্য ডিভাইস দেখুন' : 'See other devices'} right={<LinkAction to="/account/privacy">{bn ? 'দেখুন' : 'View'}</LinkAction>} />
-            <Row
-              label={bn ? 'আমার ডেটা ডাউনলোড' : 'Download my data'}
-              sublabel={bn ? 'GDPR-শৈলীর এক্সপোর্ট' : 'GDPR-style export'}
-              right={
-                <Link to="/account/privacy" className="inline-flex items-center gap-1 text-xs font-black text-gray-700 hover:text-[#ba0036]"><Download size={12} /> {bn ? 'এক্সপোর্ট' : 'Export'}</Link>
-              }
-            />
-            <Row
-              label={bn ? 'অ্যাকাউন্ট ডিলিট করুন' : 'Delete account'}
-              sublabel={bn ? '৩০ দিনের গ্রেস পিরিয়ড' : '30-day grace period'}
-              right={
-                <Link to="/account/privacy" className="inline-flex items-center gap-1 text-xs font-black text-red-500 hover:text-red-600"><Trash2 size={12} /> {bn ? 'অনুরোধ' : 'Request'}</Link>
-              }
-            />
-          </Card>
+          {/* Notifications */}
+          <Card icon={Bell} title={bn ? 'নোটিফিকেশন' : 'Notifications'} subtitle={bn ? 'চ্যানেল, সাউন্ড, DND, টপিক' : 'Channels, sound, DND, topics'} defaultOpen={activeRole !== 'landlord'}>
+            <Row label={bn ? 'পুশ নোটিফিকেশন' : 'Push notifications'} sublabel={bn ? 'এই ডিভাইসে অ্যালার্ট' : 'Alerts on this device'} right={<Toggle checked={n.push} onChange={(v) => save({ notifications: { push: v } })} />} />
+            <Row label={bn ? 'ইমেইল নোটিফিকেশন' : 'Email notifications'} sublabel={bn ? 'লেনদেন ও আপডেট' : 'Transactional updates'} right={<Toggle checked={n.email} onChange={(v) => save({ notifications: { email: v } })} />} />
+            <Row label={bn ? 'SMS অ্যালার্ট' : 'SMS alerts'} right={<Toggle checked={settings.smsAlerts} onChange={(v) => save({ smsAlerts: v })} />} />
+            <Row label={bn ? 'কল নোটিফিকেশন' : 'Call notifications'} sublabel={bn ? 'ইনকামিং কল পুশ' : 'Incoming call push'} right={<Toggle checked={settings.callNotifications} onChange={(v) => save({ callNotifications: v })} />} />
+            <Row label={bn ? 'মার্কেটিং ইমেইল' : 'Marketing emails'} sublabel={bn ? 'অফার ও টিপস' : 'Offers and tips'} right={<Toggle checked={settings.marketingEmails} onChange={(v) => save({ marketingEmails: v })} />} />
+            <Row label={bn ? 'সাউন্ড' : 'Sound'} sublabel={bn ? 'নোটিফিকেশন সাউন্ড' : 'Play notification sounds'} right={<Toggle checked={n.sound} onChange={(v) => save({ notifications: { sound: v } })} />} />
 
-          {/* (c) Notifications */}
-          <Card icon={Bell} title={bn ? 'নোটিফিকেশন' : 'Notifications'} subtitle={bn ? 'পুশ, ইমেইল, SMS' : 'Push, email, SMS'}>
-            <Row label={bn ? 'সাউন্ড' : 'Sound'} sublabel={bn ? 'নোটিফিকেশন সাউন্ড' : 'Play notification sounds'} right={<Toggle checked={soundEnabled} onChange={(v) => setSoundEnabled(v)} />} />
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-3 border-b border-gray-50 last:border-b-0">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-3 border-b border-gray-50">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-black text-gray-900 truncate">{bn ? 'ডু নট ডিস্টার্ব (DND)' : 'Do Not Disturb (DND)'}</p>
-                <p className="text-[11px] font-bold text-gray-400 truncate">{bn ? 'নোটিফিকেশন সাউন্ড বন্ধ রাখুন' : 'Suppress toast and chimes'}</p>
+                <p className="text-[11px] font-bold text-gray-400 truncate">{bn ? 'নির্দিষ্ট সময়ে সাউন্ড ও টোস্ট বন্ধ' : 'Silence sound and toasts in a window'}</p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                <Toggle checked={dndSchedule.enabled} onChange={(v) => setDndSchedule(s => ({ ...s, enabled: v }))} />
-                {dndSchedule.enabled && (
-                  <div className="flex items-center gap-2">
-                    <input type="time" value={dndSchedule.from} onChange={(e) => setDndSchedule(s => ({ ...s, from: e.target.value }))} className="text-xs px-2 py-1 border rounded-md" />
-                    <span className="text-xs font-bold text-gray-400">to</span>
-                    <input type="time" value={dndSchedule.until} onChange={(e) => setDndSchedule(s => ({ ...s, until: e.target.value }))} className="text-xs px-2 py-1 border rounded-md" />
-                  </div>
+                <Toggle checked={n.dnd.enabled} onChange={(v) => save({ notifications: { dnd: { enabled: v } } })} />
+                {n.dnd.enabled && (
+                  <TimeRange
+                    from={n.dnd.from} until={n.dnd.until} bn={bn}
+                    onFrom={(val) => save({ notifications: { dnd: { from: val } } })}
+                    onUntil={(val) => save({ notifications: { dnd: { until: val } } })}
+                  />
                 )}
               </div>
             </div>
-            <Row label={bn ? 'পুশ নোটিফিকেশন' : 'Push notifications'} right={<Toggle checked={settings.notif.pushEnabled} onChange={(v) => upd('notif', { pushEnabled: v })} />} />
-            <Row label={bn ? 'ইমেইল নোটিফিকেশন' : 'Email notifications'} sublabel={bn ? 'নতুন প্রপার্টি, পেমেন্ট, ইনকোয়ারি উত্তর' : 'New properties, payments, inquiry replies'} right={<Toggle checked={settings.notif.emailEnabled} onChange={(v) => upd('notif', { emailEnabled: v })} />} />
-            <Row label={bn ? 'SMS নোটিফিকেশন' : 'SMS notifications'} right={<Toggle checked={settings.notif.smsEnabled} onChange={(v) => upd('notif', { smsEnabled: v })} />} />
+
             <Row
-              label={bn ? 'ফ্রিকোয়েন্সি' : 'Frequency'}
-              right={
-                <select
-                  value={settings.notif.frequency}
-                  onChange={(e) => upd('notif', { frequency: e.target.value })}
-                  className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-black text-gray-900 focus:outline-none focus:border-[#ba0036]"
-                >
-                  <option value="instant">{bn ? 'তাৎক্ষণিক' : 'Instant'}</option>
-                  <option value="daily">{bn ? 'দৈনিক সারসংক্ষেপ' : 'Daily digest'}</option>
-                  <option value="weekly">{bn ? 'সাপ্তাহিক সারসংক্ষেপ' : 'Weekly digest'}</option>
-                </select>
-              }
+              label={bn ? 'ইমেইল ফ্রিকোয়েন্সি' : 'Email frequency'}
+              right={<SelectInput value={n.frequency} onChange={(v) => save({ notifications: { frequency: v } })} options={opts.frequency} />}
             />
+
+            <div className="pt-3">
+              <p className="text-[11px] font-black text-gray-400 uppercase tracking-wide mb-1">{bn ? 'কী কী জানাবো' : 'Notify me about'}</p>
+            </div>
+            <Row label={bn ? 'মেসেজ' : 'Messages'} right={<Toggle checked={n.messages} onChange={(v) => save({ notifications: { messages: v } })} />} />
+            <Row label={bn ? 'বুকিং' : 'Bookings'} right={<Toggle checked={n.bookings} onChange={(v) => save({ notifications: { bookings: v } })} />} />
+            <Row label={bn ? 'পেমেন্ট ও রসিদ' : 'Payments & receipts'} right={<Toggle checked={n.payments} onChange={(v) => save({ notifications: { payments: v } })} />} />
+            <Row label={bn ? 'ভিজিট শিডিউল' : 'Visit schedules'} right={<Toggle checked={n.visits} onChange={(v) => save({ notifications: { visits: v } })} />} />
           </Card>
 
-          {/* (d) Preferences */}
-          <Card icon={Sliders} title={bn ? 'পছন্দ' : 'Preferences'} subtitle={bn ? 'ভাষা, মুদ্রা, ডিফল্ট সার্চ' : 'Language, currency, default search'}>
+          {/* Appearance & App */}
+          <Card icon={Smartphone} title={bn ? 'অ্যাপিয়ারেন্স ও অ্যাপ' : 'Appearance & app'} subtitle={bn ? 'থিম, ভাষা, মুদ্রা, মোশন' : 'Theme, language, currency, motion'}>
+            <Row label={bn ? 'থিম' : 'Theme'} sublabel={bn ? 'লাইট / ডার্ক / সিস্টেম' : 'Light / dark / system'} right={<SelectInput value={settings.theme} onChange={(v) => save({ theme: v })} options={opts.theme} />} />
             <Row
               label={bn ? 'ভাষা' : 'Language'}
               right={
-                <select
+                <SelectInput
                   value={language}
-                  onChange={(e) => setLanguage && setLanguage(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-black text-gray-900 focus:outline-none focus:border-[#ba0036]"
-                >
-                  <option value="English">English</option>
-                  <option value="বাংলা">বাংলা</option>
-                </select>
-              }
-            />
-            <Row
-              label={bn ? 'মুদ্রা' : 'Currency display'}
-              right={
-                <select
-                  value={settings.prefs.currency}
-                  onChange={(e) => upd('prefs', { currency: e.target.value })}
-                  className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-black text-gray-900 focus:outline-none focus:border-[#ba0036]"
-                >
-                  <option value="BDT">BDT (৳)</option>
-                  <option value="USD">USD ($)</option>
-                </select>
-              }
-            />
-            <Row
-              label={bn ? 'ডিফল্ট এলাকা' : 'Default search area'}
-              right={
-                <input
-                  value={settings.prefs.defaultArea}
-                  onChange={(e) => upd('prefs', { defaultArea: e.target.value })}
-                  placeholder="Gulshan"
-                  className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-900 focus:outline-none focus:border-[#ba0036] w-32"
+                  onChange={(val) => { setLanguage && setLanguage(val); save({ language: toLangCode(val) }); }}
+                  options={opts.language}
                 />
               }
             />
+            <Row label={bn ? 'মুদ্রা প্রদর্শন' : 'Currency display'} right={<SelectInput value={app.currency} onChange={(v) => save({ app: { currency: v } })} options={opts.currency} />} />
             <Row
-              label={bn ? 'ডিফল্ট বাজেট' : 'Default budget'}
-              right={
-                <input
-                  value={settings.prefs.defaultBudget}
-                  onChange={(e) => upd('prefs', { defaultBudget: e.target.value })}
-                  placeholder="20,000"
-                  className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-900 focus:outline-none focus:border-[#ba0036] w-32"
-                />
-              }
-            />
-          </Card>
-
-          {/* (e) Payment & Billing */}
-          <Card icon={CreditCard} title={bn ? 'পেমেন্ট ও বিলিং' : 'Payment & billing'} subtitle={bn ? 'মেথড, ইতিহাস, রসিদ' : 'Methods, history, receipts'}>
-            <Row label={bn ? 'সেভড পেমেন্ট মেথড' : 'Saved payment methods'} sublabel={bn ? 'কোনো কার্ড সেভ করা নেই' : 'No cards on file'} right={<button className="text-xs font-black text-[#ba0036] hover:text-[#90002a]">+ {bn ? 'যোগ করুন' : 'Add'}</button>} />
-            <Row label={bn ? 'পেমেন্ট ইতিহাস' : 'Payment history'} right={<Link to="/tenant-dashboard" state={{ activeTab: 'payments' }} className="text-xs font-black text-[#ba0036]">{bn ? 'খুলুন' : 'Open'}</Link>} />
-            <Row label={bn ? 'রসিদ' : 'Receipts'} sublabel={bn ? 'PDF ডাউনলোড' : 'Download as PDF'} right={<Link to="/tenant-dashboard" state={{ activeTab: 'payments' }} className="text-xs font-black text-[#ba0036]">{bn ? 'দেখুন' : 'View'}</Link>} />
-          </Card>
-
-          {/* (f) App */}
-          <Card icon={Smartphone} title={bn ? 'অ্যাপ' : 'App'} subtitle={bn ? 'থিম, অটোপ্লে' : 'Theme, autoplay'}>
-            <Row
-              label={bn ? 'থিম' : 'Theme'}
-              right={
-                <select
-                  value={settings.app.theme}
-                  onChange={(e) => upd('app', { theme: e.target.value })}
-                  className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-black text-gray-900 focus:outline-none focus:border-[#ba0036]"
-                >
-                  <option value="light">{bn ? 'লাইট' : 'Light'}</option>
-                  <option value="dark">{bn ? 'ডার্ক' : 'Dark'}</option>
-                  <option value="system">{bn ? 'সিস্টেম' : 'System'}</option>
-                </select>
-              }
+              label={bn ? 'মোশন কমান' : 'Reduce motion'}
+              sublabel={bn ? 'অ্যানিমেশন কমিয়ে দিন' : 'Minimise animations'}
+              right={<Toggle checked={app.reduceMotion} onChange={(v) => save({ app: { reduceMotion: v } })} />}
             />
             <Row
               label={bn ? 'প্রপার্টি ভিডিও অটোপ্লে' : 'Auto-play property videos'}
-              sublabel={bn ? 'মোবাইল ডেটায় বন্ধ রাখুন' : 'Turn off to save mobile data'}
-              right={<Toggle checked={settings.app.autoplayVideos} onChange={(v) => upd('app', { autoplayVideos: v })} />}
+              sublabel={bn ? 'মোবাইল ডেটা বাঁচাতে বন্ধ করুন' : 'Turn off to save mobile data'}
+              right={<Toggle checked={app.autoplayVideos} onChange={(v) => save({ app: { autoplayVideos: v } })} />}
+            />
+            {(isTenant && isLandlord) && (
+              <Row
+                label={bn ? 'ডিফল্ট ড্যাশবোর্ড' : 'Default dashboard'}
+                sublabel={bn ? 'লগইনের পর কোনটি খুলবে' : 'Where you land after login'}
+                right={<SelectInput value={app.defaultLandingRole} onChange={(v) => save({ app: { defaultLandingRole: v } })} options={opts.landingRole} />}
+              />
+            )}
+          </Card>
+
+          {/* Privacy & Security */}
+          <Card icon={Shield} title={bn ? 'প্রাইভেসি ও সিকিউরিটি' : 'Privacy & security'} subtitle={bn ? 'সেশন, ডেটা, অ্যাকাউন্ট' : 'Sessions, data, account'}>
+            <Row label={bn ? 'সক্রিয় সেশন' : 'Active sessions'} sublabel={bn ? 'সাইন-ইন করা ডিভাইস দেখুন' : 'See signed-in devices'} right={<LinkAction to="/account/privacy">{bn ? 'দেখুন' : 'View'}</LinkAction>} />
+            <Row
+              label={bn ? 'আমার ডেটা ডাউনলোড' : 'Download my data'}
+              sublabel={bn ? 'সম্পূর্ণ এক্সপোর্ট' : 'Full account export'}
+              right={<Link to="/account/privacy" className="inline-flex items-center gap-1 text-xs font-black text-gray-700 hover:text-[#ba0036]"><Download size={12} /> {bn ? 'এক্সপোর্ট' : 'Export'}</Link>}
+            />
+            <Row
+              label={bn ? 'অ্যাকাউন্ট ডিলিট' : 'Delete account'}
+              sublabel={bn ? '৩০ দিনের গ্রেস পিরিয়ড' : '30-day grace period'}
+              right={<Link to="/account/privacy" className="inline-flex items-center gap-1 text-xs font-black text-red-500 hover:text-red-600"><Trash2 size={12} /> {bn ? 'অনুরোধ' : 'Request'}</Link>}
             />
           </Card>
 
-          {/* (g) Legal */}
-          <Card icon={Scale} title={bn ? 'লিগ্যাল' : 'Legal'} subtitle={bn ? 'টার্মস, প্রাইভেসি পলিসি' : 'Terms, privacy policy'}>
-            <Row label={bn ? 'সার্ভিস শর্তাবলি' : 'Terms of service'} right={<LinkAction to="/account/privacy">{bn ? 'দেখুন' : 'View'}</LinkAction>} />
-            <Row label={bn ? 'প্রাইভেসি পলিসি' : 'Privacy policy'} right={<LinkAction to="/account/privacy">{bn ? 'দেখুন' : 'View'}</LinkAction>} />
-            <Row label={bn ? 'রিফান্ড পলিসি' : 'Refund policy'} right={<LinkAction to="/account/privacy">{bn ? 'দেখুন' : 'View'}</LinkAction>} />
+          {/* AI & Data */}
+          <Card icon={Sparkles} title={bn ? 'AI ও ডেটা' : 'AI & data'} subtitle={bn ? 'ব্যক্তিগতকরণ নিয়ন্ত্রণ' : 'Control personalisation'}>
+            <Row
+              label={bn ? 'AI লার্নিং' : 'AI learning'}
+              sublabel={bn ? 'আমার ব্যবহার থেকে সাজেশন উন্নত করুন' : 'Improve suggestions from my activity'}
+              right={<Toggle checked={settings.aiLearningOptIn} onChange={(v) => save({ aiLearningOptIn: v })} />}
+            />
+          </Card>
+
+          {/* Legal */}
+          <Card icon={Scale} title={bn ? 'লিগ্যাল' : 'Legal'} subtitle={bn ? 'টার্মস, প্রাইভেসি, রিফান্ড' : 'Terms, privacy, refund'}>
+            <Row label={bn ? 'সার্ভিস শর্তাবলি' : 'Terms of service'} right={<LinkAction to="/terms">{bn ? 'দেখুন' : 'View'}</LinkAction>} />
+            <Row label={bn ? 'প্রাইভেসি পলিসি' : 'Privacy policy'} right={<LinkAction to="/privacy-policy">{bn ? 'দেখুন' : 'View'}</LinkAction>} />
+            <Row label={bn ? 'রিফান্ড পলিসি' : 'Refund policy'} right={<LinkAction to="/refund">{bn ? 'দেখুন' : 'View'}</LinkAction>} />
           </Card>
         </div>
+
+        {/* ══════════════════════ TENANT SETTINGS ══════════════════════ */}
+        {isTenant && (
+          <>
+            <ScopeHeader
+              icon={Home}
+              title={bn ? 'ভাড়াটিয়া সেটিংস' : 'Tenant settings'}
+              subtitle={bn ? 'ভাড়াটিয়া হিসেবে যা প্রযোজ্য' : 'Apply when you rent as a tenant'}
+            />
+            <div className="grid gap-4 md:gap-5">
+              {/* Tenant privacy */}
+              <Card icon={Eye} title={bn ? 'প্রোফাইল ও প্রাইভেসি' : 'Profile & privacy'} subtitle={bn ? 'দৃশ্যমানতা ও যোগাযোগ' : 'Visibility & contact'} defaultOpen={activeRole === 'tenant'}>
+                <Row
+                  label={bn ? 'পাবলিক প্রোফাইল' : 'Public profile'}
+                  sublabel={bn ? 'বাড়িওয়ালারা আপনার ট্রাস্ট কার্ড দেখতে পারবে' : 'Landlords can see your trust card'}
+                  right={<SelectInput value={tn.profileVisibility} onChange={(v) => save({ tenant: { profileVisibility: v } })} options={opts.visibility} />}
+                />
+                <Row
+                  label={bn ? 'বাড়িওয়ালাকে যোগাযোগ দেখান' : 'Share contact with landlords'}
+                  sublabel={bn ? 'চ্যাট শুরু হলে ফোন/ইমেইল' : 'Phone/email once a chat starts'}
+                  right={<Toggle checked={tn.showContactToLandlords} onChange={(v) => save({ tenant: { showContactToLandlords: v } })} />}
+                />
+              </Card>
+
+              {/* Tenant alerts */}
+              <Card icon={Bell} title={bn ? 'সার্চ অ্যালার্ট' : 'Search alerts'} subtitle={bn ? 'নতুন ম্যাচ ও দাম' : 'New matches & pricing'}>
+                <Row
+                  label={bn ? 'সেভড সার্চ অ্যালার্ট' : 'Saved-search alerts'}
+                  sublabel={bn ? 'ম্যাচিং লিস্টিং এলে জানান' : 'Notify me on matching listings'}
+                  right={<Toggle checked={tn.savedSearchAlerts} onChange={(v) => save({ tenant: { savedSearchAlerts: v } })} />}
+                />
+                <Row
+                  label={bn ? 'দাম কমার অ্যালার্ট' : 'Price-drop alerts'}
+                  sublabel={bn ? 'পছন্দের বাসার দাম কমলে' : 'When a watched home drops price'}
+                  right={<Toggle checked={n.priceAlerts} onChange={(v) => save({ notifications: { priceAlerts: v } })} />}
+                />
+              </Card>
+
+              {/* Tenant default search */}
+              <Card icon={Search} title={bn ? 'ডিফল্ট সার্চ' : 'Default search'} subtitle={bn ? 'সার্চ বার প্রি-ফিল করুন' : 'Pre-fill the search bar'}>
+                <Row label={bn ? 'শহর' : 'City'} right={<TextField value={tn.defaultCity} onCommit={(v) => save({ tenant: { defaultCity: v } })} placeholder={bn ? 'ঢাকা' : 'Dhaka'} maxLength={60} className="w-36" />} />
+                <Row label={bn ? 'এলাকা' : 'Area'} right={<TextField value={tn.defaultArea} onCommit={(v) => save({ tenant: { defaultArea: v } })} placeholder="Gulshan" maxLength={80} className="w-36" />} />
+                <Row label={bn ? 'সর্বনিম্ন বাজেট (৳)' : 'Min budget (৳)'} right={<NumberField value={tn.defaultBudgetMin} onCommit={(v) => save({ tenant: { defaultBudgetMin: v } })} placeholder="10,000" />} />
+                <Row label={bn ? 'সর্বোচ্চ বাজেট (৳)' : 'Max budget (৳)'} right={<NumberField value={tn.defaultBudgetMax} onCommit={(v) => save({ tenant: { defaultBudgetMax: v } })} placeholder="40,000" />} />
+                <Row label={bn ? 'প্রপার্টি টাইপ' : 'Property type'} right={<SelectInput value={tn.defaultPropertyType} onChange={(v) => save({ tenant: { defaultPropertyType: v } })} options={opts.tenantType} />} />
+              </Card>
+            </div>
+          </>
+        )}
+
+        {/* ══════════════════════ LANDLORD SETTINGS ══════════════════════ */}
+        {isLandlord && (
+          <>
+            <ScopeHeader
+              icon={Building2}
+              title={bn ? 'বাড়িওয়ালা সেটিংস' : 'Landlord settings'}
+              subtitle={bn ? 'বাড়িওয়ালা হিসেবে যা প্রযোজ্য' : 'Apply when you host as a landlord'}
+            />
+            <div className="grid gap-4 md:gap-5">
+              {/* Inquiries & responses */}
+              <Card icon={MessageSquare} title={bn ? 'ইনকোয়ারি ও উত্তর' : 'Inquiries & responses'} subtitle={bn ? 'অ্যালার্ট ও অটো-রিপ্লাই' : 'Alerts & auto-reply'} defaultOpen={activeRole === 'landlord'}>
+                <Row
+                  label={bn ? 'নতুন ইনকোয়ারি অ্যালার্ট' : 'New inquiry alerts'}
+                  sublabel={bn ? 'ইনকোয়ারি এলে সাথে সাথে জানান' : 'Notify me the moment one arrives'}
+                  right={<Toggle checked={ll.inquiryNotifications} onChange={(v) => save({ landlord: { inquiryNotifications: v } })} />}
+                />
+                <Row
+                  label={bn ? 'অটো-রিপ্লাই' : 'Auto-reply'}
+                  sublabel={bn ? 'প্রথম ইনকোয়ারিতে স্বয়ংক্রিয় উত্তর' : 'Auto-answer first-time inquiries'}
+                  right={<Toggle checked={ll.autoReplyEnabled} onChange={(v) => save({ landlord: { autoReplyEnabled: v } })} />}
+                />
+                {ll.autoReplyEnabled && (
+                  <div className="py-3 border-b border-gray-50">
+                    <p className="text-[11px] font-black text-gray-400 mb-2">{bn ? 'অটো-রিপ্লাই বার্তা' : 'Auto-reply message'}</p>
+                    <TextField
+                      multiline
+                      value={ll.autoReplyMessage}
+                      onCommit={(v) => save({ landlord: { autoReplyMessage: v } })}
+                      maxLength={500}
+                      className="w-full"
+                      placeholder={bn ? 'ধন্যবাদ! আমি খুব দ্রুত উত্তর দেব।' : 'Thanks for reaching out — I will reply shortly.'}
+                    />
+                  </div>
+                )}
+              </Card>
+
+              {/* Listing & booking */}
+              <Card icon={Building2} title={bn ? 'লিস্টিং ও বুকিং' : 'Listing & booking'} subtitle={bn ? 'যোগাযোগ, বুকিং, ভিজিট' : 'Contact, booking, visits'}>
+                <Row
+                  label={bn ? 'লিস্টিং-এ ফোন দেখান' : 'Show phone on listings'}
+                  sublabel={bn ? 'পাবলিক লিস্টিং-এ নম্বর' : 'Number visible on public listings'}
+                  right={<Toggle checked={ll.showPhoneOnListings} onChange={(v) => save({ landlord: { showPhoneOnListings: v } })} />}
+                />
+                <Row
+                  label={bn ? 'ইনস্ট্যান্ট বুকিং' : 'Instant booking'}
+                  sublabel={bn ? 'অনুমোদন ছাড়াই বুক করা যাবে' : 'Book without manual approval'}
+                  right={<Toggle checked={ll.instantBooking} onChange={(v) => save({ landlord: { instantBooking: v } })} />}
+                />
+                <Row
+                  label={bn ? 'ভিজিট রিকোয়েস্ট নিন' : 'Allow visit requests'}
+                  sublabel={bn ? 'ভাড়াটিয়া ভিজিট শিডিউল চাইতে পারবে' : 'Tenants can request a visit slot'}
+                  right={<Toggle checked={ll.allowVisitRequests} onChange={(v) => save({ landlord: { allowVisitRequests: v } })} />}
+                />
+                <Row label={bn ? 'ডিফল্ট লিস্টিং টাইপ' : 'Default listing type'} right={<SelectInput value={ll.defaultListingType} onChange={(v) => save({ landlord: { defaultListingType: v } })} options={opts.listingType} />} />
+              </Card>
+
+              {/* Quiet hours */}
+              <Card icon={Calendar} title={bn ? 'কোয়ায়েট আওয়ার্স' : 'Quiet hours'} subtitle={bn ? 'ইনকোয়ারি পিং বন্ধ রাখার সময়' : 'Mute inquiry pings in a window'}>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-gray-900 truncate">{bn ? 'কোয়ায়েট আওয়ার্স চালু' : 'Enable quiet hours'}</p>
+                    <p className="text-[11px] font-bold text-gray-400 truncate">{bn ? 'এই সময়ে ইনকোয়ারি পুশ বন্ধ' : 'No inquiry push during this window'}</p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <Toggle checked={ll.quietHours.enabled} onChange={(v) => save({ landlord: { quietHours: { enabled: v } } })} />
+                    {ll.quietHours.enabled && (
+                      <TimeRange
+                        from={ll.quietHours.from} until={ll.quietHours.until} bn={bn}
+                        onFrom={(val) => save({ landlord: { quietHours: { from: val } } })}
+                        onUntil={(val) => save({ landlord: { quietHours: { until: val } } })}
+                      />
+                    )}
+                  </div>
+                </div>
+              </Card>
+
+              {/* Billing shortcut */}
+              <Card icon={CreditCard} title={bn ? 'সাবস্ক্রিপশন ও বিলিং' : 'Subscription & billing'} subtitle={bn ? 'প্ল্যান ও রসিদ' : 'Plan & receipts'}>
+                <Row label={bn ? 'সাবস্ক্রিপশন প্ল্যান' : 'Subscription plan'} right={<LinkAction to="/subscription">{bn ? 'ম্যানেজ' : 'Manage'}</LinkAction>} />
+              </Card>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
