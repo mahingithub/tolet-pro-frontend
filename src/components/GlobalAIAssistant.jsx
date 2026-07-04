@@ -47,6 +47,7 @@ const GlobalAIAssistant = () => {
 
   const [isOpen, setIsOpen] = useState(false);
   const [isIconVisible, setIsIconVisible] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [view, setView] = useState(/** @type {'ai'|'tickets'|'ticket'} */('ai'));
   const [activeTicketId, setActiveTicketId] = useState(/** @type {string|null} */(null));
   const [inputText, setInputText] = useState('');
@@ -92,6 +93,19 @@ const GlobalAIAssistant = () => {
       window.removeEventListener('welcomeRobotFinished', handleRobotFinish);
     };
   }, [location.pathname, isOpen]);
+
+  // Hide the floating button when the mobile menu drawer is open so it
+  // doesn't overlap. The Navbar dispatches these custom events.
+  useEffect(() => {
+    const onOpen  = () => setIsMobileMenuOpen(true);
+    const onClose = () => setIsMobileMenuOpen(false);
+    window.addEventListener('open-mobile-menu', onOpen);
+    window.addEventListener('close-mobile-menu', onClose);
+    return () => {
+      window.removeEventListener('open-mobile-menu', onOpen);
+      window.removeEventListener('close-mobile-menu', onClose);
+    };
+  }, []);
 
   useEffect(() => {
     fetch(`${API}/ai-guides`)
@@ -808,7 +822,7 @@ const GlobalAIAssistant = () => {
             setIsOpen(true);
           }}
           aria-label="Open AI assistant"
-          className={`fixed bottom-[110px] md:bottom-6 right-4 md:right-8 z-[100] group flex items-center justify-center animate-in zoom-in cursor-pointer touch-manipulation select-none transition-all duration-700 ${!isIconVisible ? 'opacity-0 scale-50 pointer-events-none' : 'opacity-100 scale-100'}`}
+          className={`fixed bottom-[110px] md:bottom-6 right-4 md:right-8 z-[100] group flex items-center justify-center animate-in zoom-in cursor-pointer touch-manipulation select-none transition-all duration-700 ${(!isIconVisible || isMobileMenuOpen) ? 'opacity-0 scale-50 pointer-events-none' : 'opacity-100 scale-100'}`}
         >
           <div className="absolute inset-0 bg-[#ba0036] rounded-full blur-xl opacity-40 group-hover:opacity-70 group-hover:scale-110 transition-all duration-300 animate-pulse pointer-events-none"></div>
           <div className="relative w-14 h-14 bg-gradient-to-br from-[#ba0036] to-[#8a0028] rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(186,0,54,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] group-hover:-translate-y-1 transition-transform duration-300 pointer-events-none">

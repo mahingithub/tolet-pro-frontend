@@ -326,7 +326,7 @@ useEffect(() => {
     return () => window.removeEventListener('open-mobile-menu', handler);
   }, []);
 
-  const closeAll = () => { setIsMobileMenuOpen(false); setIsProfileMenuOpen(false); setShowVerificationModal(false); };
+  const closeAll = () => { setIsMobileMenuOpen(false); setIsProfileMenuOpen(false); setShowVerificationModal(false); window.dispatchEvent(new CustomEvent('close-mobile-menu')); };
 
   const go = path => { navigate(path); closeAll(); };
 
