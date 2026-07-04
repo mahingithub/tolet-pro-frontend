@@ -28,6 +28,8 @@ import LandlordProfile from "./components/LandlordProfile";
 import TenantProfile from "./components/TenantProfile";
 import PrivacyCenter from "./components/PrivacyCenter.jsx";
 import SubscriptionPage from "./components/SubscriptionPage";
+import SupportPage from "./components/SupportPage";
+import HowItWorks from "./components/HowItWorks";
 
 // --- Mobile Shell ---
 import MobileBottomNav from "./components/mobile/MobileBottomNav";
@@ -136,6 +138,12 @@ const AppLayout = () => {
 				<Route path="/property/:id" element={<PropertyDetails />} />
 				<Route path="/inquire/:id" element={<InquiryPage />} />
 				<Route path="/login" element={<LoginPage />} />
+
+				{/* Help & Support — public; ticket features handle auth internally */}
+				<Route path="/support" element={<SupportPage />} />
+
+				{/* How it Works — public marketing page */}
+				<Route path="/how-it-works" element={<HowItWorks />} />
 
 				{/* Legal pages — public, no auth required (Phase 7) */}
 				<Route path="/privacy-policy" element={<PrivacyPolicy />} />

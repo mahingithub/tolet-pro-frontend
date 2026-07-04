@@ -117,9 +117,22 @@ const LoginPage = () => {
 
   const nextUrl = searchParams.get('next');
 
-  const [mode, setMode] = useState(MODES.LOGIN);
+  // Honour the auth screen requested via the URL so the navbar / menu
+  // "Log In" and "Sign Up" buttons open the correct side, and "I'm a
+  // landlord" preselects the landlord signup role.
+  //   /login              → login
+  //   /login?mode=signup  → signup
+  //   /login?mode=signup&role=landlord → signup as landlord
+  const requestedMode = searchParams.get('mode');
+  const requestedRole = searchParams.get('role');
+
+  const [mode, setMode] = useState(
+    requestedMode === 'signup' ? MODES.SIGNUP
+      : requestedMode === 'forgot' ? MODES.FORGOT
+        : MODES.LOGIN,
+  );
   const [step, setStep] = useState(STEPS.FORM);
-  const [role, setRole] = useState('tenant');
+  const [role, setRole] = useState(requestedRole === 'landlord' ? 'landlord' : 'tenant');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [infoMsg, setInfoMsg] = useState('');
