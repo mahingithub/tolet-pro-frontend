@@ -124,6 +124,15 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   const NavBtn = ({ item }) => {
     const active = isActive(item);
     const Icon = item.icon;
+    const isProfile = item.id === 'profile';
+    const [imgError, setImgError] = React.useState(false);
+
+    React.useEffect(() => {
+      setImgError(false);
+    }, [user?.avatar]);
+
+    const hasAvatar = isProfile && isAuthenticated && user?.avatar && !imgError;
+
     return (
       <button
         onClick={() => handleClick(item)}
@@ -139,11 +148,21 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
           {active && (
             <span className="absolute inset-0 rounded-full bg-[#ba0036]/10 ring-2 ring-[#ba0036]/15" />
           )}
-          <Icon
-            size={20}
-            strokeWidth={active ? 2.6 : 2.1}
-            className={`relative ${active ? 'text-[#ba0036]' : 'text-gray-500'}`}
-          />
+          {hasAvatar ? (
+            <img
+              key={user.avatar}
+              src={user.avatar}
+              alt="Profile"
+              className={`relative w-[22px] h-[22px] rounded-full object-cover ${active ? 'ring-2 ring-[#ba0036]' : 'ring-1 ring-gray-200'}`}
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <Icon
+              size={20}
+              strokeWidth={active ? 2.6 : 2.1}
+              className={`relative ${active ? 'text-[#ba0036]' : 'text-gray-500'}`}
+            />
+          )}
         </span>
         <span
           className={`text-[10px] font-bold transition-colors ${
