@@ -84,12 +84,14 @@ const tenantLinks = [
   { Icon: Heart,           color: 'text-gray-700',  bg: 'bg-transparent',   label: 'Saved Properties',  tKey: 'menuSavedProperties', path: '/tenant-dashboard?tab=saved' },
   { Icon: MessageSquare,   color: 'text-gray-700',  bg: 'bg-transparent',   label: 'My Inquiries',      tKey: 'menuMyInquiries', path: '/tenant-dashboard?tab=applications' },
   { Icon: Bell,            color: 'text-gray-700', bg: 'bg-transparent',  label: 'My Alerts',         tKey: 'menuMyAlerts', path: '/smart-alerts' },
+  { Icon: SettingsIcon,    color: 'text-gray-700', bg: 'bg-transparent',  label: 'Settings',          tKey: 'menuSettings', path: '/tenant-dashboard?tab=settings' },
 ];
 const hostLinks = [
   { Icon: LayoutDashboard, color: 'text-gray-700',  bg: 'bg-transparent',    label: 'Host Dashboard',    tKey: 'menuHostDashboard', path: '/host-dashboard' },
   { Icon: PlusCircle,      color: 'text-gray-700', bg: 'bg-transparent',label: 'Add Property',      tKey: 'menuAddProperty', path: '/list-property' },
   { Icon: BarChart2,       color: 'text-gray-700',  bg: 'bg-transparent', label: 'Listing Analytics', tKey: 'menuListingAnalytics', path: '/ai-insights' },
   { Icon: MessageSquare,   color: 'text-gray-700',    bg: 'bg-transparent',   label: 'Tenant Messages',   tKey: 'menuTenantMessages', path: '/messages' },
+  { Icon: SettingsIcon,    color: 'text-gray-700',    bg: 'bg-transparent',   label: 'Settings',          tKey: 'menuSettings', path: '/host-dashboard?tab=settings' },
 ];
 
 const footerLinks = [
@@ -654,6 +656,8 @@ useEffect(() => {
                       )}
 
                       <Link to="/smart-alerts" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-amber-50 hover:text-amber-600 rounded-xl transition-colors"><Bell size={17} /> Smart Alerts</Link>
+
+                      <Link to={userRole === 'landlord' ? '/host-dashboard?tab=settings' : '/tenant-dashboard?tab=settings'} onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors"><SettingsIcon size={17} /> {t?.menuSettings || 'Settings'}</Link>
 
                       <Link to="/how-it-works" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors mt-1 border-t border-gray-50"><BookOpen size={17} /> {t?.navHowItWorks || 'How it Works'}</Link>
                       <Link to="/support" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors"><LifeBuoy size={17} /> {t?.menuHelpSupport || 'Help & Support'}</Link>

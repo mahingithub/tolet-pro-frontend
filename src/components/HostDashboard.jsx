@@ -440,7 +440,7 @@ const HostDashboard = () => {
   // Honor ?tab=… deep-links (e.g. notification bell → /host-dashboard?tab=inquiries).
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
-    if (tab && ['dashboard', 'inquiries', 'rent', 'bookings', 'properties', 'profile'].includes(tab)) {
+    if (tab && ['dashboard', 'inquiries', 'rent', 'bookings', 'properties', 'profile', 'settings'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [location.search]);
