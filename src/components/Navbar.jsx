@@ -851,7 +851,7 @@ useEffect(() => {
           <div className="flex items-center justify-between">
             <span className="text-base font-black text-gray-900 tracking-tight">Menu</span>
             <button
-              onClick={() => setIsMobileMenuOpen(false)}
+              onClick={closeAll}
               className="p-2 rounded-full bg-gray-100 hover:bg-red-50 text-gray-500 hover:text-[#ba0036] transition-all active:scale-90"
               aria-label="Close menu"
             >
