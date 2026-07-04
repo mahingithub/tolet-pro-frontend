@@ -79,11 +79,6 @@ const exploreLinks = [
   { Icon: Search,        color: 'text-gray-700', bg: 'bg-transparent',     label: 'Search Properties',  path: '/properties/all' },
   { Icon: PlusCircle,    color: 'text-gray-700', bg: 'bg-transparent',      label: 'List a Property', path: '/list-property', protected: true },
 ];
-const toolLinks = [
-  { Icon: MessageSquare, color: 'text-gray-700',  bg: 'bg-transparent',     label: 'Messages', path: '/inquiry' },
-  { Icon: Bell,          color: 'text-gray-700', bg: 'bg-transparent',    label: 'Saved Alerts',     path: '/smart-alerts' },
-  { Icon: BarChart2,     color: 'text-gray-700',bg: 'bg-transparent',   label: 'Market Insights',  path: '/ai-insights' },
-];
 const tenantLinks = [
   { Icon: LayoutDashboard, color: 'text-gray-700',  bg: 'bg-transparent',   label: 'Tenant Dashboard',  path: '/tenant-dashboard' },
   { Icon: Heart,           color: 'text-gray-700',  bg: 'bg-transparent',   label: 'Saved Properties',  path: '/saved-properties' },
@@ -908,6 +903,34 @@ useEffect(() => {
             </div>
           )}
 
+          {/* ─── LOGGED-IN: Highlighted role switcher ───
+              Pulled out of the flat account list into a prominent brand
+              card so the tenant⇄host switch is impossible to miss. Shows
+              the mode you're in now + the role you'll switch to. */}
+          {isLoggedIn && (
+            <button
+              onClick={handleSwitchRole}
+              className="group relative w-full flex items-center gap-3.5 p-3.5 mt-1 mb-3 rounded-2xl bg-gradient-to-br from-[#ba0036] to-[#e60045] text-white shadow-[0_10px_26px_rgba(186,0,54,0.28)] overflow-hidden active:scale-[0.98] transition-transform"
+            >
+              <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+              <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center shrink-0">
+                <RefreshCw size={20} className="text-white" />
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/75 leading-none mb-1">
+                  {userRole === 'landlord' ? 'Host mode active' : 'Tenant mode active'}
+                </p>
+                <p className="text-[15px] font-black leading-tight">
+                  Switch to {userRole === 'tenant' ? 'Host' : 'Tenant'}
+                </p>
+              </div>
+              <span className="flex items-center gap-0.5 text-[11px] font-black bg-white/20 pl-3 pr-2 py-1.5 rounded-full shrink-0">
+                {userRole === 'tenant' ? 'Host' : 'Tenant'}
+                <ChevronRight size={14} className="group-active:translate-x-0.5 transition-transform" />
+              </span>
+            </button>
+          )}
+
           {/* ─── LOGGED-IN: Account links ─── */}
           {isLoggedIn && (
             <div className="py-2 border-b border-gray-100">
@@ -921,13 +944,6 @@ useEffect(() => {
                   <span className="text-[15px] font-semibold text-gray-900">{item.label}</span>
                 </button>
               ))}
-              <button onClick={handleSwitchRole}
-                className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors">
-                <RefreshCw size={20} className="text-gray-600 shrink-0" />
-                <span className="text-[15px] font-semibold text-gray-900">
-                  Switch to {userRole === 'tenant' ? 'Host' : 'Tenant'}
-                </span>
-              </button>
             </div>
           )}
 
@@ -951,22 +967,6 @@ useEffect(() => {
             ))}
           </div>
 
-          {/* ─── LOGGED-OUT: AI & Tools links ─── */}
-          {!isLoggedIn && (
-            <div className="py-2 border-b border-gray-100">
-              {toolLinks.map(item => (
-                <button
-                  key={item.label}
-                  onClick={() => go(item.path)}
-                  className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors"
-                >
-                  <item.Icon size={20} className="text-gray-600 shrink-0" />
-                  <span className="text-[15px] font-semibold text-gray-900">{item.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
           {/* ─── Help & Support section ─── */}
           <div className="py-2 border-b border-gray-100">
             <button
@@ -977,7 +977,7 @@ useEffect(() => {
               <span className="text-[15px] font-semibold text-gray-900">Help & Support</span>
             </button>
             <button
-              onClick={() => go('/')}
+              onClick={() => go('/terms')}
               className="flex items-center gap-4 w-full px-1 py-3.5 text-left hover:bg-gray-50 rounded-xl transition-colors"
             >
               <FileText size={20} className="text-gray-600 shrink-0" />
