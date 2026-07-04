@@ -58,6 +58,11 @@ const translations = {
     menuSectionAccount: "My Account",
     menuSectionExplore: "Explore",
     menuSectionSupport: "Support",
+    navPricing: "Pricing",
+    navHelp: "Help",
+    navLogIn: "Log in",
+    navSignUp: "Sign up",
+    navImLandlord: "I'm a landlord",
 
     // Hero Section
     heroTagline: "Bangladesh's #1 Property Platform",
@@ -641,8 +646,13 @@ const translations = {
     menuLanguageLabel: "ভাষা",
     menuLogOut: "লগ আউট",
     menuSectionAccount: "আমার অ্যাকাউন্ট",
-    menuSectionExplore: "অন্বেষণ",
+    menuSectionExplore: "খুঁজে দেখ",
     menuSectionSupport: "সহায়তা",
+    navPricing: "মূল্য",
+    navHelp: "সহায়তা",
+    navLogIn: "লগইন",
+    navSignUp: "সাইন আপ",
+    navImLandlord: "আমি বাড়িওয়ালা",
 
     // Hero Section
     heroTagline: "বাংলাদেশের ১নং বাড়ি প্ল্যাটফর্ম",

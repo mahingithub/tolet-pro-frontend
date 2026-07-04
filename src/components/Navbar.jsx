@@ -563,18 +563,29 @@ useEffect(() => {
 
           <div className={`hidden md:flex items-center gap-3 text-sm font-bold text-gray-700 ${(isScrolled || compactHeader) ? '' : 'ml-auto'}`}>
 
+            {/* ── Guest marketing links (HousingAnywhere-style) ── */}
+            {!isLoggedIn && (
+              <nav className="hidden lg:flex items-center gap-6 mr-1">
+                <Link to="/how-it-works" className="hover:text-[#ba0036] transition-colors">{t?.navHowItWorks || 'How it works'}</Link>
+                <Link to="/how-it-works#pricing" className="hover:text-[#ba0036] transition-colors">{t?.navPricing || 'Pricing'}</Link>
+                <Link to="/support" className="hover:text-[#ba0036] transition-colors">{t?.navHelp || 'Help'}</Link>
+              </nav>
+            )}
+
             {/* Desktop notification bell with unread badge + dropdown. */}
             {isAuthed && <NotificationBell isAuthed={isAuthed} />}
 
-            {/* List Property Desktop Button (Always Visible) */}
-            <button
-              onClick={() => handleProtected('/list-property')}
-              className="text-gray-700 bg-transparent hover:text-[#ba0036] flex items-center gap-2 font-bold text-xs lg:text-sm transition-all border-none"
-            >
-              <PlusCircle size={16} /> 
-              {t?.listProperty || 'Post Property'}
-              <span className="rounded-full bg-red-50 px-2 py-[3px] text-[10px] font-extrabold leading-none tracking-wider text-[#ba0036]">FREE</span>
-            </button>
+            {/* List Property — logged-in shortcut to post a new listing. */}
+            {isLoggedIn && (
+              <button
+                onClick={() => handleProtected('/list-property')}
+                className="text-gray-700 bg-transparent hover:text-[#ba0036] flex items-center gap-2 font-bold text-xs lg:text-sm transition-all border-none"
+              >
+                <PlusCircle size={16} />
+                {t?.listProperty || 'Post Property'}
+                <span className="rounded-full bg-red-50 px-2 py-[3px] text-[10px] font-extrabold leading-none tracking-wider text-[#ba0036]">FREE</span>
+              </button>
+            )}
 
             <div className="relative" ref={langRef}>
               <div onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="flex items-center gap-2 cursor-pointer hover:text-[#ba0036] transition-colors">
@@ -643,6 +654,9 @@ useEffect(() => {
 
                       <Link to="/smart-alerts" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-amber-50 hover:text-amber-600 rounded-xl transition-colors"><Bell size={17} /> Smart Alerts</Link>
 
+                      <Link to="/how-it-works" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors mt-1 border-t border-gray-50"><BookOpen size={17} /> {t?.navHowItWorks || 'How it Works'}</Link>
+                      <Link to="/support" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors"><LifeBuoy size={17} /> {t?.menuHelpSupport || 'Help & Support'}</Link>
+
                       <button onClick={handleLogout}
                         className="w-full flex items-center gap-3 px-5 py-3 text-sm font-black text-red-500 hover:bg-red-50 rounded-xl transition-colors text-left mt-1 border-t border-gray-50">
                         <LogOut size={17} /> Log Out
@@ -663,9 +677,20 @@ useEffect(() => {
                   )}
                 </>
               ) : (
-                <Link to="/login" className="text-gray-700 hover:text-[#ba0036] bg-transparent border border-gray-200 hover:border-[#ba0036] px-5 py-2 rounded-xl font-bold text-xs lg:text-sm transition-all active:scale-95 flex items-center gap-2">
-                <User size={16} /> {t?.login || 'Login / Signup'}
-              </Link>
+                <div className="flex items-center gap-2 lg:gap-3">
+                  <Link to="/login?mode=login" className="text-gray-700 hover:text-[#ba0036] font-bold text-xs lg:text-sm transition-colors whitespace-nowrap">
+                    {t?.navLogIn || 'Log in'}
+                  </Link>
+                  <Link to="/login?mode=signup" className="text-gray-700 hover:text-[#ba0036] font-bold text-xs lg:text-sm transition-colors whitespace-nowrap">
+                    {t?.navSignUp || 'Sign up'}
+                  </Link>
+                  <button
+                    onClick={() => navigate('/login?mode=signup&role=landlord')}
+                    className="text-gray-800 bg-white border border-gray-300 hover:border-[#ba0036] hover:text-[#ba0036] px-4 py-2 rounded-xl font-black text-xs lg:text-sm transition-all active:scale-95 flex items-center gap-1.5 whitespace-nowrap"
+                  >
+                    <Building2 size={15} /> {t?.navImLandlord || "I'm a landlord"}
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -842,18 +867,33 @@ useEffect(() => {
       {/* MOBILE DRAWER */}
       <div className={`md:hidden fixed inset-x-0 top-0 bg-gray-50 h-[100dvh] z-[65] overflow-y-auto overscroll-contain shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex flex-col px-4 pt-4 pb-28">
-          {/* Header — brand + close */}
+          {/* Header — real brand logo (matches main navbar) + close */}
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#ba0036] to-[#e60045] flex items-center justify-center text-white font-black text-sm shadow-sm">T</div>
-              <span className="text-base font-black text-gray-900 tracking-tight">TO-LET <span className="text-[#ba0036]">PRO</span></span>
-            </div>
+            <button
+              onClick={() => { navigate('/'); closeAll(); }}
+              className="flex items-center gap-2 group"
+              aria-label="TO-LET PRO home"
+            >
+              <div className="bg-[#ba0036] p-2 rounded-xl shadow-[0_4px_15px_rgba(186,0,54,0.3)] group-active:scale-95 transition-transform">
+                <Building2 className="text-white w-[18px] h-[18px]" />
+              </div>
+              <h1 className="font-black text-lg tracking-tighter">
+                <span className="text-gray-900">TO-LET</span> <span className="text-[#ba0036]">PRO</span>
+              </h1>
+              <span className="ml-0.5 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-[#ba0036] bg-red-50 border border-[#ba0036]/30 rounded-md leading-none self-center">
+                Beta
+              </span>
+            </button>
+
+            {/* Modern / futuristic close button — glass pill that fills with the
+                brand gradient on hover while the X spins 90°. */}
             <button
               onClick={closeAll}
-              className="p-2 rounded-full bg-white border border-gray-100 text-gray-500 hover:text-[#ba0036] hover:border-red-100 transition-all active:scale-90"
               aria-label="Close menu"
+              className="group relative w-10 h-10 rounded-full flex items-center justify-center text-gray-500 bg-white/80 backdrop-blur border border-gray-200/80 shadow-[0_2px_10px_rgba(0,0,0,0.06)] hover:text-white hover:border-transparent hover:bg-gradient-to-br hover:from-[#ba0036] hover:to-[#e60045] hover:shadow-[0_6px_18px_rgba(186,0,54,0.35)] transition-all duration-300 active:scale-90"
             >
-              <X size={18} />
+              <span className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/40 pointer-events-none" />
+              <X size={18} strokeWidth={2.6} className="relative transition-transform duration-300 group-hover:rotate-90" />
             </button>
           </div>
 
@@ -896,11 +936,11 @@ useEffect(() => {
               <p className="text-xs font-medium text-red-100 mb-5 text-center leading-relaxed">{t.menuJoinSubtitle || 'Dashboards, saved searches, alerts & more'}</p>
 
               <div className="flex gap-3">
-                <button onClick={() => { navigate('/login'); closeAll(); }}
+                <button onClick={() => { navigate('/login?mode=login'); closeAll(); }}
                   className="flex-1 bg-white text-[#ba0036] py-3 rounded-xl font-black text-sm shadow-lg active:scale-95 transition-transform">
                   {t.menuLogIn || 'Log In'}
                 </button>
-                <button onClick={() => { navigate('/login', { state: { isLoginMode: false } }); closeAll(); }}
+                <button onClick={() => { navigate('/login?mode=signup'); closeAll(); }}
                   className="flex-1 bg-white/20 backdrop-blur-md text-white border border-white/30 py-3 rounded-xl font-black text-sm active:scale-95 transition-transform">
                   {t.menuSignUp || 'Sign Up'}
                 </button>
@@ -988,6 +1028,16 @@ useEffect(() => {
           <div className="mb-5">
             <p className="text-[11px] font-black uppercase tracking-wider text-gray-400 px-1.5 mb-2">{t.menuSectionSupport || 'Support'}</p>
             <div className="bg-white border border-gray-100 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden divide-y divide-gray-50">
+              <button
+                onClick={() => go('/how-it-works')}
+                className="group flex items-center gap-3.5 w-full px-3.5 py-3.5 text-left active:bg-gray-50 transition-colors"
+              >
+                <span className="w-9 h-9 rounded-xl bg-gray-100 group-hover:bg-red-50 flex items-center justify-center shrink-0 transition-colors">
+                  <BookOpen size={18} className="text-gray-600 group-hover:text-[#ba0036] transition-colors" />
+                </span>
+                <span className="flex-1 text-[15px] font-semibold text-gray-800">{t.navHowItWorks || 'How it Works'}</span>
+                <ChevronRight size={16} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all" />
+              </button>
               <button
                 onClick={() => go('/support')}
                 className="group flex items-center gap-3.5 w-full px-3.5 py-3.5 text-left active:bg-gray-50 transition-colors"
