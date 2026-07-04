@@ -1,5 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  // Class-based dark mode: SettingsContext toggles `.dark` on <html> from the
+  // user's theme preference (light/dark/system). `dark:` variants opt in per
+  // component; until they do, the theme still applies via color-scheme.
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
