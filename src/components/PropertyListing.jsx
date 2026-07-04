@@ -51,6 +51,15 @@ const GOOGLE_MAPS_API_KEY =
 	(typeof process !== "undefined" && process?.env?.REACT_APP_GOOGLE_MAPS_API_KEY) ||
 	"AIzaSyC9xWNjjSPhxy2aUWLubPqHR7N6KZWmKlg";
 
+// Google Maps libraries. MUST be a stable reference AND identical to every other
+// useJsApiLoader call that shares the "tlp-google-map-script" id. PropertyDetails
+// and AddProperty both pass `[]`, so we match them exactly:
+// @react-google-maps/api keeps ONE Loader per id and THROWS "Loader must not be
+// called again with different options" if a later call passes a different
+// `libraries` value. Omitting the prop defaults it to ['maps'], which mismatches
+// `[]` and crashed the app when navigating between the map and a property page.
+const GOOGLE_MAPS_LIBRARIES = [];
+
 // Default centre — middle of Dhaka. Override via the prop on <MapView />.
 const DEFAULT_MAP_CENTER = { lat: 23.7652, lng: 90.3893 };
 const DEFAULT_MAP_ZOOM = 12;
@@ -499,11 +508,14 @@ const MapView = ({ properties, activeId, onMarkerClick, defaultCenter = DEFAULT_
 	);
 
 	// Load the Maps JS SDK once per page (the loader de-duplicates internally).
-	// NOTE: `libraries` prop is intentionally omitted — passing an empty array
-	// causes an internal constructor crash in some versions of @react-google-maps/api.
+	// `libraries` MUST match the other loaders that share this id (PropertyDetails
+	// and AddProperty both pass GOOGLE_MAPS_LIBRARIES = []). If they differ, the
+	// shared singleton Loader throws "must not be called again with different
+	// options" when the user navigates between the map and a property page.
 	const { isLoaded, loadError } = useJsApiLoader({
 		id: "tlp-google-map-script",
 		googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+		libraries: GOOGLE_MAPS_LIBRARIES,
 	});
 
 	// ── SUPERCLUSTER INPUT ──

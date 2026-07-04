@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { BedDouble, Bath, Square, X, MapPin, Star, Camera } from "lucide-react";
+import { BedDouble, Bath, Square, X, MapPin, Star, Camera, ChevronLeft, ChevronRight, Navigation } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 import { formatBdt, toLocalizedDigits, isBengali } from "../utils/formatCurrency";
 
@@ -100,6 +100,8 @@ const BottomSheetCard = ({ property, onClose, onOpen, onHeightChange }) => {
 		if (!el) return;
 		el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
 	};
+	const goPrev = (e) => { e.stopPropagation(); goToSlide(Math.max(0, activeSlide - 1)); };
+	const goNext = (e) => { e.stopPropagation(); goToSlide(Math.min(slides.length - 1, activeSlide + 1)); };
 
 	// Row 1 — type + address, grammatical in both languages.
 	const typeLabel =
@@ -115,6 +117,16 @@ const BottomSheetCard = ({ property, onClose, onOpen, onHeightChange }) => {
 			? `${typeLabel} · ${address}`
 			: `${typeLabel} in ${address}`
 		: typeLabel;
+
+	// Location control — opens the listing's coordinates (or address) in Google
+	// Maps in a new tab. Uses precise lat/lng when available, else the address.
+	const hasLocation = (property.lat && property.lng) || !!address;
+	const openLocation = (e) => {
+		e.stopPropagation();
+		const query = property.lat && property.lng ? `${property.lat},${property.lng}` : address || property.title || "";
+		if (!query) return;
+		window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, "_blank", "noopener,noreferrer");
+	};
 
 	// Row 3 — price + per-month suffix (rent/commercial), nothing extra for sale.
 	const priceSuffix = property.intent === "sale" ? "" : bn ? " / মাস" : " / month";
@@ -161,6 +173,45 @@ const BottomSheetCard = ({ property, onClose, onOpen, onHeightChange }) => {
 						</div>
 					))}
 				</div>
+
+				{/* Carousel scroll arrows — prev/next (only with multiple images) */}
+				{slides.length > 1 && (
+					<>
+						{activeSlide > 0 && (
+							<button
+								type="button"
+								onClick={goPrev}
+								aria-label="Previous image"
+								className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 flex items-center justify-center bg-white/90 backdrop-blur rounded-full shadow-md hover:bg-white active:scale-90 transition-all"
+							>
+								<ChevronLeft size={18} className="text-gray-800" />
+							</button>
+						)}
+						{activeSlide < slides.length - 1 && (
+							<button
+								type="button"
+								onClick={goNext}
+								aria-label="Next image"
+								className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 flex items-center justify-center bg-white/90 backdrop-blur rounded-full shadow-md hover:bg-white active:scale-90 transition-all"
+							>
+								<ChevronRight size={18} className="text-gray-800" />
+							</button>
+						)}
+					</>
+				)}
+
+				{/* Location tab — opens the property location in Google Maps */}
+				{hasLocation && (
+					<button
+						type="button"
+						onClick={openLocation}
+						aria-label={bn ? "গুগল ম্যাপে লোকেশন দেখুন" : "View location on Google Maps"}
+						className="absolute bottom-2.5 left-3 z-10 flex items-center gap-1 bg-white/95 backdrop-blur px-2.5 py-1 rounded-full text-[11px] font-black text-gray-900 shadow-sm hover:bg-white active:scale-95 transition-all"
+					>
+						<Navigation size={11} className="text-brandRed" />
+						{bn ? "লোকেশন" : "Location"}
+					</button>
+				)}
 
 				{/* Rating pill (mirrors the listing cards) */}
 				{property.rating != null && (
