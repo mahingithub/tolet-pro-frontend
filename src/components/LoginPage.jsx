@@ -1,21 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Capacitor } from '@capacitor/core';
-import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import {
   User, Phone, Lock, ArrowLeft, Loader2, CheckCircle2,
   Home, ShieldCheck, Building2, MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
-import { auth } from '../services/firebase';
 import {
   signupStart,
   signupVerify,
-  loginWithPassword,
-  forgotStart,
-  forgotVerify,
+  forgotPassword,
   resetPassword,
 } from '../services/authService.js';
 
@@ -33,34 +27,6 @@ function toE164(localPart) {
   return `+880${localPart}`;
 }
 
-/**
- * Maps Firebase auth errors to actionable Bangla messages instead of a
- * generic "OTP পাঠাতে সমস্যা" so future failures are debuggable.
- */
-function firebaseErrToMsg(err) {
-  const code = err?.code || '';
-  switch (code) {
-    case 'auth/invalid-phone-number':
-      return 'INVALID_PHONE_NUMBER';
-    case 'auth/missing-phone-number':
-      return 'MISSING_PHONE_NUMBER';
-    case 'auth/quota-exceeded':
-      return 'QUOTA_EXCEEDED';
-    case 'auth/captcha-check-failed':
-      return 'CAPTCHA_CHECK_FAILED';
-    case 'auth/too-many-requests':
-      return 'TOO_MANY_REQUESTS';
-    case 'auth/invalid-verification-code':
-      return 'INVALID_OTP';
-    case 'auth/code-expired':
-      return 'OTP_EXPIRED';
-    case 'auth/missing-app-credential':
-      return 'RECAPTCHA_SETUP_ERROR';
-    default:
-      return err?.message || 'OTP_PROCESS_ERROR';
-  }
-}
-
 const MODES = {
   LOGIN: 'login',
   SIGNUP: 'signup',
@@ -68,8 +34,7 @@ const MODES = {
 };
 const STEPS = {
   FORM: 'form',
-  OTP: 'otp',
-  NEW_PASSWORD: 'new-password', // forgot-password flow only
+  OTP: 'otp', // signup: verify code · forgot: verify code + set new password
 };
 
 const LoginPage = () => {
@@ -110,9 +75,10 @@ const LoginPage = () => {
   };
 
   const handleError = (err, defaultBn, defaultEn) => {
-    const key = err?.code?.startsWith?.('auth/') ? firebaseErrToMsg(err) : err?.message;
-    const translated = t[key];
-    setErrorMsg(translated || key || (isBn ? defaultBn : defaultEn));
+    // Backend ApiError → { code, message }. Prefer the server's own (Bangla)
+    // message, then a local translation by code, then a localized default.
+    const byCode = err?.code ? t[err.code] : null;
+    setErrorMsg(err?.serverMessage || byCode || (isBn ? defaultBn : defaultEn));
   };
 
   const nextUrl = searchParams.get('next');
@@ -139,54 +105,18 @@ const LoginPage = () => {
 
   const [formData, setFormData] = useState({ name: '', phone: '', password: '' });
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [resendIn, setResendIn] = useState(0);
 
-  // Firebase refs (kept across renders, recreated per new OTP request)
-  const confirmationResultRef = useRef(null);
-  const recaptchaVerifierRef = useRef(null);
-
-  // ─── Recaptcha lifecycle ──────────────────────────────────────────────────
-  // RecaptchaVerifier is single-use; clear + recreate on every OTP send so
-  // resend works and re-entering the flow after success doesn't fail silently.
-  const buildRecaptcha = useCallback(() => {
-    // Tear down any previous verifier instance.
-    if (recaptchaVerifierRef.current) {
-      try { recaptchaVerifierRef.current.clear(); } catch { /* noop */ }
-      recaptchaVerifierRef.current = null;
-    }
-    // Firebase leaves its widget markup inside the container div even after
-    // clear(), so a second attempt throws "reCAPTCHA has already been rendered
-    // in this element". Replace the div with a fresh empty one each time so the
-    // next RecaptchaVerifier always gets a clean mount point.
-    const old = document.getElementById('recaptcha-container');
-    if (old) {
-      const fresh = document.createElement('div');
-      fresh.id = 'recaptcha-container';
-      old.replaceWith(fresh);
-    }
-    recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-      size: 'invisible',
-    });
-    return recaptchaVerifierRef.current;
-  }, []);
-
   useEffect(() => {
     window.scrollTo(0, 0);
-    return () => {
-      if (recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current.clear();
-        recaptchaVerifierRef.current = null;
-      }
-    };
   }, []);
 
   // Tick the resend countdown
   useEffect(() => {
     if (resendIn <= 0) return undefined;
-    const t = setInterval(() => setResendIn((s) => Math.max(0, s - 1)), 1000);
-    return () => clearInterval(t);
+    const id = setInterval(() => setResendIn((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(id);
   }, [resendIn]);
 
   const goToNextOrDashboard = (resolvedRole) => {
@@ -214,24 +144,6 @@ const LoginPage = () => {
     setOtp(['', '', '', '', '', '']);
     setFormData({ name: '', phone: '', password: '' });
     setNewPassword('');
-    setResetToken('');
-  };
-
-  // ─── Send (or resend) the Firebase OTP ────────────────────────────────────
-  const sendFirebaseOtp = async () => {
-    const phoneE164 = toE164(formData.phone);
-    if (Capacitor.isNativePlatform()) {
-      // Native: no reCAPTCHA, Firebase handles SMS verification natively.
-      await FirebaseAuthentication.signInWithPhoneNumber({ phoneNumber: phoneE164 });
-      // Store a sentinel so the OTP verify step knows which path we took.
-      confirmationResultRef.current = { __native: true };
-    } else {
-      // Web: existing RecaptchaVerifier flow — unchanged.
-      const verifier = buildRecaptcha();
-      const result = await signInWithPhoneNumber(auth, phoneE164, verifier);
-      confirmationResultRef.current = result;
-    }
-    setResendIn(RESEND_COOLDOWN_S);
   };
 
   // ─── LOGIN flow (no OTP) ──────────────────────────────────────────────────
@@ -257,19 +169,18 @@ const LoginPage = () => {
     e.preventDefault();
     setIsLoading(true); setErrorMsg(''); setInfoMsg('');
     try {
-      // 1. Tell backend to draft the signup (validates input, ensures no
-      //    existing verified account, stores name + hashed pwd in SignupIntent).
+      // Backend validates input, ensures no existing verified account, stores
+      // name + hashed password in a SignupIntent, and texts a 6-digit OTP via
+      // sms.net.bd. A 202 means "OTP on its way".
       await signupStart({
         name: formData.name,
         phone: toE164(formData.phone),
         password: formData.password,
         role,
       });
-      // 2. Trigger Firebase OTP.
-      await sendFirebaseOtp();
       setStep(STEPS.OTP);
+      setResendIn(RESEND_COOLDOWN_S);
     } catch (err) {
-      // err here can be a backend ApiError or a Firebase error
       handleError(err, 'সাইনআপ শুরু করা যায়নি।', 'Failed to start signup.');
     } finally {
       setIsLoading(false);
@@ -281,18 +192,7 @@ const LoginPage = () => {
     setIsLoading(true); setErrorMsg(''); setInfoMsg('');
     const code = otp.join('');
     try {
-      let idToken;
-      if (confirmationResultRef.current?.__native) {
-        // Native path: confirm via Capacitor plugin, get idToken from Firebase JS SDK.
-        await FirebaseAuthentication.confirmVerificationCode({ verificationCode: code });
-        const { token } = await FirebaseAuthentication.getIdToken();
-        idToken = token;
-      } else {
-        // Web path: unchanged.
-        const credential = await confirmationResultRef.current.confirm(code);
-        idToken = await credential.user.getIdToken();
-      }
-      await signupVerify({ idToken });
+      await signupVerify({ phoneNumber: toE164(formData.phone), otp: code });
       const newUser = refresh ? await refresh() : null;
       window.dispatchEvent(
         new CustomEvent('triggerWelcomeRobot', {
@@ -316,9 +216,10 @@ const LoginPage = () => {
     e.preventDefault();
     setIsLoading(true); setErrorMsg(''); setInfoMsg('');
     try {
-      await forgotStart({ phone: toE164(formData.phone) });
-      await sendFirebaseOtp();
+      // Constant 202 response — never reveals whether the account exists.
+      await forgotPassword({ phoneNumber: toE164(formData.phone) });
       setStep(STEPS.OTP);
+      setResendIn(RESEND_COOLDOWN_S);
     } catch (err) {
       handleError(err, 'OTP পাঠানো যায়নি।', 'Failed to send OTP.');
     } finally {
@@ -326,40 +227,18 @@ const LoginPage = () => {
     }
   };
 
-  const submitForgotOtp = async (e) => {
+  // Forgot flow verifies the OTP AND sets the new password in one backend call.
+  const submitReset = async (e) => {
     e.preventDefault();
     setIsLoading(true); setErrorMsg(''); setInfoMsg('');
     try {
-      const code = otp.join('');
-      let idToken;
-      if (confirmationResultRef.current?.__native) {
-        // Native path: confirm via Capacitor plugin, get idToken from Firebase JS SDK.
-        await FirebaseAuthentication.confirmVerificationCode({ verificationCode: code });
-        const { token } = await FirebaseAuthentication.getIdToken();
-        idToken = token;
-      } else {
-        // Web path: unchanged.
-        const credential = await confirmationResultRef.current.confirm(code);
-        idToken = await credential.user.getIdToken();
-      }
-      const { resetToken: t } = await forgotVerify({ idToken });
-      setResetToken(t);
-      setStep(STEPS.NEW_PASSWORD);
-      setInfoMsg(isBn ? 'OTP যাচাই হয়েছে। এখন নতুন পাসওয়ার্ড দিন।' : 'OTP verified. Now enter a new password.');
-    } catch (err) {
-      handleError(err, 'OTP যাচাই ব্যর্থ।', 'OTP verification failed.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const submitResetPassword = async (e) => {
-    e.preventDefault();
-    setIsLoading(true); setErrorMsg(''); setInfoMsg('');
-    try {
-      await resetPassword({ resetToken, password: newPassword });
-      setInfoMsg(isBn ? 'পাসওয়ার্ড পরিবর্তন সফল। এবার লগইন করুন।' : 'Password changed successfully. Please log in.');
+      await resetPassword({
+        phoneNumber: toE164(formData.phone),
+        otp: otp.join(''),
+        newPassword,
+      });
       switchMode(MODES.LOGIN);
+      setInfoMsg(isBn ? 'পাসওয়ার্ড পরিবর্তন সফল। এবার লগইন করুন।' : 'Password changed successfully. Please log in.');
     } catch (err) {
       handleError(err, 'পাসওয়ার্ড পরিবর্তন ব্যর্থ।', 'Failed to change password.');
     } finally {
@@ -367,12 +246,24 @@ const LoginPage = () => {
     }
   };
 
+  // Re-request the OTP. Re-calls the same "start" endpoint, which upserts and
+  // re-texts a fresh code (signup) or re-sends the reset code (forgot).
   const handleResend = async () => {
     if (resendIn > 0) return;
     setIsLoading(true); setErrorMsg(''); setInfoMsg('');
     try {
-      await sendFirebaseOtp();
+      if (mode === MODES.SIGNUP) {
+        await signupStart({
+          name: formData.name,
+          phone: toE164(formData.phone),
+          password: formData.password,
+          role,
+        });
+      } else {
+        await forgotPassword({ phoneNumber: toE164(formData.phone) });
+      }
       setOtp(['', '', '', '', '', '']);
+      setResendIn(RESEND_COOLDOWN_S);
       setInfoMsg(isBn ? 'নতুন OTP পাঠানো হয়েছে।' : 'New OTP sent.');
     } catch (err) {
       handleError(err, 'OTP পাঠানো যায়নি।', 'Failed to send OTP.');
@@ -381,14 +272,30 @@ const LoginPage = () => {
     }
   };
 
+  // ─── OTP box helpers (type / backspace / paste) ───────────────────────────
   const handleOtpChange = (index, value) => {
-    if (isNaN(value)) return;
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-    if (value !== '' && index < 5) {
-      document.getElementById(`otp-${index + 1}`)?.focus();
+    const digit = value.replace(/\D/g, '').slice(-1); // keep only the last digit typed
+    if (value !== '' && digit === '') return;         // ignore non-numeric input
+    const next = [...otp];
+    next[index] = digit;
+    setOtp(next);
+    if (digit && index < 5) document.getElementById(`otp-${index + 1}`)?.focus();
+  };
+
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      document.getElementById(`otp-${index - 1}`)?.focus();
     }
+  };
+
+  const handleOtpPaste = (e) => {
+    e.preventDefault();
+    const digits = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+    if (!digits) return;
+    const next = ['', '', '', '', '', ''];
+    for (let i = 0; i < digits.length; i += 1) next[i] = digits[i];
+    setOtp(next);
+    document.getElementById(`otp-${Math.min(digits.length, 5)}`)?.focus();
   };
 
   // ─── Render ──────────────────────────────────────────────────────────────
@@ -429,9 +336,6 @@ const LoginPage = () => {
 
   return (
     <div className="h-screen w-full flex bg-[#f8f9fa] font-sans overflow-hidden">
-      {/* Invisible reCAPTCHA container — required by Firebase Phone Auth */}
-      <div id="recaptcha-container"></div>
-
       {/* ── LEFT SIDE: DESKTOP BRAND PANEL ── */}
       <div className="hidden lg:flex lg:w-[46%] relative overflow-hidden">
         <img
@@ -685,33 +589,67 @@ const LoginPage = () => {
               </>
             )}
 
-            {/* ── OTP STEP ── */}
+            {/* ── OTP STEP (signup verify · forgot verify + new password) ── */}
             {step === STEPS.OTP && (
               <div className="animate-[fadeIn_0.3s_ease-out] text-center">
                 <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Phone size={28} className="text-brandRed" />
+                  {mode === MODES.FORGOT
+                    ? <Lock size={28} className="text-brandRed" />
+                    : <Phone size={28} className="text-brandRed" />}
                 </div>
-                <h2 className="text-xl font-black text-gray-900 mb-1">{L('Verify your number', 'নম্বর যাচাই করুন')}</h2>
+                <h2 className="text-xl font-black text-gray-900 mb-1">
+                  {mode === MODES.FORGOT
+                    ? L('Reset your password', 'পাসওয়ার্ড রিসেট করুন')
+                    : L('Verify your number', 'নম্বর যাচাই করুন')}
+                </h2>
                 <p className="text-sm text-gray-500 mb-6">
                   {L('Enter the 6-digit OTP sent to', '৬-সংখ্যার OTP দিন যা পাঠানো হয়েছে')} <br />
                   <span className="font-bold text-gray-800">+880 {formData.phone}</span>
                 </p>
 
-                <form onSubmit={mode === MODES.FORGOT ? submitForgotOtp : submitSignupOtp} className="flex flex-col items-center">
-                  <div className="flex justify-center gap-3 sm:gap-4 mb-4">
+                <form onSubmit={mode === MODES.FORGOT ? submitReset : submitSignupOtp} className="flex flex-col items-center">
+                  <div className="flex justify-center gap-3 sm:gap-4 mb-4" onPaste={handleOtpPaste}>
                     {otp.map((digit, index) => (
                       <input
                         key={index}
                         id={`otp-${index}`}
                         type="text"
                         inputMode="numeric"
+                        autoComplete={index === 0 ? 'one-time-code' : 'off'}
                         maxLength="1"
                         value={digit}
                         onChange={(e) => handleOtpChange(index, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(index, e)}
                         className="w-12 h-12 sm:w-14 sm:h-14 text-center text-xl font-black text-brandRed bg-gray-50 border-2 border-gray-200 rounded-xl outline-none focus:border-brandRed focus:bg-white transition-all shadow-sm"
                       />
                     ))}
                   </div>
+
+                  {/* Forgot flow: the new password lives on the same screen as the OTP. */}
+                  {mode === MODES.FORGOT && (
+                    <div className="w-full mb-4 text-left">
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1 ml-1 uppercase tracking-wider">
+                        {L('New password', 'নতুন পাসওয়ার্ড')}
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                          <Lock size={16} />
+                        </div>
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold focus:bg-white focus:border-brandRed focus:ring-2 focus:ring-brandRed/20 transition-all outline-none tracking-widest"
+                          required
+                          minLength={8}
+                        />
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-1 ml-1">
+                        {L('At least 8 characters, with letters and numbers.', 'কমপক্ষে ৮ অক্ষর — অক্ষর ও সংখ্যা থাকতে হবে।')}
+                      </p>
+                    </div>
+                  )}
 
                   <button
                     type="button"
@@ -726,57 +664,24 @@ const LoginPage = () => {
 
                   <button
                     type="submit"
-                    disabled={isLoading || otp.join('').length < 6}
+                    disabled={
+                      isLoading
+                      || otp.join('').length < 6
+                      || (mode === MODES.FORGOT && newPassword.length < 8)
+                    }
                     className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_6px_15px_rgba(0,0,0,0.15)] hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-70"
                   >
-                    {isLoading ? <Loader2 className="animate-spin" size={18} /> : <><CheckCircle2 size={18} /> {L('Verify', 'যাচাই করুন')}</>}
+                    {isLoading ? <Loader2 className="animate-spin" size={18} />
+                      : mode === MODES.FORGOT ? L('Reset password', 'পাসওয়ার্ড রিসেট করুন')
+                      : <><CheckCircle2 size={18} /> {L('Verify', 'যাচাই করুন')}</>}
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => { setStep(STEPS.FORM); setOtp(['', '', '', '', '', '']); setErrorMsg(''); }}
+                    onClick={() => { setStep(STEPS.FORM); setOtp(['', '', '', '', '', '']); setNewPassword(''); setErrorMsg(''); }}
                     className="mt-4 text-sm font-bold text-gray-400 hover:text-brandRed transition-colors"
                   >
                     ← {L('Change number', 'নম্বর পরিবর্তন করুন')}
-                  </button>
-                </form>
-              </div>
-            )}
-
-            {/* ── NEW PASSWORD STEP (forgot flow) ── */}
-            {step === STEPS.NEW_PASSWORD && (
-              <div className="animate-[fadeIn_0.3s_ease-out]">
-                <div className="mb-6 text-center">
-                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">{L('Set a new password', 'নতুন পাসওয়ার্ড দিন')}</h2>
-                  <p className="text-sm text-gray-500 mt-1">{L('Choose a strong password.', 'একটি শক্তিশালী পাসওয়ার্ড দিন।')}</p>
-                </div>
-                <form className="space-y-3.5" onSubmit={submitResetPassword}>
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-700 mb-1 ml-1 uppercase tracking-wider">{L('New password', 'নতুন পাসওয়ার্ড')}</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                        <Lock size={16} />
-                      </div>
-                      <input
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold focus:bg-white focus:border-brandRed focus:ring-2 focus:ring-brandRed/20 transition-all outline-none tracking-widest"
-                        required
-                        minLength={8}
-                      />
-                    </div>
-                    <p className="text-[10px] text-gray-500 mt-1 ml-1">
-                      {L('At least 8 characters, with letters and numbers.', 'কমপক্ষে ৮ অক্ষর — অক্ষর ও সংখ্যা থাকতে হবে।')}
-                    </p>
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={isLoading || newPassword.length < 8}
-                    className="w-full mt-2 flex items-center justify-center gap-2 bg-brandRed text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_6px_15px_rgba(186,0,54,0.2)] hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-70"
-                  >
-                    {isLoading ? <Loader2 className="animate-spin" size={18} /> : L('Update password', 'পাসওয়ার্ড আপডেট করুন')}
                   </button>
                 </form>
               </div>

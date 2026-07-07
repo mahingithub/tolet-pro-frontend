@@ -3,23 +3,20 @@
  * ──────────────────────────────────────────────────────────────────────────
  * Talks to the TO-LET PRO auth backend.
  *
- * Flow recap (Option A — Firebase Phone Auth + backend ID-token verify):
+ * OTP is delivered by the BACKEND via sms.net.bd — there is NO client-side
+ * Firebase / reCAPTCHA anymore. The browser only posts the phone number and
+ * the 6-digit code the user received by SMS.
  *
  * Signup:
- * 1.  POST /signup/start  {name, phone, password, role}      → 202
- * 2.  client-side  signInWithPhoneNumber(...)                 → OTP via SMS
- * 3.  client-side  confirmationResult.confirm(otp)            → Firebase user
- * 4.  client-side  user.getIdToken()                          → idToken
- * 5.  POST /signup/verify {idToken}                           → { token, user }
+ * 1.  POST /signup/start  {name, phone, password, role}      → 202 (OTP texted)
+ * 2.  POST /signup/verify {phoneNumber, otp}                 → { token, user }
  *
  * Login (no OTP):
- * 1.  POST /login {phone, password}                           → { token, user }
+ * 1.  POST /login {phone, password}                          → { token, user }
  *
  * Forgot password:
- * 1.  POST /forgot/start {phone}                              → 202 (always)
- * 2.  client-side Firebase phone OTP                          → idToken
- * 3.  POST /forgot/verify {idToken}                           → { resetToken }
- * 4.  POST /reset-password {resetToken, password}             → 200
+ * 1.  POST /forgot-password {phoneNumber}                    → 202 (OTP texted)
+ * 2.  POST /reset-password  {phoneNumber, otp, newPassword}  → 200
  */
 
 import { readJson, writeJson, removeKey, broadcast } from './_storage.js';
@@ -56,6 +53,9 @@ async function api(path, { method = 'POST', body, auth: useAuth = false } = {}) 
     err.code = data.code;
     err.details = data.details;
     err.status = res.status;
+    // Backend ApiError includes a user-facing (Bangla) `message` — surface it
+    // so callers can show the server's own error text instead of a raw code.
+    err.serverMessage = data.message;
     throw err;
   }
   return data;
@@ -109,8 +109,8 @@ function purgeUserCaches() {
 export const signupStart  = ({ name, phone, password, role = 'tenant' }) =>
   api('/signup/start', { body: { name, phone, password, role } });
 
-export const signupVerify = async ({ idToken }) => {
-  const data = await api('/signup/verify', { body: { idToken } });
+export const signupVerify = async ({ phoneNumber, otp }) => {
+  const data = await api('/signup/verify', { body: { phoneNumber, otp } });
   // Purge any previous account's TenantDashboard cache BEFORE persisting
   // the new session, otherwise the freshly-mounted dashboard reads stale
   // fullName/phone from the prior user's storage slot.
@@ -137,11 +137,15 @@ export const loginWithPassword = async ({ phone, password }) => {
   return data.user;
 };
 
-// ─── Forgot / Reset ─────────────────────────────────────────────────────────
-export const forgotStart  = ({ phone })          => api('/forgot/start',   { body: { phone } });
-export const forgotVerify = ({ idToken })        => api('/forgot/verify',  { body: { idToken } });
-export const resetPassword = ({ resetToken, password }) =>
-  api('/reset-password', { body: { resetToken, password } });
+// ─── Forgot / Reset (OTP via sms.net.bd) ─────────────────────────────────────
+// Step 1: request an OTP. Backend always returns 202 (constant response) so
+// account existence is never leaked.
+export const forgotPassword = ({ phoneNumber }) =>
+  api('/forgot-password', { body: { phoneNumber } });
+
+// Step 2: verify the OTP and set the new password in a single call.
+export const resetPassword = ({ phoneNumber, otp, newPassword }) =>
+  api('/reset-password', { body: { phoneNumber, otp, newPassword } });
 
 // ─── Session ───────────────────────────────────────────────────────────────
 export const fetchMe = () => api('/me', { method: 'GET', auth: true }).then((d) => d.user);
