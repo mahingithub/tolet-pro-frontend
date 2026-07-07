@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
 import { uploadVerificationDoc, uploadAvatar, getCurrentToken } from '../services/authService';
 import { listMyInquiries, deleteInquiry } from '../services/inquiryService.js';
-import { listTenantReceipts } from '../services/receiptService.js';
+import { listTenantReceipts, markReceiptRead as apiMarkReceiptRead } from '../services/receiptService.js';
 import { listNotifications, getUnreadCount, markRead } from '../services/notificationService.js';
 import { propertyService } from '../services/Propertyservice.js';
 import { buildTenantAlerts } from '../utils/rentAlerts';
@@ -1132,10 +1132,15 @@ const handleWizardSubmit = async (payload) => {
 
   const markReceiptRead = (id) => {
     persistReceipts(paymentReceipts.map(r => r.id === id ? { ...r, read: true } : r));
+    apiMarkReceiptRead(id).catch(() => {}); // fire-and-forget; local state is already updated
   };
 
   const markAllReceiptsRead = () => {
     persistReceipts(paymentReceipts.map(r => ({ ...r, read: true })));
+    // Mark each unread receipt on the server too
+    paymentReceipts.filter(r => !r.read).forEach(r => {
+      apiMarkReceiptRead(r.id).catch(() => {});
+    });
   };
 
   const unreadReceiptsCount = paymentReceipts.filter(r => !r.read).length;
