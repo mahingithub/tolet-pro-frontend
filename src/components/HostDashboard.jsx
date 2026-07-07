@@ -1383,6 +1383,9 @@ const HostDashboard = () => {
     setActiveDropdownId(null);
     setIsProfileDrawerOpen(false);
     setConfirmDeleteBookingId(null);
+    if (type === 'upload_document') {
+      setUploadForm({ folder: activeFolder?.id || 'agreements', bookingId: '', file: null });
+    }
     if (type === 'edit' && data) {
       // Seed every editable field. Demo seed entries only carry a subset of
       // the schema; fall back to sensible defaults so the inputs render.
@@ -5003,15 +5006,25 @@ const HostDashboard = () => {
 
             {activeModal === 'upload_document' && (
                 <div className="space-y-5 p-6">
-                  <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ফোল্ডার নির্বাচন করুন' : 'Select Folder'}</label>
-                    <select value={uploadForm.folder} onChange={e => setUploadForm(f => ({ ...f, folder: e.target.value }))} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all cursor-pointer appearance-none">
-                      <option value="agreements">{language === 'বাংলা' ? 'রেন্টাল এগ্রিমেন্ট' : 'Rental Agreements'}</option>
-                      <option value="nids">{language === 'বাংলা' ? 'ভাড়াটিয়া NID / আইডি' : 'Tenant NID / IDs'}</option>
-                      <option value="payments">{language === 'বাংলা' ? 'পেমেন্ট রেকর্ড' : 'Payment Records'}</option>
-                      <option value="legal">{language === 'বাংলা' ? 'লিগ্যাল ডকুমেন্টস' : 'Legal Documents'}</option>
-                    </select>
-                  </div>
+                  {activeFolder ? (
+                    <div>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ফোল্ডার' : 'Folder'}</label>
+                      <div className="w-full mt-1.5 p-4 bg-gray-100 rounded-xl text-sm font-bold text-gray-900 flex items-center gap-2">
+                        <activeFolder.icon size={16} className="text-gray-600" />
+                        {language === 'বাংলা' ? activeFolder.bn : activeFolder.en}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ফোল্ডার নির্বাচন করুন' : 'Select Folder'}</label>
+                      <select value={uploadForm.folder} onChange={e => setUploadForm(f => ({ ...f, folder: e.target.value }))} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all cursor-pointer appearance-none">
+                        <option value="agreements">{language === 'বাংলা' ? 'রেন্টাল এগ্রিমেন্ট' : 'Rental Agreements'}</option>
+                        <option value="nids">{language === 'বাংলা' ? 'ভাড়াটিয়া NID / আইডি' : 'Tenant NID / IDs'}</option>
+                        <option value="payments">{language === 'বাংলা' ? 'পেমেন্ট রেকর্ড' : 'Payment Records'}</option>
+                        <option value="legal">{language === 'বাংলা' ? 'লিগ্যাল ডকুমেন্টস' : 'Legal Documents'}</option>
+                      </select>
+                    </div>
+                  )}
 
                   <div>
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'কোন ভাড়াটিয়া? (ঐচ্ছিক)' : 'Which tenant? (optional)'}</label>
