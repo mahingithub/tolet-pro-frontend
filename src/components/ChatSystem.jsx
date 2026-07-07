@@ -41,6 +41,12 @@ import CompactAudioPlayer from './CompactAudioPlayer';
 import MessageActionsMenu from './MessageActionsMenu';
 import BlockUserModal from './BlockUserModal';
 import ChatPinLock from './ChatPinLock';
+// ── WhatsApp-style header menu, contact/mute/report modals + reactions ──────
+import ChatHeaderMenu from './ChatHeaderMenu';
+import ViewContactModal from './ViewContactModal';
+import MuteNotificationsModal from './MuteNotificationsModal';
+import ReportContactModal from './ReportContactModal';
+import ReactionBar from './ReactionBar';
 
 // ── Reply-quote helpers (module scope, pure) ────────────────────────────────
 // A reply is encoded as a leading markdown blockquote line:
@@ -439,6 +445,15 @@ const ChatSystem = () => {
   const [replyTo, setReplyTo]       = useState(null);   // message currently being replied to
   const [forwardMsg, setForwardMsg] = useState(null);   // message currently being forwarded
   const [showBlockModal, setShowBlockModal] = useState(false);
+  // WhatsApp-style header dropdown + its action modals.
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [showMuteModal, setShowMuteModal]       = useState(false);
+  const [showReportModal, setShowReportModal]   = useState(false);
+  // Emoji reactions — frontend/session only, keyed by messageId → emoji.
+  // (Cross-user persistence would need a backend `reactions` field + socket.)
+  const [reactions, setReactions] = useState({});
+  const [reactionBar, setReactionBar] = useState(null); // { message, x, y }
   // Per-chat PIN privacy. `chatLocks` persists { chatId: pinHash } to localStorage;
   // `pinUnlocked` is per-session (unlock is forgotten on reload); `pinSetupFor`
   // holds the chatId whose PIN is currently being set.
@@ -1191,7 +1206,13 @@ const ChatSystem = () => {
     setReplyTo(null);
     setShowEmojiPicker(false);
     sendMessageTo(activeChatId, text, { replyTo: replying });
-    
+
+    // ── Crucial mobile UX fix ──────────────────────────────────────────────
+    // Refocus the input right after sending so the on-screen keyboard STAYS
+    // open for continuous typing (otherwise the input blurs and the keyboard
+    // slides away between every message).
+    inputRef.current?.focus();
+
     // Stop typing immediately when sent
     const chat = chats.find(c => c.id === activeChatId);
     if (chat && chat.peerUserId) {
@@ -1393,32 +1414,61 @@ const ChatSystem = () => {
     setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, muted: next } : c));
     try { chatService.muteConversation?.(activeChatId, next); } catch (e) { console.warn('mute failed', e); }
   };
-  const blockChat = async () => {
-    setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, blocked: true } : c));
+  // Mute for a chosen duration (from the Mute modal). Duration is recorded on
+  // the chat row; unmute clears it via toggleMuteChat.
+  const muteChatFor = (duration) => {
+    setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, muted: true, muteDuration: duration } : c));
+    try { chatService.muteConversation?.(activeChatId, true, duration); } catch (e) { console.warn('mute failed', e); }
+    setShowMuteModal(false);
+    toast.success(duration === 'always' ? 'Notifications muted' : `Muted for ${duration === '8h' ? '8 hours' : '1 week'}`);
+  };
+  const blockChat = async (reason) => {
+    setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, blocked: true, blockReason: reason } : c));
     setConfirmBlock(false);
-    try { await chatService.blockConversation?.(activeChatId); } catch (e) { console.warn('block failed', e); }
+    setShowBlockModal(false);
+    try { await chatService.blockConversation?.(activeChatId, reason); } catch (e) { console.warn('block failed', e); }
+    toast.success(`${activeChat.name || 'Contact'} blocked`);
   };
   const unblockChat = async () => {
     setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, blocked: false } : c));
     try { await chatService.unblockConversation?.(activeChatId); } catch (e) { console.warn('unblock failed', e); }
   };
   const submitReport = async (reason) => {
+    setShowReportModal(false);
     try { await chatService.reportConversation?.(activeChatId, reason); } catch (e) { console.warn('report failed', e); }
     setReportSent(true);
+    toast.success('Report submitted. Thank you.');
+  };
+
+  // ── Emoji reactions (opened by long-press / hover on a bubble) ─────────────
+  const openReactions = (message, x, y) => {
+    if (!message || message.isDeleted) return;
+    setReactionBar({ message, x, y });
+  };
+  const toggleReaction = (messageId, emoji) => {
+    if (!messageId) return;
+    // One reaction per message (WhatsApp-style toggle). Frontend/session only.
+    setReactions(prev => ({ ...prev, [messageId]: prev[messageId] === emoji ? undefined : emoji }));
   };
 
   // ── Message long-press / context menu (Reply · Forward · Delete) ───────────
   const openMessageMenu = (message, x, y) => setMenuState({ message, x, y });
 
+  // Cancel a pending long-press (used when a swipe/drag starts or pointer lifts).
+  const cancelLongPress = () => {
+    if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; }
+  };
+
   // Handlers spread onto each text/media bubble. Long-press (touch) or
-  // right-click (desktop) opens the action menu; a >10px move cancels it so
-  // scrolling never triggers it.
+  // right-click (desktop) opens the REACTION BAR (which itself has a "more"
+  // button → Reply/Forward/Delete). A >10px move cancels it so scrolling and
+  // swipe-to-reply never trigger it.
   const bubblePressHandlers = (m) => ({
-    onContextMenu: (e) => { e.preventDefault(); openMessageMenu(m, e.clientX, e.clientY); },
+    onContextMenu: (e) => { e.preventDefault(); openReactions(m, e.clientX, e.clientY); },
     onPointerDown: (e) => {
       pressPosRef.current = { x: e.clientX, y: e.clientY };
       if (longPressRef.current) clearTimeout(longPressRef.current);
-      longPressRef.current = setTimeout(() => openMessageMenu(m, pressPosRef.current.x, pressPosRef.current.y), 450);
+      longPressRef.current = setTimeout(() => openReactions(m, pressPosRef.current.x, pressPosRef.current.y), 450);
     },
     onPointerMove: (e) => {
       const p = pressPosRef.current;
@@ -1857,14 +1907,13 @@ const ChatSystem = () => {
                 </button>
               )}
               <div 
-                className={`flex items-center gap-3 ${!activeChat.isAI && activeChat.peerUserId ? 'cursor-pointer group' : ''}`}
+                className={`flex items-center gap-3 ${!activeChat.isAI ? 'cursor-pointer group' : ''}`}
                 onClick={() => {
-                  if (activeChat.isAI || !activeChat.peerUserId) return;
-                  if (activeChat.role === 'Property Owner' || activeChat.role === 'Landlord') {
-                    navigate(`/host/${activeChat.peerUserId}`);
-                  } else {
-                    navigate(`/tenant/${activeChat.peerUserId}`);
-                  }
+                  // WhatsApp behaviour: tapping the header avatar/name opens the
+                  // SAME dropdown as the ⋮ button (full profile lives in "View
+                  // contact"). The AI bot has no menu.
+                  if (activeChat.isAI) return;
+                  setHeaderMenuOpen(o => !o);
                 }}
               >
                 <div className={`w-11 h-11 rounded-2xl overflow-hidden shrink-0 shadow-sm ${!activeChat.isAI && activeChat.peerUserId ? 'group-hover:scale-105 transition-transform' : ''}`}>
@@ -1933,15 +1982,39 @@ const ChatSystem = () => {
                   <Info size={18}/>
                 </button>
               )}
-              <button
-                onClick={() => setShowInfoPane(s => !s)}
-                className={`p-2.5 sm:p-3 rounded-2xl transition-all shadow-sm ${
-                  showInfoPane ? 'bg-[#ba0036] text-white' : 'bg-white hover:bg-red-50 text-gray-500 hover:text-[#ba0036]'
-                }`}
-                aria-label="Contact info"
-              >
-                <MoreVertical size={18}/>
-              </button>
+              {/* 3-dots → WhatsApp-style dropdown. For the AI bot (no block/report/
+                  mute) it just opens the info pane instead. */}
+              {activeChat.isAI ? (
+                <button
+                  onClick={() => setShowInfoPane(s => !s)}
+                  className="p-2.5 sm:p-3 rounded-2xl bg-white hover:bg-red-50 text-gray-500 hover:text-[#ba0036] transition-all shadow-sm"
+                  aria-label="Contact info"
+                >
+                  <MoreVertical size={18}/>
+                </button>
+              ) : (
+                <div className="relative">
+                  <button
+                    onClick={() => setHeaderMenuOpen(o => !o)}
+                    className={`p-2.5 sm:p-3 rounded-2xl transition-all shadow-sm ${
+                      headerMenuOpen ? 'bg-[#ba0036] text-white' : 'bg-white hover:bg-red-50 text-gray-500 hover:text-[#ba0036]'
+                    }`}
+                    aria-label="Chat options"
+                  >
+                    <MoreVertical size={18}/>
+                  </button>
+                  <ChatHeaderMenu
+                    open={headerMenuOpen}
+                    muted={activeChat.muted}
+                    blocked={activeChat.blocked}
+                    onClose={() => setHeaderMenuOpen(false)}
+                    onViewContact={() => setShowContactModal(true)}
+                    onMute={() => (activeChat.muted ? toggleMuteChat() : setShowMuteModal(true))}
+                    onReport={() => setShowReportModal(true)}
+                    onBlock={() => (activeChat.blocked ? unblockChat() : setShowBlockModal(true))}
+                  />
+                </div>
+              )}
             </div>
           </header>
 
@@ -2013,10 +2086,24 @@ const ChatSystem = () => {
                 );
               }
               return (
-                <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'} ${m.position === 'middle' ? 'mb-0.5' : 'mb-2'}`}>
-                  <div
+                <div key={m.id} className={`group/msg flex items-center ${mine ? 'justify-end' : 'justify-start'} ${m.position === 'middle' ? 'mb-0.5' : 'mb-2'}`}>
+                  {/* Swipe-right-to-reply: the bubble is a horizontally draggable
+                      motion.div. Drag past ~60px and release → reply. A reply
+                      arrow fades in behind it as you pull. dragDirectionLock lets
+                      vertical scrolling still work. */}
+                  {!m.isDeleted && !mine && (
+                    <CornerUpLeft size={16} className="text-[#ba0036] opacity-0 group-active/msg:opacity-60 mr-1 shrink-0 transition-opacity" />
+                  )}
+                  <motion.div
                     {...bubblePressHandlers(m)}
-                    className={`relative max-w-[78%] sm:max-w-[68%] ${bubbleRadius(mine, m.position)} px-3.5 py-2.5 select-none cursor-default transition-all shadow-[0_2px_10px_-3px_rgba(0,0,0,0.12)] active:scale-[0.99] ${
+                    drag={m.isDeleted ? false : 'x'}
+                    dragDirectionLock
+                    dragConstraints={{ left: 0, right: 0 }}
+                    dragElastic={{ left: 0, right: 0.55 }}
+                    dragSnapToOrigin
+                    onDragStart={cancelLongPress}
+                    onDragEnd={(_e, info) => { if (info.offset.x > 60) handleReply(m); }}
+                    className={`relative max-w-[78%] sm:max-w-[68%] ${bubbleRadius(mine, m.position)} px-3.5 py-2.5 select-none cursor-default transition-shadow shadow-[0_2px_10px_-3px_rgba(0,0,0,0.12)] ${
                     mine
                       ? 'bg-gradient-to-br from-[#ba0036] to-[#a30030] text-white'
                       : fromBot
@@ -2099,7 +2186,23 @@ const ChatSystem = () => {
                         )}
                       </div>
                     )}
-                  </div>
+                    {/* Emoji reaction chip — sits at the bubble's bottom corner. */}
+                    {reactions[m.id] && (
+                      <span className={`absolute -bottom-2.5 ${mine ? 'right-2' : 'left-2'} bg-white rounded-full shadow-md border border-gray-100 px-1.5 py-0.5 text-[13px] leading-none z-10`}>
+                        {reactions[m.id]}
+                      </span>
+                    )}
+                  </motion.div>
+                  {/* Desktop hover affordance → opens the reaction bar. */}
+                  {!m.isDeleted && (
+                    <button
+                      onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openReactions(m, r.left + r.width / 2, r.top); }}
+                      className="hidden sm:group-hover/msg:flex w-7 h-7 rounded-full bg-white shadow-sm border border-gray-100 items-center justify-center text-gray-400 hover:text-[#ba0036] shrink-0 mx-1 transition-colors"
+                      aria-label="React"
+                    >
+                      <Smile size={14} />
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -2595,6 +2698,17 @@ const ChatSystem = () => {
         />
       )}
 
+      {/* Emoji reaction bar (long-press / right-click a bubble) */}
+      <ReactionBar
+        open={!!reactionBar}
+        x={reactionBar?.x || 0}
+        y={reactionBar?.y || 0}
+        current={reactionBar ? reactions[reactionBar.message?.id] : null}
+        onReact={(emoji) => reactionBar && toggleReaction(reactionBar.message.id, emoji)}
+        onMore={() => reactionBar && openMessageMenu(reactionBar.message, reactionBar.x, reactionBar.y)}
+        onClose={() => setReactionBar(null)}
+      />
+
       {/* Long-press / right-click message actions: Reply · Forward · Delete */}
       <MessageActionsMenu
         open={!!menuState}
@@ -2607,12 +2721,48 @@ const ChatSystem = () => {
         onClose={() => setMenuState(null)}
       />
 
-      {/* Block confirmation modal */}
+      {/* Block confirmation modal (requires a reason) */}
       <BlockUserModal
         open={showBlockModal}
         name={activeChat?.name}
         onCancel={() => setShowBlockModal(false)}
-        onConfirm={() => { blockChat(); setShowBlockModal(false); }}
+        onConfirm={(reason) => blockChat(reason)}
+      />
+
+      {/* WhatsApp-style "Contact info" */}
+      <ViewContactModal
+        open={showContactModal}
+        contact={{
+          name: activeChat?.name,
+          avatar: activeChat?.avatar,
+          role: activeChat?.role,
+          phone: activeChat?.tenantPhone,
+          propertyTitle: activeChat?.propertyTitle,
+          peerUserId: activeChat?.peerUserId,
+        }}
+        onClose={() => setShowContactModal(false)}
+        onVoiceCall={activeChat?.peerUserId ? () => placeCall({ peerUserId: activeChat.peerUserId, peerName: activeChat.name, peerAvatar: activeChat.avatar, type: 'voice' }) : undefined}
+        onVideoCall={activeChat?.peerUserId ? () => placeCall({ peerUserId: activeChat.peerUserId, peerName: activeChat.name, peerAvatar: activeChat.avatar, type: 'video' }) : undefined}
+        onViewProfile={activeChat?.peerUserId ? () => {
+          if (activeChat.role === 'Property Owner' || activeChat.role === 'Landlord') navigate(`/host/${activeChat.peerUserId}`);
+          else navigate(`/tenant/${activeChat.peerUserId}`);
+        } : undefined}
+      />
+
+      {/* Mute notifications (8 hours / 1 week / Always) */}
+      <MuteNotificationsModal
+        open={showMuteModal}
+        name={activeChat?.name}
+        onCancel={() => setShowMuteModal(false)}
+        onConfirm={(duration) => muteChatFor(duration)}
+      />
+
+      {/* Report confirmation */}
+      <ReportContactModal
+        open={showReportModal}
+        name={activeChat?.name}
+        onCancel={() => setShowReportModal(false)}
+        onConfirm={(reason) => submitReport(reason || 'Reported from chat')}
       />
 
       {/* Forward picker */}
