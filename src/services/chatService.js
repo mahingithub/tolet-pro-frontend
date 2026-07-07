@@ -102,6 +102,18 @@ export const deleteMessage = async (conversationId, messageId) => {
 };
 
 /**
+ * Add / change / remove an emoji reaction on a message. Pass an empty emoji (or
+ * the same one again) to remove it. Returns { reactions: { userId: emoji } }.
+ * The backend also emits MESSAGE_REACTION so the other user updates live.
+ */
+export const reactToMessage = async (conversationId, messageId, emoji) => {
+  return call(`/conversations/${conversationId}/messages/${messageId}/react`, {
+    method: 'POST',
+    body: { emoji: emoji || '' },
+  });
+};
+
+/**
  * Send an image or voice message (multipart upload).
  * @param {string} conversationId
  * @param {Blob|File} file       the image / audio blob
@@ -156,5 +168,6 @@ export default {
   sendMediaMessage,
   markRead,
   deleteMessage,
+  reactToMessage,
   getMissedMessagesCount,
 };

@@ -47,6 +47,17 @@ import ViewContactModal from './ViewContactModal';
 import MuteNotificationsModal from './MuteNotificationsModal';
 import ReportContactModal from './ReportContactModal';
 import ReactionBar from './ReactionBar';
+import EmojiPicker from './EmojiPicker';
+
+// Render a text message bigger when it's only emoji ("jumbo"/sticker), and
+// detect a lone image/GIF URL so stickers and Tenor GIFs render as media.
+const EMOJI_ONLY_RE = (() => { try { return new RegExp('^(?:\\p{Extended_Pictographic}|\\uFE0F|\\u200D|\\s){1,8}$', 'u'); } catch { return null; } })();
+const isJumboEmoji = (t) => { const s = (t || '').trim(); return !!s && !!EMOJI_ONLY_RE && EMOJI_ONLY_RE.test(s); };
+const isImageUrl = (t) => {
+  const s = (t || '').trim();
+  if (!/^https?:\/\/\S+$/i.test(s)) return false;
+  return /\.(gif|png|jpe?g|webp)(\?|$)/i.test(s) || /(tenor\.com|giphy\.com|media\.tenor|c\.tenor)/i.test(s);
+};
 
 // ── Reply-quote helpers (module scope, pure) ────────────────────────────────
 // A reply is encoded as a leading markdown blockquote line:
@@ -450,9 +461,9 @@ const ChatSystem = () => {
   const [showContactModal, setShowContactModal] = useState(false);
   const [showMuteModal, setShowMuteModal]       = useState(false);
   const [showReportModal, setShowReportModal]   = useState(false);
-  // Emoji reactions — frontend/session only, keyed by messageId → emoji.
-  // (Cross-user persistence would need a backend `reactions` field + socket.)
-  const [reactions, setReactions] = useState({});
+  // Emoji reactions persist + sync via the backend (Message.reactions +
+  // MESSAGE_REACTION socket). They live on each message object as
+  // m.reactions = { userId: emoji }; this state only drives the floating bar.
   const [reactionBar, setReactionBar] = useState(null); // { message, x, y }
   // Per-chat PIN privacy. `chatLocks` persists { chatId: pinHash } to localStorage;
   // `pinUnlocked` is per-session (unlock is forgotten on reload); `pinSetupFor`
@@ -570,6 +581,20 @@ const ChatSystem = () => {
       });
     };
 
+    // Reaction added/removed by either side → update the message's reactions
+    // live so the other user sees the emoji appear/disappear.
+    const onReaction = ({ messageId, reactions: rx }) => {
+      if (!messageId) return;
+      setMessages(prev => {
+        const next = { ...prev };
+        for (const chatId in next) {
+          next[chatId] = next[chatId].map(m =>
+            String(m.id) === String(messageId) ? { ...m, reactions: rx || {} } : m);
+        }
+        return next;
+      });
+    };
+
     const onTyping = ({ senderId }) => {
       if (activeChatId !== 'ai-bot') {
         const chat = chats.find(c => String(c.peerUserId) === String(senderId));
@@ -591,6 +616,7 @@ const ChatSystem = () => {
     socket.on('MESSAGE_DELIVERED', onDelivered);
     socket.on('MESSAGE_SEEN', onSeen);
     socket.on('MESSAGE_DELETED', onMessageDeleted);
+    socket.on('MESSAGE_REACTION', onReaction);
     socket.on('USER_TYPING', onTyping);
     socket.on('USER_STOPPED_TYPING', onStopTyping);
 
@@ -598,6 +624,7 @@ const ChatSystem = () => {
       socket.off('MESSAGE_DELIVERED', onDelivered);
       socket.off('MESSAGE_SEEN', onSeen);
       socket.off('MESSAGE_DELETED', onMessageDeleted);
+      socket.off('MESSAGE_REACTION', onReaction);
       socket.off('USER_TYPING', onTyping);
       socket.off('USER_STOPPED_TYPING', onStopTyping);
     };
@@ -797,6 +824,20 @@ const ChatSystem = () => {
   // full-screen "clean chat" layer that covers the app's top navbar +
   // bottom tab bar so the thread feels like a native messenger.
   const mobileChatOpen = isMobile && !showSidebarMobile;
+
+  // The full-screen mobile chat is sized to the VISUAL viewport (not 100dvh) so
+  // that when the keyboard opens, the container shrinks and the composer stays
+  // visible ABOVE the keyboard instead of being covered by it.
+  const [kbViewport, setKbViewport] = useState({ height: null, offsetTop: 0 });
+  useEffect(() => {
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    if (!mobileChatOpen || !vv) { setKbViewport({ height: null, offsetTop: 0 }); return undefined; }
+    const apply = () => setKbViewport({ height: vv.height, offsetTop: vv.offsetTop || 0 });
+    apply();
+    vv.addEventListener('resize', apply);
+    vv.addEventListener('scroll', apply);
+    return () => { vv.removeEventListener('resize', apply); vv.removeEventListener('scroll', apply); };
+  }, [mobileChatOpen]);
 
   const scrollRef = useRef(null);
   const inputRef  = useRef(null);
@@ -1028,7 +1069,7 @@ const ChatSystem = () => {
             ? {
                 id: saved.id, sender: 'me', text: saved.text,
                 type: saved.type || 'text', mediaUrl: saved.mediaUrl || null, mediaMeta: saved.mediaMeta || null,
-                replyTo: saved.replyTo || null, isDeleted: !!saved.isDeleted,
+                replyTo: saved.replyTo || null, isDeleted: !!saved.isDeleted, reactions: saved.reactions || {},
                 iso: saved.createdAt, status: 'delivered', senderId: saved.senderId,
               }
             : m,
@@ -1181,9 +1222,21 @@ const ChatSystem = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location]);
 
-  // Auto-scroll on new content.
+  // Auto-scroll to the latest message. Opening a chat (or a bulk load) JUMPS
+  // instantly to the bottom — no visible top→bottom scroll-through. Only a
+  // single newly-arrived message animates smoothly.
+  const prevChatRef  = useRef(null);
+  const prevCountRef = useRef(0);
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    const count = (messages[activeChatId] || []).length;
+    const chatChanged = prevChatRef.current !== activeChatId;
+    const bulk = count - prevCountRef.current > 1;
+    scrollRef.current?.scrollIntoView({
+      behavior: (chatChanged || bulk) ? 'auto' : 'smooth',
+      block: 'end',
+    });
+    prevChatRef.current  = activeChatId;
+    prevCountRef.current = count;
   }, [messages, activeChatId, isBotTyping, paymentReceipts]);
 
   // Esc to close call/overlay.
@@ -1222,8 +1275,9 @@ const ChatSystem = () => {
   };
 
   const insertEmoji = (e) => {
-    handleTyping(inputText + e);
-    setTimeout(() => inputRef.current?.focus(), 0);
+    // Append without refocusing the input, so the emoji panel stays open and
+    // the keyboard doesn't pop up over it (WhatsApp behaviour).
+    setInputText((t) => t + e);
   };
 
   const typingTimeoutRef = useRef(null);
@@ -1264,6 +1318,7 @@ const ChatSystem = () => {
         mediaMeta: saved.mediaMeta || null,
         replyTo:   saved.replyTo || null,
         isDeleted: !!saved.isDeleted,
+        reactions: saved.reactions || {},
         iso:       saved.createdAt,
         status:    'delivered',
         senderId:  saved.senderId,
@@ -1445,10 +1500,27 @@ const ChatSystem = () => {
     if (!message || message.isDeleted) return;
     setReactionBar({ message, x, y });
   };
-  const toggleReaction = (messageId, emoji) => {
-    if (!messageId) return;
-    // One reaction per message (WhatsApp-style toggle). Frontend/session only.
-    setReactions(prev => ({ ...prev, [messageId]: prev[messageId] === emoji ? undefined : emoji }));
+  const currentUserId = String(getCurrentUser()?.id || getCurrentUser()?._id || '');
+  const toggleReaction = (message, emoji) => {
+    if (!message?.id) return;
+    const uid = currentUserId;
+    // Optimistically flip this user's reaction on the message (one per user).
+    setMessages(prev => {
+      const next = { ...prev };
+      for (const chatId in next) {
+        next[chatId] = next[chatId].map(m => {
+          if (String(m.id) !== String(message.id)) return m;
+          const r = { ...(m.reactions || {}) };
+          if (r[uid] === emoji) delete r[uid]; else r[uid] = emoji;
+          return { ...m, reactions: r };
+        });
+      }
+      return next;
+    });
+    // Persist + fan out to the other user (AI bot + unsent temp messages stay local).
+    if (!activeChat?.isAI && !String(message.id).startsWith('temp-')) {
+      chatService.reactToMessage(activeChatId, message.id, emoji).catch(() => {});
+    }
   };
 
   // ── Message long-press / context menu (Reply · Forward · Delete) ───────────
@@ -1655,6 +1727,7 @@ const ChatSystem = () => {
             mediaMeta: m.mediaMeta || null,
             replyTo: m.replyTo || null,
             isDeleted: !!m.isDeleted,
+            reactions: m.reactions || {},
             iso:    m.createdAt,
             status: 'delivered',
             senderId: m.senderId,
@@ -1683,6 +1756,7 @@ const ChatSystem = () => {
             mediaMeta: m.mediaMeta || null,
             replyTo: m.replyTo || null,
             isDeleted: !!m.isDeleted,
+            reactions: m.reactions || {},
             iso:    m.createdAt,
             status: 'delivered',
             senderId: m.senderId,
@@ -1728,8 +1802,6 @@ const ChatSystem = () => {
     };
   }, [activeChatId]);
 
-  const QUICK_EMOJI = ['👍', '🙏', '🙂', '🎉', '❤️', '🔥', '✅', '🏠', '💸', '📅'];
-
   // This chat is PIN-locked and hasn't been unlocked yet this session.
   const activeLocked = !activeChat?.isAI && !!chatLocks[activeChatId] && !pinUnlocked[activeChatId];
   // Chats available as forward targets (real people, not this chat, not blocked).
@@ -1743,13 +1815,16 @@ const ChatSystem = () => {
         <div className="absolute -bottom-40 -right-32 w-[480px] h-[480px] bg-blue-500/10 rounded-full blur-3xl"></div>
       </div>
 
-      <div className={`flex flex-col md:flex-row overflow-hidden ${
-        mobileChatOpen
-          ? 'fixed inset-0 z-[80] h-[100dvh] bg-white'
-          : isMobile
-            ? 'relative h-[100dvh] bg-white/60 backdrop-blur-2xl border border-white/70 shadow-[0_30px_80px_rgba(0,0,0,0.08)]'
-            : 'relative h-[calc(100dvh-2rem)] my-4 max-w-[1400px] mx-auto rounded-[2rem] bg-white/60 backdrop-blur-2xl border border-white/70 shadow-[0_30px_80px_rgba(0,0,0,0.08)]'
-      }`}>
+      <div
+        className={`flex flex-col md:flex-row overflow-hidden ${
+          mobileChatOpen
+            ? 'fixed inset-x-0 top-0 z-[80] bg-white'
+            : isMobile
+              ? 'relative h-[100dvh] bg-white/60 backdrop-blur-2xl border border-white/70 shadow-[0_30px_80px_rgba(0,0,0,0.08)]'
+              : 'relative h-[calc(100dvh-2rem)] my-4 max-w-[1400px] mx-auto rounded-[2rem] bg-white/60 backdrop-blur-2xl border border-white/70 shadow-[0_30px_80px_rgba(0,0,0,0.08)]'
+        }`}
+        style={mobileChatOpen ? { height: kbViewport.height ?? '100dvh', top: kbViewport.offsetTop } : undefined}
+      >
 
 
 
@@ -1910,10 +1985,9 @@ const ChatSystem = () => {
                 className={`flex items-center gap-3 ${!activeChat.isAI ? 'cursor-pointer group' : ''}`}
                 onClick={() => {
                   // WhatsApp behaviour: tapping the header avatar/name opens the
-                  // SAME dropdown as the ⋮ button (full profile lives in "View
-                  // contact"). The AI bot has no menu.
+                  // full Contact info screen. (The ⋮ button opens the dropdown.)
                   if (activeChat.isAI) return;
-                  setHeaderMenuOpen(o => !o);
+                  setShowContactModal(true);
                 }}
               >
                 <div className={`w-11 h-11 rounded-2xl overflow-hidden shrink-0 shadow-sm ${!activeChat.isAI && activeChat.peerUserId ? 'group-hover:scale-105 transition-transform' : ''}`}>
@@ -2166,7 +2240,15 @@ const ChatSystem = () => {
                               <p className={`text-[11px] font-medium line-clamp-2 ${mine || fromBot ? 'text-white/80' : 'text-gray-500'}`}>{quote}</p>
                             </div>
                           )}
-                          <p className="text-[13px] sm:text-sm font-medium whitespace-pre-line leading-relaxed">{body}</p>
+                          {isImageUrl(body) ? (
+                            <a href={body} target="_blank" rel="noopener noreferrer" className="block">
+                              <img src={body} alt="gif" loading="lazy" className="rounded-xl max-w-full max-h-72 object-cover" />
+                            </a>
+                          ) : (
+                            <p className={isJumboEmoji(body)
+                              ? 'text-5xl leading-tight'
+                              : 'text-[13px] sm:text-sm font-medium whitespace-pre-line leading-relaxed'}>{body}</p>
+                          )}
                         </>
                       );
                     })() : (m.text ? (
@@ -2186,12 +2268,17 @@ const ChatSystem = () => {
                         )}
                       </div>
                     )}
-                    {/* Emoji reaction chip — sits at the bubble's bottom corner. */}
-                    {reactions[m.id] && (
-                      <span className={`absolute -bottom-2.5 ${mine ? 'right-2' : 'left-2'} bg-white rounded-full shadow-md border border-gray-100 px-1.5 py-0.5 text-[13px] leading-none z-10`}>
-                        {reactions[m.id]}
-                      </span>
-                    )}
+                    {/* Emoji reaction chip — aggregated from all users, at the corner. */}
+                    {m.reactions && Object.keys(m.reactions).length > 0 && (() => {
+                      const all = Object.values(m.reactions);
+                      const unique = [...new Set(all)];
+                      return (
+                        <span className={`absolute -bottom-2.5 ${mine ? 'right-2' : 'left-2'} bg-white rounded-full shadow-md border border-gray-100 px-1.5 py-0.5 text-[13px] leading-none z-10 flex items-center gap-0.5`}>
+                          {unique.slice(0, 3).map((e, i) => <span key={i}>{e}</span>)}
+                          {all.length > 1 && <span className="text-[10px] font-black text-gray-500 ml-0.5">{all.length}</span>}
+                        </span>
+                      );
+                    })()}
                   </motion.div>
                   {/* Desktop hover affordance → opens the reaction bar. */}
                   {!m.isDeleted && (
@@ -2240,25 +2327,6 @@ const ChatSystem = () => {
               </div>
             ) : (
               <>
-            <AnimatePresence>
-              {showEmojiPicker && (
-                <motion.div
-                  initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0 }}
-                  className="absolute bottom-[88px] left-4 sm:left-6 bg-white rounded-2xl shadow-[0_15px_30px_rgba(0,0,0,0.10)] border border-gray-100 p-3 flex flex-wrap gap-1.5 max-w-[280px] z-30"
-                >
-                  {QUICK_EMOJI.map(e => (
-                    <button
-                      key={e}
-                      onClick={() => insertEmoji(e)}
-                      className="w-9 h-9 hover:bg-gray-50 rounded-xl text-lg transition-all active:scale-90"
-                    >
-                      {e}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
             {replyTo && (
               <motion.div
                 initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
@@ -2278,7 +2346,15 @@ const ChatSystem = () => {
             )}
             <div className="flex items-end gap-2 bg-white border border-white p-2 rounded-[1.6rem] shadow-[0_10px_25px_rgba(0,0,0,0.06)]">
               <button
-                onClick={() => setShowEmojiPicker(s => !s)}
+                onClick={() => {
+                  // Toggle the emoji panel. When opening, blur the input so the
+                  // on-screen keyboard drops and the panel takes its place.
+                  setShowEmojiPicker((s) => {
+                    const next = !s;
+                    if (next) inputRef.current?.blur();
+                    return next;
+                  });
+                }}
                 className={`p-2.5 rounded-xl transition-all ${showEmojiPicker ? 'bg-[#ba0036]/10 text-[#ba0036]' : 'text-gray-400 hover:text-[#ba0036] hover:bg-gray-50'}`}
                 aria-label="Emoji"
               >
@@ -2302,12 +2378,21 @@ const ChatSystem = () => {
               </button>
               {isRecording ? (
                 /* Recording in progress — replace the textarea with a live indicator */
-                <div className="flex-1 flex items-center gap-2 py-2 px-1">
+                <div className="flex-1 flex items-center gap-2.5 py-2 px-1">
                   <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shrink-0" />
-                  <span className="text-sm font-bold text-gray-700 tabular-nums">
+                  <span className="text-sm font-black text-gray-700 tabular-nums shrink-0">
                     {String(Math.floor(recordSecs / 60)).padStart(1, '0')}:{String(recordSecs % 60).padStart(2, '0')}
                   </span>
-                  <span className="text-xs font-bold text-gray-400">রেকর্ড হচ্ছে…</span>
+                  {/* Live waveform line while recording */}
+                  <div className="flex-1 flex items-center gap-[3px] h-6 overflow-hidden">
+                    {Array.from({ length: 28 }).map((_, i) => (
+                      <span
+                        key={i}
+                        className="flex-1 min-w-[2px] bg-[#ba0036]/60 rounded-full animate-pulse"
+                        style={{ height: `${25 + ((i * 37) % 75)}%`, animationDelay: `${(i % 6) * 90}ms` }}
+                      />
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <textarea
@@ -2333,6 +2418,7 @@ const ChatSystem = () => {
                       handleSendMessage();
                     }
                   }}
+                  onFocus={() => setShowEmojiPicker(false)}
                   placeholder={activeChat.isAI ? 'Ask the AI assistant anything…' : 'Type a message…'}
                   className="flex-1 bg-transparent outline-none text-sm font-bold text-gray-800 resize-none py-2 max-h-[120px] leading-relaxed placeholder:text-gray-400"
                 />
@@ -2392,7 +2478,21 @@ const ChatSystem = () => {
               )}
             </div>
 
-            {!inputText && !isMobile && (
+            {/* Emoji / Sticker / GIF panel — full-width, sits where the keyboard
+                would be (WhatsApp style). Stickers + GIFs send immediately. */}
+            {showEmojiPicker && (
+              <div className="-mx-4 sm:-mx-6 mt-2 rounded-t-2xl overflow-hidden shadow-[0_-8px_24px_rgba(0,0,0,0.06)]">
+                <EmojiPicker
+                  open={showEmojiPicker}
+                  onClose={() => setShowEmojiPicker(false)}
+                  onPickEmoji={insertEmoji}
+                  onSendSticker={(e) => sendMessageTo(activeChatId, e)}
+                  onSendGif={(url) => sendMessageTo(activeChatId, url)}
+                />
+              </div>
+            )}
+
+            {!inputText && !isMobile && !showEmojiPicker && (
               <p className="text-center text-[9px] font-black text-gray-300 uppercase tracking-[0.18em] mt-2.5">
                 Enter to send · Shift + Enter for new line · Esc to close call
               </p>
@@ -2703,8 +2803,8 @@ const ChatSystem = () => {
         open={!!reactionBar}
         x={reactionBar?.x || 0}
         y={reactionBar?.y || 0}
-        current={reactionBar ? reactions[reactionBar.message?.id] : null}
-        onReact={(emoji) => reactionBar && toggleReaction(reactionBar.message.id, emoji)}
+        current={reactionBar?.message?.reactions?.[currentUserId] || null}
+        onReact={(emoji) => reactionBar && toggleReaction(reactionBar.message, emoji)}
         onMore={() => reactionBar && openMessageMenu(reactionBar.message, reactionBar.x, reactionBar.y)}
         onClose={() => setReactionBar(null)}
       />
@@ -2729,7 +2829,7 @@ const ChatSystem = () => {
         onConfirm={(reason) => blockChat(reason)}
       />
 
-      {/* WhatsApp-style "Contact info" */}
+      {/* WhatsApp-style "Contact info" (opened by tapping the header avatar/name) */}
       <ViewContactModal
         open={showContactModal}
         contact={{
@@ -2740,6 +2840,9 @@ const ChatSystem = () => {
           propertyTitle: activeChat?.propertyTitle,
           peerUserId: activeChat?.peerUserId,
         }}
+        muted={activeChat?.muted}
+        blocked={activeChat?.blocked}
+        mediaCount={(messages[activeChatId] || []).filter(m => m.mediaUrl).length}
         onClose={() => setShowContactModal(false)}
         onVoiceCall={activeChat?.peerUserId ? () => placeCall({ peerUserId: activeChat.peerUserId, peerName: activeChat.name, peerAvatar: activeChat.avatar, type: 'voice' }) : undefined}
         onVideoCall={activeChat?.peerUserId ? () => placeCall({ peerUserId: activeChat.peerUserId, peerName: activeChat.name, peerAvatar: activeChat.avatar, type: 'video' }) : undefined}
@@ -2747,6 +2850,10 @@ const ChatSystem = () => {
           if (activeChat.role === 'Property Owner' || activeChat.role === 'Landlord') navigate(`/host/${activeChat.peerUserId}`);
           else navigate(`/tenant/${activeChat.peerUserId}`);
         } : undefined}
+        onOpenMedia={() => setShowInfoPane(true)}
+        onMute={() => (activeChat?.muted ? toggleMuteChat() : setShowMuteModal(true))}
+        onBlock={() => (activeChat?.blocked ? unblockChat() : setShowBlockModal(true))}
+        onReport={() => setShowReportModal(true)}
       />
 
       {/* Mute notifications (8 hours / 1 week / Always) */}
