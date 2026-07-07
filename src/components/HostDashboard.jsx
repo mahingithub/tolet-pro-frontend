@@ -1024,7 +1024,7 @@ const HostDashboard = () => {
   // ── Document Vault (real Cloudinary-backed storage) ────────────────────
   const [documents, setDocuments] = useState([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
-  const [uploadForm, setUploadForm] = useState({ folder: 'agreements', bookingId: '', file: null });
+  const [uploadForm, setUploadForm] = useState({ folder: 'agreements', bookingId: '', file: null, error: null });
   const [uploadingDoc, setUploadingDoc] = useState(false);
 
   useEffect(() => {
@@ -1064,7 +1064,7 @@ const HostDashboard = () => {
       }
       const doc = await uploadDocApi(fd);
       setDocuments(prev => [doc, ...prev]);
-      setUploadForm({ folder: 'agreements', bookingId: '', file: null });
+      setUploadForm({ folder: 'agreements', bookingId: '', file: null, error: null });
       setActiveModal(null);
       showToast(language === 'বাংলা' ? 'ডকুমেন্ট আপলোড হয়েছে!' : 'Document uploaded!');
     } catch (err) {
@@ -1384,7 +1384,7 @@ const HostDashboard = () => {
     setIsProfileDrawerOpen(false);
     setConfirmDeleteBookingId(null);
     if (type === 'upload_document') {
-      setUploadForm({ folder: activeFolder?.id || 'agreements', bookingId: '', file: null });
+      setUploadForm({ folder: activeFolder?.id || 'agreements', bookingId: '', file: null, error: null });
     }
     if (type === 'edit' && data) {
       // Seed every editable field. Demo seed entries only carry a subset of
@@ -5041,23 +5041,27 @@ const HostDashboard = () => {
 
                   <div>
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">{language === 'বাংলা' ? 'ফাইল সিলেক্ট করুন' : 'Choose File'}</label>
-                    <label className="border-2 border-dashed border-gray-200 hover:border-[#ba0036] hover:bg-red-50/30 rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer group">
+                    <label className={`border-2 border-dashed ${uploadForm.error ? 'border-red-400 bg-red-50/50' : 'border-gray-200 hover:border-[#ba0036] hover:bg-red-50/30'} rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer group`}>
                        <input type="file" accept=".pdf,.doc,.docx,image/*" className="hidden" onChange={e => {
                          const file = e.target.files && e.target.files[0];
                          if (!file) {
-                           setUploadForm(f => ({ ...f, file: null }));
+                           setUploadForm(f => ({ ...f, file: null, error: null }));
                            return;
                          }
                          const ok = /^(image\/(jpeg|jpg|png|webp|gif)|application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)$/.test(file.type || '') || /\.(pdf|docx?|jpe?g|png|webp|gif)$/i.test(file.name);
                          if (!ok) {
-                           showToast(language === 'বাংলা' ? 'ভুল ফরম্যাট! শুধু PDF, DOCX বা ছবি আপলোড করা যাবে।' : 'Invalid format! Please upload a PDF, DOCX, or image file.');
+                           setUploadForm(f => ({ ...f, file: null, error: language === 'বাংলা' ? 'ভুল ফরম্যাট! শুধু PDF, DOCX বা ছবি (JPG/PNG) আপলোড করুন।' : 'Invalid format! Please upload a PDF, DOCX, or Image (JPG, PNG).' }));
                            e.target.value = null;
                            return;
                          }
-                         setUploadForm(f => ({ ...f, file }));
+                         setUploadForm(f => ({ ...f, file, error: null }));
                        }} />
-                       <UploadCloud size={32} className="text-gray-400 group-hover:text-[#ba0036] mb-3 transition-colors" />
-                       <p className="text-sm font-black text-gray-900 mb-1 break-all px-2">{uploadForm.file ? uploadForm.file.name : (language === 'বাংলা' ? 'পিডিএফ, DOCX বা ছবি আপলোড করুন' : 'Upload PDF, DOCX or Image')}</p>
+                       <UploadCloud size={32} className={`${uploadForm.error ? 'text-red-400' : 'text-gray-400 group-hover:text-[#ba0036]'} mb-3 transition-colors`} />
+                       {uploadForm.error ? (
+                         <p className="text-sm font-black text-red-600 mb-1 px-2">{uploadForm.error}</p>
+                       ) : (
+                         <p className="text-sm font-black text-gray-900 mb-1 break-all px-2">{uploadForm.file ? uploadForm.file.name : (language === 'বাংলা' ? 'পিডিএফ, DOCX বা ছবি আপলোড করুন' : 'Upload PDF, DOCX or Image')}</p>
+                       )}
                        <p className="text-[10px] text-gray-500 font-bold">{uploadForm.file ? `${(uploadForm.file.size / 1024 / 1024).toFixed(2)} MB` : (language === 'বাংলা' ? 'সর্বোচ্চ সাইজ: 10MB' : 'Max size: 10MB')}</p>
                     </label>
                   </div>
