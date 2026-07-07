@@ -24,7 +24,7 @@ import {
   UserPlus, Pin, Receipt, FileText, Hourglass, Info, ChevronRight,
   Download, MessageCircle, VolumeX, MessageSquare,
   PhoneIncoming, PhoneOutgoing, PhoneMissed, VideoOff,
-  BellOff, Ban, Flag,
+  BellOff, Ban, Flag, CornerUpLeft, Lock,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import chatService from '../services/chatService';
@@ -36,6 +36,41 @@ import callService from '../services/callService';
 import CallHistory from './CallHistory';
 import CallQualityOverlay from './CallQualityOverlay';
 import CallDetailModal from './CallDetailModal';
+// ── Chat UX upgrade: modular pieces that plug into this existing component ──
+import CompactAudioPlayer from './CompactAudioPlayer';
+import MessageActionsMenu from './MessageActionsMenu';
+import BlockUserModal from './BlockUserModal';
+import ChatPinLock from './ChatPinLock';
+
+// ── Reply-quote helpers (module scope, pure) ────────────────────────────────
+// A reply is encoded as a leading markdown blockquote line:
+//     "> quoted snippet\n<the actual reply>"
+// This works with the plain-text message backend (no schema change), survives
+// reload, and reaches the peer. parseReplyQuote() splits it back out so the
+// bubble can render the quote as a styled inline block.
+const parseReplyQuote = (text) => {
+  if (typeof text !== 'string' || !text.startsWith('> ')) return null;
+  const nl = text.indexOf('\n');
+  if (nl === -1) return null;
+  return { quote: text.slice(2, nl).trim(), body: text.slice(nl + 1) };
+};
+const replyPreviewText = (m) => {
+  if (!m) return '';
+  if (m.type === 'image') return '📷 Photo';
+  if (m.type === 'audio') return '🎤 Voice message';
+  if (m.type === 'document') return '📄 Document';
+  const parsed = parseReplyQuote(m.text);
+  return (parsed ? parsed.body : m.text || '').slice(0, 120);
+};
+// Tiny non-crypto hash for the per-chat PIN. Enough to gate over-the-shoulder /
+// shared-device snooping — NOT real security (see ChatPinLock's note).
+const hashPin = (pin) => {
+  let h = 0;
+  const s = `tolet:${pin}`;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return String(h);
+};
+const CHAT_LOCKS_KEY = 'tolet_chat_locks';
 
 // ─── Cross-system storage keys (mirrored on HostDashboard / TenantDashboard) ─
 const CHAT_HISTORY_KEY        = 'tolet_chat_history';
@@ -388,6 +423,22 @@ const ChatSystem = () => {
   const [contextBanner, setContextBanner] = useState(null);
   const [activeReceipt, setActiveReceipt] = useState(null);
   const [paymentReceipts, setPaymentReceipts] = useState([]);
+
+  // ── Chat UX upgrade: message actions, reply/forward, block modal, PIN lock ──
+  const [menuState, setMenuState]   = useState(null);   // { message, x, y } for the long-press menu
+  const [replyTo, setReplyTo]       = useState(null);   // message currently being replied to
+  const [forwardMsg, setForwardMsg] = useState(null);   // message currently being forwarded
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  // Per-chat PIN privacy. `chatLocks` persists { chatId: pinHash } to localStorage;
+  // `pinUnlocked` is per-session (unlock is forgotten on reload); `pinSetupFor`
+  // holds the chatId whose PIN is currently being set.
+  const [chatLocks, setChatLocks] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(CHAT_LOCKS_KEY)) || {}; } catch { return {}; }
+  });
+  const [pinUnlocked, setPinUnlocked] = useState({});
+  const [pinSetupFor, setPinSetupFor] = useState(null);
+  const longPressRef = useRef(null);   // long-press timer
+  const pressPosRef  = useRef(null);   // pointer start position (move tolerance)
 
   // ── Chat media (image upload + voice message) ──────────────────────────────
   const [isUploadingMedia, setIsUploadingMedia] = useState(false); // image/audio upload in flight
@@ -1093,8 +1144,13 @@ const ChatSystem = () => {
 
   const handleSendMessage = () => {
     if (!inputText.trim()) return;
-    const text = inputText;
+    // If replying, prepend a markdown blockquote of the original message so the
+    // reply context travels with it (renders as a styled quote in the bubble).
+    const text = replyTo
+      ? `> ${replyPreviewText(replyTo).replace(/\n/g, ' ').slice(0, 90)}\n${inputText}`
+      : inputText;
     setInputText('');
+    setReplyTo(null);
     setShowEmojiPicker(false);
     sendMessageTo(activeChatId, text);
     
@@ -1311,6 +1367,71 @@ const ChatSystem = () => {
     setReportSent(true);
   };
 
+  // ── Message long-press / context menu (Reply · Forward · Delete) ───────────
+  const openMessageMenu = (message, x, y) => setMenuState({ message, x, y });
+
+  // Handlers spread onto each text/media bubble. Long-press (touch) or
+  // right-click (desktop) opens the action menu; a >10px move cancels it so
+  // scrolling never triggers it.
+  const bubblePressHandlers = (m) => ({
+    onContextMenu: (e) => { e.preventDefault(); openMessageMenu(m, e.clientX, e.clientY); },
+    onPointerDown: (e) => {
+      pressPosRef.current = { x: e.clientX, y: e.clientY };
+      if (longPressRef.current) clearTimeout(longPressRef.current);
+      longPressRef.current = setTimeout(() => openMessageMenu(m, pressPosRef.current.x, pressPosRef.current.y), 450);
+    },
+    onPointerMove: (e) => {
+      const p = pressPosRef.current;
+      if (p && longPressRef.current && (Math.abs(e.clientX - p.x) > 10 || Math.abs(e.clientY - p.y) > 10)) {
+        clearTimeout(longPressRef.current); longPressRef.current = null;
+      }
+    },
+    onPointerUp:    () => { if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; } },
+    onPointerLeave: () => { if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; } },
+  });
+
+  const handleReply = (m) => { setReplyTo(m); setTimeout(() => inputRef.current?.focus(), 30); };
+  const handleForward = (m) => setForwardMsg(m);
+  const handleDeleteMessage = (m) => {
+    // Optimistic local removal. A true "delete for everyone" needs a backend
+    // DELETE endpoint (chatService.deleteMessage); until it exists this clears
+    // the message from the user's own view.
+    setMessages(prev => ({
+      ...prev,
+      [activeChatId]: (prev[activeChatId] || []).filter(x => String(x.id) !== String(m.id)),
+    }));
+    try { chatService.deleteMessage?.(activeChatId, m.id); } catch { /* no-op until backend exists */ }
+  };
+  const forwardTo = (targetChatId) => {
+    const m = forwardMsg;
+    setForwardMsg(null);
+    if (!m || !targetChatId) return;
+    // Media has no re-upload path, so forward its link; text forwards as-is.
+    const body = (m.type && m.type !== 'text') ? (m.mediaUrl || replyPreviewText(m)) : (parseReplyQuote(m.text)?.body || m.text);
+    sendMessageTo(targetChatId, body);
+    setActiveChatId(targetChatId);
+    if (isMobile) setShowSidebarMobile(false);
+    toast.success('Message forwarded');
+  };
+
+  // ── Per-chat PIN lock ──────────────────────────────────────────────────────
+  const verifyPin   = (chatId, pin) => !!chatLocks[chatId] && chatLocks[chatId] === hashPin(pin);
+  const beginPinSetup = () => { setShowInfoPane(false); setPinSetupFor(activeChatId); };
+  const savePin = (pin) => {
+    setChatLocks(prev => ({ ...prev, [activeChatId]: hashPin(pin) }));
+    setPinUnlocked(prev => ({ ...prev, [activeChatId]: true })); // stays open this session
+    setPinSetupFor(null);
+    toast.success('এই চ্যাট PIN দিয়ে লক করা হলো।');
+  };
+  const disablePin = () => {
+    setChatLocks(prev => { const n = { ...prev }; delete n[activeChatId]; return n; });
+    toast.success('PIN লক সরানো হলো।');
+  };
+  // Persist locks so they survive reload (unlock state does NOT — by design).
+  useEffect(() => {
+    try { localStorage.setItem(CHAT_LOCKS_KEY, JSON.stringify(chatLocks)); } catch { /* ignore */ }
+  }, [chatLocks]);
+
   // Build the rendered message stream for the active chat — merge text/bot
   // messages with inline ReceiptCards from `paymentReceipts` AND inline
   // ChatCallCards for any call exchanged with this chat's peer. Sorted by ISO.
@@ -1495,6 +1616,11 @@ const ChatSystem = () => {
 
   const QUICK_EMOJI = ['👍', '🙏', '🙂', '🎉', '❤️', '🔥', '✅', '🏠', '💸', '📅'];
 
+  // This chat is PIN-locked and hasn't been unlocked yet this session.
+  const activeLocked = !activeChat?.isAI && !!chatLocks[activeChatId] && !pinUnlocked[activeChatId];
+  // Chats available as forward targets (real people, not this chat, not blocked).
+  const forwardTargets = chats.filter(c => c.id !== 'ai-bot' && c.id !== activeChatId && !c.blocked);
+
   return (
     <div className={`relative w-full ${isMobile ? 'h-[100dvh] overflow-hidden' : ''}`}>
       {/* Backdrop accents */}
@@ -1652,7 +1778,7 @@ const ChatSystem = () => {
         </aside>
 
         {/* MAIN CHAT PANE */}
-            <main className={`${isMobile && showSidebarMobile ? 'hidden' : 'flex'} flex-1 flex-col min-w-0 min-h-0 bg-white/30`}>          <header
+            <main className={`${isMobile && showSidebarMobile ? 'hidden' : 'flex'} relative flex-1 flex-col min-w-0 min-h-0 bg-white/30`}>          <header
             className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/60 bg-white/40 backdrop-blur-md flex justify-between items-center gap-3"
             style={mobileChatOpen ? { paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' } : undefined}
           >
@@ -1824,12 +1950,14 @@ const ChatSystem = () => {
               }
               return (
                 <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'} ${m.position === 'middle' ? 'mb-0.5' : 'mb-2'}`}>
-                  <div className={`max-w-[78%] sm:max-w-[68%] ${bubbleRadius(mine, m.position)} px-4 py-2.5 shadow-sm transition-all ${
+                  <div
+                    {...bubblePressHandlers(m)}
+                    className={`relative max-w-[78%] sm:max-w-[68%] ${bubbleRadius(mine, m.position)} px-3.5 py-2.5 select-none cursor-default transition-all shadow-[0_2px_10px_-3px_rgba(0,0,0,0.12)] active:scale-[0.99] ${
                     mine
                       ? 'bg-gradient-to-br from-[#ba0036] to-[#a30030] text-white'
                       : fromBot
                         ? 'bg-gradient-to-br from-gray-900 to-[#1a1a1f] text-white'
-                        : 'bg-white text-gray-800 border border-gray-100'
+                        : 'bg-white text-gray-800 border border-gray-100 ring-1 ring-black/[0.02]'
                   }`}>
                     {fromBot && m.position !== 'middle' && m.position !== 'last' && (
                       <div className="flex items-center gap-1.5 mb-1 text-[9px] font-black text-white/60 uppercase tracking-widest">
@@ -1846,12 +1974,7 @@ const ChatSystem = () => {
                         />
                       </a>
                     ) : m.type === 'audio' && m.mediaUrl ? (
-                      <audio
-                        controls
-                        src={m.mediaUrl}
-                        className="max-w-[240px] sm:max-w-[260px]"
-                        style={{ height: 40 }}
-                      />
+                      <CompactAudioPlayer src={m.mediaUrl} mine={mine || fromBot} durationSec={m.mediaMeta?.durationSec} />
                     ) : m.type === 'document' && m.mediaUrl ? (
                       <a href={m.mediaUrl} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-3 p-3 rounded-xl border ${mine ? 'bg-white/10 border-white/20 hover:bg-white/20' : fromBot ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'} transition-all max-w-[240px] sm:max-w-[280px] group`}>
                         <div className={`w-10 h-10 shrink-0 rounded-lg flex items-center justify-center ${mine || fromBot ? 'bg-white/20 text-white' : 'bg-[#ba0036]/10 text-[#ba0036]'}`}>
@@ -1870,9 +1993,22 @@ const ChatSystem = () => {
                         </div>
                       </a>
                     ) : null}
-                    {(m.type === 'text' || !m.type) ? (
-                      <p className="text-[13px] sm:text-sm font-medium whitespace-pre-line leading-relaxed">{m.text}</p>
-                    ) : (m.text ? (
+                    {(m.type === 'text' || !m.type) ? (() => {
+                      const rq = parseReplyQuote(m.text);
+                      return (
+                        <>
+                          {rq && (
+                            <div className={`mb-1.5 rounded-lg px-2.5 py-1.5 border-l-[3px] ${
+                              mine ? 'bg-white/15 border-white/60' : fromBot ? 'bg-white/10 border-white/40' : 'bg-gray-50 border-[#ba0036]/50'
+                            }`}>
+                              <p className={`text-[9px] font-black uppercase tracking-widest mb-0.5 ${mine || fromBot ? 'text-white/70' : 'text-[#ba0036]'}`}>Reply</p>
+                              <p className={`text-[11px] font-medium line-clamp-2 ${mine || fromBot ? 'text-white/80' : 'text-gray-500'}`}>{rq.quote}</p>
+                            </div>
+                          )}
+                          <p className="text-[13px] sm:text-sm font-medium whitespace-pre-line leading-relaxed">{rq ? rq.body : m.text}</p>
+                        </>
+                      );
+                    })() : (m.text ? (
                       <p className="text-[13px] sm:text-sm font-medium whitespace-pre-line leading-relaxed mt-1.5">{m.text}</p>
                     ) : null)}
                     {showTail && (
@@ -1944,6 +2080,23 @@ const ChatSystem = () => {
               )}
             </AnimatePresence>
 
+            {replyTo && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2.5 mb-2 px-3 py-2 bg-white/95 border border-gray-100 rounded-2xl shadow-sm"
+              >
+                <CornerUpLeft size={15} className="text-[#ba0036] shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-[#ba0036]">
+                    Replying to {replyTo.sender === 'me' ? 'yourself' : activeChat.name}
+                  </p>
+                  <p className="text-[11px] font-bold text-gray-500 truncate">{replyPreviewText(replyTo)}</p>
+                </div>
+                <button onClick={() => setReplyTo(null)} className="p-1 hover:bg-gray-100 rounded-full shrink-0" aria-label="Cancel reply">
+                  <X size={13} className="text-gray-400" />
+                </button>
+              </motion.div>
+            )}
             <div className="flex items-end gap-2 bg-white border border-white p-2 rounded-[1.6rem] shadow-[0_10px_25px_rgba(0,0,0,0.06)]">
               <button
                 onClick={() => setShowEmojiPicker(s => !s)}
@@ -2068,6 +2221,27 @@ const ChatSystem = () => {
               </>
             )}
           </div>
+
+          {/* PIN lock overlay — hides the thread until the correct PIN is
+              entered (unlock is remembered for this session only). */}
+          {activeLocked && (
+            <ChatPinLock
+              chatName={activeChat.name}
+              mode="unlock"
+              verify={(pin) => verifyPin(activeChatId, pin)}
+              onUnlocked={() => setPinUnlocked(prev => ({ ...prev, [activeChatId]: true }))}
+              onCancel={() => { if (isMobile) setShowSidebarMobile(true); else setActiveChatId('ai-bot'); }}
+            />
+          )}
+          {/* PIN setup overlay — shown while turning ON privacy for this chat. */}
+          {pinSetupFor === activeChatId && (
+            <ChatPinLock
+              chatName={activeChat.name}
+              mode="set"
+              onDone={savePin}
+              onCancel={() => setPinSetupFor(null)}
+            />
+          )}
         </main>
 
         {/* CONTACT INFO — desktop: inline right rail · mobile/tablet: slide-up sheet */}
@@ -2151,9 +2325,8 @@ const ChatSystem = () => {
                   {voices.length > 0 && (
                     <div className="space-y-1.5">
                       {voices.slice(-4).reverse().map((m, i) => (
-                        <div key={m.id || i} className="flex items-center gap-2 bg-white border border-gray-100 rounded-xl px-2.5 py-2">
-                          <Mic size={13} className="text-[#ba0036] shrink-0" />
-                          <audio controls src={m.mediaUrl} className="h-8 w-full" />
+                        <div key={m.id || i} className="bg-white border border-gray-100 rounded-xl px-2.5 py-2">
+                          <CompactAudioPlayer src={m.mediaUrl} variant="list" durationSec={m.mediaMeta?.durationSec} />
                         </div>
                       ))}
                     </div>
@@ -2192,6 +2365,20 @@ const ChatSystem = () => {
               </button>
             </div>
 
+            {/* PIN privacy — lock this specific conversation behind a PIN. */}
+            {!activeChat.isAI && (
+              <button
+                onClick={() => (chatLocks[activeChatId] ? disablePin() : beginPinSetup())}
+                className={`mt-2 w-full rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 border ${
+                  chatLocks[activeChatId]
+                    ? 'bg-[#ba0036]/10 border-[#ba0036]/20 text-[#ba0036]'
+                    : 'bg-white border-gray-100 hover:border-[#ba0036]/20 text-gray-700 hover:text-[#ba0036] hover:bg-red-50'
+                }`}
+              >
+                <Lock size={12}/> {chatLocks[activeChatId] ? 'Remove PIN lock' : 'Lock chat with PIN'}
+              </button>
+            )}
+
             {/* Danger zone — Report + Block (hidden for the AI assistant) */}
             {!activeChat.isAI && (
               <div className="mt-5 pt-4 border-t border-gray-100 space-y-2">
@@ -2217,20 +2404,12 @@ const ChatSystem = () => {
                   </button>
                 )}
 
-                {confirmBlock ? (
-                  <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-center">
-                    <p className="text-[11px] font-bold text-red-700 mb-2.5">Block <b>{activeChat.name}</b>?</p>
-                    <div className="flex gap-2">
-                      <button onClick={() => setConfirmBlock(false)} className="flex-1 bg-white border border-gray-200 rounded-xl py-2 text-[10px] font-black uppercase tracking-widest text-gray-600">Cancel</button>
-                      <button onClick={blockChat} className="flex-1 bg-[#ba0036] text-white rounded-xl py-2 text-[10px] font-black uppercase tracking-widest">Block</button>
-                    </div>
-                  </div>
-                ) : activeChat.blocked ? (
+                {activeChat.blocked ? (
                   <button onClick={unblockChat} className="w-full bg-white hover:bg-emerald-50 border border-gray-100 hover:border-emerald-200 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-emerald-700 hover:text-emerald-800 transition-all flex items-center justify-center gap-1.5">
                     <Ban size={12}/> Unblock {activeChat.name}
                   </button>
                 ) : (
-                  <button onClick={() => setConfirmBlock(true)} className="w-full bg-white hover:bg-red-50 border border-gray-100 hover:border-red-200 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-700 transition-all flex items-center justify-center gap-1.5">
+                  <button onClick={() => setShowBlockModal(true)} className="w-full bg-white hover:bg-red-50 border border-gray-100 hover:border-red-200 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-700 transition-all flex items-center justify-center gap-1.5">
                     <Ban size={12}/> Block
                   </button>
                 )}
@@ -2339,6 +2518,72 @@ const ChatSystem = () => {
           onViewProfile={selectedCall.peer?.id ? () => viewPeerProfile(selectedCall.peer) : undefined}
         />
       )}
+
+      {/* Long-press / right-click message actions: Reply · Forward · Delete */}
+      <MessageActionsMenu
+        open={!!menuState}
+        x={menuState?.x || 0}
+        y={menuState?.y || 0}
+        mine={menuState?.message?.sender === 'me'}
+        onReply={() => menuState && handleReply(menuState.message)}
+        onForward={() => menuState && handleForward(menuState.message)}
+        onDelete={() => menuState && handleDeleteMessage(menuState.message)}
+        onClose={() => setMenuState(null)}
+      />
+
+      {/* Block confirmation modal */}
+      <BlockUserModal
+        open={showBlockModal}
+        name={activeChat?.name}
+        onCancel={() => setShowBlockModal(false)}
+        onConfirm={() => { blockChat(); setShowBlockModal(false); }}
+      />
+
+      {/* Forward picker */}
+      <AnimatePresence>
+        {forwardMsg && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setForwardMsg(null)}
+          >
+            <motion.div
+              initial={{ y: 20, scale: 0.96, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} exit={{ y: 20, scale: 0.96, opacity: 0 }}
+              className="bg-white rounded-[1.75rem] w-full max-w-sm shadow-[0_30px_80px_rgba(0,0,0,0.25)] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <h3 className="text-sm font-black text-gray-900">Forward to…</h3>
+                <button onClick={() => setForwardMsg(null)} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400"><X size={16}/></button>
+              </div>
+              <div className="max-h-[60vh] overflow-y-auto p-2">
+                {forwardTargets.length === 0 ? (
+                  <p className="text-[12px] font-bold text-gray-400 text-center py-8">No other chats to forward to.</p>
+                ) : forwardTargets.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => forwardTo(c.id)}
+                    className="w-full flex items-center gap-3 p-2.5 rounded-2xl hover:bg-gray-50 transition-colors text-left"
+                  >
+                    {c.avatar ? (
+                      <img src={c.avatar} alt="" className="w-10 h-10 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-gray-700 font-black text-xs">
+                        {(c.name || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-black text-gray-900 truncate">{c.name}</p>
+                      <p className="text-[10px] font-bold text-gray-400 truncate">{c.role || 'Conversation'}</p>
+                    </div>
+                    <ChevronRight size={16} className="text-gray-300 shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
