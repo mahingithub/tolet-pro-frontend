@@ -62,6 +62,16 @@ const replyPreviewText = (m) => {
   const parsed = parseReplyQuote(m.text);
   return (parsed ? parsed.body : m.text || '').slice(0, 120);
 };
+// Label for the quoted strip inside a bubble, built from the POPULATED backend
+// replyTo object: { text, type, mediaUrl, senderId, isDeleted }.
+const replyQuoteLabel = (r) => {
+  if (!r) return '';
+  if (r.isDeleted) return '🚫 Deleted message';
+  if (r.type === 'image') return '📷 Photo';
+  if (r.type === 'audio') return '🎤 Voice message';
+  if (r.type === 'document') return '📄 Document';
+  return (r.text || '').slice(0, 120);
+};
 // Tiny non-crypto hash for the per-chat PIN. Enough to gate over-the-shoulder /
 // shared-device snooping — NOT real security (see ChatPinLock's note).
 const hashPin = (pin) => {
@@ -529,6 +539,22 @@ const ChatSystem = () => {
       });
     };
 
+    // Delete-for-everyone from the other side → swap the bubble to the
+    // "This message was deleted" placeholder in real-time.
+    const onMessageDeleted = ({ messageId }) => {
+      if (!messageId) return;
+      setMessages(prev => {
+        const next = { ...prev };
+        for (const chatId in next) {
+          next[chatId] = next[chatId].map(m =>
+            String(m.id) === String(messageId)
+              ? { ...m, isDeleted: true, text: '', mediaUrl: null }
+              : m);
+        }
+        return next;
+      });
+    };
+
     const onTyping = ({ senderId }) => {
       if (activeChatId !== 'ai-bot') {
         const chat = chats.find(c => String(c.peerUserId) === String(senderId));
@@ -549,12 +575,14 @@ const ChatSystem = () => {
 
     socket.on('MESSAGE_DELIVERED', onDelivered);
     socket.on('MESSAGE_SEEN', onSeen);
+    socket.on('MESSAGE_DELETED', onMessageDeleted);
     socket.on('USER_TYPING', onTyping);
     socket.on('USER_STOPPED_TYPING', onStopTyping);
 
     return () => {
       socket.off('MESSAGE_DELIVERED', onDelivered);
       socket.off('MESSAGE_SEEN', onSeen);
+      socket.off('MESSAGE_DELETED', onMessageDeleted);
       socket.off('USER_TYPING', onTyping);
       socket.off('USER_STOPPED_TYPING', onStopTyping);
     };
@@ -920,7 +948,7 @@ const ChatSystem = () => {
   }, [refreshCallHistory]);
 
   // Send message — AI bot stays local, real chats POST to /api/conversations/:id/messages.
-  const sendMessageTo = useCallback(async (chatId, text) => {
+  const sendMessageTo = useCallback(async (chatId, text, opts = {}) => {
     if (!text || !text.trim()) return;
     const trimmed = text.trim();
     const chat = chats.find(c => c.id === chatId);
@@ -955,26 +983,39 @@ const ChatSystem = () => {
     }
 
     // Real conversation — optimistic insert, then POST.
+    const replyMsg = opts.replyTo || null;
     const tempId  = `temp-${Date.now()}`;
     const tempIso = new Date().toISOString();
     const optimistic = {
       id: tempId,
       sender: 'me',
       text: trimmed,
+      type: 'text',
       iso: tempIso,
       status: 'sent',
+      isDeleted: false,
+      // Show the quote instantly (optimistic) with a slim copy of the target.
+      replyTo: replyMsg ? {
+        id: replyMsg.id, text: replyMsg.text, type: replyMsg.type,
+        mediaUrl: replyMsg.mediaUrl, senderId: replyMsg.senderId, isDeleted: !!replyMsg.isDeleted,
+      } : null,
     };
     setMessages(prev => ({ ...prev, [chatId]: [...(prev[chatId] || []), optimistic] }));
     try {
       if (!navigator.onLine) {
         throw new Error('Offline');
       }
-      const saved = await chatService.sendMessage(chatId, trimmed);
+      const saved = await chatService.sendMessage(chatId, trimmed, { replyTo: replyMsg?.id });
       setMessages(prev => ({
         ...prev,
         [chatId]: (prev[chatId] || []).map(m =>
           m.id === tempId
-            ? { id: saved.id, sender: 'me', text: saved.text, iso: saved.createdAt, status: 'delivered' }
+            ? {
+                id: saved.id, sender: 'me', text: saved.text,
+                type: saved.type || 'text', mediaUrl: saved.mediaUrl || null, mediaMeta: saved.mediaMeta || null,
+                replyTo: saved.replyTo || null, isDeleted: !!saved.isDeleted,
+                iso: saved.createdAt, status: 'delivered', senderId: saved.senderId,
+              }
             : m,
         ),
       }));
@@ -1144,15 +1185,12 @@ const ChatSystem = () => {
 
   const handleSendMessage = () => {
     if (!inputText.trim()) return;
-    // If replying, prepend a markdown blockquote of the original message so the
-    // reply context travels with it (renders as a styled quote in the bubble).
-    const text = replyTo
-      ? `> ${replyPreviewText(replyTo).replace(/\n/g, ' ').slice(0, 90)}\n${inputText}`
-      : inputText;
+    const text = inputText;
+    const replying = replyTo; // capture before clearing so we can pass its id
     setInputText('');
     setReplyTo(null);
     setShowEmojiPicker(false);
-    sendMessageTo(activeChatId, text);
+    sendMessageTo(activeChatId, text, { replyTo: replying });
     
     // Stop typing immediately when sent
     const chat = chats.find(c => c.id === activeChatId);
@@ -1203,6 +1241,8 @@ const ChatSystem = () => {
         type:      saved.type || 'text',
         mediaUrl:  saved.mediaUrl || null,
         mediaMeta: saved.mediaMeta || null,
+        replyTo:   saved.replyTo || null,
+        isDeleted: !!saved.isDeleted,
         iso:       saved.createdAt,
         status:    'delivered',
         senderId:  saved.senderId,
@@ -1392,15 +1432,35 @@ const ChatSystem = () => {
 
   const handleReply = (m) => { setReplyTo(m); setTimeout(() => inputRef.current?.focus(), 30); };
   const handleForward = (m) => setForwardMsg(m);
-  const handleDeleteMessage = (m) => {
-    // Optimistic local removal. A true "delete for everyone" needs a backend
-    // DELETE endpoint (chatService.deleteMessage); until it exists this clears
-    // the message from the user's own view.
-    setMessages(prev => ({
+  const handleDeleteMessage = async (m) => {
+    if (!m?.id) return;
+    // AI bot messages are local-only — just drop them.
+    if (activeChat?.isAI) {
+      setMessages(prev => ({
+        ...prev,
+        [activeChatId]: (prev[activeChatId] || []).filter(x => String(x.id) !== String(m.id)),
+      }));
+      return;
+    }
+    // Can't delete a message that hasn't been persisted yet.
+    if (String(m.id).startsWith('temp-')) return;
+
+    // Optimistically flip to the "deleted" placeholder, then confirm with the
+    // backend. The backend also emits MESSAGE_DELETED so the OTHER user updates.
+    const setDeleted = (deleted) => setMessages(prev => ({
       ...prev,
-      [activeChatId]: (prev[activeChatId] || []).filter(x => String(x.id) !== String(m.id)),
+      [activeChatId]: (prev[activeChatId] || []).map(x =>
+        String(x.id) === String(m.id)
+          ? { ...x, isDeleted: deleted, ...(deleted ? { text: '', mediaUrl: null } : {}) }
+          : x),
     }));
-    try { chatService.deleteMessage?.(activeChatId, m.id); } catch { /* no-op until backend exists */ }
+    setDeleted(true);
+    try {
+      await chatService.deleteMessage(activeChatId, m.id);
+    } catch (err) {
+      setDeleted(false); // revert if the server rejected it (e.g. not the sender)
+      toast.error('Delete করা যায়নি।');
+    }
   };
   const forwardTo = (targetChatId) => {
     const m = forwardMsg;
@@ -1543,6 +1603,8 @@ const ChatSystem = () => {
             type:   m.type || 'text',
             mediaUrl: m.mediaUrl || null,
             mediaMeta: m.mediaMeta || null,
+            replyTo: m.replyTo || null,
+            isDeleted: !!m.isDeleted,
             iso:    m.createdAt,
             status: 'delivered',
             senderId: m.senderId,
@@ -1569,6 +1631,8 @@ const ChatSystem = () => {
             type:   m.type || 'text',
             mediaUrl: m.mediaUrl || null,
             mediaMeta: m.mediaMeta || null,
+            replyTo: m.replyTo || null,
+            isDeleted: !!m.isDeleted,
             iso:    m.createdAt,
             status: 'delivered',
             senderId: m.senderId,
@@ -1964,6 +2028,12 @@ const ChatSystem = () => {
                         <Sparkles size={10}/> AI Assistant
                       </div>
                     )}
+                    {m.isDeleted ? (
+                      <p className={`text-[13px] italic font-medium inline-flex items-center gap-1.5 ${mine || fromBot ? 'text-white/70' : 'text-gray-400'}`}>
+                        <Ban size={13} className="shrink-0" /> This message was deleted
+                      </p>
+                    ) : (
+                    <>
                     {m.type === 'image' && m.mediaUrl ? (
                       <a href={m.mediaUrl} target="_blank" rel="noopener noreferrer" className="block">
                         <img
@@ -1994,23 +2064,29 @@ const ChatSystem = () => {
                       </a>
                     ) : null}
                     {(m.type === 'text' || !m.type) ? (() => {
-                      const rq = parseReplyQuote(m.text);
+                      // Prefer the structured backend replyTo; fall back to the
+                      // legacy "> quote" text encoding for messages sent earlier.
+                      const legacy = m.replyTo ? null : parseReplyQuote(m.text);
+                      const quote = m.replyTo ? replyQuoteLabel(m.replyTo) : (legacy ? legacy.quote : null);
+                      const body = legacy ? legacy.body : m.text;
                       return (
                         <>
-                          {rq && (
+                          {quote && (
                             <div className={`mb-1.5 rounded-lg px-2.5 py-1.5 border-l-[3px] ${
                               mine ? 'bg-white/15 border-white/60' : fromBot ? 'bg-white/10 border-white/40' : 'bg-gray-50 border-[#ba0036]/50'
                             }`}>
                               <p className={`text-[9px] font-black uppercase tracking-widest mb-0.5 ${mine || fromBot ? 'text-white/70' : 'text-[#ba0036]'}`}>Reply</p>
-                              <p className={`text-[11px] font-medium line-clamp-2 ${mine || fromBot ? 'text-white/80' : 'text-gray-500'}`}>{rq.quote}</p>
+                              <p className={`text-[11px] font-medium line-clamp-2 ${mine || fromBot ? 'text-white/80' : 'text-gray-500'}`}>{quote}</p>
                             </div>
                           )}
-                          <p className="text-[13px] sm:text-sm font-medium whitespace-pre-line leading-relaxed">{rq ? rq.body : m.text}</p>
+                          <p className="text-[13px] sm:text-sm font-medium whitespace-pre-line leading-relaxed">{body}</p>
                         </>
                       );
                     })() : (m.text ? (
                       <p className="text-[13px] sm:text-sm font-medium whitespace-pre-line leading-relaxed mt-1.5">{m.text}</p>
                     ) : null)}
+                    </>
+                    )}
                     {showTail && (
                       <div className={`flex items-center gap-1.5 mt-1 ${mine ? 'justify-end text-white/70' : fromBot ? 'justify-start text-white/50' : 'justify-start text-gray-400'}`}>
                         <span className="text-[9px] font-bold tabular-nums">{formatTime(m.iso)}</span>

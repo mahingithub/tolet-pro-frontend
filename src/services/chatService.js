@@ -78,13 +78,27 @@ export const listMessages = async (conversationId, { since } = {}) => {
   return Array.isArray(data.messages) ? data.messages : [];
 };
 
-/** Send a message to a conversation. */
-export const sendMessage = async (conversationId, text) => {
+/**
+ * Send a message to a conversation.
+ * @param {string} conversationId
+ * @param {string} text
+ * @param {object} [opts]
+ * @param {string} [opts.replyTo]  id of the message being replied to (quote).
+ */
+export const sendMessage = async (conversationId, text, { replyTo } = {}) => {
   const data = await call(`/conversations/${conversationId}/messages`, {
     method: 'POST',
-    body: { text },
+    body: { text, ...(replyTo ? { replyTo } : {}) },
   });
   return data.message;
+};
+
+/**
+ * Delete-for-everyone (soft delete). Only works on messages you sent; the
+ * backend clears the content and notifies the other user in real-time.
+ */
+export const deleteMessage = async (conversationId, messageId) => {
+  return call(`/conversations/${conversationId}/messages/${messageId}`, { method: 'DELETE' });
 };
 
 /**
@@ -141,5 +155,6 @@ export default {
   sendMessage,
   sendMediaMessage,
   markRead,
+  deleteMessage,
   getMissedMessagesCount,
 };
