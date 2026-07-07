@@ -12,6 +12,7 @@ export default function InquiryCard({ inquiry, propertyStatus, onStatusChange, o
   // Safe fallbacks for inquiry details
   const tenantName = inquiry?.user || inquiry?.tenantName || 'Unknown Tenant';
   const tenantPhone = inquiry?.phone || inquiry?.tenantPhone || 'N/A';
+  const tenantAvatar = inquiry?.userAvatar || inquiry?.tenantAvatar || '';
   const propertyTitle = inquiry?.propTitle || inquiry?.propertyName || 'Unknown Property';
   const status = inquiry?.status?.toLowerCase() || 'delivered';
 
@@ -88,8 +89,12 @@ export default function InquiryCard({ inquiry, propertyStatus, onStatusChange, o
       <div className="flex justify-between items-start mb-4">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
-            <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-              <User size={16} />
+            <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 overflow-hidden shrink-0">
+              {tenantAvatar ? (
+                <img src={tenantAvatar} alt={tenantName} className="w-full h-full object-cover" />
+              ) : (
+                <User size={16} />
+              )}
             </div>
             <h3 className="font-bold text-gray-900">{tenantName}</h3>
           </div>

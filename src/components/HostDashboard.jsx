@@ -3665,8 +3665,12 @@ const HostDashboard = () => {
                   onClick={forceOpen ? undefined : () => setExpandedBookingId(isExpanded ? null : booking.id)}
                   className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-3 text-left transition-colors ${forceOpen ? 'cursor-default' : 'hover:bg-gray-50/50'}`}
                 >
-                  <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-black text-[11px] sm:text-xs shrink-0 ${stageAvatar}`}>
-                    {booking.tenantInit}
+                  <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-black text-[11px] sm:text-xs shrink-0 ${stageAvatar} overflow-hidden`}>
+                    {booking.tenantAvatar ? (
+                      <img src={booking.tenantAvatar} alt={booking.tenant} className="w-full h-full object-cover" />
+                    ) : (
+                      booking.tenantInit
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 mb-0.5">
@@ -4123,8 +4127,12 @@ const HostDashboard = () => {
                   onClick={forceOpen ? undefined : () => setExpandedRentId(isExpanded ? null : booking.id)}
                   className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-3 text-left transition-colors ${forceOpen ? 'cursor-default' : 'hover:bg-gray-50/50'}`}
                 >
-                  <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-black text-[11px] sm:text-xs shrink-0 ${theme.avatar}`}>
-                    {booking.tenantInit}
+                  <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-black text-[11px] sm:text-xs shrink-0 ${theme.avatar} overflow-hidden`}>
+                    {booking.tenantAvatar ? (
+                      <img src={booking.tenantAvatar} alt={booking.tenant} className="w-full h-full object-cover" />
+                    ) : (
+                      booking.tenantInit
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 mb-0.5">
