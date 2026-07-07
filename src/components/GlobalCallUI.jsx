@@ -19,6 +19,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import callProvider from '../services/callProvider';
+import callService from '../services/callService';
 import { getCurrentToken } from '../services/authService';
 
 // ─── Ringtone — Web Audio API synthesized tone, no file needed ──────────────
@@ -92,24 +93,32 @@ const GlobalCallUI = () => {
   const remoteVideoRef = useRef(null);
   const localVideoRef  = useRef(null);
   const ringtoneRef    = useRef(null);
+  // Hold the remote MediaStream so we can (re)attach it whenever the audio/video
+  // elements mount. Without this, a voice call's stream could arrive a beat
+  // before the <audio> element existed and then never get attached → no sound.
+  const remoteStreamRef = useRef(null);
   const handledNotificationActionsRef = useRef(new Set());
 
   if (!ringtoneRef.current) ringtoneRef.current = new Ringtone();
 
-  // Attach a stream to whichever element is appropriate based on call type.
+  // Attach the current remote stream to whichever media elements exist.
+  // NOTE: we do NOT gate on call type here — a voice call has only the <audio>
+  // element (no <video>), so we just attach to whatever is mounted. This is the
+  // key fix for "voice call connects but there's no audio": the stream is stored
+  // in a ref and (re)attached on every relevant render, so it can't be missed.
   const attachRemoteStream = useCallback((stream) => {
-    if (!stream) return;
-    // For video calls, prefer the video element.
-    if (callState?.type === 'video' && remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = stream;
-      remoteVideoRef.current.play?.().catch(() => {});
-    }
-    // Always attach to audio too so voice works even on video.
-    if (remoteAudioRef.current) {
-      remoteAudioRef.current.srcObject = stream;
+    if (stream) remoteStreamRef.current = stream;
+    const s = remoteStreamRef.current;
+    if (!s) return;
+    if (remoteAudioRef.current && remoteAudioRef.current.srcObject !== s) {
+      remoteAudioRef.current.srcObject = s;
       remoteAudioRef.current.play?.().catch(() => {});
     }
-  }, [callState?.type]);
+    if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== s) {
+      remoteVideoRef.current.srcObject = s;
+      remoteVideoRef.current.play?.().catch(() => {});
+    }
+  }, []);
 
   const attachLocalStream = useCallback((stream, type) => {
     if (type === 'video' && stream && localVideoRef.current) {
@@ -132,29 +141,34 @@ const GlobalCallUI = () => {
     callerId:    data.callerId,
     peerName:    data.callerName || data.peerName || 'Unknown',
     peerAvatar:  data.callerAvatar || data.peerAvatar || null,
-    type:        data.type || 'voice',
+    // Normalise to exactly 'voice' | 'video'. A voice call must NEVER be read as
+    // video (that would turn the camera on and stall the connection), so
+    // anything that isn't literally 'video' falls back to 'voice'.
+    type:        data.type === 'video' ? 'video' : 'voice',
     roomId:      data.roomId,
   }), []);
 
   const acceptIncomingCall = useCallback(async (incoming) => {
     if (!incoming?.callId) return;
-    setCallState(toIncomingState(incoming, 'ringing'));
-    if (!ensureSocket()) return;
+    if (!ensureSocket()) { setCallState(null); return; }
+
+    // Flip to "accepted" IMMEDIATELY so the ringtone stops the instant the user
+    // taps Accept — we do NOT wait for the mic/camera to be acquired first.
+    // (Previously 'accepted' was set only AFTER acceptCall() resolved, so a slow
+    // getUserMedia left the phone ringing even though the call was answered.)
+    setCallState(toIncomingState(incoming, 'accepted'));
 
     try {
       await callProvider.acceptCall({
         callId:   incoming.callId,
         callerId: incoming.callerId,
-        type:     incoming.type || 'voice',
+        type:     incoming.type === 'video' ? 'video' : 'voice',
         roomId:   incoming.roomId,
       });
-      setCallState((prev) => (
-        prev?.callId === incoming.callId
-          ? { ...prev, status: 'accepted' }
-          : toIncomingState(incoming, 'accepted')
-      ));
     } catch (err) {
       console.error('[GlobalCallUI] acceptCall failed:', err);
+      toast.error('Call connect করা গেল না।');
+      callProvider.endCall({ callId: incoming.callId });
       setCallState(null);
     }
   }, [ensureSocket, toIncomingState]);
@@ -169,15 +183,40 @@ const GlobalCallUI = () => {
     setCallState(null);
   }, [ensureSocket]);
 
-  const handleNotificationLaunch = useCallback((incoming, action = 'open') => {
+  const handleNotificationLaunch = useCallback(async (incoming, action = 'open') => {
     if (!incoming?.callId) return;
 
     const key = `${incoming.callId}:${action}:${incoming.roomId || ''}`;
     if (handledNotificationActionsRef.current.has(key)) return;
     handledNotificationActionsRef.current.add(key);
 
+    // Declining is always safe (idempotent, even on a dead call).
     if (action === 'decline') {
       rejectIncomingCall(incoming);
+      return;
+    }
+
+    // Opening/answering from a notification: the notification can outlive the
+    // call (the caller hung up, it went to voicemail/missed, or the other side
+    // ended it). Confirm the call is STILL ringing with the server before we
+    // show an answerable UI — otherwise tapping a stale "missed call" would open
+    // the call screen and let the user "answer" a call that no longer exists.
+    let liveStatus = null;
+    try {
+      const call = await callService.getCall(incoming.callId);
+      liveStatus = call?.status || null;
+    } catch (err) {
+      // 404 (call not found / already cleaned up) → treat as no-longer-active.
+      if (err?.status === 404 || err?.code === 'not_found') liveStatus = 'ended';
+      // Any other failure (network, auth): fall through and let the socket flow
+      // decide, rather than blocking a genuinely-ringing call.
+    }
+
+    if (liveStatus && liveStatus !== 'ringing') {
+      const missed = liveStatus === 'missed';
+      toast.info(missed ? 'Missed call — এই কলটি আর নেই।' : 'এই কলটি আর সক্রিয় নেই।');
+      // Make sure no stale ringing UI is showing.
+      setCallState((prev) => (prev?.callId === incoming.callId ? null : prev));
       return;
     }
 
@@ -203,7 +242,7 @@ const GlobalCallUI = () => {
         callId:      data.callId,
         peerName:    data.receiverName || prev?.peerName || 'Unknown',
         peerAvatar:  data.receiverAvatar || prev?.peerAvatar || null,
-        type:        data.type || 'voice',
+        type:        data.type === 'video' ? 'video' : 'voice',
         roomId:      data.roomId,
       }));
     });
@@ -233,6 +272,9 @@ const GlobalCallUI = () => {
           }
           return null;
         });
+        // Drop the finished call's remote stream so a later call can't briefly
+        // play the previous call's audio before its own stream attaches.
+        remoteStreamRef.current = null;
         setMuted(false);
         setVideoOff(false);
       }
@@ -257,6 +299,14 @@ const GlobalCallUI = () => {
     if (callState?.status !== 'accepted' || callState?.type !== 'video') return;
     attachLocalStream(callProvider.getLocalStream(), callState.type);
   }, [attachLocalStream, callState?.status, callState?.type]);
+
+  // Re-attach the remote stream once the call is accepted. The <audio>/<video>
+  // elements can mount AFTER the remote stream first arrived (especially on a
+  // voice call), so this guarantees the stored stream gets wired to them and
+  // audio actually plays.
+  useEffect(() => {
+    if (callState?.status === 'accepted') attachRemoteStream();
+  }, [attachRemoteStream, callState?.status, callState?.type]);
 
   // Notification click → app launch. The service worker opens /messages with
   // these params when the PWA was closed or in the background.

@@ -90,23 +90,16 @@ export function NotificationProvider({ children }) {
     let cancelled = false;
     const socket = callProvider.getSocket();
 
-    const handleReceiveMessage = (data) => {
-      if (cancelled) return;
-      setUnreadCount((prev) => prev + 1);
-      
-      // Try to load new notifications if a new message comes in,
-      // or we can just mock it if we don't want to hit the API every time.
-      // Easiest is to reload:
-      loadNotifications();
-      lastConnectedTimeRef.current = new Date().toISOString();
-    };
-
     const handleNewNotification = (data) => {
       if (cancelled) return;
       setItems((prev) => [data, ...prev]);
       setUnreadCount((prev) => prev + 1);
 
-      if (['message', 'message_new', 'booking', 'payment', 'receipt', 'rent_receipt'].includes(data.type)) {
+      // Chat messages already get a rich toast from GlobalToaster (via the
+      // RECEIVE_MESSAGE event), so we must NOT toast them again here — that was
+      // the duplicate. We still added the item + bumped unread above, so the
+      // notification bell/list stays accurate.
+      if (['booking', 'payment', 'receipt', 'rent_receipt'].includes(data.type)) {
         toast.info(data.title || 'New Notification', {
           description: data.body,
           action: {
@@ -165,7 +158,9 @@ export function NotificationProvider({ children }) {
     };
 
     if (socket) {
-      socket.on('RECEIVE_MESSAGE', handleReceiveMessage);
+      // RECEIVE_MESSAGE is owned by GlobalToaster (the message toast). Listening
+      // to it here too was double-counting unread on every message, so we only
+      // track generic 'new_notification' events for the bell + unread count.
       socket.on('new_notification', handleNewNotification);
       socket.on('connect', handleConnect);
     }
@@ -173,7 +168,6 @@ export function NotificationProvider({ children }) {
     return () => {
       cancelled = true;
       if (socket) {
-        socket.off('RECEIVE_MESSAGE', handleReceiveMessage);
         socket.off('new_notification', handleNewNotification);
         socket.off('connect', handleConnect);
       }

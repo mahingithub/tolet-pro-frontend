@@ -192,15 +192,20 @@ function connect(token) {
   // peer connection, create the OFFER, and send it (the receiver is now ready).
   _socket.on('CALL_ACCEPTED', async (data) => {
     console.log('[callProvider] call accepted:', data);
+    if (data?.roomId && _isCaller) _currentRoomId = data.roomId;
+
+    // Tell the UI the call is accepted FIRST, so the caller's ringtone stops
+    // the instant the receiver answers — we must not make that wait on the
+    // WebRTC offer/answer negotiation below.
+    _emit(_callStateCbs, 'accepted', data);
+
     if (_isCaller) {
-      if (data?.roomId) _currentRoomId = data.roomId;
       try {
         await sendOfferAsCaller();
       } catch (err) {
         console.error('[callProvider] caller failed to send offer:', err);
       }
     }
-    _emit(_callStateCbs, 'accepted', data);
   });
 
   _socket.on('CALL_REJECTED', (data) => {
