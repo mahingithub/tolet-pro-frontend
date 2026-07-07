@@ -3,13 +3,13 @@ importScripts('/call-notification-sw.js');
 /* TO-LET PRO — Service Worker
  * ───────────────────────────────────────────────────────────────────────────
  * Makes the app installable + gives a basic offline shell. Written DEFENSIVELY
- * because TO-LET PRO is real-time (Socket.IO signaling, WebRTC/ZegoCloud media,
- * live chat polling). If the SW cached those, calls would silently break and
- * users would see stale messages — bugs that are miserable to trace.
+ * because TO-LET PRO is real-time (Socket.IO signaling, peer-to-peer WebRTC
+ * media, live chat polling). If the SW cached those, calls would silently break
+ * and users would see stale messages — bugs that are miserable to trace.
  *
  * The rule here is simple and strict:
  *   • STATIC assets (the built JS/CSS/images, icons, manifest) → cache-first.
- *   • EVERYTHING dynamic (API, socket, Zego, cross-origin) → NETWORK-ONLY,
+ *   • EVERYTHING dynamic (API, socket, cross-origin) → NETWORK-ONLY,
  *     never touched by the cache.
  *
  * ► TO CHANGE LATER:
@@ -43,15 +43,11 @@ const PRECACHE_URLS = [
 
 // Requests we must NEVER serve from cache. If any of these substrings appear in
 // the URL, the SW gets out of the way and lets the network handle it directly.
-// (Covers your Render API, Socket.IO, and ZegoCloud media/log endpoints.)
+// (Covers your Render API and Socket.IO signaling endpoints.)
 const NETWORK_ONLY = [
   '/api/',
   '/socket.io/',
   'onrender.com',          // backend host (API + socket)
-  'zego.im',
-  'zegocloud.com',
-  'coolzcloud.com',        // Zego media/edge
-  'webliveroom',           // Zego room endpoints
   'googleapis.com',        // Firebase / Google auth
   'firebaseio.com',
   'identitytoolkit',       // Firebase auth

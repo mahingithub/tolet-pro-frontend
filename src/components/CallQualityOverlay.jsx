@@ -1,15 +1,16 @@
 /**
- * CallQualityOverlay.jsx — Phase Call-3 UI add-ons for the call overlay.
+ * CallQualityOverlay.jsx — optional UI add-ons for the call overlay.
  *
- * Self-contained so ChatSystem only needs to mount it. It subscribes to the
- * additive callProvider callbacks (onNetworkQuality / onReconnectStateChange)
- * and renders:
+ * Self-contained so a parent only needs to mount it. It subscribes to the
+ * callProvider callbacks (onNetworkQuality / onReconnectStateChange) and renders:
  *   • a 5-bar network-quality indicator (top-left of the call view)
- *   • a "Reconnecting…" banner when the media room drops
+ *   • a "Reconnecting…" banner when the media link drops
  *   • a front/back camera switch button (video calls only, mobile)
  *
- * Under the NATIVE provider these callbacks never fire, so the indicator stays
- * idle (grey) and the banner never shows — harmless.
+ * These are driven by the WebRTC connection: onNetworkQuality comes from a
+ * periodic getStats() packet-loss check, and onReconnectStateChange follows the
+ * peer connection's ICE state. Before the call connects the indicator simply
+ * stays idle (grey) — harmless.
  *
  * Styling intentionally mirrors the existing overlay: dark translucent chips,
  * white text, brand accent (#ba0036). Uses only Tailwind + inline SVG, so it
@@ -19,7 +20,7 @@
 import React, { useState, useEffect } from 'react';
 import callProvider from '../services/callProvider';
 
-// Zego quality levels: 0 excellent · 1 good · 2 medium · 3 bad · 4 unusable.
+// Quality levels: 0 excellent · 1 good · 2 medium · 3 bad · 4 unusable.
 // Map to how many of the 5 bars are "active".
 function levelToActiveBars(level) {
   if (level === null || level === undefined || Number.isNaN(level)) return 0;

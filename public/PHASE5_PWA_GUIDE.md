@@ -12,7 +12,7 @@ backend পরিবর্তন নেই।**
 | ফাইল | কাজ |
 |---|---|
 | `public/manifest.json` | Web App Manifest (নাম, icon, theme color, standalone) |
-| `public/service-worker.js` | Static asset cache; **API/socket/Zego কখনো cache হয় না** |
+| `public/service-worker.js` | Static asset cache; **API/socket/WebRTC কখনো cache হয় না** |
 | `public/offline.html` | offline হলে যে পেজ দেখায় |
 | `public/icons/` | সব size: 72–512 + maskable 192/512 + logo.svg, maskable.svg |
 | `public/apple-touch-icon.png` | iOS home-screen icon (180) |
@@ -156,7 +156,7 @@ return (
 
 ## ⚠️ গুরুত্বপূর্ণ — service worker আর real-time
 
-service worker **ইচ্ছে করে** API, socket.io, ZegoCloud কখনো cache করে না — শুধু
+service worker **ইচ্ছে করে** API, socket.io, WebRTC signaling কখনো cache করে না — শুধু
 static asset (JS/CSS/icon)। তাই কল, chat, live data সবসময় network থেকে fresh
 আসবে, PWA install করার পরেও। এটা না করলে কল ভাঙত বা পুরনো message দেখাত।
 

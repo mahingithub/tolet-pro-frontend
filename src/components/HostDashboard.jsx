@@ -5042,7 +5042,20 @@ const HostDashboard = () => {
                   <div>
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">{language === 'বাংলা' ? 'ফাইল সিলেক্ট করুন' : 'Choose File'}</label>
                     <label className="border-2 border-dashed border-gray-200 hover:border-[#ba0036] hover:bg-red-50/30 rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer group">
-                       <input type="file" accept=".pdf,.doc,.docx,image/*" className="hidden" onChange={e => setUploadForm(f => ({ ...f, file: (e.target.files && e.target.files[0]) ? e.target.files[0] : null }))} />
+                       <input type="file" accept=".pdf,.doc,.docx,image/*" className="hidden" onChange={e => {
+                         const file = e.target.files && e.target.files[0];
+                         if (!file) {
+                           setUploadForm(f => ({ ...f, file: null }));
+                           return;
+                         }
+                         const ok = /^(image\/(jpeg|jpg|png|webp|gif)|application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)$/.test(file.type || '') || /\.(pdf|docx?|jpe?g|png|webp|gif)$/i.test(file.name);
+                         if (!ok) {
+                           showToast(language === 'বাংলা' ? 'ভুল ফরম্যাট! শুধু PDF, DOCX বা ছবি আপলোড করা যাবে।' : 'Invalid format! Please upload a PDF, DOCX, or image file.');
+                           e.target.value = null;
+                           return;
+                         }
+                         setUploadForm(f => ({ ...f, file }));
+                       }} />
                        <UploadCloud size={32} className="text-gray-400 group-hover:text-[#ba0036] mb-3 transition-colors" />
                        <p className="text-sm font-black text-gray-900 mb-1 break-all px-2">{uploadForm.file ? uploadForm.file.name : (language === 'বাংলা' ? 'পিডিএফ, DOCX বা ছবি আপলোড করুন' : 'Upload PDF, DOCX or Image')}</p>
                        <p className="text-[10px] text-gray-500 font-bold">{uploadForm.file ? `${(uploadForm.file.size / 1024 / 1024).toFixed(2)} MB` : (language === 'বাংলা' ? 'সর্বোচ্চ সাইজ: 10MB' : 'Max size: 10MB')}</p>
