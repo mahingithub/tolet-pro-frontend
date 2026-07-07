@@ -3388,8 +3388,12 @@ const HostDashboard = () => {
                             <div>
                               <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 md:w-12 md:h-12 bg-red-50 rounded-xl flex items-center justify-center text-[#ba0036] font-black text-sm md:text-lg border-none shadow-sm">
-                                    {inquiry.init}
+                                  <div className="w-10 h-10 md:w-12 md:h-12 bg-red-50 rounded-xl flex items-center justify-center text-[#ba0036] font-black text-sm md:text-lg border-none shadow-sm overflow-hidden shrink-0">
+                                    {inquiry.userAvatar ? (
+                                      <img src={inquiry.userAvatar} alt={inquiry.user} className="w-full h-full object-cover" />
+                                    ) : (
+                                      inquiry.init
+                                    )}
                                   </div>
                                   <div>
                                     {inquiry.inquirerUserId ? (
