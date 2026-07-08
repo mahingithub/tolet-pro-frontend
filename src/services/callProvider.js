@@ -54,16 +54,44 @@ const SOCKET_URL = import.meta.env.VITE_API_BASE_URL
   ? import.meta.env.VITE_API_BASE_URL.replace(/\/api\/?$/, '').replace(/\/$/, '')
   : 'http://localhost:5000';
 
-// ─── Free STUN servers (NAT traversal) ──────────────────────────────────────
-// These are Google's public STUN servers — free, no signup, no keys. They only
-// help each peer learn its own public address; they never see your audio/video.
+// ─── ICE servers (NAT traversal) ─────────────────────────────────────────────
+// STUN helps each peer learn its own public address; TURN RELAYS the media when
+// a direct peer-to-peer link can't be established (strict/mobile/carrier NAT) —
+// this is what stops calls from flapping "connected → disconnected" on mobile.
 //
-// If you later find that users on strict mobile networks can't connect, add a
-// TURN server here as an extra entry (TURN relays media and is NOT free):
-//   { urls: 'turn:YOUR_TURN_HOST:3478', username: '...', credential: '...' }
+// The TURN entries below are Metered (metered.ca). NOTE: these credentials are
+// intended for client-side (browser) use and are therefore visible in the built
+// bundle — that is normal for TURN. Prefer moving them to a VITE_ env var and/or
+// Metered's short-lived credential API if you want to rotate them without a
+// redeploy. The tcp/443 + turns entries let calls punch through firewalls that
+// only allow HTTPS traffic.
 const ICE_SERVERS = [
+  // Google free STUN
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
+
+  // Metered STUN + TURN
+  { urls: 'stun:stun.relay.metered.ca:80' },
+  {
+    urls: 'turn:global.relay.metered.ca:80',
+    username: 'cf7ceeb95aa081e6df81e60f',
+    credential: 'C0QeQUvvuyE2ur2z',
+  },
+  {
+    urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+    username: 'cf7ceeb95aa081e6df81e60f',
+    credential: 'C0QeQUvvuyE2ur2z',
+  },
+  {
+    urls: 'turn:global.relay.metered.ca:443',
+    username: 'cf7ceeb95aa081e6df81e60f',
+    credential: 'C0QeQUvvuyE2ur2z',
+  },
+  {
+    urls: 'turns:global.relay.metered.ca:443?transport=tcp',
+    username: 'cf7ceeb95aa081e6df81e60f',
+    credential: 'C0QeQUvvuyE2ur2z',
+  },
 ];
 
 // ─── Media quality (kept modest so it works on 3G/4G) ───────────────────────
