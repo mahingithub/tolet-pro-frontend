@@ -2,23 +2,19 @@
 <!--
   Maskable variant for Android adaptive icons.
   ► Same logo, but the building sits inside the centre ~64% "safe zone" so when
-    Android masks it into a circle/squircle/rounded-square the building is never
-    clipped. The red fills the whole canvas (full bleed).
-  ► TO CHANGE: edit alongside logo.svg; keep the building within the safe zone.
+  Android masks it into a circle/squircle/rounded-square the building is never
+  clipped. The red fills the whole canvas (full bleed).
 -->
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
   <rect x="0" y="0" width="512" height="512" fill="#ba0036"/>
-  <g fill="#ffffff" transform="translate(256,256) scale(0.66) translate(-256,-256)">
-    <rect x="176" y="150" width="160" height="226" rx="10"/>
-    <rect x="232" y="120" width="48" height="36" rx="8"/>
-    <rect x="236" y="320" width="40" height="56" rx="6" fill="#ba0036"/>
-    <g fill="#ba0036">
-      <rect x="200" y="182" width="34" height="30" rx="5"/>
-      <rect x="278" y="182" width="34" height="30" rx="5"/>
-      <rect x="200" y="232" width="34" height="30" rx="5"/>
-      <rect x="278" y="232" width="34" height="30" rx="5"/>
-      <rect x="200" y="282" width="34" height="30" rx="5"/>
-      <rect x="278" y="282" width="34" height="30" rx="5"/>
-    </g>
+  <g transform="translate(256,256) scale(0.66) translate(-256,-256)" fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 144,360 V 266 A 20,20 0 0 1 164,246 H 208" />
+    <path d="M 208,360 V 176 A 20,20 0 0 1 228,156 H 284 A 20,20 0 0 1 304,176 V 360" />
+    <path d="M 304,246 H 348 A 20,20 0 0 1 368,266 V 360" />
+    <line x1="134" y1="360" x2="378" y2="360" />
+    <path d="M 232,360 V 316 A 24,24 0 0 1 280,316 V 360" />
+    <line x1="160" y1="306" x2="192" y2="306" />
+    <line x1="240" y1="226" x2="272" y2="226" />
+    <line x1="320" y1="306" x2="352" y2="306" />
   </g>
 </svg>
