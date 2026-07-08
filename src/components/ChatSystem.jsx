@@ -52,6 +52,7 @@ import EmojiPicker from './EmojiPicker';
 import ChatMessageBubble from './ChatMessageBubble';
 import MediaLightbox from './MediaLightbox';
 import ChatListItemMenu from './ChatListItemMenu';
+import ReactionBar from './ReactionBar';
 
 // Render a text message bigger when it's only emoji ("jumbo"/sticker), and
 // detect a lone image/GIF URL so stickers and Tenor GIFs render as media.
@@ -524,7 +525,8 @@ const ChatSystem = () => {
   const [paymentReceipts, setPaymentReceipts] = useState([]);
 
   // ── Chat UX upgrade: message actions, reply/forward, block modal, PIN lock ──
-  const [menuState, setMenuState]   = useState(null);   // { message, x, y } for the long-press menu
+  const [menuState, setMenuState]   = useState(null);   // { message, x, y } for the 3-dot actions menu
+  const [reactionBar, setReactionBar] = useState(null); // { message, x, y } for the quick-emoji bar
   const [replyTo, setReplyTo]       = useState(null);   // message currently being replied to
   const [forwardMsg, setForwardMsg] = useState(null);   // message currently being forwarded
   const [showBlockModal, setShowBlockModal] = useState(false);
@@ -1730,6 +1732,12 @@ const ChatSystem = () => {
     setMenuState({ message, x, y });
   }, []);
 
+  // Open the quick-emoji reaction bar (long-press or the reaction button).
+  const openReactions = useCallback((message, x, y) => {
+    if (!message || message.isDeleted) return;
+    setReactionBar({ message, x, y });
+  }, []);
+
   // Open the in-app media lightbox (image / video / PDF) instead of a new tab.
   const openLightbox = useCallback((item) => {
     if (item?.url) setLightbox(item);
@@ -2559,6 +2567,7 @@ const ChatSystem = () => {
                   m={m}
                   currentUserId={currentUserId}
                   onOpenMenu={openMessageMenu}
+                  onOpenReactions={openReactions}
                   onReply={handleReply}
                   onMediaClick={openLightbox}
                 />
@@ -2939,8 +2948,20 @@ const ChatSystem = () => {
         />
       )}
 
-      {/* Unified long-press action sheet: reactions + Reply/Forward/Copy/Pin/
-          Mute/Remove. Replaces the old two-step reaction-bar → more flow. */}
+      {/* Quick-emoji reaction bar (long-press or the reaction button). Its "⋯"
+          hands off to the actions menu below. */}
+      <ReactionBar
+        open={!!reactionBar}
+        x={reactionBar?.x || 0}
+        y={reactionBar?.y || 0}
+        current={reactionBar?.message?.reactions?.[currentUserId] || null}
+        onReact={(emoji) => reactionBar && toggleReaction(reactionBar.message, emoji)}
+        onMore={() => reactionBar && openMessageMenu(reactionBar.message, reactionBar.x, reactionBar.y)}
+        onClose={() => setReactionBar(null)}
+      />
+
+      {/* Actions menu (3-dot button / right-click / reaction-bar "⋯"):
+          Reply · Copy · Forward · Pin · Mute · Remove. */}
       <MessageActionsMenu
         open={!!menuState}
         x={menuState?.x || 0}
@@ -2949,7 +2970,6 @@ const ChatSystem = () => {
         canCopy={!menuState?.message?.type || menuState?.message?.type === 'text'}
         pinned={menuState?.message ? (activeChat.pinnedMessageIds || []).map(String).includes(String(menuState.message.id)) : false}
         muted={!!activeChat.muted}
-        currentReaction={menuState?.message?.reactions?.[currentUserId] || null}
         labels={{
           reply: t.msgReply || 'Reply',
           forward: t.msgForward || 'Forward',
@@ -2960,7 +2980,6 @@ const ChatSystem = () => {
           unmute: t.msgUnmute || 'Unmute',
           remove: t.msgRemove || 'Remove',
         }}
-        onReact={(emoji) => menuState && toggleReaction(menuState.message, emoji)}
         onReply={() => menuState && handleReply(menuState.message)}
         onForward={() => menuState && handleForward(menuState.message)}
         onCopy={() => menuState && handleCopyMessage(menuState.message)}
@@ -2996,7 +3015,8 @@ const ChatSystem = () => {
         onVoiceCall={activeChat?.peerUserId ? () => placeCall({ peerUserId: activeChat.peerUserId, peerName: activeChat.name, peerAvatar: activeChat.avatar, type: 'voice' }) : undefined}
         onVideoCall={activeChat?.peerUserId ? () => placeCall({ peerUserId: activeChat.peerUserId, peerName: activeChat.name, peerAvatar: activeChat.avatar, type: 'video' }) : undefined}
         onViewProfile={activeChat?.peerUserId ? () => {
-          if (activeChat.role === 'Property Owner' || activeChat.role === 'Landlord') navigate(`/host/${activeChat.peerUserId}`);
+          // Route paths are /landlord/:id and /tenant/:id (there is no /host/:id).
+          if (activeChat.role === 'Property Owner' || activeChat.role === 'Landlord') navigate(`/landlord/${activeChat.peerUserId}`);
           else navigate(`/tenant/${activeChat.peerUserId}`);
         } : undefined}
         onOpenMedia={() => { setShowContactModal(false); setShowMediaViewer(true); }}

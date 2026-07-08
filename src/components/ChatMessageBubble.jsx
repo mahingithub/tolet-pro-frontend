@@ -20,7 +20,7 @@
 import React, { useRef, memo } from 'react';
 import { motion } from 'framer-motion';
 import {
-  CheckCheck, Check, Hourglass, X, Ban, FileText, Download, Play, Sparkles, CornerUpLeft, Smile,
+  CheckCheck, Check, Hourglass, X, Ban, FileText, Download, Play, Sparkles, CornerUpLeft, Smile, MoreVertical,
 } from 'lucide-react';
 import CompactAudioPlayer from './CompactAudioPlayer';
 
@@ -61,7 +61,7 @@ const bubbleRadius = (mine, position) => {
 
 const LONG_PRESS_MS = 350;   // requirement: exactly 350ms
 
-function ChatMessageBubble({ m, currentUserId, onOpenMenu, onReply, onMediaClick }) {
+function ChatMessageBubble({ m, currentUserId, onOpenMenu, onOpenReactions, onReply, onMediaClick }) {
   const timerRef = useRef(null);
   const posRef = useRef(null);
 
@@ -69,7 +69,8 @@ function ChatMessageBubble({ m, currentUserId, onOpenMenu, onReply, onMediaClick
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
   };
 
-  // Long-press (touch) / right-click (desktop) → open the action sheet.
+  // Long-press (touch) → quick REACTION bar (WhatsApp/Messenger behaviour).
+  // Right-click (desktop) → the ACTIONS menu.
   const pressHandlers = {
     onContextMenu: (e) => { e.preventDefault(); onOpenMenu?.(m, e.clientX, e.clientY); },
     onPointerDown: (e) => {
@@ -77,7 +78,7 @@ function ChatMessageBubble({ m, currentUserId, onOpenMenu, onReply, onMediaClick
       posRef.current = { x: e.clientX, y: e.clientY };
       clearTimer();
       timerRef.current = setTimeout(() => {
-        onOpenMenu?.(m, posRef.current.x, posRef.current.y);
+        onOpenReactions?.(m, posRef.current.x, posRef.current.y);
         timerRef.current = null;
       }, LONG_PRESS_MS);
     },
@@ -96,8 +97,32 @@ function ChatMessageBubble({ m, currentUserId, onOpenMenu, onReply, onMediaClick
   const showTail = m.position === 'last' || m.position === 'solo';
   const name = m.mediaMeta?.originalName;
 
+  // Reaction + 3-dot buttons that sit on the INNER side of the bubble. Always
+  // visible on mobile (there's no hover), fade in on hover on desktop. The
+  // reaction button opens the emoji bar; the 3-dot opens the actions menu.
+  const actionCluster = m.isDeleted ? null : (
+    <div className="flex items-center gap-1 shrink-0 mx-1 transition-opacity duration-150 opacity-100 sm:opacity-0 sm:pointer-events-none sm:group-hover/msg:opacity-100 sm:group-hover/msg:pointer-events-auto">
+      <button
+        onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onOpenReactions?.(m, r.left + r.width / 2, r.bottom); }}
+        className="w-7 h-7 rounded-full bg-white shadow-sm border border-gray-100 flex items-center justify-center text-gray-400 hover:text-[#ba0036] active:scale-90 transition-transform"
+        aria-label="React"
+      >
+        <Smile size={15} />
+      </button>
+      <button
+        onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onOpenMenu?.(m, r.left + r.width / 2, r.bottom); }}
+        className="w-7 h-7 rounded-full bg-white shadow-sm border border-gray-100 flex items-center justify-center text-gray-400 hover:text-[#ba0036] active:scale-90 transition-transform"
+        aria-label="More actions"
+      >
+        <MoreVertical size={15} />
+      </button>
+    </div>
+  );
+
   return (
     <div className={`group/msg flex items-center ${mine ? 'justify-end' : 'justify-start'} ${m.position === 'middle' ? 'mb-0.5' : 'mb-2'}`}>
+      {/* Mine → cluster on the LEFT (inner side). */}
+      {mine && actionCluster}
       {!m.isDeleted && !mine && (
         <CornerUpLeft size={16} className="text-[#ba0036] opacity-0 group-active/msg:opacity-60 mr-1 shrink-0 transition-opacity" />
       )}
@@ -237,26 +262,20 @@ function ChatMessageBubble({ m, currentUserId, onOpenMenu, onReply, onMediaClick
         })()}
       </motion.div>
 
-      {/* Desktop hover affordance → open the action sheet */}
-      {!m.isDeleted && (
-        <button
-          onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onOpenMenu?.(m, r.left + r.width / 2, r.bottom); }}
-          className="hidden sm:group-hover/msg:flex w-7 h-7 rounded-full bg-white shadow-sm border border-gray-100 items-center justify-center text-gray-400 hover:text-[#ba0036] shrink-0 mx-1 transition-colors"
-          aria-label="Message actions"
-        >
-          <Smile size={14} />
-        </button>
-      )}
+      {/* Them → cluster on the RIGHT (inner side). */}
+      {!mine && actionCluster}
     </div>
   );
 }
 
-// Only re-render a bubble when its OWN data changes. menuState/composer/presence
-// changes in the parent won't touch these props, so the list stays still.
+// Only re-render a bubble when its OWN data changes. menuState/reactionBar/
+// composer/presence changes in the parent won't touch these props, so the list
+// stays still.
 export default memo(ChatMessageBubble, (prev, next) => (
   prev.m === next.m &&
   prev.currentUserId === next.currentUserId &&
   prev.onOpenMenu === next.onOpenMenu &&
+  prev.onOpenReactions === next.onOpenReactions &&
   prev.onReply === next.onReply &&
   prev.onMediaClick === next.onMediaClick
 ));
