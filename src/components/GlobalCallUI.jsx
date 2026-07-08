@@ -23,6 +23,7 @@ import callService from '../services/callService';
 import chatService from '../services/chatService';
 import { getCurrentToken } from '../services/authService';
 import { useLanguage } from '../context/LanguageContext';
+import CallOutcomeToast from './CallOutcomeToast';
 
 // mm:ss / h:mm:ss timer for the connected-call duration.
 const fmtDuration = (sec) => {
@@ -103,6 +104,27 @@ const GlobalCallUI = () => {
   const [videoOff, setVideoOff]   = useState(false);
   const [callSeconds, setCallSeconds] = useState(0);   // connected-call timer
   const [peerOnline, setPeerOnline]   = useState(null); // outgoing: is the callee online?
+
+  // `t` is a fresh Proxy each render — hold it in a ref so the call-outcome
+  // toasts (fired from a mount-time subscription) always read current labels.
+  const tRef = useRef(t);
+  tRef.current = t;
+
+  // Shows one of the premium call-outcome cards (ended / missed / declined /
+  // cancelled / failed) via sonner's custom-toast API.
+  const showCallToast = useCallback((variant, { title, subtitle, isVideo = false, onCallBack = null, duration = 6000 } = {}) => {
+    toast.custom((id) => (
+      <CallOutcomeToast
+        variant={variant}
+        title={title}
+        subtitle={subtitle}
+        isVideo={isVideo}
+        callBackLabel={tRef.current.callBackAction || 'Call back'}
+        onCallBack={onCallBack ? () => { toast.dismiss(id); onCallBack(); } : undefined}
+        onClose={() => toast.dismiss(id)}
+      />
+    ), { duration, position: 'top-center' });
+  }, []);
 
   const remoteAudioRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -197,11 +219,15 @@ const GlobalCallUI = () => {
       });
     } catch (err) {
       console.error('[GlobalCallUI] acceptCall failed:', err);
-      toast.error('Call connect করা গেল না।');
+      showCallToast('failed', {
+        title: tRef.current.callFailedTitle || 'Call failed',
+        subtitle: tRef.current.callFailedSub || "Couldn't connect the call",
+        isVideo: incoming.type === 'video',
+      });
       callProvider.endCall({ callId: incoming.callId });
       setCallState(null);
     }
-  }, [ensureSocket, toIncomingState]);
+  }, [ensureSocket, toIncomingState, showCallToast]);
 
   const rejectIncomingCall = useCallback((incoming) => {
     if (!incoming?.callId) return;
@@ -244,7 +270,20 @@ const GlobalCallUI = () => {
 
     if (liveStatus && liveStatus !== 'ringing') {
       const missed = liveStatus === 'missed';
-      toast.info(missed ? 'Missed call — এই কলটি আর নেই।' : 'এই কলটি আর সক্রিয় নেই।');
+      if (missed) {
+        showCallToast('missed', {
+          title: tRef.current.callMissedTitle || 'Missed call',
+          subtitle: incoming.callerName || incoming.peerName || 'Unknown',
+          isVideo: incoming.type === 'video',
+          duration: 8000,
+        });
+      } else {
+        showCallToast('cancelled', {
+          title: tRef.current.callNoLongerActive || 'Call no longer active',
+          subtitle: incoming.callerName || incoming.peerName || '',
+          isVideo: incoming.type === 'video',
+        });
+      }
       // Make sure no stale ringing UI is showing.
       setCallState((prev) => (prev?.callId === incoming.callId ? null : prev));
       return;
@@ -257,7 +296,7 @@ const GlobalCallUI = () => {
 
     ensureSocket();
     setCallState(toIncomingState(incoming, 'ringing'));
-  }, [acceptIncomingCall, ensureSocket, rejectIncomingCall, toIncomingState]);
+  }, [acceptIncomingCall, ensureSocket, rejectIncomingCall, toIncomingState, showCallToast]);
 
   // ─── Subscribe to provider events ──────────────────────────────────────
   useEffect(() => {
@@ -288,23 +327,34 @@ const GlobalCallUI = () => {
         setCallState((prev) => prev ? { ...prev, status: 'accepted', roomId: data?.roomId || prev.roomId } : null);
       } else if (status === 'ended' || status === 'rejected' || status === 'missed') {
         setCallState((prev) => {
+          const wasAccepted = prev?.status === 'accepted';
+          const isVideo   = prev?.type === 'video';
+          const peerName  = prev?.peerName || 'Unknown';
+          const T = tRef.current;
+
           if (status === 'missed' && prev?.direction === 'incoming') {
-            toast.error(`Missed call from ${prev.peerName || 'Unknown'}`, {
-              action: {
-                label: 'Call Back',
-                onClick: () => {
-                  toast.dismiss();
-                  navigate('/messages', { state: { peerUserId: prev.callerId, action: 'call' } });
-                }
-              },
+            const peerId = prev?.callerId || prev?.peerId || null;
+            showCallToast('missed', {
+              title: T.callMissedTitle || 'Missed call',
+              subtitle: peerName,
+              isVideo,
               duration: 10000,
+              onCallBack: peerId
+                ? () => navigate('/messages', { state: { peerUserId: peerId, mode: 'call', callType: isVideo ? 'video' : 'voice' } })
+                : null,
             });
           } else if (status === 'rejected') {
-            toast.error(prev?.direction === 'outgoing' ? 'Call Rejected/Busy' : 'Call Declined');
-          } else if (status === 'ended' && prev?.status !== 'accepted') {
-            toast.error('Call Cancelled');
-          } else if (status === 'ended' && prev?.status === 'accepted') {
-            toast.success('Call Ended');
+            showCallToast('declined', {
+              title: prev?.direction === 'outgoing' ? (T.callBusyTitle || 'Call declined') : (T.callDeclinedTitle || 'Call declined'),
+              subtitle: peerName,
+              isVideo,
+            });
+          } else if (status === 'ended' && !wasAccepted) {
+            showCallToast('cancelled', { title: T.callCancelledTitle || 'Call cancelled', subtitle: peerName, isVideo });
+          } else if (status === 'ended' && wasAccepted) {
+            const dur = Number(data?.duration);
+            const subtitle = Number.isFinite(dur) && dur > 0 ? `${peerName} · ${fmtDuration(dur)}` : peerName;
+            showCallToast('ended', { title: T.callEndedTitle || 'Call ended', subtitle, isVideo });
           }
           return null;
         });
@@ -329,7 +379,7 @@ const GlobalCallUI = () => {
       unsubRemoteStream?.();
       unsubLocalStream?.();
     };
-  }, [attachLocalStream, attachRemoteStream, toIncomingState]);
+  }, [attachLocalStream, attachRemoteStream, toIncomingState, showCallToast, navigate]);
 
   useEffect(() => {
     if (callState?.status !== 'accepted' || callState?.type !== 'video') return;

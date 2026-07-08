@@ -370,9 +370,17 @@ const TypingDots = ({ name = 'AI' }) => (
 );
 
 // ─── Sidebar chat row ───────────────────────────────────────────────────────
-const ChatRow = ({ chat, lastMsg, isActive, onClick, isMobile, online = false, onContextMenu }) => {
+// Memoized so a parent re-render (e.g. opening the list context menu, presence
+// ticks, the 5s message poll) never re-renders rows whose data didn't change.
+// Requires STABLE props from the parent: `onSelect`/`onContextMenu` via
+// useCallback, and `lastMessage` (a referentially-stable message object) instead
+// of a freshly-built object each render.
+const ChatRow = React.memo(function ChatRow({ chat, lastMessage, isActive, onSelect, isMobile, online = false, onContextMenu }) {
   const initials = (chat.name || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
+
   // Long-press (mobile) / right-click (desktop) → open the row context menu.
+  // Timer + touch state are LOCAL refs, so pressing a row never touches the
+  // parent's state or re-renders the list.
   const lpRef = useRef(null);
   const posRef = useRef(null);
   const openedRef = useRef(false);   // suppress the click that follows a long-press
@@ -387,7 +395,7 @@ const ChatRow = ({ chat, lastMsg, isActive, onClick, isMobile, online = false, o
         openedRef.current = true;
         onContextMenu(chat, posRef.current.x, posRef.current.y);
         lpRef.current = null;
-      }, 450);
+      }, 350);
     },
     onPointerMove: (e) => {
       const p = posRef.current;
@@ -396,14 +404,22 @@ const ChatRow = ({ chat, lastMsg, isActive, onClick, isMobile, online = false, o
     onPointerUp: clearLp,
     onPointerLeave: clearLp,
   } : {};
+
+  // Derive preview/time from the stable lastMessage prop (no per-render object).
+  const preview = lastMessage
+    ? (lastMessage.sender === 'me' ? `You: ${lastMessage.text || ''}` : (lastMessage.text || ''))
+    : '';
+  const timeLabel = lastMessage?.iso ? formatTime(lastMessage.iso) : chat.time;
+
   return (
     <button
       {...ctxHandlers}
       onClick={(e) => {
         if (openedRef.current) { openedRef.current = false; e.preventDefault(); return; }
-        onClick?.();
+        onSelect?.(chat.id);
       }}
-      className={`w-full text-left p-3 sm:p-4 rounded-2xl flex items-center gap-3 border transition-all active:scale-[0.99] select-none ${
+      style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
+      className={`w-full text-left p-3 sm:p-4 rounded-2xl flex items-center gap-3 border transition-colors touch-pan-y select-none active:bg-gray-100 ${
         isActive
           ? 'bg-white border-[#ba0036]/15 shadow-[0_4px_20px_rgba(186,0,54,0.08)]'
           : 'border-transparent hover:bg-white/70'
@@ -437,12 +453,12 @@ const ChatRow = ({ chat, lastMsg, isActive, onClick, isMobile, online = false, o
             {chat.blocked && <Ban size={10} className="text-red-400 shrink-0" />}
           </h4>
           <span className="text-[9px] font-black text-gray-400 shrink-0 tabular-nums">
-            {lastMsg?.iso ? formatTime(lastMsg.iso) : chat.time}
+            {timeLabel}
           </span>
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">
           <p className={`text-[11px] truncate ${chat.unread > 0 ? 'font-black text-gray-900' : 'font-bold text-gray-500'}`}>
-            {lastMsg?.preview || chat.lastMsg}
+            {preview || chat.lastMsg}
           </p>
           {chat.unread > 0 && (
             <span className="bg-[#ba0036] text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] px-1.5 flex items-center justify-center shrink-0">
@@ -455,7 +471,7 @@ const ChatRow = ({ chat, lastMsg, isActive, onClick, isMobile, online = false, o
       {isMobile && <ChevronRight size={14} className="text-gray-300 shrink-0"/>}
     </button>
   );
-};
+});
 
 // ─── Main ChatSystem component ──────────────────────────────────────────────
 const ChatSystem = () => {
@@ -1808,6 +1824,13 @@ const ChatSystem = () => {
   };
 
   // ── Chat-list row actions (long-press/right-click menu + header delete) ────
+  // Stable so the memoized ChatRow keeps its identity and never re-renders the
+  // list on unrelated parent updates.
+  const handleSelectChat = useCallback((id) => {
+    setActiveChatId(id);
+    if (isMobile) setShowSidebarMobile(false);
+  }, [isMobile]);
+
   const openListMenu = useCallback((chat, x, y) => {
     if (!chat || chat.isAI) return;   // AI bot can't be pinned/muted/removed
     setListMenu({ chat, x, y });
@@ -2262,24 +2285,20 @@ const ChatSystem = () => {
                 </div>
               ) : (
                 visibleChats.map(chat => {
-                  const stream = messages[chat.id] || [];
-                  const last = stream[stream.length - 1];
-                  const lastMsg = last
-                    ? { iso: last.iso, preview: last.sender === 'me' ? `You: ${last.text}` : last.text }
-                    : null;
+                  const stream = messages[chat.id];
+                  // Pass the raw last-message OBJECT (referentially stable) — not a
+                  // freshly-built { iso, preview } each render — so React.memo works.
+                  const last = stream && stream.length ? stream[stream.length - 1] : undefined;
                   return (
                     <ChatRow
                       key={chat.id}
                       chat={chat}
-                      lastMsg={lastMsg}
+                      lastMessage={last}
                       isActive={activeChatId === chat.id}
                       isMobile={isMobile}
                       online={chat.peerUserId ? (presence[String(chat.peerUserId)]?.online ?? chat.online ?? false) : false}
+                      onSelect={handleSelectChat}
                       onContextMenu={chat.isAI ? undefined : openListMenu}
-                      onClick={() => {
-                        setActiveChatId(chat.id);
-                        if (isMobile) setShowSidebarMobile(false);
-                      }}
                     />
                   );
                 })
@@ -2612,7 +2631,7 @@ const ChatSystem = () => {
                     return next;
                   });
                 }}
-                className={`p-2.5 rounded-xl transition-all ${showEmojiPicker ? 'bg-[#ba0036]/10 text-[#ba0036]' : 'text-gray-400 hover:text-[#ba0036] hover:bg-gray-50'}`}
+                className={`shrink-0 p-2.5 rounded-xl transition-all ${showEmojiPicker ? 'bg-[#ba0036]/10 text-[#ba0036]' : 'text-gray-400 hover:text-[#ba0036] hover:bg-gray-50'}`}
                 aria-label="Emoji"
               >
                 <Smile size={18}/>
@@ -2662,14 +2681,16 @@ const ChatSystem = () => {
                 )}
               </div>
               {isRecording ? (
-                /* Recording in progress — replace the textarea with a live indicator */
-                <div className="flex-1 flex items-center gap-2.5 py-2 px-1">
+                /* Recording in progress — replace the textarea with a live indicator.
+                   min-w-0 lets this middle area shrink so the Cancel/Send buttons
+                   on the right always stay on-screen (they were being pushed off). */
+                <div className="flex-1 min-w-0 flex items-center gap-2.5 py-2 px-1">
                   <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shrink-0" />
                   <span className="text-sm font-black text-gray-700 tabular-nums shrink-0">
                     {String(Math.floor(recordSecs / 60)).padStart(1, '0')}:{String(recordSecs % 60).padStart(2, '0')}
                   </span>
-                  {/* Live waveform line while recording */}
-                  <div className="flex-1 flex items-center gap-[3px] h-6 overflow-hidden">
+                  {/* Live waveform line while recording (min-w-0 → clips instead of overflowing) */}
+                  <div className="flex-1 min-w-0 flex items-center gap-[3px] h-6 overflow-hidden">
                     {Array.from({ length: 28 }).map((_, i) => (
                       <span
                         key={i}
@@ -2705,7 +2726,7 @@ const ChatSystem = () => {
                   }}
                   onFocus={() => setShowEmojiPicker(false)}
                   placeholder={activeChat.isAI ? (t.chatAskAI || 'Ask the AI assistant anything…') : (t.chatTypeMessage || 'Type a message…')}
-                  className="flex-1 bg-transparent outline-none text-sm font-bold text-gray-800 resize-none py-2 max-h-[120px] leading-relaxed placeholder:text-gray-400"
+                  className="flex-1 min-w-0 bg-transparent outline-none text-sm font-bold text-gray-800 resize-none py-2 max-h-[120px] leading-relaxed placeholder:text-gray-400"
                 />
               )}
               {isRecording ? (

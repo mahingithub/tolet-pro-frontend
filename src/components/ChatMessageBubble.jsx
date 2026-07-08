@@ -59,7 +59,7 @@ const bubbleRadius = (mine, position) => {
   return mine ? 'rounded-3xl rounded-tr-md' : 'rounded-3xl rounded-tl-md'; // solo / first
 };
 
-const LONG_PRESS_MS = 400;   // requirement: ~400ms
+const LONG_PRESS_MS = 350;   // requirement: exactly 350ms
 
 function ChatMessageBubble({ m, currentUserId, onOpenMenu, onReply, onMediaClick }) {
   const timerRef = useRef(null);
@@ -111,7 +111,13 @@ function ChatMessageBubble({ m, currentUserId, onOpenMenu, onReply, onMediaClick
         dragSnapToOrigin
         onDragStart={clearTimer}
         onDragEnd={(_e, info) => { if (info.offset.x > 60) onReply?.(m); }}
-        className={`relative max-w-[78%] sm:max-w-[68%] ${bubbleRadius(mine, m.position)} px-3.5 py-2.5 select-none cursor-default transition-shadow shadow-[0_2px_10px_-3px_rgba(0,0,0,0.12)] ${
+        // touch-pan-y + WebkitTouchCallout:none stop the mobile browser's native
+        // long-press callout / text-selection from fighting our JS long-press
+        // (a big source of the "buffering" feel). active:brightness-95 gives
+        // instant press feedback (a filter, so it doesn't fight framer's drag
+        // transform).
+        style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
+        className={`relative max-w-[78%] sm:max-w-[68%] ${bubbleRadius(mine, m.position)} px-3.5 py-2.5 select-none touch-pan-y cursor-default transition-[filter,box-shadow] active:brightness-95 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.12)] ${
           mine
             ? 'bg-gradient-to-br from-[#ba0036] to-[#a30030] text-white'
             : fromBot

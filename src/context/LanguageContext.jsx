@@ -711,6 +711,15 @@ const translations = {
     callEnd: "End",
     callFlip: "Flip",
     callFlipCamera: "Flip camera",
+    callMissedTitle: "Missed call",
+    callEndedTitle: "Call ended",
+    callDeclinedTitle: "Call declined",
+    callBusyTitle: "Call declined",
+    callCancelledTitle: "Call cancelled",
+    callFailedTitle: "Call failed",
+    callFailedSub: "Couldn't connect the call",
+    callBackAction: "Call back",
+    callNoLongerActive: "Call no longer active",
   },
 
   'বাংলা': {
@@ -1410,6 +1419,15 @@ const translations = {
     callEnd: "শেষ",
     callFlip: "ফ্লিপ",
     callFlipCamera: "ক্যামেরা ঘোরান",
+    callMissedTitle: "মিসড কল",
+    callEndedTitle: "কল শেষ হয়েছে",
+    callDeclinedTitle: "কল প্রত্যাখ্যাত",
+    callBusyTitle: "কল প্রত্যাখ্যাত",
+    callCancelledTitle: "কল বাতিল হয়েছে",
+    callFailedTitle: "কল ব্যর্থ হয়েছে",
+    callFailedSub: "কলটি সংযোগ করা যায়নি",
+    callBackAction: "ফিরতি কল",
+    callNoLongerActive: "কলটি আর সক্রিয় নেই",
   }
 };
 
