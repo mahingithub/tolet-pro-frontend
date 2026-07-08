@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import chatService from '../services/chatService';
+import { useLanguage } from '../context/LanguageContext';
 import { getCurrentUser } from '../services/authService';
 import { listTenantReceipts, listHostReceipts } from '../services/receiptService';
 import callProvider from '../services/callProvider';
@@ -44,9 +45,9 @@ import ChatPinLock from './ChatPinLock';
 // ── WhatsApp-style header menu, contact/mute/report modals + reactions ──────
 import ChatHeaderMenu from './ChatHeaderMenu';
 import ViewContactModal from './ViewContactModal';
+import ChatMediaViewer from './ChatMediaViewer';
 import MuteNotificationsModal from './MuteNotificationsModal';
 import ReportContactModal from './ReportContactModal';
-import ReactionBar from './ReactionBar';
 import EmojiPicker from './EmojiPicker';
 
 // Render a text message bigger when it's only emoji ("jumbo"/sticker), and
@@ -98,6 +99,7 @@ const hashPin = (pin) => {
   return String(h);
 };
 const CHAT_LOCKS_KEY = 'tolet_chat_locks';
+const HIDDEN_MSGS_KEY = 'tolet_hidden_msgs';   // messages the user removed "for me"
 
 // ─── Cross-system storage keys (mirrored on HostDashboard / TenantDashboard) ─
 const CHAT_HISTORY_KEY        = 'tolet_chat_history';
@@ -210,6 +212,23 @@ const formatTime = (iso) => {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso; // already a label like "Just now"
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+// "Last seen" relative label for the offline (red) presence state. Bilingual.
+const formatLastSeen = (iso, isBn = false) => {
+  if (!iso) return isBn ? 'অফলাইন' : 'Offline';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return isBn ? 'অফলাইন' : 'Offline';
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  const pre = isBn ? 'সর্বশেষ দেখা' : 'Last seen';
+  if (mins < 1)  return isBn ? 'একটু আগে দেখা গিয়েছিল' : 'Last seen just now';
+  if (mins < 60) return isBn ? `${pre} ${mins} মিনিট আগে` : `${pre} ${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)  return isBn ? `${pre} ${hrs} ঘণ্টা আগে` : `${pre} ${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7)  return isBn ? `${pre} ${days} দিন আগে` : `${pre} ${days}d ago`;
+  return isBn ? `${pre} ${d.toLocaleDateString()}` : `${pre} ${d.toLocaleDateString()}`;
 };
 
 // ─── Receipt card — rendered inline inside the message stream when a host has
@@ -348,7 +367,7 @@ const TypingDots = ({ name = 'AI' }) => (
 );
 
 // ─── Sidebar chat row ───────────────────────────────────────────────────────
-const ChatRow = ({ chat, lastMsg, isActive, onClick, isMobile }) => {
+const ChatRow = ({ chat, lastMsg, isActive, onClick, isMobile, online = false }) => {
   const initials = (chat.name || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
   return (
     <button
@@ -371,8 +390,10 @@ const ChatRow = ({ chat, lastMsg, isActive, onClick, isMobile }) => {
             {initials}
           </div>
         )}
-        {chat.status === 'online' && (
+        {chat.isAI ? (
           <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
+        ) : (
+          <span className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white rounded-full ${online ? 'bg-green-500' : 'bg-gray-300'}`}></span>
         )}
       </div>
 
@@ -409,6 +430,7 @@ const ChatRow = ({ chat, lastMsg, isActive, onClick, isMobile }) => {
 const ChatSystem = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t, language } = useLanguage();
   const peerUserId = location.state?.peerUserId;
 
   // Chat list = AI bot (local-only) + real backend conversations (polled).
@@ -431,6 +453,9 @@ const ChatSystem = () => {
 
   const [activeChatId, setActiveChatId] = useState('ai-bot');
   const activeChat = chats.find(c => c.id === activeChatId) || initialChats[0];
+  // Live presence per peer userId → { online, lastSeenAt }. Seeded from the
+  // conversation list poll and kept live via PRESENCE_UPDATE socket events.
+  const [presence, setPresence] = useState({});
   // Legacy states kept for basic overlay visibility; managed by callProvider now
   const [muted, setMuted] = useState(false);
   const [inputText, setInputText] = useState('');
@@ -459,12 +484,17 @@ const ChatSystem = () => {
   // WhatsApp-style header dropdown + its action modals.
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+  const [showMediaViewer, setShowMediaViewer]   = useState(false); // Media/Links/Docs
   const [showMuteModal, setShowMuteModal]       = useState(false);
   const [showReportModal, setShowReportModal]   = useState(false);
   // Emoji reactions persist + sync via the backend (Message.reactions +
   // MESSAGE_REACTION socket). They live on each message object as
   // m.reactions = { userId: emoji }; this state only drives the floating bar.
-  const [reactionBar, setReactionBar] = useState(null); // { message, x, y }
+  // Messages the current user hid "for me" (Removing someone else's message).
+  // Persisted so they stay hidden across reloads + polling merges.
+  const [hiddenMsgIds, setHiddenMsgIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(HIDDEN_MSGS_KEY)) || {}; } catch { return {}; }
+  });
   // Per-chat PIN privacy. `chatLocks` persists { chatId: pinHash } to localStorage;
   // `pinUnlocked` is per-session (unlock is forgotten on reload); `pinSetupFor`
   // holds the chatId whose PIN is currently being set.
@@ -613,12 +643,53 @@ const ChatSystem = () => {
       }
     };
 
+    // Presence — flip a peer online/offline in real time.
+    const onPresenceUpdate = ({ userId, online, lastSeenAt }) => {
+      if (!userId) return;
+      setPresence(prev => ({
+        ...prev,
+        [String(userId)]: {
+          online: !!online,
+          lastSeenAt: lastSeenAt || prev[String(userId)]?.lastSeenAt || null,
+        },
+      }));
+    };
+    const onPresenceSnapshot = ({ online }) => {
+      if (!Array.isArray(online)) return;
+      setPresence(prev => {
+        const next = { ...prev };
+        online.forEach(id => {
+          next[String(id)] = { online: true, lastSeenAt: next[String(id)]?.lastSeenAt || null };
+        });
+        return next;
+      });
+    };
+
+    // Block state changed by the peer → reflect it so the composer updates.
+    const onConversationBlocked = ({ conversationId }) => {
+      if (!conversationId) return;
+      setChats(prev => prev.map(c => c.id === conversationId ? { ...c, blockedByPeer: true } : c));
+    };
+    const onConversationUnblocked = ({ conversationId }) => {
+      if (!conversationId) return;
+      setChats(prev => prev.map(c => c.id === conversationId ? { ...c, blockedByPeer: false } : c));
+    };
+    const onConversationPins = ({ conversationId, pinnedMessageIds }) => {
+      if (!conversationId) return;
+      setChats(prev => prev.map(c => c.id === conversationId ? { ...c, pinnedMessageIds: pinnedMessageIds || [] } : c));
+    };
+
     socket.on('MESSAGE_DELIVERED', onDelivered);
     socket.on('MESSAGE_SEEN', onSeen);
     socket.on('MESSAGE_DELETED', onMessageDeleted);
     socket.on('MESSAGE_REACTION', onReaction);
     socket.on('USER_TYPING', onTyping);
     socket.on('USER_STOPPED_TYPING', onStopTyping);
+    socket.on('PRESENCE_UPDATE', onPresenceUpdate);
+    socket.on('PRESENCE_SNAPSHOT', onPresenceSnapshot);
+    socket.on('CONVERSATION_BLOCKED', onConversationBlocked);
+    socket.on('CONVERSATION_UNBLOCKED', onConversationUnblocked);
+    socket.on('CONVERSATION_PINS', onConversationPins);
 
     return () => {
       socket.off('MESSAGE_DELIVERED', onDelivered);
@@ -627,8 +698,32 @@ const ChatSystem = () => {
       socket.off('MESSAGE_REACTION', onReaction);
       socket.off('USER_TYPING', onTyping);
       socket.off('USER_STOPPED_TYPING', onStopTyping);
+      socket.off('PRESENCE_UPDATE', onPresenceUpdate);
+      socket.off('PRESENCE_SNAPSHOT', onPresenceSnapshot);
+      socket.off('CONVERSATION_BLOCKED', onConversationBlocked);
+      socket.off('CONVERSATION_UNBLOCKED', onConversationUnblocked);
+      socket.off('CONVERSATION_PINS', onConversationPins);
     };
   }, [activeChatId, chats]);
+
+  // Poll authoritative presence for the ACTIVE peer (socket keeps it live; this
+  // is a freshness backstop in case a PRESENCE_UPDATE was missed).
+  useEffect(() => {
+    const chat = chats.find(c => c.id === activeChatId);
+    const pid = chat?.peerUserId ? String(chat.peerUserId) : null;
+    if (!pid) return undefined;
+    let cancelled = false;
+    const fetchPresence = async () => {
+      try {
+        const map = await chatService.getPresence([pid]);
+        if (!cancelled && map && map[pid]) setPresence(prev => ({ ...prev, [pid]: map[pid] }));
+      } catch { /* silent */ }
+    };
+    fetchPresence();
+    const timer = setInterval(fetchPresence, 20_000);
+    return () => { cancelled = true; clearInterval(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChatId, chats.length]);
 
   // Emit MARK_SEEN for unseen incoming messages
   useEffect(() => {
@@ -656,6 +751,20 @@ const ChatSystem = () => {
   // Load the user's real conversations on mount, then re-poll every 15 s.
   // Each backend conversation becomes a chat row keyed by its Mongo id.
   const mergeBackendConversations = useCallback((list) => {
+    // Seed presence from the poll (socket PRESENCE_UPDATE keeps it live between).
+    setPresence((prev) => {
+      const next = { ...prev };
+      for (const b of list) {
+        if (b.peerUserId) {
+          const key = String(b.peerUserId);
+          next[key] = {
+            online: !!b.peerOnline,
+            lastSeenAt: b.peerLastSeenAt || next[key]?.lastSeenAt || null,
+          };
+        }
+      }
+      return next;
+    });
     setChats((prev) => {
       // Build a map of existing local UI state (blocked, muted, pinned) keyed by id
       // so polling never wipes out what the user just set in this session.
@@ -685,14 +794,18 @@ const ChatSystem = () => {
                        : (Array.isArray(b.peerRoles) && b.peerRoles.includes('tenant') ? 'Tenant' : 'User'),
           avatar:    b.peerAvatar || null,
           isAI:      false,
-          status:    'online',
+          status:    b.peerOnline ? 'online' : 'offline',
+          online:    !!b.peerOnline,
+          lastSeenAt: b.peerLastSeenAt || null,
           lastMsg:   b.lastMessageText || 'New conversation',
           time:      b.lastMessageAt ? new Date(b.lastMessageAt).toISOString() : 'Just now',
           unread:    Number(b.unread) || 0,
           // Preserve local UI toggles so polling doesn't revert block/mute/pin.
           pinned:    ls.pinned  ?? false,
           blocked:   ls.blocked ?? (b.blocked   || false),
+          blockedByPeer: b.blockedByPeer || false,
           muted:     ls.muted   ?? (b.muted     || false),
+          pinnedMessageIds: b.pinnedMessageIds || [],
           peerUserId: b.peerUserId,
           propertyId: b.propertyId,
         });
@@ -842,6 +955,7 @@ const ChatSystem = () => {
   const scrollRef = useRef(null);
   const inputRef  = useRef(null);
   const handledStateRef = useRef(null);
+  const headerMenuBtnRef = useRef(null);   // anchor for the ⋮ dropdown (portal)
 
   // ─── Call media refs ──────────────────────────────────────────────────────
   // remoteVideoRef → <video> element that displays the peer's stream
@@ -1490,16 +1604,16 @@ const ChatSystem = () => {
   };
   const submitReport = async (reason) => {
     setShowReportModal(false);
-    try { await chatService.reportConversation?.(activeChatId, reason); } catch (e) { console.warn('report failed', e); }
+    try {
+      await chatService.reportConversation?.(activeChatId, reason);
+      toast.success(language === 'বাংলা' ? 'রিপোর্ট পাঠানো হয়েছে। ধন্যবাদ।' : 'Report submitted. Thank you.');
+    } catch (e) {
+      console.warn('report failed', e);
+      toast.error(language === 'বাংলা' ? 'রিপোর্ট পাঠানো যায়নি।' : 'Could not submit the report.');
+    }
     setReportSent(true);
-    toast.success('Report submitted. Thank you.');
   };
 
-  // ── Emoji reactions (opened by long-press / hover on a bubble) ─────────────
-  const openReactions = (message, x, y) => {
-    if (!message || message.isDeleted) return;
-    setReactionBar({ message, x, y });
-  };
   const currentUserId = String(getCurrentUser()?.id || getCurrentUser()?._id || '');
   const toggleReaction = (message, emoji) => {
     if (!message?.id) return;
@@ -1523,8 +1637,13 @@ const ChatSystem = () => {
     }
   };
 
-  // ── Message long-press / context menu (Reply · Forward · Delete) ───────────
-  const openMessageMenu = (message, x, y) => setMenuState({ message, x, y });
+  // ── Message long-press / context menu (unified action sheet) ──────────────
+  // Opens the single popup that carries reactions + Reply/Forward/Copy/Pin/
+  // Mute/Remove. Deleted bubbles get no menu.
+  const openMessageMenu = (message, x, y) => {
+    if (!message || message.isDeleted) return;
+    setMenuState({ message, x, y });
+  };
 
   // Cancel a pending long-press (used when a swipe/drag starts or pointer lifts).
   const cancelLongPress = () => {
@@ -1532,19 +1651,24 @@ const ChatSystem = () => {
   };
 
   // Handlers spread onto each text/media bubble. Long-press (touch) or
-  // right-click (desktop) opens the REACTION BAR (which itself has a "more"
-  // button → Reply/Forward/Delete). A >10px move cancels it so scrolling and
-  // swipe-to-reply never trigger it.
+  // right-click (desktop) opens the unified action sheet. A >14px move cancels
+  // the pending long-press so scrolling and swipe-to-reply never trigger it —
+  // the slightly larger tolerance + 500ms hold make the popup appear reliably.
   const bubblePressHandlers = (m) => ({
-    onContextMenu: (e) => { e.preventDefault(); openReactions(m, e.clientX, e.clientY); },
+    onContextMenu: (e) => { e.preventDefault(); openMessageMenu(m, e.clientX, e.clientY); },
     onPointerDown: (e) => {
+      // Only left button / touch / pen — ignore right-click (handled above).
+      if (e.button === 2) return;
       pressPosRef.current = { x: e.clientX, y: e.clientY };
       if (longPressRef.current) clearTimeout(longPressRef.current);
-      longPressRef.current = setTimeout(() => openReactions(m, pressPosRef.current.x, pressPosRef.current.y), 450);
+      longPressRef.current = setTimeout(() => {
+        openMessageMenu(m, pressPosRef.current.x, pressPosRef.current.y);
+        longPressRef.current = null;
+      }, 500);
     },
     onPointerMove: (e) => {
       const p = pressPosRef.current;
-      if (p && longPressRef.current && (Math.abs(e.clientX - p.x) > 10 || Math.abs(e.clientY - p.y) > 10)) {
+      if (p && longPressRef.current && (Math.abs(e.clientX - p.x) > 14 || Math.abs(e.clientY - p.y) > 14)) {
         clearTimeout(longPressRef.current); longPressRef.current = null;
       }
     },
@@ -1581,19 +1705,120 @@ const ChatSystem = () => {
       await chatService.deleteMessage(activeChatId, m.id);
     } catch (err) {
       setDeleted(false); // revert if the server rejected it (e.g. not the sender)
-      toast.error('Delete করা যায়নি।');
+      toast.error(t.chatDeleteFailed || 'Could not delete the message.');
     }
   };
-  const forwardTo = (targetChatId) => {
+
+  // "Remove" from the action sheet. Your OWN message → delete for everyone
+  // (server, reliable). Someone else's message → hide it just for you
+  // (persisted locally so it doesn't reappear on the next poll).
+  const handleRemoveMessage = (m) => {
+    if (!m?.id) return;
+    if (m.sender === 'me') {
+      handleDeleteMessage(m);
+      return;
+    }
+    setHiddenMsgIds((prev) => {
+      const next = { ...prev, [String(m.id)]: true };
+      try { localStorage.setItem(HIDDEN_MSGS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+    toast.success(t.chatRemovedForYou || 'Removed for you');
+  };
+
+  // Copy a text message's body to the clipboard.
+  const handleCopyMessage = async (m) => {
+    if (!m) return;
+    const body = (m.type === 'text' || !m.type) ? (parseReplyQuote(m.text)?.body || m.text || '') : (m.mediaUrl || '');
+    try { await navigator.clipboard?.writeText(body); toast.success(t.chatCopied || 'Copied'); }
+    catch { /* clipboard blocked */ }
+  };
+
+  // Pin / unpin a message (shared banner for both participants).
+  const handlePinMessage = async (m) => {
+    if (!m?.id || activeChat?.isAI || String(m.id).startsWith('temp-')) return;
+    const cur = (activeChat.pinnedMessageIds || []).map(String);
+    const already = cur.includes(String(m.id));
+    const nextPinned = !already;
+    // Optimistic.
+    setChats(prev => prev.map(c => {
+      if (c.id !== activeChatId) return c;
+      const list = (c.pinnedMessageIds || []).map(String);
+      const updated = nextPinned
+        ? [...new Set([...list, String(m.id)])].slice(-3)
+        : list.filter(x => x !== String(m.id));
+      return { ...c, pinnedMessageIds: updated };
+    }));
+    try {
+      const res = await chatService.pinMessage(activeChatId, m.id, nextPinned);
+      if (res?.pinnedMessageIds) {
+        setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, pinnedMessageIds: res.pinnedMessageIds } : c));
+      }
+      toast.success(nextPinned ? (t.chatPinned || 'Message pinned') : (t.chatUnpinned || 'Message unpinned'));
+    } catch {
+      toast.error(t.chatActionFailed || 'Action failed. Please try again.');
+    }
+  };
+
+  const forwardTo = async (targetChatId) => {
     const m = forwardMsg;
+    const sourceChatId = activeChatId;
+    const sourceIsAI = activeChat?.isAI;
     setForwardMsg(null);
     if (!m || !targetChatId) return;
-    // Media has no re-upload path, so forward its link; text forwards as-is.
-    const body = (m.type && m.type !== 'text') ? (m.mediaUrl || replyPreviewText(m)) : (parseReplyQuote(m.text)?.body || m.text);
-    sendMessageTo(targetChatId, body);
+
+    const targetChat = chats.find(c => c.id === targetChatId);
+    const isMedia = m.type && m.type !== 'text';
+    // A real backend forward works when BOTH threads are real conversations and
+    // the message is a persisted one (not a temp/optimistic id, receipt or call
+    // card). This is what keeps voice notes / photos / documents as real media
+    // instead of forwarding the raw Cloudinary URL as text.
+    const canBackendForward =
+      !!m.id && !String(m.id).startsWith('temp-') &&
+      m.kind !== 'receipt' && m.kind !== 'call' &&
+      targetChat && !targetChat.isAI && !sourceIsAI;
+
+    // Switch to the target thread first for instant feedback.
     setActiveChatId(targetChatId);
     if (isMobile) setShowSidebarMobile(false);
-    toast.success('Message forwarded');
+
+    if (canBackendForward) {
+      try {
+        const saved = await chatService.forwardMessage(targetChatId, m.id, sourceChatId);
+        const myId = String(getCurrentUser()?.id || getCurrentUser()?._id || '');
+        setMessages(prev => {
+          const existing = prev[targetChatId] || [];
+          if (existing.some(x => String(x.id) === String(saved.id))) return prev;
+          return {
+            ...prev,
+            [targetChatId]: [...existing, {
+              id: saved.id,
+              sender: String(saved.senderId) === myId ? 'me' : 'them',
+              text: saved.text || '',
+              type: saved.type || 'text',
+              mediaUrl: saved.mediaUrl || null,
+              mediaMeta: saved.mediaMeta || null,
+              isDeleted: false,
+              reactions: saved.reactions || {},
+              iso: saved.createdAt,
+              status: 'delivered',
+              senderId: saved.senderId,
+            }],
+          };
+        });
+        latestMessageIso.current[targetChatId] = saved.createdAt;
+        toast.success(t.chatForwarded || 'Message forwarded');
+      } catch (err) {
+        toast.error(t.chatForwardFailed || 'Forward failed. Please try again.');
+      }
+      return;
+    }
+
+    // Fallback: text-only forward (AI bot target/source, or an unsent message).
+    // For media with no backend path we still share its link so it's not lost.
+    const body = isMedia ? (m.mediaUrl || replyPreviewText(m)) : (parseReplyQuote(m.text)?.body || m.text);
+    sendMessageTo(targetChatId, body);
+    toast.success(t.chatForwarded || 'Message forwarded');
   };
 
   // ── Per-chat PIN lock ──────────────────────────────────────────────────────
@@ -1618,7 +1843,9 @@ const ChatSystem = () => {
   // messages with inline ReceiptCards from `paymentReceipts` AND inline
   // ChatCallCards for any call exchanged with this chat's peer. Sorted by ISO.
   const renderedStream = useMemo(() => {
-    const base = (messages[activeChatId] || []).map(m => ({ kind: 'text', ...m }));
+    const base = (messages[activeChatId] || [])
+      .filter(m => !hiddenMsgIds[String(m.id)])   // hide messages the user Removed "for me"
+      .map(m => ({ kind: 'text', ...m }));
     const receiptItems = paymentReceipts
       .filter(r => r.landlordChatId === activeChatId)
       .map(r => ({
@@ -1646,7 +1873,15 @@ const ChatSystem = () => {
 
     return [...base, ...receiptItems, ...callItems]
       .sort((a, b) => (a.iso || '').localeCompare(b.iso || ''));
-  }, [messages, activeChatId, paymentReceipts, callHistory, activeChat]);
+  }, [messages, activeChatId, paymentReceipts, callHistory, activeChat, hiddenMsgIds]);
+
+  // Pinned messages (resolved from ids on the active chat row) for the banner.
+  const pinnedMessages = useMemo(() => {
+    const ids = (activeChat?.pinnedMessageIds || []).map(String);
+    if (!ids.length) return [];
+    const stream = messages[activeChatId] || [];
+    return ids.map(id => stream.find(m => String(m.id) === id)).filter(Boolean);
+  }, [activeChat, messages, activeChatId]);
 
   const lastIncoming = useMemo(() => {
     const stream = messages[activeChatId] || [];
@@ -1802,6 +2037,12 @@ const ChatSystem = () => {
     };
   }, [activeChatId]);
 
+  // Presence for the active peer (live socket state → falls back to poll data).
+  const isBn = language === 'বাংলা';
+  const activePeerId = activeChat?.peerUserId ? String(activeChat.peerUserId) : null;
+  const activeOnline = activePeerId ? (presence[activePeerId]?.online ?? activeChat.online ?? false) : false;
+  const activeLastSeen = activePeerId ? (presence[activePeerId]?.lastSeenAt ?? activeChat.lastSeenAt ?? null) : null;
+
   // This chat is PIN-locked and hasn't been unlocked yet this session.
   const activeLocked = !activeChat?.isAI && !!chatLocks[activeChatId] && !pinUnlocked[activeChatId];
   // Chats available as forward targets (real people, not this chat, not blocked).
@@ -1839,7 +2080,7 @@ const ChatSystem = () => {
           <div className="p-5 sm:p-6 pb-3">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-black text-gray-900">
-                {sidebarTab === 'messages' ? 'Messages' : 'Calls'}
+                {sidebarTab === 'messages' ? (t.chatMessages || 'Messages') : (t.chatCalls || 'Calls')}
               </h2>
               <button
                 onClick={() => setIsSearching(s => !s)}
@@ -1861,7 +2102,7 @@ const ChatSystem = () => {
                 }`}
               >
                 <MessageSquare size={13}/>
-                Chats
+                {t.chatChatsTab || 'Chats'}
                 <span className={`text-[9px] font-black rounded-full min-w-[18px] h-[16px] px-1.5 inline-flex items-center justify-center ${
                   sidebarTab === 'messages' ? 'bg-white/25 text-white' : 'bg-gray-200 text-gray-600'
                 }`}>{chats.length}</span>
@@ -1875,7 +2116,7 @@ const ChatSystem = () => {
                 }`}
               >
                 <Phone size={13}/>
-                Calls
+                {t.chatCallsTab || 'Calls'}
                 {(() => {
                   const missedCount = callHistory.filter(c => c.status === 'missed' && !c.seen).length;
                   if (missedCount === 0) return null;
@@ -1900,7 +2141,7 @@ const ChatSystem = () => {
                       type="text" autoFocus
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
-                      placeholder={sidebarTab === 'messages' ? 'Search chats…' : 'Search calls…'}
+                      placeholder={sidebarTab === 'messages' ? (t.chatSearchChats || 'Search chats…') : (t.chatSearchCalls || 'Search calls…')}
                       className="w-full bg-white border border-white rounded-2xl py-2.5 pl-11 pr-10 outline-none text-sm font-bold text-gray-800 focus:border-[#ba0036]/30 transition-all shadow-sm"
                     />
                     {searchQuery && (
@@ -1937,6 +2178,7 @@ const ChatSystem = () => {
                       lastMsg={lastMsg}
                       isActive={activeChatId === chat.id}
                       isMobile={isMobile}
+                      online={chat.peerUserId ? (presence[String(chat.peerUserId)]?.online ?? chat.online ?? false) : false}
                       onClick={() => {
                         setActiveChatId(chat.id);
                         if (isMobile) setShowSidebarMobile(false);
@@ -1990,27 +2232,47 @@ const ChatSystem = () => {
                   setShowContactModal(true);
                 }}
               >
-                <div className={`w-11 h-11 rounded-2xl overflow-hidden shrink-0 shadow-sm ${!activeChat.isAI && activeChat.peerUserId ? 'group-hover:scale-105 transition-transform' : ''}`}>
-                  {activeChat.isAI ? (
-                    <div className="w-full h-full bg-gradient-to-br from-[#ba0036] to-[#7a0024] flex items-center justify-center text-white">
-                      <Bot size={22}/>
-                    </div>
-                  ) : activeChat.avatar ? (
-                    <img src={activeChat.avatar} className="w-full h-full object-cover" alt={activeChat.name}/>
-                  ) : (
-                    <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-700 font-black text-sm">
-                      {(activeChat.name || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase()}
-                    </div>
+                <div className="relative shrink-0">
+                  <div className={`w-11 h-11 rounded-2xl overflow-hidden shadow-sm ${!activeChat.isAI && activeChat.peerUserId ? 'group-hover:scale-105 transition-transform' : ''}`}>
+                    {activeChat.isAI ? (
+                      <div className="w-full h-full bg-gradient-to-br from-[#ba0036] to-[#7a0024] flex items-center justify-center text-white">
+                        <Bot size={22}/>
+                      </div>
+                    ) : activeChat.avatar ? (
+                      <img src={activeChat.avatar} className="w-full h-full object-cover" alt={activeChat.name}/>
+                    ) : (
+                      <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-700 font-black text-sm">
+                        {(activeChat.name || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  {!activeChat.isAI && (
+                    <span
+                      className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${activeOnline ? 'bg-green-500' : 'bg-red-500'}`}
+                      title={activeOnline ? (t.chatActiveNow || 'Active now') : formatLastSeen(activeLastSeen, isBn)}
+                    />
                   )}
                 </div>
                 <div className="min-w-0">
                   <h3 className={`text-base sm:text-lg font-black text-gray-900 truncate ${!activeChat.isAI && activeChat.peerUserId ? 'group-hover:text-blue-600 transition-colors' : ''}`}>
                     {activeChat.name}
                   </h3>
-                  <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 text-green-600 truncate">
-                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shrink-0"></span>
-                    {activeChat.role || 'Online'}{activeChat.tenantPhone ? ` · ${activeChat.tenantPhone}` : ''}
-                  </p>
+                  {activeChat.isAI ? (
+                    <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 text-green-600 truncate">
+                      <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shrink-0"></span>
+                      {activeChat.role || 'Online'}
+                    </p>
+                  ) : activeOnline ? (
+                    <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 text-green-600 truncate">
+                      <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shrink-0"></span>
+                      {t.chatActiveNow || 'Active now'}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] font-bold flex items-center gap-1.5 text-gray-400 truncate normal-case">
+                      <span className="w-1.5 h-1.5 bg-red-500 rounded-full shrink-0"></span>
+                      {formatLastSeen(activeLastSeen, isBn)}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -2045,30 +2307,13 @@ const ChatSystem = () => {
               >
                 <Video size={18}/>
               </button>
-              {!isMobile && (
-                <button
-                  onClick={() => setShowInfoPane(s => !s)}
-                  className={`p-2.5 sm:p-3 rounded-2xl transition-all shadow-sm ${
-                    showInfoPane ? 'bg-[#ba0036] text-white' : 'bg-white hover:bg-red-50 text-gray-500 hover:text-[#ba0036]'
-                  }`}
-                  aria-label="Toggle info pane"
-                >
-                  <Info size={18}/>
-                </button>
-              )}
-              {/* 3-dots → WhatsApp-style dropdown. For the AI bot (no block/report/
-                  mute) it just opens the info pane instead. */}
-              {activeChat.isAI ? (
-                <button
-                  onClick={() => setShowInfoPane(s => !s)}
-                  className="p-2.5 sm:p-3 rounded-2xl bg-white hover:bg-red-50 text-gray-500 hover:text-[#ba0036] transition-all shadow-sm"
-                  aria-label="Contact info"
-                >
-                  <MoreVertical size={18}/>
-                </button>
-              ) : (
+              {/* Desktop (i) info button removed — Shared media + Lock chat with
+                  PIN now live in the Contact tab (tap the header / "View
+                  contact"). The AI bot has no block/report/mute, so no ⋮ menu. */}
+              {!activeChat.isAI && (
                 <div className="relative">
                   <button
+                    ref={headerMenuBtnRef}
                     onClick={() => setHeaderMenuOpen(o => !o)}
                     className={`p-2.5 sm:p-3 rounded-2xl transition-all shadow-sm ${
                       headerMenuOpen ? 'bg-[#ba0036] text-white' : 'bg-white hover:bg-red-50 text-gray-500 hover:text-[#ba0036]'
@@ -2079,6 +2324,7 @@ const ChatSystem = () => {
                   </button>
                   <ChatHeaderMenu
                     open={headerMenuOpen}
+                    anchorRef={headerMenuBtnRef}
                     muted={activeChat.muted}
                     blocked={activeChat.blocked}
                     onClose={() => setHeaderMenuOpen(false)}
@@ -2111,6 +2357,29 @@ const ChatSystem = () => {
             </div>
           )}
 
+          {/* Pinned messages banner */}
+          {pinnedMessages.length > 0 && (
+            <div className="px-4 sm:px-6 pt-2">
+              <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                <Pin size={14} className="text-amber-600 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-amber-700">
+                    {t.chatPinnedLabel || 'Pinned'}{pinnedMessages.length > 1 ? ` · ${pinnedMessages.length}` : ''}
+                  </p>
+                  <p className="text-[11px] font-bold text-gray-600 truncate">
+                    {replyPreviewText(pinnedMessages[pinnedMessages.length - 1])}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handlePinMessage(pinnedMessages[pinnedMessages.length - 1])}
+                  className="text-[9px] font-black uppercase tracking-widest text-amber-700 hover:underline shrink-0"
+                >
+                  {t.chatUnpin || 'Unpin'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Messages stream */}
           <div className="flex-1 overflow-y-auto min-h-0 px-4 sm:px-6 py-4 sm:py-6 bg-gradient-to-b from-transparent via-white/10 to-white/40 relative">
             {groupedStream.length === 0 && !isBotTyping && (
@@ -2119,7 +2388,7 @@ const ChatSystem = () => {
                   {activeChat.isAI ? <Bot size={28}/> : <MessageCircle size={28}/>}
                 </div>
                 <h4 className="text-lg font-black text-gray-900">
-                  {activeChat.isAI ? 'Ask me anything' : `Say hi to ${activeChat.name}`}
+                  {activeChat.isAI ? (t.chatAskAnything || 'Ask me anything') : `${t.chatSayHiTo || 'Say hi to'} ${activeChat.name}`}
                 </h4>
                 <p className="text-[11px] font-bold text-gray-500 mt-1.5 max-w-[280px] leading-relaxed">
                   {activeChat.isAI
@@ -2280,12 +2549,12 @@ const ChatSystem = () => {
                       );
                     })()}
                   </motion.div>
-                  {/* Desktop hover affordance → opens the reaction bar. */}
+                  {/* Desktop hover affordance → opens the unified action sheet. */}
                   {!m.isDeleted && (
                     <button
-                      onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openReactions(m, r.left + r.width / 2, r.top); }}
+                      onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMessageMenu(m, r.left + r.width / 2, r.bottom); }}
                       className="hidden sm:group-hover/msg:flex w-7 h-7 rounded-full bg-white shadow-sm border border-gray-100 items-center justify-center text-gray-400 hover:text-[#ba0036] shrink-0 mx-1 transition-colors"
-                      aria-label="React"
+                      aria-label="Message actions"
                     >
                       <Smile size={14} />
                     </button>
@@ -2299,7 +2568,7 @@ const ChatSystem = () => {
           </div>
 
           {/* Smart-reply chips */}
-          {smartReplies.length > 0 && !isBotTyping && (
+          {smartReplies.length > 0 && !isBotTyping && !activeChat.blocked && !activeChat.blockedByPeer && (
             <div className="px-4 sm:px-6 pb-2 flex gap-2 overflow-x-auto scrollbar-none">
               {smartReplies.map(sr => (
                 <button
@@ -2322,8 +2591,13 @@ const ChatSystem = () => {
             {activeChat.blocked ? (
               <div className="flex items-center justify-center gap-3 bg-gray-50 border border-gray-200 rounded-[1.6rem] px-4 py-3.5">
                 <Ban size={16} className="text-gray-400 shrink-0" />
-                <span className="text-[12px] font-bold text-gray-500">You blocked {activeChat.name}</span>
-                <button onClick={unblockChat} className="text-[11px] font-black uppercase tracking-widest text-[#ba0036] hover:underline">Unblock</button>
+                <span className="text-[12px] font-bold text-gray-500">{(t.chatYouBlocked || 'You blocked')} {activeChat.name}</span>
+                <button onClick={unblockChat} className="text-[11px] font-black uppercase tracking-widest text-[#ba0036] hover:underline">{t.chatUnblockShort || 'Unblock'}</button>
+              </div>
+            ) : activeChat.blockedByPeer ? (
+              <div className="flex items-center justify-center gap-3 bg-gray-50 border border-gray-200 rounded-[1.6rem] px-4 py-3.5">
+                <Ban size={16} className="text-gray-400 shrink-0" />
+                <span className="text-[12px] font-bold text-gray-500 text-center">{t.chatCantReply || "You can't send messages to this contact."}</span>
               </div>
             ) : (
               <>
@@ -2419,7 +2693,7 @@ const ChatSystem = () => {
                     }
                   }}
                   onFocus={() => setShowEmojiPicker(false)}
-                  placeholder={activeChat.isAI ? 'Ask the AI assistant anything…' : 'Type a message…'}
+                  placeholder={activeChat.isAI ? (t.chatAskAI || 'Ask the AI assistant anything…') : (t.chatTypeMessage || 'Type a message…')}
                   className="flex-1 bg-transparent outline-none text-sm font-bold text-gray-800 resize-none py-2 max-h-[120px] leading-relaxed placeholder:text-gray-400"
                 />
               )}
@@ -2523,180 +2797,10 @@ const ChatSystem = () => {
           )}
         </main>
 
-        {/* CONTACT INFO — desktop: inline right rail · mobile/tablet: slide-up sheet */}
-        {showInfoPane && (
-          <>
-            {!isDesktop && (
-              <div
-                className="fixed inset-0 z-[85] bg-gray-900/40 backdrop-blur-sm"
-                onClick={() => setShowInfoPane(false)}
-              />
-            )}
-            <motion.aside
-              initial={isDesktop ? false : { y: 28, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.26, ease: [0.25, 0.46, 0.45, 0.94] }}
-              className={
-                isDesktop
-                  ? 'w-[300px] border-l border-white/60 bg-white/30 backdrop-blur-md p-5 overflow-y-auto shrink-0'
-                  : 'fixed inset-x-0 bottom-0 z-[90] max-h-[88vh] overflow-y-auto rounded-t-[2rem] bg-white shadow-[0_-20px_60px_rgba(0,0,0,0.25)] p-5'
-              }
-              style={!isDesktop ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.5rem)' } : undefined}
-            >
-              {!isDesktop && <div className="w-10 h-1.5 bg-gray-300 rounded-full mx-auto mb-4" />}
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-sm font-black text-gray-900">Conversation</h4>
-              <button onClick={() => setShowInfoPane(false)} className="p-1.5 hover:bg-white rounded-full text-gray-400">
-                <X size={14}/>
-              </button>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4 text-center">
-              {activeChat.avatar ? (
-                <img src={activeChat.avatar} className="w-20 h-20 rounded-full object-cover mx-auto mb-3" alt={activeChat.name}/>
-              ) : (
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#ba0036] to-[#7a0024] text-white flex items-center justify-center mx-auto mb-3">
-                  <Bot size={32}/>
-                </div>
-              )}
-              <h5 className="text-base font-black text-gray-900">{activeChat.name}</h5>
-              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mt-1">{activeChat.role}</p>
-              {activeChat.tenantPhone && (
-                <p className="text-[11px] font-bold text-gray-700 mt-2">{activeChat.tenantPhone}</p>
-              )}
-              {activeChat.propertyTitle && (
-                <p className="text-[11px] font-bold text-gray-500 mt-1 line-clamp-2">{activeChat.propertyTitle}</p>
-              )}
-            </div>
-
-            <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 px-1">Receipts in this chat</h5>
-            <div className="space-y-2">
-              {paymentReceipts.filter(r => r.landlordChatId === activeChatId).slice(0, 6).map(r => (
-                <ReceiptCard key={r.id} receipt={r} mine={false} onView={(rec) => setActiveReceipt(rec)}/>
-              ))}
-              {paymentReceipts.filter(r => r.landlordChatId === activeChatId).length === 0 && (
-                <p className="text-[11px] font-bold text-gray-400 text-center py-6 leading-relaxed">
-                  No rent receipts yet.<br/>They'll appear here automatically when the landlord marks a month as paid.
-                </p>
-              )}
-            </div>
-
-            {/* Shared media — photos + voice from this conversation */}
-            <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 px-1 mt-5">Shared media</h5>
-            {(() => {
-              const msgs = messages[activeChatId] || [];
-              const photos = msgs.filter(m => m.type === 'image' && m.mediaUrl);
-              const voices = msgs.filter(m => m.type === 'audio' && m.mediaUrl);
-              if (photos.length === 0 && voices.length === 0) {
-                return <p className="text-[11px] font-bold text-gray-400 text-center py-5">No photos or voice messages yet.</p>;
-              }
-              return (
-                <div className="space-y-3">
-                  {photos.length > 0 && (
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {photos.slice(-9).reverse().map((m, i) => (
-                        <a key={m.id || i} href={m.mediaUrl} target="_blank" rel="noopener noreferrer" className="block aspect-square rounded-xl overflow-hidden bg-gray-100 ring-1 ring-gray-100 hover:ring-2 hover:ring-[#ba0036]/30 transition-all">
-                          <img src={m.mediaUrl} alt="" loading="lazy" className="w-full h-full object-cover" />
-                        </a>
-                      ))}
-                    </div>
-                  )}
-                  {voices.length > 0 && (
-                    <div className="space-y-1.5">
-                      {voices.slice(-4).reverse().map((m, i) => (
-                        <div key={m.id || i} className="bg-white border border-gray-100 rounded-xl px-2.5 py-2">
-                          <CompactAudioPlayer src={m.mediaUrl} variant="list" durationSec={m.mediaMeta?.durationSec} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 px-1 mt-5">Quick actions</h5>
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => {   }} className="bg-white hover:bg-red-50 border border-gray-100 hover:border-[#ba0036]/20 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-700 hover:text-[#ba0036] transition-all flex items-center justify-center gap-1.5">
-                <Phone size={12}/> Call
-              </button>
-              <button onClick={() => {   }} className="bg-white hover:bg-red-50 border border-gray-100 hover:border-[#ba0036]/20 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-700 hover:text-[#ba0036] transition-all flex items-center justify-center gap-1.5">
-                <Video size={12}/> Video
-              </button>
-              <button
-                onClick={toggleMuteChat}
-                className={`rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 border ${
-                  activeChat.muted
-                    ? 'bg-amber-50 border-amber-200 text-amber-700'
-                    : 'bg-white border-gray-100 hover:border-amber-200 text-gray-700 hover:text-amber-700 hover:bg-amber-50'
-                }`}
-              >
-                <BellOff size={12}/> {activeChat.muted ? 'Unmute' : 'Mute'}
-              </button>
-              <button
-                onClick={() => setChats(prev => prev.map(c => c.id === activeChatId ? { ...c, pinned: !c.pinned } : c))}
-                className={`rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 border ${
-                  activeChat.pinned
-                    ? 'bg-[#ba0036]/10 border-[#ba0036]/20 text-[#ba0036]'
-                    : 'bg-white border-gray-100 hover:border-amber-200 text-gray-700 hover:text-amber-700 hover:bg-amber-50'
-                }`}
-              >
-                <Pin size={12}/> {activeChat.pinned ? 'Unpin' : 'Pin'}
-              </button>
-            </div>
-
-            {/* PIN privacy — lock this specific conversation behind a PIN. */}
-            {!activeChat.isAI && (
-              <button
-                onClick={() => (chatLocks[activeChatId] ? disablePin() : beginPinSetup())}
-                className={`mt-2 w-full rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 border ${
-                  chatLocks[activeChatId]
-                    ? 'bg-[#ba0036]/10 border-[#ba0036]/20 text-[#ba0036]'
-                    : 'bg-white border-gray-100 hover:border-[#ba0036]/20 text-gray-700 hover:text-[#ba0036] hover:bg-red-50'
-                }`}
-              >
-                <Lock size={12}/> {chatLocks[activeChatId] ? 'Remove PIN lock' : 'Lock chat with PIN'}
-              </button>
-            )}
-
-            {/* Danger zone — Report + Block (hidden for the AI assistant) */}
-            {!activeChat.isAI && (
-              <div className="mt-5 pt-4 border-t border-gray-100 space-y-2">
-                {reportSent ? (
-                  <div className="rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold px-3 py-2.5 text-center">
-                    Report পাঠানো হয়েছে। ধন্যবাদ।
-                  </div>
-                ) : reportOpen ? (
-                  <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-2">Report reason</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {['Spam', 'Harassment', 'Scam / Fraud', 'Inappropriate'].map(r => (
-                        <button key={r} onClick={() => submitReport(r)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-full bg-white border border-amber-200 text-amber-800 hover:bg-amber-100 transition-all">
-                          {r}
-                        </button>
-                      ))}
-                    </div>
-                    <button onClick={() => setReportOpen(false)} className="mt-2 text-[10px] font-bold text-gray-400 hover:text-gray-600">Cancel</button>
-                  </div>
-                ) : (
-                  <button onClick={() => setReportOpen(true)} className="w-full bg-white hover:bg-amber-50 border border-gray-100 hover:border-amber-200 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-600 hover:text-amber-700 transition-all flex items-center justify-center gap-1.5">
-                    <Flag size={12}/> Report
-                  </button>
-                )}
-
-                {activeChat.blocked ? (
-                  <button onClick={unblockChat} className="w-full bg-white hover:bg-emerald-50 border border-gray-100 hover:border-emerald-200 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-emerald-700 hover:text-emerald-800 transition-all flex items-center justify-center gap-1.5">
-                    <Ban size={12}/> Unblock {activeChat.name}
-                  </button>
-                ) : (
-                  <button onClick={() => setShowBlockModal(true)} className="w-full bg-white hover:bg-red-50 border border-gray-100 hover:border-red-200 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-700 transition-all flex items-center justify-center gap-1.5">
-                    <Ban size={12}/> Block
-                  </button>
-                )}
-              </div>
-            )}
-            </motion.aside>
-          </>
-        )}
+        {/* The old desktop (i) info pane was removed. Its contents now live in
+            the Contact tab: Shared media → ChatMediaViewer (Media/Links/Docs),
+            Lock chat with PIN → ViewContactModal, Report/Block → header menu +
+            ViewContactModal. Receipts still render inline in the thread. */}
       </div>
 
       {/* RECEIPT DETAIL MODAL */}
@@ -2798,26 +2902,34 @@ const ChatSystem = () => {
         />
       )}
 
-      {/* Emoji reaction bar (long-press / right-click a bubble) */}
-      <ReactionBar
-        open={!!reactionBar}
-        x={reactionBar?.x || 0}
-        y={reactionBar?.y || 0}
-        current={reactionBar?.message?.reactions?.[currentUserId] || null}
-        onReact={(emoji) => reactionBar && toggleReaction(reactionBar.message, emoji)}
-        onMore={() => reactionBar && openMessageMenu(reactionBar.message, reactionBar.x, reactionBar.y)}
-        onClose={() => setReactionBar(null)}
-      />
-
-      {/* Long-press / right-click message actions: Reply · Forward · Delete */}
+      {/* Unified long-press action sheet: reactions + Reply/Forward/Copy/Pin/
+          Mute/Remove. Replaces the old two-step reaction-bar → more flow. */}
       <MessageActionsMenu
         open={!!menuState}
         x={menuState?.x || 0}
         y={menuState?.y || 0}
         mine={menuState?.message?.sender === 'me'}
+        canCopy={!menuState?.message?.type || menuState?.message?.type === 'text'}
+        pinned={menuState?.message ? (activeChat.pinnedMessageIds || []).map(String).includes(String(menuState.message.id)) : false}
+        muted={!!activeChat.muted}
+        currentReaction={menuState?.message?.reactions?.[currentUserId] || null}
+        labels={{
+          reply: t.msgReply || 'Reply',
+          forward: t.msgForward || 'Forward',
+          copy: t.msgCopy || 'Copy',
+          pin: t.msgPin || 'Pin',
+          unpin: t.msgUnpin || 'Unpin',
+          mute: t.msgMute || 'Mute',
+          unmute: t.msgUnmute || 'Unmute',
+          remove: t.msgRemove || 'Remove',
+        }}
+        onReact={(emoji) => menuState && toggleReaction(menuState.message, emoji)}
         onReply={() => menuState && handleReply(menuState.message)}
         onForward={() => menuState && handleForward(menuState.message)}
-        onDelete={() => menuState && handleDeleteMessage(menuState.message)}
+        onCopy={() => menuState && handleCopyMessage(menuState.message)}
+        onPin={activeChat.isAI ? undefined : () => menuState && handlePinMessage(menuState.message)}
+        onMute={activeChat.isAI ? undefined : () => (activeChat.muted ? toggleMuteChat() : setShowMuteModal(true))}
+        onDelete={() => menuState && handleRemoveMessage(menuState.message)}
         onClose={() => setMenuState(null)}
       />
 
@@ -2850,10 +2962,20 @@ const ChatSystem = () => {
           if (activeChat.role === 'Property Owner' || activeChat.role === 'Landlord') navigate(`/host/${activeChat.peerUserId}`);
           else navigate(`/tenant/${activeChat.peerUserId}`);
         } : undefined}
-        onOpenMedia={() => setShowInfoPane(true)}
+        onOpenMedia={() => { setShowContactModal(false); setShowMediaViewer(true); }}
         onMute={() => (activeChat?.muted ? toggleMuteChat() : setShowMuteModal(true))}
         onBlock={() => (activeChat?.blocked ? unblockChat() : setShowBlockModal(true))}
         onReport={() => setShowReportModal(true)}
+        locked={!!chatLocks[activeChatId]}
+        onToggleLock={activeChat?.isAI ? undefined : () => (chatLocks[activeChatId] ? disablePin() : beginPinSetup())}
+      />
+
+      {/* Media / Links / Docs viewer (opened from the Contact tab) */}
+      <ChatMediaViewer
+        open={showMediaViewer}
+        onClose={() => setShowMediaViewer(false)}
+        messages={messages[activeChatId] || []}
+        contactName={activeChat?.name}
       />
 
       {/* Mute notifications (8 hours / 1 week / Always) */}
@@ -2886,12 +3008,12 @@ const ChatSystem = () => {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                <h3 className="text-sm font-black text-gray-900">Forward to…</h3>
+                <h3 className="text-sm font-black text-gray-900">{t.chatForwardTo || 'Forward to…'}</h3>
                 <button onClick={() => setForwardMsg(null)} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400"><X size={16}/></button>
               </div>
               <div className="max-h-[60vh] overflow-y-auto p-2">
                 {forwardTargets.length === 0 ? (
-                  <p className="text-[12px] font-bold text-gray-400 text-center py-8">No other chats to forward to.</p>
+                  <p className="text-[12px] font-bold text-gray-400 text-center py-8">{t.chatNoForwardTargets || 'No other chats to forward to.'}</p>
                 ) : forwardTargets.map(c => (
                   <button
                     key={c.id}

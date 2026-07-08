@@ -129,6 +129,34 @@ export const deleteAdminUser = async (userId) =>
     method: 'DELETE',
   });
 
+// ─── User reports + suspected flag ──────────────────────────────────────────
+// Returns { reports, total, openCount, page, limit }.
+export const listReports = async (filter = {}) => {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(filter)) {
+    if (v !== undefined && v !== null && String(v).trim() !== '') {
+      qs.set(k, String(v));
+    }
+  }
+  const path = qs.toString() ? `/reports?${qs.toString()}` : '/reports';
+  return api(path);
+};
+
+export const updateReportStatus = async (reportId, status) =>
+  (await api(`/reports/${encodeURIComponent(reportId)}/status`, {
+    method: 'POST',
+    body: { status },
+  })).report;
+
+export const suspectUser = async (userId, reason) =>
+  (await api(`/users/${encodeURIComponent(userId)}/suspect`, {
+    method: 'POST',
+    body: { reason },
+  })).user;
+
+export const unsuspectUser = async (userId) =>
+  (await api(`/users/${encodeURIComponent(userId)}/unsuspect`, { method: 'POST' })).user;
+
 // ─── Audit Log ───────────────────────────────────────────────────────────────
 export const logAuditAction = async (action, details = {}) => {
   try {

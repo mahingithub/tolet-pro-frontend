@@ -53,6 +53,7 @@ import AdminOverview from "./components/AdminOverview";
 import PropertyModeration from "./components/PropertyModeration";
 import UserManagement from "./components/UserManagement";
 import SupportAndAI from "./components/SupportAndAI";
+import AdminReports from "./components/AdminReports";
 
 // --- Auth-gate Imports ---
 import RequireAdmin from "./components/RequireAdmin.jsx";
@@ -209,6 +210,7 @@ const AppLayout = () => {
 					<Route index element={<AdminOverview />} />
 					<Route path="properties" element={<PropertyModeration />} />
 					<Route path="users" element={<UserManagement />} />
+					<Route path="reports" element={<AdminReports />} />
 					<Route path="support" element={<SupportAndAI />} />
 				</Route>
 

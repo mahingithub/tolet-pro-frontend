@@ -16,11 +16,23 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, UserPlus } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff } from 'lucide-react';
 import { toast } from 'sonner';
 import callProvider from '../services/callProvider';
 import callService from '../services/callService';
+import chatService from '../services/chatService';
 import { getCurrentToken } from '../services/authService';
+import { useLanguage } from '../context/LanguageContext';
+
+// mm:ss / h:mm:ss timer for the connected-call duration.
+const fmtDuration = (sec) => {
+  const s = Math.max(0, Math.floor(Number(sec) || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(ss)}` : `${m}:${pad(ss)}`;
+};
 
 // ─── Ringtone — Web Audio API synthesized tone, no file needed ──────────────
 class Ringtone {
@@ -85,9 +97,12 @@ const GlobalCallUI = () => {
   //   null  — no call
   //   { status: 'ringing'|'accepted', direction: 'incoming'|'outgoing',
   //     callId, callerId, peerName, peerAvatar, type, roomId }
+  const { t } = useLanguage();
   const [callState, setCallState] = useState(null);
   const [muted, setMuted]         = useState(false);
   const [videoOff, setVideoOff]   = useState(false);
+  const [callSeconds, setCallSeconds] = useState(0);   // connected-call timer
+  const [peerOnline, setPeerOnline]   = useState(null); // outgoing: is the callee online?
 
   const remoteAudioRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -240,6 +255,7 @@ const GlobalCallUI = () => {
         status: 'ringing',
         direction: 'outgoing',
         callId:      data.callId,
+        peerId:      data.receiverId || prev?.peerId || null,
         peerName:    data.receiverName || prev?.peerName || 'Unknown',
         peerAvatar:  data.receiverAvatar || prev?.peerAvatar || null,
         type:        data.type === 'video' ? 'video' : 'voice',
@@ -372,6 +388,26 @@ const GlobalCallUI = () => {
     return () => rt.stop();
   }, [callState?.status, callState?.direction]);
 
+  // ── Connected-call timer — counts up once the call is accepted ────────────
+  useEffect(() => {
+    if (callState?.status !== 'accepted') { setCallSeconds(0); return undefined; }
+    const t = setInterval(() => setCallSeconds((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [callState?.status, callState?.callId]);
+
+  // ── Outgoing presence — "Ringing" (peer online) vs "Calling" (offline) ────
+  useEffect(() => {
+    let cancelled = false;
+    if (callState?.direction === 'outgoing' && callState?.status === 'ringing' && callState?.peerId) {
+      chatService.getPresence([callState.peerId])
+        .then((map) => { if (!cancelled) setPeerOnline(map?.[String(callState.peerId)]?.online ?? null); })
+        .catch(() => { if (!cancelled) setPeerOnline(null); });
+    } else {
+      setPeerOnline(null);
+    }
+    return () => { cancelled = true; };
+  }, [callState?.direction, callState?.status, callState?.peerId]);
+
   // Hang-up on Escape.
   useEffect(() => {
     const onKey = (e) => {
@@ -416,6 +452,14 @@ const GlobalCallUI = () => {
   const isVideoCall = callState?.type === 'video';
   const isInCall    = callState?.status === 'accepted';
 
+  // Status line: connected → running timer; outgoing → "Ringing" (peer online)
+  // vs "Calling" (peer offline); incoming → "Incoming call".
+  const statusText = isInCall
+    ? fmtDuration(callSeconds)
+    : callState?.direction === 'outgoing'
+      ? (peerOnline === false ? (t.callCalling || 'Calling…') : (t.callRinging || 'Ringing…'))
+      : (t.callIncoming || 'Incoming call');
+
   return (
     <>
       {/* Hidden audio element — always mounted whenever there's a call so
@@ -426,130 +470,128 @@ const GlobalCallUI = () => {
         {showOverlay && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-gray-900/95 backdrop-blur-2xl flex flex-col items-center justify-center text-white p-6"
+            className={`fixed inset-0 z-[200] flex flex-col items-center text-white overflow-hidden ${isInCall && isVideoCall ? 'bg-black' : ''}`}
           >
-            {/* Video area when in-call + video */}
-            {isInCall && isVideoCall && (
-              <div className="absolute inset-0 bg-black">
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="absolute bottom-28 right-4 w-32 h-44 sm:w-40 sm:h-56 object-cover rounded-2xl border-2 border-white/20 shadow-2xl bg-black"
-                />
+            {/* Ambient gradient background (audio / all ringing states). Video call
+                gets an indigo accent; voice call gets the brand red accent. */}
+            {!(isInCall && isVideoCall) && (
+              <div aria-hidden className="absolute inset-0 -z-10">
+                <div className={`absolute inset-0 ${isVideoCall ? 'bg-gradient-to-b from-indigo-900 via-gray-900 to-black' : 'bg-gradient-to-b from-[#7a0024] via-gray-900 to-black'}`} />
+                <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl opacity-30 bg-[#ba0036]" />
+                <div className={`absolute -bottom-24 -right-24 w-96 h-96 rounded-full blur-3xl opacity-30 ${isVideoCall ? 'bg-indigo-500' : 'bg-[#ba0036]'}`} />
               </div>
             )}
 
-            {/* Avatar / caller info (only visible during ringing or voice-call) */}
-            {(!isInCall || !isVideoCall) && (
-              <>
-                <div className="relative mb-6">
+            {/* Remote + local video (connected video call) */}
+            {isInCall && isVideoCall && (
+              <div className="absolute inset-0 bg-black">
+                <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                <video ref={localVideoRef} autoPlay playsInline muted className="absolute bottom-32 right-4 w-28 h-40 sm:w-40 sm:h-56 object-cover rounded-2xl border-2 border-white/25 shadow-2xl bg-black" />
+                <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-black/70 to-transparent" />
+              </div>
+            )}
+
+            {/* Top bar: call-type chip + (connected video) name + timer */}
+            <div className="relative z-10 w-full flex flex-col items-center px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}>
+              <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest border shadow-lg ${
+                isVideoCall ? 'bg-indigo-500/25 border-indigo-400/50 text-indigo-100' : 'bg-[#ba0036]/30 border-[#ba0036]/60 text-red-100'
+              }`}>
+                {isVideoCall ? <Video size={14}/> : <Phone size={14}/>}
+                {isVideoCall ? (t.callVideoCall || 'Video Call') : (t.callVoiceCall || 'Voice Call')}
+              </div>
+              {isInCall && isVideoCall && (
+                <div className="mt-3 text-center">
+                  <h2 className="text-xl font-black drop-shadow">{callState?.peerName}</h2>
+                  <p className="text-sm font-bold text-white/80 tabular-nums mt-0.5">{fmtDuration(callSeconds)}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Center: avatar + name + status (hidden while connected video shows) */}
+            {!(isInCall && isVideoCall) && (
+              <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6">
+                <div className="relative mb-7">
                   {!isInCall && (
                     <>
-                      <span className="absolute inset-0 rounded-full border-2 border-[#ba0036]/40 animate-ping"></span>
-                      <span className="absolute -inset-3 rounded-full border-2 border-[#ba0036]/20 animate-ping" style={{ animationDelay: '0.4s' }}></span>
+                      <span className={`absolute inset-0 rounded-full border-2 animate-ping ${isVideoCall ? 'border-indigo-400/40' : 'border-[#ba0036]/40'}`}></span>
+                      <span className={`absolute -inset-4 rounded-full border-2 animate-ping ${isVideoCall ? 'border-indigo-400/20' : 'border-[#ba0036]/20'}`} style={{ animationDelay: '0.5s' }}></span>
                     </>
                   )}
-                  <div className="w-32 h-32 rounded-full border-4 border-[#ba0036] p-1 relative">
+                  <div className={`w-36 h-36 rounded-full p-1 relative border-4 shadow-2xl ${isVideoCall ? 'border-indigo-400' : 'border-[#ba0036]'}`}>
                     {callState?.peerAvatar ? (
                       <img src={callState.peerAvatar} className="w-full h-full rounded-full object-cover" alt=""/>
                     ) : (
-                      <div className="w-full h-full rounded-full bg-gradient-to-br from-[#ba0036] to-[#7a0024] flex items-center justify-center text-3xl font-black">
+                      <div className="w-full h-full rounded-full bg-gradient-to-br from-[#ba0036] to-[#7a0024] flex items-center justify-center text-4xl font-black">
                         {(callState?.peerName || '?').charAt(0).toUpperCase()}
                       </div>
                     )}
                   </div>
-                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-[#ba0036] px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
-                    {isInCall
-                      ? 'In Call'
-                      : callState?.direction === 'outgoing' ? 'Calling...' : 'Incoming Call'}
-                  </div>
                 </div>
-                <h2 className="text-2xl sm:text-3xl font-black mb-1 text-center">{callState?.peerName}</h2>
-                <p className="text-gray-400 font-bold mb-10 text-sm">
-                  TO-LET PRO HD {isVideoCall ? 'Video' : 'Voice'} Call
-                </p>
-              </>
+                <h2 className="text-2xl sm:text-3xl font-black mb-2 text-center drop-shadow">{callState?.peerName}</h2>
+                <div className="flex items-center gap-2">
+                  {!isInCall && <span className={`w-2 h-2 rounded-full animate-pulse ${isVideoCall ? 'bg-indigo-400' : 'bg-[#ba0036]'}`} />}
+                  <p className="text-white/85 font-bold text-base tabular-nums">{statusText}</p>
+                </div>
+                {isInCall && muted && (
+                  <p className="mt-3 text-[11px] font-black uppercase tracking-widest text-amber-300 flex items-center gap-1.5"><MicOff size={12}/> {t.callMuted || 'You are muted'}</p>
+                )}
+              </div>
             )}
 
             {/* Controls */}
-            <div className={`flex gap-4 sm:gap-8 ${isInCall && isVideoCall ? 'absolute bottom-8 left-1/2 -translate-x-1/2 z-10' : ''}`}>
+            <div className={`relative z-10 flex items-end justify-center gap-5 sm:gap-8 w-full px-6 ${isInCall && isVideoCall ? 'mt-auto' : ''}`} style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 2.5rem)' }}>
               {!isInCall ? (
-                /* Ringing controls: Accept / Reject for incoming, Hangup for outgoing */
                 callState?.direction === 'incoming' ? (
                   <>
-                    <button
-                      onClick={handleReject}
-                      className="w-16 h-16 sm:w-20 sm:h-20 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center shadow-2xl shadow-red-600/40 transition-all"
-                      aria-label="Decline"
-                    >
-                      <PhoneOff size={28}/>
-                    </button>
-                    <button
-                      onClick={handleAccept}
-                      className="w-16 h-16 sm:w-20 sm:h-20 bg-green-600 hover:bg-green-700 rounded-full flex items-center justify-center shadow-2xl shadow-green-600/40 transition-all animate-bounce"
-                      aria-label="Accept"
-                    >
-                      <Phone size={28}/>
-                    </button>
+                    <div className="flex flex-col items-center gap-2">
+                      <button onClick={handleReject} className="w-16 h-16 sm:w-[4.5rem] sm:h-[4.5rem] bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center shadow-2xl shadow-red-600/40 transition-all active:scale-95" aria-label={t.callDecline || 'Decline'}><PhoneOff size={26}/></button>
+                      <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">{t.callDecline || 'Decline'}</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-2">
+                      <button onClick={handleAccept} className="w-16 h-16 sm:w-[4.5rem] sm:h-[4.5rem] bg-green-600 hover:bg-green-700 rounded-full flex items-center justify-center shadow-2xl shadow-green-600/40 transition-all animate-bounce" aria-label={t.callAccept || 'Accept'}><Phone size={26}/></button>
+                      <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">{t.callAccept || 'Accept'}</span>
+                    </div>
                   </>
                 ) : (
-                  <button
-                    onClick={handleHangup}
-                    className="w-16 h-16 sm:w-20 sm:h-20 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center shadow-2xl shadow-red-600/40 transition-all"
-                    aria-label="End call"
-                  >
-                    <PhoneOff size={28}/>
-                  </button>
+                  <div className="flex flex-col items-center gap-2">
+                    <button onClick={handleHangup} className="w-16 h-16 sm:w-[4.5rem] sm:h-[4.5rem] bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center shadow-2xl shadow-red-600/40 transition-all active:scale-95" aria-label={t.callCancel || 'Cancel'}><PhoneOff size={26}/></button>
+                    <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">{t.callCancel || 'Cancel'}</span>
+                  </div>
                 )
               ) : (
-                /* In-call controls: Mute / Hangup / Video toggle */
                 <>
-                  <button
-                    onClick={handleMute}
-                    className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all border ${
-                      muted ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' : 'bg-white/10 hover:bg-white/20 border-white/10'
-                    }`}
-                    aria-label={muted ? 'Unmute' : 'Mute'}
-                  >
-                    {muted ? <MicOff size={22}/> : <Mic size={22}/>}
-                  </button>
-                  <button
-                    onClick={handleHangup}
-                    className="w-16 h-16 sm:w-20 sm:h-20 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center shadow-2xl shadow-red-600/40 transition-all"
-                    aria-label="End call"
-                  >
-                    <PhoneOff size={28}/>
-                  </button>
-                  {isVideoCall ? (
+                  {/* Mute / Unmute */}
+                  <div className="flex flex-col items-center gap-2">
                     <button
-                      onClick={handleVideoToggle}
-                      className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all border ${
-                        videoOff ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' : 'bg-white/10 hover:bg-white/20 border-white/10'
-                      }`}
-                      aria-label={videoOff ? 'Turn camera on' : 'Turn camera off'}
+                      onClick={handleMute}
+                      className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all border active:scale-95 ${muted ? 'bg-white text-gray-900 border-white' : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'}`}
+                      aria-label={muted ? (t.callUnmute || 'Unmute') : (t.callMute || 'Mute')}
                     >
-                      {videoOff ? <VideoOff size={22}/> : <Video size={22}/>}
+                      {muted ? <MicOff size={22}/> : <Mic size={22}/>}
                     </button>
-                  ) : (
-                    <button
-                      className="w-14 h-14 sm:w-16 sm:h-16 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-all border border-white/10"
-                      aria-label="Add participant"
-                    >
-                      <UserPlus size={22}/>
-                    </button>
+                    <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">{muted ? (t.callUnmute || 'Unmute') : (t.callMute || 'Mute')}</span>
+                  </div>
+                  {/* Camera toggle (video only) */}
+                  {isVideoCall && (
+                    <div className="flex flex-col items-center gap-2">
+                      <button
+                        onClick={handleVideoToggle}
+                        className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all border active:scale-95 ${videoOff ? 'bg-white text-gray-900 border-white' : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'}`}
+                        aria-label={videoOff ? (t.callCameraOn || 'Turn camera on') : (t.callCameraOff || 'Turn camera off')}
+                      >
+                        {videoOff ? <VideoOff size={22}/> : <Video size={22}/>}
+                      </button>
+                      <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">{t.callCamera || 'Camera'}</span>
+                    </div>
                   )}
+                  {/* End */}
+                  <div className="flex flex-col items-center gap-2">
+                    <button onClick={handleHangup} className="w-16 h-16 sm:w-[4.5rem] sm:h-[4.5rem] bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center shadow-2xl shadow-red-600/40 transition-all active:scale-95" aria-label={t.callEnd || 'End call'}><PhoneOff size={26}/></button>
+                    <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">{t.callEnd || 'End'}</span>
+                  </div>
                 </>
               )}
             </div>
-            <p className="mt-6 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Tap Esc to hang up</p>
           </motion.div>
         )}
       </AnimatePresence>

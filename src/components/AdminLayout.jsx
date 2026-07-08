@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Building, Users, MessageSquare, 
-  BellRing, LogOut, Search, ChevronDown, Menu, X, Home
+  BellRing, LogOut, Search, ChevronDown, Menu, X, Home, Flag
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import NotificationBell from './NotificationBell';
@@ -25,6 +25,7 @@ const AdminLayout = () => {
     { path: '/admin', icon: LayoutDashboard, label: 'Overview' },
     { path: '/admin/properties', icon: Building, label: 'Property Moderation' },
     { path: '/admin/users', icon: Users, label: 'User Management' },
+    { path: '/admin/reports', icon: Flag, label: 'User Reports' },
     { path: '/admin/support', icon: MessageSquare, label: 'Support & AI' },
   ];
 

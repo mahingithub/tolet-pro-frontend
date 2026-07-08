@@ -16,12 +16,14 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Phone, Video, UserCircle, Image as ImageIcon, Bell, BellOff, Ban, Flag, ChevronRight, MessageCircle } from 'lucide-react';
+import { X, Phone, Video, UserCircle, Image as ImageIcon, Bell, BellOff, Ban, Flag, ChevronRight, MessageCircle, Lock } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function ViewContactModal({
-  open, contact = {}, muted = false, blocked = false, mediaCount = 0,
-  onClose, onViewProfile, onVoiceCall, onVideoCall, onOpenMedia, onMute, onBlock, onReport,
+  open, contact = {}, muted = false, blocked = false, mediaCount = 0, locked = false,
+  onClose, onViewProfile, onVoiceCall, onVideoCall, onOpenMedia, onMute, onBlock, onReport, onToggleLock,
 }) {
+  const { t } = useLanguage();
   const initials = (contact.name || '?').split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase();
 
   const Action = ({ icon: Icon, label, onClick }) => (
@@ -55,7 +57,7 @@ export default function ViewContactModal({
               <button onClick={onClose} className="p-2 -ml-1 rounded-xl hover:bg-gray-100 text-gray-600" aria-label="Close">
                 <X size={20} />
               </button>
-              <h3 className="text-sm font-black text-gray-900">Contact info</h3>
+              <h3 className="text-sm font-black text-gray-900">{t.contactInfo || 'Contact info'}</h3>
             </div>
 
             {/* Avatar + name */}
@@ -71,9 +73,9 @@ export default function ViewContactModal({
 
             {/* Action buttons */}
             <div className="flex gap-2.5 px-5">
-              {onVoiceCall && <Action icon={Phone} label="Call" onClick={() => { onClose?.(); onVoiceCall(); }} />}
-              {onVideoCall && <Action icon={Video} label="Video" onClick={() => { onClose?.(); onVideoCall(); }} />}
-              {onViewProfile && <Action icon={UserCircle} label="Profile" onClick={() => { onClose?.(); onViewProfile(); }} />}
+              {onVoiceCall && <Action icon={Phone} label={t.contactCall || 'Call'} onClick={() => { onClose?.(); onVoiceCall(); }} />}
+              {onVideoCall && <Action icon={Video} label={t.contactVideo || 'Video'} onClick={() => { onClose?.(); onVideoCall(); }} />}
+              {onViewProfile && <Action icon={UserCircle} label={t.contactProfile || 'Profile'} onClick={() => { onClose?.(); onViewProfile(); }} />}
             </div>
 
             {/* Phone card */}
@@ -90,19 +92,35 @@ export default function ViewContactModal({
               </div>
             )}
 
-            {/* Media, links & docs */}
+            {/* Media, links & docs — opens the tabbed Media/Links/Docs viewer */}
             <button
-              onClick={() => { onClose?.(); onOpenMedia?.(); }}
+              onClick={() => { onOpenMedia?.(); }}
               className="mx-5 mt-3 bg-gray-50 rounded-2xl px-4 py-3.5 flex items-center justify-between hover:bg-gray-100 transition-colors"
             >
               <span className="flex items-center gap-3 text-gray-700">
                 <ImageIcon size={18} className="text-gray-400" />
-                <span className="text-[13px] font-bold">Media, links and docs</span>
+                <span className="text-[13px] font-bold">{t.contactSharedMedia || 'Media, links and docs'}</span>
               </span>
               <span className="flex items-center gap-1 text-gray-400 text-[12px] font-bold">
                 {mediaCount > 0 ? mediaCount : ''} <ChevronRight size={16} />
               </span>
             </button>
+
+            {/* Lock chat with PIN — moved here from the old (i) info pane */}
+            {onToggleLock && (
+              <button
+                onClick={() => { onClose?.(); onToggleLock(); }}
+                className="mx-5 mt-3 bg-gray-50 rounded-2xl px-4 py-3.5 flex items-center justify-between hover:bg-gray-100 transition-colors"
+              >
+                <span className="flex items-center gap-3 text-gray-700">
+                  <Lock size={18} className={locked ? 'text-[#ba0036]' : 'text-gray-400'} />
+                  <span className="text-[13px] font-bold">{locked ? (t.contactRemovePin || 'Remove PIN lock') : (t.contactLockPin || 'Lock chat with PIN')}</span>
+                </span>
+                <span className="flex items-center gap-1 text-gray-400 text-[12px] font-bold">
+                  {locked ? (t.contactOn || 'On') : (t.contactOff || 'Off')} <ChevronRight size={16} />
+                </span>
+              </button>
+            )}
 
             {/* Mute row */}
             <button
@@ -111,10 +129,10 @@ export default function ViewContactModal({
             >
               <span className="flex items-center gap-3 text-gray-700">
                 {muted ? <BellOff size={18} className="text-amber-500" /> : <Bell size={18} className="text-gray-400" />}
-                <span className="text-[13px] font-bold">Mute notifications</span>
+                <span className="text-[13px] font-bold">{t.chatMute || 'Mute notifications'}</span>
               </span>
               <span className="flex items-center gap-1 text-gray-400 text-[12px] font-bold">
-                {muted ? 'On' : 'No'} <ChevronRight size={16} />
+                {muted ? (t.contactOn || 'On') : (t.contactOff || 'Off')} <ChevronRight size={16} />
               </span>
             </button>
 
@@ -124,13 +142,13 @@ export default function ViewContactModal({
                 onClick={() => { onClose?.(); onBlock?.(); }}
                 className="w-full flex items-center gap-3 px-4 py-3.5 text-red-600 hover:bg-red-50 transition-colors border-b border-gray-100"
               >
-                <Ban size={18} /> <span className="text-[13px] font-bold">{blocked ? `Unblock ${contact.name || ''}` : `Block ${contact.name || ''}`}</span>
+                <Ban size={18} /> <span className="text-[13px] font-bold">{blocked ? `${t.chatUnblockShort || 'Unblock'} ${contact.name || ''}` : `${t.contactBlockName || 'Block'} ${contact.name || ''}`}</span>
               </button>
               <button
                 onClick={() => { onClose?.(); onReport?.(); }}
                 className="w-full flex items-center gap-3 px-4 py-3.5 text-red-600 hover:bg-red-50 transition-colors"
               >
-                <Flag size={18} /> <span className="text-[13px] font-bold">Report {contact.name || ''}</span>
+                <Flag size={18} /> <span className="text-[13px] font-bold">{t.contactReportName || 'Report'} {contact.name || ''}</span>
               </button>
             </div>
           </motion.div>

@@ -196,20 +196,51 @@ export function NotificationProvider({ children }) {
   }, [isDNDActive]);
 
   const removeNotification = useCallback(async (id) => {
-    if (!isAuthed) return;
+    if (!isAuthed || id == null) return;
+    const key = String(id);
+
+    // Optimistic remove FIRST so the row disappears instantly (this is the
+    // "it doesn't disappear" fix — we no longer wait on the network, and we
+    // compare ids as strings so socket-delivered ObjectId-ish ids still match).
+    let removed = null;
+    let removedIdx = -1;
+    setItems((prev) => {
+      removedIdx = prev.findIndex((i) => String(i.id) === key);
+      if (removedIdx === -1) return prev;
+      removed = prev[removedIdx];
+      return prev.filter((i) => String(i.id) !== key);
+    });
+    if (removed && !removed.read) setUnreadCount((c) => Math.max(0, c - 1));
+
     try {
-      await notificationService.deleteNotification(id);
-      setItems((prev) => {
-        const item = prev.find(i => i.id === id);
-        if (item && !item.read) {
-          setUnreadCount(c => Math.max(0, c - 1));
-        }
-        return prev.filter(i => i.id !== id);
-      });
-    } catch {
+      await notificationService.deleteNotification(key);
+    } catch (err) {
+      // 404 → already gone on the server; treat as success (stay removed).
+      if (err?.status === 404) return;
+      // Anything else → roll the row back so nothing is silently lost.
+      if (removed) {
+        setItems((prev) => {
+          if (prev.some((i) => String(i.id) === key)) return prev;
+          const next = [...prev];
+          next.splice(Math.min(Math.max(removedIdx, 0), next.length), 0, removed);
+          return next;
+        });
+        if (removed && !removed.read) setUnreadCount((c) => c + 1);
+      }
       toast.error('Failed to remove notification');
     }
   }, [isAuthed]);
+
+  // Clear every notification for the user (used by the panel's "Clear all").
+  const clearAllNotifications = useCallback(async () => {
+    if (!isAuthed) return;
+    const snapshot = items;
+    setItems([]);
+    setUnreadCount(0);
+    try {
+      await Promise.allSettled(snapshot.map((n) => notificationService.deleteNotification(n.id)));
+    } catch { /* best-effort */ }
+  }, [isAuthed, items]);
 
   return (
     <NotificationContext.Provider value={{
@@ -219,6 +250,7 @@ export function NotificationProvider({ children }) {
       markAsRead,
       markAllRead,
       removeNotification,
+      clearAllNotifications,
       soundEnabled,
       setSoundEnabled,
       dndSchedule,

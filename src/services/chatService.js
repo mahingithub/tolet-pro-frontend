@@ -160,6 +160,76 @@ export const getMissedMessagesCount = async (since) => {
   return data.count || 0;
 };
 
+/**
+ * Forward an existing message (text OR media) into another conversation. The
+ * backend clones it so voice notes / photos / documents forward as real media
+ * instead of the raw Cloudinary URL pasted as text.
+ * @param {string} targetConversationId  where to forward TO
+ * @param {string} messageId             the message being forwarded
+ * @param {string} [sourceConversationId] the message's origin thread
+ */
+export const forwardMessage = async (targetConversationId, messageId, sourceConversationId) => {
+  const data = await call(`/conversations/${targetConversationId}/messages/forward`, {
+    method: 'POST',
+    body: { messageId, ...(sourceConversationId ? { sourceId: sourceConversationId } : {}) },
+  });
+  return data.message;
+};
+
+/** Pin / unpin a message in a conversation. Returns { pinnedMessageIds }. */
+export const pinMessage = async (conversationId, messageId, pinned = true) => {
+  return call(`/conversations/${conversationId}/messages/${messageId}/pin`, {
+    method: 'POST',
+    body: { pinned },
+  });
+};
+
+/** Block the other participant of a conversation. */
+export const blockConversation = async (conversationId, reason) => {
+  return call(`/conversations/${conversationId}/block`, {
+    method: 'POST',
+    body: { ...(reason ? { reason } : {}) },
+  });
+};
+
+/** Unblock the other participant. */
+export const unblockConversation = async (conversationId) => {
+  return call(`/conversations/${conversationId}/unblock`, { method: 'POST' });
+};
+
+/**
+ * Mute / unmute a conversation's notifications.
+ * @param {string} conversationId
+ * @param {boolean} muted            false to unmute
+ * @param {'8h'|'1w'|'always'} [duration]
+ */
+export const muteConversation = async (conversationId, muted, duration) => {
+  return call(`/conversations/${conversationId}/mute`, {
+    method: 'POST',
+    body: { muted, ...(duration ? { duration } : {}) },
+  });
+};
+
+/** Report the other participant to the admins. */
+export const reportConversation = async (conversationId, reason, details) => {
+  return call(`/conversations/${conversationId}/report`, {
+    method: 'POST',
+    body: { reason, ...(details ? { details } : {}) },
+  });
+};
+
+/**
+ * Fetch live presence (online + lastSeenAt) for a list of peer userIds.
+ * Returns { [userId]: { online, lastSeenAt } }.
+ */
+export const getPresence = async (ids = []) => {
+  const list = Array.isArray(ids) ? ids : [ids];
+  const clean = list.filter(Boolean).join(',');
+  if (!clean) return {};
+  const data = await call(`/conversations/presence?ids=${encodeURIComponent(clean)}`);
+  return data.presence || {};
+};
+
 export default {
   listConversations,
   openConversation,
@@ -170,4 +240,11 @@ export default {
   deleteMessage,
   reactToMessage,
   getMissedMessagesCount,
+  forwardMessage,
+  pinMessage,
+  blockConversation,
+  unblockConversation,
+  muteConversation,
+  reportConversation,
+  getPresence,
 };
