@@ -148,7 +148,20 @@ function isConnected() {
  * @param {string} token — the logged-in user's JWT (used to authenticate the socket).
  */
 function connect(token) {
-  if (_socket?.connected) return _socket;
+  // Reuse the SINGLE existing socket instance. Creating a second io() while the
+  // first is still connecting/reconnecting (very common on mobile networks)
+  // would (a) attach a duplicate set of event listeners and (b) leave TWO live
+  // sockets in the user's room — so every incoming call would ring twice and
+  // signaling would race. connect() is called from several places (login,
+  // accepting a call, notification launch), so it MUST be idempotent: one
+  // socket, one set of handlers, for the whole session.
+  if (_socket) {
+    if (token) _socket.auth = { token };
+    if (!_socket.connected) {
+      try { _socket.connect(); } catch { /* already (re)connecting */ }
+    }
+    return _socket;
+  }
 
   _socket = io(SOCKET_URL, {
     auth: { token },

@@ -698,6 +698,8 @@ const translations = {
     callCameraOn: "Turn camera on",
     callCameraOff: "Turn camera off",
     callEnd: "End",
+    callFlip: "Flip",
+    callFlipCamera: "Flip camera",
   },
 
   'বাংলা': {
@@ -1384,6 +1386,8 @@ const translations = {
     callCameraOn: "ক্যামেরা চালু করুন",
     callCameraOff: "ক্যামেরা বন্ধ করুন",
     callEnd: "শেষ",
+    callFlip: "ফ্লিপ",
+    callFlipCamera: "ক্যামেরা ঘোরান",
   }
 };
 

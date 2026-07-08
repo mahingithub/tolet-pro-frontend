@@ -16,7 +16,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, SwitchCamera } from 'lucide-react';
 import { toast } from 'sonner';
 import callProvider from '../services/callProvider';
 import callService from '../services/callService';
@@ -116,22 +116,37 @@ const GlobalCallUI = () => {
 
   if (!ringtoneRef.current) ringtoneRef.current = new Ringtone();
 
-  // Attach the current remote stream to whichever media elements exist.
-  // NOTE: we do NOT gate on call type here — a voice call has only the <audio>
-  // element (no <video>), so we just attach to whatever is mounted. This is the
-  // key fix for "voice call connects but there's no audio": the stream is stored
-  // in a ref and (re)attached on every relevant render, so it can't be missed.
+  // Attach the current remote stream to EXACTLY ONE media element.
+  //
+  // A <video> element plays BOTH the video AND the audio track of its stream,
+  // while a voice call has only the <audio> element. Attaching the same stream
+  // to both a <video> and an <audio> element (the old behaviour) made the remote
+  // voice play TWICE on a video call → echo / robotic audio. So we route by
+  // whether the stream actually carries a video track:
+  //   • has video → <video> element (plays audio+video); detach the <audio>.
+  //   • no video  → <audio> element (voice call, or video not mounted yet).
+  // The stream is stored in a ref and re-attached on every relevant render, so
+  // it can never be missed even if an element mounts a beat late.
   const attachRemoteStream = useCallback((stream) => {
     if (stream) remoteStreamRef.current = stream;
     const s = remoteStreamRef.current;
     if (!s) return;
-    if (remoteAudioRef.current && remoteAudioRef.current.srcObject !== s) {
-      remoteAudioRef.current.srcObject = s;
-      remoteAudioRef.current.play?.().catch(() => {});
-    }
-    if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== s) {
-      remoteVideoRef.current.srcObject = s;
-      remoteVideoRef.current.play?.().catch(() => {});
+    const hasVideo = typeof s.getVideoTracks === 'function' && s.getVideoTracks().length > 0;
+
+    if (hasVideo && remoteVideoRef.current) {
+      if (remoteVideoRef.current.srcObject !== s) {
+        remoteVideoRef.current.srcObject = s;
+        remoteVideoRef.current.play?.().catch(() => {});
+      }
+      // Never let the standalone <audio> element ALSO play this stream (echo).
+      if (remoteAudioRef.current && remoteAudioRef.current.srcObject) {
+        remoteAudioRef.current.srcObject = null;
+      }
+    } else if (remoteAudioRef.current) {
+      if (remoteAudioRef.current.srcObject !== s) {
+        remoteAudioRef.current.srcObject = s;
+        remoteAudioRef.current.play?.().catch(() => {});
+      }
     }
   }, []);
 
@@ -247,7 +262,12 @@ const GlobalCallUI = () => {
   // ─── Subscribe to provider events ──────────────────────────────────────
   useEffect(() => {
     const unsubIncoming = callProvider.onIncomingCall((data) => {
-      setCallState(toIncomingState(data, 'ringing'));
+      setCallState((prev) => {
+        // Ignore a duplicate/stale ring for a call we're already showing or in
+        // (prevents a late CALL_RINGING from resetting an accepted call).
+        if (prev && String(prev.callId) === String(data.callId)) return prev;
+        return toIncomingState(data, 'ringing');
+      });
     });
 
     const unsubOutgoing = callProvider.onOutgoingCall((data) => {
@@ -448,6 +468,12 @@ const GlobalCallUI = () => {
     setVideoOff(isOff);
   };
 
+  // Flip between front/back camera on a phone (video calls only). No-op on
+  // single-camera devices (the provider returns false and leaves the call as-is).
+  const handleSwitchCamera = () => {
+    callProvider.switchCamera?.();
+  };
+
   const showOverlay = !!callState;
   const isVideoCall = callState?.type === 'video';
   const isInCall    = callState?.status === 'accepted';
@@ -486,7 +512,13 @@ const GlobalCallUI = () => {
             {isInCall && isVideoCall && (
               <div className="absolute inset-0 bg-black">
                 <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                <video ref={localVideoRef} autoPlay playsInline muted className="absolute bottom-32 right-4 w-28 h-40 sm:w-40 sm:h-56 object-cover rounded-2xl border-2 border-white/25 shadow-2xl bg-black" />
+                {/* Local self-view — mirrored (scale-x-[-1]) like every camera app. */}
+                <video ref={localVideoRef} autoPlay playsInline muted className={`absolute bottom-32 right-4 w-28 h-40 sm:w-40 sm:h-56 object-cover rounded-2xl border-2 border-white/25 shadow-2xl bg-black scale-x-[-1] ${videoOff ? 'hidden' : ''}`} />
+                {videoOff && (
+                  <div className="absolute bottom-32 right-4 w-28 h-40 sm:w-40 sm:h-56 rounded-2xl border-2 border-white/25 shadow-2xl bg-gray-800 flex items-center justify-center">
+                    <VideoOff size={26} className="text-white/50" />
+                  </div>
+                )}
                 <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-black/70 to-transparent" />
               </div>
             )}
@@ -582,6 +614,19 @@ const GlobalCallUI = () => {
                         {videoOff ? <VideoOff size={22}/> : <Video size={22}/>}
                       </button>
                       <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">{t.callCamera || 'Camera'}</span>
+                    </div>
+                  )}
+                  {/* Flip front/back camera (video only, not while camera off) */}
+                  {isVideoCall && !videoOff && (
+                    <div className="flex flex-col items-center gap-2">
+                      <button
+                        onClick={handleSwitchCamera}
+                        className="w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all border active:scale-95 bg-white/10 hover:bg-white/20 border-white/20 text-white"
+                        aria-label={t.callFlipCamera || 'Flip camera'}
+                      >
+                        <SwitchCamera size={22}/>
+                      </button>
+                      <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">{t.callFlip || 'Flip'}</span>
                     </div>
                   )}
                   {/* End */}

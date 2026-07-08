@@ -27,7 +27,7 @@ importScripts('/call-notification-sw.js');
 // Bump this on any release that changes a PRECACHED file (index.html, manifest,
 // icons, offline.html). Hashed build assets (index-*.js/css) already bust their
 // own cache via unique filenames, so they don't need a version bump.
-const CACHE_VERSION = 'tolet-pro-v2';
+const CACHE_VERSION = 'tolet-pro-v3';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 // Minimal app shell. Hashed build assets (index-*.js/css) are cached at runtime
@@ -88,6 +88,15 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const url = req.url;
+
+  // Cross-origin requests (Cloudinary chat media, CDNs, any third-party) →
+  // NEVER intercept. The browser must handle these itself, including the HTTP
+  // Range requests that <audio>/<video> use for voice messages. Previously the
+  // SW re-fetched these and a failed range re-fetch returned a 503, which is
+  // exactly why voice notes wouldn't play. Getting out of the way fixes it.
+  let sameOrigin = true;
+  try { sameOrigin = new URL(url).origin === self.location.origin; } catch { sameOrigin = true; }
+  if (!sameOrigin) return;
 
   // Real-time / API / cross-origin dynamic → straight to network, no caching.
   if (isNetworkOnly(url)) {
