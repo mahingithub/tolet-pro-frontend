@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, LifeBuoy, Send, Plus, MessageSquare, ChevronRight,
   CheckCircle2, Loader2, HelpCircle, ShieldCheck,
-  Sparkles, ChevronDown,
+  Sparkles, ChevronDown, User, Building2, CreditCard, Clock, BookOpen,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLanguage } from '../context/LanguageContext';
@@ -64,6 +64,36 @@ const FAQS = [
       bn: 'ভেরিফাইড ব্যাজ দেওয়ার আগে আমাদের টিম মালিকানার কাগজপত্র ও বাড়ির তথ্য যাচাই করে, যাতে আপনি নিশ্চিন্তে যোগাযোগ করতে পারেন।',
     },
   },
+  {
+    q: { en: 'How long does verification take?', bn: 'ভেরিফিকেশনে কত সময় লাগে?' },
+    a: {
+      en: 'Most owner verifications finish within 24\u201348 hours after a valid NID and proof of ownership are submitted. You get a notification the moment it\u2019s approved.',
+      bn: 'সঠিক এনআইডি ও মালিকানার প্রমাণ জমা দেওয়ার পর বেশিরভাগ মালিক ভেরিফিকেশন ২৪–৪৮ ঘণ্টার মধ্যে সম্পন্ন হয়। অনুমোদন হওয়ার সাথে সাথেই নোটিফিকেশন পাবেন।',
+    },
+  },
+  {
+    q: { en: 'How do I report a suspicious user or listing?', bn: 'সন্দেহজনক ব্যবহারকারী বা লিস্টিং কীভাবে রিপোর্ট করব?' },
+    a: {
+      en: 'Open the chat or listing, tap the menu and choose Report or Block. Our moderation team reviews every report quickly — or open a request here and we\u2019ll take it from there.',
+      bn: 'চ্যাট বা লিস্টিং খুলে মেনুতে ট্যাপ করে রিপোর্ট বা ব্লক বেছে নিন। আমাদের মডারেশন টিম প্রতিটি রিপোর্ট দ্রুত পর্যালোচনা করে — অথবা এখানে একটি অনুরোধ খুলুন, আমরা ব্যবস্থা নেব।',
+    },
+  },
+];
+
+// Quick-start topics — tapping one opens the request composer pre-filled so
+// the ticket lands in the admin support inbox already categorised.
+const HELP_TOPICS = [
+  { Icon: User,        en: 'Account & profile',       bn: 'অ্যাকাউন্ট ও প্রোফাইল' },
+  { Icon: Building2,   en: 'Listings & search',       bn: 'লিস্টিং ও সার্চ' },
+  { Icon: CreditCard,  en: 'Payments & billing',      bn: 'পেমেন্ট ও বিলিং' },
+  { Icon: ShieldCheck, en: 'Safety & verification',   bn: 'নিরাপত্তা ও ভেরিফিকেশন' },
+];
+
+// Reassurance chips shown in the hero.
+const ASSURANCES = [
+  { Icon: Clock,         en: 'Fast replies',      bn: 'দ্রুত উত্তর' },
+  { Icon: MessageSquare, en: 'In-app updates',    bn: 'অ্যাপে আপডেট' },
+  { Icon: ShieldCheck,   en: 'Real support team', bn: 'আসল সাপোর্ট টিম' },
 ];
 
 export default function SupportPage() {
@@ -153,6 +183,19 @@ export default function SupportPage() {
     } finally {
       setCreating(false);
     }
+  };
+
+  // Tapping a help topic opens the composer with the topic pre-filled so the
+  // request reaches the support team already labelled. Guests are sent to
+  // login first (the ticket API requires auth).
+  const startTopic = (label) => {
+    if (!isAuthenticated) {
+      navigate('/login?next=%2Fsupport');
+      return;
+    }
+    setShowComposer(true);
+    setComposer((prev) => (prev.trim() ? prev : `${label}: `));
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleReply = async () => {
@@ -321,10 +364,38 @@ export default function SupportPage() {
               <p className="text-sm font-medium text-red-100">{tr("We're here to help you", 'আমরা আপনাকে সাহায্য করতে এখানে আছি')}</p>
             </div>
           </div>
+          <div className="flex flex-wrap gap-2 mt-5">
+            {ASSURANCES.map((a, i) => (
+              <span key={i} className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur px-3 py-1.5 rounded-full text-[11px] font-black">
+                <a.Icon size={13} /> {tr(a.en, a.bn)}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 -mt-5">
+        {/* Browse help topics — quick-start into a categorised request */}
+        <div className="mb-5">
+          <p className="text-[11px] font-black uppercase tracking-wider text-gray-400 px-2 mb-2">
+            {tr('Browse help topics', 'সহায়তার বিষয় দেখুন')}
+          </p>
+          <div className="grid grid-cols-2 gap-2.5">
+            {HELP_TOPICS.map((topic, i) => (
+              <button
+                key={i}
+                onClick={() => startTopic(tr(topic.en, topic.bn))}
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:border-gray-200 hover:shadow-md p-4 flex items-center gap-3 text-left active:scale-[0.98] transition-all"
+              >
+                <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                  <topic.Icon size={18} className="text-[#ba0036]" />
+                </div>
+                <span className="text-sm font-bold text-gray-900 leading-tight">{tr(topic.en, topic.bn)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Contact / new request card */}
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 mb-5">
           {isAuthenticated ? (
@@ -460,6 +531,21 @@ export default function SupportPage() {
             })}
           </div>
         </div>
+
+        {/* Learn more — cross-link to the How it Works guide */}
+        <button
+          onClick={() => navigate('/how-it-works')}
+          className="w-full bg-white rounded-3xl border border-gray-100 shadow-sm p-4 flex items-center gap-3 text-left hover:border-gray-200 hover:shadow-md active:scale-[0.99] transition-all mb-5"
+        >
+          <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+            <BookOpen size={18} className="text-[#ba0036]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-gray-900">{tr('New here? See how TO-LET PRO works', 'নতুন? দেখুন টু-লেট প্রো যেভাবে কাজ করে')}</p>
+            <p className="text-xs font-medium text-gray-400">{tr('A quick guide for tenants and landlords.', 'ভাড়াটিয়া ও বাড়িওয়ালার জন্য দ্রুত গাইড।')}</p>
+          </div>
+          <ChevronRight size={18} className="text-gray-300 shrink-0" />
+        </button>
 
         {/* Trust footer */}
         <div className="flex items-center justify-center gap-2 text-xs font-bold text-gray-400 py-2">

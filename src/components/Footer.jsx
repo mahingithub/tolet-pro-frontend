@@ -54,9 +54,15 @@ const Footer = () => {
           <div>
             <h4 className="text-brandRed text-xs font-bold uppercase tracking-widest mb-6">{t.landlordsTitle}</h4>
             <ul className="space-y-4 text-gray-400 text-sm font-medium">
-              <li className="hover:text-white transition-colors cursor-pointer">{t.navHowItWorks}</li>
-              <li className="hover:text-white transition-colors cursor-pointer">{t.navListProperty}</li>
-              <li className="hover:text-white transition-colors cursor-pointer">{t.navTrustSafety}</li>
+              <li>
+                <Link to="/how-it-works" className="hover:text-white transition-colors">{t.navHowItWorks}</Link>
+              </li>
+              <li>
+                <Link to="/list-property" className="hover:text-white transition-colors">{t.navListProperty}</Link>
+              </li>
+              <li>
+                <Link to="/how-it-works#safety" className="hover:text-white transition-colors">{t.navTrustSafety}</Link>
+              </li>
               <li className="hover:text-white transition-colors cursor-pointer">{t.navHostGuidelines}</li>
             </ul>
           </div>
@@ -81,7 +87,8 @@ const Footer = () => {
 
         <div className="flex flex-col md:flex-row justify-between items-center text-xs text-gray-500 font-medium">
           <p>{t.footerCopyright}</p>
-          <div className="flex gap-6 mt-4 md:mt-0">
+          <div className="flex flex-wrap justify-center gap-6 mt-4 md:mt-0">
+            <Link to="/support" className="hover:text-white transition-colors cursor-pointer">{t.menuHelpSupport || 'Help & Support'}</Link>
             <Link to="/privacy-policy" className="hover:text-white transition-colors cursor-pointer">{t.privacyPolicyUpper || 'Privacy Policy'}</Link>
             <Link to="/terms" className="hover:text-white transition-colors cursor-pointer">{t.termsServiceUpper || 'Terms of Service'}</Link>
             <Link to="/refund" className="hover:text-white transition-colors cursor-pointer">{t.refundUpper || 'Refund Policy'}</Link>

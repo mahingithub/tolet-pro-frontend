@@ -5,12 +5,13 @@
 // /how-it-works#pricing. Fully bilingual (English / বাংলা) following the same
 // inline pattern used across the app.
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, MessageSquare, CalendarCheck, KeyRound,
   PlusCircle, BadgeCheck, Users, Handshake,
   ShieldCheck, Sparkles, ArrowRight, Check, Building2,
+  Lock, PhoneCall, Flag, HelpCircle, ChevronDown, LifeBuoy,
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -22,6 +23,7 @@ export default function HowItWorks() {
   const { isAuthenticated } = useAuth();
   const isBn = language === 'বাংলা' || language === 'bn';
   const tr = (en, bn) => (isBn ? bn : en);
+  const [openFaq, setOpenFaq] = useState(null);
 
   // Scroll to #pricing (or any hash) when arriving via a hash link.
   useEffect(() => {
@@ -45,6 +47,23 @@ export default function HowItWorks() {
     { Icon: BadgeCheck, en: 'Get verified', bn: 'ভেরিফাই হন', den: 'Our team verifies you so tenants trust and contact you first.', dbn: 'আমাদের টিম আপনাকে ভেরিফাই করে যাতে ভাড়াটিয়ারা আগে আপনাকেই বিশ্বাস করে।' },
     { Icon: Users, en: 'Receive leads', bn: 'লিড পান', den: 'Get inquiries from genuine, ready-to-move tenants.', dbn: 'সত্যিকারের, উঠতে প্রস্তুত ভাড়াটিয়াদের কাছ থেকে যোগাযোগ পান।' },
     { Icon: Handshake, en: 'Close the deal', bn: 'চুক্তি সম্পন্ন করুন', den: 'Chat, agree on terms and hand over the keys.', dbn: 'চ্যাট করুন, শর্তে একমত হন এবং চাবি হস্তান্তর করুন।' },
+  ];
+
+  // Detailed safety pillars — the "why you can trust us" story.
+  const safetyItems = [
+    { Icon: ShieldCheck, en: 'Verified owners & listings', bn: 'ভেরিফাইড মালিক ও লিস্টিং', den: 'Our team reviews ownership documents and property details before a listing earns its verified badge.', dbn: 'ভেরিফাইড ব্যাজ পাওয়ার আগে আমাদের টিম মালিকানার কাগজপত্র ও বাড়ির তথ্য যাচাই করে।' },
+    { Icon: Lock, en: 'Your number stays private', bn: 'আপনার নম্বর গোপন থাকে', den: 'Chat and call inside the app — you never have to share your personal phone number to talk.', dbn: 'অ্যাপের ভেতরেই চ্যাট ও কল করুন — কথা বলতে কখনো ব্যক্তিগত নম্বর শেয়ার করতে হয় না।' },
+    { Icon: PhoneCall, en: 'Secure in-app calls', bn: 'নিরাপদ অ্যাপ-কল', den: 'Voice and video calls run through TO-LET PRO, so every conversation stays protected.', dbn: 'ভয়েস ও ভিডিও কল টু-লেট প্রো-র মাধ্যমে হয়, তাই প্রতিটি কথোপকথন সুরক্ষিত থাকে।' },
+    { Icon: Flag, en: 'Report & block anytime', bn: 'যেকোনো সময় রিপোর্ট ও ব্লক', den: 'See something off? Report or block any user in a tap and our moderation team steps in fast.', dbn: 'সন্দেহজনক কিছু দেখলেন? এক ট্যাপে যেকোনো ব্যবহারকারীকে রিপোর্ট বা ব্লক করুন, আমাদের মডারেশন টিম দ্রুত ব্যবস্থা নেয়।' },
+  ];
+
+  // Frequently asked questions shown on the marketing page.
+  const faqs = [
+    { q: { en: 'Is TO-LET PRO free to use?', bn: 'টু-লেট প্রো ব্যবহার কি ফ্রি?' }, a: { en: 'Yes. Searching, contacting verified owners and listing a property are all free. Landlords can optionally upgrade for premium placement and tools.', bn: 'হ্যাঁ। সার্চ করা, ভেরিফাইড মালিকের সাথে যোগাযোগ ও বাড়ি লিস্ট করা সবই ফ্রি। মালিকরা চাইলে প্রিমিয়াম প্লেসমেন্ট ও টুলসের জন্য আপগ্রেড করতে পারেন।' } },
+    { q: { en: 'Do I have to pay any brokerage?', bn: 'আমাকে কি কোনো দালাল ফি দিতে হবে?' }, a: { en: 'Never. Tenants deal directly with verified owners, so there is zero brokerage on TO-LET PRO.', bn: 'কখনো না। ভাড়াটিয়ারা সরাসরি ভেরিফাইড মালিকের সাথে লেনদেন করেন, তাই টু-লেট প্রো-তে কোনো দালাল ফি নেই।' } },
+    { q: { en: 'How do I know a listing is genuine?', bn: 'একটি লিস্টিং আসল কিনা কীভাবে বুঝব?' }, a: { en: 'Look for the verified badge. It means our team has checked the owner\u2019s documents and the property details.', bn: 'ভেরিফাইড ব্যাজ খুঁজুন। এর মানে আমাদের টিম মালিকের কাগজপত্র ও বাড়ির তথ্য যাচাই করেছে।' } },
+    { q: { en: 'How long does owner verification take?', bn: 'মালিক ভেরিফিকেশনে কত সময় লাগে?' }, a: { en: 'Most verifications are completed within 24\u201348 hours once you submit a valid NID and ownership proof.', bn: 'সঠিক এনআইডি ও মালিকানার প্রমাণ জমা দিলে বেশিরভাগ ভেরিফিকেশন ২৪–৪৮ ঘণ্টার মধ্যে সম্পন্ন হয়।' } },
+    { q: { en: 'What if I need help?', bn: 'সাহায্য দরকার হলে কী করব?' }, a: { en: 'Open the Help & Support center anytime. Send us a request and our support team replies right inside the app.', bn: 'যেকোনো সময় সহায়তা ও সাপোর্ট সেন্টার খুলুন। একটি অনুরোধ পাঠান, আমাদের সাপোর্ট টিম অ্যাপের ভেতরেই উত্তর দেবে।' } },
   ];
 
   const StepCard = ({ Icon, title, desc, n }) => (
@@ -131,6 +150,30 @@ export default function HowItWorks() {
         </div>
       </section>
 
+      {/* Safety & Trust */}
+      <section id="safety" className="max-w-5xl mx-auto px-4 mt-12 scroll-mt-24">
+        <div className="text-center mb-6">
+          <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036] mb-1">{tr('Safety & trust', 'নিরাপত্তা ও বিশ্বাস')}</p>
+          <h2 className="text-2xl md:text-3xl font-black text-gray-900">{tr('Built to keep you safe', 'আপনার নিরাপত্তার জন্য তৈরি')}</h2>
+          <p className="text-sm font-medium text-gray-500 mt-2 max-w-2xl mx-auto leading-relaxed">
+            {tr('Every step — from listing to move-in — is designed to protect both tenants and owners.', 'লিস্টিং থেকে বাড়িতে ওঠা পর্যন্ত প্রতিটি ধাপ ভাড়াটিয়া ও মালিক উভয়ের সুরক্ষার জন্য ডিজাইন করা।')}
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {safetyItems.map((s, i) => (
+            <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5 flex items-start gap-4">
+              <div className="w-11 h-11 rounded-2xl bg-red-50 flex items-center justify-center shrink-0">
+                <s.Icon size={20} className="text-[#ba0036]" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-gray-900 mb-1">{tr(s.en, s.bn)}</h3>
+                <p className="text-sm font-medium text-gray-500 leading-relaxed">{tr(s.den, s.dbn)}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Pricing */}
       <section id="pricing" className="max-w-5xl mx-auto px-4 mt-12 scroll-mt-24">
         <div className="text-center mb-6">
@@ -189,6 +232,57 @@ export default function HowItWorks() {
               {tr('Become a landlord', 'বাড়িওয়ালা হোন')} <ArrowRight size={16} />
             </button>
           </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="max-w-3xl mx-auto px-4 mt-14">
+        <div className="text-center mb-6">
+          <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036] mb-1">{tr('FAQ', 'সাধারণ প্রশ্ন')}</p>
+          <h2 className="text-2xl md:text-3xl font-black text-gray-900">{tr('Questions, answered', 'প্রশ্নের উত্তর')}</h2>
+        </div>
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
+          {faqs.map((f, i) => {
+            const open = openFaq === i;
+            return (
+              <div key={i}>
+                <button
+                  onClick={() => setOpenFaq(open ? null : i)}
+                  className="w-full flex items-center gap-3 px-5 py-4 text-left active:bg-gray-50 transition-colors"
+                >
+                  <HelpCircle size={18} className="text-[#ba0036] shrink-0" />
+                  <span className="flex-1 text-sm font-bold text-gray-900">{tr(f.q.en, f.q.bn)}</span>
+                  <ChevronDown size={18} className={`text-gray-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+                </button>
+                {open && (
+                  <p className="px-5 pb-4 pl-[56px] text-sm font-medium text-gray-500 leading-relaxed">
+                    {tr(f.a.en, f.a.bn)}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Need help — links through to the Help & Support center */}
+      <section className="max-w-3xl mx-auto px-4 mt-8">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+          <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center shrink-0">
+            <LifeBuoy size={26} className="text-[#ba0036]" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-base font-black text-gray-900">{tr('Still have questions?', 'এখনও প্রশ্ন আছে?')}</h3>
+            <p className="text-sm font-medium text-gray-500 leading-relaxed mt-0.5">
+              {tr('Our support team is one tap away. Send a request and track replies right here in the app.', 'আমাদের সাপোর্ট টিম এক ট্যাপ দূরে। একটি অনুরোধ পাঠান এবং অ্যাপেই উত্তর দেখুন।')}
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/support')}
+            className="w-full sm:w-auto shrink-0 bg-[#ba0036] text-white px-5 py-3 rounded-xl font-black text-sm shadow-md active:scale-95 transition-transform inline-flex items-center justify-center gap-2"
+          >
+            {tr('Get help', 'সাহায্য নিন')} <ArrowRight size={16} />
+          </button>
         </div>
       </section>
 
