@@ -4,13 +4,20 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import callProvider from '../services/callProvider';
 import useAudioChime from '../hooks/useAudioChime';
 import { useNotificationSettings } from '../context/NotificationContext';
+import { useLanguage } from '../context/LanguageContext';
+import QuickReplyToast from './QuickReplyToast';
 
 export default function GlobalToaster() {
   const location = useLocation();
   const navigate = useNavigate();
   const playChime = useAudioChime();
   const { shouldPlayChimeOrToast, soundEnabled } = useNotificationSettings();
-  
+  const { t } = useLanguage();
+  // `t` is a fresh Proxy each render — keep it in a ref so the socket handler
+  // reads the latest labels without re-subscribing on every render.
+  const tRef = useRef(t);
+  tRef.current = t;
+
   const activeToastsRef = useRef([]);
 
   useEffect(() => {
@@ -39,39 +46,42 @@ export default function GlobalToaster() {
         toast.dismiss(oldestId);
       }
 
-      toast(
-        <div className="flex items-center gap-3 w-full">
-          {senderAvatar ? (
-            <img src={senderAvatar} alt={senderName} className="w-10 h-10 rounded-full object-cover" />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
-              {senderName.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <h4 className="text-sm font-semibold text-gray-900 truncate">{senderName}</h4>
-            <p className="text-xs text-gray-500 line-clamp-1">{message?.text || (message?.type === 'image' ? '📷 Photo' : '🎤 Voice message')}</p>
-          </div>
-          <button 
-            onClick={() => {
-              navigate(`/messages/${conversationId}`);
+      const preview = message?.text
+        || (message?.type === 'image' ? '📷 Photo'
+          : message?.type === 'video' ? '🎥 Video'
+          : message?.type === 'document' ? '📄 Document'
+          : message?.type === 'audio' ? '🎤 Voice message' : 'New message');
+
+      const cleanup = () => {
+        activeToastsRef.current = activeToastsRef.current.filter((id) => id !== toastId);
+      };
+
+      // Premium custom toast with an inline quick-reply box (no default chrome).
+      toast.custom(
+        () => (
+          <QuickReplyToast
+            conversationId={conversationId}
+            senderName={senderName}
+            senderAvatar={senderAvatar}
+            preview={preview}
+            labels={{
+              newMessage: tRef.current.notifNewMessage || 'New message',
+              placeholder: tRef.current.quickReplyPlaceholder || 'Reply…',
+              sent: tRef.current.quickReplySent || 'Reply sent',
+            }}
+            onOpen={() => {
+              navigate('/messages', { state: { peerUserId: message?.senderId, conversationId, autoOpen: true } });
               toast.dismiss(toastId);
             }}
-            className="text-xs font-semibold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-md shrink-0 hover:bg-blue-100 transition-colors"
-          >
-            Reply
-          </button>
-        </div>,
+            onClose={() => toast.dismiss(toastId)}
+          />
+        ),
         {
           id: toastId,
-          duration: 4000,
+          duration: 6500,
           position: 'top-center',
-          onDismiss: () => {
-            activeToastsRef.current = activeToastsRef.current.filter((id) => id !== toastId);
-          },
-          onAutoClose: () => {
-            activeToastsRef.current = activeToastsRef.current.filter((id) => id !== toastId);
-          }
+          onDismiss: cleanup,
+          onAutoClose: cleanup,
         }
       );
     };

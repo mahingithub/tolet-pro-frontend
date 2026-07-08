@@ -230,6 +230,14 @@ export const getPresence = async (ids = []) => {
   return data.presence || {};
 };
 
+/**
+ * Delete a whole conversation for the current user only (soft, per-user).
+ * The thread comes back if a new message arrives (server clears deletedBy).
+ */
+export const deleteConversation = async (conversationId) => {
+  return call(`/conversations/${conversationId}`, { method: 'DELETE' });
+};
+
 export default {
   listConversations,
   openConversation,
@@ -247,4 +255,5 @@ export default {
   muteConversation,
   reportConversation,
   getPresence,
+  deleteConversation,
 };

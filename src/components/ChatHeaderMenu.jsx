@@ -21,12 +21,12 @@
 import React, { useEffect, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, BellOff, Bell, Flag, Ban } from 'lucide-react';
+import { User, BellOff, Bell, Flag, Ban, Trash2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 const MENU_W = 232;
 
-export default function ChatHeaderMenu({ open, muted, blocked, anchorRef, onViewContact, onMute, onReport, onBlock, onClose }) {
+export default function ChatHeaderMenu({ open, muted, blocked, anchorRef, onViewContact, onMute, onReport, onBlock, onDelete, onClose }) {
   const { t } = useLanguage();
   const [pos, setPos] = useState({ top: 64, left: 0 });
 
@@ -92,6 +92,7 @@ export default function ChatHeaderMenu({ open, muted, blocked, anchorRef, onView
             <Item icon={User} label={t.chatViewContact || 'View contact'} onClick={onViewContact} />
             <Item icon={muted ? Bell : BellOff} label={muted ? (t.chatUnmute || 'Unmute notifications') : (t.chatMute || 'Mute notifications')} onClick={onMute} />
             <Item icon={Flag} label={t.chatReport || 'Report'} onClick={onReport} />
+            {onDelete && <Item icon={Trash2} label={t.chatDeleteConversation || 'Delete conversation'} onClick={onDelete} danger />}
             <Item icon={Ban} label={blocked ? (t.chatUnblock || 'Unblock') : (t.chatBlock || 'Block')} onClick={onBlock} danger />
           </motion.div>
         </>

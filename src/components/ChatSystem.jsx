@@ -24,7 +24,7 @@ import {
   UserPlus, Pin, Receipt, FileText, Hourglass, Info, ChevronRight,
   Download, MessageCircle, VolumeX, MessageSquare,
   PhoneIncoming, PhoneOutgoing, PhoneMissed, VideoOff,
-  BellOff, Ban, Flag, CornerUpLeft, Lock,
+  BellOff, Ban, Flag, CornerUpLeft, Lock, Image as ImageIcon,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import chatService from '../services/chatService';
@@ -38,7 +38,6 @@ import CallHistory from './CallHistory';
 import CallQualityOverlay from './CallQualityOverlay';
 import CallDetailModal from './CallDetailModal';
 // ── Chat UX upgrade: modular pieces that plug into this existing component ──
-import CompactAudioPlayer from './CompactAudioPlayer';
 import MessageActionsMenu from './MessageActionsMenu';
 import BlockUserModal from './BlockUserModal';
 import ChatPinLock from './ChatPinLock';
@@ -49,6 +48,10 @@ import ChatMediaViewer from './ChatMediaViewer';
 import MuteNotificationsModal from './MuteNotificationsModal';
 import ReportContactModal from './ReportContactModal';
 import EmojiPicker from './EmojiPicker';
+// ── Perf + UX upgrade pieces ────────────────────────────────────────────────
+import ChatMessageBubble from './ChatMessageBubble';
+import MediaLightbox from './MediaLightbox';
+import ChatListItemMenu from './ChatListItemMenu';
 
 // Render a text message bigger when it's only emoji ("jumbo"/sticker), and
 // detect a lone image/GIF URL so stickers and Tenor GIFs render as media.
@@ -367,12 +370,40 @@ const TypingDots = ({ name = 'AI' }) => (
 );
 
 // ─── Sidebar chat row ───────────────────────────────────────────────────────
-const ChatRow = ({ chat, lastMsg, isActive, onClick, isMobile, online = false }) => {
+const ChatRow = ({ chat, lastMsg, isActive, onClick, isMobile, online = false, onContextMenu }) => {
   const initials = (chat.name || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
+  // Long-press (mobile) / right-click (desktop) → open the row context menu.
+  const lpRef = useRef(null);
+  const posRef = useRef(null);
+  const openedRef = useRef(false);   // suppress the click that follows a long-press
+  const clearLp = () => { if (lpRef.current) { clearTimeout(lpRef.current); lpRef.current = null; } };
+  const ctxHandlers = onContextMenu ? {
+    onContextMenu: (e) => { e.preventDefault(); onContextMenu(chat, e.clientX, e.clientY); },
+    onPointerDown: (e) => {
+      if (e.button === 2) return;
+      posRef.current = { x: e.clientX, y: e.clientY };
+      clearLp();
+      lpRef.current = setTimeout(() => {
+        openedRef.current = true;
+        onContextMenu(chat, posRef.current.x, posRef.current.y);
+        lpRef.current = null;
+      }, 450);
+    },
+    onPointerMove: (e) => {
+      const p = posRef.current;
+      if (p && lpRef.current && (Math.abs(e.clientX - p.x) > 12 || Math.abs(e.clientY - p.y) > 12)) clearLp();
+    },
+    onPointerUp: clearLp,
+    onPointerLeave: clearLp,
+  } : {};
   return (
     <button
-      onClick={onClick}
-      className={`w-full text-left p-3 sm:p-4 rounded-2xl flex items-center gap-3 border transition-all active:scale-[0.99] ${
+      {...ctxHandlers}
+      onClick={(e) => {
+        if (openedRef.current) { openedRef.current = false; e.preventDefault(); return; }
+        onClick?.();
+      }}
+      className={`w-full text-left p-3 sm:p-4 rounded-2xl flex items-center gap-3 border transition-all active:scale-[0.99] select-none ${
         isActive
           ? 'bg-white border-[#ba0036]/15 shadow-[0_4px_20px_rgba(186,0,54,0.08)]'
           : 'border-transparent hover:bg-white/70'
@@ -487,6 +518,14 @@ const ChatSystem = () => {
   const [showMediaViewer, setShowMediaViewer]   = useState(false); // Media/Links/Docs
   const [showMuteModal, setShowMuteModal]       = useState(false);
   const [showReportModal, setShowReportModal]   = useState(false);
+  // ── New UX pieces ───────────────────────────────────────────────────────
+  const [lightbox, setLightbox]         = useState(null);  // { type, url, name } for the in-app viewer
+  const [showAttachMenu, setShowAttachMenu] = useState(false); // Photo&Video / Document popover
+  const [listMenu, setListMenu]         = useState(null);  // { chat, x, y } chat-list context menu
+  // Conversations the user just deleted — filtered from the poll merge so they
+  // don't flicker back before the backend DELETE lands.
+  const deletedConvoIdsRef = useRef(new Set());
+  const chatBackGuardRef   = useRef(false);   // mobile hardware-back history guard
   // Emoji reactions persist + sync via the backend (Message.reactions +
   // MESSAGE_REACTION socket). They live on each message object as
   // m.reactions = { userId: emoji }; this state only drives the floating bar.
@@ -503,8 +542,7 @@ const ChatSystem = () => {
   });
   const [pinUnlocked, setPinUnlocked] = useState({});
   const [pinSetupFor, setPinSetupFor] = useState(null);
-  const longPressRef = useRef(null);   // long-press timer
-  const pressPosRef  = useRef(null);   // pointer start position (move tolerance)
+  // (long-press timing now lives inside ChatMessageBubble)
 
   // ── Chat media (image upload + voice message) ──────────────────────────────
   const [isUploadingMedia, setIsUploadingMedia] = useState(false); // image/audio upload in flight
@@ -751,6 +789,9 @@ const ChatSystem = () => {
   // Load the user's real conversations on mount, then re-poll every 15 s.
   // Each backend conversation becomes a chat row keyed by its Mongo id.
   const mergeBackendConversations = useCallback((list) => {
+    // Drop any conversation the user just deleted so the 15s poll can't briefly
+    // resurrect it before the backend DELETE is acknowledged.
+    list = (Array.isArray(list) ? list : []).filter((b) => !deletedConvoIdsRef.current.has(b.id));
     // Seed presence from the poll (socket PRESENCE_UPDATE keeps it live between).
     setPresence((prev) => {
       const next = { ...prev };
@@ -951,6 +992,23 @@ const ChatSystem = () => {
     vv.addEventListener('scroll', apply);
     return () => { vv.removeEventListener('resize', apply); vv.removeEventListener('scroll', apply); };
   }, [mobileChatOpen]);
+
+  // ── Mobile hardware / browser BACK button → return to the chat LIST, not the
+  // Home page. While a conversation is open on a phone we push a history
+  // "guard" entry; pressing Back pops it and we simply close the thread (show
+  // the list) instead of navigating away from /messages.
+  useEffect(() => {
+    if (!(isMobile && mobileChatOpen)) return undefined;
+    window.history.pushState({ toletChatOpen: true }, '');
+    chatBackGuardRef.current = true;
+    const onPop = () => {
+      chatBackGuardRef.current = false;
+      setShowInfoPane(false);
+      setShowSidebarMobile(true);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [isMobile, mobileChatOpen]);
 
   const scrollRef = useRef(null);
   const inputRef  = useRef(null);
@@ -1442,29 +1500,39 @@ const ChatSystem = () => {
     });
   };
 
-  // Paperclip → open file picker.
+  // Paperclip → open the attachment menu (Photo & Video / Document).
   const handleAttachClick = () => {
     if (activeChat.isAI) return;        // can't send media to the AI bot
     if (isUploadingMedia) return;
-    fileInputRef.current?.click();
+    setShowAttachMenu((s) => !s);
   };
 
-  // A file was chosen → validate + upload as an image message.
+  // Open the OS file picker filtered to a given accept string. One hidden input
+  // serves both attachment-menu options (we set `accept` imperatively).
+  const openPicker = (accept) => {
+    setShowAttachMenu(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = accept;
+      fileInputRef.current.click();
+    }
+  };
+
+  // A file was chosen → validate + upload as an image / VIDEO / document.
   const handleFileChosen = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';                // reset so the same file can be re-picked
     if (!file) return;
     const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
     const isPdf   = file.type === 'application/pdf';
-    if (!isImage && !isPdf) { alert('শুধু ছবি বা PDF পাঠানো যাবে।'); return; }
-    if (file.size > 10 * 1024 * 1024)  { alert('ফাইল অনেক বড় (সর্বোচ্চ ১০ MB)।'); return; }
+    if (!isImage && !isVideo && !isPdf) { alert('শুধু ছবি, ভিডিও বা PDF পাঠানো যাবে।'); return; }
+    const maxMb = isVideo ? 20 : 10;
+    if (file.size > maxMb * 1024 * 1024) { alert(`ফাইল অনেক বড় (সর্বোচ্চ ${maxMb} MB)।`); return; }
 
+    const kind = isPdf ? 'document' : isVideo ? 'video' : 'image';
     setIsUploadingMedia(true);
     try {
-      const saved = await chatService.sendMediaMessage(activeChatId, file, {
-        kind: isPdf ? 'document' : 'image',
-        filename: file.name,
-      });
+      const saved = await chatService.sendMediaMessage(activeChatId, file, { kind, filename: file.name });
       appendLocalMessage(saved);
     } catch (err) {
       alert('ফাইল পাঠানো যায়নি: ' + (err?.message || 'unknown'));
@@ -1639,44 +1707,23 @@ const ChatSystem = () => {
 
   // ── Message long-press / context menu (unified action sheet) ──────────────
   // Opens the single popup that carries reactions + Reply/Forward/Copy/Pin/
-  // Mute/Remove. Deleted bubbles get no menu.
-  const openMessageMenu = (message, x, y) => {
+  // Mute/Remove. Deleted bubbles get no menu. useCallback → stable identity so
+  // the memoized ChatMessageBubble doesn't re-render when other state changes.
+  const openMessageMenu = useCallback((message, x, y) => {
     if (!message || message.isDeleted) return;
     setMenuState({ message, x, y });
-  };
+  }, []);
 
-  // Cancel a pending long-press (used when a swipe/drag starts or pointer lifts).
-  const cancelLongPress = () => {
-    if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; }
-  };
+  // Open the in-app media lightbox (image / video / PDF) instead of a new tab.
+  const openLightbox = useCallback((item) => {
+    if (item?.url) setLightbox(item);
+  }, []);
 
-  // Handlers spread onto each text/media bubble. Long-press (touch) or
-  // right-click (desktop) opens the unified action sheet. A >14px move cancels
-  // the pending long-press so scrolling and swipe-to-reply never trigger it —
-  // the slightly larger tolerance + 500ms hold make the popup appear reliably.
-  const bubblePressHandlers = (m) => ({
-    onContextMenu: (e) => { e.preventDefault(); openMessageMenu(m, e.clientX, e.clientY); },
-    onPointerDown: (e) => {
-      // Only left button / touch / pen — ignore right-click (handled above).
-      if (e.button === 2) return;
-      pressPosRef.current = { x: e.clientX, y: e.clientY };
-      if (longPressRef.current) clearTimeout(longPressRef.current);
-      longPressRef.current = setTimeout(() => {
-        openMessageMenu(m, pressPosRef.current.x, pressPosRef.current.y);
-        longPressRef.current = null;
-      }, 500);
-    },
-    onPointerMove: (e) => {
-      const p = pressPosRef.current;
-      if (p && longPressRef.current && (Math.abs(e.clientX - p.x) > 14 || Math.abs(e.clientY - p.y) > 14)) {
-        clearTimeout(longPressRef.current); longPressRef.current = null;
-      }
-    },
-    onPointerUp:    () => { if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; } },
-    onPointerLeave: () => { if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; } },
-  });
+  // NOTE: the long-press timer + swipe gesture now live INSIDE the memoized
+  // ChatMessageBubble (their own local refs), which is what stops the list
+  // re-rendering on long-press. ChatSystem only supplies stable callbacks.
 
-  const handleReply = (m) => { setReplyTo(m); setTimeout(() => inputRef.current?.focus(), 30); };
+  const handleReply = useCallback((m) => { setReplyTo(m); setTimeout(() => inputRef.current?.focus(), 30); }, []);
   const handleForward = (m) => setForwardMsg(m);
   const handleDeleteMessage = async (m) => {
     if (!m?.id) return;
@@ -1758,6 +1805,61 @@ const ChatSystem = () => {
     } catch {
       toast.error(t.chatActionFailed || 'Action failed. Please try again.');
     }
+  };
+
+  // ── Chat-list row actions (long-press/right-click menu + header delete) ────
+  const openListMenu = useCallback((chat, x, y) => {
+    if (!chat || chat.isAI) return;   // AI bot can't be pinned/muted/removed
+    setListMenu({ chat, x, y });
+  }, []);
+
+  // Pin/unpin a thread in the list (client-side; visibleChats sorts pinned first).
+  const pinChatRow = (chat) => {
+    if (!chat) return;
+    setChats(prev => prev.map(c => c.id === chat.id ? { ...c, pinned: !c.pinned } : c));
+  };
+
+  // Mute/unmute a specific thread from the list menu.
+  const muteChatRow = (chat) => {
+    if (!chat) return;
+    const next = !chat.muted;
+    setChats(prev => prev.map(c => c.id === chat.id ? { ...c, muted: next } : c));
+    if (!chat.isAI) { try { chatService.muteConversation?.(chat.id, next); } catch { /* ignore */ } }
+    toast.success(next
+      ? (language === 'বাংলা' ? 'নোটিফিকেশন বন্ধ করা হয়েছে' : 'Notifications muted')
+      : (language === 'বাংলা' ? 'নোটিফিকেশন চালু করা হয়েছে' : 'Notifications unmuted'));
+  };
+
+  // Actually delete the conversation (optimistic remove + backend soft-delete).
+  const doDeleteConversation = async (chat) => {
+    const target = chat || activeChat;
+    if (!target || target.isAI) return;
+    const id = target.id;
+    deletedConvoIdsRef.current.add(id);
+    setChats(prev => prev.filter(c => c.id !== id));
+    setMessages(prev => { const n = { ...prev }; delete n[id]; return n; });
+    if (activeChatId === id) {
+      setActiveChatId('ai-bot');
+      if (isMobile) setShowSidebarMobile(true);
+    }
+    try {
+      await chatService.deleteConversation(id);
+      toast.success(t.chatConversationDeleted || 'Conversation deleted');
+    } catch {
+      // Roll back the "pending delete" guard so a later poll can restore it.
+      deletedConvoIdsRef.current.delete(id);
+      toast.error(t.chatActionFailed || 'Action failed. Please try again.');
+    }
+  };
+
+  // Ask for confirmation (via an actionable toast) before deleting.
+  const handleDeleteConversation = (chat) => {
+    const target = chat || activeChat;
+    if (!target || target.isAI) return;
+    toast(t.chatDeleteConfirm || 'Delete this conversation?', {
+      action: { label: t.chatDelete || 'Delete', onClick: () => doDeleteConversation(target) },
+      duration: 6000,
+    });
   };
 
   const forwardTo = async (targetChatId) => {
@@ -1915,13 +2017,7 @@ const ChatSystem = () => {
     return out;
   }, [renderedStream]);
 
-  const bubbleRadius = (mine, position) => {
-    if (position === 'solo')   return mine ? 'rounded-3xl rounded-tr-md'    : 'rounded-3xl rounded-tl-md';
-    if (position === 'first')  return mine ? 'rounded-3xl rounded-tr-md'    : 'rounded-3xl rounded-tl-md';
-    if (position === 'middle') return mine ? 'rounded-l-3xl rounded-r-md'   : 'rounded-r-3xl rounded-l-md';
-    if (position === 'last')   return mine ? 'rounded-3xl rounded-br-md'    : 'rounded-3xl rounded-bl-md';
-    return 'rounded-3xl';
-  };
+  // (bubbleRadius now lives inside ChatMessageBubble.)
 
   // Mark thread "read" when opened. For backend conversations we hit the
   // /read endpoint so the unread counter resets server-side too.
@@ -2179,6 +2275,7 @@ const ChatSystem = () => {
                       isActive={activeChatId === chat.id}
                       isMobile={isMobile}
                       online={chat.peerUserId ? (presence[String(chat.peerUserId)]?.online ?? chat.online ?? false) : false}
+                      onContextMenu={chat.isAI ? undefined : openListMenu}
                       onClick={() => {
                         setActiveChatId(chat.id);
                         if (isMobile) setShowSidebarMobile(false);
@@ -2216,7 +2313,13 @@ const ChatSystem = () => {
             <div className="flex items-center gap-3 min-w-0">
               {isMobile && (
                 <button
-                  onClick={() => { setShowInfoPane(false); setShowSidebarMobile(true); }}
+                  onClick={() => {
+                    setShowInfoPane(false);
+                    // Route through history so the pushed guard entry is consumed
+                    // and hardware-back stays in sync; popstate shows the list.
+                    if (chatBackGuardRef.current) window.history.back();
+                    else setShowSidebarMobile(true);
+                  }}
                   className="p-2 -ml-1 rounded-xl hover:bg-white/70 transition-all"
                   aria-label="Back to chats"
                 >
@@ -2332,6 +2435,7 @@ const ChatSystem = () => {
                     onMute={() => (activeChat.muted ? toggleMuteChat() : setShowMuteModal(true))}
                     onReport={() => setShowReportModal(true)}
                     onBlock={() => (activeChat.blocked ? unblockChat() : setShowBlockModal(true))}
+                    onDelete={() => handleDeleteConversation(activeChat)}
                   />
                 </div>
               )}
@@ -2403,8 +2507,6 @@ const ChatSystem = () => {
                 return <DayDivider key={m.id} label={m.label}/>;
               }
               const mine = m.sender === 'me';
-              const fromBot = m.sender === 'bot';
-              const showTail = m.position === 'last' || m.position === 'solo';
 
               if (m.kind === 'receipt') {
                 return (
@@ -2428,138 +2530,19 @@ const ChatSystem = () => {
                   </div>
                 );
               }
+              // Text / bot bubble → memoized component. Extracting it means the
+              // whole list no longer re-renders when the long-press action sheet
+              // opens (menuState is not one of its props), which kills the
+              // long-press stutter. All its callbacks are useCallback-stable.
               return (
-                <div key={m.id} className={`group/msg flex items-center ${mine ? 'justify-end' : 'justify-start'} ${m.position === 'middle' ? 'mb-0.5' : 'mb-2'}`}>
-                  {/* Swipe-right-to-reply: the bubble is a horizontally draggable
-                      motion.div. Drag past ~60px and release → reply. A reply
-                      arrow fades in behind it as you pull. dragDirectionLock lets
-                      vertical scrolling still work. */}
-                  {!m.isDeleted && !mine && (
-                    <CornerUpLeft size={16} className="text-[#ba0036] opacity-0 group-active/msg:opacity-60 mr-1 shrink-0 transition-opacity" />
-                  )}
-                  <motion.div
-                    {...bubblePressHandlers(m)}
-                    drag={m.isDeleted ? false : 'x'}
-                    dragDirectionLock
-                    dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={{ left: 0, right: 0.55 }}
-                    dragSnapToOrigin
-                    onDragStart={cancelLongPress}
-                    onDragEnd={(_e, info) => { if (info.offset.x > 60) handleReply(m); }}
-                    className={`relative max-w-[78%] sm:max-w-[68%] ${bubbleRadius(mine, m.position)} px-3.5 py-2.5 select-none cursor-default transition-shadow shadow-[0_2px_10px_-3px_rgba(0,0,0,0.12)] ${
-                    mine
-                      ? 'bg-gradient-to-br from-[#ba0036] to-[#a30030] text-white'
-                      : fromBot
-                        ? 'bg-gradient-to-br from-gray-900 to-[#1a1a1f] text-white'
-                        : 'bg-white text-gray-800 border border-gray-100 ring-1 ring-black/[0.02]'
-                  }`}>
-                    {fromBot && m.position !== 'middle' && m.position !== 'last' && (
-                      <div className="flex items-center gap-1.5 mb-1 text-[9px] font-black text-white/60 uppercase tracking-widest">
-                        <Sparkles size={10}/> AI Assistant
-                      </div>
-                    )}
-                    {m.isDeleted ? (
-                      <p className={`text-[13px] italic font-medium inline-flex items-center gap-1.5 ${mine || fromBot ? 'text-white/70' : 'text-gray-400'}`}>
-                        <Ban size={13} className="shrink-0" /> This message was deleted
-                      </p>
-                    ) : (
-                    <>
-                    {m.type === 'image' && m.mediaUrl ? (
-                      <a href={m.mediaUrl} target="_blank" rel="noopener noreferrer" className="block">
-                        <img
-                          src={m.mediaUrl}
-                          alt="shared"
-                          className="rounded-xl max-w-full max-h-72 object-cover cursor-pointer"
-                          loading="lazy"
-                        />
-                      </a>
-                    ) : m.type === 'audio' && m.mediaUrl ? (
-                      <CompactAudioPlayer src={m.mediaUrl} mine={mine || fromBot} durationSec={m.mediaMeta?.durationSec} />
-                    ) : m.type === 'document' && m.mediaUrl ? (
-                      <a href={m.mediaUrl} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-3 p-3 rounded-xl border ${mine ? 'bg-white/10 border-white/20 hover:bg-white/20' : fromBot ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'} transition-all max-w-[240px] sm:max-w-[280px] group`}>
-                        <div className={`w-10 h-10 shrink-0 rounded-lg flex items-center justify-center ${mine || fromBot ? 'bg-white/20 text-white' : 'bg-[#ba0036]/10 text-[#ba0036]'}`}>
-                          <FileText size={20} className="group-hover:scale-110 transition-transform"/>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-[12px] font-bold truncate leading-tight mb-0.5 ${mine || fromBot ? 'text-white' : 'text-gray-800'}`}>
-                            {m.mediaMeta?.originalName || 'Document.pdf'}
-                          </p>
-                          <div className="flex items-center justify-between mt-1">
-                            <p className={`text-[9px] font-black uppercase tracking-widest ${mine || fromBot ? 'text-white/60' : 'text-gray-400'}`}>
-                              {m.mediaMeta?.bytes ? (m.mediaMeta.bytes / 1024 / 1024).toFixed(2) + ' MB' : 'PDF FILE'}
-                            </p>
-                            <Download size={12} className={`${mine || fromBot ? 'text-white/80' : 'text-gray-400'} group-hover:-translate-y-0.5 transition-transform`} />
-                          </div>
-                        </div>
-                      </a>
-                    ) : null}
-                    {(m.type === 'text' || !m.type) ? (() => {
-                      // Prefer the structured backend replyTo; fall back to the
-                      // legacy "> quote" text encoding for messages sent earlier.
-                      const legacy = m.replyTo ? null : parseReplyQuote(m.text);
-                      const quote = m.replyTo ? replyQuoteLabel(m.replyTo) : (legacy ? legacy.quote : null);
-                      const body = legacy ? legacy.body : m.text;
-                      return (
-                        <>
-                          {quote && (
-                            <div className={`mb-1.5 rounded-lg px-2.5 py-1.5 border-l-[3px] ${
-                              mine ? 'bg-white/15 border-white/60' : fromBot ? 'bg-white/10 border-white/40' : 'bg-gray-50 border-[#ba0036]/50'
-                            }`}>
-                              <p className={`text-[9px] font-black uppercase tracking-widest mb-0.5 ${mine || fromBot ? 'text-white/70' : 'text-[#ba0036]'}`}>Reply</p>
-                              <p className={`text-[11px] font-medium line-clamp-2 ${mine || fromBot ? 'text-white/80' : 'text-gray-500'}`}>{quote}</p>
-                            </div>
-                          )}
-                          {isImageUrl(body) ? (
-                            <a href={body} target="_blank" rel="noopener noreferrer" className="block">
-                              <img src={body} alt="gif" loading="lazy" className="rounded-xl max-w-full max-h-72 object-cover" />
-                            </a>
-                          ) : (
-                            <p className={isJumboEmoji(body)
-                              ? 'text-5xl leading-tight'
-                              : 'text-[13px] sm:text-sm font-medium whitespace-pre-line leading-relaxed'}>{body}</p>
-                          )}
-                        </>
-                      );
-                    })() : (m.text ? (
-                      <p className="text-[13px] sm:text-sm font-medium whitespace-pre-line leading-relaxed mt-1.5">{m.text}</p>
-                    ) : null)}
-                    </>
-                    )}
-                    {showTail && (
-                      <div className={`flex items-center gap-1.5 mt-1 ${mine ? 'justify-end text-white/70' : fromBot ? 'justify-start text-white/50' : 'justify-start text-gray-400'}`}>
-                        <span className="text-[9px] font-bold tabular-nums">{formatTime(m.iso)}</span>
-                        {mine && (
-                          m.status === 'read'      ? <CheckCheck size={11} className="text-blue-200"/>
-                          : m.status === 'delivered' ? <CheckCheck size={11}/>
-                          : m.status === 'queued' ? <Hourglass size={11} className="opacity-70"/>
-                          : m.status === 'failed' ? <X size={11} className="text-red-300"/>
-                          : <Check size={11}/>
-                        )}
-                      </div>
-                    )}
-                    {/* Emoji reaction chip — aggregated from all users, at the corner. */}
-                    {m.reactions && Object.keys(m.reactions).length > 0 && (() => {
-                      const all = Object.values(m.reactions);
-                      const unique = [...new Set(all)];
-                      return (
-                        <span className={`absolute -bottom-2.5 ${mine ? 'right-2' : 'left-2'} bg-white rounded-full shadow-md border border-gray-100 px-1.5 py-0.5 text-[13px] leading-none z-10 flex items-center gap-0.5`}>
-                          {unique.slice(0, 3).map((e, i) => <span key={i}>{e}</span>)}
-                          {all.length > 1 && <span className="text-[10px] font-black text-gray-500 ml-0.5">{all.length}</span>}
-                        </span>
-                      );
-                    })()}
-                  </motion.div>
-                  {/* Desktop hover affordance → opens the unified action sheet. */}
-                  {!m.isDeleted && (
-                    <button
-                      onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMessageMenu(m, r.left + r.width / 2, r.bottom); }}
-                      className="hidden sm:group-hover/msg:flex w-7 h-7 rounded-full bg-white shadow-sm border border-gray-100 items-center justify-center text-gray-400 hover:text-[#ba0036] shrink-0 mx-1 transition-colors"
-                      aria-label="Message actions"
-                    >
-                      <Smile size={14} />
-                    </button>
-                  )}
-                </div>
+                <ChatMessageBubble
+                  key={m.id}
+                  m={m}
+                  currentUserId={currentUserId}
+                  onOpenMenu={openMessageMenu}
+                  onReply={handleReply}
+                  onMediaClick={openLightbox}
+                />
               );
             })}
 
@@ -2637,19 +2620,47 @@ const ChatSystem = () => {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*,application/pdf"
+                accept="image/*,video/*,application/pdf"
                 className="hidden"
                 onChange={handleFileChosen}
               />
-              <button
-                onClick={handleAttachClick}
-                disabled={isUploadingMedia || isRecording}
-                className="p-2.5 rounded-xl text-gray-400 hover:text-[#ba0036] hover:bg-gray-50 transition-all disabled:opacity-40"
-                aria-label="Attach image or PDF"
-                title="ছবি বা PDF পাঠান"
-              >
-                <Paperclip size={18}/>
-              </button>
+              <div className="relative shrink-0">
+                <button
+                  onClick={handleAttachClick}
+                  disabled={isUploadingMedia || isRecording}
+                  className={`p-2.5 rounded-xl transition-all disabled:opacity-40 ${showAttachMenu ? 'bg-[#ba0036]/10 text-[#ba0036]' : 'text-gray-400 hover:text-[#ba0036] hover:bg-gray-50'}`}
+                  aria-label="Attach"
+                  title={t.attachTitle || 'Attach photo, video or PDF'}
+                >
+                  <Paperclip size={18}/>
+                </button>
+                {showAttachMenu && (
+                  <>
+                    <div className="fixed inset-0 z-[60]" onClick={() => setShowAttachMenu(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ duration: 0.14, ease: 'easeOut' }}
+                      className="absolute bottom-full left-0 mb-2 z-[61] w-48 bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-gray-100 p-1.5 origin-bottom-left"
+                    >
+                      <button
+                        onClick={() => openPicker('image/*,video/*')}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors text-[13px] font-bold text-gray-700"
+                      >
+                        <span className="w-8 h-8 rounded-lg bg-[#ba0036]/10 text-[#ba0036] flex items-center justify-center shrink-0"><ImageIcon size={16}/></span>
+                        {t.attachPhotoVideo || 'Photo & Video'}
+                      </button>
+                      <button
+                        onClick={() => openPicker('application/pdf')}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors text-[13px] font-bold text-gray-700"
+                      >
+                        <span className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center shrink-0"><FileText size={16}/></span>
+                        {t.attachDocument || 'Document'}
+                      </button>
+                    </motion.div>
+                  </>
+                )}
+              </div>
               {isRecording ? (
                 /* Recording in progress — replace the textarea with a live indicator */
                 <div className="flex-1 flex items-center gap-2.5 py-2 px-1">
@@ -2699,7 +2710,7 @@ const ChatSystem = () => {
               )}
               {isRecording ? (
                 /* Cancel + Send buttons while recording */
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => stopRecording(false)}
                     className="w-11 h-11 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-xl flex items-center justify-center transition-all active:scale-95"
@@ -2719,36 +2730,41 @@ const ChatSystem = () => {
                 </div>
               ) : isUploadingMedia ? (
                 /* Upload spinner */
-                <div className="w-11 h-11 bg-gray-100 rounded-xl flex items-center justify-center">
+                <div className="w-11 h-11 shrink-0 bg-gray-100 rounded-xl flex items-center justify-center">
                   <div className="w-5 h-5 border-2 border-gray-300 border-t-[#ba0036] rounded-full animate-spin" />
                 </div>
-              ) : inputText.trim() ? (
-                <button
-                  onClick={handleSendMessage}
-                  className="w-11 h-11 bg-gradient-to-br from-[#ba0036] to-[#7a0024] text-white rounded-xl flex items-center justify-center shadow-[0_8px_20px_rgba(186,0,54,0.30)] hover:-translate-y-0.5 transition-all active:scale-95"
-                  aria-label="Send"
-                >
-                  <Send size={18} className="ml-0.5"/>
-                </button>
-              ) : activeChat.isAI ? (
-                /* AI chat: no voice message, keep a disabled-looking mic */
-                <button
-                  className="w-11 h-11 bg-gray-100 text-gray-300 rounded-xl flex items-center justify-center cursor-not-allowed"
-                  aria-label="Voice message unavailable"
-                  title="Voice message is for chats with people"
-                  disabled
-                >
-                  <Mic size={18}/>
-                </button>
               ) : (
-                <button
-                  onClick={startRecording}
-                  className="w-11 h-11 bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-[#ba0036] rounded-xl flex items-center justify-center transition-all active:scale-95"
-                  aria-label="Record voice message"
-                  title="ভয়েস মেসেজ"
-                >
-                  <Mic size={18}/>
-                </button>
+                /* ── Fixed-width action slot ──────────────────────────────────
+                   Send + Mic are BOTH absolutely positioned inside one w-11 h-11
+                   box and cross-fade in place. Toggling between them (typing /
+                   clearing text) therefore never changes the slot's width, so the
+                   textarea never shifts. */
+                <div className="relative w-11 h-11 shrink-0">
+                  {/* Send — visible only when there's text */}
+                  <button
+                    onClick={handleSendMessage}
+                    tabIndex={inputText.trim() ? 0 : -1}
+                    className={`absolute inset-0 w-11 h-11 bg-gradient-to-br from-[#ba0036] to-[#7a0024] text-white rounded-xl flex items-center justify-center shadow-[0_8px_20px_rgba(186,0,54,0.30)] transition-all duration-150 active:scale-95 ${
+                      inputText.trim() ? 'opacity-100 scale-100' : 'opacity-0 scale-75 pointer-events-none'
+                    }`}
+                    aria-label="Send"
+                  >
+                    <Send size={18} className="ml-0.5"/>
+                  </button>
+                  {/* Mic — visible only when empty (disabled for the AI bot) */}
+                  <button
+                    onClick={activeChat.isAI ? undefined : startRecording}
+                    disabled={activeChat.isAI}
+                    tabIndex={inputText.trim() ? -1 : 0}
+                    className={`absolute inset-0 w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-150 active:scale-95 ${
+                      inputText.trim() ? 'opacity-0 scale-75 pointer-events-none' : 'opacity-100 scale-100'
+                    } ${activeChat.isAI ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : 'bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-[#ba0036]'}`}
+                    aria-label={activeChat.isAI ? 'Voice message unavailable' : 'Record voice message'}
+                    title={activeChat.isAI ? 'Voice message is for chats with people' : 'ভয়েস মেসেজ'}
+                  >
+                    <Mic size={18}/>
+                  </button>
+                </div>
               )}
             </div>
 
@@ -2976,6 +2992,30 @@ const ChatSystem = () => {
         onClose={() => setShowMediaViewer(false)}
         messages={messages[activeChatId] || []}
         contactName={activeChat?.name}
+      />
+
+      {/* In-app media lightbox — opens photos / videos / PDFs OVER the chat
+          instead of a new browser tab. */}
+      <MediaLightbox open={!!lightbox} media={lightbox} onClose={() => setLightbox(null)} />
+
+      {/* Chat-list row context menu (long-press mobile / right-click desktop) */}
+      <ChatListItemMenu
+        open={!!listMenu}
+        x={listMenu?.x || 0}
+        y={listMenu?.y || 0}
+        pinned={!!listMenu?.chat?.pinned}
+        muted={!!listMenu?.chat?.muted}
+        labels={{
+          pin: t.msgPin || 'Pin',
+          unpin: t.msgUnpin || 'Unpin',
+          mute: t.msgMute || 'Mute',
+          unmute: t.msgUnmute || 'Unmute',
+          remove: t.msgRemove || 'Remove',
+        }}
+        onPin={() => listMenu && pinChatRow(listMenu.chat)}
+        onMute={() => listMenu && muteChatRow(listMenu.chat)}
+        onRemove={() => listMenu && handleDeleteConversation(listMenu.chat)}
+        onClose={() => setListMenu(null)}
       />
 
       {/* Mute notifications (8 hours / 1 week / Always) */}
