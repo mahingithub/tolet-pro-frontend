@@ -27,7 +27,7 @@ import fcmService from '../services/fcmService';
  *
  * Single-page user privacy hub. Four sections:
  *
- *   1. Export my data        — JSON download (mock builds a Blob URL)
+ *   1. Export my data        — PDF download (rendered client-side from the export payload)
  *   2. Active sessions       — revoke individual or all-other sessions
  *   3. AI & comms preferences— opt-in/out toggles
  *   4. Delete account        — soft delete with 30-day grace period
@@ -192,7 +192,7 @@ const PrivacyCenter = () => {
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+            className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 transition-all duration-150 active:scale-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-gray-300/60 [-webkit-tap-highlight-color:transparent]"
             aria-label="Back"
           >
             <ChevronLeft size={18} />
@@ -225,7 +225,7 @@ const PrivacyCenter = () => {
               <button
                 onClick={handleCancelDelete}
                 disabled={busy.delete}
-                className="mt-3 inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-black shadow-sm transition-colors"
+                className="mt-3 inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-black shadow-sm transition-all duration-150 active:scale-[0.97] focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-500/30 select-none [-webkit-tap-highlight-color:transparent] disabled:opacity-60"
               >
                 <RefreshCcw size={12} /> Cancel deletion
               </button>
@@ -237,14 +237,14 @@ const PrivacyCenter = () => {
         <Section
           icon={Download}
           title="Download my data"
-          description="Get a JSON copy of every record we hold for you — profile, properties, inquiries, AI chat history, support tickets, preferences."
+          description="Get a PDF copy of every record we hold for you — profile, properties, inquiries, AI chat history, support tickets, preferences."
         >
           <button
             onClick={handleExport}
             disabled={busy.export}
-            className="bg-[#ba0036] hover:bg-[#d4004a] disabled:opacity-60 text-white px-5 py-3 rounded-xl text-xs font-black shadow-[0_4px_15px_rgba(186,0,54,0.2)] transition-all flex items-center gap-2"
+            className="bg-[#ba0036] hover:bg-[#d4004a] disabled:opacity-60 text-white px-5 py-3 rounded-xl text-xs font-black shadow-[0_4px_15px_rgba(186,0,54,0.2)] transition-all duration-150 active:scale-[0.97] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ba0036]/25 select-none [-webkit-tap-highlight-color:transparent] flex items-center gap-2"
           >
-            <Download size={14} /> {busy.export ? 'Preparing…' : 'Export now (JSON)'}
+            <Download size={14} /> {busy.export ? 'Preparing…' : 'Export now (PDF)'}
           </button>
           {exportToast && (
             <div className="mt-3 bg-green-50 text-green-700 text-xs font-bold rounded-xl px-3 py-2 inline-flex items-center gap-2">
@@ -263,7 +263,7 @@ const PrivacyCenter = () => {
               <button
                 onClick={handleRevokeAllOthers}
                 disabled={busy.sessions}
-                className="text-xs font-black px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-60 transition-colors"
+                className="text-xs font-black px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-60 transition-all duration-150 active:scale-[0.97] focus:outline-none focus-visible:ring-4 focus-visible:ring-gray-400/40 select-none [-webkit-tap-highlight-color:transparent]"
               >
                 Sign out all other devices
               </button>
@@ -293,7 +293,7 @@ const PrivacyCenter = () => {
                   <button
                     onClick={() => handleRevokeSession(s.id)}
                     disabled={busy.sessions}
-                    className="text-xs font-black px-3 py-2 rounded-xl bg-red-50 text-[#ba0036] hover:bg-red-100 disabled:opacity-60 transition-colors"
+                    className="text-xs font-black px-3 py-2 rounded-xl bg-red-50 text-[#ba0036] hover:bg-red-100 disabled:opacity-60 transition-all duration-150 active:scale-[0.95] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ba0036]/25 select-none [-webkit-tap-highlight-color:transparent]"
                   >
                     Sign out
                   </button>
@@ -347,7 +347,7 @@ const PrivacyCenter = () => {
           <button
             onClick={() => setDeleteModalOpen(true)}
             disabled={!!pendingDeletion}
-            className="bg-red-50 hover:bg-red-100 text-[#ba0036] disabled:opacity-50 px-5 py-3 rounded-xl text-xs font-black border border-red-100 transition-colors flex items-center gap-2"
+            className="bg-red-50 hover:bg-red-100 text-[#ba0036] disabled:opacity-50 px-5 py-3 rounded-xl text-xs font-black border border-red-100 transition-all duration-150 active:scale-[0.97] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ba0036]/25 select-none [-webkit-tap-highlight-color:transparent] flex items-center gap-2"
           >
             <Trash2 size={14} />
             {pendingDeletion ? 'Deletion already scheduled' : 'Delete my account'}
@@ -386,7 +386,7 @@ const PrivacyCenter = () => {
                   setDeleteModalOpen(false);
                   setDeleteConfirmText('');
                 }}
-                className="p-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700"
+                className="p-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 transition-all duration-150 active:scale-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-gray-300/60 [-webkit-tap-highlight-color:transparent]"
               >
                 <X size={16} />
               </button>
@@ -419,14 +419,14 @@ const PrivacyCenter = () => {
                   setDeleteModalOpen(false);
                   setDeleteConfirmText('');
                 }}
-                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-xl text-sm font-black transition-colors"
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-xl text-sm font-black transition-all duration-150 active:scale-[0.97] focus:outline-none focus-visible:ring-4 focus-visible:ring-gray-300/60 select-none [-webkit-tap-highlight-color:transparent]"
               >
                 Keep my account
               </button>
               <button
                 onClick={handleConfirmDelete}
                 disabled={deleteConfirmText !== 'DELETE' || busy.delete}
-                className="flex-1 bg-[#ba0036] hover:bg-[#d4004a] disabled:opacity-50 text-white px-4 py-3 rounded-xl text-sm font-black shadow-[0_4px_15px_rgba(186,0,54,0.25)] transition-all flex items-center justify-center gap-2"
+                className="flex-1 bg-[#ba0036] hover:bg-[#d4004a] disabled:opacity-50 text-white px-4 py-3 rounded-xl text-sm font-black shadow-[0_4px_15px_rgba(186,0,54,0.25)] transition-all duration-150 active:scale-[0.97] disabled:active:scale-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ba0036]/30 select-none [-webkit-tap-highlight-color:transparent] flex items-center justify-center gap-2"
               >
                 <Lock size={14} /> {busy.delete ? 'Scheduling…' : 'Schedule deletion'}
               </button>

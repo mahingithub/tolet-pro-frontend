@@ -26,3 +26,19 @@ html.reduce-motion *::after {
   transition-duration: 0.001ms !important;
   scroll-behavior: auto !important;
 }
+
+/* ─── Modal + overlay entrance ─────────────────────────────────────────────
+   Lightweight, self-contained entrance utilities (the project doesn't ship
+   the tailwindcss-animate plugin). Used by the settings ChangePasswordModal
+   and available anywhere. They inherit the html.reduce-motion override above,
+   so users who opt into reduced motion get a near-instant appearance. */
+@keyframes tpFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes tpModalIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-tp-fade-in  { animation: tpFadeIn 0.2s ease-out both; }
+.animate-tp-modal-in { animation: tpModalIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }

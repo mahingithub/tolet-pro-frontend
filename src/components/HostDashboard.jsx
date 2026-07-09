@@ -29,7 +29,6 @@ import { uploadAvatar } from "../services/authService";
 import ProfileSection from './shared/ProfileSection';
 import VerificationModal from './VerificationModal';
 import SharedSettings from './shared/SharedSettings';
-import SharedSupport from './shared/SharedSupport';
 import Smartalertspage from './Smartalertspage';
 import Aiinsightspage from './Aiinsightspage';
 
@@ -1862,7 +1861,7 @@ const HostDashboard = () => {
     { id: 'smartAlerts', icon: BellRing, label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্টস' : 'Smart Alerts' },
     { id: 'aiInsights',  icon: Sparkles, label: language === 'বাংলা' ? 'এআই ইনসাইটস'   : 'AI Insights' },
     { id: 'settings', icon: Settings, label: language === 'বাংলা' ? 'সেটিংস' : 'Settings' },
-    { id: 'support', icon: HelpCircle, label: language === 'বাংলা' ? 'হেল্প ও সাপোর্ট' : 'Support' },
+    { id: 'support', icon: HelpCircle, label: language === 'বাংলা' ? 'হেল্প ও সাপোর্ট' : 'Support', isLink: true, path: '/support' },
   ];
 
   return (
@@ -4882,7 +4881,8 @@ const HostDashboard = () => {
         )}
 
         {/* ─────────────────────────────────────────────────────────────────
-            🔴 NEW TABS (Smart Alerts, AI Insights, Settings, Support)
+            🔴 NEW TABS (Smart Alerts, AI Insights, Settings)
+            Help & Support links out to the shared /support page.
             ───────────────────────────────────────────────────────────────── */}
         {activeTab === 'smartAlerts' && (
           <div className="w-full h-[calc(100vh-120px)] animate-in fade-in zoom-in-95 duration-500 overflow-y-auto">
@@ -4920,12 +4920,6 @@ const HostDashboard = () => {
         {activeTab === 'settings' && (
           <div className="w-full animate-in fade-in zoom-in-95 duration-500">
              <SharedSettings />
-          </div>
-        )}
-
-        {activeTab === 'support' && (
-          <div className="w-full animate-in fade-in zoom-in-95 duration-500">
-             <SharedSupport />
           </div>
         )}
 

@@ -28,11 +28,13 @@ import {
   ChevronDown, User, Shield, ShieldCheck, Bell, CreditCard,
   Smartphone, Scale, Globe, Trash2, LogOut, Download, ExternalLink,
   Home, Search, MessageSquare, Eye, Calendar, Building2, Sparkles,
+  KeyRound, RotateCcw, Pencil,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useLanguage } from '../../context/LanguageContext';
 import { useSettings } from '../../context/SettingsContext.jsx';
 import { useNotificationSettings } from '../../context/NotificationContext';
+import ChangePasswordModal from './ChangePasswordModal.jsx';
 
 // ─── Language mapping (LanguageContext uses labels, backend uses codes) ──────
 const toLangCode = (label) => (label === 'বাংলা' ? 'bn' : 'en');
@@ -45,7 +47,8 @@ const Card = ({ icon: Icon, title, subtitle, defaultOpen, children }) => {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full px-5 md:px-6 py-4 flex items-center justify-between gap-3 hover:bg-gray-50/60 transition-colors text-left"
+        aria-expanded={open}
+        className="w-full px-5 md:px-6 py-4 flex items-center justify-between gap-3 text-left transition-colors duration-150 hover:bg-gray-50/80 active:bg-gray-100/70 focus:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[#ba0036]/15 select-none [-webkit-tap-highlight-color:transparent]"
       >
         <div className="flex items-center gap-3 min-w-0">
           <span className="w-9 h-9 rounded-xl bg-rose-50 text-[#ba0036] flex items-center justify-center shrink-0">
@@ -78,10 +81,11 @@ const Toggle = ({ checked, onChange, disabled }) => (
     type="button"
     disabled={disabled}
     onClick={() => !disabled && onChange(!checked)}
-    className={`relative w-11 h-6 rounded-full transition-colors ${checked ? 'bg-[#ba0036]' : 'bg-gray-300'} ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
-    aria-pressed={checked}
+    className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ba0036]/25 [-webkit-tap-highlight-color:transparent] ${checked ? 'bg-[#ba0036]' : 'bg-gray-300'} ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+    role="switch"
+    aria-checked={checked}
   >
-    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
   </button>
 );
 
@@ -89,11 +93,34 @@ const SelectInput = ({ value, onChange, options }) => (
   <select
     value={value}
     onChange={(e) => onChange(e.target.value)}
-    className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-black text-gray-900 focus:outline-none focus:border-[#ba0036]"
+    className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-black text-gray-900 cursor-pointer transition-all duration-150 hover:border-gray-300 focus:outline-none focus:border-[#ba0036] focus:ring-4 focus:ring-[#ba0036]/15 [-webkit-tap-highlight-color:transparent]"
   >
     {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
   </select>
 );
+
+// ─── Chip-style action button ─────────────────────────────────────────────────
+// A small, tappable pill used for every right-aligned row action. It has a
+// solid tinted background (so it reads as a button, not plain text) plus
+// hover, pressed (active:scale) and keyboard-focus states. Renders as either a
+// router <Link> (when `to` is given) or a real <button>.
+const TONES = {
+  brand:   'bg-rose-50 text-[#ba0036] hover:bg-rose-100 active:bg-rose-100 focus-visible:ring-[#ba0036]/25',
+  neutral: 'bg-gray-100 text-gray-700 hover:bg-gray-200 active:bg-gray-200 focus-visible:ring-gray-300/70',
+  danger:  'bg-red-50 text-red-600 hover:bg-red-100 active:bg-red-100 focus-visible:ring-red-400/30',
+};
+const ActionButton = ({ to, onClick, children, icon: Icon, trailingIcon: Trailing, tone = 'brand', className = '' }) => {
+  const cls = `inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition-all duration-150 active:scale-[0.95] focus:outline-none focus-visible:ring-4 select-none [-webkit-tap-highlight-color:transparent] ${TONES[tone]} ${className}`;
+  const inner = (
+    <>
+      {Icon && <Icon size={13} />}
+      {children}
+      {Trailing && <Trailing size={12} className="opacity-70" />}
+    </>
+  );
+  if (to) return <Link to={to} className={cls}>{inner}</Link>;
+  return <button type="button" onClick={onClick} className={cls}>{inner}</button>;
+};
 
 // Text input that only commits on blur / Enter, so we don't PATCH per keystroke.
 const TextField = ({ value, onCommit, placeholder, multiline, maxLength, className = 'w-40' }) => {
@@ -151,9 +178,7 @@ const NumberField = ({ value, onCommit, placeholder, className = 'w-28' }) => {
 };
 
 const LinkAction = ({ to, children }) => (
-  <Link to={to} className="inline-flex items-center gap-1.5 text-xs font-black text-[#ba0036] hover:text-[#90002a]">
-    {children} <ExternalLink size={12} />
-  </Link>
+  <ActionButton to={to} tone="brand" trailingIcon={ExternalLink}>{children}</ActionButton>
 );
 
 const ScopeHeader = ({ icon: Icon, title, subtitle }) => (
@@ -184,6 +209,17 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
   const { settings, update, saving, loading } = useSettings();
   const { soundEnabled, setSoundEnabled, dndSchedule, setDndSchedule } = useNotificationSettings();
   const bn = language === 'বাংলা';
+
+  // Change / forgot password modal (uses the OTP reset flow under the hood).
+  const [pwModalOpen, setPwModalOpen] = useState(false);
+
+  // After a successful password change the backend invalidates the current
+  // session token, so sign the user out locally and send them to login.
+  const handlePasswordChanged = useCallback(async () => {
+    setPwModalOpen(false);
+    try { await logout(); } catch { /* ignore */ }
+    navigate('/');
+  }, [logout, navigate]);
 
   const isTenant = typeof hasRole === 'function' ? hasRole('tenant') : true;
   const isLandlord = typeof hasRole === 'function' ? hasRole('landlord') : false;
@@ -306,35 +342,37 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
             <Row
               label={bn ? 'প্রোফাইল এডিট করুন' : 'Edit profile'}
               sublabel={bn ? 'নাম, ছবি, পরিচয়' : 'Name, photo, identity'}
-              right={
-                <button onClick={goToProfile} className="inline-flex items-center gap-1.5 text-xs font-black text-[#ba0036] hover:text-[#90002a]">
-                  {bn ? 'খুলুন' : 'Open'} <ExternalLink size={12} />
-                </button>
-              }
+              right={<ActionButton onClick={goToProfile} tone="brand" trailingIcon={ExternalLink}>{bn ? 'খুলুন' : 'Open'}</ActionButton>}
             />
             <Row label={bn ? 'ইমেইল' : 'Email'} sublabel={user?.email || (bn ? 'যোগ করা হয়নি' : 'Not added')} right={
-              <button onClick={goToProfile} className="text-xs font-black text-[#ba0036] hover:text-[#90002a]">{bn ? 'এডিট' : 'Edit'}</button>
+              <ActionButton onClick={goToProfile} tone="neutral" icon={Pencil}>{bn ? 'এডিট' : 'Edit'}</ActionButton>
             } />
             <Row
               label={bn ? 'ফোন নম্বর' : 'Phone number'}
               sublabel={user?.phone || '—'}
               right={
-                <span className={`inline-flex items-center gap-1 text-[11px] font-black ${phoneVerified ? 'text-emerald-600' : 'text-amber-600'}`}>
+                <span className={`inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-full ${phoneVerified ? 'text-emerald-700 bg-emerald-50' : 'text-amber-700 bg-amber-50'}`}>
                   {phoneVerified ? <ShieldCheck size={12} /> : null}
                   {phoneVerified ? (bn ? 'যাচাইকৃত' : 'Verified') : (bn ? 'যাচাই বাকি' : 'Unverified')}
                 </span>
               }
             />
-            <Row label={bn ? 'পাসওয়ার্ড পরিবর্তন' : 'Change password'} sublabel={bn ? 'সিকিউরিটি সেন্টারে' : 'In the security center'} right={<LinkAction to="/account/privacy">{bn ? 'পরিবর্তন' : 'Change'}</LinkAction>} />
+            <Row
+              label={bn ? 'পাসওয়ার্ড পরিবর্তন' : 'Change password'}
+              sublabel={bn ? 'ফোনে পাঠানো কোড দিয়ে নতুন পাসওয়ার্ড সেট করুন' : 'Set a new password with a code sent to your phone'}
+              right={<ActionButton onClick={() => setPwModalOpen(true)} tone="brand" icon={KeyRound}>{bn ? 'পরিবর্তন' : 'Change'}</ActionButton>}
+            />
+            <Row
+              label={bn ? 'পাসওয়ার্ড ভুলে গেছেন?' : 'Forgot password?'}
+              sublabel={bn ? 'বর্তমান পাসওয়ার্ড ছাড়াই OTP দিয়ে রিসেট করুন' : 'Reset with an OTP — no current password needed'}
+              right={<ActionButton onClick={() => setPwModalOpen(true)} tone="neutral" icon={RotateCcw}>{bn ? 'রিসেট' : 'Reset'}</ActionButton>}
+            />
             <Row
               label={bn ? 'লগ আউট' : 'Sign out'}
               right={
-                <button
-                  onClick={async () => { await logout(); navigate('/'); }}
-                  className="inline-flex items-center gap-1.5 text-xs font-black text-red-500 hover:text-red-600"
-                >
-                  <LogOut size={12} /> {bn ? 'এখন লগআউট' : 'Sign out'}
-                </button>
+                <ActionButton onClick={async () => { await logout(); navigate('/'); }} tone="danger" icon={LogOut}>
+                  {bn ? 'এখন লগআউট' : 'Sign out'}
+                </ActionButton>
               }
             />
           </Card>
@@ -417,13 +455,13 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
             <Row label={bn ? 'সক্রিয় সেশন' : 'Active sessions'} sublabel={bn ? 'সাইন-ইন করা ডিভাইস দেখুন' : 'See signed-in devices'} right={<LinkAction to="/account/privacy">{bn ? 'দেখুন' : 'View'}</LinkAction>} />
             <Row
               label={bn ? 'আমার ডেটা ডাউনলোড' : 'Download my data'}
-              sublabel={bn ? 'সম্পূর্ণ এক্সপোর্ট' : 'Full account export'}
-              right={<Link to="/account/privacy" className="inline-flex items-center gap-1 text-xs font-black text-gray-700 hover:text-[#ba0036]"><Download size={12} /> {bn ? 'এক্সপোর্ট' : 'Export'}</Link>}
+              sublabel={bn ? 'সম্পূর্ণ অ্যাকাউন্ট এক্সপোর্ট (PDF)' : 'Full account export (PDF)'}
+              right={<ActionButton to="/account/privacy" tone="neutral" icon={Download}>{bn ? 'এক্সপোর্ট' : 'Export'}</ActionButton>}
             />
             <Row
               label={bn ? 'অ্যাকাউন্ট ডিলিট' : 'Delete account'}
               sublabel={bn ? '৩০ দিনের গ্রেস পিরিয়ড' : '30-day grace period'}
-              right={<Link to="/account/privacy" className="inline-flex items-center gap-1 text-xs font-black text-red-500 hover:text-red-600"><Trash2 size={12} /> {bn ? 'অনুরোধ' : 'Request'}</Link>}
+              right={<ActionButton to="/account/privacy" tone="danger" icon={Trash2}>{bn ? 'অনুরোধ' : 'Request'}</ActionButton>}
             />
           </Card>
 
@@ -577,6 +615,16 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
           </>
         )}
       </div>
+
+      {/* Change / forgot password — OTP-based reset via the user's phone. */}
+      <ChangePasswordModal
+        open={pwModalOpen}
+        onClose={() => setPwModalOpen(false)}
+        phone={user?.phone}
+        phoneVerified={phoneVerified}
+        bn={bn}
+        onSuccess={handlePasswordChanged}
+      />
     </div>
   );
 };
