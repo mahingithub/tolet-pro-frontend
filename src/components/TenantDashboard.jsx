@@ -502,8 +502,39 @@ const TenantDashboard = () => {
     }
   }, [location.state, paymentReceipts]);
 
-  const [tenantProfile, setTenantProfile] = useState(DEFAULT_TENANT_PROFILE);
-  const [draftProfile, setDraftProfile] = useState(DEFAULT_TENANT_PROFILE);
+  // 🟢 Seed the profile SYNCHRONOUSLY from the per-user localStorage slot +
+  // auth identity so the card shows the user's saved name / phone / email /
+  // details on the FIRST render. Previously this started at an empty DEFAULT
+  // and only filled in from post-mount effects, which is why the data
+  // "appeared only after a reload". Mirrors the synchronous useState(() => …)
+  // hydration HostDashboard already uses for its landlordProfile. The effects
+  // below still reconcile against the server (the source of truth); this
+  // initializer just removes the blank first paint.
+  const readInitialTenantProfile = () => {
+    const authName  = authUser?.name?.trim()  || '';
+    const authPhone = authUser?.phone?.trim() || '';
+    const authEmail = authUser?.email?.trim() || '';
+    try {
+      const uid    = authUser?.id || authUser?._id || null;
+      const stored = JSON.parse(localStorage.getItem(tenantProfileKey(uid)) || 'null');
+      if (stored) {
+        return {
+          ...DEFAULT_TENANT_PROFILE,
+          ...stored,
+          fullName: stored.fullName?.trim() || authName,
+          // Phone is always auth-owned (OTP-verified at signup), never stored.
+          phone:    authPhone || stored.phone || '',
+          email:    stored.email?.trim() || authEmail,
+          emergencyContact: { ...DEFAULT_TENANT_PROFILE.emergencyContact, ...(stored.emergencyContact || {}) },
+          verification:     { ...DEFAULT_TENANT_PROFILE.verification, ...(stored.verification || {}) },
+        };
+      }
+    } catch { /* corrupt slot — fall through to the auth-seeded default below */ }
+    return { ...DEFAULT_TENANT_PROFILE, fullName: authName, phone: authPhone, email: authEmail };
+  };
+
+  const [tenantProfile, setTenantProfile] = useState(readInitialTenantProfile);
+  const [draftProfile, setDraftProfile] = useState(readInitialTenantProfile);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileToast, setProfileToast] = useState(null);
 
@@ -688,7 +719,9 @@ const TenantDashboard = () => {
           delete merged.rentalPreferences;
           delete merged.household;
           delete merged.references;
-          delete merged.emergencyContact;
+          // emergencyContact stays — it's a CURRENT field (name/phone/relation)
+          // read by computeTrustScore + ProfileSection. Purging it here made the
+          // emergency-contact values blank out mid-hydration.
           delete merged.preferences;
           setTenantProfile(merged);
           setDraftProfile(merged);
@@ -705,8 +738,19 @@ const TenantDashboard = () => {
           setDraftProfile(seed);
         }
       } catch {
-        setTenantProfile(DEFAULT_TENANT_PROFILE);
-        setDraftProfile(DEFAULT_TENANT_PROFILE);
+        // Corrupt slot (e.g. the legacy "undefined" string a previous bug
+        // wrote via JSON.stringify(fn)). Purge it so it stops throwing on every
+        // load, and seed from the auth identity instead of blanking the whole
+        // card. The backend-hydration effect below then refills server fields.
+        try { localStorage.removeItem(storageKey); } catch { /* ignore */ }
+        const seed = {
+          ...DEFAULT_TENANT_PROFILE,
+          fullName: authUser?.name?.trim()  || '',
+          phone:    authUser?.phone?.trim() || '',
+          email:    authUser?.email?.trim() || '',
+        };
+        setTenantProfile(seed);
+        setDraftProfile(seed);
       }
     };
     loadProfile();
@@ -951,16 +995,6 @@ const TenantDashboard = () => {
   //   2. Call authSubmitVerification so the verification.status flips to
   //      'pending' and submittedForReview goes true server-side.
   //   3. Mirror everything into local tenantProfile + show toast.
-  
-  // Hydrate saved profile on mount — survives page refresh
-useEffect(() => {
-  try {
-const raw = localStorage.getItem(tenantProfileKey(authUser?.id || authUser?._id || null));   if (raw) {
-      const saved = JSON.parse(raw);
-      persistProfile((prev) => ({ ...prev, ...saved }));
-    }
-  } catch (_) {}
-}, []);
   
 const handleWizardSubmit = async (payload) => {
   // ── 1. Decide what new files need uploading ─────────────────────────
