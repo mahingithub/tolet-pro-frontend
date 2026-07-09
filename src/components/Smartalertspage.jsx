@@ -33,11 +33,25 @@ export default function SmartAlertsPage({ bookings = [], inquiries = [], today, 
   const [activeFilter, setActiveFilter] = useState('all');
   const [activeCategory, setActiveCategory] = useState('all');
   const [expandedId, setExpandedId] = useState(null);
-  const [dismissed, setDismissed] = useState([]);
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      const saved = localStorage.getItem('smartAlertsDismissed');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [toastMsg, setToastMsg] = useState(null);
 
   const showToast = (msg) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
-  const dismiss = (id) => { setDismissed(prev => [...prev, id]); showToast(bn ? 'অ্যালার্ট সরানো হয়েছে' : 'Alert dismissed'); };
+  const dismiss = (id) => { 
+    setDismissed(prev => {
+      const next = [...prev, id];
+      try { localStorage.setItem('smartAlertsDismissed', JSON.stringify(next)); } catch (e) {}
+      return next;
+    }); 
+    showToast(bn ? 'অ্যালার্ট সরানো হয়েছে' : 'Alert dismissed'); 
+  };
 
   // Landlord alerts are computed here; the tenant passes pre-computed alerts via props.
   const computed = useMemo(() => {
@@ -267,7 +281,10 @@ export default function SmartAlertsPage({ bookings = [], inquiries = [], today, 
                         {alert.actionLabel || actionLabel || (bn ? 'মেসেজ করুন' : 'Message Tenant')}
                       </button>
                       <button
-                        onClick={() => dismiss(alert.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          dismiss(alert.id);
+                        }}
                         className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-[11px] font-black text-gray-500 hover:bg-gray-50 transition-all active:scale-95"
                       >
                         {bn ? 'সরিয়ে দিন' : 'Dismiss'}
