@@ -469,7 +469,16 @@ const TenantDashboard = () => {
     if (tab && ['overview', 'saved', 'applications', 'alerts', 'payments', 'settings', 'profile'].includes(tab)) {
       setActiveTab(tab);
     }
-  }, [location]);
+  }, [location.search]);
+
+  // Keep the URL in sync with the currently active tab so that hitting the "Back" button
+  // from another page returns the user to the exact tab they were on.
+  useEffect(() => {
+    const currentTabInUrl = new URLSearchParams(window.location.search).get('tab');
+    if (currentTabInUrl !== activeTab) {
+      navigate(`?tab=${activeTab}`, { replace: true, state: location.state });
+    }
+  }, [activeTab]);
 
   // Deep-link scrolling
   useEffect(() => {

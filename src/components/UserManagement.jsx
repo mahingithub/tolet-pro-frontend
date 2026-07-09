@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Users, Search, ShieldCheck, ShieldAlert, ShieldX, CheckCircle2,
@@ -579,10 +579,18 @@ const LandlordPendingCard = ({ user, busyId, onApprove, onReject }) => {
 // ─── Page ───────────────────────────────────────────────────────────
 const UserManagement = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   
   const initialTab = new URLSearchParams(location.search).get('tab') || 'pending';
   const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    const currentTabInUrl = new URLSearchParams(window.location.search).get('tab');
+    if (currentTabInUrl !== activeTab) {
+      navigate(`?tab=${activeTab}`, { replace: true, state: location.state });
+    }
+  }, [activeTab]);
   const [pending,        setPending]        = useState([]);
   const [pendingLandlord, setPendingLandlord] = useState([]);
   const [allUsers,       setAllUsers]       = useState([]);
