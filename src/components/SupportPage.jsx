@@ -19,13 +19,15 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, LifeBuoy, Send, Plus, MessageSquare, ChevronRight,
   CheckCircle2, Loader2, HelpCircle, ShieldCheck,
-  Sparkles, ChevronDown, User, Building2, CreditCard, Clock, BookOpen,
+  Sparkles, ChevronDown, User, Building2, CreditCard, Clock, BookOpen, PlayCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLanguage } from '../context/LanguageContext';
 import {
   listMyTickets, openTicket, getTicket, sendMessage, closeTicket, onTicketsChanged,
 } from '../services/supportService';
+import { getSectionGuides } from '../services/aiGuideService';
+import VideoGuides from './shared/VideoGuides';
 
 // status → badge styling + bilingual label
 const STATUS = {
@@ -114,6 +116,7 @@ export default function SupportPage() {
   const [reply, setReply]         = useState('');
   const [replying, setReplying]   = useState(false);
   const [openFaq, setOpenFaq]     = useState(null);
+  const [supportVideos, setSupportVideos] = useState([]);
 
   const threadEndRef = useRef(null);
   const activeIdRef  = useRef(null);
@@ -148,6 +151,13 @@ export default function SupportPage() {
     });
     return unsub;
   }, [isAuthenticated, loadTickets, refreshActive]);
+
+  // Load admin-managed "how to use support" videos. Public — guests see them too.
+  useEffect(() => {
+    let alive = true;
+    getSectionGuides('support').then((v) => { if (alive) setSupportVideos(v); });
+    return () => { alive = false; };
+  }, []);
 
   // Auto-scroll the thread to the newest message.
   useEffect(() => {
@@ -395,6 +405,19 @@ export default function SupportPage() {
             ))}
           </div>
         </div>
+
+        {/* How-to-support videos (admin-managed via /admin/support → AI Video Guides) */}
+        {supportVideos.length > 0 && (
+          <div className="mb-5">
+            <div className="flex items-center gap-2 px-2 mb-2">
+              <PlayCircle size={16} className="text-[#ba0036] shrink-0" />
+              <p className="text-[11px] font-black uppercase tracking-wider text-gray-400">
+                {tr('Watch how support works', 'দেখে নিন সাপোর্ট কীভাবে কাজ করে')}
+              </p>
+            </div>
+            <VideoGuides guides={supportVideos} columns={2} />
+          </div>
+        )}
 
         {/* Contact / new request card */}
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 mb-5">

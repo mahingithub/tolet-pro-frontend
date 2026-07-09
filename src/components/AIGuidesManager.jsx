@@ -100,7 +100,7 @@ const AIGuidesManager = () => {
 					<h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
 						<Video className="text-[#ba0036]" /> AI Video Guides
 					</h2>
-					<p className="text-xs font-bold text-gray-500 mt-1">Manage interactive video suggestions for the AI Assistant.</p>
+					<p className="text-xs font-bold text-gray-500 mt-1">Upload videos for the AI Assistant, Welcome Robot, the How it Works page and the Help &amp; Support page.</p>
 				</div>
 				{!isEditing && (
 					<button
@@ -161,6 +161,8 @@ const AIGuidesManager = () => {
 							>
 								<option value="assistant">AI Assistant (suggestion list)</option>
 								<option value="welcome">Welcome Robot (after login)</option>
+								<option value="how_it_works">How it Works page</option>
+								<option value="support">Help &amp; Support page</option>
 							</select>
 						</div>
 						<div>
@@ -175,7 +177,7 @@ const AIGuidesManager = () => {
 								<option value="landlord">Landlord only</option>
 							</select>
 							<p className="text-[10px] font-bold text-gray-400 mt-1.5 leading-snug">
-								Welcome Robot–এর জন্য Tenant ও Landlord আলাদা গাইড বানান।
+								Welcome ও How-it-Works ভিডিওর জন্য Tenant ও Landlord আলাদা করে টার্গেট করুন।
 							</p>
 						</div>
 						<div>
@@ -246,14 +248,24 @@ const AIGuidesManager = () => {
 											<div className="text-xs text-gray-500 mt-0.5">&quot;{g.suggestionText}&quot;</div>
 										</td>
 										<td className="py-3">
-											{g.placement === 'welcome' ? (
-												<div className="flex flex-col gap-1 w-max">
-													<span className="text-[10px] font-black text-[#ba0036] bg-[#ba0036]/10 px-2 py-0.5 rounded-full">Welcome</span>
-													<span className="text-[10px] font-bold text-gray-500 capitalize">{g.audience || 'all'}</span>
-												</div>
-											) : (
-												<span className="text-[10px] font-black text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full w-max inline-block">Assistant</span>
-											)}
+											{(() => {
+												const PLACEMENTS = {
+													welcome:      { label: 'Welcome',      cls: 'text-[#ba0036] bg-[#ba0036]/10' },
+													how_it_works: { label: 'How it Works', cls: 'text-indigo-600 bg-indigo-50' },
+													support:      { label: 'Support',      cls: 'text-emerald-600 bg-emerald-50' },
+													assistant:    { label: 'Assistant',    cls: 'text-gray-500 bg-gray-100' },
+												};
+												const meta = PLACEMENTS[g.placement] || PLACEMENTS.assistant;
+												const showAudience = g.placement === 'welcome' || g.placement === 'how_it_works';
+												return (
+													<div className="flex flex-col gap-1 w-max">
+														<span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${meta.cls}`}>{meta.label}</span>
+														{showAudience && (
+															<span className="text-[10px] font-bold text-gray-500 capitalize">{g.audience || 'all'}</span>
+														)}
+													</div>
+												);
+											})()}
 										</td>
 										<td className="py-3 max-w-[200px] truncate text-xs text-blue-600">
 											<a href={g.videoUrl} target="_blank" rel="noreferrer" className="hover:underline">{g.videoUrl}</a>

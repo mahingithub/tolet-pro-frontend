@@ -11,10 +11,12 @@ import {
   Search, MessageSquare, CalendarCheck, KeyRound,
   PlusCircle, BadgeCheck, Users, Handshake,
   ShieldCheck, Sparkles, ArrowRight, Check, Building2,
-  Lock, PhoneCall, Flag, HelpCircle, ChevronDown, LifeBuoy,
+  Lock, PhoneCall, Flag, HelpCircle, ChevronDown, LifeBuoy, PlayCircle,
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
+import { getSectionGuides } from '../services/aiGuideService';
+import VideoGuides from './shared/VideoGuides';
 
 export default function HowItWorks() {
   const navigate = useNavigate();
@@ -24,6 +26,8 @@ export default function HowItWorks() {
   const isBn = language === 'বাংলা' || language === 'bn';
   const tr = (en, bn) => (isBn ? bn : en);
   const [openFaq, setOpenFaq] = useState(null);
+  const [tenantVideos, setTenantVideos] = useState([]);
+  const [landlordVideos, setLandlordVideos] = useState([]);
 
   // Scroll to #pricing (or any hash) when arriving via a hash link.
   useEffect(() => {
@@ -34,6 +38,18 @@ export default function HowItWorks() {
       window.scrollTo({ top: 0 });
     }
   }, [location.hash]);
+
+  // Load admin-managed "How it Works" video guides and split them into
+  // tenant / landlord sections (an "all"-audience guide shows in both).
+  useEffect(() => {
+    let alive = true;
+    getSectionGuides('how_it_works').then((all) => {
+      if (!alive) return;
+      setTenantVideos(all.filter((g) => g.audience === 'tenant' || g.audience === 'all'));
+      setLandlordVideos(all.filter((g) => g.audience === 'landlord' || g.audience === 'all'));
+    });
+    return () => { alive = false; };
+  }, []);
 
   const tenantSteps = [
     { Icon: Search, en: 'Search & filter', bn: 'খুঁজুন ও ফিল্টার করুন', den: 'Browse verified listings by area, budget and property type.', dbn: 'এলাকা, বাজেট ও ধরন অনুযায়ী ভেরিফাইড লিস্টিং দেখুন।' },
@@ -114,6 +130,20 @@ export default function HowItWorks() {
         </div>
       </section>
 
+      {/* Tenant video guides (admin-managed via /admin/support → AI Video Guides) */}
+      {tenantVideos.length > 0 && (
+        <section className="max-w-5xl mx-auto px-4 mt-8">
+          <div className="flex items-center gap-2.5 mb-3 px-1">
+            <PlayCircle size={20} className="text-[#ba0036] shrink-0" />
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036]">{tr('Watch & learn', 'দেখে শিখুন')}</p>
+              <h3 className="text-lg font-black text-gray-900 leading-tight">{tr('Video guides for tenants', 'ভাড়াটিয়াদের জন্য ভিডিও গাইড')}</h3>
+            </div>
+          </div>
+          <VideoGuides guides={tenantVideos} />
+        </section>
+      )}
+
       {/* For landlords */}
       <section className="max-w-5xl mx-auto px-4 mt-8">
         <div className="bg-white/60 backdrop-blur rounded-[2rem] p-2 md:p-4">
@@ -128,6 +158,20 @@ export default function HowItWorks() {
           </div>
         </div>
       </section>
+
+      {/* Landlord video guides (admin-managed via /admin/support → AI Video Guides) */}
+      {landlordVideos.length > 0 && (
+        <section className="max-w-5xl mx-auto px-4 mt-8">
+          <div className="flex items-center gap-2.5 mb-3 px-1">
+            <PlayCircle size={20} className="text-[#ba0036] shrink-0" />
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036]">{tr('Watch & learn', 'দেখে শিখুন')}</p>
+              <h3 className="text-lg font-black text-gray-900 leading-tight">{tr('Video guides for landlords', 'বাড়িওয়ালাদের জন্য ভিডিও গাইড')}</h3>
+            </div>
+          </div>
+          <VideoGuides guides={landlordVideos} />
+        </section>
+      )}
 
       {/* Trust strip */}
       <section className="max-w-5xl mx-auto px-4 mt-8">
