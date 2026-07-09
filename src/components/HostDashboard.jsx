@@ -597,9 +597,6 @@ const HostDashboard = () => {
     }
   };
 
-  // Whenever the auth user changes (login, logout, profile update from
-  // another tab) re-seed the dashboard profile so we never fall back to a
-  // stale demo placeholder.
   useEffect(() => {
     if (!authUser) return;
     setUserData(prev => ({
@@ -613,6 +610,22 @@ const HostDashboard = () => {
       avatar:   authUser.avatar  || prev.avatar,
     }));
   }, [authUser]);
+
+  useEffect(() => {
+    if (!authUser) return;
+    const serverLP = authUser.landlordProfile || {};
+    
+    setLandlordProfile((prev) => {
+      const merged = {
+        ...prev,
+        preferredTenants: serverLP.preferredTenants || prev.preferredTenants || [],
+        communication:    serverLP.communication    || prev.communication || [],
+        serviceCharge:    serverLP.serviceCharge !== undefined ? serverLP.serviceCharge : prev.serviceCharge,
+        houseRules:       serverLP.houseRules       || prev.houseRules || [],
+      };
+      return merged;
+    });
+  }, [JSON.stringify(authUser?.landlordProfile || {})]);
   
   const [uploadedDocs, setUploadedDocs] = useState({
     nidFront: false,

@@ -264,7 +264,7 @@ export default function SupportPage() {
     const isClosed = ticket && (ticket.status === 'closed' || ticket.status === 'resolved');
     return (
       <div className="min-h-[100dvh] bg-gray-50 pb-28 md:pb-10">
-        <div className="max-w-2xl mx-auto px-4 pt-5">
+        <div className="max-w-3xl mx-auto px-4 pt-5 md:pt-8">
           <button
             onClick={() => { setView('list'); activeIdRef.current = null; }}
             className="inline-flex items-center gap-2 text-sm font-bold text-gray-600 hover:text-[#ba0036] mb-4 active:scale-95 transition-all"
@@ -357,7 +357,7 @@ export default function SupportPage() {
     <div className="min-h-[100dvh] bg-gray-50 pb-28 md:pb-10">
       {/* Hero */}
       <div className="bg-gradient-to-br from-[#ba0036] to-[#e60045] text-white">
-        <div className="max-w-2xl mx-auto px-5 pt-6 pb-10 relative overflow-hidden">
+        <div className="max-w-5xl mx-auto px-5 pt-6 pb-10 md:pt-10 md:pb-16 relative overflow-hidden">
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
           <button
             onClick={() => navigate(-1)}
@@ -384,13 +384,13 @@ export default function SupportPage() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 -mt-5">
+      <div className="max-w-5xl mx-auto px-4 -mt-5 md:-mt-10">
         {/* Browse help topics — quick-start into a categorised request */}
         <div className="mb-5">
           <p className="text-[11px] font-black uppercase tracking-wider text-gray-400 px-2 mb-2">
             {tr('Browse help topics', 'সহায়তার বিষয় দেখুন')}
           </p>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
             {HELP_TOPICS.map((topic, i) => (
               <button
                 key={i}
@@ -415,9 +415,14 @@ export default function SupportPage() {
                 {tr('Watch how support works', 'দেখে নিন সাপোর্ট কীভাবে কাজ করে')}
               </p>
             </div>
-            <VideoGuides guides={supportVideos} columns={2} />
+            <VideoGuides guides={supportVideos} columns={3} />
           </div>
         )}
+
+        {/* Desktop workspace: main column (compose + my requests) beside a
+            help sidebar (FAQ + guide). Collapses to a single column on mobile. */}
+        <div className="lg:grid lg:grid-cols-3 lg:gap-6 lg:items-start">
+          <div className="lg:col-span-2">
 
         {/* Contact / new request card */}
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 mb-5">
@@ -526,6 +531,9 @@ export default function SupportPage() {
           </div>
         )}
 
+          </div>{/* /main column */}
+
+          <div className="lg:col-span-1">
         {/* FAQ */}
         <div className="mb-5">
           <p className="text-[11px] font-black uppercase tracking-wider text-gray-400 px-2 mb-2">
@@ -569,6 +577,9 @@ export default function SupportPage() {
           </div>
           <ChevronRight size={18} className="text-gray-300 shrink-0" />
         </button>
+
+          </div>{/* /help sidebar */}
+        </div>{/* /desktop workspace grid */}
 
         {/* Trust footer */}
         <div className="flex items-center justify-center gap-2 text-xs font-bold text-gray-400 py-2">

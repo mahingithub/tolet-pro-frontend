@@ -735,8 +735,7 @@ const TenantDashboard = () => {
   // the user might have made while offline.
   useEffect(() => {
     if (!authUser) return;
-    const serverTP = authUser.tenantProfile;
-    if (!serverTP || typeof serverTP !== 'object') return;
+    const serverTP = authUser.tenantProfile || {};
 
     const pickServer = (s, l) => (s !== undefined && s !== null && s !== '' ? s : l);
 
