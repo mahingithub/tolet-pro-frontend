@@ -120,6 +120,34 @@ const FuturisticTheme = () => {
       .cyber-btn:hover::before { left: 150%; }
       .airbnb-grid-hover { transition: filter 0.3s ease, transform 0.3s ease; }
       .airbnb-grid-hover:hover { filter: brightness(1.04); transform: scale(1.005); }
+
+      /* ── DARK THEME ── applied when the user picks Dark/System (SettingsContext
+         toggles <html class="dark">). Higher specificity than the light rules
+         above, so these win automatically in dark mode. Values mirror the
+         global dark palette in index.css. */
+      html.dark .futuristic-root { color: #eef2f8; }
+      html.dark .futuristic-bg {
+        background: #0b1220;
+        background-image:
+          radial-gradient(ellipse 80% 60% at 20% 0%, rgba(186,0,54,0.14) 0%, transparent 60%),
+          radial-gradient(ellipse 60% 50% at 80% 100%, rgba(186,0,54,0.08) 0%, transparent 60%);
+      }
+      html.dark .glass-card {
+        background: #1b2536;
+        border: 1px solid rgba(148,163,184,0.2);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.35), 0 6px 18px rgba(0,0,0,0.4);
+      }
+      html.dark .glass-card-light {
+        background: #27324a;
+        border: 1px solid rgba(148,163,184,0.16);
+      }
+      html.dark .neon-text { color: #ff7d9d; }
+      html.dark .futuristic-input {
+        background: #27324a;
+        border: 1px solid rgba(148,163,184,0.2);
+        color: #eef2f8;
+      }
+      html.dark .futuristic-input::placeholder { color: #9dabc0; }
     `;
     if (!document.getElementById('pd-light-theme')) {
       document.head.appendChild(styleEl);

@@ -257,3 +257,91 @@ html.dark .hover\:bg-blue-50:hover { background-color: rgba(59, 130, 246, 0.18) 
 html.dark .hover\:bg-amber-50:hover { background-color: rgba(245, 158, 11, 0.18) !important; }
 html.dark .hover\:bg-emerald-50:hover,
 html.dark .hover\:bg-green-50:hover { background-color: rgba(16, 185, 129, 0.18) !important; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DARK THEME — round 2: opacity-variant tints, gradient stops, deeper glass.
+   The app uses opacity modifiers everywhere (bg-emerald-50/60, to-white/40),
+   which are their own classes and weren't caught by the base rules above.
+   Exact escaped selectors are used (safe: they never match `-500` shades or
+   `hover:` variants).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Deeper glass — panels also use bg-white/30–45 (chat area, dashboard empties). */
+html.dark .bg-white\/30, html.dark .bg-white\/35,
+html.dark .bg-white\/40, html.dark .bg-white\/45 { background-color: var(--tp-glass) !important; }
+
+/* ── Solid tint backgrounds: opacity variants + remaining hues ──────────── */
+/* red / rose / pink / fuchsia */
+html.dark .bg-red-50\/20, html.dark .bg-red-50\/30, html.dark .bg-red-50\/40,
+html.dark .bg-red-50\/50, html.dark .bg-red-50\/60,
+html.dark .bg-rose-50\/40, html.dark .bg-rose-50\/60,
+html.dark .bg-pink-50, html.dark .bg-pink-100, html.dark .bg-fuchsia-50 { background-color: rgba(244, 63, 94, 0.16) !important; }
+html.dark .text-pink-600, html.dark .text-pink-700, html.dark .text-fuchsia-600 { color: #f9a8d4 !important; }
+
+/* purple / violet */
+html.dark .bg-purple-50, html.dark .bg-purple-100, html.dark .bg-violet-50, html.dark .bg-violet-100,
+html.dark .bg-violet-50\/80, html.dark .bg-indigo-50\/80 { background-color: rgba(168, 85, 247, 0.17) !important; }
+html.dark .text-purple-600, html.dark .text-purple-700,
+html.dark .text-violet-600, html.dark .text-violet-700 { color: #c4b5fd !important; }
+
+/* blue (opacity variants) */
+html.dark .bg-blue-50\/30, html.dark .bg-blue-50\/40, html.dark .bg-blue-50\/50,
+html.dark .bg-blue-50\/60, html.dark .bg-blue-50\/80, html.dark .bg-blue-50\/90 { background-color: rgba(59, 130, 246, 0.16) !important; }
+
+/* emerald / green (opacity variants) + teal / cyan */
+html.dark .bg-emerald-50\/60, html.dark .bg-emerald-50\/90,
+html.dark .bg-green-50\/60, html.dark .bg-green-50\/80 { background-color: rgba(16, 185, 129, 0.16) !important; }
+html.dark .bg-teal-50, html.dark .bg-teal-100, html.dark .bg-cyan-50, html.dark .bg-cyan-100 { background-color: rgba(20, 184, 166, 0.16) !important; }
+html.dark .text-teal-600, html.dark .text-teal-700, html.dark .text-cyan-600, html.dark .text-cyan-700 { color: #2dd4bf !important; }
+
+/* amber / yellow (opacity variants) + orange */
+html.dark .bg-amber-50\/30, html.dark .bg-amber-50\/40, html.dark .bg-amber-50\/60,
+html.dark .bg-amber-50\/90, html.dark .bg-yellow-50\/80 { background-color: rgba(245, 158, 11, 0.16) !important; }
+html.dark .bg-orange-50, html.dark .bg-orange-100 { background-color: rgba(249, 115, 22, 0.16) !important; }
+html.dark .text-orange-600, html.dark .text-orange-700 { color: #fb923c !important; }
+
+/* ── Tint borders (opacity variants) → toned to the hue ─────────────────── */
+html.dark .border-rose-100\/80, html.dark .border-red-200\/60, html.dark .border-red-100\/50 { border-color: rgba(244, 63, 94, 0.32) !important; }
+html.dark .border-emerald-100\/80 { border-color: rgba(16, 185, 129, 0.32) !important; }
+html.dark .border-amber-100\/60, html.dark .border-amber-100\/80, html.dark .border-amber-200\/60 { border-color: rgba(245, 158, 11, 0.32) !important; }
+html.dark .border-blue-100\/50, html.dark .border-blue-100\/60, html.dark .border-blue-100\/80 { border-color: rgba(59, 130, 246, 0.32) !important; }
+html.dark .border-violet-200\/60 { border-color: rgba(168, 85, 247, 0.32) !important; }
+
+/* ── Light gradient color-stops → dark (set background-image, not -color) ── */
+/* neutral → surface */
+html.dark .from-white, html.dark .from-gray-50, html.dark .from-gray-50\/50,
+html.dark .from-gray-100, html.dark .from-slate-50 { --tw-gradient-from: var(--tp-surface) var(--tw-gradient-from-position) !important; }
+html.dark .to-white, html.dark .to-gray-50, html.dark .to-gray-50\/40,
+html.dark .to-gray-50\/50 { --tw-gradient-to: var(--tp-surface) var(--tw-gradient-to-position) !important; }
+html.dark .via-slate-50\/80 { --tw-gradient-stops: var(--tw-gradient-from), var(--tp-surface) var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+
+/* rose / red */
+html.dark .from-rose-50, html.dark .from-rose-50\/40, html.dark .from-rose-100,
+html.dark .from-red-50, html.dark .from-red-50\/40 { --tw-gradient-from: rgba(244, 63, 94, 0.18) var(--tw-gradient-from-position) !important; }
+html.dark .to-rose-50, html.dark .to-rose-50\/20, html.dark .to-rose-100\/60,
+html.dark .to-red-50, html.dark .to-red-50\/40, html.dark .to-red-100\/50 { --tw-gradient-to: rgba(244, 63, 94, 0.18) var(--tw-gradient-to-position) !important; }
+html.dark .via-rose-50, html.dark .via-rose-50\/40 { --tw-gradient-stops: var(--tw-gradient-from), rgba(244, 63, 94, 0.18) var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+
+/* emerald / green */
+html.dark .from-emerald-50, html.dark .from-green-50 { --tw-gradient-from: rgba(16, 185, 129, 0.18) var(--tw-gradient-from-position) !important; }
+html.dark .to-emerald-50, html.dark .to-emerald-50\/60, html.dark .to-green-50,
+html.dark .to-green-100\/60 { --tw-gradient-to: rgba(16, 185, 129, 0.18) var(--tw-gradient-to-position) !important; }
+html.dark .via-green-50, html.dark .via-emerald-50 { --tw-gradient-stops: var(--tw-gradient-from), rgba(16, 185, 129, 0.18) var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+
+/* amber / orange */
+html.dark .from-amber-50, html.dark .from-amber-50\/80, html.dark .from-amber-100,
+html.dark .from-orange-50 { --tw-gradient-from: rgba(245, 158, 11, 0.18) var(--tw-gradient-from-position) !important; }
+html.dark .to-amber-50, html.dark .to-orange-50, html.dark .to-orange-50\/40,
+html.dark .to-orange-50\/60, html.dark .to-orange-100\/50, html.dark .to-orange-100\/60 { --tw-gradient-to: rgba(245, 158, 11, 0.18) var(--tw-gradient-to-position) !important; }
+
+/* blue / indigo / violet / purple / pink */
+html.dark .from-blue-50, html.dark .from-blue-50\/80, html.dark .from-blue-100,
+html.dark .from-indigo-50, html.dark .from-violet-50 { --tw-gradient-from: rgba(99, 102, 241, 0.18) var(--tw-gradient-from-position) !important; }
+html.dark .to-blue-50, html.dark .to-indigo-50, html.dark .to-indigo-50\/40,
+html.dark .to-indigo-50\/60, html.dark .to-indigo-50\/80, html.dark .to-indigo-100\/50,
+html.dark .to-purple-50, html.dark .to-purple-100\/60, html.dark .to-pink-50 { --tw-gradient-to: rgba(99, 102, 241, 0.18) var(--tw-gradient-to-position) !important; }
+
+/* Low-opacity white gradient stops (chat scroll vignette etc.) → dark. */
+html.dark .to-white\/30, html.dark .to-white\/40, html.dark .to-white\/50,
+html.dark .to-white\/60 { --tw-gradient-to: rgba(23, 32, 48, 0.5) var(--tw-gradient-to-position) !important; }
+html.dark .via-white\/10, html.dark .via-white\/20, html.dark .via-white\/30 { --tw-gradient-stops: var(--tw-gradient-from), rgba(23, 32, 48, 0.2) var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
