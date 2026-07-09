@@ -49,7 +49,6 @@ import ProfileSection from './shared/ProfileSection';
 // ("Account Settings" + "Help & Support") so clicking them in the side
 // drawer actually opens the screen.
 import SharedSettings from './shared/SharedSettings';
-import SharedSupport from './shared/SharedSupport';
 import InquiryStatusTimeline from './InquiryStatusTimeline';
 
 // 🟢 Shared localStorage key — written by HostDashboard when the landlord
@@ -338,7 +337,8 @@ const TenantDashboard = () => {
   // 🔴 100% Connected to your Global LanguageContext from Navbar
   const { t, language, setLanguage } = useLanguage(); 
 
-  const [activeTab, setActiveTab] = useState('overview');
+  const initialTab = new URLSearchParams(location.search).get('tab') || (location.state && location.state.activeTab) || 'overview';
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -1241,7 +1241,7 @@ const handleWizardSubmit = async (payload) => {
     // power users who want the legacy /messages inbox.
     { id: 'messages', icon: MessageSquare, label: t.messages || (language === 'বাংলা' ? 'মেসেজ' : 'Messages'), isLink: true, path: '/messages', desktopOnly: true },
     { id: 'settings', icon: Settings, label: t.accountSettings || (language === 'বাংলা' ? 'অ্যাকাউন্ট সেটিংস' : 'Account Settings') },
-    { id: 'support', icon: HelpCircle, label: t.support || (language === 'বাংলা' ? 'হেল্প ও সাপোর্ট' : 'Help & Support') },
+    { id: 'support', icon: HelpCircle, label: t.support || (language === 'বাংলা' ? 'হেল্প ও সাপোর্ট' : 'Help & Support'), isLink: true, path: '/support' },
   ];
 
   return (
@@ -2855,13 +2855,8 @@ const handleWizardSubmit = async (payload) => {
           </div>
         )}
 
-        {/* 🟢 HELP & SUPPORT — same fix as Settings: the file exists in
-            ./tenant/, it just was never rendered. Now it is. */}
-        {activeTab === 'support' && (
-          <div className="animate-in fade-in duration-500">
-            <SharedSupport />
-          </div>
-        )}
+        {/* Help & Support now lives on the shared /support page — the drawer
+            entry links there directly (no in-dashboard duplicate). */}
 
       </main>
 

@@ -435,8 +435,8 @@ const HostDashboard = () => {
   const { user: authUser, logout: authLogout, updateMe: authUpdateMe } = useAuth();
   
   // 🟢 CORE STATES
-  const [activeTab, setActiveTab] = useState('dashboard');
-
+  const initialTab = new URLSearchParams(location.search).get('tab') || (location.state && location.state.activeTab) || 'dashboard';
+  const [activeTab, setActiveTab] = useState(initialTab);
   // Honor ?tab=… deep-links (e.g. notification bell → /host-dashboard?tab=inquiries).
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
