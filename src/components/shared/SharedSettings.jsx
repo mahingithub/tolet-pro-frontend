@@ -28,7 +28,7 @@ import {
   ChevronDown, User, Shield, ShieldCheck, Bell, CreditCard,
   Smartphone, Scale, Globe, Trash2, LogOut, Download, ExternalLink,
   Home, Search, MessageSquare, Eye, Calendar, Building2, Sparkles,
-  KeyRound, RotateCcw, Pencil,
+  KeyRound, RotateCcw, Pencil, Sun, Moon, Monitor,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useLanguage } from '../../context/LanguageContext';
@@ -98,6 +98,41 @@ const SelectInput = ({ value, onChange, options }) => (
     {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
   </select>
 );
+
+// ─── Theme segmented control (Light / Dark / System) ─────────────────────────
+// A three-way selector with icons. The active option is a solid brand pill so
+// it stays obvious in both light AND dark mode without extra theming.
+const ThemeSwitcher = ({ value, onChange, bn }) => {
+  const items = [
+    { value: 'light', label: bn ? 'লাইট' : 'Light', icon: Sun },
+    { value: 'dark', label: bn ? 'ডার্ক' : 'Dark', icon: Moon },
+    { value: 'system', label: bn ? 'সিস্টেম' : 'System', icon: Monitor },
+  ];
+  return (
+    <div role="radiogroup" aria-label={bn ? 'থিম' : 'Theme'} className="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-gray-100">
+      {items.map(({ value: v, label, icon: Icon }) => {
+        const active = value === v;
+        return (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(v)}
+            className={`flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl text-xs font-black transition-all duration-150 active:scale-[0.96] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ba0036]/25 [-webkit-tap-highlight-color:transparent] ${
+              active
+                ? 'bg-[#ba0036] text-white shadow-[0_6px_16px_-6px_rgba(186,0,54,0.6)]'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-white/70'
+            }`}
+          >
+            <Icon size={18} />
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
 
 // ─── Chip-style action button ─────────────────────────────────────────────────
 // A small, tappable pill used for every right-aligned row action. It has a
@@ -266,11 +301,6 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
 
   // ── Localised option lists ───────────────────────────────────────────────
   const opts = useMemo(() => ({
-    theme: [
-      { value: 'light', label: bn ? 'লাইট' : 'Light' },
-      { value: 'dark', label: bn ? 'ডার্ক' : 'Dark' },
-      { value: 'system', label: bn ? 'সিস্টেম' : 'System' },
-    ],
     language: [
       { value: 'English', label: 'English' },
       { value: 'বাংলা', label: 'বাংলা' },
@@ -418,8 +448,14 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
           </Card>
 
           {/* Appearance & App */}
-          <Card icon={Smartphone} title={bn ? 'অ্যাপিয়ারেন্স ও অ্যাপ' : 'Appearance & app'} subtitle={bn ? 'থিম, ভাষা, মুদ্রা, মোশন' : 'Theme, language, currency, motion'}>
-            <Row label={bn ? 'থিম' : 'Theme'} sublabel={bn ? 'লাইট / ডার্ক / সিস্টেম' : 'Light / dark / system'} right={<SelectInput value={settings.theme} onChange={(v) => save({ theme: v })} options={opts.theme} />} />
+          <Card icon={Smartphone} title={bn ? 'অ্যাপিয়ারেন্স ও অ্যাপ' : 'Appearance & app'} subtitle={bn ? 'থিম, ভাষা, মুদ্রা, মোশন' : 'Theme, language, currency, motion'} defaultOpen>
+            <div className="py-3.5 border-b border-gray-50">
+              <div className="mb-3">
+                <p className="text-sm font-black text-gray-900">{bn ? 'থিম' : 'Theme'}</p>
+                <p className="text-[11px] font-bold text-gray-400">{bn ? 'লাইট, ডার্ক বা সিস্টেম অনুযায়ী' : 'Light, dark, or match your system'}</p>
+              </div>
+              <ThemeSwitcher value={settings.theme} onChange={(v) => save({ theme: v })} bn={bn} />
+            </div>
             <Row
               label={bn ? 'ভাষা' : 'Language'}
               right={

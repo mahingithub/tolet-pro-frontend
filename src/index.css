@@ -42,3 +42,161 @@ html.reduce-motion *::after {
 }
 .animate-tp-fade-in  { animation: tpFadeIn 0.2s ease-out both; }
 .animate-tp-modal-in { animation: tpModalIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DARK THEME
+   ──────────────────────────────────────────────────────────────────────────
+   The app was built without per-component `dark:` variants, so we retrofit a
+   global dark palette here. SettingsContext toggles `.dark` on <html> from the
+   Theme setting (light / dark / system); everything below is scoped under
+   `html.dark`, so LIGHT MODE IS COMPLETELY UNAFFECTED.
+
+   We remap the handful of surface / text / border / tint utility classes the
+   app actually leans on. The brand colour (#ba0036) is kept — it reads well on
+   dark — but brand *text* is lightened so it stays legible. `!important` is
+   used so we reliably win over Tailwind utilities; interactive (hover/focus)
+   overrides carry higher specificity so buttons still respond.
+   ══════════════════════════════════════════════════════════════════════════ */
+html.dark {
+  color-scheme: dark;
+  --tp-bg: #0b1220;         /* app / page background            */
+  --tp-surface: #1b2536;    /* cards, modals, sheets            */
+  --tp-surface-2: #27324a;  /* chips, inputs, secondary panels  */
+  --tp-surface-3: #33405b;  /* hover on secondary surfaces      */
+  --tp-border: rgba(148, 163, 184, 0.18);
+  --tp-text: #e9eef5;       /* headings / primary text          */
+  --tp-text-2: #c3cede;     /* body text                        */
+  --tp-text-3: #93a1b5;     /* muted / captions                 */
+  --tp-brand-text: #ff7d9d; /* lightened brand for legibility   */
+}
+
+html.dark body { background-color: var(--tp-bg); color: var(--tp-text); }
+
+/* ── Surfaces ─────────────────────────────────────────────────────────── */
+html.dark .bg-white { background-color: var(--tp-surface) !important; }
+
+html.dark .bg-gray-50,
+html.dark .bg-slate-50,
+html.dark .bg-neutral-50,
+html.dark .bg-zinc-50,
+html.dark .bg-\[\#f8f9fa\],
+html.dark .bg-\[\#f9fafb\],
+html.dark .bg-\[\#f7f8fa\],
+html.dark .bg-\[\#fafafa\],
+html.dark .bg-\[\#f5f6f8\] { background-color: var(--tp-bg) !important; }
+
+html.dark .bg-gray-100,
+html.dark .bg-gray-200,
+html.dark .bg-slate-100,
+html.dark .bg-slate-200,
+html.dark .bg-neutral-100,
+html.dark .bg-\[\#f4f7fb\],
+html.dark .bg-\[\#eef2f7\],
+html.dark .bg-\[\#f1f5f9\] { background-color: var(--tp-surface-2) !important; }
+
+/* Interactive hover backgrounds — higher specificity so they still win. */
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-gray-100:hover,
+html.dark .hover\:bg-gray-200:hover,
+html.dark .hover\:bg-slate-100:hover,
+html.dark .hover\:bg-slate-200:hover { background-color: var(--tp-surface-3) !important; }
+
+html.dark .hover\:bg-white:hover,
+html.dark .hover\:bg-white\/60:hover,
+html.dark .hover\:bg-white\/70:hover { background-color: var(--tp-surface-2) !important; }
+
+/* ── Text ─────────────────────────────────────────────────────────────── */
+html.dark .text-black,
+html.dark .text-gray-900,
+html.dark .text-slate-900,
+html.dark .text-neutral-900,
+html.dark .text-gray-800,
+html.dark .text-slate-800 { color: var(--tp-text) !important; }
+
+html.dark .text-gray-700,
+html.dark .text-gray-600,
+html.dark .text-slate-700,
+html.dark .text-slate-600,
+html.dark .text-neutral-700 { color: var(--tp-text-2) !important; }
+
+html.dark .text-gray-500,
+html.dark .text-gray-400,
+html.dark .text-slate-500,
+html.dark .text-slate-400,
+html.dark .text-neutral-500,
+html.dark .text-neutral-400 { color: var(--tp-text-3) !important; }
+
+/* Brand-coloured text → lightened so it pops on dark surfaces. */
+html.dark .text-\[\#ba0036\],
+html.dark .text-\[\#90002a\],
+html.dark .text-brandRed,
+html.dark .text-crimson-500,
+html.dark .text-crimson-600 { color: var(--tp-brand-text) !important; }
+
+/* ── Borders & dividers ───────────────────────────────────────────────── */
+html.dark .border-gray-50,
+html.dark .border-gray-100,
+html.dark .border-gray-200,
+html.dark .border-gray-300,
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-neutral-100,
+html.dark .border-neutral-200 { border-color: var(--tp-border) !important; }
+
+html.dark .divide-gray-50 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: var(--tp-border) !important; }
+
+/* ── Tinted status chips / badges (light -50/-100 fills → dark tints) ──── */
+html.dark .bg-rose-50, html.dark .bg-rose-100,
+html.dark .bg-red-50,  html.dark .bg-red-100 { background-color: rgba(244, 63, 94, 0.16) !important; }
+html.dark .text-red-500, html.dark .text-red-600, html.dark .text-red-700 { color: #fb7185 !important; }
+
+html.dark .bg-emerald-50, html.dark .bg-emerald-100,
+html.dark .bg-green-50,   html.dark .bg-green-100 { background-color: rgba(16, 185, 129, 0.16) !important; }
+html.dark .text-emerald-600, html.dark .text-emerald-700, html.dark .text-emerald-800,
+html.dark .text-green-600,   html.dark .text-green-700 { color: #34d399 !important; }
+
+html.dark .bg-amber-50, html.dark .bg-amber-100,
+html.dark .bg-yellow-50, html.dark .bg-yellow-100 { background-color: rgba(245, 158, 11, 0.16) !important; }
+html.dark .text-amber-600, html.dark .text-amber-700, html.dark .text-amber-800,
+html.dark .text-yellow-600, html.dark .text-yellow-700 { color: #fbbf24 !important; }
+
+html.dark .bg-blue-50, html.dark .bg-blue-100,
+html.dark .bg-sky-50,  html.dark .bg-indigo-50 { background-color: rgba(59, 130, 246, 0.16) !important; }
+html.dark .text-blue-600, html.dark .text-blue-700,
+html.dark .text-sky-600,  html.dark .text-indigo-600 { color: #60a5fa !important; }
+
+/* ── Form controls ────────────────────────────────────────────────────── */
+html.dark input,
+html.dark textarea,
+html.dark select {
+  background-color: var(--tp-surface-2);
+  color: var(--tp-text);
+  border-color: var(--tp-border);
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder { color: var(--tp-text-3); opacity: 1; }
+
+/* Keep switch/toggle knobs light so they stay visible on dark tracks. */
+html.dark [role="switch"] > span { background-color: #e9eef5 !important; }
+
+/* Soften the big soft shadows so cards don't look like black blobs. */
+html.dark .shadow-xl,
+html.dark .shadow-2xl { box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.6) !important; }
+
+/* Hover TEXT states — without these, `hover:text-gray-900` etc. would turn
+   near-black on a dark surface (invisible). Higher specificity than the base
+   text overrides so they win while hovering. */
+html.dark .hover\:text-black:hover,
+html.dark .hover\:text-gray-900:hover,
+html.dark .hover\:text-gray-800:hover,
+html.dark .hover\:text-slate-900:hover { color: var(--tp-text) !important; }
+
+html.dark .hover\:text-gray-700:hover,
+html.dark .hover\:text-gray-600:hover,
+html.dark .hover\:text-slate-700:hover { color: var(--tp-text-2) !important; }
+
+html.dark .hover\:text-\[\#ba0036\]:hover,
+html.dark .hover\:text-\[\#90002a\]:hover { color: var(--tp-brand-text) !important; }
