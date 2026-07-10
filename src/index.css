@@ -416,3 +416,54 @@ html.dark .bg-clip-text.to-gray-700,
 html.dark .bg-clip-text.to-gray-600,
 html.dark .bg-clip-text.to-slate-900,
 html.dark .bg-clip-text.to-slate-800 { --tw-gradient-to: var(--tp-text-2) var(--tw-gradient-to-position) !important; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   FUTURISTIC ACCENTS — used by the Settings hub + its modal. Effects use the
+   brand colour at low intensity so they read on BOTH light and dark. The
+   html.reduce-motion rule above already neutralises these animations.
+   ══════════════════════════════════════════════════════════════════════════ */
+@keyframes tpOrbFloat {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(4%, -5%, 0) scale(1.1); }
+}
+@keyframes tpSheen {
+  0%        { transform: translateX(-130%) skewX(-14deg); }
+  55%, 100% { transform: translateX(360%) skewX(-14deg); }
+}
+
+/* Ambient blurred orb (decorative background blob). */
+.tp-orb { position: absolute; border-radius: 9999px; filter: blur(70px); pointer-events: none; animation: tpOrbFloat 16s ease-in-out infinite; will-change: transform; }
+@media (min-width: 1024px) { .tp-orb { filter: blur(110px); } }
+
+/* Brand glow — active category card + focused panels. */
+.tp-glow { box-shadow: 0 0 0 1px rgba(186, 0, 54, 0.30), 0 20px 55px -22px rgba(186, 0, 54, 0.65) !important; }
+
+/* Gradient hairline along the top edge of a card / panel. */
+.tp-topline { position: relative; }
+.tp-topline::before {
+  content: ''; position: absolute; top: 0; left: 9%; right: 9%; height: 1.5px; border-radius: 9999px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(186, 0, 54, 0.85), rgba(255, 77, 109, 0.95), transparent);
+}
+
+/* Very subtle tech grid backdrop. */
+.tp-grid {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: 34px 34px;
+}
+
+/* Animated sheen sweep — put inside a relative, overflow-hidden element. */
+.tp-sheen::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 45%; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+  transform: translateX(-130%) skewX(-14deg);
+}
+.tp-sheen:hover::after { animation: tpSheen 0.9s ease-out; }
+
+/* Gradient-glow border wrapper (futuristic modal / card). The padding is the
+   visible border thickness; place the real panel inside as a child. */
+.tp-border-glow {
+  background: linear-gradient(150deg, rgba(186, 0, 54, 0.6), rgba(255, 77, 109, 0.28) 42%, rgba(148, 163, 184, 0.16) 100%);
+  box-shadow: 0 34px 90px -34px rgba(186, 0, 54, 0.55), 0 0 46px -18px rgba(186, 0, 54, 0.5);
+}

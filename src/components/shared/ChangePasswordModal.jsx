@@ -156,42 +156,54 @@ const ChangePasswordModal = ({ open, onClose, phone, phoneVerified = false, bn =
 
   // ── Shared button classes (nice pressed / focus feedback) ──────────────────
   const primaryBtn =
-    'inline-flex items-center justify-center gap-2 rounded-xl bg-[#ba0036] px-5 py-3 text-sm font-black text-white shadow-[0_6px_18px_-6px_rgba(186,0,54,0.6)] transition-all duration-150 hover:bg-[#a10030] active:scale-[0.97] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ba0036]/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 select-none [-webkit-tap-highlight-color:transparent]';
+    'relative overflow-hidden tp-sheen inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#ba0036] to-[#e11d48] px-5 py-3.5 text-sm font-black text-white shadow-[0_12px_30px_-8px_rgba(186,0,54,0.7)] transition-all duration-150 hover:brightness-110 active:scale-[0.97] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ba0036]/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 disabled:hover:brightness-100 select-none [-webkit-tap-highlight-color:transparent]';
   const ghostBtn =
     'inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 px-5 py-3 text-sm font-black text-gray-700 transition-all duration-150 hover:bg-gray-200 active:scale-[0.97] focus:outline-none focus-visible:ring-4 focus-visible:ring-gray-300/60 select-none [-webkit-tap-highlight-color:transparent]';
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4 animate-tp-fade-in"
+      className="fixed inset-0 z-[60] flex items-end md:items-center justify-center p-0 md:p-4 animate-tp-fade-in"
       onMouseDown={(e) => { if (e.target === e.currentTarget && !loading) onClose?.(); }}
     >
-      <div className="w-full md:max-w-md bg-white rounded-t-[2rem] md:rounded-[2rem] shadow-2xl animate-tp-modal-in overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-4 px-6 pt-6 pb-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="w-11 h-11 rounded-2xl bg-rose-50 text-[#ba0036] flex items-center justify-center shrink-0">
-              <KeyRound size={20} />
-            </span>
-            <div className="min-w-0">
-              <h2 className="text-lg font-black text-gray-900 tracking-tight truncate">
-                {bn ? 'পাসওয়ার্ড পরিবর্তন' : 'Change password'}
-              </h2>
-              <p className="text-[11px] font-bold text-gray-400 truncate">
-                {bn ? 'ফোনে পাঠানো কোড দিয়ে যাচাই' : 'Verify with a code sent to your phone'}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => !loading && onClose?.()}
-            aria-label={bn ? 'বন্ধ করুন' : 'Close'}
-            className="p-2 rounded-xl bg-gray-100 text-gray-600 transition-all duration-150 hover:bg-gray-200 active:scale-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-gray-300/60 [-webkit-tap-highlight-color:transparent]"
-          >
-            <X size={18} />
-          </button>
-        </div>
+      {/* Backdrop + radial brand glow (pointer-events-none so click-outside
+          still reaches the overlay for close detection). */}
+      <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-md pointer-events-none" aria-hidden />
+      <div
+        className="absolute inset-0 pointer-events-none"
+        aria-hidden
+        style={{ background: 'radial-gradient(58% 46% at 50% 38%, rgba(186,0,54,0.20), transparent 72%)' }}
+      />
 
-        <div className="px-6 pb-6">
+      {/* Gradient-glow border wrapper → inner panel */}
+      <div className="relative w-full md:max-w-md p-[1.5px] rounded-t-[2rem] md:rounded-[2rem] tp-border-glow animate-tp-modal-in">
+        <div className="relative rounded-t-[calc(2rem-1.5px)] md:rounded-[calc(2rem-1.5px)] bg-white overflow-hidden">
+          {/* Header — tech grid + gradient key */}
+          <div className="tp-grid relative flex items-center justify-between gap-4 px-6 pt-6 pb-4">
+            <span className="absolute top-0 left-8 right-8 h-px bg-gradient-to-r from-transparent via-[#ba0036] to-transparent" aria-hidden />
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#ba0036] to-[#7c0026] text-white flex items-center justify-center shrink-0 shadow-[0_10px_26px_-8px_rgba(186,0,54,0.75)] ring-1 ring-white/15">
+                <KeyRound size={22} />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-lg font-black text-gray-900 tracking-tight truncate">
+                  {bn ? 'পাসওয়ার্ড পরিবর্তন' : 'Change password'}
+                </h2>
+                <p className="text-[11px] font-bold text-gray-400 truncate">
+                  {bn ? 'ফোনে পাঠানো কোড দিয়ে যাচাই' : 'Verify with a code sent to your phone'}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => !loading && onClose?.()}
+              aria-label={bn ? 'বন্ধ করুন' : 'Close'}
+              className="p-2 rounded-xl bg-gray-100 text-gray-600 transition-all duration-150 hover:bg-gray-200 active:scale-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-gray-300/60 [-webkit-tap-highlight-color:transparent]"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="px-6 pb-6">
           {/* ── Not phone-verified: block the flow with guidance ───────────── */}
           {!phoneVerified ? (
             <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 flex items-start gap-3">
@@ -252,7 +264,7 @@ const ChangePasswordModal = ({ open, onClose, phone, phoneVerified = false, bn =
                     onChange={(e) => handleOtpChange(i, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(i, e)}
                     aria-label={`${bn ? 'কোড অঙ্ক' : 'Code digit'} ${i + 1}`}
-                    className="w-11 h-12 md:w-12 md:h-14 text-center text-lg font-black text-gray-900 rounded-xl border-2 border-gray-200 bg-white transition-all duration-150 focus:outline-none focus:border-[#ba0036] focus:ring-4 focus:ring-[#ba0036]/15"
+                    className="w-11 h-12 md:w-12 md:h-14 text-center text-lg font-black text-gray-900 rounded-xl border-2 border-gray-200 bg-white transition-all duration-150 focus:outline-none focus:border-[#ba0036] focus:ring-4 focus:ring-[#ba0036]/25 focus:shadow-[0_0_18px_-3px_rgba(186,0,54,0.6)]"
                   />
                 ))}
               </div>
@@ -268,7 +280,7 @@ const ChangePasswordModal = ({ open, onClose, phone, phoneVerified = false, bn =
                   onChange={(e) => setPw(e.target.value)}
                   placeholder={bn ? 'নতুন পাসওয়ার্ড' : 'Enter a new password'}
                   autoComplete="new-password"
-                  className="w-full rounded-xl border-2 border-gray-200 bg-white px-3.5 py-3 pr-11 text-sm font-bold text-gray-900 transition-all duration-150 focus:outline-none focus:border-[#ba0036] focus:ring-4 focus:ring-[#ba0036]/15"
+                  className="w-full rounded-xl border-2 border-gray-200 bg-white px-3.5 py-3 pr-11 text-sm font-bold text-gray-900 transition-all duration-150 focus:outline-none focus:border-[#ba0036] focus:ring-4 focus:ring-[#ba0036]/25 focus:shadow-[0_0_18px_-3px_rgba(186,0,54,0.6)]"
                 />
                 <button
                   type="button"
@@ -293,7 +305,7 @@ const ChangePasswordModal = ({ open, onClose, phone, phoneVerified = false, bn =
                 onChange={(e) => setPw2(e.target.value)}
                 placeholder={bn ? 'আবার লিখুন' : 'Re-enter the password'}
                 autoComplete="new-password"
-                className="w-full rounded-xl border-2 border-gray-200 bg-white px-3.5 py-3 text-sm font-bold text-gray-900 transition-all duration-150 focus:outline-none focus:border-[#ba0036] focus:ring-4 focus:ring-[#ba0036]/15"
+                className="w-full rounded-xl border-2 border-gray-200 bg-white px-3.5 py-3 text-sm font-bold text-gray-900 transition-all duration-150 focus:outline-none focus:border-[#ba0036] focus:ring-4 focus:ring-[#ba0036]/25 focus:shadow-[0_0_18px_-3px_rgba(186,0,54,0.6)]"
               />
               {pw2.length > 0 && !pwMatch && (
                 <p className="text-[11px] font-bold text-red-500 mt-1.5">
@@ -333,6 +345,7 @@ const ChangePasswordModal = ({ open, onClose, phone, phoneVerified = false, bn =
               </div>
             </form>
           )}
+          </div>
         </div>
       </div>
     </div>

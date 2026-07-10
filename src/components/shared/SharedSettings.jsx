@@ -207,8 +207,8 @@ const TimeRange = ({ from, until, onFrom, onUntil, bn }) => (
 // ─── Scope + master-detail primitives ─────────────────────────────────────────
 const ScopeHeader = ({ icon: Icon, title, subtitle }) => (
   <div className="flex items-center gap-3 mt-10 mb-4 first:mt-2">
-    <span className="w-8 h-8 rounded-lg bg-[#ba0036] text-white flex items-center justify-center shrink-0">
-      <Icon size={16} />
+    <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#ba0036] to-[#7c0026] text-white flex items-center justify-center shrink-0 shadow-[0_8px_20px_-8px_rgba(186,0,54,0.7)]">
+      <Icon size={17} />
     </span>
     <div className="min-w-0">
       <h2 className="text-base md:text-lg font-black tracking-tight text-gray-900 truncate">{title}</h2>
@@ -223,13 +223,13 @@ const CategoryNavButton = ({ icon: Icon, title, subtitle, active, onClick }) => 
     type="button"
     onClick={onClick}
     aria-current={active ? 'true' : undefined}
-    className={`group w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left border transition-all duration-150 active:scale-[0.99] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ba0036]/20 select-none [-webkit-tap-highlight-color:transparent] ${
+    className={`group relative overflow-hidden tp-sheen w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left border transition-all duration-200 active:scale-[0.99] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ba0036]/20 select-none [-webkit-tap-highlight-color:transparent] ${
       active
-        ? 'bg-white border-[#ba0036]/25 shadow-[0_10px_30px_-16px_rgba(186,0,54,0.45)] ring-1 ring-[#ba0036]/5'
-        : 'bg-white/50 border-gray-100 hover:bg-white hover:border-gray-200'
+        ? 'bg-white border-[#ba0036]/40 tp-glow'
+        : 'bg-white/60 border-gray-100 hover:bg-white hover:border-gray-200'
     }`}
   >
-    <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors duration-150 ${active ? 'bg-[#ba0036] text-white' : 'bg-rose-50 text-[#ba0036] group-hover:bg-rose-100'}`}>
+    <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 ${active ? 'bg-gradient-to-br from-[#ba0036] to-[#7c0026] text-white shadow-[0_8px_20px_-8px_rgba(186,0,54,0.75)]' : 'bg-rose-50 text-[#ba0036] group-hover:bg-rose-100'}`}>
       <Icon size={17} />
     </span>
     <div className="min-w-0 flex-1">
@@ -242,9 +242,9 @@ const CategoryNavButton = ({ icon: Icon, title, subtitle, active, onClick }) => 
 
 // Header of the right-hand detail pane (desktop).
 const DetailHeader = ({ icon: Icon, title, subtitle }) => (
-  <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-50">
-    <span className="w-10 h-10 rounded-xl bg-rose-50 text-[#ba0036] flex items-center justify-center shrink-0">
-      <Icon size={19} />
+  <div className="tp-grid relative flex items-center gap-3 px-6 py-5 border-b border-gray-50">
+    <span className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#ba0036] to-[#7c0026] text-white flex items-center justify-center shrink-0 shadow-[0_8px_22px_-8px_rgba(186,0,54,0.7)]">
+      <Icon size={20} />
     </span>
     <div className="min-w-0">
       <h3 className="text-base font-black text-gray-900 tracking-tight truncate">{title}</h3>
@@ -257,7 +257,7 @@ const DetailHeader = ({ icon: Icon, title, subtitle }) => (
 const AccordionCard = ({ icon: Icon, title, subtitle, defaultOpen, children }) => {
   const [open, setOpen] = useState(!!defaultOpen);
   return (
-    <section className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_-15px_rgba(0,0,0,0.08)] overflow-hidden">
+    <section className="tp-topline bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_-15px_rgba(0,0,0,0.08)] overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -303,7 +303,7 @@ const SettingsScope = ({ icon, title, subtitle, categories }) => {
       <ScopeHeader icon={icon} title={title} subtitle={subtitle} />
 
       {/* Desktop: master-detail */}
-      <div className="hidden lg:grid lg:grid-cols-[290px_minmax(0,1fr)] gap-5 items-start">
+      <div className="hidden lg:grid lg:grid-cols-[340px_minmax(0,1fr)] gap-6 items-start">
         <nav className="flex flex-col gap-2.5" aria-label={title}>
           {categories.map((cat) => (
             <CategoryNavButton
@@ -316,7 +316,7 @@ const SettingsScope = ({ icon, title, subtitle, categories }) => {
             />
           ))}
         </nav>
-        <section className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_30px_-15px_rgba(0,0,0,0.08)] overflow-hidden">
+        <section className="tp-topline relative bg-white/95 backdrop-blur-xl rounded-2xl border border-gray-100 ring-1 ring-black/5 shadow-[0_24px_70px_-34px_rgba(15,23,42,0.5)] overflow-hidden">
           {active && (
             <div key={active.id} className="animate-tp-fade-in">
               <DetailHeader icon={active.icon} title={active.title} subtitle={active.subtitle} />
@@ -784,17 +784,27 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
   ];
 
   return (
-    <div className="w-full mb-10 animate-in fade-in zoom-in-95 duration-500">
-      <div className="max-w-[1080px] mx-auto">
+    <div className="relative w-full mb-10 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+      {/* Ambient futuristic backdrop — faint tech grid + blurred brand orbs. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-0 tp-grid opacity-60" />
+        <span className="tp-orb w-[46vw] h-[46vw] max-w-[560px] max-h-[560px] -top-[12%] -left-[8%] bg-[#ba0036]/20" />
+        <span className="tp-orb w-[40vw] h-[40vw] max-w-[500px] max-h-[500px] top-[40%] -right-[10%] bg-[#ff4d6d]/12" style={{ animationDelay: '-7s' }} />
+      </div>
+
+      <div className="relative z-10 max-w-[1600px] mx-auto px-1 sm:px-2 lg:px-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900">{bn ? 'সেটিংস' : 'Settings'}</h1>
-            <p className="text-sm font-bold text-gray-500 mb-2">
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight bg-gradient-to-br from-[#ba0036] via-[#e11d48] to-[#ff4d6d] bg-clip-text text-transparent [-webkit-text-fill-color:transparent]">
+              {bn ? 'সেটিংস' : 'Settings'}
+            </h1>
+            <p className="text-sm font-bold text-gray-500 mb-2 mt-1">
               {bn ? 'অ্যাপ, ভাড়াটিয়া ও বাড়িওয়ালা — সব সেটিং এক জায়গায়।' : 'App, tenant and landlord preferences in one place.'}
             </p>
           </div>
           {saving && (
-            <span className="text-[11px] font-black text-gray-400 mt-1 shrink-0 animate-pulse">
+            <span className="inline-flex items-center gap-2 text-[11px] font-black text-[#ba0036] mt-1 shrink-0 bg-rose-50 px-3 py-1.5 rounded-full ring-1 ring-[#ba0036]/15">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#ba0036] animate-ping" />
               {bn ? 'সেভ হচ্ছে…' : 'Saving…'}
             </span>
           )}
