@@ -345,3 +345,51 @@ html.dark .to-purple-50, html.dark .to-purple-100\/60, html.dark .to-pink-50 { -
 html.dark .to-white\/30, html.dark .to-white\/40, html.dark .to-white\/50,
 html.dark .to-white\/60 { --tw-gradient-to: rgba(23, 32, 48, 0.5) var(--tw-gradient-to-position) !important; }
 html.dark .via-white\/10, html.dark .via-white\/20, html.dark .via-white\/30 { --tw-gradient-stops: var(--tw-gradient-from), rgba(23, 32, 48, 0.2) var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DARK THEME — round 3: robust opacity-variant surfaces + via-white.
+   Opacity modifiers keep appearing on light surfaces (bg-gray-50/85,
+   bg-[#f8f9fa]/90 division bar, bg-slate-100/60 search toggle, bg-gray-50/85
+   rent+booking toolbars). We match them by TOKEN using [class^="…"] (first
+   class) and [class*=" …"] (space-preceded) so we never hit a `hover:`-prefixed
+   variant (preceded by ':') or a `-500` shade (no '/' right after).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Opacity variants of light gray / slate / neutral / zinc surfaces → elevated surface. */
+html.dark [class^="bg-gray-50/"],    html.dark [class*=" bg-gray-50/"],
+html.dark [class^="bg-gray-100/"],   html.dark [class*=" bg-gray-100/"],
+html.dark [class^="bg-gray-200/"],   html.dark [class*=" bg-gray-200/"],
+html.dark [class^="bg-slate-50/"],   html.dark [class*=" bg-slate-50/"],
+html.dark [class^="bg-slate-100/"],  html.dark [class*=" bg-slate-100/"],
+html.dark [class^="bg-slate-200/"],  html.dark [class*=" bg-slate-200/"],
+html.dark [class^="bg-neutral-50/"], html.dark [class*=" bg-neutral-50/"],
+html.dark [class^="bg-neutral-100/"],html.dark [class*=" bg-neutral-100/"],
+html.dark [class^="bg-zinc-50/"],    html.dark [class*=" bg-zinc-50/"] { background-color: var(--tp-surface-2) !important; }
+
+/* Opacity variants of light arbitrary-hex surfaces (navbar division bar, shells). */
+html.dark [class^="bg-[#f8f9fa]/"], html.dark [class*=" bg-[#f8f9fa]/"],
+html.dark [class^="bg-[#f9fafb]/"], html.dark [class*=" bg-[#f9fafb]/"],
+html.dark [class^="bg-[#eaeff5]/"], html.dark [class*=" bg-[#eaeff5]/"],
+html.dark [class^="bg-[#f8fafc]/"], html.dark [class*=" bg-[#f8fafc]/"],
+html.dark [class^="bg-[#fdfdfd]/"], html.dark [class*=" bg-[#fdfdfd]/"] { background-color: var(--tp-surface-2) !important; }
+
+/* Hover opacity gray/slate → hover surface (keeps interactive feedback). */
+html.dark [class*="hover:bg-gray-50/"]:hover,   html.dark [class*="hover:bg-gray-100/"]:hover,
+html.dark [class*="hover:bg-gray-200/"]:hover,  html.dark [class*="hover:bg-slate-50/"]:hover,
+html.dark [class*="hover:bg-slate-100/"]:hover, html.dark [class*="hover:bg-slate-200/"]:hover { background-color: var(--tp-surface-3) !important; }
+
+/* Solid `via-white` gradient stop (used by ~11 gradient cards incl. the profile
+   page: from-rose-50/40 via-white to-white). Without this the middle stays white. */
+html.dark .via-white { --tw-gradient-stops: var(--tw-gradient-from), var(--tp-surface) var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+
+/* Extra dividers seen in the hero search bar + cards. */
+html.dark .divide-slate-50 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-gray-300 > :not([hidden]) ~ :not([hidden]) { border-color: var(--tp-border) !important; }
+
+/* Opacity-variant light borders (search pill, cards) → subtle dark hairline.
+   Token-boundary matched so we never hit `hover:` variants or `-500` shades. */
+html.dark [class^="border-gray-100/"],  html.dark [class*=" border-gray-100/"],
+html.dark [class^="border-gray-200/"],  html.dark [class*=" border-gray-200/"],
+html.dark [class^="border-slate-100/"], html.dark [class*=" border-slate-100/"],
+html.dark [class^="border-slate-200/"], html.dark [class*=" border-slate-200/"] { border-color: var(--tp-border) !important; }

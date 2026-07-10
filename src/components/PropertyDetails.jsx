@@ -125,29 +125,42 @@ const FuturisticTheme = () => {
          toggles <html class="dark">). Higher specificity than the light rules
          above, so these win automatically in dark mode. Values mirror the
          global dark palette in index.css. */
-      html.dark .futuristic-root { color: #eef2f8; }
+      html.dark .futuristic-root { color: #eef2f8 !important; }
       html.dark .futuristic-bg {
-        background: #0b1220;
+        background: #0b1220 !important;
         background-image:
           radial-gradient(ellipse 80% 60% at 20% 0%, rgba(186,0,54,0.14) 0%, transparent 60%),
-          radial-gradient(ellipse 60% 50% at 80% 100%, rgba(186,0,54,0.08) 0%, transparent 60%);
+          radial-gradient(ellipse 60% 50% at 80% 100%, rgba(186,0,54,0.08) 0%, transparent 60%) !important;
       }
       html.dark .glass-card {
-        background: #1b2536;
-        border: 1px solid rgba(148,163,184,0.2);
-        box-shadow: 0 1px 2px rgba(0,0,0,0.35), 0 6px 18px rgba(0,0,0,0.4);
+        background: #1b2536 !important;
+        border-color: rgba(148,163,184,0.2) !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.35), 0 6px 18px rgba(0,0,0,0.4) !important;
       }
       html.dark .glass-card-light {
-        background: #27324a;
-        border: 1px solid rgba(148,163,184,0.16);
+        background: #27324a !important;
+        border-color: rgba(148,163,184,0.16) !important;
       }
-      html.dark .neon-text { color: #ff7d9d; }
+      html.dark .neon-text { color: #ff7d9d !important; }
       html.dark .futuristic-input {
-        background: #27324a;
-        border: 1px solid rgba(148,163,184,0.2);
-        color: #eef2f8;
+        background: #27324a !important;
+        border-color: rgba(148,163,184,0.2) !important;
+        color: #eef2f8 !important;
       }
-      html.dark .futuristic-input::placeholder { color: #9dabc0; }
+      html.dark .futuristic-input::placeholder { color: #9dabc0 !important; }
+
+      /* This component hardcodes light colours via inline style="" (which beats
+         CSS classes). Override them with !important, matched by their colour
+         substring and scoped to .futuristic-root. Safe because this <style> tag
+         only exists in the DOM while the property page is mounted. */
+      html.dark .futuristic-root [style*="#ffffff"] { background-color: #1b2536 !important; }
+      html.dark .futuristic-root [style*="#fafbfc"],
+      html.dark .futuristic-root [style*="#f1f5f9"],
+      html.dark .futuristic-root [style*="#f8fafc"] { background-color: #27324a !important; }
+      html.dark .futuristic-root [style*="rgba(255,255,255,0.9"] { background-color: rgba(23,32,48,0.92) !important; }
+      html.dark .futuristic-root [style*="solid rgba(15,23,42"] { border-color: rgba(148,163,184,0.2) !important; }
+      html.dark .futuristic-root [style*="#475569"],
+      html.dark .futuristic-root [style*="#64748b"] { color: #ccd6e4 !important; }
     `;
     if (!document.getElementById('pd-light-theme')) {
       document.head.appendChild(styleEl);
