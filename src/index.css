@@ -393,3 +393,26 @@ html.dark [class^="border-gray-100/"],  html.dark [class*=" border-gray-100/"],
 html.dark [class^="border-gray-200/"],  html.dark [class*=" border-gray-200/"],
 html.dark [class^="border-slate-100/"], html.dark [class*=" border-slate-100/"],
 html.dark [class^="border-slate-200/"], html.dark [class*=" border-slate-200/"] { border-color: var(--tp-border) !important; }
+
+/* ── Dark-gradient CLIPPED text (premium score/heading style) ───────────────
+   Elements like the Trust Score number use
+   `bg-gradient-to-br from-gray-900 to-gray-600 bg-clip-text text-transparent`
+   — a DARK gradient painted onto transparent text. On a dark background that
+   text is invisible. Lighten the gradient stops (only when combined with
+   bg-clip-text, so real dark gradients elsewhere are untouched). */
+html.dark .bg-clip-text.from-gray-900,
+html.dark .bg-clip-text.from-gray-800,
+html.dark .bg-clip-text.from-slate-900,
+html.dark .bg-clip-text.from-slate-800,
+html.dark .bg-clip-text.from-black,
+html.dark .bg-clip-text.from-neutral-900 {
+  --tw-gradient-from: var(--tp-text) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: var(--tp-text-2) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+html.dark .bg-clip-text.to-gray-900,
+html.dark .bg-clip-text.to-gray-800,
+html.dark .bg-clip-text.to-gray-700,
+html.dark .bg-clip-text.to-gray-600,
+html.dark .bg-clip-text.to-slate-900,
+html.dark .bg-clip-text.to-slate-800 { --tw-gradient-to: var(--tp-text-2) var(--tw-gradient-to-position) !important; }

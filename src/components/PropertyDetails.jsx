@@ -1691,10 +1691,8 @@ const PropertyDetails = () => {
           Z-INDEX: z-30 so the global Navbar (z-[60]) and its city dropdowns
           (z-[70]) stay above this bar. */}
       <header
-        className="sticky top-[56px] md:top-[64px] z-30"
+        className="sticky top-[56px] md:top-[64px] z-30 bg-white border-b border-gray-100"
         style={{
-          background: '#ffffff',
-          borderBottom: '1px solid rgba(15,23,42,0.06)',
           boxShadow: navScrolled ? '0 6px 18px rgba(15,23,42,0.06)' : 'none',
           transition: 'box-shadow 220ms ease',
         }}
