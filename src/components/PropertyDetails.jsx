@@ -149,18 +149,29 @@ const FuturisticTheme = () => {
       }
       html.dark .futuristic-input::placeholder { color: #9dabc0 !important; }
 
-      /* This component hardcodes light colours via inline style="" (which beats
-         CSS classes). Override them with !important, matched by their colour
-         substring and scoped to .futuristic-root. Safe because this <style> tag
-         only exists in the DOM while the property page is mounted. */
-      html.dark .futuristic-root [style*="#ffffff"] { background-color: #1b2536 !important; }
-      html.dark .futuristic-root [style*="#fafbfc"],
-      html.dark .futuristic-root [style*="#f1f5f9"],
-      html.dark .futuristic-root [style*="#f8fafc"] { background-color: #27324a !important; }
-      html.dark .futuristic-root [style*="rgba(255,255,255,0.9"] { background-color: rgba(23,32,48,0.92) !important; }
-      html.dark .futuristic-root [style*="solid rgba(15,23,42"] { border-color: rgba(148,163,184,0.2) !important; }
-      html.dark .futuristic-root [style*="#475569"],
-      html.dark .futuristic-root [style*="#64748b"] { color: #ccd6e4 !important; }
+      /* This component hardcodes light colours via inline style="". React sets
+         them through the CSSOM, so the browser SERIALISES hex → rgb() in the
+         style attribute (#fafbfc → rgb(250, 251, 252); #ffffff → rgb(255, 255,
+         255); rgba(15,23,42,0.06) → rgba(15, 23, 42, 0.06)). We match the
+         normalised rgb()/rgba() forms — the hex forms never actually appear in
+         the DOM attribute — and keep them scoped to .futuristic-root. !important
+         beats inline styles. This <style> only exists while the page is mounted. */
+      /* Solid white surfaces → card surface */
+      html.dark .futuristic-root [style*="rgb(255, 255, 255)"] { background-color: #1b2536 !important; }
+      /* Off-white / slate-50 surfaces → elevated surface */
+      html.dark .futuristic-root [style*="rgb(250, 251, 252)"],
+      html.dark .futuristic-root [style*="rgb(241, 245, 249)"],
+      html.dark .futuristic-root [style*="rgb(248, 250, 252)"] { background-color: #27324a !important; }
+      /* Translucent white glass (mobile action bar, toast) → dark glass */
+      html.dark .futuristic-root [style*="rgba(255, 255, 255, 0.9"] { background-color: rgba(23, 32, 48, 0.92) !important; }
+      /* Hairline borders (border shorthand + borderColor) → subtle light border */
+      html.dark .futuristic-root [style*="rgba(15, 23, 42, 0.05)"],
+      html.dark .futuristic-root [style*="rgba(15, 23, 42, 0.06)"],
+      html.dark .futuristic-root [style*="rgba(15, 23, 42, 0.08)"],
+      html.dark .futuristic-root [style*="rgba(15, 23, 42, 0.1)"] { border-color: rgba(148, 163, 184, 0.22) !important; }
+      /* Dark inline text colours (#475569 / #64748b / #0f172a) → light */
+      html.dark .futuristic-root [style*="rgb(71, 85, 105)"],
+      html.dark .futuristic-root [style*="rgb(100, 116, 139)"] { color: #ccd6e4 !important; }
     `;
     if (!document.getElementById('pd-light-theme')) {
       document.head.appendChild(styleEl);
@@ -1683,15 +1694,11 @@ const PropertyDetails = () => {
           • No brand logo, no home brand button — just the page-level row
           • Light surface; subtle lift shadow once you've scrolled past 24px
 
-          POSITIONING (important): sticky `top-[56px] md:top-[64px]` so this bar
-          parks BELOW the compact global TopNav's top row and
-          also `sticky top-0`). Without this offset both bars would stack at
-          y=0 and this one would visually cover the global Navbar.
-
-          Z-INDEX: z-30 so the global Navbar (z-[60]) and its city dropdowns
-          (z-[70]) stay above this bar. */}
+          POSITIONING: the marketing Navbar is hidden on /property/ routes
+          (see App.jsx hideNavbarRoutes), so this is the ONE top bar — it sticks
+          flush at `top-0` instead of floating below a phantom navbar. */}
       <header
-        className="sticky top-[56px] md:top-[64px] z-30 bg-white border-b border-gray-100"
+        className="sticky top-0 z-40 bg-white border-b border-gray-100"
         style={{
           boxShadow: navScrolled ? '0 6px 18px rgba(15,23,42,0.06)' : 'none',
           transition: 'box-shadow 220ms ease',
