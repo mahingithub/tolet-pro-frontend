@@ -47,16 +47,12 @@ import RefundPolicy from "./components/legal/RefundPolicy";
 import FeedbackButton from "./components/FeedbackButton";
 import GlobalCallUI from "./components/GlobalCallUI";
 
-// --- Admin Imports ---
-import AdminLayout from "./components/AdminLayout";
-import AdminOverview from "./components/AdminOverview";
-import PropertyModeration from "./components/PropertyModeration";
-import UserManagement from "./components/UserManagement";
-import SupportAndAI from "./components/SupportAndAI";
-import AdminReports from "./components/AdminReports";
+// --- Admin panel ---
+// The admin panel is now a SEPARATE React app (see ../tolet-pro-admin),
+// hosted on its own subdomain with its own dedicated auth. It is no longer
+// bundled into the consumer app.
 
 // --- Auth-gate Imports ---
-import RequireAdmin from "./components/RequireAdmin.jsx";
 import RequireAuth from "./components/RequireAuth.jsx";
 
 // ─── Global call socket bootstrap ───────────────────────────────────────────
@@ -104,7 +100,6 @@ const AppLayout = () => {
 		"/tenant-dashboard",
 		"/host-dashboard",
 		"/login",
-		"/admin",
 		"/account",
 		// Property detail pages have their own dedicated sticky header
 		// (Back / breadcrumb / save+share), so the marketing navbar is
@@ -203,21 +198,6 @@ const AppLayout = () => {
 					}
 				/>
 
-				<Route
-					path="/admin"
-					element={
-						<RequireAdmin>
-							<AdminLayout />
-						</RequireAdmin>
-					}
-				>
-					<Route index element={<AdminOverview />} />
-					<Route path="properties" element={<PropertyModeration />} />
-					<Route path="users" element={<UserManagement />} />
-					<Route path="reports" element={<AdminReports />} />
-					<Route path="support" element={<SupportAndAI />} />
-				</Route>
-
 				<Route path="*" element={<Navigate to="/" replace />} />
 			</Routes>
 
@@ -225,7 +205,7 @@ const AppLayout = () => {
 			<WelcomeRobotOverlay />
 			<GlobalToaster />
 			{!shouldHideAIAssistant && <GlobalAIAssistant />}
-			<MobileBottomNav hideOnRoutes={['/login', '/admin', '/list-property', '/properties/']} />
+			<MobileBottomNav hideOnRoutes={['/login', '/list-property', '/properties/']} />
 			<InstallPrompt />
 			<FeedbackButton />
 		</div>
