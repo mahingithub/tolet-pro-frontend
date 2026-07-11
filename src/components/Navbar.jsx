@@ -137,6 +137,15 @@ const Navbar = () => {
   const [userRole, setUserRole] = useState(activeRoleFromAuth);
   useEffect(() => { setUserRole(activeRoleFromAuth); }, [activeRoleFromAuth]);
 
+  // Which roles this account has ACTUALLY unlocked server-side (roles[]).
+  // The tenant⇄host mode toggle only makes sense once BOTH roles exist —
+  // telling a tenant who has never hosted to "Switch to Host" is confusing
+  // (they aren't a host yet). Tenant-only users instead get a "become a
+  // landlord" invitation that routes them into the verification flow.
+  const ownsLandlord = Array.isArray(auth.roles) && (auth.roles.includes('landlord') || auth.roles.includes('host'));
+  const ownsTenant   = Array.isArray(auth.roles) && auth.roles.includes('tenant');
+  const hasBothRoles = ownsLandlord && ownsTenant;
+
   // Switch the active role. If the user hasn't unlocked the destination
   // role yet (e.g. they're a tenant who has never posted a listing),
   // call addRole() first so the server-side roles[] gets `landlord`
@@ -667,17 +676,28 @@ useEffect(() => {
                         <LogOut size={17} /> Log Out
                       </button>
 
-                      <div className="px-3 py-3 bg-gray-900 mt-2 rounded-[1.2rem]">
-                        {/* Mode pill — wired to AuthContext.setActiveRole so the
-                            switch survives reloads and is mirrored across tabs.
-                            Calls addRole() first if the destination role hasn't
-                            been unlocked yet (e.g. a brand-new tenant becoming
-                            a host for the first time). */}
-                        <button onClick={handleSwitchRole}
-                          className="w-full flex items-center justify-center gap-2 text-[10px] font-black text-white uppercase tracking-widest py-1 hover:scale-105 transition-transform">
-                          <RefreshCw size={13} /> Switch to {userRole === 'tenant' ? 'Host' : 'Tenant'}
-                        </button>
-                      </div>
+                      {(hasBothRoles || !ownsLandlord) && (
+                        <div className="px-3 py-3 bg-gray-900 mt-2 rounded-[1.2rem]">
+                          {hasBothRoles ? (
+                            /* Mode pill — genuine tenant⇄host toggle, shown only
+                               once BOTH roles are unlocked. Wired to
+                               AuthContext.setActiveRole so the switch survives
+                               reloads and is mirrored across tabs. */
+                            <button onClick={handleSwitchRole}
+                              className="w-full flex items-center justify-center gap-2 text-[10px] font-black text-white uppercase tracking-widest py-1 hover:scale-105 transition-transform">
+                              <RefreshCw size={13} /> Switch to {userRole === 'tenant' ? 'Host' : 'Tenant'}
+                            </button>
+                          ) : (
+                            /* Tenant who hasn't become a host yet — invite them
+                               to become a landlord. Routes through the same
+                               verification gate handleSwitchRole enforces. */
+                            <button onClick={handleSwitchRole}
+                              className="w-full flex items-center justify-center gap-2 text-[11px] font-black text-white py-1 hover:scale-105 transition-transform">
+                              <Building2 size={13} /> {t.menuBecomeLandlord || 'I want to be a landlord'}
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </>
@@ -956,10 +976,11 @@ useEffect(() => {
           )}
 
           {/* ─── LOGGED-IN: Highlighted role switcher ───
-              Pulled out of the flat account list into a prominent brand
-              card so the tenant⇄host switch is impossible to miss. Shows
-              the mode you're in now + the role you'll switch to. */}
-          {isLoggedIn && (
+              Only shown once the user owns BOTH roles — this is a genuine
+              tenant⇄host TOGGLE, so it must not appear for a tenant who has
+              never become a host. Shows the mode you're in now + the role
+              you'll switch to. */}
+          {isLoggedIn && hasBothRoles && (
             <button
               onClick={handleSwitchRole}
               className="group relative w-full flex items-center gap-3.5 p-3.5 mb-5 rounded-2xl bg-gradient-to-br from-[#ba0036] to-[#e60045] text-white shadow-[0_10px_26px_rgba(186,0,54,0.28)] overflow-hidden active:scale-[0.98] transition-transform"
@@ -978,6 +999,35 @@ useEffect(() => {
               </div>
               <span className="flex items-center gap-0.5 text-[11px] font-black bg-white/20 pl-3 pr-2 py-1.5 rounded-full shrink-0">
                 {userRole === 'tenant' ? (t.menuRoleHost || 'Host') : (t.menuRoleTenant || 'Tenant')}
+                <ChevronRight size={14} className="group-active:translate-x-0.5 transition-transform" />
+              </span>
+            </button>
+          )}
+
+          {/* ─── LOGGED-IN: "Become a landlord" invitation ───
+              For tenants who have NOT unlocked the host role yet. Instead of
+              a misleading "switch" toggle, we offer an upgrade CTA that routes
+              them through the same verification gate handleSwitchRole uses
+              (tenant → landlord opens the verification modal when needed). */}
+          {isLoggedIn && !ownsLandlord && (
+            <button
+              onClick={handleSwitchRole}
+              className="group relative w-full flex items-center gap-3.5 p-3.5 mb-5 rounded-2xl bg-gradient-to-br from-[#ba0036] to-[#e60045] text-white shadow-[0_10px_26px_rgba(186,0,54,0.28)] overflow-hidden active:scale-[0.98] transition-transform"
+            >
+              <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+              <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center shrink-0">
+                <Building2 size={20} className="text-white" />
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/75 leading-none mb-1">
+                  {t.menuBecomeLandlordSub || 'Rent out your property'}
+                </p>
+                <p className="text-[15px] font-black leading-tight">
+                  {t.menuBecomeLandlord || 'I want to be a landlord'}
+                </p>
+              </div>
+              <span className="flex items-center gap-0.5 text-[11px] font-black bg-white/20 pl-3 pr-2 py-1.5 rounded-full shrink-0">
+                {t.menuBecomeLandlordCta || 'Start'}
                 <ChevronRight size={14} className="group-active:translate-x-0.5 transition-transform" />
               </span>
             </button>
