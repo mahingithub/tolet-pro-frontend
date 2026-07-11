@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   User, Phone, Lock, ArrowLeft, Loader2, CheckCircle2,
-  Home, ShieldCheck, Building2, MessageCircle,
+  Home, ShieldCheck, Building2, MessageCircle, ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
@@ -99,6 +99,23 @@ const LoginPage = () => {
   );
   const [step, setStep] = useState(STEPS.FORM);
   const [role, setRole] = useState(requestedRole === 'landlord' ? 'landlord' : 'tenant');
+
+  // ─── Role-selection popup ───────────────────────────────────────────────
+  // On entering the login / signup screen we prompt the user to say whether
+  // they're a tenant or a landlord, so they never have to guess which side
+  // they registered on. We skip it when the URL already carries an explicit
+  // role (e.g. the navbar "I'm a landlord" CTA → ?role=landlord) or on the
+  // forgot-password flow where role is irrelevant. The in-form toggle stays
+  // available as a quick way to change the choice afterwards.
+  const hasExplicitRole = requestedRole === 'landlord' || requestedRole === 'tenant';
+  const [showRolePicker, setShowRolePicker] = useState(
+    !hasExplicitRole && requestedMode !== 'forgot',
+  );
+  const chooseRole = (r) => {
+    setRole(r);
+    setShowRolePicker(false);
+  };
+
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [infoMsg, setInfoMsg] = useState('');
@@ -336,6 +353,75 @@ const LoginPage = () => {
 
   return (
     <div className="h-screen w-full flex bg-[#f8f9fa] font-sans overflow-hidden">
+      {/* ── ROLE PICKER POPUP ──
+          Appears on entry to login/signup so the user explicitly picks whether
+          they're a tenant or a landlord (they don't have to remember which side
+          they signed up on). Skipped when a role is already set via the URL or
+          on the forgot-password screen. Picking an option preselects the role
+          and reveals the form; the in-form toggle can still change it. */}
+      {showRolePicker && mode !== MODES.FORGOT && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
+            onClick={() => setShowRolePicker(false)}
+          />
+          <div className="relative bg-white rounded-3xl shadow-[0_30px_80px_rgba(0,0,0,0.25)] w-full max-w-sm overflow-hidden animate-[floatIn_0.3s_ease-out]">
+            {/* Brand header */}
+            <div className="relative bg-gradient-to-br from-[#BA0036] to-[#7A0024] px-6 pt-7 pb-7 text-white text-center overflow-hidden">
+              <div className="absolute -top-8 -right-8 w-28 h-28 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+              <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center mx-auto mb-3 ring-1 ring-white/25">
+                <Home size={26} strokeWidth={2.5} className="text-white" />
+              </div>
+              <h3 className="text-xl font-black tracking-tight">
+                {mode === MODES.SIGNUP
+                  ? L('How do you want to sign up?', 'কীভাবে সাইন আপ করতে চান?')
+                  : L('How do you want to log in?', 'কীভাবে লগইন করতে চান?')}
+              </h3>
+              <p className="text-white/80 text-sm mt-1">
+                {L('Choose your role to continue', 'চালিয়ে যেতে আপনার ভূমিকা বেছে নিন')}
+              </p>
+            </div>
+
+            {/* Options */}
+            <div className="p-5 grid gap-3">
+              <button
+                type="button"
+                onClick={() => chooseRole('tenant')}
+                className="group flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 hover:border-brandRed hover:bg-red-50/40 transition-all text-left active:scale-[0.98]"
+              >
+                <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                  <User size={22} className="text-blue-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-base font-black text-gray-900">{L('Tenant', 'ভাড়াটিয়া')}</p>
+                  <p className="text-xs text-gray-500">{L("I'm looking for a home", 'আমি বাসা খুঁজছি')}</p>
+                </div>
+                <ChevronRight size={18} className="text-gray-300 group-hover:text-brandRed group-hover:translate-x-0.5 transition-all shrink-0" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => chooseRole('landlord')}
+                className="group flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 hover:border-brandRed hover:bg-red-50/40 transition-all text-left active:scale-[0.98]"
+              >
+                <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                  <Building2 size={22} className="text-brandRed" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-base font-black text-gray-900">{L('Landlord', 'বাড়িওয়ালা')}</p>
+                  <p className="text-xs text-gray-500">{L('I want to list my property', 'আমি বাড়ি ভাড়া দিতে চাই')}</p>
+                </div>
+                <ChevronRight size={18} className="text-gray-300 group-hover:text-brandRed group-hover:translate-x-0.5 transition-all shrink-0" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── LEFT SIDE: DESKTOP BRAND PANEL ── */}
       <div className="hidden lg:flex lg:w-[46%] relative overflow-hidden">
         <img
