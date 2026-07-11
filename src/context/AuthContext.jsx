@@ -11,13 +11,19 @@ import {
   setActiveRole as svcSetActiveRole,
   submitVerification as svcSubmitVerification,
   isAdminRole,
+  isSessionExpired,
+  ensureSessionExpiry,
+  clearAllAppData,
 } from '../services/authService.js';
 import { subscribe } from '../services/_storage.js';
+import { isInstalledApp } from '../utils/platform.js';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => getCurrentUser());
+  // Never boot into an expired website session (prevents a one-frame flash of
+  // the previous user's data before the effect below wipes it).
+  const [user, setUser] = useState(() => (isSessionExpired() ? null : getCurrentUser()));
 
   // On boot, if a token exists, validate it server-side via /me. If the token
   // is invalid or the user was deleted, this returns null and we clear the
@@ -29,6 +35,17 @@ export const AuthProvider = ({ children }) => {
   // call — that was killing fresh logins immediately and forcing the user back
   // to the login screen.
   useEffect(() => {
+    // Website-only 7-day session cap: if the stored session has aged out, wipe
+    // all local data and stay logged out — never hit /me with a dead session.
+    if (isSessionExpired()) {
+      clearAllAppData();
+      setUser(null);
+      return;
+    }
+    // Backfill a 7-day window for sessions created before this shipped, so
+    // existing logins aren't immortal.
+    ensureSessionExpiry();
+
     const initialToken = getCurrentToken();
     if (!initialToken) return;
     let cancelled = false;
@@ -45,6 +62,28 @@ export const AuthProvider = ({ children }) => {
         svcLogout().finally(() => setUser(null));
       });
     return () => { cancelled = true; };
+  }, []);
+
+  // While a website tab stays open, enforce the 7-day cap in the background so
+  // a long-lived tab (or one reopened after the cap) logs itself out and clears
+  // its data. Installed apps (native / standalone PWA) opt out entirely.
+  useEffect(() => {
+    if (isInstalledApp()) return undefined;
+    const enforce = () => {
+      if (!isSessionExpired()) return;
+      clearAllAppData();
+      setUser(null);
+      // Hard reload to a clean, logged-out screen (drops stale in-memory UI).
+      try { window.location.assign('/login'); } catch { /* ignore */ }
+    };
+    const id = window.setInterval(enforce, 60 * 1000);
+    window.addEventListener('focus', enforce);
+    document.addEventListener('visibilitychange', enforce);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('focus', enforce);
+      document.removeEventListener('visibilitychange', enforce);
+    };
   }, []);
 
   // Keep state in sync with localStorage broadcasts from authService.
@@ -120,6 +159,10 @@ export const AuthProvider = ({ children }) => {
       logout: async () => {
         await svcLogout();
         setUser(null);
+        // Hard reload to a clean state so NO stale in-memory data from this
+        // account (dashboard cards, chat threads, etc.) lingers until the next
+        // manual reload — the exact bug where a re-login showed the old data.
+        try { window.location.assign('/'); } catch { /* ignore */ }
       },
       updateMe: async (patch) => {
         const u = await svcUpdateMe(patch);

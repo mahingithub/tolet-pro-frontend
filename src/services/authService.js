@@ -19,8 +19,9 @@
  * 2.  POST /reset-password  {phoneNumber, otp, newPassword}  → 200
  */
 
-import { readJson, writeJson, removeKey, broadcast } from './_storage.js';
+import { readJson, writeJson, broadcast } from './_storage.js';
 import { unsubscribeFromPushNotifications } from '../utils/pushSubscription.js';
+import { isInstalledApp } from '../utils/platform.js';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL
   ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/auth`
@@ -28,6 +29,21 @@ const API_URL = import.meta.env.VITE_API_BASE_URL
 
 const KEY_USER  = 'auth:user';
 const KEY_TOKEN = 'auth:token';
+const KEY_EXPIRES = 'auth:expiresAt';
+
+// Website sessions are capped at 7 days — like apple.com signing you out of a
+// browser after a while. Installed apps (native / standalone PWA) ignore this
+// entirely: see isSessionExpired().
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+// localStorage keys that are DEVICE-level, not account-level. clearAllAppData()
+// preserves ONLY these so a logout / auto-expiry doesn't reset the user's
+// language choice or re-trigger the PWA install banner.
+const DEVICE_KEEP_KEYS = new Set([
+  'tolet_lang',    // LanguageContext — chosen language
+  'pwa:visits',    // InstallPrompt — visit counter
+  'pwa:dismissed', // InstallPrompt — "not now" memory
+]);
 
 const ADMIN_ROLES = ['support_agent', 'moderator', 'super_admin'];
 export const isAdminRole = (role) => ADMIN_ROLES.includes(role);
@@ -64,45 +80,60 @@ async function api(path, { method = 'POST', body, auth: useAuth = false } = {}) 
 function persistSession({ token, user }) {
   window.localStorage.setItem(KEY_TOKEN, token);
   writeJson(KEY_USER, user);
+  stampSessionExpiry();
   broadcast(KEY_USER);
 }
 
-function clearSession() {
-  window.localStorage.removeItem(KEY_TOKEN);
-  removeKey(KEY_USER);
-  broadcast(KEY_USER);
-}
-
-// 🧹 Purge every per-user cache slot.
-// Called on logout AND right before persisting a fresh signup session so account B can never
-// inherit account A's cached profile data from the same browser. We
-// scan all localStorage keys because we don't know the previous user
-// id at this point.
-function purgeUserCaches() {
+// ─── Session expiry (website only) ──────────────────────────────────────────
+// Start the 7-day clock. Called every time a session is persisted (login /
+// signup) so expiry is measured from login, not from first page load.
+function stampSessionExpiry() {
   try {
-    const keysToRemove = [
-      'tolet_tenant_profile',
-      'userName',
-      'userPhone',
-      'tolet_chat_history',
-      'tolet_chat_threads',
-      'tolet_offline_messages',
-      'tolet_payment_receipts',
-      'tolet_host_receipts',
-      'savedProperties',
-      'ai_chat_history'
-    ];
-    keysToRemove.forEach(k => localStorage.removeItem(k));
-
-    const toDelete = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && (k.startsWith('tolet_tenant_profile:') || k.startsWith('tolet_host_profile:'))) {
-        toDelete.push(k);
-      }
-    }
-    toDelete.forEach((k) => localStorage.removeItem(k));
+    window.localStorage.setItem(KEY_EXPIRES, String(Date.now() + SESSION_TTL_MS));
   } catch { /* ignore */ }
+}
+
+// Backfill an expiry for sessions that predate this feature so already
+// logged-in users still get a 7-day window (from now) rather than an immortal
+// session. No-op when one already exists or there's no session.
+export function ensureSessionExpiry() {
+  try {
+    if (getCurrentToken() && !window.localStorage.getItem(KEY_EXPIRES)) stampSessionExpiry();
+  } catch { /* ignore */ }
+}
+
+// True when a WEBSITE session has passed its 7-day cap. Always false inside an
+// installed app (native build / standalone PWA) — those keep the session until
+// an explicit logout or uninstall, so the user's data is there on next launch.
+export function isSessionExpired() {
+  try {
+    if (isInstalledApp()) return false;
+    const raw = window.localStorage.getItem(KEY_EXPIRES);
+    if (!raw) return false; // legacy session — ensureSessionExpiry() backfills it
+    const expiresAt = Number(raw);
+    if (!Number.isFinite(expiresAt)) return false;
+    return Date.now() > expiresAt;
+  } catch {
+    return false;
+  }
+}
+
+// 🧹 Wipe EVERY account-scoped key from localStorage, preserving only the
+// device-level prefs in DEVICE_KEEP_KEYS. Used on logout and the 7-day auto-
+// expiry ("all data deleted"), and when a DIFFERENT account signs in so
+// account B can never inherit account A's cached dashboard / chat / profile
+// data on the same browser.
+export function clearAllAppData() {
+  try {
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const k = localStorage.key(i);
+      if (k && !DEVICE_KEEP_KEYS.has(k)) toRemove.push(k);
+    }
+    toRemove.forEach((k) => { try { localStorage.removeItem(k); } catch { /* ignore */ } });
+  } catch { /* ignore */ }
+  // Notify same-tab + cross-tab subscribers that the auth/user state changed.
+  try { broadcast(KEY_USER); } catch { /* ignore */ }
 }
 
 // ─── Signup ─────────────────────────────────────────────────────────────────
@@ -111,10 +142,10 @@ export const signupStart  = ({ name, phone, password, role = 'tenant' }) =>
 
 export const signupVerify = async ({ phoneNumber, otp }) => {
   const data = await api('/signup/verify', { body: { phoneNumber, otp } });
-  // Purge any previous account's TenantDashboard cache BEFORE persisting
-  // the new session, otherwise the freshly-mounted dashboard reads stale
-  // fullName/phone from the prior user's storage slot.
-  purgeUserCaches();
+  // Wipe any previous account's cached data BEFORE persisting the new session,
+  // otherwise the freshly-mounted dashboard/chat reads stale fullName/phone/
+  // threads from the prior user's storage slots.
+  clearAllAppData();
   persistSession(data);
   return data.user;
 };
@@ -131,7 +162,7 @@ export const loginWithPassword = async ({ phone, password }) => {
   const prevId = prev?.id || prev?._id;
   const nextId = data.user?.id || data.user?._id;
   if (!prevId || String(prevId) !== String(nextId)) {
-    purgeUserCaches();
+    clearAllAppData();
   }
   persistSession(data);
   return data.user;
@@ -153,8 +184,10 @@ export const fetchMe = () => api('/me', { method: 'GET', auth: true }).then((d) 
 export const logout = async () => {
   try { await unsubscribeFromPushNotifications(); } catch { /* ignore */ }
   try { await api('/logout', { auth: true }); } catch { /* ignore */ }
-  purgeUserCaches();
-  clearSession();
+  // Full wipe (keeps only language + PWA prefs). Matches the product rule:
+  // "on logout the data is gone". The AuthContext hard-reloads afterwards so
+  // no stale in-memory state from this account survives either.
+  clearAllAppData();
   return { ok: true };
 };
 
