@@ -21,8 +21,9 @@ import { propertyService, subscribeUserProperties } from '../services/Propertyse
 import { getDynamicFields } from '../constants/propertyFields';
 import { subscriptionService } from '../services/subscriptionService';
 import { listHostInquiries, updateInquiryStatus, deleteInquiry, replyToInquiry, respondVisit, proposeVisit } from "../services/inquiryService.js";
-import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi, cancelBooking as cancelBookingApi } from "../services/bookingService.js";
+import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi, cancelBooking as cancelBookingApi, updateBookingSettings as updateBookingSettingsApi } from "../services/bookingService.js";
 import { listDocuments as listDocsApi, uploadDocument as uploadDocApi, deleteDocument as deleteDocApi, downloadUrlFor } from "../services/documentService.js";
+import tenantService from "../services/tenantService.js";
 import callProvider from "../services/callProvider";
 import { listNotifications, getUnreadCount, markRead, markAllRead } from "../services/notificationService.js";
 import { uploadAvatar } from "../services/authService";
@@ -31,6 +32,11 @@ import VerificationModal from './VerificationModal';
 import SharedSettings from './shared/SharedSettings';
 import Smartalertspage from './Smartalertspage';
 import Aiinsightspage from './Aiinsightspage';
+import { jsPDF } from 'jspdf';
+
+// Payment channels offered when converting an inquiry into a booking / recording
+// an advance. Order matches the most-used mobile-money + bank rails in Bangladesh.
+const PAYMENT_METHODS = ['bKash', 'Nagad', 'Rocket', 'Bank Transfer', 'Cash'];
 
 /**
  * Adapt a property record returned by propertyService (used by the public
@@ -865,14 +871,26 @@ const HostDashboard = () => {
 
   const [leaseForm, setLeaseForm] = useState({
     inquiryId: null,
+    // Tenant's user id (carried from the inquiry). Persisted onto the booking as
+    // `tenantId` so Message / Call / Profile actions can resolve the real user.
+    inquirerUserId: null,
     serviceCharge: '',
     propertyId: '',
     property: '',
+    // Auto-populated from the selected property's Add-Property location.
+    location: '',
     tenant: '',
     tenantPhone: '',
     leaseStart: todayIso(),
     leaseEnd: '',
     monthlyRent: '',
+    // One-time advance / booking money collected up front.
+    advancePayment: '',
+    // How the advance / rent is collected: bKash | Nagad | Rocket | Bank Transfer | Cash.
+    paymentMethod: 'bKash',
+    // Number of people who will live in the unit (prefilled from the tenant's
+    // family-members count when known).
+    occupants: '',
     rentDueDay: 5,
     reminderLeadDays: 3,
     autoReminder: true,
@@ -1234,6 +1252,16 @@ const HostDashboard = () => {
 
   // 🟢 ACTION HANDLERS
   const handleCallUser = (peerUserId, peerName, peerAvatar) => {
+    setActiveDropdownId(null);
+    // A call needs a real user on the platform. Manual bookings (no linked
+    // tenant account) can't be called — tell the host instead of silently
+    // landing them on an empty Messages page.
+    if (!peerUserId) {
+      showToast(language === 'বাংলা'
+        ? 'এই ভাড়াটিয়া এখনো TO-LET PRO অ্যাকাউন্টে যুক্ত নন — কল করা যাচ্ছে না।'
+        : "This tenant isn't linked to a TO-LET PRO account yet, so calling isn't available.");
+      return;
+    }
     navigate('/messages', {
       state: {
         peerUserId,
@@ -1250,9 +1278,36 @@ const HostDashboard = () => {
   // is one single conversation surface for the whole app — ChatSystem will
   // hydrate the right thread from `location.state.chatId` and render any
   // cross-system rent receipts inline.
+  // 🟢 OPEN TENANT PROFILE — routes to /tenant/:id (the public trust card).
+  // Guards the "no linked account" case so the host gets a clear message
+  // instead of a broken profile page.
+  const openTenantProfile = (tenantUserId, opts = {}) => {
+    setActiveDropdownId(null);
+    if (!tenantUserId) {
+      showToast(language === 'বাংলা'
+        ? 'এই ভাড়াটিয়ার কোনো লিংকড প্রোফাইল নেই।'
+        : 'This tenant has no linked profile yet.');
+      return;
+    }
+    navigate(`/tenant/${tenantUserId}`, {
+      state: { peerName: opts.name || '', peerAvatar: opts.avatar || '' },
+    });
+  };
+
   const openChatPanel = (chatId, context = {}) => {
     setActiveDropdownId(null);
-    if (chatId == null) return;
+    // ChatSystem opens a REAL thread only from a peerUserId or an actual
+    // conversation id (24-hex Mongo id) / the AI bot. A synthetic `chat-<id>`
+    // with no peerUserId is a dead-end (this was the "opens Messages then does
+    // nothing" bug). Prefer peerUserId; guard the dead-end case with a toast.
+    const hasPeer = !!context.peerUserId;
+    const isRealConvo = typeof chatId === 'string' && /^[0-9a-fA-F]{24}$/.test(chatId);
+    if (!hasPeer && !isRealConvo && chatId !== 'ai-bot') {
+      showToast(language === 'বাংলা'
+        ? 'এই ভাড়াটিয়ার সাথে মেসেজ করা যাচ্ছে না — কোনো লিংকড অ্যাকাউন্ট নেই।'
+        : "Messaging isn't available for this tenant yet (no linked account).");
+      return;
+    }
     navigate('/messages', {
       state: {
         chatId,
@@ -1655,10 +1710,167 @@ const HostDashboard = () => {
       : `Reminder sent to ${booking.tenant} for ${monthLabel}`);
   };
 
-  // Toggle auto-reminder on/off for a booking. The server cron reads this flag.
-  // TODO(backend): PATCH /api/host/bookings/{bookingId}  body: { autoReminder }
+  // Toggle auto-reminder on/off for a booking. The server cron reads this flag,
+  // so we persist it (real 24-hex booking ids only) instead of just flipping
+  // local state — otherwise the toggle "worked" visually but reset on reload.
   const toggleAutoReminder = (bookingId) => {
-    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, autoReminder: !b.autoReminder } : b));
+    let nextVal = null;
+    setBookings(prev => prev.map(b => {
+      if (b.id !== bookingId) return b;
+      nextVal = !b.autoReminder;
+      return { ...b, autoReminder: nextVal };
+    }));
+    if (nextVal !== null && /^[0-9a-fA-F]{24}$/.test(String(bookingId))) {
+      updateBookingSettingsApi(bookingId, { autoReminder: nextVal })
+        .catch(err => console.warn('[host] autoReminder sync failed:', err.message || err));
+    }
+    if (nextVal !== null) {
+      showToast(nextVal
+        ? (language === 'বাংলা' ? 'অটো রিমাইন্ডার চালু' : 'Auto reminder ON')
+        : (language === 'বাংলা' ? 'অটো রিমাইন্ডার বন্ধ' : 'Auto reminder OFF'));
+    }
+  };
+
+  // Generate + download a real lease-agreement PDF for a booking. Uses jsPDF
+  // (already a dependency), imported lazily so it doesn't bloat the initial
+  // bundle. Landlord details come from the signed-in host; everything else
+  // from the booking record. Replaces the old toast-only stub.
+  const downloadAgreement = async (booking) => {
+    if (!booking) return;
+    showToast(language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট তৈরি হচ্ছে…' : 'Generating agreement…');
+    try {
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageW = doc.internal.pageSize.getWidth();
+      const margin = 48;
+      let y = margin;
+
+      const line = (text, opts = {}) => {
+        const { size = 11, bold = false, gap = 16, color = [30, 30, 30], align = 'left' } = opts;
+        doc.setFont('helvetica', bold ? 'bold' : 'normal');
+        doc.setFontSize(size);
+        doc.setTextColor(color[0], color[1], color[2]);
+        const x = align === 'center' ? pageW / 2 : margin;
+        doc.text(String(text), x, y, { align });
+        y += gap;
+      };
+      const rule = () => { doc.setDrawColor(214); doc.line(margin, y, pageW - margin, y); y += 16; };
+      const kv = (k, v) => {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(110, 110, 110);
+        doc.text(String(k).toUpperCase(), margin, y);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(20, 20, 20);
+        doc.text(String(v ?? '—'), margin + 160, y);
+        y += 19;
+      };
+
+      // Header
+      line('TO-LET PRO', { size: 18, bold: true, color: [186, 0, 54], gap: 22 });
+      line('Rental / Lease Agreement', { size: 14, bold: true, gap: 12 });
+      line(`Generated: ${formatDate(todayIso(), language)}`, { size: 9, color: [130, 130, 130], gap: 20 });
+      rule();
+
+      line('Parties', { size: 12, bold: true, gap: 20 });
+      kv('Landlord', userData?.fullName || authUser?.name || authUser?.fullName || '—');
+      kv('Landlord Phone', userData?.phone || authUser?.phone || '—');
+      kv('Tenant', booking.tenant || '—');
+      kv('Tenant Phone', booking.tenantPhone || '—');
+      kv('Occupants', booking.tenantsCount || 1);
+      y += 4; rule();
+
+      line('Property', { size: 12, bold: true, gap: 20 });
+      kv('Property', booking.property || '—');
+      kv('Location', booking.location || '—');
+      y += 4; rule();
+
+      line('Lease Terms', { size: 12, bold: true, gap: 20 });
+      kv('Lease Start', formatDate(booking.leaseStart, language));
+      kv('Lease End', formatDate(booking.leaseEnd, language));
+      kv('Monthly Rent', formatBDT(booking.monthlyRent));
+      kv('Service Charge', formatBDT(booking.serviceCharge || 0));
+      kv('Security Deposit', formatBDT(booking.securityDeposit || 0));
+      kv('Advance Payment', formatBDT(booking.advancePayment || 0));
+      kv('Payment Method', booking.paymentMethod || '—');
+      kv('Rent Due Day', `${booking.rentDueDay || 5} of each month`);
+      y += 8; rule();
+
+      line('Terms & Conditions', { size: 12, bold: true, gap: 16 });
+      const terms = [
+        '1. The tenant agrees to pay the monthly rent on or before the due date each month.',
+        '2. The security deposit is refundable subject to the condition of the property at handover.',
+        '3. The tenant shall maintain the property in good condition and report damage promptly.',
+        '4. Either party may terminate this agreement with prior written notice as per local law.',
+        '5. This document is a summary generated by TO-LET PRO for record-keeping purposes.',
+      ];
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(60, 60, 60);
+      terms.forEach((tline) => {
+        const wrapped = doc.splitTextToSize(tline, pageW - margin * 2);
+        doc.text(wrapped, margin, y);
+        y += wrapped.length * 14 + 4;
+      });
+
+      y += 46;
+      doc.setDrawColor(120);
+      doc.line(margin, y, margin + 180, y);
+      doc.line(pageW - margin - 180, y, pageW - margin, y);
+      y += 14;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(90, 90, 90);
+      doc.text('Landlord Signature', margin, y);
+      doc.text('Tenant Signature', pageW - margin - 180, y);
+
+      const safeName = String(booking.tenant || 'tenant').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+      doc.save(`lease-agreement-${safeName}.pdf`);
+      showToast(language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড হয়েছে ✓' : 'Agreement downloaded ✓');
+    } catch (err) {
+      console.warn('[host] agreement generation failed:', err?.message || err);
+      showToast(language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট তৈরি ব্যর্থ' : 'Could not generate agreement');
+    }
+  };
+
+  // Export the Rent Collection view (for the selected year) to a CSV file.
+  // Replaces the old toast-only stub. One row per tenant/booking with a column
+  // per month (paid amount, "P:<amt>" for partial, "DUE" for marked-due).
+  const exportRentCsv = (rows, year) => {
+    if (!rows || rows.length === 0) {
+      showToast(language === 'বাংলা' ? 'এক্সপোর্ট করার মতো কিছু নেই' : 'Nothing to export for this year');
+      return;
+    }
+    const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`);
+    const esc = (v) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = [
+      'Tenant', 'Property', 'Location', 'Phone', 'Occupants', 'Monthly Rent', 'Advance', 'Payment Method',
+      ...MO, 'Year Collected', 'Lease Start', 'Lease End', 'Status',
+    ];
+    const lines = [header.map(esc).join(',')];
+    rows.forEach((b) => {
+      const ledger = b.ledger || {};
+      let yearTotal = 0;
+      const monthCells = months.map((m) => {
+        const e = ledger[m];
+        if (e && e.paid) { const amt = Number(e.amount) || 0; yearTotal += amt; return String(amt); }
+        if (e && e.status === 'partial') { const amt = Number(e.amount) || 0; yearTotal += amt; return `P:${amt}`; }
+        if (e && e.status === 'due') return 'DUE';
+        return '';
+      });
+      lines.push([
+        b.tenant || '', b.property || '', b.location || '', b.tenantPhone || '', b.tenantsCount || 1,
+        Number(b.monthlyRent) || 0, Number(b.advancePayment) || 0, b.paymentMethod || '',
+        ...monthCells, yearTotal, b.leaseStart || '', b.leaseEnd || '', computeLeaseStage(b, today),
+      ].map(esc).join(','));
+    });
+    // Prefix a BOM so Excel opens the UTF-8 (Bangla-safe) file correctly.
+    const blob = new Blob([`\ufeff${lines.join('\n')}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `rent-collection-${year}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast(language === 'বাংলা' ? 'CSV এক্সপোর্ট হয়েছে ✓' : 'CSV exported ✓');
   };
 
   // Convert an inquiry into a booking. PREMIUM-GATED — non-premium hosts get
@@ -1683,13 +1895,18 @@ const HostDashboard = () => {
     const endIso = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
     setLeaseForm({
       inquiryId: inquiry.id,
+      inquirerUserId: inquiry.inquirerUserId || null,
       propertyId: inquiry.propertyId || (matchingProp?.id ?? ''),
       property: inquiry.propTitle || matchingProp?.title || '',
+      location: matchingProp?.location || inquiry.location || '',
       tenant: inquiry.user || '',
       tenantPhone: inquiry.phone || '',
       leaseStart: start,
       leaseEnd: endIso,
       monthlyRent: String(matchingProp?.price || '').replace(/[^\d]/g, '') || '',
+      advancePayment: '',
+      paymentMethod: 'bKash',
+      occupants: '',
       serviceCharge: String(landlordProfile?.serviceCharge ?? authUser?.landlordProfile?.serviceCharge ?? ''),
       rentDueDay: 5,
       reminderLeadDays: 3,
@@ -1698,6 +1915,20 @@ const HostDashboard = () => {
     });
     setConfirmDeleteBookingId(null);
     setActiveModal('create_lease');
+
+    // Prefill "Number of Occupants" from the tenant's family-members count when
+    // we can see it (host has an inquiry link → the profile unlocks familySize).
+    // Fired in the background so the modal opens instantly.
+    if (inquiry.inquirerUserId) {
+      tenantService.getTenant(inquiry.inquirerUserId)
+        .then((t) => {
+          const fam = Number(t?.familySize);
+          if (Number.isFinite(fam) && fam > 0) {
+            setLeaseForm((prev) => (prev.occupants ? prev : { ...prev, occupants: String(fam) }));
+          }
+        })
+        .catch(() => {});
+    }
   };
 
   // Reject an inquiry
@@ -1730,13 +1961,18 @@ const HostDashboard = () => {
   const openBlankLease = () => {
     setLeaseForm({
       inquiryId: null,
+      inquirerUserId: null,
       propertyId: properties[0]?.id || '',
       property: properties[0]?.title || '',
+      location: properties[0]?.location || '',
       tenant: '',
       tenantPhone: '',
       leaseStart: todayIso(),
       leaseEnd: '',
       monthlyRent: '',
+      advancePayment: '',
+      paymentMethod: 'bKash',
+      occupants: '',
       serviceCharge: String(landlordProfile?.serviceCharge ?? authUser?.landlordProfile?.serviceCharge ?? ''),
       rentDueDay: 5,
       reminderLeadDays: 3,
@@ -1775,17 +2011,31 @@ const HostDashboard = () => {
 
     const matchingProp = properties.find(p => String(p.id) === pidStr) || null;
     const initials = tenant.trim().split(/\s+/).map(s => s[0]).slice(0, 2).join('').toUpperCase() || 'NT';
+    const occupants = Math.max(1, Number(leaseForm.occupants) || 1);
+    const advancePayment = Number(leaseForm.advancePayment) || 0;
+    const paymentMethod = leaseForm.paymentMethod || 'Cash';
+    // Carry the tenant's user id from the inquiry so Message / Call / Profile
+    // can resolve the real user. Must be a Mongo ObjectId for the backend to
+    // store it; anything else stays null (manual, un-linked bookings).
+    const tenantUserId = /^[0-9a-fA-F]{24}$/.test(String(leaseForm.inquirerUserId || ''))
+      ? leaseForm.inquirerUserId
+      : null;
     const newBooking = {
       id: `BKG-${String(Date.now()).slice(-6)}`,
       inquiryId: leaseForm.inquiryId,
+      tenantId: tenantUserId,
       propertyId: pidStr,
       property: matchingProp?.title || leaseForm.property,
+      location: leaseForm.location || matchingProp?.location || '',
       tenant: tenant.trim(),
       tenantInit: initials,
       tenantPhone: tenantPhone.trim(),
       tenantEmail: '',
+      tenantsCount: occupants,
       leaseStart, leaseEnd,
       monthlyRent: rent,
+      advancePayment,
+      paymentMethod,
       serviceCharge: Number(leaseForm.serviceCharge) || 0,
       rentDueDay: Number(leaseForm.rentDueDay) || 5,
       reminderLeadDays: Number(leaseForm.reminderLeadDays) || 3,
@@ -1799,6 +2049,9 @@ const HostDashboard = () => {
 
     createBookingApi({
       propertyId: matchingProp ? (matchingProp._id || matchingProp.id) : propertyId,
+      tenantId: tenantUserId,
+      property: matchingProp?.title || leaseForm.property,
+      location: leaseForm.location || matchingProp?.location || '',
       serviceCharge: Number(leaseForm.serviceCharge) || 0,
       inquiryId: leaseForm.inquiryId,
       leaseStart, leaseEnd,
@@ -1808,6 +2061,9 @@ const HostDashboard = () => {
       notes: leaseForm.notes || '',
       tenant: tenant.trim(),
       tenantPhone: tenantPhone.trim(),
+      tenantsCount: occupants,
+      advancePayment,
+      paymentMethod,
       monthlyRent: rent,
     }).then(saved => {
       setBookings(prev => prev.map(b => b.id === newBooking.id ? { ...b, ...saved } : b));
@@ -3287,24 +3543,40 @@ const HostDashboard = () => {
                                 </p>
                               </div>
 
-                              {/* Action */}
-                              <button
-                                type="button"
-                                onClick={() => openChatPanel(c.booking.chatId || `chat-${c.booking.id}`, {
-                                  source: 'host-analytics',
-                                  bookingId: c.booking.id,
-                                  tenantName: c.booking.tenant,
-                                  tenantPhone: c.booking.tenantPhone,
-                                  propertyTitle: c.booking.property,
-                                  prefillMessage: c.overdueSoFar > 0
-                                    ? (language === 'বাংলা' ? `হাই ${c.booking.tenant}, ${c.overdueSoFar} মাসের ভাড়া বকেয়া আছে। দয়া করে পরিশোধের তারিখ জানান।` : `Hi ${c.booking.tenant}, you have ${c.overdueSoFar} overdue month${c.overdueSoFar > 1 ? 's' : ''}. Could you confirm your next payment date?`)
-                                    : '',
-                                })}
-                                className="shrink-0 p-2 rounded-xl bg-gray-50 hover:bg-gray-900 text-gray-500 hover:text-white transition-colors active:scale-95"
-                                title={language === 'বাংলা' ? 'মেসেজ' : 'Message tenant'}
-                              >
-                                <Send size={13}/>
-                              </button>
+                              {/* Actions — Call + Message. Both carry the
+                                  tenant's real user id so ChatSystem opens the
+                                  exact conversation directly (with a loading
+                                  state) instead of dead-ending on a synthetic id. */}
+                              <div className="shrink-0 flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleCallUser(c.booking.tenantId, c.booking.tenant, c.booking.tenantAvatar)}
+                                  className="p-2 rounded-xl bg-gray-50 hover:bg-emerald-600 text-gray-500 hover:text-white transition-colors active:scale-95"
+                                  title={language === 'বাংলা' ? 'কল' : 'Call tenant'}
+                                >
+                                  <Phone size={13}/>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openChatPanel(c.booking.chatId || `chat-${c.booking.id}`, {
+                                    source: 'host-analytics',
+                                    peerUserId: c.booking.tenantId,
+                                    peerName: c.booking.tenant,
+                                    peerAvatar: c.booking.tenantAvatar,
+                                    bookingId: c.booking.id,
+                                    tenantName: c.booking.tenant,
+                                    tenantPhone: c.booking.tenantPhone,
+                                    propertyTitle: c.booking.property,
+                                    prefillMessage: c.overdueSoFar > 0
+                                      ? (language === 'বাংলা' ? `হাই ${c.booking.tenant}, ${c.overdueSoFar} মাসের ভাড়া বকেয়া আছে। দয়া করে পরিশোধের তারিখ জানান।` : `Hi ${c.booking.tenant}, you have ${c.overdueSoFar} overdue month${c.overdueSoFar > 1 ? 's' : ''}. Could you confirm your next payment date?`)
+                                      : '',
+                                  })}
+                                  className="p-2 rounded-xl bg-gray-50 hover:bg-gray-900 text-gray-500 hover:text-white transition-colors active:scale-95"
+                                  title={language === 'বাংলা' ? 'মেসেজ' : 'Message tenant'}
+                                >
+                                  <Send size={13}/>
+                                </button>
+                              </div>
                             </div>
                           </div>
                         );
@@ -3588,7 +3860,7 @@ const HostDashboard = () => {
                               )}
 
                               <div className="grid grid-cols-2 gap-3">
-                                <button onClick={() => openChatPanel(inquiry.chatId, { source: 'host-inquiries', tenantName: inquiry.user, tenantPhone: inquiry.phone, propertyTitle: inquiry.propTitle, prefillMessage: '', peerUserId: inquiry.inquirerUserId })} className="w-full bg-[#ba0036] hover:bg-[#90002a] text-white py-3.5 rounded-2xl font-bold text-[11px] shadow-[0_4px_15px_rgba(186,0,54,0.2)] transition-all flex items-center justify-center gap-1.5 border-none active:scale-95">
+                                <button onClick={() => openChatPanel(inquiry.chatId, { source: 'host-inquiries', peerUserId: inquiry.inquirerUserId, peerName: inquiry.user, tenantName: inquiry.user, tenantPhone: inquiry.phone, propertyTitle: inquiry.propTitle, prefillMessage: '' })} className="w-full bg-[#ba0036] hover:bg-[#90002a] text-white py-3.5 rounded-2xl font-bold text-[11px] shadow-[0_4px_15px_rgba(186,0,54,0.2)] transition-all flex items-center justify-center gap-1.5 border-none active:scale-95">
                                   <MessageSquare size={14} /> {t?.openMessage || (language === 'বাংলা' ? 'মেসেজ' : 'Message')}
                                 </button>
                                 <button onClick={() => handleCallUser(inquiry.inquirerUserId, inquiry.user)} className="w-full bg-white text-gray-700 py-3.5 rounded-2xl font-bold text-[11px] hover:bg-gray-50 hover:text-[#ba0036] shadow-[0_4px_15px_rgba(0,0,0,0.03)] transition-all flex items-center justify-center gap-1.5 border border-gray-100">
@@ -3601,8 +3873,17 @@ const HostDashboard = () => {
                               </button>
                             </div>
 
-                            <div className="bg-gray-50/80 p-5 rounded-2xl border-none mt-auto">
-                               <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">{language === 'বাংলা' ? 'টেন্যান্ট প্রোফাইল' : 'Tenant Profile'}</p>
+                            <button
+                              type="button"
+                              onClick={() => openTenantProfile(inquiry.inquirerUserId, { name: inquiry.user })}
+                              className="w-full text-left bg-gray-50/80 p-5 rounded-2xl border-none mt-auto hover:bg-gray-100 transition-colors active:scale-[0.99] group"
+                            >
+                               <div className="flex items-center justify-between mb-3">
+                                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'টেন্যান্ট প্রোফাইল' : 'Tenant Profile'}</p>
+                                 <span className="text-[9px] font-black text-[#ba0036] uppercase tracking-widest inline-flex items-center gap-1 group-hover:gap-1.5 transition-all">
+                                   {language === 'বাংলা' ? 'দেখুন' : 'View'} <ArrowRight size={11} />
+                                 </span>
+                               </div>
                                <div className="flex flex-col gap-3">
                                  <div className="flex items-center gap-2.5 text-xs font-bold text-gray-700">
                                     {inquiry.verified ? <CheckCircle2 size={16} className="text-green-500" /> : <Hourglass size={16} className="text-orange-400" />}
@@ -3613,7 +3894,7 @@ const HostDashboard = () => {
                                     Joined {inquiry.memberSince || 'Recently'}
                                  </div>
                                </div>
-                            </div>
+                            </button>
 
                           </div>
 
@@ -3737,8 +4018,21 @@ const HostDashboard = () => {
                   <div className="border-t border-gray-100 bg-gray-50/40 px-3 sm:px-4 py-4 animate-in slide-in-from-top-2 fade-in duration-300">
 
                     {/* Tenant count chip */}
-                    <div className="flex items-center justify-end mb-3">
-                      <div className="px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[10px] font-black text-gray-700 inline-flex items-center gap-1.5">
+                    <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                        {booking.location && (
+                          <div className="px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[10px] font-bold text-gray-600 inline-flex items-center gap-1.5 max-w-[220px]">
+                            <MapPin size={11} className="text-[#ba0036] shrink-0"/> <span className="truncate">{booking.location}</span>
+                          </div>
+                        )}
+                        {Number(booking.advancePayment) > 0 && (
+                          <div className="px-2.5 py-1 bg-emerald-50 border border-emerald-100 rounded-lg text-[10px] font-black text-emerald-700 inline-flex items-center gap-1.5">
+                            <Banknote size={11}/> {language === 'বাংলা' ? 'অ্যাডভান্স' : 'Advance'} {formatBDT(booking.advancePayment)}
+                            {booking.paymentMethod ? <span className="text-emerald-500 font-bold">· {booking.paymentMethod}</span> : null}
+                          </div>
+                        )}
+                      </div>
+                      <div className="px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[10px] font-black text-gray-700 inline-flex items-center gap-1.5 shrink-0">
                         <User size={11}/> {tenantsLabel}
                       </div>
                     </div>
@@ -3814,11 +4108,19 @@ const HostDashboard = () => {
                       </button>
 
                       <div className="flex items-center gap-1.5 flex-wrap">
+                        {/* Profile — opens the tenant's trust card (/tenant/:id). */}
+                        <button
+                          onClick={() => openTenantProfile(booking.tenantId, { name: booking.tenant, avatar: booking.tenantAvatar })}
+                          className="px-2.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1"
+                          title={language === 'বাংলা' ? 'টেন্যান্ট প্রোফাইল' : 'Tenant profile'}
+                        >
+                          <UserCircle size={12}/> {language === 'বাংলা' ? 'প্রোফাইল' : 'Profile'}
+                        </button>
                         {/* Message — single button. Routes to /messages so every conversation
                             lives in one place; ChatSystem hydrates the right thread from
                             location.state. */}
                         <button
-                          onClick={() => openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-bookings', tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property, peerUserId: booking.tenantId })}
+                          onClick={() => openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-bookings', peerUserId: booking.tenantId, peerName: booking.tenant, peerAvatar: booking.tenantAvatar, tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property })}
                           className="px-3 py-2 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-md flex items-center gap-1"
                         >
                           <MessageCircle size={12}/> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
@@ -3839,9 +4141,9 @@ const HostDashboard = () => {
                           <button onClick={() => setActiveDropdownId(activeDropdownId === booking.id ? null : booking.id)} className="p-2 rounded-xl bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"><MoreVertical size={13}/></button>
                           {activeDropdownId === booking.id && (
                             <div className="absolute right-0 bottom-full mb-2 w-52 bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[50] animate-in fade-in zoom-in-95 origin-bottom-right border border-gray-100">
-                              <button onClick={() => { handleCallUser(booking.tenantId, booking.tenantName); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
+                              <button onClick={() => { handleCallUser(booking.tenantId, booking.tenant, booking.tenantAvatar); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
                               <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
-                              <button onClick={() => { showToast(language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড হচ্ছে...' : 'Downloading agreement...'); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
+                              <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
                               <div className="h-px w-full bg-gray-100 my-1"></div>
                               <button onClick={() => { setActiveDropdownId(null); setConfirmDeleteBookingId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
                             </div>
@@ -4096,12 +4398,33 @@ const HostDashboard = () => {
             return 'upcoming';
           };
           const matchesQuery = (b) => b.tenant.toLowerCase().includes(searchQuery.toLowerCase()) || b.property.toLowerCase().includes(searchQuery.toLowerCase());
-          const filteredBookings = bookings.filter(b => {
+
+          // Year scope: a booking belongs to the selected ledger year when its
+          // lease term overlaps that year. Bad/missing dates fall back to
+          // "included" so a parse error never hides real data.
+          const leaseTouchesYear = (b, year) => {
+            const sy = new Date(b.leaseStart).getFullYear();
+            const ey = new Date(b.leaseEnd).getFullYear();
+            if (Number.isNaN(sy) || Number.isNaN(ey)) return true;
+            return sy <= year && year <= ey;
+          };
+          const viewingPastYear = ledgerYear < today.getFullYear();
+          // Base list for the year: overlaps the picked year, not cancelled, and
+          // — for the current/future year — not an already-ended (expired) lease.
+          // Ended tenants therefore drop off the live Rent Collection view, but
+          // stay visible when the host reviews a past year they were active in.
+          const yearBookings = bookings.filter(b => {
+            if (b.status === 'cancelled') return false;
+            if (!leaseTouchesYear(b, ledgerYear)) return false;
+            if (!viewingPastYear && computeLeaseStage(b, today) === 'done') return false;
+            return true;
+          });
+          const filteredBookings = yearBookings.filter(b => {
             if (!matchesQuery(b)) return false;
             if (rentPriorityFilter === 'all') return true;
             return tenantBucket(b) === rentPriorityFilter;
           });
-          const counts = bookings.reduce((acc, b) => { const k = tenantBucket(b); acc[k] = (acc[k] || 0) + 1; return acc; }, {});
+          const counts = yearBookings.reduce((acc, b) => { const k = tenantBucket(b); acc[k] = (acc[k] || 0) + 1; return acc; }, {});
           // Auto-pin: overdue + partial when filter is "all" — the rows the
           // host actually needs to do something about.
           const attentionRent = rentPriorityFilter === 'all'
@@ -4336,7 +4659,7 @@ const HostDashboard = () => {
                         )}
                       </div>
                       <button
-                        onClick={() => openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-rent', tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property, peerUserId: booking.tenantId })}
+                        onClick={() => openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-rent', peerUserId: booking.tenantId, peerName: booking.tenant, peerAvatar: booking.tenantAvatar, tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property })}
                         className="px-3 py-2 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-md flex items-center gap-1.5"
                       >
                         <MessageCircle size={12}/> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
@@ -4550,10 +4873,12 @@ const HostDashboard = () => {
                         </button>
                       ))}
                     </div>
-                    {/* Export action — corner-pinned. */}
+                    {/* Export action — corner-pinned. Exports the current year's
+                        filtered rent ledger to a CSV (one row per tenant). */}
                     <button
-                      onClick={() => showToast(language === 'বাংলা' ? 'এক্সপোর্ট হচ্ছে...' : 'Exporting...')}
+                      onClick={() => exportRentCsv(filteredBookings, ledgerYear)}
                       className="shrink-0 px-3 py-2 bg-white text-gray-700 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all flex items-center gap-1.5 active:scale-95 order-1 sm:order-none ml-auto sm:ml-0"
+                      title={language === 'বাংলা' ? `${ledgerYear} সালের রেন্ট CSV` : `Export ${ledgerYear} rent as CSV`}
                     >
                       <FileSpreadsheet size={12}/> <span className="hidden sm:inline">{language === 'বাংলা' ? 'এক্সপোর্ট' : 'Export'}</span>
                     </button>
@@ -5429,13 +5754,30 @@ const HostDashboard = () => {
                     <div className="sm:col-span-2">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'প্রপার্টি' : 'Property'}</label>
                       <select value={leaseForm.propertyId} onChange={e => {
-                        const id = Number(e.target.value);
-                        const prop = properties.find(p => p.id === id);
-                        setLeaseForm(f => ({ ...f, propertyId: id, property: prop?.title || '' }));
+                        const val = e.target.value;
+                        // Match on String() so this works for both numeric demo ids and
+                        // Mongo ObjectId strings, and auto-fill the property's location.
+                        const prop = properties.find(p => String(p.id) === String(val));
+                        setLeaseForm(f => ({ ...f, propertyId: val, property: prop?.title || '', location: prop?.location || '' }));
                       }} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all">
                         <option value="">{language === 'বাংলা' ? 'প্রপার্টি সিলেক্ট করুন' : 'Select a property'}</option>
                         {properties.map(p => (<option key={p.id} value={p.id}>{p.title} · {p.location}</option>))}
                       </select>
+                    </div>
+
+                    {/* Location — auto-populated from the selected property's
+                        Add-Property location. Read-only so the booking address
+                        always matches the listing (host edits the listing to change it). */}
+                    <div className="sm:col-span-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                        <MapPin size={11} className="text-[#ba0036]" /> {language === 'বাংলা' ? 'লোকেশন' : 'Location'}
+                      </label>
+                      <div className="w-full mt-1.5 p-4 bg-gray-100/70 rounded-xl text-sm font-bold text-gray-700 border border-transparent flex items-center gap-2 min-h-[52px]">
+                        <span className="truncate">
+                          {leaseForm.location || (language === 'বাংলা' ? 'প্রপার্টি সিলেক্ট করলে অটো-ফিল হবে' : 'Auto-fills when you pick a property')}
+                        </span>
+                      </div>
+                      <p className="text-[9px] font-bold text-gray-400 mt-1">{language === 'বাংলা' ? 'প্রপার্টির ঠিকানা থেকে অটো-ফিল' : 'Auto-filled from the property address'}</p>
                     </div>
 
                     <div>
@@ -5459,6 +5801,51 @@ const HostDashboard = () => {
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'সার্ভিস চার্জ (৳)' : 'Service Charge (BDT)'}</label>
                       <input type="number" min="0" value={leaseForm.serviceCharge} onChange={e => setLeaseForm(f => ({ ...f, serviceCharge: e.target.value }))} placeholder="0" className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
                       <p className="text-[9px] font-bold text-gray-400 mt-1">{language === 'বাংলা' ? 'প্রোফাইল থেকে অটো-ফিল · এডিটযোগ্য' : 'Auto-filled from profile · editable'}</p>
+                    </div>
+
+                    {/* Number of Occupants — prefilled from the tenant's family
+                        members count when the profile is linked (see openConvertInquiry). */}
+                    <div>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                        <Users size={11} className="text-[#ba0036]" /> {language === 'বাংলা' ? 'অকুপ্যান্ট সংখ্যা' : 'Number of Occupants'}
+                      </label>
+                      <input type="number" min="1" max="50" value={leaseForm.occupants} onChange={e => setLeaseForm(f => ({ ...f, occupants: e.target.value }))} placeholder={language === 'বাংলা' ? 'যেমন ৩' : 'e.g. 3'} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
+                      <p className="text-[9px] font-bold text-gray-400 mt-1">{language === 'বাংলা' ? 'ভাড়াটিয়ার ফ্যামিলি মেম্বার থেকে অটো-ফিল' : "Auto-filled from tenant's family members"}</p>
+                    </div>
+
+                    {/* Advance Payment + Payment Method — the up-front money the
+                        host collects at booking time and the channel it came through. */}
+                    <div className="sm:col-span-2 bg-gradient-to-br from-emerald-50/70 to-white p-4 rounded-2xl border border-emerald-100">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Banknote size={14} className="text-emerald-600" />
+                        <span className="text-[11px] font-black text-gray-900 uppercase tracking-widest">{language === 'বাংলা' ? 'অ্যাডভান্স পেমেন্ট' : 'Advance Payment'}</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'অ্যাডভান্স (৳)' : 'Advance Amount (BDT)'}</label>
+                          <input type="number" min="0" value={leaseForm.advancePayment} onChange={e => setLeaseForm(f => ({ ...f, advancePayment: e.target.value }))} placeholder="0" className="w-full mt-1.5 p-4 bg-white rounded-xl text-sm font-bold text-gray-900 outline-none focus:shadow-[0_4px_15px_rgba(16,185,129,0.12)] border border-gray-100 focus:border-emerald-300 transition-all" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'পেমেন্ট মেথড' : 'Payment Method'}</label>
+                          <select value={leaseForm.paymentMethod} onChange={e => setLeaseForm(f => ({ ...f, paymentMethod: e.target.value }))} className="w-full mt-1.5 p-4 bg-white rounded-xl text-sm font-bold text-gray-900 outline-none focus:shadow-[0_4px_15px_rgba(16,185,129,0.12)] border border-gray-100 focus:border-emerald-300 transition-all">
+                            {PAYMENT_METHODS.map(m => (<option key={m} value={m}>{m}</option>))}
+                          </select>
+                        </div>
+                      </div>
+                      {/* Quick-pick pills so the host taps once on mobile instead of
+                          scrolling a native <select>. */}
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {PAYMENT_METHODS.map(m => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setLeaseForm(f => ({ ...f, paymentMethod: m }))}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${leaseForm.paymentMethod === m ? 'bg-emerald-600 text-white shadow-[0_4px_12px_rgba(16,185,129,0.3)]' : 'bg-white text-gray-500 hover:text-gray-900 border border-gray-100'}`}
+                          >
+                            {m}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="sm:col-span-2 bg-gray-50/80 p-4 rounded-2xl border border-gray-100">

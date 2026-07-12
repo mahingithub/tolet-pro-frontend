@@ -481,6 +481,21 @@ const ChatSystem = () => {
   const { t, language } = useLanguage();
   const peerUserId = location.state?.peerUserId;
 
+  // While we resolve/open a real conversation from navigation state, show a
+  // dedicated loading layer so tapping "Message" / "Call" on a tenant lands
+  // straight in the thread (with a spinner) instead of flashing the chat list
+  // or the AI-bot thread first. Seeded synchronously from the incoming state so
+  // it paints on the very first frame — no multi-page bounce.
+  const [openingPeer, setOpeningPeer] = useState(() => {
+    try {
+      const st = location.state || {};
+      const qp = new URLSearchParams(location.search);
+      const pid = st.peerUserId || qp.get('peerUserId');
+      if (!pid) return null;
+      return { name: st.peerName || '', avatar: st.peerAvatar || '', mode: st.mode || 'message' };
+    } catch { return null; }
+  });
+
   // Chat list = AI bot (local-only) + real backend conversations (polled).
   // We hydrate from localStorage for instant perceived load (SWR pattern),
   // then conversations are synced from Mongo.
@@ -1359,11 +1374,17 @@ const ChatSystem = () => {
 
     // 2. New backend path — open or find a real conversation.
     if (s.peerUserId) {
+      // Show the loading layer straight away (covers re-navigation while already
+      // on /messages — the useState seed only catches the first mount).
+      setOpeningPeer({ name: s.peerName || '', avatar: s.peerAvatar || '', mode: s.mode || 'message' });
+      // Go straight to the thread pane on mobile so we never flash the list.
+      if (isMobile) setShowSidebarMobile(false);
       (async () => {
         try {
           const me = getCurrentUser();
           const myId = String(me?.id || me?._id || '');
           if (String(s.peerUserId) === myId) {
+            setOpeningPeer(null);
             toast.error('নিজের সাথে চ্যাট বা কল করা যায় না।');
             return;
           }
@@ -1371,7 +1392,7 @@ const ChatSystem = () => {
             peerUserId: s.peerUserId,
             propertyId: s.propertyId,
           });
-          if (!convo?.id) return;
+          if (!convo?.id) { setOpeningPeer(null); return; }
           // Make sure the new convo is in the sidebar immediately.
           try {
             const list = await chatService.listConversations();
@@ -1398,19 +1419,29 @@ const ChatSystem = () => {
           }
         } catch (err) {
           console.warn('[chat] failed to open conversation:', err?.message);
+          toast.error(language === 'বাংলা' ? 'কথোপকথন খুলতে সমস্যা হয়েছে।' : 'Could not open the conversation.');
+        } finally {
+          // Clear the loading layer once the thread is active (or on failure).
+          setOpeningPeer(null);
         }
       })();
       return;
     }
 
-    // 3. Legacy free-form chatId path — just open call/banner UI without
-    //    activating a thread (we have no peer mapping for it).
-    if (s.chatId) {
-      if (s.mode === 'call') {
-                      }
-    }
+    // 3. Legacy free-form chatId path — we have no peer mapping for it, so we
+    //    can't open a real backend thread. The context banner (set above for
+    //    host-bookings / tenant-receipt) is enough; we leave the user on the
+    //    conversation list rather than a dead-end. No thread to activate.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location]);
+
+  // Safety net: never let the "opening conversation" layer get stuck if the
+  // async open silently stalls (offline, slow backend). Clears after 12s.
+  useEffect(() => {
+    if (!openingPeer) return undefined;
+    const timer = setTimeout(() => setOpeningPeer(null), 12000);
+    return () => clearTimeout(timer);
+  }, [openingPeer]);
 
   // Auto-scroll to the latest message. Opening a chat (or a bulk load) JUMPS
   // instantly to the bottom — no visible top→bottom scroll-through. Only a
@@ -2182,6 +2213,50 @@ const ChatSystem = () => {
         <div className="absolute -top-40 -left-32 w-[480px] h-[480px] bg-[#ba0036]/15 rounded-full blur-3xl"></div>
         <div className="absolute -bottom-40 -right-32 w-[480px] h-[480px] bg-blue-500/10 rounded-full blur-3xl"></div>
       </div>
+
+      {/* ── "Opening conversation" loading layer ──────────────────────────────
+          Shown the instant the user taps Message/Call on a tenant (seeded from
+          navigation state) and cleared once the real thread is active. Replaces
+          the old behaviour where the chat list / AI-bot thread flashed first. */}
+      <AnimatePresence>
+        {openingPeer && (
+          <motion.div
+            key="opening-peer"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-[120] flex items-center justify-center bg-white/80 backdrop-blur-xl"
+          >
+            <div className="flex flex-col items-center gap-5 px-8 text-center">
+              <div className="relative">
+                {openingPeer.avatar ? (
+                  <img
+                    src={openingPeer.avatar}
+                    alt={openingPeer.name || 'Tenant'}
+                    className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-xl"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#ba0036] to-[#ff004c] flex items-center justify-center text-white text-2xl font-black shadow-xl">
+                    {(openingPeer.name || 'T').trim().charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <span className="absolute -inset-1.5 rounded-full border-[3px] border-[#ba0036]/25 border-t-[#ba0036] animate-spin" />
+              </div>
+              <div>
+                <p className="text-base font-black text-gray-900">
+                  {openingPeer.mode === 'call'
+                    ? (language === 'বাংলা' ? 'কল সংযোগ হচ্ছে…' : 'Connecting call…')
+                    : (language === 'বাংলা' ? 'কথোপকথন খোলা হচ্ছে…' : 'Opening conversation…')}
+                </p>
+                {openingPeer.name && (
+                  <p className="text-sm font-bold text-gray-500 mt-0.5">{openingPeer.name}</p>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div
         className={`flex flex-col md:flex-row overflow-hidden ${

@@ -1576,13 +1576,47 @@ const PropertyDetails = () => {
     localStorage.setItem('savedProperties', JSON.stringify(saved));
   };
 
-  const handleShare = () => {
-    const url = `https://toletpro.com/property/${id}`;
-    if (navigator.share) {
-      navigator.share({ title: property.title, url });
-    } else {
-      navigator.clipboard.writeText(url);
+  const handleShare = async () => {
+    // Build the link from the ACTUAL deployment origin (prod domain, Vercel
+    // alias, custom domain, or localhost) instead of a hardcoded host — a
+    // fixed "toletpro.com" URL broke on every other environment. `id` is the
+    // same param the /property/:id route resolves, so the link always lands
+    // on this exact property.
+    const origin = (typeof window !== 'undefined' && window.location && window.location.origin)
+      ? window.location.origin
+      : 'https://toletpro.com';
+    const url = `${origin}/property/${property?.id || id}`;
+    const title = property?.title || 'TO-LET PRO listing';
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text: title, url });
+        return;
+      }
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        showToast('Link copied! 🔗');
+        return;
+      }
+      // Last-resort fallback for browsers without the Clipboard API.
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
       showToast('Link copied! 🔗');
+    } catch (err) {
+      // User cancelled the native share sheet, or share/clipboard failed —
+      // fall back to a copy so the host always ends up with a usable link.
+      if (err?.name === 'AbortError') return;
+      try {
+        await navigator.clipboard?.writeText(url);
+        showToast('Link copied! 🔗');
+      } catch {
+        showToast(`Share this link: ${url}`);
+      }
     }
   };
 

@@ -27,13 +27,31 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, BadgeCheck, MessageCircle, Phone, Mail,
   Calendar, Briefcase, ShieldCheck, Share2, Lock, Award,
+  Wallet, Receipt, Banknote, CheckCircle2, Clock, Home,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 import { tenantService } from '../services/tenantService';
+import { listHostBookings } from '../services/bookingService';
 import { useAuth } from '../context/AuthContext.jsx';
 import TrustGauge from './shared/TrustGauge';
 import VerifStep  from './shared/VerifStep';
+
+// ── Payment helpers (module scope, pure) ────────────────────────────────────
+const bdt = (n) => `৳ ${(Number(n) || 0).toLocaleString('en-IN')}`;
+
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const monthKeyLabel = (key) => {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(key || ''));
+  if (!m) return String(key || '');
+  return `${MONTHS_SHORT[Number(m[2]) - 1] || '?'} ${m[1]}`;
+};
+const prettyDate = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
+  return `${MONTHS_SHORT[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}, ${d.getFullYear()}`;
+};
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -56,6 +74,8 @@ const TenantProfile = () => {
 
   const [tenant, setTenant]   = useState(null);
   const [loading, setLoading] = useState(true);
+  // Bookings this host holds for the tenant — powers the Payment section.
+  const [tenantBookings, setTenantBookings] = useState([]);
 
   // `isSelf` — viewer তার নিজেরই profile দেখছে কিনা।
   const isSelf =
@@ -75,6 +95,34 @@ const TenantProfile = () => {
     })();
     return () => { cancelled = true; };
   }, [id]);
+
+  // ── Load the host's bookings for THIS tenant (Payment section) ────────────
+  // listHostBookings returns bookings the signed-in landlord owns; we keep only
+  // the ones for this tenant (by linked user id, or phone as a fallback for
+  // manual bookings). A random viewer / the tenant themselves gets nothing here,
+  // so the section only shows to the host who actually created the booking.
+  useEffect(() => {
+    if (!authUser || isSelf) { setTenantBookings([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await listHostBookings();
+        if (cancelled) return;
+        const tenantPhone = tenant?.phone ? String(tenant.phone).replace(/\D/g, '') : '';
+        const mine = (rows || []).filter((b) => {
+          if (b.status === 'cancelled') return false;
+          const byId = b.tenantId && String(b.tenantId) === String(id);
+          const byPhone = tenantPhone && b.tenantPhone && String(b.tenantPhone).replace(/\D/g, '') === tenantPhone;
+          return byId || byPhone;
+        });
+        setTenantBookings(mine);
+      } catch (err) {
+        if (!cancelled) setTenantBookings([]);
+        console.warn('[tenant-profile] booking load failed:', err?.message || err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [authUser, isSelf, id, tenant?.phone]);
 
   useEffect(() => {
     if (!isSelf || !authUser || !tenant) return;
@@ -163,6 +211,50 @@ const TenantProfile = () => {
   const emergencyContact  = isUnlocked ? (tenant.emergencyContact || {}) : {};
   const familySize        = isUnlocked ? (tenant.familySize || '') : '';
 
+  // Achievement badges shown under the tenant's name. The backend has no
+  // explicit `badges` array, so we derive one from the verification + trust
+  // signals it does return. Previously this variable was referenced but never
+  // defined, which threw a ReferenceError and tripped the global ErrorBoundary
+  // ("Something went wrong") the moment a verified/new tenant profile opened.
+  const badges = Array.isArray(tenant.badges)
+    ? tenant.badges
+    : (() => {
+        const out = [];
+        if (idStatus === 'verified') out.push('ID Verified');
+        if (phoneStatus === 'verified') out.push('Phone Verified');
+        if (emailStatus === 'verified') out.push('Email Verified');
+        if (employmentStatus === 'verified') out.push('Employment Verified');
+        if (trustTier && !/^bronze$/i.test(trustTier)) {
+          out.push(`${trustTier.charAt(0).toUpperCase()}${trustTier.slice(1)} Tenant`);
+        }
+        return out;
+      })();
+
+  // ── Payment summary — derived from the host's bookings for this tenant. ────
+  // Auto-updates whenever a booking is created (the Payment section re-reads
+  // listHostBookings). Each paid/partial ledger month becomes a receipt row.
+  const paymentBookings = Array.isArray(tenantBookings) ? tenantBookings : [];
+  const paymentReceipts = paymentBookings
+    .flatMap((b) => {
+      const ledger = b.ledger && typeof b.ledger === 'object' ? b.ledger : {};
+      return Object.entries(ledger)
+        .filter(([, v]) => v && (v.paid || v.status === 'partial'))
+        .map(([monthKey, v]) => ({
+          key: `${b.id || b._id}-${monthKey}`,
+          monthKey,
+          amount: Number(v.amount) || 0,
+          paidOn: v.paidOn || '',
+          method: v.method || b.paymentMethod || '',
+          status: v.status || 'full',
+          property: b.property || '',
+        }));
+    })
+    .sort((a, b) => String(b.monthKey).localeCompare(String(a.monthKey)));
+  const totalAdvance   = paymentBookings.reduce((s, b) => s + (Number(b.advancePayment) || 0), 0);
+  const totalCollected = paymentReceipts.reduce((s, r) => s + r.amount, 0);
+  const activeBooking  = paymentBookings.find((b) => b.status !== 'cancelled') || paymentBookings[0] || null;
+  const hasPaymentInfo = paymentBookings.length > 0;
+
   return (
     <div className="w-full bg-[#f4f7fb] min-h-screen font-sans relative pb-20 selection:bg-blue-500 selection:text-white">
 
@@ -207,7 +299,7 @@ const TenantProfile = () => {
                   alt={tenant.name}
                   className="relative w-28 h-28 md:w-44 md:h-44 rounded-full md:rounded-[2rem] border-[4px] md:border-[6px] border-white bg-white object-cover shadow-xl"
                 />
-                {verif.idVerified && (
+                {idStatus === 'verified' && (
                   <div className="absolute -bottom-2 -right-2 bg-gradient-to-tr from-blue-600 to-blue-400 text-white p-2.5 rounded-full border-4 border-white shadow-lg">
                     <ShieldCheck size={20} />
                   </div>
@@ -244,18 +336,18 @@ const TenantProfile = () => {
               <div className="flex-1">
                 <div className="flex items-center gap-2.5">
                   <h1 className="text-2xl md:text-4xl font-black text-gray-900 tracking-tight">{tenant.name}</h1>
-                  {verif.idVerified && <BadgeCheck size={24} className="text-blue-500 drop-shadow-sm md:w-7 md:h-7" />}
+                  {idStatus === 'verified' && <BadgeCheck size={24} className="text-blue-500 drop-shadow-sm md:w-7 md:h-7" />}
                 </div>
                 {tagline && <p className="text-gray-500 font-bold text-sm md:text-base mt-1.5">{tagline}</p>}
 
-                {(verif.idVerified || isNewTenant) && (
+                {(badges.length > 0 || isNewTenant) && (
                   <div className="flex flex-wrap gap-2.5 mt-5">
                     {badges.map((badge, i) => (
                       <span key={i} className="text-[10px] md:text-xs font-black px-3 md:px-4 py-1.5 md:py-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 flex items-center gap-1.5 md:gap-2 uppercase tracking-widest shadow-sm">
                         <Award size={12} className="md:w-3.5 md:h-3.5" /> {badge}
                       </span>
                     ))}
-                    {isNewTenant && !verif.idVerified && (
+                    {isNewTenant && badges.length === 0 && (
                       <span className="text-xs font-black px-4 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-2 uppercase tracking-widest shadow-sm">
                         <Award size={14} /> New tenant
                       </span>
@@ -460,6 +552,103 @@ const TenantProfile = () => {
                 <div className="p-3 md:p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50 flex flex-col sm:flex-row sm:items-center justify-between">
                   <span className="text-[10px] md:text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Family Size</span>
                   <span className="text-sm md:text-[15px] font-bold text-gray-900">{familySize} {familySize === '1' ? 'Person' : 'People'}</span>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ── PAYMENT & RENT ─────────────────────────────────────────────
+                Shown to the host who holds a booking for this tenant. Auto-fills
+                from that booking (advance + payment method) and lists every
+                rent receipt (paid/partial ledger month) in a clean card. */}
+            {hasPaymentInfo && (
+              <motion.div variants={fadeInUp} className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.03)] p-6 md:p-8">
+                <div className="flex items-center justify-between mb-5 md:mb-6">
+                  <h3 className="text-lg md:text-xl font-black text-gray-900 flex items-center gap-3">
+                    <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                      <Wallet size={18} className="md:w-5 md:h-5" />
+                    </div>
+                    Payment &amp; Rent
+                  </h3>
+                  {activeBooking?.paymentMethod && (
+                    <span className="text-[10px] font-black px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-widest inline-flex items-center gap-1.5">
+                      <Banknote size={12} /> {activeBooking.paymentMethod}
+                    </span>
+                  )}
+                </div>
+
+                {/* Summary tiles */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                  <div className="p-4 bg-gradient-to-b from-emerald-50/60 to-emerald-50 rounded-2xl border border-emerald-100/70 text-center">
+                    <p className="text-[9px] md:text-[10px] font-black text-emerald-600/80 uppercase tracking-widest mb-1">Advance Paid</p>
+                    <p className="text-base md:text-xl font-black text-emerald-700 tabular-nums">{bdt(totalAdvance)}</p>
+                  </div>
+                  <div className="p-4 bg-gradient-to-b from-blue-50/60 to-blue-50 rounded-2xl border border-blue-100/70 text-center">
+                    <p className="text-[9px] md:text-[10px] font-black text-blue-600/80 uppercase tracking-widest mb-1">Monthly Rent</p>
+                    <p className="text-base md:text-xl font-black text-blue-700 tabular-nums">{bdt(activeBooking?.monthlyRent)}</p>
+                  </div>
+                  <div className="p-4 bg-gradient-to-b from-gray-50/60 to-gray-50 rounded-2xl border border-gray-100 text-center col-span-2 md:col-span-1">
+                    <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Collected</p>
+                    <p className="text-base md:text-xl font-black text-gray-900 tabular-nums">{bdt(totalCollected)}</p>
+                  </div>
+                </div>
+
+                {/* Property + lease term chip */}
+                {activeBooking && (
+                  <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] font-bold text-gray-500">
+                    {activeBooking.property && (
+                      <span className="inline-flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
+                        <Home size={12} className="text-gray-400" /> {activeBooking.property}
+                      </span>
+                    )}
+                    {activeBooking.leaseStart && activeBooking.leaseEnd && (
+                      <span className="inline-flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
+                        <Calendar size={12} className="text-gray-400" /> {prettyDate(activeBooking.leaseStart)} – {prettyDate(activeBooking.leaseEnd)}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Receipts — clean, modern rent-payment rows */}
+                <div className="mt-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Receipt size={14} className="text-gray-400" />
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Payment Receipts</span>
+                    <div className="flex-1 h-px bg-gray-100" />
+                    <span className="text-[10px] font-black text-gray-400 tabular-nums">{paymentReceipts.length}</span>
+                  </div>
+
+                  {paymentReceipts.length === 0 ? (
+                    <div className="text-center py-8 bg-gray-50/60 rounded-2xl border border-dashed border-gray-200">
+                      <Receipt className="mx-auto text-gray-300 mb-2" size={22} />
+                      <p className="text-xs font-bold text-gray-400">No rent payments recorded yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {paymentReceipts.map((r) => {
+                        const partial = r.status === 'partial';
+                        return (
+                          <div key={r.key} className="flex items-center gap-3 p-3 md:p-3.5 bg-white rounded-2xl border border-gray-100 hover:border-emerald-200 hover:shadow-[0_6px_18px_rgba(16,185,129,0.08)] transition-all">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${partial ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                              {partial ? <Clock size={18} /> : <CheckCircle2 size={18} />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-black text-gray-900 truncate">{monthKeyLabel(r.monthKey)}</p>
+                              <p className="text-[10px] font-bold text-gray-400 truncate">
+                                {r.paidOn ? prettyDate(r.paidOn) : 'Recorded'}
+                                {r.method ? <> · {r.method}</> : null}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-sm font-black text-gray-900 tabular-nums">{bdt(r.amount)}</p>
+                              <span className={`text-[9px] font-black uppercase tracking-widest ${partial ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                {partial ? 'Partial' : 'Paid'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
