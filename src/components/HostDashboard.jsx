@@ -919,6 +919,15 @@ const HostDashboard = () => {
   // thrash the matrix.
   const today = useMemo(() => new Date(), [todayIso()]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Landlord's default active payment method — repeated in every rent reminder
+  // and shown on the dashboard card. All of a landlord's bookings share the
+  // same default account. Declared BEFORE hostAlerts (which consumes it).
+  const defaultPaymentMethod = useMemo(
+    () => paymentMethods.find((m) => m.isDefault && m.isActive) || paymentMethods.find((m) => m.isActive) || null,
+    [paymentMethods],
+  );
+  const hasActivePaymentMethod = paymentMethods.some((m) => m.isActive);
+
   // 🟢 Merged Smart Alerts for the landlord — the SAME computation the
   // Smart Alerts page runs internally (rent + lease + inquiry), lifted here
   // so the once-per-session pop-up can flag URGENT items the moment the
@@ -1032,14 +1041,6 @@ const HostDashboard = () => {
     return () => clearInterval(rentPoll);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Landlord's default active method — repeated in every rent reminder. All of
-  // a landlord's bookings share the same default account.
-  const defaultPaymentMethod = useMemo(
-    () => paymentMethods.find((m) => m.isDefault && m.isActive) || paymentMethods.find((m) => m.isActive) || null,
-    [paymentMethods],
-  );
-  const hasActivePaymentMethod = paymentMethods.some((m) => m.isActive);
 
   // ── Hydrate the host's inquiries from the backend ───────────────────────
   useEffect(() => {
