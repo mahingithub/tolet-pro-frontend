@@ -620,8 +620,11 @@ const HeroSection = () => {
         {/* ═══════════════════════════════════════════════════════════════ */}
         <section className="relative z-[60] -mt-10 md:-mt-28 w-full max-w-[1000px] mx-auto px-4 md:px-8 overflow-visible">
 
-          {/* ──────────────────── MOBILE SEARCH UI ─────────────────────── */}
-          <div className="flex md:hidden flex-col bg-gradient-to-br from-white/60 via-white/30 to-white/50 backdrop-blur-[24px] backdrop-saturate-[180%] rounded-3xl shadow-[inset_0_1.5px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(255,255,255,0.25),0_22px_60px_rgba(15,23,42,0.30)] border border-white/60 p-3 relative z-[100] ring-1 ring-inset ring-white/25">
+          {/* ──────────────────── MOBILE / TABLET SEARCH UI ─────────────────────── */}
+          {/* Stacked layout is used up to `lg` (1024px). Between 768–1023px the
+              single-row desktop bar was too cramped and truncated the location
+              placeholder, so tablets now get this comfortable stacked layout too. */}
+          <div className="flex lg:hidden flex-col bg-gradient-to-br from-white/60 via-white/30 to-white/50 backdrop-blur-[24px] backdrop-saturate-[180%] rounded-3xl shadow-[inset_0_1.5px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(255,255,255,0.25),0_22px_60px_rgba(15,23,42,0.30)] border border-white/60 p-3 relative z-[100] ring-1 ring-inset ring-white/25">
 
             <div className="flex bg-white/35 backdrop-blur-md p-1 rounded-full w-full mb-3 border border-white/55 ring-1 ring-inset ring-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
               {[{ id: 'rent', label: t?.tabRent || 'Rent' }, { id: 'buy', label: t?.tabBuy || 'Buy' }, { id: 'commercial', label: t?.tabCommercial || 'Commercial' }].map(tab => (
@@ -699,8 +702,10 @@ const HeroSection = () => {
             </button>
           </div>
 
-          {/* ──────────────────── DESKTOP SEARCH UI ────────────────────── */}
-          <div className="hidden md:flex flex-col items-center w-full relative z-[100]">
+          {/* ──────────────────── DESKTOP SEARCH UI (lg and up) ────────────────────── */}
+          {/* Single-row bar only kicks in at ≥1024px, where there is enough
+              width for LOCATION + TYPE + BUDGET + SEARCH without cramping. */}
+          <div className="hidden lg:flex flex-col items-center w-full relative z-[100]">
             <div className="bg-white/85 backdrop-blur-[24px] backdrop-saturate-[180%] p-3 md:p-4 rounded-[2rem] shadow-[0_22px_60px_rgba(15,23,42,0.20),0_0_0_3px_rgba(255,255,255,0.6)] w-full transition-all hover:bg-white/95">
               
               <div className="flex justify-center mb-3">
@@ -720,7 +725,7 @@ const HeroSection = () => {
               <div className="flex flex-row items-center w-full bg-white rounded-full border border-slate-100 shadow-[inset_0_1px_3px_rgba(0,0,0,0.02)] p-1">
                 <div className="flex flex-row flex-1 divide-x-2 divide-slate-50">
 
-                  <div className="flex-[1.4] flex items-center px-4 w-full relative group min-w-0 hover:bg-slate-50/60 rounded-l-full transition-colors">
+                  <div className="flex-[1.7] flex items-center px-3 lg:px-4 w-full relative group min-w-0 hover:bg-slate-50/60 rounded-l-full transition-colors">
                   <div className="bg-crimson-50 p-2.5 rounded-2xl mr-3 shrink-0 shadow-sm border border-crimson-100"><MapPin size={18} className="text-crimson-500" /></div>
                   <button
                     type="button"
@@ -745,7 +750,7 @@ const HeroSection = () => {
                 </div>
 
                 <div
-                  className="flex-1 flex items-center px-4 w-full cursor-pointer relative group min-w-0 hover:bg-slate-50/60 transition-colors"
+                  className="flex-1 flex items-center px-3 lg:px-4 w-full cursor-pointer relative group min-w-0 hover:bg-slate-50/60 transition-colors"
                   ref={typeRef}
                   onClick={() => setIsTypeOpen(!isTypeOpen)}
                 >
@@ -774,7 +779,7 @@ const HeroSection = () => {
                 </div>
 
                 <div
-                  className="flex-1 flex items-center px-4 w-full cursor-pointer relative group min-w-0 hover:bg-slate-50/60 rounded-r-full transition-colors"
+                  className="flex-1 flex items-center px-3 lg:px-4 w-full cursor-pointer relative group min-w-0 hover:bg-slate-50/60 rounded-r-full transition-colors"
                   ref={budgetRef}
                   onClick={e => { if (!e.target.closest('.custom-budget-inputs')) setIsBudgetOpen(!isBudgetOpen); }}
                 >
@@ -814,10 +819,10 @@ const HeroSection = () => {
                 </div>
               </div>
 
-              <div className="pl-2.5 shrink-0">
+              <div className="pl-2 lg:pl-2.5 shrink-0">
                 <button
                   onClick={handleSearch}
-                  className="h-[56px] bg-[#ba0036] hover:bg-[#a0002d] text-white px-8 rounded-full font-black text-sm uppercase tracking-widest active:scale-95 hover:scale-[1.02] hover:-translate-y-0.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-[0_10px_24px_rgba(186,0,54,0.35)] hover:shadow-[0_14px_32px_rgba(186,0,54,0.45)] group"
+                  className="h-[56px] bg-[#ba0036] hover:bg-[#a0002d] text-white px-6 xl:px-8 rounded-full font-black text-sm uppercase tracking-widest active:scale-95 hover:scale-[1.02] hover:-translate-y-0.5 flex items-center justify-center gap-2 transition-all duration-300 shadow-[0_10px_24px_rgba(186,0,54,0.35)] hover:shadow-[0_14px_32px_rgba(186,0,54,0.45)] group"
                 >
                   <Search size={16} className="group-hover:scale-110 transition-transform duration-300" /> {t?.searchBtn || 'Search'}
                 </button>
