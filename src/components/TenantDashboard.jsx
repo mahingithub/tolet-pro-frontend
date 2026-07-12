@@ -4,6 +4,9 @@ import { uploadVerificationDoc, uploadAvatar, getCurrentToken } from '../service
 import { listMyInquiries, deleteInquiry } from '../services/inquiryService.js';
 import { listTenantReceipts, markReceiptRead as apiMarkReceiptRead } from '../services/receiptService.js';
 import { listTenantBookings } from '../services/bookingService.js';
+import { listTenantRentPayments } from '../services/rentPaymentService.js';
+import { listPaymentMethodsForBooking } from '../services/paymentMethodService.js';
+import TenantRentPay from './payments/TenantRentPay';
 import { listNotifications, getUnreadCount, markRead } from '../services/notificationService.js';
 import { propertyService } from '../services/Propertyservice.js';
 import { buildTenantAlerts } from '../utils/rentAlerts';
@@ -415,6 +418,22 @@ const TenantDashboard = () => {
   // (Receipts are only created once money changes hands, which is exactly
   // why unpaid rent was previously invisible to the tenant.)
   const [myBookings, setMyBookings] = useState([]);
+  // 🟢 V1 manual rent — the tenant's own "I have paid" submissions + a map of
+  // each booking's landlord default payment method (drives rent-reminder text).
+  const [rentSubmissions, setRentSubmissions] = useState([]);
+  const [paymentMethodsByBooking, setPaymentMethodsByBooking] = useState({});
+
+  // Re-fetch bookings + submissions right after the tenant submits a payment,
+  // so the rent card flips to "Pending Verification" without waiting for a poll.
+  const refreshRentData = async () => {
+    try {
+      const [subs, rows] = await Promise.all([listTenantRentPayments(), listTenantBookings()]);
+      setRentSubmissions(subs);
+      setMyBookings(rows);
+    } catch (err) {
+      console.warn('[tenant] refresh rent data failed:', err.message || err);
+    }
+  };
 
   useEffect(() => {
     if (!getCurrentToken()) return undefined;
@@ -459,6 +478,50 @@ const TenantDashboard = () => {
       clearInterval(interval);
     };
   }, []);
+
+  // 🟢 V1 manual rent: load the tenant's own submissions (poll every 30s so an
+  // approve/reject by the landlord reflects quickly).
+  useEffect(() => {
+    if (!getCurrentToken()) return undefined;
+    let cancelled = false;
+    const hydrate = async () => {
+      try {
+        const subs = await listTenantRentPayments();
+        if (!cancelled) setRentSubmissions(subs);
+      } catch (err) {
+        console.warn('[tenant] failed to load rent submissions:', err.message || err);
+      }
+    };
+    hydrate();
+    const interval = setInterval(hydrate, 30_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
+  // 🟢 V1 manual rent: resolve each active booking's landlord DEFAULT payment
+  // method so the rent reminder can include "where to pay". Keyed by booking id.
+  const activeBookingIdsKey = useMemo(
+    () => (myBookings || []).filter(b => b.status !== 'cancelled').map(b => b.id).sort().join(','),
+    [myBookings],
+  );
+  useEffect(() => {
+    if (!getCurrentToken()) return undefined;
+    const ids = activeBookingIdsKey ? activeBookingIdsKey.split(',') : [];
+    if (ids.length === 0) { setPaymentMethodsByBooking({}); return undefined; }
+    let cancelled = false;
+    (async () => {
+      const map = {};
+      await Promise.all(ids.map(async (id) => {
+        try {
+          const rows = await listPaymentMethodsForBooking(id);
+          const def = rows.find(m => m.isDefault && m.isActive) || rows.find(m => m.isActive) || rows[0];
+          if (def) map[id] = def;
+        } catch { /* ignore per-booking */ }
+      }));
+      if (!cancelled) setPaymentMethodsByBooking(map);
+    })();
+    return () => { cancelled = true; };
+  }, [activeBookingIdsKey]);
+
   // Withdraw (delete) one of the tenant's OWN inquiries. The backend permits
   // the original inquirer to delete; on success we optimistically drop the row
   // from the list and surface a toast either way.
@@ -1276,8 +1339,8 @@ const handleWizardSubmit = async (payload) => {
   // 🟢 NEW: Smart Alerts for the tenant — derived from their bookings' rent
   // ledger (unpaid rent), receipts (paid/new-receipt), and inquiry status.
   const { alerts: tenantAlerts, resolved: tenantResolved } = useMemo(
-    () => buildTenantAlerts(myBookings, myInquiries, paymentReceipts, new Date(), language),
-    [myBookings, myInquiries, paymentReceipts, language],
+    () => buildTenantAlerts(myBookings, myInquiries, paymentReceipts, new Date(), language, { paymentMethodsByBooking }),
+    [myBookings, myInquiries, paymentReceipts, language, paymentMethodsByBooking],
   );
   const tenantAlertCount = tenantAlerts.filter(a => a.type !== 'low').length;
 
@@ -2651,6 +2714,24 @@ const handleWizardSubmit = async (payload) => {
             return d.toLocaleDateString(language === 'বাংলা' ? 'bn-BD' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
           };
           const activeLeases = (myBookings || []).filter((b) => b.status !== 'cancelled');
+
+          // 🟢 V1 manual rent — a "Pay Your Rent" card per active lease. Shows
+          // the landlord's bKash/Nagad/Rocket/Bank account + QR, one-click copy,
+          // and the "I Have Paid" / "Upload Proof" submission flow.
+          const rentPaySection = activeLeases.length > 0 ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 px-1">
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center"><Wallet size={14} /></div>
+                <h3 className="text-sm font-black text-gray-800">{language === 'বাংলা' ? 'ভাড়া পরিশোধ করুন' : 'Pay Your Rent'}</h3>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {activeLeases.map((b) => (
+                  <TenantRentPay key={b.id || b._id} booking={b} submissions={rentSubmissions} onSubmitted={refreshRentData} />
+                ))}
+              </div>
+            </div>
+          ) : null;
+
           const leaseBanner = activeLeases.length > 0 ? (
             <div className="space-y-3">
               <div className="flex items-center gap-2 px-1">
@@ -2706,6 +2787,7 @@ const handleWizardSubmit = async (payload) => {
           if (paymentReceipts.length === 0) {
             return (
               <div className="animate-in fade-in duration-500 space-y-5">
+                {rentPaySection}
                 {leaseBanner}
                 <div className="text-center py-24 bg-white/40 backdrop-blur-md rounded-[3rem] border border-white shadow-sm flex flex-col items-center">
                   <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4">
@@ -2726,6 +2808,9 @@ const handleWizardSubmit = async (payload) => {
 
           return (
             <div className="animate-in fade-in duration-500 space-y-5">
+
+              {/* ─── PAY YOUR RENT (V1 manual rent) ──────────────────── */}
+              {rentPaySection}
 
               {/* ─── YOUR BOOKINGS (host-created leases) ─────────────── */}
               {leaseBanner}

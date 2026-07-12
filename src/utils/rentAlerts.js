@@ -39,11 +39,49 @@ function fmtDate(d, bn) {
   }
 }
 
-export function buildRentAlerts(bookings = [], today = new Date(), lang = 'English') {
+// Human label for a payment-method rail (matches backend labelForType).
+function methodLabel(type) {
+  switch (String(type || '').toLowerCase()) {
+    case 'bkash':  return 'bKash';
+    case 'nagad':  return 'Nagad';
+    case 'rocket': return 'Rocket';
+    case 'bank':   return 'Bank';
+    default:       return type || '';
+  }
+}
+
+/**
+ * One-line "where to pay" string for a landlord payment method, e.g.
+ *   "bKash: 017XXXXXXXX (Asraf)"  or  "City Bank A/C: 123456 (Asraf)".
+ * Exported so the tenant rent page can reuse the exact same formatting.
+ */
+export function paymentAccountLine(method) {
+  if (!method) return '';
+  const holder = method.accountHolderName ? ` (${method.accountHolderName})` : '';
+  if (method.type === 'bank') {
+    const bank = method.bankName ? `${method.bankName} ` : '';
+    return `${bank}A/C: ${method.accountNumber || ''}${holder}`;
+  }
+  return `${methodLabel(method.type)}: ${method.accountNumber || ''}${holder}`;
+}
+
+// Full payment-instruction sentence appended to a rent reminder ONLY when the
+// landlord has configured Payment Settings. Uses the DEFAULT method only.
+function paymentInstruction(method, bn) {
+  const line = paymentAccountLine(method);
+  if (!line) return '';
+  return bn
+    ? ` ভাড়া পাঠান — ${line}। পেমেন্টের পর Transaction ID অ্যাপে সাবমিট করুন।`
+    : ` Send your rent to — ${line}. After paying, submit the Transaction ID in the app.`;
+}
+
+export function buildRentAlerts(bookings = [], today = new Date(), lang = 'English', options = {}) {
   const bn = lang === 'বাংলা';
   const t0 = startOfDay(today) || startOfDay(new Date());
   const alerts = [];
   const resolved = [];
+  // Map of bookingId → the landlord's default payment method (optional).
+  const payByBooking = options.paymentMethodsByBooking || {};
 
   for (const b of (bookings || [])) {
     if (!b) continue;
@@ -87,10 +125,35 @@ export function buildRentAlerts(bookings = [], today = new Date(), lang = 'Engli
       continue;
     }
 
+    // Tenant filed a manual "I have paid" claim awaiting the landlord's review.
+    // Nudge the landlord to verify instead of showing a due/overdue alert.
+    if (entry && entry.status === 'submitted') {
+      alerts.push({
+        id: idBase,
+        category: 'payment',
+        bookingId: b.id || null,
+        tenant,
+        phone,
+        amount: amountStr,
+        type: 'medium',
+        iconType: 'dueSoon',
+        title: bn ? `ভাড়া যাচাই করুন — ${tenant}` : `Verify payment — ${tenant}`,
+        subtitle: bn ? `${key} • যাচাইয়ের অপেক্ষায়` : `${key} • awaiting your review`,
+        detail: bn
+          ? `${tenant} ${key} মাসের ৳${amountStr} ভাড়া পরিশোধের দাবি করেছেন। "Pending Rent Payments"-এ গিয়ে যাচাই করে Approve বা Reject করুন।`
+          : `${tenant} submitted a ৳${amountStr} rent payment for ${key}. Review it under "Pending Rent Payments" and Approve or Reject.`,
+        daysLeft: null,
+      });
+      continue;
+    }
+
     const graceEnd = new Date(dueDate);
     graceEnd.setDate(graceEnd.getDate() + grace);
     const daysUntilDue = Math.round((dueDate - t0) / MS_DAY);
     const daysPastGrace = Math.round((t0 - graceEnd) / MS_DAY);
+    // Landlord's default payment method for this booking (if configured) — the
+    // reminder repeats the account so the host can copy it to the tenant.
+    const hostPayMsg = paymentInstruction(payByBooking[b.id], bn);
 
     const common = {
       id: idBase,
@@ -112,9 +175,9 @@ export function buildRentAlerts(bookings = [], today = new Date(), lang = 'Engli
         subtitle: bn
           ? `${daysPastGrace} দিন পার${lateFee ? ` • ৳${fmtAmount(lateFee, bn)} বিলম্ব ফি` : ''}`
           : `${daysPastGrace} days past grace${lateFee ? ` • ৳${fmtAmount(lateFee, bn)} late fee` : ''}`,
-        detail: bn
+        detail: (bn
           ? `${tenant}-এর ${key} মাসের ভাড়া ৳${amountStr} এখনো বাকি। নির্ধারিত তারিখ ছিল ${dueStr}, grace period শেষ।${lateFee ? ` ৳${fmtAmount(lateFee, bn)} বিলম্ব ফি যোগ হতে পারে।` : ''}`
-          : `${tenant}'s ৳${amountStr} rent for ${key} is still unpaid. It was due ${dueStr} and the grace period has ended.${lateFee ? ` A ৳${fmtAmount(lateFee, bn)} late fee may apply.` : ''}`,
+          : `${tenant}'s ৳${amountStr} rent for ${key} is still unpaid. It was due ${dueStr} and the grace period has ended.${lateFee ? ` A ৳${fmtAmount(lateFee, bn)} late fee may apply.` : ''}`) + hostPayMsg,
         daysLeft: null,
       });
     } else if (t0 >= dueDate) {
@@ -128,9 +191,9 @@ export function buildRentAlerts(bookings = [], today = new Date(), lang = 'Engli
         subtitle: bn
           ? `নির্ধারিত তারিখ পেরিয়েছে • grace-এ ${graceLeft} দিন বাকি`
           : `Past due date • ${graceLeft}d of grace left`,
-        detail: bn
+        detail: (bn
           ? `${tenant}-এর ${key} মাসের ভাড়া ৳${amountStr} এখন বকেয়া (নির্ধারিত ${dueStr})। grace period এখনো চলছে — দ্রুত আদায় করলে বিলম্ব ফি এড়ানো যাবে।`
-          : `${tenant}'s ৳${amountStr} rent for ${key} is now due (was ${dueStr}). Still within grace — collect soon to avoid a late fee.`,
+          : `${tenant}'s ৳${amountStr} rent for ${key} is now due (was ${dueStr}). Still within grace — collect soon to avoid a late fee.`) + hostPayMsg,
         daysLeft: null,
       });
     } else if (daysUntilDue <= 5) {
@@ -141,9 +204,9 @@ export function buildRentAlerts(bookings = [], today = new Date(), lang = 'Engli
         iconType: 'dueSoon',
         title: bn ? `ভাড়া due ${daysUntilDue} দিনে — ${tenant}` : `Rent due in ${daysUntilDue}d — ${tenant}`,
         subtitle: bn ? `নির্ধারিত তারিখ ${dueStr}` : `Due ${dueStr}`,
-        detail: bn
+        detail: (bn
           ? `${tenant}-এর ${key} মাসের ভাড়া ৳${amountStr} ${daysUntilDue} দিনের মধ্যে (${dueStr}) দিতে হবে। এখনই একটি রিমাইন্ডার পাঠাতে পারেন।`
-          : `${tenant}'s ৳${amountStr} rent for ${key} is due in ${daysUntilDue} day(s) (${dueStr}). A friendly reminder now helps.`,
+          : `${tenant}'s ৳${amountStr} rent for ${key} is due in ${daysUntilDue} day(s) (${dueStr}). A friendly reminder now helps.`) + hostPayMsg,
         daysLeft: daysUntilDue,
       });
     } else if (daysUntilDue <= 14) {
@@ -352,11 +415,14 @@ export function buildInquiryAlerts(inquiries = [], today = new Date(), lang = 'E
  * receipt and was therefore invisible to the tenant. Reading the ledger (the
  * same source the landlord's alerts use) fixes that.
  */
-export function buildTenantAlerts(bookings = [], inquiries = [], receipts = [], today = new Date(), lang = 'English') {
+export function buildTenantAlerts(bookings = [], inquiries = [], receipts = [], today = new Date(), lang = 'English', options = {}) {
   const bn = lang === 'বাংলা';
   const t0 = startOfDay(today) || startOfDay(new Date());
   const alerts = [];
   const resolved = [];
+  // Map of bookingId → the landlord's default payment method (optional). Drives
+  // the "where to pay" line inside the tenant's rent reminder.
+  const payByBooking = options.paymentMethodsByBooking || {};
 
   // ── Rent, from the tenant's bookings + ledger (matches buildRentAlerts) ──
   // We only surface UNPAID months here; paid months are handled by the
@@ -389,9 +455,36 @@ export function buildTenantAlerts(bookings = [], inquiries = [], receipts = [], 
     const dueStr = fmtDate(dueDate, bn);
     const amountStr = fmtAmount(totalDue, bn);
 
+    // Manual payment already submitted — awaiting the landlord's verification.
+    // Reassure the tenant instead of nagging them to pay again.
+    if (entry && entry.status === 'submitted') {
+      alerts.push({
+        id: `trent-${b.id || property}-${key}`,
+        category: 'payment',
+        bookingId: b.id || null,
+        amount: amountStr,
+        dueDate: dueStr,
+        monthKey: key,
+        daysLeft: null,
+        type: 'low',
+        iconType: 'receipt',
+        title: bn ? `পেমেন্ট যাচাইয়ের অপেক্ষায় — ${property}` : `Payment under review — ${property}`,
+        subtitle: bn ? `${key} • ৳${amountStr} সাবমিট হয়েছে` : `${key} • ৳${amountStr} submitted`,
+        detail: bn
+          ? `${property}-এর ${key} মাসের ৳${amountStr} ভাড়ার পেমেন্ট সাবমিট হয়েছে এবং মালিকের যাচাইয়ের অপেক্ষায় আছে। অনুমোদিত হলে আপনি রিসিট পাবেন।`
+          : `Your ৳${amountStr} rent payment for ${key} (${property}) has been submitted and is awaiting your landlord's verification. You'll receive a receipt once it's approved.`,
+        actionType: 'view_receipt',
+        actionLabel: bn ? 'দেখুন' : 'View',
+      });
+      continue;
+    }
+
     const graceEnd = new Date(dueDate);
     graceEnd.setDate(graceEnd.getDate() + grace);
     const daysUntilDue = Math.round((dueDate - t0) / MS_DAY);
+    // Landlord's default payment method for this booking (if configured) —
+    // this is the "include payment instruction inside the reminder" step.
+    const payMsg = paymentInstruction(payByBooking[b.id], bn);
 
     const common = {
       id: `trent-${b.id || property}-${key}`,
@@ -416,9 +509,9 @@ export function buildTenantAlerts(bookings = [], inquiries = [], receipts = [], 
         subtitle: bn
           ? `${daysPastGrace} দিন পার • ৳${amountStr} বাকি${lateFee ? ` • ৳${fmtAmount(lateFee, bn)} লেট ফি` : ''}`
           : `${daysPastGrace}d past grace • ৳${amountStr} due${lateFee ? ` • ৳${fmtAmount(lateFee, bn)} late fee` : ''}`,
-        detail: bn
+        detail: (bn
           ? `${property}-এর ${key} মাসের ভাড়া ৳${amountStr} এখনো বাকি। নির্ধারিত তারিখ ছিল ${dueStr}, grace period শেষ।${lateFee ? ` ৳${fmtAmount(lateFee, bn)} বিলম্ব ফি যোগ হতে পারে।` : ''} দ্রুত পরিশোধ করুন বা মালিকের সাথে কথা বলুন।`
-          : `Your ৳${amountStr} rent for ${key} (${property}) is still unpaid. It was due ${dueStr} and the grace period has ended.${lateFee ? ` A ৳${fmtAmount(lateFee, bn)} late fee may apply.` : ''} Pay soon or talk to your landlord.`,
+          : `Your ৳${amountStr} rent for ${key} (${property}) is still unpaid. It was due ${dueStr} and the grace period has ended.${lateFee ? ` A ৳${fmtAmount(lateFee, bn)} late fee may apply.` : ''} Pay soon or talk to your landlord.`) + payMsg,
       });
     } else if (t0 >= dueDate) {
       // DUE — on/after the due date but still inside the grace window.
@@ -431,9 +524,9 @@ export function buildTenantAlerts(bookings = [], inquiries = [], receipts = [], 
         subtitle: bn
           ? `নির্ধারিত তারিখ পেরিয়েছে • grace-এ ${graceLeft} দিন বাকি`
           : `Past due date • ${graceLeft}d of grace left`,
-        detail: bn
+        detail: (bn
           ? `${property}-এর ${key} মাসের ভাড়া ৳${amountStr} এখন বকেয়া (নির্ধারিত ${dueStr})। grace period এখনো চলছে — দ্রুত পরিশোধ করলে বিলম্ব ফি এড়ানো যাবে।`
-          : `Your ৳${amountStr} rent for ${key} (${property}) is now due (was ${dueStr}). Still within grace — pay soon to avoid a late fee.`,
+          : `Your ৳${amountStr} rent for ${key} (${property}) is now due (was ${dueStr}). Still within grace — pay soon to avoid a late fee.`) + payMsg,
       });
     } else if (daysUntilDue <= 5) {
       // DUE SOON.
@@ -444,9 +537,9 @@ export function buildTenantAlerts(bookings = [], inquiries = [], receipts = [], 
         daysLeft: daysUntilDue,
         title: bn ? `ভাড়া due ${daysUntilDue} দিনে — ${property}` : `Rent due in ${daysUntilDue}d — ${property}`,
         subtitle: bn ? `নির্ধারিত তারিখ ${dueStr}` : `Due ${dueStr}`,
-        detail: bn
+        detail: (bn
           ? `${property}-এর ${key} মাসের ভাড়া ৳${amountStr} ${daysUntilDue} দিনের মধ্যে (${dueStr}) দিতে হবে। সময়মতো পরিশোধ করলে ঝামেলা এড়ানো যায়।`
-          : `Your ৳${amountStr} rent for ${key} (${property}) is due in ${daysUntilDue} day(s) (${dueStr}). Paying on time keeps things smooth.`,
+          : `Your ৳${amountStr} rent for ${key} (${property}) is due in ${daysUntilDue} day(s) (${dueStr}). Paying on time keeps things smooth.`) + payMsg,
       });
     } else if (daysUntilDue <= 14) {
       // UPCOMING — early heads-up.
@@ -457,9 +550,9 @@ export function buildTenantAlerts(bookings = [], inquiries = [], receipts = [], 
         daysLeft: daysUntilDue,
         title: bn ? `আসন্ন ভাড়া — ${property}` : `Upcoming rent — ${property}`,
         subtitle: bn ? `${daysUntilDue} দিনে due (${dueStr})` : `Due in ${daysUntilDue}d (${dueStr})`,
-        detail: bn
+        detail: (bn
           ? `${property}-এর ${key} মাসের ভাড়া ৳${amountStr} আসছে ${dueStr}-এ।`
-          : `Your ৳${amountStr} rent for ${key} (${property}) is coming up on ${dueStr}.`,
+          : `Your ৳${amountStr} rent for ${key} (${property}) is coming up on ${dueStr}.`) + payMsg,
       });
     }
   }

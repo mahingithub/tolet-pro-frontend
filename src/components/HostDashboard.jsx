@@ -22,6 +22,11 @@ import { getDynamicFields } from '../constants/propertyFields';
 import { subscriptionService } from '../services/subscriptionService';
 import { listHostInquiries, updateInquiryStatus, deleteInquiry, replyToInquiry, respondVisit, proposeVisit } from "../services/inquiryService.js";
 import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi, cancelBooking as cancelBookingApi, updateBookingSettings as updateBookingSettingsApi } from "../services/bookingService.js";
+import { listMyPaymentMethods } from "../services/paymentMethodService.js";
+import { listHostRentPayments } from "../services/rentPaymentService.js";
+import PaymentSettings from './payments/PaymentSettings';
+import PendingRentPayments from './payments/PendingRentPayments';
+import PaymentSettingsPopup from './payments/PaymentSettingsPopup';
 import { listDocuments as listDocsApi, uploadDocument as uploadDocApi, deleteDocument as deleteDocApi, downloadUrlFor } from "../services/documentService.js";
 import tenantService from "../services/tenantService.js";
 import callProvider from "../services/callProvider";
@@ -447,7 +452,7 @@ const HostDashboard = () => {
   // Honor ?tab=… deep-links (e.g. notification bell → /host-dashboard?tab=inquiries).
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
-    if (tab && ['dashboard', 'inquiries', 'rent', 'bookings', 'properties', 'profile', 'settings'].includes(tab)) {
+    if (tab && ['dashboard', 'inquiries', 'rent', 'bookings', 'properties', 'payments', 'profile', 'settings'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [location.search]);
@@ -732,6 +737,10 @@ const HostDashboard = () => {
   const [propertyRefreshTick, setPropertyRefreshTick] = useState(0);
   const [bookings, setBookings] = useState(initialBookings);
   const [inquiries, setInquiries] = useState(initialInquiries);
+  // 🟢 V1 manual rent — landlord payment accounts + pending tenant claims.
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
+  const [pendingRentCount, setPendingRentCount] = useState(0);
   const [inquiryTab, setInquiryTab] = useState('pending'); // 'pending' | 'accepted' | 'rejected' | 'rented'
   const [searchQuery, setSearchQuery] = useState('');
   const [propertyFilter, setPropertyFilter] = useState('all');
@@ -915,14 +924,21 @@ const HostDashboard = () => {
   // so the once-per-session pop-up can flag URGENT items the moment the
   // dashboard opens. Memoised on the same inputs the page uses.
   const hostAlerts = useMemo(() => {
-    const rent = buildRentAlerts(bookings, today, language);
+    // Every booking shares the landlord's default account → append the "where
+    // to pay" line to each rent reminder when Payment Settings is configured.
+    const paymentMethodsByBooking = {};
+    if (defaultPaymentMethod) {
+      for (const b of bookings) { if (b?.id) paymentMethodsByBooking[b.id] = defaultPaymentMethod; }
+    }
+    const opts = { paymentMethodsByBooking };
+    const rent = buildRentAlerts(bookings, today, language, opts);
     const lease = buildLeaseAlerts(bookings, today, language);
     const inquiry = buildInquiryAlerts(inquiries, today, language);
     const rank = { urgent: 0, medium: 1, low: 2 };
     return [...rent.alerts, ...lease.alerts, ...inquiry.alerts].sort(
       (a, b) => (rank[a.type] - rank[b.type]) || ((a.daysLeft ?? 999) - (b.daysLeft ?? 999)),
     );
-  }, [bookings, inquiries, today, language]);
+  }, [bookings, inquiries, today, language, defaultPaymentMethod]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -986,6 +1002,44 @@ const HostDashboard = () => {
     const interval = setInterval(hydrate, 30_000);
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
+
+  // ── V1 manual rent: load payment methods + pending-verification count ────
+  // Payment methods drive the Payment Settings badge, the after-login popup,
+  // and the payment instruction appended to rent reminders. Pending count
+  // drives the "Pending Rent Payments" badge.
+  const refreshPaymentMethods = async () => {
+    setPaymentMethodsLoading(true);
+    try {
+      setPaymentMethods(await listMyPaymentMethods());
+    } catch (err) {
+      console.warn('[host] failed to load payment methods:', err.message || err);
+    } finally {
+      setPaymentMethodsLoading(false);
+    }
+  };
+  const refreshPendingRent = async () => {
+    try {
+      const rows = await listHostRentPayments('pending');
+      setPendingRentCount(rows.length);
+    } catch (err) {
+      console.warn('[host] failed to load pending rent payments:', err.message || err);
+    }
+  };
+  useEffect(() => {
+    refreshPaymentMethods();
+    refreshPendingRent();
+    const rentPoll = setInterval(refreshPendingRent, 60_000);
+    return () => clearInterval(rentPoll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Landlord's default active method — repeated in every rent reminder. All of
+  // a landlord's bookings share the same default account.
+  const defaultPaymentMethod = useMemo(
+    () => paymentMethods.find((m) => m.isDefault && m.isActive) || paymentMethods.find((m) => m.isActive) || null,
+    [paymentMethods],
+  );
+  const hasActivePaymentMethod = paymentMethods.some((m) => m.isActive);
 
   // ── Hydrate the host's inquiries from the backend ───────────────────────
   useEffect(() => {
@@ -2157,6 +2211,7 @@ const HostDashboard = () => {
     { id: 'messages', icon: MessageCircle, label: t?.messages || (language === 'বাংলা' ? 'বার্তা' : "Messages"), isLink: true, path: '/messages' },
     { id: 'bookings', icon: Calendar, label: t?.bookings || (language === 'বাংলা' ? 'বুকিং' : "Bookings") },
     { id: 'rent',     icon: Wallet,   label: language === 'বাংলা' ? 'ভাড়া কালেকশন' : "Rent Collection" },
+    { id: 'payments', icon: CreditCard, label: language === 'বাংলা' ? 'পেমেন্ট সেটিংস' : 'Payment Settings' },
     { id: 'smartAlerts', icon: BellRing, label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্টস' : 'Smart Alerts' },
     { id: 'aiInsights',  icon: Sparkles, label: language === 'বাংলা' ? 'এআই ইনসাইটস'   : 'AI Insights' },
     { id: 'settings', icon: Settings, label: language === 'বাংলা' ? 'সেটিংস' : 'Settings' },
@@ -2174,6 +2229,14 @@ const HostDashboard = () => {
         language={language}
         role="landlord"
         onViewAll={() => setActiveTab('smartAlerts')}
+      />
+
+      {/* 💳 PAYMENT SETTINGS REMINDER — after login, if no payment method is
+          configured yet, nudge the landlord to complete Payment Settings. */}
+      <PaymentSettingsPopup
+        hasPaymentMethod={hasActivePaymentMethod}
+        loading={paymentMethodsLoading}
+        onAddMethod={() => setActiveTab('payments')}
       />
 
       {/* ✨ GLOWING ORBS ✨ */}
@@ -2404,6 +2467,11 @@ const HostDashboard = () => {
                        {inquiries.filter(i => i.status === 'sent').length}
                      </span>
                    )}
+                   {item.id === 'payments' && (pendingRentCount > 0 || (!hasActivePaymentMethod && !paymentMethodsLoading)) && (
+                     <span className={`text-white text-[9px] px-1.5 py-0.5 rounded-full font-black ${pendingRentCount > 0 ? 'bg-[#ba0036]' : 'bg-amber-500'}`}>
+                       {pendingRentCount > 0 ? pendingRentCount : '!'}
+                     </span>
+                   )}
                 </span>
                 {locked && <Lock size={12} className="text-amber-500" />}
               </button>
@@ -2591,6 +2659,69 @@ const HostDashboard = () => {
         {/* 🔴 OPTIMIZED MOBILE-FIRST DASHBOARD */}
         {activeTab === 'dashboard' && (
           <div className="animate-in fade-in zoom-in-95 duration-500 space-y-6 md:space-y-8">
+
+            {/* 💳 PAYMENT SETTINGS CARD — highly visible. Warns until a payout
+                account is configured; otherwise surfaces the default account +
+                any pending tenant payments to verify. */}
+            {!paymentMethodsLoading && (
+              !hasActivePaymentMethod ? (
+                <div
+                  onClick={() => setActiveTab('payments')}
+                  className="group cursor-pointer bg-gradient-to-br from-amber-50 to-orange-50/60 border border-amber-200 rounded-[1.5rem] p-5 md:p-6 shadow-[0_4px_25px_rgba(245,158,11,0.10)] hover:shadow-[0_12px_35px_rgba(245,158,11,0.15)] hover:-translate-y-0.5 transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                      <CreditCard size={22} />
+                      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#ba0036] text-white text-[10px] font-black flex items-center justify-center animate-pulse">!</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base md:text-lg font-black text-gray-900 leading-tight">
+                        {language === 'বাংলা' ? 'পেমেন্ট সেটিংস সম্পূর্ণ করুন' : 'Complete Your Payment Settings'}
+                      </h3>
+                      <p className="text-[11px] md:text-xs font-bold text-amber-700/90 mt-0.5">
+                        {language === 'বাংলা'
+                          ? 'পেমেন্ট অ্যাকাউন্ট যোগ করুন যাতে ভাড়াটিয়া সরাসরি ভাড়া পাঠাতে পারে।'
+                          : 'Add a payment account so tenants can send rent directly to you.'}
+                      </p>
+                    </div>
+                    <span className="hidden sm:inline-flex items-center gap-1 bg-amber-500 text-white px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest group-hover:translate-x-0.5 transition-transform shrink-0">
+                      {language === 'বাংলা' ? 'সেট আপ করুন' : 'Set Up'} <ArrowUpRight size={14} />
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  onClick={() => setActiveTab('payments')}
+                  className="group cursor-pointer bg-white border border-gray-100 rounded-[1.5rem] p-5 md:p-6 shadow-[0_4px_25px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_35px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                      <CreditCard size={22} />
+                      {pendingRentCount > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-[#ba0036] text-white text-[10px] font-black flex items-center justify-center">{pendingRentCount}</span>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base md:text-lg font-black text-gray-900 leading-tight">
+                        {language === 'বাংলা' ? 'পেমেন্ট সেটিংস' : 'Payment Settings'}
+                      </h3>
+                      <p className="text-[11px] md:text-xs font-bold text-gray-500 mt-0.5 truncate">
+                        {pendingRentCount > 0
+                          ? (language === 'বাংলা'
+                              ? `${pendingRentCount} টি পেমেন্ট যাচাইয়ের অপেক্ষায়`
+                              : `${pendingRentCount} payment${pendingRentCount > 1 ? 's' : ''} awaiting verification`)
+                          : (defaultPaymentMethod
+                              ? `${({ bkash: 'bKash', nagad: 'Nagad', rocket: 'Rocket', bank: 'Bank' })[defaultPaymentMethod.type] || ''} • ${defaultPaymentMethod.accountNumber}`
+                              : (language === 'বাংলা' ? 'পেমেন্ট অ্যাকাউন্ট কনফিগার করা আছে' : 'Payment account configured'))}
+                      </p>
+                    </div>
+                    <span className={`inline-flex items-center gap-1 px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest group-hover:translate-x-0.5 transition-transform shrink-0 ${pendingRentCount > 0 ? 'bg-[#ba0036] text-white' : 'text-[#ba0036]'}`}>
+                      {pendingRentCount > 0 ? (language === 'বাংলা' ? 'যাচাই করুন' : 'Verify') : (language === 'বাংলা' ? 'ম্যানেজ' : 'Manage')} <ArrowUpRight size={14} />
+                    </span>
+                  </div>
+                </div>
+              )
+            )}
 
             {/* ১. Stats Bento Grid */}
             <div className="grid grid-cols-3 gap-3 md:gap-5">
@@ -5293,6 +5424,15 @@ const HostDashboard = () => {
             🔴 NEW TABS (Smart Alerts, AI Insights, Settings)
             Help & Support links out to the shared /support page.
             ───────────────────────────────────────────────────────────────── */}
+        {/* 🟢 PAYMENT SETTINGS TAB — V1 manual rent: pending verification + payout accounts */}
+        {activeTab === 'payments' && (
+          <div className="w-full max-w-5xl mx-auto animate-in fade-in zoom-in-95 duration-500 space-y-8 pb-10">
+            <PendingRentPayments onChange={refreshPendingRent} />
+            <div className="h-px bg-gray-100" />
+            <PaymentSettings onChange={(rows) => setPaymentMethods(rows)} />
+          </div>
+        )}
+
         {activeTab === 'smartAlerts' && (
           <div className="w-full h-[calc(100vh-120px)] animate-in fade-in zoom-in-95 duration-500 overflow-y-auto">
              <Smartalertspage
