@@ -1294,6 +1294,20 @@ const HostDashboard = () => {
   // is one single conversation surface for the whole app — ChatSystem will
   // hydrate the right thread from `location.state.chatId` and render any
   // cross-system rent receipts inline.
+  // Best-effort resolve of a booking's tenant user id. Prefers the id already
+  // on the booking (set at create time / backfilled by the backend), then falls
+  // back to the linked inquiry's inquirer — this covers the brief window before
+  // the next bookings poll lands the backend-resolved id.
+  const resolveTenantUserId = (booking) => {
+    if (!booking) return null;
+    if (booking.tenantId) return booking.tenantId;
+    if (booking.inquiryId) {
+      const inq = inquiries.find(i => String(i.id) === String(booking.inquiryId));
+      if (inq?.inquirerUserId) return inq.inquirerUserId;
+    }
+    return null;
+  };
+
   // 🟢 OPEN TENANT PROFILE — routes to /tenant/:id (the public trust card).
   // Guards the "no linked account" case so the host gets a clear message
   // instead of a broken profile page.
@@ -4051,12 +4065,6 @@ const HostDashboard = () => {
                             <MapPin size={11} className="text-[#ba0036] shrink-0"/> <span className="truncate">{booking.location}</span>
                           </div>
                         )}
-                        {Number(booking.advancePayment) > 0 && (
-                          <div className="px-2.5 py-1 bg-emerald-50 border border-emerald-100 rounded-lg text-[10px] font-black text-emerald-700 inline-flex items-center gap-1.5">
-                            <Banknote size={11}/> {language === 'বাংলা' ? 'অ্যাডভান্স' : 'Advance'} {formatBDT(booking.advancePayment)}
-                            {booking.paymentMethod ? <span className="text-emerald-500 font-bold">· {booking.paymentMethod}</span> : null}
-                          </div>
-                        )}
                       </div>
                       <div className="px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[10px] font-black text-gray-700 inline-flex items-center gap-1.5 shrink-0">
                         <User size={11}/> {tenantsLabel}
@@ -4086,6 +4094,24 @@ const HostDashboard = () => {
                         <p className="text-xs sm:text-sm font-black text-[#ba0036] tabular-nums mt-0.5">{formatBDT(monthlyTotal)}</p>
                         <p className="text-[8px] font-bold text-gray-500 mt-1">{language === 'বাংলা' ? 'ভাড়া + সার্ভিস' : 'Rent + Service'}</p>
                       </div>
+                    </div>
+
+                    {/* Advance Payment deposit — the up-front money collected at
+                        booking time, with the channel it came through. Always
+                        shown so this field is clearly part of the booking record. */}
+                    <div className="mt-2 sm:mt-3 flex items-center justify-between gap-3 bg-white rounded-xl p-3 border border-emerald-100">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><Banknote size={15}/></div>
+                        <div className="min-w-0">
+                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'অ্যাডভান্স পেমেন্ট' : 'Advance Payment'}</p>
+                          <p className="text-sm font-black text-gray-900 tabular-nums">{formatBDT(booking.advancePayment || 0)}</p>
+                        </div>
+                      </div>
+                      {booking.paymentMethod ? (
+                        <span className="text-[10px] font-black px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-widest inline-flex items-center gap-1 shrink-0">
+                          <CreditCard size={11}/> {booking.paymentMethod}
+                        </span>
+                      ) : null}
                     </div>
 
                     {/* Lease term — Move-In · Next Payment · Lease Expiry */}
@@ -4136,7 +4162,7 @@ const HostDashboard = () => {
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {/* Profile — opens the tenant's trust card (/tenant/:id). */}
                         <button
-                          onClick={() => openTenantProfile(booking.tenantId, { name: booking.tenant, avatar: booking.tenantAvatar })}
+                          onClick={() => openTenantProfile(resolveTenantUserId(booking), { name: booking.tenant, avatar: booking.tenantAvatar })}
                           className="px-2.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1"
                           title={language === 'বাংলা' ? 'টেন্যান্ট প্রোফাইল' : 'Tenant profile'}
                         >
@@ -4146,7 +4172,7 @@ const HostDashboard = () => {
                             lives in one place; ChatSystem hydrates the right thread from
                             location.state. */}
                         <button
-                          onClick={() => openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-bookings', peerUserId: booking.tenantId, peerName: booking.tenant, peerAvatar: booking.tenantAvatar, tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property })}
+                          onClick={() => openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-bookings', peerUserId: resolveTenantUserId(booking), peerName: booking.tenant, peerAvatar: booking.tenantAvatar, tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property })}
                           className="px-3 py-2 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-md flex items-center gap-1"
                         >
                           <MessageCircle size={12}/> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
@@ -4167,7 +4193,7 @@ const HostDashboard = () => {
                           <button onClick={() => setActiveDropdownId(activeDropdownId === booking.id ? null : booking.id)} className="p-2 rounded-xl bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"><MoreVertical size={13}/></button>
                           {activeDropdownId === booking.id && (
                             <div className="absolute right-0 bottom-full mb-2 w-52 bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[50] animate-in fade-in zoom-in-95 origin-bottom-right border border-gray-100">
-                              <button onClick={() => { handleCallUser(booking.tenantId, booking.tenant, booking.tenantAvatar); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
+                              <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
                               <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
                               <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
                               <div className="h-px w-full bg-gray-100 my-1"></div>
@@ -4684,12 +4710,22 @@ const HostDashboard = () => {
                           </button>
                         )}
                       </div>
-                      <button
-                        onClick={() => openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-rent', peerUserId: booking.tenantId, peerName: booking.tenant, peerAvatar: booking.tenantAvatar, tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property })}
-                        className="px-3 py-2 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-md flex items-center gap-1.5"
-                      >
-                        <MessageCircle size={12}/> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        {/* Profile — opens the tenant's trust card (/tenant/:id). */}
+                        <button
+                          onClick={() => openTenantProfile(resolveTenantUserId(booking), { name: booking.tenant, avatar: booking.tenantAvatar })}
+                          className="px-2.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1"
+                          title={language === 'বাংলা' ? 'টেন্যান্ট প্রোফাইল' : 'Tenant profile'}
+                        >
+                          <UserCircle size={12}/> {language === 'বাংলা' ? 'প্রোফাইল' : 'Profile'}
+                        </button>
+                        <button
+                          onClick={() => openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-rent', peerUserId: resolveTenantUserId(booking), peerName: booking.tenant, peerAvatar: booking.tenantAvatar, tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property })}
+                          className="px-3 py-2 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-md flex items-center gap-1.5"
+                        >
+                          <MessageCircle size={12}/> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Per-month ledger detail rows — collapsible secondary view */}
@@ -5218,7 +5254,9 @@ const HostDashboard = () => {
                         </div>
                       </div>
 
-                      <div className="mt-auto flex flex-wrap lg:flex-nowrap gap-2">
+                      {/* Action row — stop card-click propagation so these
+                          buttons don't also open the property details page. */}
+                      <div className="mt-auto flex flex-wrap lg:flex-nowrap gap-2" onClick={(e) => e.stopPropagation()}>
                          <button onClick={() => openModal('edit', prop)} className="flex-1 flex items-center justify-center gap-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 py-2.5 md:py-3 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95"><Edit3 size={12} /> {t?.editBtn || (language === 'বাংলা' ? 'এডিট' : 'Edit')}</button>
                          {prop.status !== 'rented' ? (
                            <>

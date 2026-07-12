@@ -314,6 +314,32 @@ const mergeReceipts = (prev, incoming) => {
   return Array.from(map.values()).sort((a, b) => new Date(b.issuedAt) - new Date(a.issuedAt));
 };
 
+// Format a receipt's issued date + time. The receipt time is when the payment
+// was recorded (`issuedAt`), so the tenant sees exactly when it landed. Falls
+// back to createdAt / paidOn, and returns the pre-formatted `date` if no ISO
+// timestamp is available (legacy localStorage receipts).
+const fmtReceiptDateTime = (r, language) => {
+  const iso = r?.issuedAt || r?.createdAt || r?.paidOn;
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) {
+    return { date: r?.date || r?.paidOn || '', time: '' };
+  }
+  const locale = language === 'বাংলা' ? 'bn-BD' : 'en-GB';
+  const date = d.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' });
+  const time = d.toLocaleTimeString(language === 'বাংলা' ? 'bn-BD' : 'en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  return { date, time };
+};
+
+// Was a booking created very recently (host just made it)? Drives the "New"
+// badge on the tenant's Bookings banner in the payment tab.
+const isFreshBooking = (b) => {
+  const iso = b?.createdAt;
+  if (!iso) return false;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return false;
+  return (Date.now() - t) < 7 * 24 * 60 * 60 * 1000; // 7 days
+};
+
 const TenantDashboard = () => {
   const navigate = useNavigate();
   // 🟢 Pull the logged-in user from AuthContext so the header /
@@ -2615,10 +2641,72 @@ const handleWizardSubmit = async (payload) => {
             .filter((r) => (r.balance || 0) > 0)
             .sort((a, b) => (a.monthKey || '').localeCompare(b.monthKey || ''))[0];
 
-          // empty state — no receipts at all
+          // ── "Your Bookings" banner — notifies the tenant the moment a host
+          //    creates a booking / lease for them (shows even before any rent
+          //    is paid, so a fresh booking is never invisible). Newly-created
+          //    bookings get a pulsing "New" badge.
+          const fmtLeaseDate = (iso) => {
+            const d = iso ? new Date(iso) : null;
+            if (!d || Number.isNaN(d.getTime())) return '';
+            return d.toLocaleDateString(language === 'বাংলা' ? 'bn-BD' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+          };
+          const activeLeases = (myBookings || []).filter((b) => b.status !== 'cancelled');
+          const leaseBanner = activeLeases.length > 0 ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 px-1">
+                <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center"><KeyRound size={14} /></div>
+                <h3 className="text-sm font-black text-gray-800">{language === 'বাংলা' ? 'আপনার বুকিং / লিজ' : 'Your Bookings'}</h3>
+                <span className="text-[10px] font-black text-gray-400 tabular-nums">{activeLeases.length}</span>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {activeLeases.map((b) => {
+                  const fresh = isFreshBooking(b);
+                  return (
+                    <div key={b.id || b._id} className={`relative bg-white rounded-2xl p-4 border shadow-sm transition-all ${fresh ? 'border-indigo-200 ring-2 ring-indigo-100' : 'border-gray-100'}`}>
+                      {fresh && (
+                        <span className="absolute top-3 right-3 inline-flex items-center gap-1 bg-indigo-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest shadow-md">
+                          <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />{language === 'বাংলা' ? 'নতুন' : 'New'}
+                        </span>
+                      )}
+                      <div className="flex items-center gap-2.5 mb-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0"><Home size={16} /></div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-black text-gray-900 truncate">{b.property || (language === 'বাংলা' ? 'আপনার ভাড়া' : 'Your rental')}</p>
+                          {b.location && <p className="text-[10px] font-bold text-gray-400 truncate flex items-center gap-1"><MapPin size={9} /> {b.location}</p>}
+                        </div>
+                      </div>
+                      <p className="text-[11px] font-bold text-indigo-700 bg-indigo-50/70 rounded-lg px-2.5 py-1.5 mb-3">
+                        {language === 'বাংলা' ? 'আপনার হোস্ট একটি বুকিং তৈরি করেছেন।' : 'Your host created a booking for you.'}
+                      </p>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-gray-50 rounded-xl p-2">
+                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ভাড়া' : 'Rent'}</p>
+                          <p className="text-xs font-black text-gray-900 tabular-nums">৳{(Number(b.monthlyRent) || 0).toLocaleString('en-IN')}</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-xl p-2">
+                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'অ্যাডভান্স' : 'Advance'}</p>
+                          <p className="text-xs font-black text-gray-900 tabular-nums">৳{(Number(b.advancePayment) || 0).toLocaleString('en-IN')}</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-xl p-2">
+                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'মেথড' : 'Method'}</p>
+                          <p className="text-[10px] font-black text-gray-900 truncate">{b.paymentMethod || '—'}</p>
+                        </div>
+                      </div>
+                      {(b.leaseStart && b.leaseEnd) && (
+                        <p className="text-[10px] font-bold text-gray-400 mt-2.5 flex items-center gap-1.5"><Calendar size={11} /> {fmtLeaseDate(b.leaseStart)} – {fmtLeaseDate(b.leaseEnd)}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null;
+
+          // empty state — no receipts at all (still show any booking banner)
           if (paymentReceipts.length === 0) {
             return (
-              <div className="animate-in fade-in duration-500">
+              <div className="animate-in fade-in duration-500 space-y-5">
+                {leaseBanner}
                 <div className="text-center py-24 bg-white/40 backdrop-blur-md rounded-[3rem] border border-white shadow-sm flex flex-col items-center">
                   <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4">
                     <Receipt className="text-blue-400" size={36} />
@@ -2638,6 +2726,9 @@ const handleWizardSubmit = async (payload) => {
 
           return (
             <div className="animate-in fade-in duration-500 space-y-5">
+
+              {/* ─── YOUR BOOKINGS (host-created leases) ─────────────── */}
+              {leaseBanner}
 
               {/* ─── HERO SUMMARY ───────────────────────────────────── */}
               <div className="relative overflow-hidden rounded-[2rem] border border-white/80 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white shadow-[0_20px_50px_-20px_rgba(59,7,100,0.55)] p-5 md:p-7">
@@ -2831,6 +2922,7 @@ const handleWizardSubmit = async (payload) => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
                   {filtered.map(r => {
                     const isFull = r.status === 'full' || r.balance <= 0;
+                    const { date: rDate, time: rTime } = fmtReceiptDateTime(r, language);
                     return (
                       <button
                         id={`receipt-${r.id}`}
@@ -2863,8 +2955,14 @@ const handleWizardSubmit = async (payload) => {
                             <p className="text-base font-black text-gray-900 leading-tight truncate">{r.propertyTitle}</p>
                             <p className="text-[11px] font-bold text-gray-500 mt-0.5 flex items-center gap-1.5">
                               <Calendar size={11} className="text-gray-400" />
-                              {r.monthLabel || r.monthKey} · {r.date}
+                              {r.monthLabel || r.monthKey}{rDate ? ` · ${rDate}` : ''}
                             </p>
+                            {rTime && (
+                              <p className="text-[10px] font-bold text-gray-400 mt-0.5 flex items-center gap-1.5">
+                                <Clock size={10} className="text-gray-400" />
+                                {language === 'বাংলা' ? 'সময়' : 'Received'} {rTime}
+                              </p>
+                            )}
                           </div>
                         </div>
 
@@ -3065,10 +3163,18 @@ const handleWizardSubmit = async (payload) => {
                   {activeReceipt.balance > 0 ? `৳ ${activeReceipt.balance.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}` : (language === 'বাংলা' ? 'ক্লিয়ার' : 'Cleared')}
                 </span>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'তারিখ' : 'Date'}</span>
-                <span className="text-sm font-black text-gray-900">{activeReceipt.date}</span>
-              </div>
+              {(() => {
+                const dt = fmtReceiptDateTime(activeReceipt, language);
+                return (
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'তারিখ ও সময়' : 'Date & Time'}</span>
+                    <span className="text-sm font-black text-gray-900 text-right">
+                      {dt.date || '—'}
+                      {dt.time && <span className="block text-[11px] font-bold text-gray-500 mt-0.5 flex items-center justify-end gap-1"><Clock size={11} className="text-gray-400" /> {dt.time}</span>}
+                    </span>
+                  </div>
+                );
+              })()}
               <div className="flex justify-between items-center py-2">
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'রিসিট আইডি' : 'Receipt ID'}</span>
                 <span className="text-[11px] font-black text-gray-700 font-mono">{activeReceipt.id}</span>
