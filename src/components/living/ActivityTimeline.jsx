@@ -4,7 +4,7 @@ import { Activity } from 'lucide-react';
 import useLivingStore from '../../store/useLivingStore';
 import { timeAgo, dateLabel } from './livingUtils';
 import { getActivityMeta } from './livingConfig';
-import { Card, SectionHeader, IconBadge, EmptyState, cx } from './ui';
+import { Card, SectionHeader, IconBadge, EmptyState, cx } from './livingUI';
 
 const FILTERS = [
   { id: 'all', en: 'All', bn: 'সব' },

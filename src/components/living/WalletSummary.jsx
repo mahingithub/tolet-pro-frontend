@@ -8,7 +8,7 @@ import useLivingStore from '../../store/useLivingStore';
 import { walletSummary, monthlyReport, taka, takaSigned, timeAgo, dateLabel, daysUntil, roommateById } from './livingUtils';
 import { getBillType, BILL_STATUS, getActivityMeta } from './livingConfig';
 import { deriveBillStatus } from './livingUtils';
-import { Card, IconBadge, Avatar, Chip, cx } from './ui';
+import { Card, IconBadge, Avatar, Chip, cx } from './livingUI';
 
 const QUICK = [
   { id: 'add-expense', icon: Receipt, tint: 'bg-blue-50', text: 'text-blue-600', en: 'Add Expense', bn: 'খরচ যোগ', module: 'expenses', intent: 'add' },

@@ -5,7 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
 import { taka, dateLabel, daysUntil, deriveBillStatus, isSameMonth } from './livingUtils';
 import { BILL_TYPES, BILL_ORDER, getBillType, BILL_STATUS } from './livingConfig';
-import { Card, SectionHeader, IconBadge, Chip, Toggle, PrimaryButton, Field, MoneyInput, Sheet, cx } from './ui';
+import { Card, SectionHeader, IconBadge, Chip, Toggle, PrimaryButton, Field, MoneyInput, Sheet, cx } from './livingUI';
 
 const todayInput = () => new Date().toISOString().slice(0, 10);
 

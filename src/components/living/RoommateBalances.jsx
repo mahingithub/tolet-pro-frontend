@@ -5,7 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
 import { computeLedger, simplifyDebts, taka, takaSigned, dateLabel, roommateById } from './livingUtils';
 import { PAYMENT_METHODS, METHOD_ORDER, getMethod } from './livingConfig';
-import { Card, SectionHeader, IconBadge, Avatar, Chip, PrimaryButton, Field, MoneyInput, TextInput, EmptyState, Sheet, cx } from './ui';
+import { Card, SectionHeader, IconBadge, Avatar, Chip, PrimaryButton, Field, MoneyInput, TextInput, EmptyState, Sheet, cx } from './livingUI';
 
 const SettleSheet = ({ open, onClose, roommates, preset, onSave }) => {
   const { language } = useLanguage();

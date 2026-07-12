@@ -6,7 +6,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
 import { buildReminders, monthlyReport, taka } from './livingUtils';
 import { getBillType } from './livingConfig';
-import { Card, SectionHeader, IconBadge, ProgressBar, PrimaryButton, Field, MoneyInput, EmptyState, Sheet, cx } from './ui';
+import { Card, SectionHeader, IconBadge, ProgressBar, PrimaryButton, Field, MoneyInput, EmptyState, Sheet, cx } from './livingUI';
 
 const SEVERITY = {
   high: { tint: 'bg-rose-50', text: 'text-red-600', bar: '#f43f5e' },

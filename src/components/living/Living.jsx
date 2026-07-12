@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import useLivingStore from '../../store/useLivingStore';
 import { buildReminders } from './livingUtils';
 import { MODULES } from './livingConfig';
-import { cx } from './ui';
+import { cx } from './livingUI';
 
 import WalletSummary from './WalletSummary';
 import ExpenseSplit from './ExpenseSplit';

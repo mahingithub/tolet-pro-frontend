@@ -8,7 +8,7 @@ import { CATEGORIES, CATEGORY_ORDER, getCategory, SPLIT_TYPES } from './livingCo
 import {
   Card, SectionHeader, IconBadge, Avatar, AvatarStack, Chip, PrimaryButton, GhostButton,
   Field, MoneyInput, TextArea, SegmentedControl, EmptyState, Sheet, cx,
-} from './ui';
+} from './livingUI';
 
 const ROUND = (n) => Math.round((Number(n) || 0) * 100) / 100;
 

@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Home, Zap, ShoppingBasket, UtensilsCrossed, 
 
 import useLivingStore from '../../store/useLivingStore';
 import { monthlyReport, monthStart, monthLabel, taka, num } from './livingUtils';
-import { Card, SectionHeader, DonutChart, HBar, BarChart, cx } from './ui';
+import { Card, SectionHeader, DonutChart, HBar, BarChart, cx } from './livingUI';
 
 const BUCKET_META = {
   rent: { icon: Home, color: '#ba0036', en: 'Rent', bn: 'ভাড়া' },

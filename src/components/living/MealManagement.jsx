@@ -7,7 +7,7 @@ import { mealSummary, taka, num, dateLabel } from './livingUtils';
 import {
   Card, SectionHeader, IconBadge, Avatar, Stepper, HBar, PrimaryButton, Field, MoneyInput, TextInput,
   EmptyState, Sheet, cx,
-} from './ui';
+} from './livingUI';
 
 const MEALS = [
   { key: 'breakfast', icon: Coffee, en: 'Breakfast', bn: 'সকাল' },
