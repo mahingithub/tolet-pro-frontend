@@ -6,7 +6,6 @@ import {
   MessageCircle,
   User,
   PlusCircle,
-  Heart,
   Wallet,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -18,13 +17,13 @@ import { useAuth } from '../../context/AuthContext.jsx';
  * affected. The centre slot is a raised brand-red "+ List Property" floating
  * action.
  *
- * Layout (left to right) — role-aware:
- *   Tenant       : Home · Saved · [Living FAB] · Explore · Messages · Profile
- *   Landlord/guest: Home · Explore · [+List FAB] · Messages · Profile
+ * Layout (left to right) — 5 targets for everyone (2 · FAB · 2):
+ *   Tenant        : Home · Explore · [Living FAB] · Messages · Profile
+ *   Landlord/guest: Home · Explore · [+List FAB]  · Messages · Profile
  *
- * Tenants never list properties, so their centre slot hosts the "Living"
- * (Roommate Wallet) action — their flagship daily surface for managing shared
- * living costs — instead of the "+ List" action landlords/guests get.
+ * Only the raised centre action changes by role: tenants get "Living"
+ * (Roommate Wallet), everyone else gets "+ List". Saved lives inside the
+ * tenant dashboard (Profile → Saved), keeping the rail uncluttered.
  *
  * Profile button behaviour (auth-aware):
  *   - Not logged in → opens the Navbar slide-out drawer (Join TO-LET PRO,
@@ -53,21 +52,15 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
 
   if (hides.some((r) => location.pathname.startsWith(r))) return null;
 
-  // Tenants don't list properties — swap the centre +List FAB for a
-  // regular "Saved" tab that deep-links into the tenant dashboard's
-  // Saved view. Landlords + guests keep the existing FAB so they can
-  // start a new listing in one tap.
+  // Tenants get the Living (Roommate Wallet) centre FAB; landlords/guests get
+  // the "+ List" FAB. The four flat tabs are identical for everyone, so the
+  // rail is always a clean 5 targets (2 · FAB · 2).
   const isTenant = isAuthenticated && user?.role === 'tenant';
 
-  const LEFT = isTenant
-    ? [
-        { id: 'home',  label: 'Home',  icon: Home,  to: '/' },
-        { id: 'saved', label: 'Saved', icon: Heart, to: '/tenant-dashboard', tab: 'saved' },
-      ]
-    : [
-        { id: 'home',    label: 'Home',    icon: Home,   to: '/' },
-        { id: 'explore', label: 'Explore', icon: Search, to: '/properties/all' },
-      ];
+  const LEFT = [
+    { id: 'home',    label: 'Home',    icon: Home,   to: '/' },
+    { id: 'explore', label: 'Explore', icon: Search, to: '/properties/all' },
+  ];
 
   // Profile target depends on who's logged in. Falls back to "open drawer"
   // for guests so they can pick Login / Sign Up.
@@ -80,16 +73,10 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
     return { ...base, to: '/tenant-dashboard' };
   })();
 
-  const RIGHT = isTenant
-    ? [
-        { id: 'explore',  label: 'Explore',  icon: Search,        to: '/properties/all' },
-        { id: 'messages', label: 'Messages', icon: MessageCircle, to: '/messages' },
-        profileTarget,
-      ]
-    : [
-        { id: 'messages', label: 'Messages', icon: MessageCircle, to: '/messages' },
-        profileTarget,
-      ];
+  const RIGHT = [
+    { id: 'messages', label: 'Messages', icon: MessageCircle, to: '/messages' },
+    profileTarget,
+  ];
 
   const isActive = (item) => {
     if (item.action === 'drawer' && !item.to) return false;

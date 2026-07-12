@@ -34,6 +34,12 @@ const MODULE_COMPONENTS = {
 
 const VALID = MODULES.map((m) => m.id);
 
+// Only the 5 daily-use modules live in the tab bar to keep it calm. Report,
+// Activity and Reminders are reached from the Overview cards + the header bell
+// (all still fully functional — just not competing for space in the rail).
+const PRIMARY_IDS = ['overview', 'expenses', 'meals', 'bills', 'balances'];
+const NAV_MODULES = MODULES.filter((m) => PRIMARY_IDS.includes(m.id));
+
 /**
  * Living — the "Roommate Wallet" tab. A self-contained tenant surface for
  * managing shared living costs (expenses, meals, bills, balances, reports,
@@ -144,39 +150,26 @@ const Living = () => {
         </header>
       </div>
 
-      {/* ── Module sub-navigation (horizontal scroll pills, sticky) ────── */}
+      {/* ── Module sub-navigation — clean segmented row (sticky) ──────── */}
       <div className="w-full max-w-3xl mx-auto z-30 sticky top-0 px-4 mt-3 pt-1 pb-1.5 bg-[#eaeff5]/85 backdrop-blur-xl">
-        <div
-          className="flex items-center gap-2 overflow-x-auto py-1 [&::-webkit-scrollbar]:hidden"
-          style={{ scrollbarWidth: 'none' }}
-        >
-          {MODULES.map((m) => {
+        <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/70 border border-white/80 shadow-[0_6px_20px_-14px_rgba(15,23,42,0.3)]">
+          {NAV_MODULES.map((m) => {
             const Icon = m.icon;
             const active = module === m.id;
-            const isReminder = m.id === 'reminders';
             return (
               <button
                 key={m.id}
                 onClick={() => go(m.id)}
                 className={cx(
-                  'shrink-0 inline-flex items-center gap-1.5 pl-3 pr-3.5 py-2 rounded-2xl text-[12px] font-black tracking-tight transition-all border active:scale-95',
+                  'flex-1 min-w-0 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl text-[10px] font-black tracking-tight transition-all active:scale-95',
                   active
-                    ? 'bg-[#ba0036] text-white border-[#ba0036] shadow-[0_8px_20px_-8px_rgba(186,0,54,0.55)]'
-                    : 'bg-white/70 backdrop-blur-xl text-gray-600 border-white/80 hover:text-gray-900'
+                    ? 'bg-[#ba0036] text-white shadow-[0_8px_18px_-8px_rgba(186,0,54,0.55)]'
+                    : 'text-gray-500 hover:text-gray-900'
                 )}
+                aria-current={active ? 'page' : undefined}
               >
-                <Icon size={15} strokeWidth={2.4} />
-                {isBn ? m.bn : m.en}
-                {isReminder && reminders.length > 0 && (
-                  <span
-                    className={cx(
-                      'ml-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full text-[9px] font-black',
-                      active ? 'bg-white/25 text-white' : 'bg-[#ba0036] text-white'
-                    )}
-                  >
-                    {reminders.length}
-                  </span>
-                )}
+                <Icon size={17} strokeWidth={2.4} />
+                <span className="truncate max-w-full leading-none">{isBn ? m.bn : m.en}</span>
               </button>
             );
           })}

@@ -1,14 +1,12 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
-  Receipt, UtensilsCrossed, Zap, HandCoins, TrendingUp, TrendingDown, ArrowUpRight,
-  ArrowDownLeft, ChevronRight, Wallet, PiggyBank, CalendarClock,
+  Receipt, UtensilsCrossed, Zap, HandCoins, ArrowUpRight, ArrowDownLeft,
+  Wallet, PieChart, Activity, BellRing, UserPlus, ChevronRight, Check, Info,
 } from 'lucide-react';
 
 import useLivingStore from '../../store/useLivingStore';
-import { walletSummary, monthlyReport, taka, takaSigned, timeAgo, dateLabel, daysUntil, roommateById } from './livingUtils';
-import { getBillType, BILL_STATUS, getActivityMeta } from './livingConfig';
-import { deriveBillStatus } from './livingUtils';
-import { Card, IconBadge, Avatar, Chip, cx } from './livingUI';
+import { walletSummary, buildReminders, taka, takaSigned } from './livingUtils';
+import { Card, IconBadge, Avatar, AvatarStack, PrimaryButton, Field, TextInput, Sheet, cx } from './livingUI';
 
 const QUICK = [
   { id: 'add-expense', icon: Receipt, tint: 'bg-blue-50', text: 'text-blue-600', en: 'Add Expense', bn: 'খরচ যোগ', module: 'expenses', intent: 'add' },
@@ -17,28 +15,93 @@ const QUICK = [
   { id: 'settle', icon: HandCoins, tint: 'bg-violet-50', text: 'text-violet-600', en: 'Settle Up', bn: 'সেটেল', module: 'balances', intent: 'add' },
 ];
 
+const SWATCHES = ['#ba0036', '#1B8553', '#2563eb', '#D99B28', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+
+const AddRoommateSheet = ({ open, onClose, isBn, onAdd }) => {
+  const [name, setName] = useState('');
+  const [color, setColor] = useState(SWATCHES[1]);
+
+  useEffect(() => {
+    if (open) {
+      setName('');
+      setColor(SWATCHES[Math.floor(Math.random() * SWATCHES.length)]);
+    }
+  }, [open]);
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={isBn ? 'রুমমেট যোগ করুন' : 'Add Roommate'}
+      subtitle={isBn ? 'ভাগাভাগির জন্য একজন যোগ করুন' : 'Add a person to split costs with'}
+      footer={
+        <PrimaryButton className="w-full" disabled={!name.trim()} onClick={() => { onAdd(name.trim(), color); onClose(); }}>
+          <Check size={17} /> {isBn ? 'যোগ করুন' : 'Add roommate'}
+        </PrimaryButton>
+      }
+    >
+      <div className="space-y-4 py-1">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center justify-center rounded-full font-black text-white shrink-0" style={{ width: 48, height: 48, background: color, fontSize: 18 }}>
+            {(name.trim()[0] || '?').toUpperCase()}
+          </span>
+          <div className="flex-1">
+            <Field label={isBn ? 'নাম' : 'Name'}>
+              <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder={isBn ? 'যেমন: রাকিব' : 'e.g. Rakib'} autoFocus />
+            </Field>
+          </div>
+        </div>
+
+        <Field label={isBn ? 'রঙ' : 'Colour'}>
+          <div className="flex flex-wrap gap-2.5">
+            {SWATCHES.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setColor(c)}
+                className={cx('w-8 h-8 rounded-full transition active:scale-90', color === c ? 'ring-2 ring-offset-2 ring-gray-900' : '')}
+                style={{ background: c }}
+                aria-label={c}
+              />
+            ))}
+          </div>
+        </Field>
+
+        <div className="flex items-start gap-2 rounded-2xl bg-blue-50 border border-blue-100 p-3">
+          <Info size={15} className="text-blue-600 shrink-0 mt-0.5" />
+          <p className="text-[11px] font-semibold text-blue-700 leading-relaxed">
+            {isBn
+              ? 'এই রুমমেট এই ডিভাইসে যোগ হবে। তারা নিজের ফোন থেকে একই ওয়ালেট ব্যবহার করতে চাইলে কানেক্টেড (ইনভাইট) ভার্সন লাগবে।'
+              : 'This roommate is added on this device. For them to share this wallet from their own phone, the connected (invite) version is needed.'}
+          </p>
+        </div>
+      </div>
+    </Sheet>
+  );
+};
+
+const MoreRow = ({ icon: Icon, tint, text, label, badge, onClick }) => (
+  <button onClick={onClick} className="w-full flex items-center gap-3 py-2.5 active:scale-[0.99] transition">
+    <IconBadge icon={Icon} tint={tint} text={text} size={38} iconSize={17} />
+    <span className="flex-1 text-left text-[13px] font-bold text-gray-800">{label}</span>
+    {badge > 0 && (
+      <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-[#ba0036] text-white text-[10px] font-black">{badge}</span>
+    )}
+    <ChevronRight size={17} className="text-gray-300" />
+  </button>
+);
+
 const WalletSummary = ({ go, me, language }) => {
   const isBn = language === 'বাংলা';
   const state = useLivingStore();
-  const { roommates, bills, activities } = state;
+  const roommates = useLivingStore((s) => s.roommates);
+  const addRoommate = useLivingStore((s) => s.addRoommate);
 
   const ws = useMemo(() => walletSummary(state, me), [state, me]);
-  const report = useMemo(() => monthlyReport(state, 0), [state]);
-
-  const myDebts = useMemo(() => {
-    const owe = ws.debts.filter((d) => d.from === me).map((d) => ({ ...d, dir: 'owe' }));
-    const owed = ws.debts.filter((d) => d.to === me).map((d) => ({ ...d, dir: 'owed' }));
-    return [...owe, ...owed].slice(0, 3);
-  }, [ws.debts, me]);
-
-  const nextBill = useMemo(() => {
-    const unpaid = bills.filter((b) => b.status !== 'paid');
-    unpaid.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
-    return unpaid[0] || null;
-  }, [bills]);
-
-  const recent = activities.slice(0, 3);
+  const reminders = useMemo(() => buildReminders(state, me), [state, me]);
   const positive = ws.totalBalance >= 0;
+
+  const [addOpen, setAddOpen] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -48,9 +111,7 @@ const WalletSummary = ({ go, me, language }) => {
         <div className="relative">
           <div className="flex items-center gap-2 text-white/80">
             <Wallet size={15} />
-            <span className="text-[11px] font-black uppercase tracking-widest">
-              {isBn ? 'মোট ব্যালেন্স' : 'Total Balance'}
-            </span>
+            <span className="text-[11px] font-black uppercase tracking-widest">{isBn ? 'মোট ব্যালেন্স' : 'Total Balance'}</span>
           </div>
           <p className="text-[34px] leading-none font-black tracking-tight mt-2">{takaSigned(ws.totalBalance, language)}</p>
           <p className="text-[12px] font-semibold text-white/80 mt-1.5">
@@ -94,137 +155,53 @@ const WalletSummary = ({ go, me, language }) => {
         ))}
       </div>
 
-      {/* ── This Month Spending + Total Living Cost ─────────────────── */}
+      {/* ── This Month + Living Cost ─────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-4">
-          <div className="flex items-center gap-1.5 text-gray-400">
-            <TrendingDown size={14} />
-            <span className="text-[10px] font-black uppercase tracking-wider">{isBn ? 'এ মাসের খরচ' : 'This Month'}</span>
-          </div>
+          <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">{isBn ? 'এ মাসের খরচ' : 'This Month'}</p>
           <p className="text-xl font-black text-gray-900 tracking-tight mt-1.5">{taka(ws.thisMonthSpending, language)}</p>
-          <p className="text-[11px] font-semibold text-gray-400 mt-0.5">{isBn ? 'আপনার ভাগের খরচ' : 'Your share of costs'}</p>
+          <p className="text-[11px] font-semibold text-gray-400 mt-0.5">{isBn ? 'আপনার ভাগ' : 'Your share'}</p>
         </Card>
         <Card className="p-4">
-          <div className="flex items-center gap-1.5 text-gray-400">
-            <Wallet size={14} />
-            <span className="text-[10px] font-black uppercase tracking-wider">{isBn ? 'মোট খরচ' : 'Living Cost'}</span>
-          </div>
+          <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">{isBn ? 'মোট খরচ' : 'Living Cost'}</p>
           <p className="text-xl font-black text-gray-900 tracking-tight mt-1.5">{taka(ws.totalLivingCost, language)}</p>
-          <p className="text-[11px] font-semibold text-gray-400 mt-0.5">{isBn ? 'বাসার মোট (এ মাস)' : 'Household this month'}</p>
+          <p className="text-[11px] font-semibold text-gray-400 mt-0.5">{isBn ? 'বাসার মোট' : 'Household'}</p>
         </Card>
       </div>
 
-      {/* ── Monthly snapshot strip → Report ─────────────────────────── */}
-      <button onClick={() => go('report')} className="w-full text-left">
-        <Card className="p-4 flex items-center gap-4 active:scale-[0.99] transition">
-          <div className={cx('w-11 h-11 rounded-2xl flex items-center justify-center shrink-0', report.savings >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-red-600')}>
-            <PiggyBank size={20} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-wider text-gray-400">{isBn ? 'এ মাসের সঞ্চয়' : 'Projected Savings'}</p>
-            <p className={cx('text-lg font-black tracking-tight', report.savings >= 0 ? 'text-emerald-600' : 'text-red-600')}>
-              {takaSigned(report.savings, language)}
-            </p>
-          </div>
-          <div className="text-right shrink-0">
-            <p className="text-[11px] font-bold text-gray-400">{isBn ? 'আয়' : 'Income'}</p>
-            <p className="text-[13px] font-black text-gray-700">{taka(report.income, language)}</p>
-          </div>
-          <ChevronRight size={18} className="text-gray-300 shrink-0" />
-        </Card>
-      </button>
-
-      {/* ── Balances snapshot ───────────────────────────────────────── */}
+      {/* ── Roommates (with Add) ─────────────────────────────────────── */}
       <Card className="p-4">
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="text-[14px] font-black text-gray-900 tracking-tight">{isBn ? 'কে কাকে দিবে' : 'Who owes whom'}</h3>
-          <button onClick={() => go('balances')} className="text-[11px] font-black text-[#ba0036] flex items-center gap-0.5">
-            {isBn ? 'সব দেখুন' : 'View all'} <ChevronRight size={13} />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <AvatarStack roommates={roommates} size={34} max={5} />
+            <div className="min-w-0">
+              <p className="text-[13px] font-black text-gray-900 leading-tight">
+                {roommates.length} {isBn ? 'জন রুমমেট' : roommates.length === 1 ? 'roommate' : 'roommates'}
+              </p>
+              <p className="text-[11px] font-semibold text-gray-400 truncate max-w-[160px]">
+                {roommates.map((r) => (r.isMe ? (isBn ? 'আপনি' : 'You') : r.name)).join(', ')}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setAddOpen(true)}
+            className="flex items-center gap-1 bg-[#ba0036] text-white pl-2.5 pr-3 py-2 rounded-xl text-[12px] font-black shadow-[0_8px_20px_-8px_rgba(186,0,54,0.55)] active:scale-95 transition shrink-0"
+          >
+            <UserPlus size={15} /> {isBn ? 'যোগ' : 'Add'}
           </button>
         </div>
-        {myDebts.length === 0 ? (
-          <p className="text-[12px] font-semibold text-gray-400 py-3 text-center">{isBn ? 'কোনো বকেয়া নেই 🎉' : 'No pending balances 🎉'}</p>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {myDebts.map((d) => {
-              const other = roommateById(roommates, d.dir === 'owe' ? d.to : d.from);
-              return (
-                <div key={`${d.from}-${d.to}`} className="flex items-center gap-3 py-2.5">
-                  <Avatar roommate={other} size={34} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-bold text-gray-800 truncate">
-                      {d.dir === 'owe'
-                        ? isBn ? `${other.name}-কে দিতে হবে` : `You owe ${other.name}`
-                        : isBn ? `${other.name} আপনাকে দিবে` : `${other.name} owes you`}
-                    </p>
-                  </div>
-                  <span className={cx('text-[14px] font-black tabular-nums', d.dir === 'owe' ? 'text-red-600' : 'text-emerald-600')}>
-                    {d.dir === 'owe' ? '−' : '+'}
-                    {taka(d.amount, language)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </Card>
 
-      {/* ── Upcoming bill ───────────────────────────────────────────── */}
-      {nextBill && (() => {
-        const meta = getBillType(nextBill.type);
-        const st = deriveBillStatus(nextBill);
-        const stMeta = BILL_STATUS[st];
-        const d = daysUntil(nextBill.dueDate);
-        const Icon = meta.icon;
-        return (
-          <button onClick={() => go('bills')} className="w-full text-left">
-            <Card className="p-4 flex items-center gap-3.5 active:scale-[0.99] transition">
-              <IconBadge icon={Icon} tint={meta.tint} text={meta.text} size={44} iconSize={20} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-[13px] font-black text-gray-900">{isBn ? meta.bn : meta.en}</p>
-                  <Chip tint={stMeta.tint} text={stMeta.text}>{isBn ? stMeta.bn : stMeta.en}</Chip>
-                </div>
-                <p className="text-[11px] font-semibold text-gray-400 mt-0.5 flex items-center gap-1">
-                  <CalendarClock size={12} />
-                  {d < 0
-                    ? isBn ? `${Math.abs(d)} দিন পার` : `${Math.abs(d)}d overdue`
-                    : d === 0
-                    ? isBn ? 'আজ শেষ দিন' : 'Due today'
-                    : isBn ? `${d} দিনে দিতে হবে` : `Due in ${d} days`}
-                </p>
-              </div>
-              <span className="text-[15px] font-black text-gray-900 shrink-0">{taka(nextBill.amount, language)}</span>
-            </Card>
-          </button>
-        );
-      })()}
-
-      {/* ── Recent activity ─────────────────────────────────────────── */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="text-[14px] font-black text-gray-900 tracking-tight">{isBn ? 'সাম্প্রতিক কার্যক্রম' : 'Recent activity'}</h3>
-          <button onClick={() => go('activity')} className="text-[11px] font-black text-[#ba0036] flex items-center gap-0.5">
-            {isBn ? 'সব দেখুন' : 'View all'} <ChevronRight size={13} />
-          </button>
-        </div>
+      {/* ── More (Report / Activity / Reminders) ─────────────────────── */}
+      <Card className="px-4 py-1.5">
         <div className="divide-y divide-gray-50">
-          {recent.map((a) => {
-            const meta = getActivityMeta(a.type);
-            const Icon = meta.icon;
-            return (
-              <div key={a.id} className="flex items-center gap-3 py-2.5">
-                <IconBadge icon={Icon} tint={meta.tint} text={meta.text} size={34} iconSize={15} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12.5px] font-bold text-gray-800 truncate">{a.title}</p>
-                  <p className="text-[11px] font-medium text-gray-400 truncate">{a.detail}</p>
-                </div>
-                <span className="text-[10px] font-bold text-gray-400 shrink-0">{timeAgo(a.date, language)}</span>
-              </div>
-            );
-          })}
+          <MoreRow icon={PieChart} tint="bg-violet-50" text="text-violet-600" label={isBn ? 'মাসিক রিপোর্ট' : 'Monthly Report'} onClick={() => go('report')} />
+          <MoreRow icon={Activity} tint="bg-blue-50" text="text-blue-600" label={isBn ? 'একটিভিটি টাইমলাইন' : 'Activity Timeline'} onClick={() => go('activity')} />
+          <MoreRow icon={BellRing} tint="bg-rose-50" text="text-red-600" label={isBn ? 'স্মার্ট রিমাইন্ডার' : 'Smart Reminders'} badge={reminders.length} onClick={() => go('reminders')} />
         </div>
       </Card>
+
+      <AddRoommateSheet open={addOpen} onClose={() => setAddOpen(false)} isBn={isBn} onAdd={addRoommate} />
     </div>
   );
 };
