@@ -20,6 +20,7 @@ import AddProperty from "./components/AddProperty";
 import HomePage from "./components/HomePage";
 import ChatSystem from "./components/ChatSystem";
 import TenantDashboard from "./components/TenantDashboard";
+import Living from "./components/living/Living";
 import GlobalAIAssistant from "./components/GlobalAIAssistant";
 import WelcomeRobotOverlay from "./components/WelcomeRobotOverlay";
 import GlobalToaster from "./components/GlobalToaster";
@@ -99,6 +100,7 @@ const AppLayout = () => {
 	const hideNavbarRoutes = [
 		"/tenant-dashboard",
 		"/host-dashboard",
+		"/living",
 		"/login",
 		"/account",
 		// Property detail pages have their own dedicated sticky header
@@ -169,6 +171,14 @@ const AppLayout = () => {
 				/>
 				<Route path="/messages" element={<ChatSystem />} />
 				<Route path="/tenant-dashboard" element={<TenantDashboard />} />
+				<Route
+					path="/living"
+					element={
+						<RequireAuth>
+							<Living />
+						</RequireAuth>
+					}
+				/>
 				<Route
 					path="/smart-alerts"
 					element={

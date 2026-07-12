@@ -7,6 +7,7 @@ import {
   User,
   PlusCircle,
   Heart,
+  Wallet,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 
@@ -18,12 +19,12 @@ import { useAuth } from '../../context/AuthContext.jsx';
  * action.
  *
  * Layout (left to right) — role-aware:
- *   Tenant       : Home · Saved · Explore · Messages · Profile
+ *   Tenant       : Home · Saved · [Living FAB] · Explore · Messages · Profile
  *   Landlord/guest: Home · Explore · [+List FAB] · Messages · Profile
  *
- * Tenants never list properties, so the centre slot becomes a regular
- * "Saved" tab (deep-link into the tenant dashboard's Saved tab) instead
- * of the floating + List action.
+ * Tenants never list properties, so their centre slot hosts the "Living"
+ * (Roommate Wallet) action — their flagship daily surface for managing shared
+ * living costs — instead of the "+ List" action landlords/guests get.
  *
  * Profile button behaviour (auth-aware):
  *   - Not logged in → opens the Navbar slide-out drawer (Join TO-LET PRO,
@@ -189,23 +190,42 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
             <NavBtn key={item.id} item={item} />
           ))}
 
-          {isTenant ? null : (
-            /* CENTRE (non-tenant only): floating "+ List" action. Tenants
-               never list properties, so the FAB is omitted for them and the
-               nav becomes 5 equal-width tabs. */
-            <div className="flex-1 h-full flex flex-col items-center justify-end relative pb-1">
-              <button
-                onClick={() => navigate('/list-property')}
-                className="absolute -top-5 w-14 h-14 rounded-2xl bg-gradient-to-br from-[#ba0036] via-[#d4143a] to-[#ff4d6d] text-white flex items-center justify-center shadow-[0_12px_30px_-8px_rgba(186,0,54,0.55)] active:scale-95 transition-transform ring-4 ring-white"
-                aria-label="List a property"
-              >
-                <PlusCircle size={26} strokeWidth={2.2} />
-              </button>
-              <span className="text-[9px] font-black uppercase tracking-widest text-[#ba0036]">
-                List
-              </span>
-            </div>
-          )}
+          {/* CENTRE: a raised floating action. Tenants never list properties,
+              so their centre slot becomes the "Living" (Roommate Wallet) entry
+              — their flagship daily-use surface. Landlords + guests keep the
+              "+ List" action so they can start a new listing in one tap. */}
+          <div className="flex-1 h-full flex flex-col items-center justify-end relative pb-1">
+            {isTenant ? (
+              <>
+                <button
+                  onClick={() => navigate('/living')}
+                  className={`absolute -top-5 w-14 h-14 rounded-2xl bg-gradient-to-br from-[#ba0036] via-[#d4143a] to-[#ff4d6d] text-white flex items-center justify-center shadow-[0_12px_30px_-8px_rgba(186,0,54,0.55)] active:scale-95 transition-transform ring-4 ring-white ${
+                    location.pathname === '/living' ? 'scale-105' : ''
+                  }`}
+                  aria-label="Roommate Wallet"
+                  aria-current={location.pathname === '/living' ? 'page' : undefined}
+                >
+                  <Wallet size={24} strokeWidth={2.3} />
+                </button>
+                <span className="text-[9px] font-black uppercase tracking-widest text-[#ba0036]">
+                  Living
+                </span>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => navigate('/list-property')}
+                  className="absolute -top-5 w-14 h-14 rounded-2xl bg-gradient-to-br from-[#ba0036] via-[#d4143a] to-[#ff4d6d] text-white flex items-center justify-center shadow-[0_12px_30px_-8px_rgba(186,0,54,0.55)] active:scale-95 transition-transform ring-4 ring-white"
+                  aria-label="List a property"
+                >
+                  <PlusCircle size={26} strokeWidth={2.2} />
+                </button>
+                <span className="text-[9px] font-black uppercase tracking-widest text-[#ba0036]">
+                  List
+                </span>
+              </>
+            )}
+          </div>
 
           {RIGHT.map((item) => (
             <NavBtn key={item.id} item={item} />
