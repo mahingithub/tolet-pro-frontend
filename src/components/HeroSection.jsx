@@ -502,10 +502,13 @@ const HeroSection = () => {
   const budgetRef         = useRef(null);
 
   // Dynamic Logic Variables
-  const currentPlaceholder = searchType === 'commercial' 
-    ? 'Search commercial zone, building, or landmark...' 
+  // Placeholders are kept short (and localized via the `t` object) so they
+  // fit the location field without truncating — the tab label already says
+  // Rent/Buy/Commercial, so the hint doesn't need to repeat it.
+  const currentPlaceholder = searchType === 'commercial'
+    ? (t?.locationPlaceholderCommercial || 'Zone, building, or landmark…')
     : searchType === 'buy'
-    ? 'Search city, neighborhood, or property to buy...'
+    ? (t?.locationPlaceholderBuy || 'City, area, or property…')
     : (t?.locationPlaceholder || 'Where do you want to live?');
     
   const activeChips = searchType === 'commercial' ? commercialChips : rentBuyChips;
