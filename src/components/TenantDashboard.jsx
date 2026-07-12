@@ -3,10 +3,12 @@ import { toast } from 'sonner';
 import { uploadVerificationDoc, uploadAvatar, getCurrentToken } from '../services/authService';
 import { listMyInquiries, deleteInquiry } from '../services/inquiryService.js';
 import { listTenantReceipts, markReceiptRead as apiMarkReceiptRead } from '../services/receiptService.js';
+import { listTenantBookings } from '../services/bookingService.js';
 import { listNotifications, getUnreadCount, markRead } from '../services/notificationService.js';
 import { propertyService } from '../services/Propertyservice.js';
 import { buildTenantAlerts } from '../utils/rentAlerts';
 import SmartAlertsPage from './Smartalertspage';
+import SmartAlertsPopup from './SmartAlertsPopup';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Building2, Search, Bell, Globe, LayoutDashboard, Heart,
@@ -381,6 +383,13 @@ const TenantDashboard = () => {
   // outcome / sentAt / lastUpdate / img).
   const [myInquiries, setMyInquiries] = useState([]);
 
+  // 🟢 NEW: the tenant's active leases (bookings). Rent Smart Alerts are
+  // derived from each booking's `ledger` — the SAME source the landlord's
+  // alerts use — so UNPAID rent shows up even before any receipt exists.
+  // (Receipts are only created once money changes hands, which is exactly
+  // why unpaid rent was previously invisible to the tenant.)
+  const [myBookings, setMyBookings] = useState([]);
+
   useEffect(() => {
     if (!getCurrentToken()) return undefined;
     let cancelled = false;
@@ -391,6 +400,30 @@ const TenantDashboard = () => {
         setMyInquiries(rows);
       } catch (err) {
         console.warn('[tenant] failed to load inquiries:', err.message || err);
+      }
+    };
+    hydrate();
+    const interval = setInterval(hydrate, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // 🟢 NEW: hydrate the tenant's bookings on mount + poll every 30s so a
+  // landlord's rent update (or a fresh monthly invoice from the cron job)
+  // reflects in the tenant's Smart Alerts within half a minute. Mirrors the
+  // inquiries / receipts polling pattern above.
+  useEffect(() => {
+    if (!getCurrentToken()) return undefined;
+    let cancelled = false;
+    const hydrate = async () => {
+      try {
+        const rows = await listTenantBookings();
+        if (cancelled) return;
+        setMyBookings(rows);
+      } catch (err) {
+        console.warn('[tenant] failed to load bookings:', err.message || err);
       }
     };
     hydrate();
@@ -1214,10 +1247,11 @@ const handleWizardSubmit = async (payload) => {
     }
   };
 
-  // 🟢 NEW: Smart Alerts for the tenant — derived from their inquiries + rent ledger.
+  // 🟢 NEW: Smart Alerts for the tenant — derived from their bookings' rent
+  // ledger (unpaid rent), receipts (paid/new-receipt), and inquiry status.
   const { alerts: tenantAlerts, resolved: tenantResolved } = useMemo(
-    () => buildTenantAlerts(myInquiries, paymentReceipts, new Date(), language),
-    [myInquiries, paymentReceipts, language],
+    () => buildTenantAlerts(myBookings, myInquiries, paymentReceipts, new Date(), language),
+    [myBookings, myInquiries, paymentReceipts, language],
   );
   const tenantAlertCount = tenantAlerts.filter(a => a.type !== 'low').length;
 
@@ -1281,6 +1315,16 @@ const handleWizardSubmit = async (payload) => {
     // 🟢 SHELL — same architecture as HostDashboard so both portals feel like
     // the same app. Different content, identical skeleton & responsive grid.
     <div className="flex flex-col min-h-screen bg-[#eaeff5] font-sans relative overflow-hidden text-gray-900 selection:bg-[#ba0036] selection:text-white">
+
+      {/* 🚨 SMART ALERTS POP-UP — proactively surfaces URGENT alerts (e.g.
+          overdue rent) once per login session so the tenant doesn't have to
+          open the Smart Alerts tab to notice them. "View all" jumps there. */}
+      <SmartAlertsPopup
+        alerts={tenantAlerts}
+        language={language}
+        role="tenant"
+        onViewAll={() => setActiveTab('alerts')}
+      />
 
       {/* ✨ GLOWING ORBS ✨ — same decorative pattern as HostDashboard */}
       <div className="fixed top-[-20%] left-[-10%] w-[50vw] h-[50vw] bg-gradient-to-br from-[#ba0036]/10 to-transparent rounded-full blur-[120px] pointer-events-none z-0"></div>

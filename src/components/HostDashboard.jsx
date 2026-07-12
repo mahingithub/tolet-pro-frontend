@@ -31,6 +31,8 @@ import ProfileSection from './shared/ProfileSection';
 import VerificationModal from './VerificationModal';
 import SharedSettings from './shared/SharedSettings';
 import Smartalertspage from './Smartalertspage';
+import SmartAlertsPopup from './SmartAlertsPopup';
+import { buildRentAlerts, buildLeaseAlerts, buildInquiryAlerts } from '../utils/rentAlerts';
 import Aiinsightspage from './Aiinsightspage';
 import { jsPDF } from 'jspdf';
 
@@ -907,6 +909,20 @@ const HostDashboard = () => {
   // memoise on date-string change so flipping months in the picker doesn't
   // thrash the matrix.
   const today = useMemo(() => new Date(), [todayIso()]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 🟢 Merged Smart Alerts for the landlord — the SAME computation the
+  // Smart Alerts page runs internally (rent + lease + inquiry), lifted here
+  // so the once-per-session pop-up can flag URGENT items the moment the
+  // dashboard opens. Memoised on the same inputs the page uses.
+  const hostAlerts = useMemo(() => {
+    const rent = buildRentAlerts(bookings, today, language);
+    const lease = buildLeaseAlerts(bookings, today, language);
+    const inquiry = buildInquiryAlerts(inquiries, today, language);
+    const rank = { urgent: 0, medium: 1, low: 2 };
+    return [...rent.alerts, ...lease.alerts, ...inquiry.alerts].sort(
+      (a, b) => (rank[a.type] - rank[b.type]) || ((a.daysLeft ?? 999) - (b.daysLeft ?? 999)),
+    );
+  }, [bookings, inquiries, today, language]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -2135,7 +2151,17 @@ const HostDashboard = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-[#eaeff5] font-sans relative overflow-hidden text-gray-900 selection:bg-[#ba0036] selection:text-white">
-      
+
+      {/* 🚨 SMART ALERTS POP-UP — proactively surfaces URGENT alerts (e.g.
+          overdue rent, expired leases) once per login session. "View all"
+          jumps to the Smart Alerts tab. */}
+      <SmartAlertsPopup
+        alerts={hostAlerts}
+        language={language}
+        role="landlord"
+        onViewAll={() => setActiveTab('smartAlerts')}
+      />
+
       {/* ✨ GLOWING ORBS ✨ */}
       <div className="fixed top-[-20%] left-[-10%] w-[50vw] h-[50vw] bg-gradient-to-br from-[#ba0036]/10 to-transparent rounded-full blur-[120px] pointer-events-none z-0"></div>
       <div className="fixed bottom-[-20%] right-[-10%] w-[50vw] h-[50vw] bg-gradient-to-tl from-blue-600/5 to-transparent rounded-full blur-[120px] pointer-events-none z-0"></div>
@@ -5063,7 +5089,14 @@ const HostDashboard = () => {
                     .slice(0, 2)
                     .toUpperCase();
                   return (
-                  <div key={prop.id} data-property-id={prop.id} className="bg-white rounded-[1.5rem] md:rounded-[2rem] p-3 shadow-[0_4px_15px_rgba(0,0,0,0.02)] hover:shadow-[0_15px_35px_rgba(0,0,0,0.06)] transition-all duration-500 group flex flex-col cursor-default" style={{ animation: 'fadeSlideIn 0.4s ease-out' }}>
+                  <div
+                    key={prop.id}
+                    data-property-id={prop.id}
+                    onClick={() => navigate(`/property/${prop.id}`)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/property/${prop.id}`); }}
+                    className="bg-white rounded-[1.5rem] md:rounded-[2rem] p-3 shadow-[0_4px_15px_rgba(0,0,0,0.02)] hover:shadow-[0_15px_35px_rgba(0,0,0,0.06)] transition-all duration-500 group flex flex-col cursor-pointer" style={{ animation: 'fadeSlideIn 0.4s ease-out' }}>
                     {/* Cover + side-thumbnail strip (listing-card style) */}
                     <div className="relative h-52 sm:h-56 lg:h-64 overflow-hidden bg-gray-100 rounded-[1.2rem] md:rounded-[1.5rem]">
                       {thumbs.length > 0 ? (

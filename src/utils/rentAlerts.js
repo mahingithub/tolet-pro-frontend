@@ -328,92 +328,173 @@ export function buildInquiryAlerts(inquiries = [], today = new Date(), lang = 'E
 
 /**
  * buildTenantAlerts — the tenant's side ("both parties" half).
- * Derived from the tenant's own data: rent ledger receipts + inquiry status.
+ * Derived from the tenant's own data: rent ledger (bookings) + receipts +
+ * inquiry status.
  *
- *   Rent (from receipts, monthly granularity):
- *     • overdue   → a past month still has an outstanding balance
- *     • due       → the current month has an outstanding balance
- *     • upcoming  → a future month has a balance (gentle heads-up)
- *     • receipt   → a new (unread) paid receipt is ready  [actionable]
- *     • collected → already-seen paid month               [resolved]
+ *   Rent (from the tenant's bookings + ledger — mirrors buildRentAlerts so
+ *   UNPAID rent shows up even before any receipt exists):
+ *     • overdue   → grace period passed on this month's rent   [urgent]
+ *     • due now   → past the due date, still inside grace       [urgent]
+ *     • due soon  → due within 5 days                           [medium]
+ *     • upcoming  → due within 6–14 days (early heads-up)       [low]
+ *   Receipts (paid months only — receipts only exist once money changes hands):
+ *     • receipt   → a new (unread) paid receipt is ready        [actionable]
+ *     • collected → already-seen paid month                     [resolved]
  *   Inquiry (from status):
- *     • accepted  → landlord accepted the inquiry 🎉       [contact]
- *     • replied   → landlord replied                       [contact]
+ *     • accepted  → landlord accepted the inquiry 🎉            [contact]
+ *     • replied   → landlord replied                            [contact]
  *
  * Each alert carries `actionType` ('view_receipt' | 'contact_landlord') and an
  * `actionLabel` so the shared page can show the right button + dispatch.
+ *
+ * NOTE: rent alerts moved OFF receipts and ONTO bookings.ledger. Receipts are
+ * only generated when a payment is made, so unpaid rent never produced a
+ * receipt and was therefore invisible to the tenant. Reading the ledger (the
+ * same source the landlord's alerts use) fixes that.
  */
-export function buildTenantAlerts(inquiries = [], receipts = [], today = new Date(), lang = 'English') {
+export function buildTenantAlerts(bookings = [], inquiries = [], receipts = [], today = new Date(), lang = 'English') {
   const bn = lang === 'বাংলা';
   const t0 = startOfDay(today) || startOfDay(new Date());
-  const curKey = monthKeyOf(t0);
   const alerts = [];
   const resolved = [];
 
-  // ── Rent, from the tenant's ledger receipts ──
+  // ── Rent, from the tenant's bookings + ledger (matches buildRentAlerts) ──
+  // We only surface UNPAID months here; paid months are handled by the
+  // receipts loop below (new-receipt alert + collected/resolved feedback).
+  for (const b of (bookings || [])) {
+    if (!b) continue;
+    if (b.status === 'cancelled' || b.deletedAt) continue;
+
+    // Only leases that are currently running.
+    const leaseStart = b.leaseStart ? startOfDay(b.leaseStart) : null;
+    const leaseEnd = b.leaseEnd ? startOfDay(b.leaseEnd) : null;
+    if (leaseStart && t0 < leaseStart) continue;
+    if (leaseEnd && t0 > leaseEnd) continue;
+
+    const dueDay = Math.min(Math.max(Number(b.rentDueDay) || 5, 1), 28);
+    const grace = Math.max(Number(b.gracePeriodDays) || 0, 0);
+    const lateFee = Math.max(Number(b.lateFeeAmount) || 0, 0);
+    const rent = Math.max(Number(b.monthlyRent) || 0, 0);
+    const service = Math.max(Number(b.serviceCharge) || 0, 0);
+    const totalDue = rent + service;
+
+    // This month's due date + ledger entry.
+    const dueDate = new Date(t0.getFullYear(), t0.getMonth(), dueDay);
+    const key = monthKeyOf(dueDate);
+    const entry = (b.ledger && b.ledger[key]) || null;
+    const isPaid = !!entry && (entry.paid === true || entry.status === 'full');
+    if (isPaid) continue; // paid months surface via receipts, not here
+
+    const property = b.property || (bn ? 'আপনার বাসা' : 'your rental');
+    const dueStr = fmtDate(dueDate, bn);
+    const amountStr = fmtAmount(totalDue, bn);
+
+    const graceEnd = new Date(dueDate);
+    graceEnd.setDate(graceEnd.getDate() + grace);
+    const daysUntilDue = Math.round((dueDate - t0) / MS_DAY);
+
+    const common = {
+      id: `trent-${b.id || property}-${key}`,
+      category: 'payment',
+      bookingId: b.id || null,
+      amount: amountStr,
+      dueDate: dueStr,
+      monthKey: key,
+      daysLeft: null,
+      actionType: 'view_receipt',
+      actionLabel: bn ? 'দেখুন' : 'View',
+    };
+
+    if (t0 > graceEnd) {
+      // OVERDUE — grace period has passed.
+      const daysPastGrace = Math.round((t0 - graceEnd) / MS_DAY);
+      alerts.push({
+        ...common,
+        type: 'urgent',
+        iconType: 'overdue',
+        title: bn ? `ভাড়া বকেয়া — ${property}` : `Rent overdue — ${property}`,
+        subtitle: bn
+          ? `${daysPastGrace} দিন পার • ৳${amountStr} বাকি${lateFee ? ` • ৳${fmtAmount(lateFee, bn)} লেট ফি` : ''}`
+          : `${daysPastGrace}d past grace • ৳${amountStr} due${lateFee ? ` • ৳${fmtAmount(lateFee, bn)} late fee` : ''}`,
+        detail: bn
+          ? `${property}-এর ${key} মাসের ভাড়া ৳${amountStr} এখনো বাকি। নির্ধারিত তারিখ ছিল ${dueStr}, grace period শেষ।${lateFee ? ` ৳${fmtAmount(lateFee, bn)} বিলম্ব ফি যোগ হতে পারে।` : ''} দ্রুত পরিশোধ করুন বা মালিকের সাথে কথা বলুন।`
+          : `Your ৳${amountStr} rent for ${key} (${property}) is still unpaid. It was due ${dueStr} and the grace period has ended.${lateFee ? ` A ৳${fmtAmount(lateFee, bn)} late fee may apply.` : ''} Pay soon or talk to your landlord.`,
+      });
+    } else if (t0 >= dueDate) {
+      // DUE — on/after the due date but still inside the grace window.
+      const graceLeft = Math.max(grace - Math.round((t0 - dueDate) / MS_DAY), 0);
+      alerts.push({
+        ...common,
+        type: 'urgent',
+        iconType: 'dueToday',
+        title: bn ? `ভাড়া এখন due — ${property}` : `Rent due now — ${property}`,
+        subtitle: bn
+          ? `নির্ধারিত তারিখ পেরিয়েছে • grace-এ ${graceLeft} দিন বাকি`
+          : `Past due date • ${graceLeft}d of grace left`,
+        detail: bn
+          ? `${property}-এর ${key} মাসের ভাড়া ৳${amountStr} এখন বকেয়া (নির্ধারিত ${dueStr})। grace period এখনো চলছে — দ্রুত পরিশোধ করলে বিলম্ব ফি এড়ানো যাবে।`
+          : `Your ৳${amountStr} rent for ${key} (${property}) is now due (was ${dueStr}). Still within grace — pay soon to avoid a late fee.`,
+      });
+    } else if (daysUntilDue <= 5) {
+      // DUE SOON.
+      alerts.push({
+        ...common,
+        type: 'medium',
+        iconType: 'dueSoon',
+        daysLeft: daysUntilDue,
+        title: bn ? `ভাড়া due ${daysUntilDue} দিনে — ${property}` : `Rent due in ${daysUntilDue}d — ${property}`,
+        subtitle: bn ? `নির্ধারিত তারিখ ${dueStr}` : `Due ${dueStr}`,
+        detail: bn
+          ? `${property}-এর ${key} মাসের ভাড়া ৳${amountStr} ${daysUntilDue} দিনের মধ্যে (${dueStr}) দিতে হবে। সময়মতো পরিশোধ করলে ঝামেলা এড়ানো যায়।`
+          : `Your ৳${amountStr} rent for ${key} (${property}) is due in ${daysUntilDue} day(s) (${dueStr}). Paying on time keeps things smooth.`,
+      });
+    } else if (daysUntilDue <= 14) {
+      // UPCOMING — early heads-up.
+      alerts.push({
+        ...common,
+        type: 'low',
+        iconType: 'upcoming',
+        daysLeft: daysUntilDue,
+        title: bn ? `আসন্ন ভাড়া — ${property}` : `Upcoming rent — ${property}`,
+        subtitle: bn ? `${daysUntilDue} দিনে due (${dueStr})` : `Due in ${daysUntilDue}d (${dueStr})`,
+        detail: bn
+          ? `${property}-এর ${key} মাসের ভাড়া ৳${amountStr} আসছে ${dueStr}-এ।`
+          : `Your ৳${amountStr} rent for ${key} (${property}) is coming up on ${dueStr}.`,
+      });
+    }
+  }
+
+  // ── Receipts — paid months only (new-receipt alert + collected feedback) ──
+  // Outstanding balances are NOT read from receipts anymore; the booking
+  // ledger above owns all unpaid-rent alerting.
   for (const r of (receipts || [])) {
     if (!r || !r.monthKey) continue;
     const balance = Number(r.balance ?? ((Number(r.totalDue) || 0) - (Number(r.totalPaid) || 0))) || 0;
     const isFull = r.status === 'full' || balance <= 0;
+    if (!isFull) continue; // partial/unpaid is covered by the booking-ledger loop
     const property = r.propertyTitle || (bn ? 'আপনার বাসা' : 'your rental');
     const monthLbl = r.monthLabel || r.monthKey;
     const idTail = `${r.monthKey}-${r.propertyId || ''}`;
 
-    if (isFull) {
-      if (r.read === false) {
-        alerts.push({
-          id: `trcpt-${idTail}`,
-          category: 'payment', type: 'low', iconType: 'receipt',
-          title: bn ? `নতুন রিসিট — ${monthLbl}` : `New receipt — ${monthLbl}`,
-          subtitle: bn ? `${property} • পরিশোধিত` : `${property} • paid`,
-          detail: bn
-            ? `${property}-এর ${monthLbl} মাসের ভাড়ার রিসিট তৈরি হয়েছে। দেখে নিন এবং রেকর্ডের জন্য রাখুন।`
-            : `Your rent receipt for ${monthLbl} (${property}) is ready. Open it and keep it for your records.`,
-          daysLeft: null, actionType: 'view_receipt', actionLabel: bn ? 'রিসিট দেখুন' : 'View receipt', monthKey: r.monthKey,
-        });
-      } else {
-        resolved.push({
-          id: `trcpt-${idTail}`, type: 'low', iconType: 'collected',
-          title: bn ? `ভাড়া পরিশোধিত — ${monthLbl}` : `Rent paid — ${monthLbl}`,
-          detail: `${property} • ৳${fmtAmount(r.totalPaid || 0, bn)}`,
-          resolvedOn: r.date || (bn ? 'পরিশোধিত' : 'Paid'),
-        });
-      }
-      continue;
-    }
-
-    // Outstanding balance (unpaid / partial)
-    const amountStr = fmtAmount(balance, bn);
-    const isPast = r.monthKey < curKey;
-    const isCurrent = r.monthKey === curKey;
-    let type, iconType, title, subtitle, detail;
-    if (isPast) {
-      type = 'urgent'; iconType = 'overdue';
-      title = bn ? `ভাড়া বকেয়া — ${monthLbl}` : `Rent overdue — ${monthLbl}`;
-      subtitle = bn ? `${property} • ৳${amountStr} বাকি` : `${property} • ৳${amountStr} due`;
-      detail = bn
-        ? `${property}-এর ${monthLbl} মাসের ভাড়া ৳${amountStr} এখনো বাকি। দেরি হলে বিলম্ব ফি লাগতে পারে — দ্রুত পরিশোধ করুন বা মালিকের সাথে কথা বলুন।`
-        : `৳${amountStr} rent for ${monthLbl} (${property}) is still outstanding. Late payment may add a fee — pay soon or talk to your landlord.`;
-    } else if (isCurrent) {
-      type = 'medium'; iconType = 'dueToday';
-      title = bn ? `এ মাসের ভাড়া বাকি — ${monthLbl}` : `This month's rent due — ${monthLbl}`;
-      subtitle = `${property} • ৳${amountStr}`;
-      detail = bn
-        ? `${property}-এর ${monthLbl} মাসের ভাড়া ৳${amountStr} বাকি আছে। সময়মতো পরিশোধ করলে ঝামেলা এড়ানো যায়।`
-        : `৳${amountStr} rent for ${monthLbl} (${property}) is due. Paying on time keeps things smooth.`;
+    if (r.read === false) {
+      alerts.push({
+        id: `trcpt-${idTail}`,
+        category: 'payment', type: 'low', iconType: 'receipt',
+        title: bn ? `নতুন রিসিট — ${monthLbl}` : `New receipt — ${monthLbl}`,
+        subtitle: bn ? `${property} • পরিশোধিত` : `${property} • paid`,
+        detail: bn
+          ? `${property}-এর ${monthLbl} মাসের ভাড়ার রিসিট তৈরি হয়েছে। দেখে নিন এবং রেকর্ডের জন্য রাখুন।`
+          : `Your rent receipt for ${monthLbl} (${property}) is ready. Open it and keep it for your records.`,
+        daysLeft: null, actionType: 'view_receipt', actionLabel: bn ? 'রিসিট দেখুন' : 'View receipt', monthKey: r.monthKey,
+      });
     } else {
-      type = 'low'; iconType = 'upcoming';
-      title = bn ? `আসন্ন ভাড়া — ${monthLbl}` : `Upcoming rent — ${monthLbl}`;
-      subtitle = `${property} • ৳${amountStr}`;
-      detail = bn
-        ? `${property}-এর ${monthLbl} মাসের ভাড়া ৳${amountStr} আসছে।`
-        : `৳${amountStr} rent for ${monthLbl} (${property}) is coming up.`;
+      resolved.push({
+        id: `trcpt-${idTail}`, type: 'low', iconType: 'collected',
+        title: bn ? `ভাড়া পরিশোধিত — ${monthLbl}` : `Rent paid — ${monthLbl}`,
+        detail: `${property} • ৳${fmtAmount(r.totalPaid || 0, bn)}`,
+        resolvedOn: r.date || (bn ? 'পরিশোধিত' : 'Paid'),
+      });
     }
-    alerts.push({
-      id: `trent-${idTail}`, category: 'payment', type, iconType,
-      title, subtitle, detail, amount: amountStr, daysLeft: null,
-      actionType: 'view_receipt', actionLabel: bn ? 'দেখুন' : 'View', monthKey: r.monthKey,
-    });
   }
 
   // ── Inquiry status ──
