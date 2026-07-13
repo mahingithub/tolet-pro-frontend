@@ -4,7 +4,7 @@ import {
   ChevronDown, User, Globe, Home, Building2,
   Check, X, LogOut, LayoutDashboard, Heart, MessageSquare,
   RefreshCw, ShieldAlert, ArrowRight, Search, ChevronRight,
-  Bell, Sparkles, PlusCircle, BarChart2,
+  Bell, Sparkles, PlusCircle, BarChart2, Wallet,
   UserCircle, MapPin, SlidersHorizontal,
   FileText, Phone, BookOpen, PenLine, HelpCircle,
   Settings as SettingsIcon, LifeBuoy
@@ -81,6 +81,7 @@ const exploreLinks = [
 ];
 const tenantLinks = [
   { Icon: LayoutDashboard, color: 'text-gray-700',  bg: 'bg-transparent',   label: 'Tenant Dashboard',  tKey: 'menuTenantDashboard', path: '/tenant-dashboard' },
+  { Icon: Wallet,          color: 'text-gray-700',  bg: 'bg-transparent',   label: 'Roommate Wallet',   tKey: 'menuRoommateWallet', path: '/living' },
   { Icon: Heart,           color: 'text-gray-700',  bg: 'bg-transparent',   label: 'Saved Properties',  tKey: 'menuSavedProperties', path: '/tenant-dashboard?tab=saved' },
   { Icon: MessageSquare,   color: 'text-gray-700',  bg: 'bg-transparent',   label: 'My Inquiries',      tKey: 'menuMyInquiries', path: '/tenant-dashboard?tab=applications' },
   { Icon: Bell,            color: 'text-gray-700', bg: 'bg-transparent',  label: 'My Alerts',         tKey: 'menuMyAlerts', path: '/smart-alerts' },
@@ -659,6 +660,7 @@ useEffect(() => {
                       ) : (
                         <>
                           <Link to="/tenant-dashboard" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><LayoutDashboard size={17} /> Tenant Dashboard</Link>
+                          <Link to="/living" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-[#ba0036]/5 hover:text-[#ba0036] rounded-xl transition-colors"><Wallet size={17} /> {t?.menuRoommateWallet || 'Roommate Wallet'}</Link>
                           <Link to="/tenant-dashboard?tab=saved" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><Heart size={17} /> Saved Properties</Link>
                           <Link to="/tenant-dashboard?tab=applications" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><MessageSquare size={17} /> My Inquiries</Link>
                         </>

@@ -6,6 +6,7 @@
  * avoid pulling in a charting dependency.
  */
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Minus, Plus } from 'lucide-react';
 import { initials } from './livingUtils';
@@ -230,57 +231,73 @@ export const EmptyState = ({ icon: Icon, title, subtitle, action }) => (
 );
 
 // ── Bottom sheet / modal ─────────────────────────────────────────────────────────────────
-export const Sheet = ({ open, onClose, title, subtitle, children, footer, maxWidth = 'max-w-md' }) => (
-  <AnimatePresence>
-    {open && (
-      <>
-        <motion.div
-          key="backdrop"
-          className="fixed inset-0 z-[80] bg-gray-900/50 backdrop-blur-sm"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-        />
-        <motion.div
-          key="panel"
-          className="fixed inset-x-0 bottom-0 sm:inset-0 z-[90] flex sm:items-center justify-center sm:p-4 pointer-events-none"
-        >
+// Rendered through a portal to <body> so it escapes the Living page's animated,
+// z-indexed containers — otherwise `position: fixed` anchors to a transformed
+// ancestor and the bottom nav (z-40) paints OVER the sheet, hiding the footer
+// action button. At body level with z-[110] it sits above everything, and a
+// safe-area-aware footer keeps the primary button clear of the home indicator.
+export const Sheet = ({ open, onClose, title, subtitle, children, footer, maxWidth = 'max-w-md' }) => {
+  if (typeof document === 'undefined') return null;
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <>
           <motion.div
-            className={cx(
-              'pointer-events-auto w-full bg-white rounded-t-[2rem] sm:rounded-[2rem] border border-gray-100 shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[86vh]',
-              maxWidth
-            )}
-            initial={{ y: '100%', opacity: 0.6 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: '100%', opacity: 0.6 }}
-            transition={{ type: 'spring', damping: 30, stiffness: 320 }}
+            key="backdrop"
+            className="fixed inset-0 z-[100] bg-gray-900/50 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
+          <motion.div
+            key="panel"
+            className="fixed inset-x-0 bottom-0 sm:inset-0 z-[110] flex sm:items-center justify-center sm:p-4 pointer-events-none"
           >
-            {/* drag handle */}
-            <div className="pt-3 pb-1 flex justify-center sm:hidden">
-              <span className="w-10 h-1.5 rounded-full bg-gray-200" />
-            </div>
-            <div className="flex items-start justify-between gap-3 px-5 pt-2 pb-3 sm:pt-5">
-              <div>
-                <h3 className="text-lg font-black text-gray-900 tracking-tight leading-tight">{title}</h3>
-                {subtitle && <p className="text-[12px] font-semibold text-gray-500 mt-0.5">{subtitle}</p>}
+            <motion.div
+              className={cx(
+                'pointer-events-auto w-full bg-white rounded-t-[2rem] sm:rounded-[2rem] border border-gray-100 shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[86vh]',
+                maxWidth
+              )}
+              initial={{ y: '100%', opacity: 0.6 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0.6 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 320 }}
+            >
+              {/* drag handle */}
+              <div className="pt-3 pb-1 flex justify-center sm:hidden">
+                <span className="w-10 h-1.5 rounded-full bg-gray-200" />
               </div>
-              <button
-                onClick={onClose}
-                className="p-2 -mr-1 rounded-full text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition active:scale-90"
-                aria-label="Close"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="px-5 overflow-y-auto flex-1 pb-2">{children}</div>
-            {footer && <div className="px-5 py-4 border-t border-gray-100 bg-white sticky bottom-0 rounded-b-[2rem]">{footer}</div>}
+              <div className="flex items-start justify-between gap-3 px-5 pt-2 pb-3 sm:pt-5">
+                <div>
+                  <h3 className="text-lg font-black text-gray-900 tracking-tight leading-tight">{title}</h3>
+                  {subtitle && <p className="text-[12px] font-semibold text-gray-500 mt-0.5">{subtitle}</p>}
+                </div>
+                <button
+                  onClick={onClose}
+                  className="p-2 -mr-1 rounded-full text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition active:scale-90"
+                  aria-label="Close"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="px-5 overflow-y-auto flex-1 pb-2">{children}</div>
+              {footer && (
+                <div
+                  className="px-5 pt-4 border-t border-gray-100 bg-white rounded-b-[2rem]"
+                  style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+                >
+                  {footer}
+                </div>
+              )}
+            </motion.div>
           </motion.div>
-        </motion.div>
-      </>
-    )}
-  </AnimatePresence>
-);
+        </>
+      )}
+    </AnimatePresence>,
+    document.body,
+  );
+};
 
 // ── Donut chart (SVG) ─────────────────────────────────────────────────────────────────────
 export const DonutChart = ({ data = [], size = 168, thickness = 22, centerTop, centerMain, centerSub }) => {
