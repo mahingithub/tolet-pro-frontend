@@ -7,7 +7,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext.jsx';
 import useLivingStore from '../../store/useLivingStore';
 import callProvider from '../../services/callProvider';
-import { buildReminders } from './livingUtils';
+import { buildReminders, initials } from './livingUtils';
 import { MODULES } from './livingConfig';
 import { cx } from './livingUI';
 
@@ -167,18 +167,39 @@ const Living = () => {
             </div>
           </div>
 
-          <button
-            onClick={() => go('reminders')}
-            className="relative p-2.5 bg-white/70 rounded-xl border border-white/80 shadow-sm text-gray-500 hover:text-[#ba0036] hover:bg-white active:scale-90 transition shrink-0"
-            aria-label={isBn ? 'রিমাইন্ডার' : 'Reminders'}
-          >
-            <BellRing size={18} />
-            {reminders.length > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-[#ba0036] text-white text-[10px] font-black border-2 border-white">
-                {reminders.length}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => go('reminders')}
+              className="relative p-2.5 bg-white/70 rounded-xl border border-white/80 shadow-sm text-gray-500 hover:text-[#ba0036] hover:bg-white active:scale-90 transition"
+              aria-label={isBn ? 'রিমাইন্ডার' : 'Reminders'}
+            >
+              <BellRing size={18} />
+              {reminders.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-[#ba0036] text-white text-[10px] font-black border-2 border-white">
+                  {reminders.length}
+                </span>
+              )}
+            </button>
+
+            {/* Profile — reachable straight from the Living tab (mobile + desktop). */}
+            <button
+              onClick={() => navigate('/tenant-dashboard?tab=profile')}
+              className="rounded-full border border-white/80 shadow-sm active:scale-90 transition"
+              aria-label={isBn ? 'প্রোফাইল' : 'Profile'}
+            >
+              <span className="relative w-9 h-9 rounded-full bg-[#ba0036] text-white flex items-center justify-center text-[12px] font-black overflow-hidden">
+                {initials(user?.name)}
+                {user?.avatar && (
+                  <img
+                    src={user.avatar}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                )}
               </span>
-            )}
-          </button>
+            </button>
+          </div>
         </header>
       </div>
 

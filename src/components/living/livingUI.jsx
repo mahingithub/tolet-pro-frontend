@@ -48,15 +48,27 @@ export const IconBadge = ({ icon: Icon, tint = 'bg-gray-100', text = 'text-gray-
 );
 
 // ── Avatar ───────────────────────────────────────────────────────────────────
+// Shows the roommate's real profile photo when available (joined members carry
+// an `avatar` URL from their account); falls back to coloured initials — and
+// if the photo 404s at runtime, the initials underneath show through.
 export const Avatar = ({ roommate, size = 34, ring = true, className = '' }) => {
   const label = initials(roommate?.name);
   return (
     <span
-      className={cx('inline-flex items-center justify-center rounded-full font-black text-white select-none', ring && 'ring-2 ring-white', className)}
+      className={cx('relative inline-flex items-center justify-center rounded-full font-black text-white select-none overflow-hidden', ring && 'ring-2 ring-white', className)}
       style={{ width: size, height: size, background: roommate?.color || '#64748b', fontSize: size * 0.4 }}
       title={roommate?.name}
     >
       {label}
+      {roommate?.avatar && (
+        <img
+          src={roommate.avatar}
+          alt=""
+          loading="lazy"
+          className="absolute inset-0 w-full h-full object-cover"
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+        />
+      )}
     </span>
   );
 };

@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { HandCoins, ArrowRight, ArrowLeftRight, Check, Clock, Users, ArrowDownLeft, ArrowUpRight, Trash2, Lock, Sparkles } from 'lucide-react';
+import { HandCoins, ArrowRight, ArrowLeftRight, Check, Clock, Users, ArrowDownLeft, ArrowUpRight, Trash2, Lock, Sparkles, Receipt } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
-import { computeLedger, simplifyDebts, taka, dateLabel, roommateById } from './livingUtils';
-import { PAYMENT_METHODS, METHOD_ORDER, getMethod } from './livingConfig';
+import { computeLedger, simplifyDebts, paymentBreakdown, taka, dateLabel, roommateById } from './livingUtils';
+import { PAYMENT_METHODS, METHOD_ORDER, getMethod, getCategory } from './livingConfig';
 import { Card, SectionHeader, IconBadge, Avatar, Chip, PrimaryButton, Field, MoneyInput, TextInput, EmptyState, Sheet, ConfirmDialog, cx } from './livingUI';
 
 const SettleSheet = ({ open, onClose, roommates, preset, onSave }) => {
@@ -154,6 +154,7 @@ const RoommateBalances = ({ me, language, intent, clearIntent }) => {
   const expenses = useLivingStore((s) => s.expenses);
   const groceries = useLivingStore((s) => s.groceries);
   const meals = useLivingStore((s) => s.meals);
+  const bills = useLivingStore((s) => s.bills);
   const settlements = useLivingStore((s) => s.settlements);
   const connected = useLivingStore((s) => s.connected);
   const addSettlement = useLivingStore((s) => s.addSettlement);
@@ -163,8 +164,10 @@ const RoommateBalances = ({ me, language, intent, clearIntent }) => {
   const [preset, setPreset] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
 
-  const net = useMemo(() => computeLedger({ expenses, groceries, meals, settlements, roommates }), [expenses, groceries, meals, settlements, roommates]);
+  // Paid bills feed the ledger too (payer credited, split equally) — same as the Overview wallet.
+  const net = useMemo(() => computeLedger({ expenses, groceries, meals, bills, settlements, roommates }), [expenses, groceries, meals, bills, settlements, roommates]);
   const debts = useMemo(() => simplifyDebts(net, roommates), [net, roommates]);
+  const breakdown = useMemo(() => paymentBreakdown({ expenses, groceries, bills, roommates }), [expenses, groceries, bills, roommates]);
 
   const owedToMe = debts.filter((d) => d.to === me); // people who owe me
   const iOwe = debts.filter((d) => d.from === me); // I owe them
@@ -267,6 +270,46 @@ const RoommateBalances = ({ me, language, intent, clearIntent }) => {
             )}
           </Card>
         </div>
+      )}
+
+      {/* who paid what — transparent per-person / per-category breakdown */}
+      {breakdown.grandTotal > 0 && (
+        <Card className="p-4">
+          <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-0.5 flex items-center gap-1.5">
+            <Receipt size={15} className="text-[#ba0036]" /> {isBn ? 'কে কত পরিশোধ করেছে' : 'Who paid what'}
+          </h3>
+          <p className="text-[11px] font-semibold text-gray-400 mb-3">
+            {isBn ? 'মোট পরিশোধ ' : 'Total paid out '}
+            <span className="font-black text-gray-700">{taka(breakdown.grandTotal, language)}</span>
+            {isBn ? ' · কোন খাতে কে দিয়েছে' : ' · by person & category'}
+          </p>
+          <div className="space-y-2.5">
+            {breakdown.rows.map((row) => (
+              <div key={row.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
+                <div className="flex items-center gap-2.5">
+                  <Avatar roommate={row} size={34} />
+                  <span className="flex-1 text-[13px] font-black text-gray-900 truncate">{row.isMe ? (isBn ? 'আপনি' : 'You') : row.name}</span>
+                  <span className="text-[14px] font-black text-gray-900">{taka(row.total, language)}</span>
+                </div>
+                {row.cats.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
+                    {row.cats.map((c) => {
+                      const cat = getCategory(c.key);
+                      const CIcon = cat.icon;
+                      return (
+                        <span key={c.key} className={cx('inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold', cat.tint, cat.text)}>
+                          <CIcon size={11} /> {isBn ? cat.bn : cat.en} <span className="font-black">{taka(c.amount, language)}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-[11px] font-semibold text-gray-400 mt-1.5">{isBn ? 'এখনো কিছু পরিশোধ করেনি' : 'Nothing paid yet'}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
       )}
 
       {/* balances between other roommates (only if any) */}

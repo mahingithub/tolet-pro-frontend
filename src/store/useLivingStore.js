@@ -87,10 +87,10 @@ function buildSeed() {
   }
 
   const bills = [
-    { id: uid(), type: 'electricity', amount: 3200, dueDate: dayThis(25), status: 'unpaid', paidDate: null, reminder: true },
-    { id: uid(), type: 'gas', amount: 1050, dueDate: dayThis(10), status: 'paid', paidDate: dayThis(8), reminder: false },
-    { id: uid(), type: 'water', amount: 620, dueDate: dayThis(Math.min(28, now.getDate() + 2)), status: 'unpaid', paidDate: null, reminder: true },
-    { id: uid(), type: 'internet', amount: 1500, dueDate: dayThis(5), status: 'paid', paidDate: dayThis(4), reminder: false },
+    { id: uid(), type: 'electricity', amount: 3200, dueDate: dayThis(25), status: 'unpaid', paidDate: null, reminder: true, paidBy: 'me', recurring: true, createdBy: 'me' },
+    { id: uid(), type: 'gas', amount: 1050, dueDate: dayThis(10), status: 'paid', paidDate: dayThis(8), reminder: false, paidBy: 'r2', createdBy: 'r2' },
+    { id: uid(), type: 'water', amount: 620, dueDate: dayThis(Math.min(28, now.getDate() + 2)), status: 'unpaid', paidDate: null, reminder: true, paidBy: 'r3', createdBy: 'r3' },
+    { id: uid(), type: 'internet', amount: 1500, dueDate: dayThis(5), status: 'paid', paidDate: dayThis(4), reminder: false, paidBy: 'me', recurring: true, createdBy: 'me' },
   ];
 
   const settlements = [
@@ -346,7 +346,9 @@ const useLivingStore = create(
       markBillPaid: (id) => {
         if (get().connected) { runRemote(get, livingService.updateBill(id, { status: 'paid' })); return; }
         const bill = get().bills.find((b) => b.id === id);
-        set((s) => ({ bills: s.bills.map((b) => (b.id === id ? { ...b, status: 'paid', paidDate: new Date().toISOString() } : b)) }));
+        const meId = get().myId || 'me';
+        // Attribute the payment (default: me) so it flows into the balances ledger.
+        set((s) => ({ bills: s.bills.map((b) => (b.id === id ? { ...b, status: 'paid', paidDate: new Date().toISOString(), paidBy: b.paidBy || meId } : b)) }));
         if (bill) get().pushActivity('bill', 'Bill paid', `${bill.type} · ৳${Number(bill.amount).toLocaleString('en-BD')}`);
       },
       markBillUnpaid: (id) => {

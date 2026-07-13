@@ -103,7 +103,7 @@ export function mealCountByRoommate(meals, roommates, monthRef = null) {
  * Grocery is distributed by each roommate's share of meals in the grocery's
  * own month (equal split fallback when no meals are logged).
  */
-export function computeLedger({ expenses = [], groceries = [], meals = [], settlements = [], roommates = [] }) {
+export function computeLedger({ expenses = [], groceries = [], meals = [], bills = [], settlements = [], roommates = [] }) {
   const net = {};
   roommates.forEach((r) => (net[r.id] = 0));
   const ensure = (id) => {
@@ -118,6 +118,23 @@ export function computeLedger({ expenses = [], groceries = [], meals = [], settl
     Object.entries(shares).forEach(([id, amt]) => {
       ensure(id);
       net[id] -= amt;
+    });
+  });
+
+  // Paid bills feed the ledger exactly like an equal-split expense: whoever
+  // fronted the money (paidBy) is credited the full amount and every member is
+  // debited an equal share. Unpaid bills don't move balances (nobody paid yet).
+  bills.forEach((b) => {
+    if (b.status !== 'paid') return;
+    const amount = Number(b.amount) || 0;
+    if (amount <= 0) return;
+    const payer = b.paidBy || b.createdBy;
+    if (!payer) return; // can't attribute → leave balances untouched
+    ensure(payer);
+    net[payer] += amount;
+    const each = amount / (roommates.length || 1);
+    roommates.forEach((r) => {
+      net[r.id] -= each;
     });
   });
 
@@ -171,6 +188,44 @@ export function simplifyDebts(net, roommates) {
     if (creditors[j].amt <= 0.5) j++;
   }
   return out;
+}
+
+/**
+ * Transparent "who paid what" breakdown. For every roommate returns the total
+ * they personally paid out, plus a per-category split (expense categories, the
+ * meal bazar pot → 'groceries', and PAID bills → their bill type). This is the
+ * "why" behind the balances: exactly who paid, for what, and how much.
+ * Rows are sorted by total paid (desc); categories within a row likewise.
+ */
+export function paymentBreakdown(state) {
+  const { expenses = [], groceries = [], bills = [], roommates = [] } = state;
+  const byMember = {};
+  const bump = (memberId, categoryKey, amount) => {
+    if (!memberId || !(amount > 0)) return;
+    if (!byMember[memberId]) byMember[memberId] = { total: 0, cats: {} };
+    byMember[memberId].total += amount;
+    byMember[memberId].cats[categoryKey] = (byMember[memberId].cats[categoryKey] || 0) + amount;
+  };
+
+  expenses.forEach((e) => bump(e.paidBy, e.category || 'other', Number(e.amount) || 0));
+  groceries.forEach((g) => bump(g.paidBy, 'groceries', Number(g.amount) || 0));
+  bills.forEach((b) => {
+    if (b.status !== 'paid') return;
+    bump(b.paidBy || b.createdBy, b.type || 'other', Number(b.amount) || 0);
+  });
+
+  const grandTotal = Object.values(byMember).reduce((s, m) => s + m.total, 0);
+  const rows = roommates
+    .map((r) => {
+      const m = byMember[r.id] || { total: 0, cats: {} };
+      const cats = Object.entries(m.cats)
+        .map(([key, amount]) => ({ key, amount }))
+        .sort((a, b) => b.amount - a.amount);
+      return { id: r.id, name: r.name, color: r.color, avatar: r.avatar, isMe: r.isMe, total: m.total, cats };
+    })
+    .sort((a, b) => b.total - a.total);
+
+  return { rows, grandTotal };
 }
 
 // ── meals ────────────────────────────────────────────────────────────────────
@@ -258,8 +313,8 @@ export function myMonthlyShare(state, meId = 'me', monthOffset = 0) {
 
 // ── wallet summary ────────────────────────────────────────────────────────────
 export function walletSummary(state, meId = 'me') {
-  const { expenses, groceries, meals, settlements, roommates } = state;
-  const net = computeLedger({ expenses, groceries, meals, settlements, roommates });
+  const { expenses, groceries, meals, bills, settlements, roommates } = state;
+  const net = computeLedger({ expenses, groceries, meals, bills, settlements, roommates });
   const debts = simplifyDebts(net, roommates);
   const youOwe = debts.filter((d) => d.from === meId).reduce((s, d) => s + d.amount, 0);
   const othersOweYou = debts.filter((d) => d.to === meId).reduce((s, d) => s + d.amount, 0);

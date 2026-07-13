@@ -295,42 +295,58 @@ const WalletSummary = ({ go, me, language }) => {
             {isBn ? 'রুমমেটদের কোডটি দিন — তারা কোড দিয়ে জয়েন করবে।' : 'Share this code so roommates can join from their phones.'}
           </p>
 
-          <div className="divide-y divide-gray-50">
-            {roommates.map((r) => (
-              <div key={r.id} className="flex items-center gap-3 py-2">
-                <Avatar roommate={r} size={32} />
-                <span className="flex-1 text-[13px] font-bold text-gray-800 truncate">{r.isMe ? (isBn ? 'আপনি' : 'You') : r.name}</span>
-                {r.joined ? (
-                  <Chip tint="bg-emerald-50" text="text-emerald-600">{isBn ? 'জয়েন্ড' : 'Joined'}</Chip>
-                ) : (
-                  <Chip tint="bg-gray-100" text="text-gray-500">{isBn ? 'ইনভাইটেড' : 'Invited'}</Chip>
-                )}
-                {!r.joined && !r.isMe && isOwner && (
-                  <button onClick={() => setPendingRemove(r)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="remove">
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-            ))}
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+              {roommates.length} {isBn ? 'জন সদস্য' : roommates.length === 1 ? 'member' : 'members'}
+            </p>
+            <div className="divide-y divide-gray-50">
+              {roommates.map((r) => (
+                <div key={r.id} className="flex items-center gap-3 py-2.5">
+                  <Avatar roommate={r} size={40} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-black text-gray-900 truncate flex items-center gap-1.5">
+                      {r.isMe ? `${r.name} (${isBn ? 'আপনি' : 'You'})` : r.name}
+                      {r.role === 'owner' && (
+                        <span className="inline-block text-[9px] font-black uppercase tracking-wider text-[#ba0036] bg-[#ba0036]/10 px-1.5 py-0.5 rounded-full">
+                          {isBn ? 'ম্যানেজার' : 'Manager'}
+                        </span>
+                      )}
+                    </p>
+                    <p className={cx('text-[11px] font-bold mt-0.5 flex items-center gap-1', r.joined ? 'text-emerald-600' : 'text-gray-400')}>
+                      {r.joined ? (
+                        <>
+                          <Check size={12} /> {isBn ? 'জয়েন করেছে' : 'Joined'}
+                        </>
+                      ) : (
+                        isBn ? 'ইনভাইট পেন্ডিং' : 'Invite pending'
+                      )}
+                    </p>
+                  </div>
+                  {!r.joined && !r.isMe && isOwner && (
+                    <button onClick={() => setPendingRemove(r)} className="p-2 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90 shrink-0" aria-label="remove">
+                      <X size={15} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="flex gap-2 pt-1">
-            <GhostButton onClick={() => setAddOpen(true)} className="flex-1 py-2.5 text-[12px]">
-              <UserPlus size={15} /> {isBn ? 'যোগ করুন' : 'Add person'}
-            </GhostButton>
+          {/* Real roommates join with the invite code above — no manual "add person" needed. */}
+          <div className="pt-1">
             {confirmLeave ? (
               <button
                 onClick={async () => { await leaveHousehold(); toast.success(isBn ? 'ছেড়ে দিয়েছেন' : 'Left household'); setConfirmLeave(false); }}
-                className="px-4 py-2.5 rounded-2xl bg-rose-50 text-red-600 text-[12px] font-black active:scale-95 transition"
+                className="w-full px-4 py-2.5 rounded-2xl bg-rose-50 text-red-600 text-[12px] font-black active:scale-95 transition"
               >
-                {isBn ? 'নিশ্চিত?' : 'Confirm?'}
+                {isBn ? 'নিশ্চিত? — ছেড়ে দিন' : 'Confirm — leave household'}
               </button>
             ) : (
               <button
                 onClick={() => { setConfirmLeave(true); setTimeout(() => setConfirmLeave(false), 3000); }}
-                className="px-3.5 py-2.5 rounded-2xl bg-gray-100 text-gray-500 text-[12px] font-black active:scale-95 transition flex items-center gap-1.5"
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-gray-100 text-gray-500 text-[12px] font-black active:scale-95 transition flex items-center justify-center gap-1.5"
               >
-                <LogOut size={14} /> {isBn ? 'ছাড়ুন' : 'Leave'}
+                <LogOut size={14} /> {isBn ? 'হাউসহোল্ড ছাড়ুন' : 'Leave household'}
               </button>
             )}
           </div>

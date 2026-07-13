@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Zap, Bell, Check, CircleDollarSign, RotateCcw, CalendarClock, Pencil, Trash2, Lock, Info, Users } from 'lucide-react';
+import { Plus, Bell, Check, CircleDollarSign, RotateCcw, CalendarClock, Pencil, Trash2, Lock, Info, Users } from 'lucide-react';
 
-import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
 import { taka, num, dateLabel, daysUntil, deriveBillStatus, isSameMonth, roommateById } from './livingUtils';
 import { BILL_TYPES, BILL_ORDER, getBillType, BILL_STATUS } from './livingConfig';
@@ -10,13 +9,15 @@ import { Card, SectionHeader, IconBadge, Avatar, Chip, Toggle, PrimaryButton, Fi
 const todayInput = () => new Date().toISOString().slice(0, 10);
 
 // ── Add / Edit bill sheet ──────────────────────────────────────────────────
-const BillSheet = ({ open, onClose, editing, onSave }) => {
-  const { language } = useLanguage();
+const BillSheet = ({ open, onClose, editing, onSave, roommates = [], myId = 'me', language }) => {
   const isBn = language === 'বাংলা';
   const [type, setType] = useState('electricity');
   const [amount, setAmount] = useState('');
   const [due, setDue] = useState(todayInput());
   const [reminder, setReminder] = useState(true);
+  const [paidBy, setPaidBy] = useState(myId);
+  const [recurring, setRecurring] = useState(false);
+  const [alreadyPaid, setAlreadyPaid] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -25,15 +26,25 @@ const BillSheet = ({ open, onClose, editing, onSave }) => {
       setAmount(String(editing.amount ?? ''));
       setDue(new Date(editing.dueDate).toISOString().slice(0, 10));
       setReminder(editing.reminder !== false);
+      setPaidBy(editing.paidBy || editing.createdBy || myId);
+      setRecurring(!!editing.recurring);
+      setAlreadyPaid(editing.status === 'paid');
     } else {
       setType('electricity');
       setAmount('');
       setDue(todayInput());
       setReminder(true);
+      setPaidBy(myId);
+      setRecurring(false);
+      setAlreadyPaid(false);
     }
-  }, [open, editing]);
+  }, [open, editing, myId]);
 
   const amt = Number(amount) || 0;
+  const memberCount = Math.max(1, roommates.length);
+  const share = amt / memberCount;
+  const dueDay = new Date(due + 'T12:00:00').getDate();
+
   return (
     <Sheet
       open={open}
@@ -45,7 +56,15 @@ const BillSheet = ({ open, onClose, editing, onSave }) => {
           className="w-full"
           disabled={amt <= 0}
           onClick={() => {
-            onSave({ type, amount: amt, dueDate: new Date(due + 'T12:00:00').toISOString(), reminder });
+            onSave({
+              type,
+              amount: amt,
+              dueDate: new Date(due + 'T12:00:00').toISOString(),
+              reminder,
+              paidBy,
+              recurring,
+              status: alreadyPaid ? 'paid' : 'unpaid',
+            });
             onClose();
           }}
         >
@@ -76,9 +95,45 @@ const BillSheet = ({ open, onClose, editing, onSave }) => {
             })}
           </div>
         </Field>
+
         <Field label={isBn ? 'পরিমাণ (মোট বিল)' : 'Amount (total bill)'}>
           <MoneyInput value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" autoFocus />
         </Field>
+
+        {/* Live equal-split hint — "your share is X". */}
+        {amt > 0 && (
+          <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 border border-emerald-100 px-3.5 py-2.5 -mt-1">
+            <Users size={15} className="text-emerald-600 shrink-0" />
+            <p className="text-[12px] font-bold text-emerald-700">
+              {isBn
+                ? `${num(memberCount, language)} জনে সমান ভাগ · আপনার ভাগ ${taka(share, language)}`
+                : `Split ${num(memberCount, language)} ways · your share ${taka(share, language)}`}
+            </p>
+          </div>
+        )}
+
+        {/* Paid by — who fronts the money (feeds balances once paid). */}
+        <Field label={isBn ? 'কে পরিশোধ করছেন' : 'Paid by'} hint={isBn ? 'পরিশোধ হলে বাকিরা এই জনকে তাদের ভাগ ফেরত দেবে।' : 'Once paid, everyone reimburses this person their share.'}>
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            {roommates.map((r) => {
+              const active = paidBy === r.id;
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setPaidBy(r.id)}
+                  className={cx('flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border shrink-0 transition active:scale-95', active ? 'border-[#ba0036] bg-[#ba0036]/5' : 'border-gray-200 bg-gray-50')}
+                >
+                  <Avatar roommate={r} size={24} />
+                  <span className={cx('text-[12px] font-bold whitespace-nowrap', active ? 'text-[#ba0036]' : 'text-gray-600')}>
+                    {r.isMe ? (isBn ? 'আপনি' : 'You') : r.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+
         <Field label={isBn ? 'শেষ তারিখ' : 'Due date'}>
           <input
             type="date"
@@ -87,6 +142,33 @@ const BillSheet = ({ open, onClose, editing, onSave }) => {
             className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ba0036]/30"
           />
         </Field>
+
+        {/* Recurring monthly bill (WiFi / electricity / water). */}
+        <div>
+          <div className="flex items-center justify-between rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3">
+            <span className="flex items-center gap-2 text-[13px] font-bold text-gray-700">
+              <RotateCcw size={16} className="text-gray-400" /> {isBn ? 'প্রতি মাসে অটো-রিপিট' : 'Repeat every month'}
+            </span>
+            <Toggle checked={recurring} onChange={setRecurring} label="recurring" />
+          </div>
+          {recurring && (
+            <p className="text-[11px] font-semibold text-violet-600 mt-1.5 px-1 flex items-center gap-1.5">
+              <CalendarClock size={12} />
+              {isBn
+                ? `প্রতি মাসের ${num(dueDay, language)} তারিখে নতুন বিল অটো তৈরি হবে।`
+                : `A new bill is auto-created on day ${dueDay} of every month.`}
+            </p>
+          )}
+        </div>
+
+        {/* Already paid — one-step "I added it and I've paid it". */}
+        <div className="flex items-center justify-between rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3">
+          <span className="flex items-center gap-2 text-[13px] font-bold text-gray-700">
+            <CircleDollarSign size={16} className="text-gray-400" /> {isBn ? 'এটি ইতিমধ্যে পরিশোধ করা হয়েছে' : 'Already paid'}
+          </span>
+          <Toggle checked={alreadyPaid} onChange={setAlreadyPaid} label="already paid" />
+        </div>
+
         <div className="flex items-center justify-between rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3">
           <span className="flex items-center gap-2 text-[13px] font-bold text-gray-700">
             <Bell size={16} className="text-gray-400" /> {isBn ? 'পেমেন্ট রিমাইন্ডার' : 'Payment reminder'}
@@ -140,8 +222,8 @@ const Bills = ({ language }) => {
   const openAdd = () => { setEditing(null); setOpen(true); };
   const openEdit = (bill) => { setEditing(bill); setOpen(true); };
   const handleSave = (data) => {
-    if (editing) updateBill(editing.id, data);
-    else addBill({ ...data, status: 'unpaid', paidDate: null });
+    if (editing) { updateBill(editing.id, data); return; }
+    addBill({ ...data, paidDate: data.status === 'paid' ? new Date().toISOString() : null });
   };
 
   // Ownership: in the connected (shared) wallet only the person who added a
@@ -165,9 +247,9 @@ const Bills = ({ language }) => {
         <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
         <p className="text-[11.5px] font-semibold text-blue-700 leading-relaxed">
           {isBn ? (
-            <>মোট বিল <b>{num(memberCount, language)} জন</b>-এর মধ্যে সমান ভাগ হয়। যিনি বিল যোগ করেন, <b>শুধু তিনিই</b> এডিট বা মুছতে পারেন।</>
+            <>মোট বিল <b>{num(memberCount, language)} জন</b>-এর মধ্যে সমান ভাগ হয়। বিল <b>পরিশোধ</b> করলে যিনি দিয়েছেন তিনি সবার কাছ থেকে তার ভাগ ফেরত পাবেন — এটি <b>ব্যালেন্স</b>-এ যোগ হয়। WiFi/কারেন্টের মতো বিলে <b>অটো-রিপিট</b> চালু করলে প্রতি মাসে নিজে থেকেই তৈরি হবে।</>
           ) : (
-            <>Each bill is split <b>equally among {num(memberCount, language)} roommates</b>. Only the person who added a bill can edit or delete it.</>
+            <>Each bill splits <b>equally among {num(memberCount, language)} roommates</b>. Mark a bill <b>paid</b> and the payer is reimbursed their share by everyone — it shows up in <b>Balances</b>. Turn on <b>Repeat monthly</b> for bills like WiFi so they’re created automatically each month.</>
           )}
         </p>
       </div>
@@ -197,6 +279,9 @@ const Bills = ({ language }) => {
           const isPaid = b.status === 'paid';
           const editable = canEdit(b);
           const creator = roommateById(roommates, b.createdBy || myId);
+          const payerId = b.paidBy || b.createdBy || myId;
+          const payer = roommateById(roommates, payerId);
+          const iPaid = payerId === myId;
           const share = (Number(b.amount) || 0) / memberCount;
           return (
             <Card key={b.id} className="p-4">
@@ -206,6 +291,9 @@ const Bills = ({ language }) => {
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-[14px] font-black text-gray-900">{isBn ? meta.bn : meta.en}</p>
                     <Chip tint={stMeta.tint} text={stMeta.text}>{isBn ? stMeta.bn : stMeta.en}</Chip>
+                    {b.recurring && (
+                      <Chip tint="bg-violet-50" text="text-violet-600"><RotateCcw size={10} /> {isBn ? 'মাসিক' : 'Monthly'}</Chip>
+                    )}
                   </div>
                   <p className="text-[11px] font-semibold text-gray-400 mt-0.5">
                     {isPaid
@@ -221,18 +309,42 @@ const Bills = ({ language }) => {
                 </div>
               </div>
 
-              {/* added-by + share detail */}
-              <div className="flex items-center gap-2 mt-2.5 pl-0.5">
-                <Avatar roommate={creator} size={22} />
-                <span className="text-[11px] font-semibold text-gray-500">
-                  {isBn ? 'যোগ করেছে' : 'Added by'}{' '}
-                  <span className="font-black text-gray-700">{creator.isMe ? (isBn ? 'আপনি' : 'You') : creator.name}</span>
-                </span>
-                <span className="text-gray-300">·</span>
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-400">
-                  <Users size={12} /> {num(memberCount, language)} {isBn ? 'জন' : 'people'}
-                </span>
-              </div>
+              {/* who paid + what it means for me (transparent per-bill breakdown) */}
+              {isPaid ? (
+                <div className="flex items-center gap-2 flex-wrap mt-2.5 pl-0.5">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Avatar roommate={payer} size={22} />
+                    <span className="text-[11px] font-semibold text-gray-500">
+                      {isBn ? 'পরিশোধ করেছে' : 'Paid by'}{' '}
+                      <span className="font-black text-gray-700">{payer.isMe ? (isBn ? 'আপনি' : 'You') : payer.name}</span>
+                    </span>
+                  </span>
+                  <span className="text-gray-300">·</span>
+                  {iPaid ? (
+                    <span className="text-[11px] font-black text-emerald-600">
+                      {isBn ? `ফেরত পাবেন ${taka(share * (memberCount - 1), language)}` : `You get back ${taka(share * (memberCount - 1), language)}`}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-black text-[#ba0036]">
+                      {isBn ? `আপনি দিবেন ${taka(share, language)}` : `You owe ${taka(share, language)}`}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 flex-wrap mt-2.5 pl-0.5">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Avatar roommate={creator} size={22} />
+                    <span className="text-[11px] font-semibold text-gray-500">
+                      {isBn ? 'যোগ করেছে' : 'Added by'}{' '}
+                      <span className="font-black text-gray-700">{creator.isMe ? (isBn ? 'আপনি' : 'You') : creator.name}</span>
+                    </span>
+                  </span>
+                  <span className="text-gray-300">·</span>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-400">
+                    <Users size={12} /> {num(memberCount, language)} {isBn ? 'জন' : 'people'}
+                  </span>
+                </div>
+              )}
 
               {/* actions */}
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
@@ -275,7 +387,7 @@ const Bills = ({ language }) => {
         })}
       </div>
 
-      <BillSheet open={open} onClose={() => setOpen(false)} editing={editing} onSave={handleSave} />
+      <BillSheet open={open} onClose={() => setOpen(false)} editing={editing} onSave={handleSave} roommates={roommates} myId={myId} language={language} />
       <ConfirmDialog
         open={!!pendingDelete}
         onClose={() => setPendingDelete(null)}
