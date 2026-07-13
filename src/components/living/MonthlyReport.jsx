@@ -56,9 +56,10 @@ const MonthlyReport = ({ language }) => {
         }
       />
 
-      {/* donut + total */}
+      {/* donut + legend (side-by-side on desktop) */}
       <Card className="p-5">
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:gap-8">
+        <div className="flex flex-col items-center shrink-0">
           <DonutChart
             data={donutData}
             size={190}
@@ -68,7 +69,7 @@ const MonthlyReport = ({ language }) => {
             centerSub={monthLabel(report.ref, language)}
           />
         </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-4 lg:mt-0 lg:flex-1">
           {report.buckets.map((b) => {
             const meta = BUCKET_META[b.key];
             const pct = report.total > 0 ? Math.round((b.amount / report.total) * 100) : 0;
@@ -81,6 +82,7 @@ const MonthlyReport = ({ language }) => {
               </div>
             );
           })}
+        </div>
         </div>
       </Card>
 

@@ -356,12 +356,16 @@ const useLivingStore = create(
         const { roommates } = get();
         const fromR = roommates.find((r) => r.id === st.from);
         const toR = roommates.find((r) => r.id === st.to);
-        set((s) => ({ settlements: [{ id: uid(), date: new Date().toISOString(), ...st }, ...s.settlements] }));
+        set((s) => ({ settlements: [{ id: uid(), date: new Date().toISOString(), createdBy: 'me', ...st }, ...s.settlements] }));
         get().pushActivity(
           'settlement',
           'Settlement completed',
           `${fromR?.name || 'Someone'} paid ${toR?.name || 'someone'} ৳${Number(st.amount).toLocaleString('en-BD')} via ${st.method}`
         );
+      },
+      deleteSettlement: (id) => {
+        if (get().connected) { runRemote(get, livingService.deleteSettlement(id)); return; }
+        set((s) => ({ settlements: s.settlements.filter((x) => x.id !== id) }));
       },
 
       // ── budgets / rent ────────────────────────────────────────────────

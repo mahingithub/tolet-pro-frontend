@@ -8,7 +8,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Minus, Plus } from 'lucide-react';
+import { X, Minus, Plus, AlertTriangle } from 'lucide-react';
 import { initials } from './livingUtils';
 
 export const cx = (...c) => c.filter(Boolean).join(' ');
@@ -290,6 +290,56 @@ export const Sheet = ({ open, onClose, title, subtitle, children, footer, maxWid
                   {footer}
                 </div>
               )}
+            </motion.div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>,
+    document.body,
+  );
+};
+
+// ── Confirm dialog ─────────────────────────────────────────────────────────────────────────
+// A small centred "are you sure?" popup for destructive actions (delete /
+// remove). Portaled to <body> and above the sheets so it always shows on top.
+export const ConfirmDialog = ({ open, onClose, onConfirm, title, message, confirmLabel, cancelLabel, tone = 'danger' }) => {
+  if (typeof document === 'undefined') return null;
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            key="cd-backdrop"
+            className="fixed inset-0 z-[120] bg-gray-900/50 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
+          <motion.div key="cd-wrap" className="fixed inset-0 z-[130] flex items-center justify-center p-5 pointer-events-none">
+            <motion.div
+              className="pointer-events-auto w-full max-w-[320px] bg-white rounded-3xl border border-gray-100 shadow-2xl p-5"
+              initial={{ scale: 0.92, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 340 }}
+            >
+              <div className={cx('w-12 h-12 rounded-2xl flex items-center justify-center mb-3.5', tone === 'danger' ? 'bg-rose-50 text-red-600' : 'bg-blue-50 text-blue-600')}>
+                <AlertTriangle size={24} strokeWidth={2.2} />
+              </div>
+              <h3 className="text-[17px] font-black text-gray-900 tracking-tight leading-tight">{title}</h3>
+              {message && <p className="text-[13px] font-semibold text-gray-500 mt-1.5 leading-relaxed">{message}</p>}
+              <div className="flex gap-2.5 mt-5">
+                <button onClick={onClose} className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-black text-sm active:scale-95 transition hover:bg-gray-200">
+                  {cancelLabel}
+                </button>
+                <button
+                  onClick={() => { onConfirm?.(); onClose(); }}
+                  className={cx('flex-1 py-3 rounded-2xl text-white font-black text-sm active:scale-95 transition', tone === 'danger' ? 'bg-[#ba0036] hover:bg-[#a0002d]' : 'bg-gray-900')}
+                >
+                  {confirmLabel}
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         </>

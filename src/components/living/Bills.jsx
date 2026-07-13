@@ -5,7 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
 import { taka, num, dateLabel, daysUntil, deriveBillStatus, isSameMonth, roommateById } from './livingUtils';
 import { BILL_TYPES, BILL_ORDER, getBillType, BILL_STATUS } from './livingConfig';
-import { Card, SectionHeader, IconBadge, Avatar, Chip, Toggle, PrimaryButton, Field, MoneyInput, Sheet, cx } from './livingUI';
+import { Card, SectionHeader, IconBadge, Avatar, Chip, Toggle, PrimaryButton, Field, MoneyInput, Sheet, ConfirmDialog, cx } from './livingUI';
 
 const todayInput = () => new Date().toISOString().slice(0, 10);
 
@@ -113,7 +113,7 @@ const Bills = ({ language }) => {
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [confirmDel, setConfirmDel] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   const memberCount = Math.max(1, roommates.length);
 
@@ -249,15 +249,9 @@ const Bills = ({ language }) => {
                       <button onClick={() => openEdit(b)} className="p-2 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition active:scale-90" aria-label="edit">
                         <Pencil size={15} />
                       </button>
-                      {confirmDel === b.id ? (
-                        <button onClick={() => { deleteBill(b.id); setConfirmDel(null); }} className="text-[11px] font-black text-red-600 bg-rose-50 px-2.5 py-1.5 rounded-lg active:scale-95 transition">
-                          {isBn ? 'নিশ্চিত?' : 'Sure?'}
-                        </button>
-                      ) : (
-                        <button onClick={() => { setConfirmDel(b.id); setTimeout(() => setConfirmDel((c) => (c === b.id ? null : c)), 3000); }} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
-                          <Trash2 size={15} />
-                        </button>
-                      )}
+                      <button onClick={() => setPendingDelete(b)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                        <Trash2 size={15} />
+                      </button>
                       {isPaid ? (
                         <button onClick={() => markBillUnpaid(b.id)} className="flex items-center gap-1.5 text-[12px] font-black text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg active:scale-95 transition ml-1">
                           <RotateCcw size={13} /> {isBn ? 'বাকি' : 'Unpay'}
@@ -282,6 +276,15 @@ const Bills = ({ language }) => {
       </div>
 
       <BillSheet open={open} onClose={() => setOpen(false)} editing={editing} onSave={handleSave} />
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => deleteBill(pendingDelete.id)}
+        title={isBn ? 'বিলটি মুছবেন?' : 'Delete this bill?'}
+        message={isBn ? 'এই বিলটি স্থায়ীভাবে মুছে যাবে, ফেরানো যাবে না।' : "This bill will be permanently removed. This can't be undone."}
+        confirmLabel={isBn ? 'মুছে ফেলুন' : 'Delete'}
+        cancelLabel={isBn ? 'বাতিল' : 'Cancel'}
+      />
     </div>
   );
 };

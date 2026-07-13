@@ -8,7 +8,7 @@ import {
 
 import useLivingStore from '../../store/useLivingStore';
 import { walletSummary, buildReminders, taka, takaSigned } from './livingUtils';
-import { Card, IconBadge, Avatar, AvatarStack, Chip, PrimaryButton, GhostButton, Field, TextInput, Sheet, cx } from './livingUI';
+import { Card, IconBadge, Avatar, AvatarStack, Chip, PrimaryButton, GhostButton, Field, TextInput, Sheet, ConfirmDialog, cx } from './livingUI';
 
 const QUICK = [
   { id: 'add-expense', icon: Receipt, tint: 'bg-blue-50', text: 'text-blue-600', en: 'Add Expense', bn: 'খরচ যোগ', module: 'expenses', intent: 'add' },
@@ -186,6 +186,7 @@ const WalletSummary = ({ go, me, language }) => {
   const [addOpen, setAddOpen] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [pendingRemove, setPendingRemove] = useState(null);
 
   const copyCode = async () => {
     try {
@@ -305,7 +306,7 @@ const WalletSummary = ({ go, me, language }) => {
                   <Chip tint="bg-gray-100" text="text-gray-500">{isBn ? 'ইনভাইটেড' : 'Invited'}</Chip>
                 )}
                 {!r.joined && !r.isMe && isOwner && (
-                  <button onClick={() => removeRoommate(r.id)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="remove">
+                  <button onClick={() => setPendingRemove(r)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="remove">
                     <X size={14} />
                   </button>
                 )}
@@ -375,6 +376,15 @@ const WalletSummary = ({ go, me, language }) => {
 
       <AddRoommateSheet open={addOpen} onClose={() => setAddOpen(false)} isBn={isBn} onAdd={addRoommate} />
       <ConnectSheet open={connectOpen} onClose={() => setConnectOpen(false)} isBn={isBn} />
+      <ConfirmDialog
+        open={!!pendingRemove}
+        onClose={() => setPendingRemove(null)}
+        onConfirm={() => removeRoommate(pendingRemove.id)}
+        title={isBn ? 'রুমমেট সরাবেন?' : 'Remove this roommate?'}
+        message={pendingRemove ? (isBn ? `${pendingRemove.name}-কে হাউসহোল্ড থেকে সরানো হবে।` : `${pendingRemove.name} will be removed from the household.`) : ''}
+        confirmLabel={isBn ? 'সরান' : 'Remove'}
+        cancelLabel={isBn ? 'বাতিল' : 'Cancel'}
+      />
     </div>
   );
 };

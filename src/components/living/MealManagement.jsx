@@ -6,7 +6,7 @@ import useLivingStore from '../../store/useLivingStore';
 import { mealSummary, taka, num, dateLabel, roommateById } from './livingUtils';
 import {
   Card, SectionHeader, IconBadge, Avatar, Stepper, HBar, PrimaryButton, Field, MoneyInput, TextInput,
-  EmptyState, Sheet, cx,
+  EmptyState, Sheet, ConfirmDialog, cx,
 } from './livingUI';
 
 const MEALS = [
@@ -90,6 +90,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
 
   const [dayOffset, setDayOffset] = useState(0);
   const [open, setOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   useEffect(() => {
     if (intent === 'add') {
@@ -255,7 +256,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                   </div>
                   <span className="text-[13px] font-black text-gray-900 shrink-0">{taka(g.amount, language)}</span>
                   {editable ? (
-                    <button onClick={() => deleteGrocery(g.id)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                    <button onClick={() => setPendingDelete(g)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
                       <Trash2 size={14} />
                     </button>
                   ) : (
@@ -271,6 +272,15 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       )}
 
       <GrocerySheet open={open} onClose={() => setOpen(false)} roommates={roommates} onSave={addGrocery} />
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => deleteGrocery(pendingDelete.id)}
+        title={isBn ? 'বাজার এন্ট্রি মুছবেন?' : 'Delete this grocery entry?'}
+        message={isBn ? 'এটি স্থায়ীভাবে মুছে যাবে, ফেরানো যাবে না।' : "This entry will be permanently removed. This can't be undone."}
+        confirmLabel={isBn ? 'মুছে ফেলুন' : 'Delete'}
+        cancelLabel={isBn ? 'বাতিল' : 'Cancel'}
+      />
     </div>
   );
 };

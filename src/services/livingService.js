@@ -65,6 +65,7 @@ export const livingService = {
 
   // settlements
   addSettlement: (s) => req('/settlements', { method: 'POST', body: s }),
+  deleteSettlement: (id) => req(`/settlements/${id}`, { method: 'DELETE' }),
 };
 
 export default livingService;
