@@ -6,6 +6,7 @@ import { ArrowLeft, Wallet, BellRing } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext.jsx';
 import useLivingStore from '../../store/useLivingStore';
+import callProvider from '../../services/callProvider';
 import { buildReminders } from './livingUtils';
 import { MODULES } from './livingConfig';
 import { cx } from './livingUI';
@@ -55,16 +56,47 @@ const Living = () => {
 
   const setMyName = useLivingStore((s) => s.setMyName);
   const roommates = useLivingStore((s) => s.roommates);
+  const connected = useLivingStore((s) => s.connected);
+  const myId = useLivingStore((s) => s.myId);
+  const hydrateHousehold = useLivingStore((s) => s.hydrateHousehold);
   // Whole-state snapshot for reminder badge (recomputes on any store change).
   const state = useLivingStore();
 
-  // Adopt the authenticated user's name for the "You" roommate the first time
-  // (only while it's still the default), so balances read naturally.
+  // Identity used across every module: my member id when connected to a shared
+  // household, else the local planner's 'me'.
+  const me = connected ? myId : ME;
+
+  // On mount: sync with the server. If the user belongs to a household we flip
+  // into connected mode; otherwise we stay on the local planner. No-op for guests.
   useEffect(() => {
-    const me = roommates.find((r) => r.isMe);
-    if (user?.name && me && me.name === 'You') setMyName(user.name);
+    const ctrl = new AbortController();
+    hydrateHousehold(ctrl.signal);
+    return () => ctrl.abort();
+  }, [hydrateHousehold]);
+
+  // Adopt the authenticated user's name for the LOCAL "You" roommate (connected
+  // member names come from each user's real account, so skip it there).
+  useEffect(() => {
+    const meMember = roommates.find((r) => r.isMe);
+    if (!connected && user?.name && meMember && meMember.name === 'You') setMyName(user.name);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.name]);
+  }, [user?.name, connected]);
+
+  // Live sync while connected: apply pushes from other members over the shared
+  // call socket, plus a periodic poll as a backstop if the socket is asleep.
+  useEffect(() => {
+    if (!connected) return undefined;
+    const socket = callProvider.getSocket();
+    const onSync = (household) => {
+      if (household) useLivingStore.getState().applyHousehold(household);
+    };
+    if (socket) socket.on('living:sync', onSync);
+    const poll = setInterval(() => hydrateHousehold(), 25000);
+    return () => {
+      if (socket) socket.off('living:sync', onSync);
+      clearInterval(poll);
+    };
+  }, [connected, hydrateHousehold]);
 
   const initialModule = useMemo(() => {
     const fromState = location.state?.module;
@@ -186,7 +218,7 @@ const Living = () => {
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
           >
-            <ActiveModule go={go} me={ME} t={t} language={language} intent={intent} clearIntent={() => setIntent(null)} />
+            <ActiveModule go={go} me={me} t={t} language={language} intent={intent} clearIntent={() => setIntent(null)} />
           </motion.div>
         </AnimatePresence>
       </main>

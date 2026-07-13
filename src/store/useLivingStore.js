@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { toast } from 'sonner';
+import livingService from '../services/livingService';
 
 /**
  * useLivingStore — client-side data layer for the "Living / Roommate Wallet"
@@ -140,37 +142,154 @@ function buildSeed() {
 
 const seed = buildSeed();
 
+// Base64 receipt images are never sent to the server (16MB doc cap); only
+// short http(s) URLs survive. Local mode keeps the full data URL.
+const stripReceipt = (o) =>
+  o && typeof o.receipt === 'string' && !/^https?:\/\//i.test(o.receipt) ? { ...o, receipt: null } : o;
+
+// Fire a connected mutation: call the API, then apply the server-authoritative
+// household it returns. On failure, surface a toast (the local state is left
+// untouched, so the next poll / retry can reconcile).
+async function runRemote(get, promise) {
+  try {
+    const { household } = await promise;
+    if (household) get().applyHousehold(household);
+    else get()._clearHousehold();
+  } catch (e) {
+    toast.error(e?.message || 'সিঙ্ক ব্যর্থ হয়েছে। ইন্টারনেট চেক করুন।');
+  }
+}
+
 const useLivingStore = create(
   persist(
     (set, get) => ({
       _v: STORE_VERSION,
       ...seed,
 
-      // ── activity log ──────────────────────────────────────────────────
+      // ── connected (household) mode ────────────────────────────────────
+      // When `connected` is true the wallet is a real shared household on the
+      // server: `myId` is my member id and all data below is server-owned.
+      // When false it's the on-device local planner (the seed above).
+      connected: false,
+      householdId: null,
+      householdName: '',
+      inviteCode: '',
+      isOwner: false,
+      myId: 'me',
+      hydrating: false,
+
+      // Replace all state from a serialized household (server-authoritative).
+      applyHousehold: (h) =>
+        set({
+          connected: true,
+          householdId: h.id,
+          householdName: h.name,
+          inviteCode: h.inviteCode,
+          isOwner: !!h.isOwner,
+          myId: h.me || 'me',
+          roommates: h.roommates || [],
+          rent: h.rent || 0,
+          monthlyIncome: h.monthlyIncome || 0,
+          budgets: h.budgets || { grocery: 0, meal: 0 },
+          expenses: h.expenses || [],
+          bills: h.bills || [],
+          meals: h.meals || [],
+          groceries: h.groceries || [],
+          settlements: h.settlements || [],
+          activities: h.activities || [],
+          hydrating: false,
+        }),
+
+      // Drop back to a fresh local planner (used after leaving a household).
+      _clearHousehold: () =>
+        set({
+          connected: false,
+          householdId: null,
+          householdName: '',
+          inviteCode: '',
+          isOwner: false,
+          myId: 'me',
+          hydrating: false,
+          ...buildSeed(),
+        }),
+
+      // Load the caller's household from the server (call on mount + polling).
+      // Never destructive on failure — keeps the last-known (offline) cache.
+      hydrateHousehold: async (signal) => {
+        if (!window.localStorage.getItem('auth:token')) return; // guest → stay local
+        set({ hydrating: true });
+        try {
+          const { household } = await livingService.getHousehold(signal);
+          if (household) get().applyHousehold(household);
+          else if (get().connected) get()._clearHousehold(); // removed elsewhere
+          else set({ connected: false, myId: 'me', hydrating: false });
+        } catch {
+          set({ hydrating: false });
+        }
+      },
+
+      createHousehold: async (name) => {
+        const { household } = await livingService.createHousehold(name);
+        get().applyHousehold(household);
+        return household;
+      },
+      joinHousehold: async (code) => {
+        const { household } = await livingService.joinHousehold(code);
+        get().applyHousehold(household);
+        return household;
+      },
+      leaveHousehold: async () => {
+        try { await livingService.leaveHousehold(); } catch { /* leave locally anyway */ }
+        get()._clearHousehold();
+      },
+      regenerateCode: async () => {
+        const { household } = await livingService.regenerateCode();
+        get().applyHousehold(household);
+        return household;
+      },
+
+      // ── activity log (local-only; server auto-logs its own) ───────────
       pushActivity: (type, title, detail) =>
         set((s) => ({
           activities: [{ id: uid(), type, title, detail, date: new Date().toISOString() }, ...s.activities].slice(0, 60),
         })),
 
       // ── roommates ─────────────────────────────────────────────────────
-      addRoommate: (name, color) =>
-        set((s) => ({ roommates: [...s.roommates, { id: uid(), name: name.trim() || 'Roommate', color: color || '#64748b', isMe: false }] })),
-
-      setMyName: (name) =>
-        set((s) => ({ roommates: s.roommates.map((r) => (r.isMe ? { ...r, name: name || r.name } : r)) })),
+      addRoommate: (name, color) => {
+        if (get().connected) { runRemote(get, livingService.addMember(name, color)); return; }
+        set((s) => ({ roommates: [...s.roommates, { id: uid(), name: name.trim() || 'Roommate', color: color || '#64748b', isMe: false }] }));
+      },
+      removeRoommate: (id) => {
+        if (get().connected) { runRemote(get, livingService.removeMember(id)); return; }
+        set((s) => ({ roommates: s.roommates.filter((r) => r.id !== id) }));
+      },
+      // Only meaningful for the local planner — connected member names come
+      // from each user's real account.
+      setMyName: (name) => {
+        if (get().connected) return;
+        set((s) => ({ roommates: s.roommates.map((r) => (r.isMe ? { ...r, name: name || r.name } : r)) }));
+      },
 
       // ── expenses ──────────────────────────────────────────────────────
       addExpense: (exp) => {
+        if (get().connected) { runRemote(get, livingService.addExpense(stripReceipt(exp))); return undefined; }
         const id = uid();
         set((s) => ({ expenses: [{ id, receipt: null, shares: {}, ...exp }, ...s.expenses] }));
         get().pushActivity('expense', 'Expense added', `${exp.note || exp.category} · ৳${Number(exp.amount).toLocaleString('en-BD')}`);
         return id;
       },
-      updateExpense: (id, patch) => set((s) => ({ expenses: s.expenses.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
-      deleteExpense: (id) => set((s) => ({ expenses: s.expenses.filter((e) => e.id !== id) })),
+      updateExpense: (id, patch) => {
+        if (get().connected) { runRemote(get, livingService.updateExpense(id, stripReceipt(patch))); return; }
+        set((s) => ({ expenses: s.expenses.map((e) => (e.id === id ? { ...e, ...patch } : e)) }));
+      },
+      deleteExpense: (id) => {
+        if (get().connected) { runRemote(get, livingService.deleteExpense(id)); return; }
+        set((s) => ({ expenses: s.expenses.filter((e) => e.id !== id) }));
+      },
 
       // ── meals + grocery pot ───────────────────────────────────────────
-      setMeal: (dateISO, roommateId, meal, value) =>
+      setMeal: (dateISO, roommateId, meal, value) => {
+        if (get().connected) { runRemote(get, livingService.setMeal({ date: dateISO, roommateId, meal, value })); return; }
         set((s) => {
           const dayKey = dateISO.slice(0, 10);
           const existing = s.meals.find((m) => m.date.slice(0, 10) === dayKey && m.roommateId === roommateId);
@@ -184,28 +303,46 @@ const useLivingStore = create(
               { id: uid(), date: new Date(dayKey + 'T12:00:00').toISOString(), roommateId, breakfast: 0, lunch: 0, dinner: 0, [meal]: v },
             ],
           };
-        }),
+        });
+      },
       addGrocery: (g) => {
+        if (get().connected) { runRemote(get, livingService.addGrocery(g)); return; }
         set((s) => ({ groceries: [{ id: uid(), date: new Date().toISOString(), ...g }, ...s.groceries] }));
         get().pushActivity('meal', 'Grocery added', `${g.note || 'Meal groceries'} · ৳${Number(g.amount).toLocaleString('en-BD')}`);
       },
-      deleteGrocery: (id) => set((s) => ({ groceries: s.groceries.filter((g) => g.id !== id) })),
+      deleteGrocery: (id) => {
+        if (get().connected) { runRemote(get, livingService.deleteGrocery(id)); return; }
+        set((s) => ({ groceries: s.groceries.filter((g) => g.id !== id) }));
+      },
 
       // ── bills ─────────────────────────────────────────────────────────
       addBill: (bill) => {
+        if (get().connected) { runRemote(get, livingService.addBill(bill)); return; }
         set((s) => ({ bills: [...s.bills, { id: uid(), status: 'unpaid', paidDate: null, reminder: true, ...bill }] }));
         get().pushActivity('bill', 'Bill added', `${bill.type} · ৳${Number(bill.amount).toLocaleString('en-BD')}`);
       },
       markBillPaid: (id) => {
+        if (get().connected) { runRemote(get, livingService.updateBill(id, { status: 'paid' })); return; }
         const bill = get().bills.find((b) => b.id === id);
         set((s) => ({ bills: s.bills.map((b) => (b.id === id ? { ...b, status: 'paid', paidDate: new Date().toISOString() } : b)) }));
         if (bill) get().pushActivity('bill', 'Bill paid', `${bill.type} · ৳${Number(bill.amount).toLocaleString('en-BD')}`);
       },
-      markBillUnpaid: (id) => set((s) => ({ bills: s.bills.map((b) => (b.id === id ? { ...b, status: 'unpaid', paidDate: null } : b)) })),
-      toggleBillReminder: (id) => set((s) => ({ bills: s.bills.map((b) => (b.id === id ? { ...b, reminder: !b.reminder } : b)) })),
+      markBillUnpaid: (id) => {
+        if (get().connected) { runRemote(get, livingService.updateBill(id, { status: 'unpaid' })); return; }
+        set((s) => ({ bills: s.bills.map((b) => (b.id === id ? { ...b, status: 'unpaid', paidDate: null } : b)) }));
+      },
+      toggleBillReminder: (id) => {
+        if (get().connected) {
+          const bill = get().bills.find((b) => b.id === id);
+          runRemote(get, livingService.updateBill(id, { reminder: !(bill && bill.reminder) }));
+          return;
+        }
+        set((s) => ({ bills: s.bills.map((b) => (b.id === id ? { ...b, reminder: !b.reminder } : b)) }));
+      },
 
       // ── settlements ───────────────────────────────────────────────────
       addSettlement: (st) => {
+        if (get().connected) { runRemote(get, livingService.addSettlement(st)); return; }
         const { roommates } = get();
         const fromR = roommates.find((r) => r.id === st.from);
         const toR = roommates.find((r) => r.id === st.to);
@@ -218,18 +355,36 @@ const useLivingStore = create(
       },
 
       // ── budgets / rent ────────────────────────────────────────────────
-      setRent: (rent) => set({ rent: Math.max(0, Number(rent) || 0) }),
-      setBudgets: (patch) => set((s) => ({ budgets: { ...s.budgets, ...patch } })),
-      setMonthlyIncome: (v) => set({ monthlyIncome: Math.max(0, Number(v) || 0) }),
+      setRent: (rent) => {
+        if (get().connected) { runRemote(get, livingService.updateConfig({ rent: Math.max(0, Number(rent) || 0) })); return; }
+        set({ rent: Math.max(0, Number(rent) || 0) });
+      },
+      setBudgets: (patch) => {
+        if (get().connected) { runRemote(get, livingService.updateConfig({ budgets: patch })); return; }
+        set((s) => ({ budgets: { ...s.budgets, ...patch } }));
+      },
+      setMonthlyIncome: (v) => {
+        if (get().connected) { runRemote(get, livingService.updateConfig({ monthlyIncome: Math.max(0, Number(v) || 0) })); return; }
+        set({ monthlyIncome: Math.max(0, Number(v) || 0) });
+      },
 
-      // ── danger zone ───────────────────────────────────────────────────
-      resetDemoData: () => set({ ...buildSeed() }),
+      // ── danger zone (local planner only) ──────────────────────────────
+      resetDemoData: () => {
+        if (get().connected) return;
+        set({ ...buildSeed() });
+      },
     }),
     {
       name: 'living-store',
       version: STORE_VERSION,
       partialize: (s) => ({
         _v: s._v,
+        connected: s.connected,
+        householdId: s.householdId,
+        householdName: s.householdName,
+        inviteCode: s.inviteCode,
+        isOwner: s.isOwner,
+        myId: s.myId,
         roommates: s.roommates,
         rent: s.rent,
         monthlyIncome: s.monthlyIncome,

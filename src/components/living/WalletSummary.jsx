@@ -1,12 +1,14 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import {
   Receipt, UtensilsCrossed, Zap, HandCoins, ArrowUpRight, ArrowDownLeft,
   Wallet, PieChart, Activity, BellRing, UserPlus, ChevronRight, Check, Info,
+  Users, Copy, LogOut, RefreshCw, Wifi, LogIn, X,
 } from 'lucide-react';
 
 import useLivingStore from '../../store/useLivingStore';
 import { walletSummary, buildReminders, taka, takaSigned } from './livingUtils';
-import { Card, IconBadge, Avatar, AvatarStack, PrimaryButton, Field, TextInput, Sheet, cx } from './livingUI';
+import { Card, IconBadge, Avatar, AvatarStack, Chip, PrimaryButton, GhostButton, Field, TextInput, Sheet, cx } from './livingUI';
 
 const QUICK = [
   { id: 'add-expense', icon: Receipt, tint: 'bg-blue-50', text: 'text-blue-600', en: 'Add Expense', bn: 'খরচ যোগ', module: 'expenses', intent: 'add' },
@@ -17,6 +19,7 @@ const QUICK = [
 
 const SWATCHES = ['#ba0036', '#1B8553', '#2563eb', '#D99B28', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
+// ── Add a roommate (works in both local + connected mode) ──────────────────
 const AddRoommateSheet = ({ open, onClose, isBn, onAdd }) => {
   const [name, setName] = useState('');
   const [color, setColor] = useState(SWATCHES[1]);
@@ -55,26 +58,98 @@ const AddRoommateSheet = ({ open, onClose, isBn, onAdd }) => {
         <Field label={isBn ? 'রঙ' : 'Colour'}>
           <div className="flex flex-wrap gap-2.5">
             {SWATCHES.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                className={cx('w-8 h-8 rounded-full transition active:scale-90', color === c ? 'ring-2 ring-offset-2 ring-gray-900' : '')}
-                style={{ background: c }}
-                aria-label={c}
-              />
+              <button key={c} type="button" onClick={() => setColor(c)} className={cx('w-8 h-8 rounded-full transition active:scale-90', color === c ? 'ring-2 ring-offset-2 ring-gray-900' : '')} style={{ background: c }} aria-label={c} />
             ))}
           </div>
         </Field>
+      </div>
+    </Sheet>
+  );
+};
 
-        <div className="flex items-start gap-2 rounded-2xl bg-blue-50 border border-blue-100 p-3">
-          <Info size={15} className="text-blue-600 shrink-0 mt-0.5" />
-          <p className="text-[11px] font-semibold text-blue-700 leading-relaxed">
-            {isBn
-              ? 'এই রুমমেট এই ডিভাইসে যোগ হবে। তারা নিজের ফোন থেকে একই ওয়ালেট ব্যবহার করতে চাইলে কানেক্টেড (ইনভাইট) ভার্সন লাগবে।'
-              : 'This roommate is added on this device. For them to share this wallet from their own phone, the connected (invite) version is needed.'}
-          </p>
+// ── Create / join a shared household ────────────────────────────────────────
+const ConnectSheet = ({ open, onClose, isBn }) => {
+  const createHousehold = useLivingStore((s) => s.createHousehold);
+  const joinHousehold = useLivingStore((s) => s.joinHousehold);
+  const [mode, setMode] = useState('create');
+  const [name, setName] = useState('');
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) { setMode('create'); setName(''); setCode(''); setBusy(false); }
+  }, [open]);
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      if (mode === 'create') {
+        await createHousehold(name.trim() || (isBn ? 'আমাদের বাসা' : 'Our Flat'));
+        toast.success(isBn ? 'হাউসহোল্ড তৈরি হয়েছে' : 'Shared household created');
+      } else {
+        await joinHousehold(code.trim().toUpperCase());
+        toast.success(isBn ? 'হাউসহোল্ডে যোগ হয়েছেন' : 'Joined the household');
+      }
+      onClose();
+    } catch (e) {
+      toast.error(e?.message || (isBn ? 'ব্যর্থ হয়েছে' : 'Something went wrong'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={isBn ? 'রুমমেট কানেক্ট করুন' : 'Connect Roommates'}
+      subtitle={isBn ? 'একটি শেয়ার্ড ওয়ালেট সবার ফোনে' : 'One shared wallet across everyone’s phones'}
+      footer={
+        <PrimaryButton className="w-full" disabled={busy || (mode === 'join' && !code.trim())} onClick={submit}>
+          {mode === 'create' ? <Users size={17} /> : <LogIn size={17} />}
+          {busy ? (isBn ? 'অপেক্ষা করুন…' : 'Please wait…') : mode === 'create' ? (isBn ? 'হাউসহোল্ড তৈরি করুন' : 'Create household') : (isBn ? 'কোড দিয়ে জয়েন' : 'Join with code')}
+        </PrimaryButton>
+      }
+    >
+      <div className="space-y-4 py-1">
+        <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-2xl">
+          {[{ id: 'create', en: 'Create', bn: 'তৈরি' }, { id: 'join', en: 'Join', bn: 'জয়েন' }].map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => setMode(o.id)}
+              className={cx('flex-1 py-2 rounded-xl text-[12px] font-black transition-all', mode === o.id ? 'bg-white text-[#ba0036] shadow-sm' : 'text-gray-500')}
+            >
+              {isBn ? o.bn : o.en}
+            </button>
+          ))}
         </div>
+
+        {mode === 'create' ? (
+          <>
+            <Field label={isBn ? 'হাউসহোল্ডের নাম' : 'Household name'}>
+              <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder={isBn ? 'যেমন: ধানমন্ডি ফ্ল্যাট' : 'e.g. Dhanmondi Flat'} autoFocus />
+            </Field>
+            <div className="flex items-start gap-2 rounded-2xl bg-blue-50 border border-blue-100 p-3">
+              <Info size={15} className="text-blue-600 shrink-0 mt-0.5" />
+              <p className="text-[11px] font-semibold text-blue-700 leading-relaxed">
+                {isBn
+                  ? 'তৈরি করার পর একটি ইনভাইট কোড পাবেন। রুমমেটদের কোডটি দিন — তারা নিজের ফোন থেকে জয়েন করে একই ওয়ালেট ব্যবহার করবে।'
+                  : 'After creating, you get an invite code. Share it with roommates so they can join from their own phones and share this one wallet.'}
+              </p>
+            </div>
+          </>
+        ) : (
+          <Field label={isBn ? 'ইনভাইট কোড' : 'Invite code'}>
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 8))}
+              placeholder="ABC123"
+              autoFocus
+              className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-center text-2xl font-black tracking-[0.35em] text-gray-900 placeholder:text-gray-300 placeholder:tracking-[0.35em] focus:outline-none focus:ring-2 focus:ring-[#ba0036]/30 uppercase"
+            />
+          </Field>
+        )}
       </div>
     </Sheet>
   );
@@ -96,12 +171,30 @@ const WalletSummary = ({ go, me, language }) => {
   const state = useLivingStore();
   const roommates = useLivingStore((s) => s.roommates);
   const addRoommate = useLivingStore((s) => s.addRoommate);
+  const removeRoommate = useLivingStore((s) => s.removeRoommate);
+  const leaveHousehold = useLivingStore((s) => s.leaveHousehold);
+  const regenerateCode = useLivingStore((s) => s.regenerateCode);
+  const connected = useLivingStore((s) => s.connected);
+  const householdName = useLivingStore((s) => s.householdName);
+  const inviteCode = useLivingStore((s) => s.inviteCode);
+  const isOwner = useLivingStore((s) => s.isOwner);
 
   const ws = useMemo(() => walletSummary(state, me), [state, me]);
   const reminders = useMemo(() => buildReminders(state, me), [state, me]);
   const positive = ws.totalBalance >= 0;
 
   const [addOpen, setAddOpen] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteCode);
+      toast.success(isBn ? 'কোড কপি হয়েছে' : 'Invite code copied');
+    } catch {
+      toast.error(isBn ? 'কপি করা যায়নি' : 'Could not copy');
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -169,28 +262,107 @@ const WalletSummary = ({ go, me, language }) => {
         </Card>
       </div>
 
-      {/* ── Roommates (with Add) ─────────────────────────────────────── */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <AvatarStack roommates={roommates} size={34} max={5} />
+      {/* ── Household / Roommates ────────────────────────────────────── */}
+      {connected ? (
+        <Card className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
             <div className="min-w-0">
-              <p className="text-[13px] font-black text-gray-900 leading-tight">
-                {roommates.length} {isBn ? 'জন রুমমেট' : roommates.length === 1 ? 'roommate' : 'roommates'}
+              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 flex items-center gap-1">
+                <Wifi size={11} /> {isBn ? 'কানেক্টেড' : 'Connected'}
               </p>
-              <p className="text-[11px] font-semibold text-gray-400 truncate max-w-[160px]">
-                {roommates.map((r) => (r.isMe ? (isBn ? 'আপনি' : 'You') : r.name)).join(', ')}
-              </p>
+              <p className="text-[15px] font-black text-gray-900 truncate">{householdName}</p>
             </div>
+            {isOwner && (
+              <button
+                onClick={async () => { try { await regenerateCode(); toast.success(isBn ? 'নতুন কোড তৈরি' : 'New code generated'); } catch (e) { toast.error(e?.message || 'Failed'); } }}
+                className="p-2 rounded-xl bg-gray-50 border border-gray-100 text-gray-500 active:scale-90 transition"
+                aria-label={isBn ? 'নতুন কোড' : 'New code'}
+              >
+                <RefreshCw size={15} />
+              </button>
+            )}
           </div>
-          <button
-            onClick={() => setAddOpen(true)}
-            className="flex items-center gap-1 bg-[#ba0036] text-white pl-2.5 pr-3 py-2 rounded-xl text-[12px] font-black shadow-[0_8px_20px_-8px_rgba(186,0,54,0.55)] active:scale-95 transition shrink-0"
-          >
-            <UserPlus size={15} /> {isBn ? 'যোগ' : 'Add'}
+
+          <button onClick={copyCode} className="w-full flex items-center justify-between rounded-2xl bg-gray-50 border border-gray-100 px-3.5 py-3 active:scale-[0.99] transition">
+            <div className="text-left">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{isBn ? 'ইনভাইট কোড' : 'Invite code'}</p>
+              <p className="text-xl font-black tracking-[0.28em] text-gray-900">{inviteCode}</p>
+            </div>
+            <span className="flex items-center gap-1 text-[#ba0036] font-black text-[12px]"><Copy size={14} /> {isBn ? 'কপি' : 'Copy'}</span>
           </button>
-        </div>
-      </Card>
+          <p className="text-[11px] font-semibold text-gray-400 -mt-1">
+            {isBn ? 'রুমমেটদের কোডটি দিন — তারা কোড দিয়ে জয়েন করবে।' : 'Share this code so roommates can join from their phones.'}
+          </p>
+
+          <div className="divide-y divide-gray-50">
+            {roommates.map((r) => (
+              <div key={r.id} className="flex items-center gap-3 py-2">
+                <Avatar roommate={r} size={32} />
+                <span className="flex-1 text-[13px] font-bold text-gray-800 truncate">{r.isMe ? (isBn ? 'আপনি' : 'You') : r.name}</span>
+                {r.joined ? (
+                  <Chip tint="bg-emerald-50" text="text-emerald-600">{isBn ? 'জয়েন্ড' : 'Joined'}</Chip>
+                ) : (
+                  <Chip tint="bg-gray-100" text="text-gray-500">{isBn ? 'ইনভাইটেড' : 'Invited'}</Chip>
+                )}
+                {!r.joined && !r.isMe && isOwner && (
+                  <button onClick={() => removeRoommate(r.id)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="remove">
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <GhostButton onClick={() => setAddOpen(true)} className="flex-1 py-2.5 text-[12px]">
+              <UserPlus size={15} /> {isBn ? 'যোগ করুন' : 'Add person'}
+            </GhostButton>
+            {confirmLeave ? (
+              <button
+                onClick={async () => { await leaveHousehold(); toast.success(isBn ? 'ছেড়ে দিয়েছেন' : 'Left household'); setConfirmLeave(false); }}
+                className="px-4 py-2.5 rounded-2xl bg-rose-50 text-red-600 text-[12px] font-black active:scale-95 transition"
+              >
+                {isBn ? 'নিশ্চিত?' : 'Confirm?'}
+              </button>
+            ) : (
+              <button
+                onClick={() => { setConfirmLeave(true); setTimeout(() => setConfirmLeave(false), 3000); }}
+                className="px-3.5 py-2.5 rounded-2xl bg-gray-100 text-gray-500 text-[12px] font-black active:scale-95 transition flex items-center gap-1.5"
+              >
+                <LogOut size={14} /> {isBn ? 'ছাড়ুন' : 'Leave'}
+              </button>
+            )}
+          </div>
+        </Card>
+      ) : (
+        <Card className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <AvatarStack roommates={roommates} size={34} max={5} />
+              <div className="min-w-0">
+                <p className="text-[13px] font-black text-gray-900 leading-tight">
+                  {roommates.length} {isBn ? 'জন রুমমেট' : roommates.length === 1 ? 'roommate' : 'roommates'}
+                </p>
+                <p className="text-[11px] font-semibold text-gray-400 truncate max-w-[160px]">
+                  {roommates.map((r) => (r.isMe ? (isBn ? 'আপনি' : 'You') : r.name)).join(', ')}
+                </p>
+              </div>
+            </div>
+            <button onClick={() => setAddOpen(true)} className="flex items-center gap-1 bg-gray-100 text-gray-700 pl-2.5 pr-3 py-2 rounded-xl text-[12px] font-black active:scale-95 transition shrink-0">
+              <UserPlus size={15} /> {isBn ? 'যোগ' : 'Add'}
+            </button>
+          </div>
+
+          <button onClick={() => setConnectOpen(true)} className="w-full flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#ba0036]/[0.07] to-transparent border border-[#ba0036]/15 px-3.5 py-3 active:scale-[0.99] transition">
+            <IconBadge icon={Users} tint="bg-[#ba0036]/10" text="text-[#ba0036]" size={40} iconSize={18} />
+            <div className="flex-1 text-left min-w-0">
+              <p className="text-[13px] font-black text-gray-900">{isBn ? 'রুমমেট কানেক্ট করুন' : 'Connect your roommates'}</p>
+              <p className="text-[11px] font-semibold text-gray-500">{isBn ? 'এক ওয়ালেট, সবার ফোনে সিঙ্ক' : 'One shared wallet, synced across phones'}</p>
+            </div>
+            <ChevronRight size={18} className="text-[#ba0036] shrink-0" />
+          </button>
+        </Card>
+      )}
 
       {/* ── More (Report / Activity / Reminders) ─────────────────────── */}
       <Card className="px-4 py-1.5">
@@ -202,6 +374,7 @@ const WalletSummary = ({ go, me, language }) => {
       </Card>
 
       <AddRoommateSheet open={addOpen} onClose={() => setAddOpen(false)} isBn={isBn} onAdd={addRoommate} />
+      <ConnectSheet open={connectOpen} onClose={() => setConnectOpen(false)} isBn={isBn} />
     </div>
   );
 };
