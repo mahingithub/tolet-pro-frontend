@@ -12,6 +12,7 @@ import { MODULES } from './livingConfig';
 import { cx } from './livingUI';
 
 import WalletSummary from './WalletSummary';
+import FeaturedRail from './FeaturedRail';
 import ExpenseSplit from './ExpenseSplit';
 import MealManagement from './MealManagement';
 import Bills from './Bills';
@@ -137,12 +138,20 @@ const Living = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-[#eaeff5] font-sans relative overflow-x-hidden text-gray-900 selection:bg-[#ba0036] selection:text-white">
-      {/* decorative orbs — same language as the dashboards */}
-      <div className="fixed top-[-18%] left-[-12%] w-[52vw] h-[52vw] bg-gradient-to-br from-[#ba0036]/10 to-transparent rounded-full blur-[120px] pointer-events-none z-0" />
-      <div className="fixed bottom-[-22%] right-[-12%] w-[52vw] h-[52vw] bg-gradient-to-tl from-emerald-500/10 to-transparent rounded-full blur-[120px] pointer-events-none z-0" />
+      {/* Decorative orbs. Promoted to their own GPU layer (translateZ + will-change)
+          so the browser re-composites instead of repainting the huge blur on every
+          scroll frame — this is what made desktop scrolling feel janky. */}
+      <div
+        className="fixed top-[-18%] left-[-12%] w-[52vw] h-[52vw] bg-gradient-to-br from-[#ba0036]/10 to-transparent rounded-full blur-[100px] pointer-events-none z-0"
+        style={{ transform: 'translateZ(0)', willChange: 'transform' }}
+      />
+      <div
+        className="fixed bottom-[-22%] right-[-12%] w-[52vw] h-[52vw] bg-gradient-to-tl from-emerald-500/10 to-transparent rounded-full blur-[100px] pointer-events-none z-0"
+        style={{ transform: 'translateZ(0)', willChange: 'transform' }}
+      />
 
       {/* ── Header (full width) ─────────────────────────────────────── */}
-      <div className="w-full max-w-6xl mx-auto z-40 relative px-4">
+      <div className="w-full max-w-6xl xl:max-w-7xl mx-auto z-40 relative px-4">
         <header className="mt-4 bg-white/60 backdrop-blur-3xl border border-white/80 rounded-[2rem] px-3.5 py-3 flex items-center justify-between gap-3 shadow-[0_8px_30px_rgb(0,0,0,0.05)]">
           <div className="flex items-center gap-2.5 min-w-0">
             <button
@@ -203,8 +212,8 @@ const Living = () => {
         </header>
       </div>
 
-      {/* ── Body: desktop sidebar + content · mobile top pills + content ── */}
-      <div className="w-full max-w-6xl mx-auto px-4 relative z-10 mt-3 lg:flex lg:gap-6 lg:items-start">
+      {/* ── Body: desktop nav + content + featured rail · mobile pills + content ── */}
+      <div className="w-full max-w-6xl xl:max-w-7xl mx-auto px-4 relative z-10 mt-3 lg:flex lg:gap-6 lg:items-start">
         {/* MOBILE: sticky segmented tab bar (5 primary modules) */}
         <div className="lg:hidden sticky top-0 z-30 -mx-4 px-4 pt-1 pb-1.5 bg-[#eaeff5]/85 backdrop-blur-xl">
           <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/70 border border-white/80 shadow-[0_6px_20px_-14px_rgba(15,23,42,0.3)]">
@@ -231,7 +240,9 @@ const Living = () => {
 
         {/* DESKTOP: vertical sidebar nav (all modules) */}
         <aside className="hidden lg:block w-60 shrink-0 lg:sticky lg:top-4">
-          <nav className="bg-white/70 backdrop-blur-xl border border-white/80 rounded-3xl p-2 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.35)] space-y-1">
+          {/* Solid bg (no backdrop-blur): this rail is sticky, so blurring its
+              backdrop every scroll frame was a desktop-jank source. */}
+          <nav className="bg-white/95 border border-white/80 rounded-3xl p-2 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.35)] space-y-1">
             {MODULES.map((m) => {
               const Icon = m.icon;
               const active = module === m.id;
@@ -275,6 +286,13 @@ const Living = () => {
             </motion.div>
           </AnimatePresence>
         </main>
+
+        {/* DESKTOP (xl+): sticky "Featured" wallet snapshot — stays pinned while
+            the module content scrolls. Gives the wide desktop a real 3-column
+            dashboard instead of one narrow mobile column. */}
+        <aside className="hidden xl:block w-72 shrink-0 xl:sticky xl:top-4 pb-12">
+          <FeaturedRail go={go} me={me} language={language} />
+        </aside>
       </div>
     </div>
   );
