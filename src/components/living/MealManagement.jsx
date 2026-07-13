@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, UtensilsCrossed, ShoppingBasket, Trash2, ChevronLeft, ChevronRight, Coffee, Sun, Moon, Check, ChefHat } from 'lucide-react';
+import { Plus, UtensilsCrossed, ShoppingBasket, Trash2, ChevronLeft, ChevronRight, Coffee, Sun, Moon, Check, ChefHat, Lock } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
-import { mealSummary, taka, num, dateLabel } from './livingUtils';
+import { mealSummary, taka, num, dateLabel, roommateById } from './livingUtils';
 import {
   Card, SectionHeader, IconBadge, Avatar, Stepper, HBar, PrimaryButton, Field, MoneyInput, TextInput,
   EmptyState, Sheet, cx,
@@ -77,9 +77,10 @@ const GrocerySheet = ({ open, onClose, roommates, onSave }) => {
   );
 };
 
-const MealManagement = ({ language, intent, clearIntent }) => {
+const MealManagement = ({ me, language, intent, clearIntent }) => {
   const isBn = language === 'বাংলা';
   const roommates = useLivingStore((s) => s.roommates);
+  const connected = useLivingStore((s) => s.connected);
   const meals = useLivingStore((s) => s.meals);
   const groceries = useLivingStore((s) => s.groceries);
   const setMeal = useLivingStore((s) => s.setMeal);
@@ -241,6 +242,8 @@ const MealManagement = ({ language, intent, clearIntent }) => {
           <div className="divide-y divide-gray-50">
             {recentGroceries.map((g) => {
               const payer = roommates.find((r) => r.id === g.paidBy);
+              const editable = !connected || !g.createdBy || g.createdBy === me;
+              const creator = roommateById(roommates, g.createdBy || me);
               return (
                 <div key={g.id} className="flex items-center gap-3 py-2.5">
                   <IconBadge icon={ShoppingBasket} tint="bg-emerald-50" text="text-emerald-600" size={36} iconSize={16} />
@@ -251,9 +254,15 @@ const MealManagement = ({ language, intent, clearIntent }) => {
                     </p>
                   </div>
                   <span className="text-[13px] font-black text-gray-900 shrink-0">{taka(g.amount, language)}</span>
-                  <button onClick={() => deleteGrocery(g.id)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
-                    <Trash2 size={14} />
-                  </button>
+                  {editable ? (
+                    <button onClick={() => deleteGrocery(g.id)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                      <Trash2 size={14} />
+                    </button>
+                  ) : (
+                    <span className="p-1.5 text-gray-300" title={isBn ? `শুধু ${creator.name} মুছতে পারবে` : `Only ${creator.name} can delete`}>
+                      <Lock size={13} />
+                    </span>
+                  )}
                 </div>
               );
             })}

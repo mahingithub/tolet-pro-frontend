@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Receipt, Trash2, Pencil, Camera, X, Check } from 'lucide-react';
+import { Plus, Receipt, Trash2, Pencil, Camera, X, Check, Lock } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
-import { expenseShares, taka, num, dateLabel, isSameMonth } from './livingUtils';
+import { expenseShares, taka, num, dateLabel, isSameMonth, roommateById } from './livingUtils';
 import { CATEGORIES, CATEGORY_ORDER, getCategory, SPLIT_TYPES } from './livingConfig';
 import {
   Card, SectionHeader, IconBadge, Avatar, AvatarStack, Chip, PrimaryButton, GhostButton,
@@ -301,6 +301,7 @@ const ExpenseSheet = ({ open, onClose, roommates, editing, onSave }) => {
 const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
   const isBn = language === 'বাংলা';
   const roommates = useLivingStore((s) => s.roommates);
+  const connected = useLivingStore((s) => s.connected);
   const expenses = useLivingStore((s) => s.expenses);
   const addExpense = useLivingStore((s) => s.addExpense);
   const updateExpense = useLivingStore((s) => s.updateExpense);
@@ -402,6 +403,9 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
             const Icon = c.icon;
             const payer = roommates.find((r) => r.id === e.paidBy);
             const myShare = expenseShares(e, roommates)[me] || 0;
+            // Only the person who added an expense may edit/delete it (shared mode).
+            const editable = !connected || !e.createdBy || e.createdBy === me;
+            const creator = roommateById(roommates, e.createdBy || me);
             return (
               <Card key={e.id} className="p-3.5">
                 <div className="flex items-center gap-3">
@@ -431,14 +435,20 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => openEdit(e)} className="p-2 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition active:scale-90" aria-label="edit">
-                      <Pencil size={15} />
-                    </button>
-                    <button onClick={() => deleteExpense(e.id)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
+                  {editable ? (
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => openEdit(e)} className="p-2 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition active:scale-90" aria-label="edit">
+                        <Pencil size={15} />
+                      </button>
+                      <button onClick={() => deleteExpense(e.id)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-[10.5px] font-bold text-gray-400">
+                      <Lock size={12} /> {isBn ? `শুধু ${creator.name}` : `Only ${creator.name}`}
+                    </span>
+                  )}
                 </div>
               </Card>
             );

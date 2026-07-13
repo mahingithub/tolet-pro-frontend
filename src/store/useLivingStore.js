@@ -274,7 +274,7 @@ const useLivingStore = create(
       addExpense: (exp) => {
         if (get().connected) { runRemote(get, livingService.addExpense(stripReceipt(exp))); return undefined; }
         const id = uid();
-        set((s) => ({ expenses: [{ id, receipt: null, shares: {}, ...exp }, ...s.expenses] }));
+        set((s) => ({ expenses: [{ id, receipt: null, shares: {}, createdBy: 'me', ...exp }, ...s.expenses] }));
         get().pushActivity('expense', 'Expense added', `${exp.note || exp.category} · ৳${Number(exp.amount).toLocaleString('en-BD')}`);
         return id;
       },
@@ -307,7 +307,7 @@ const useLivingStore = create(
       },
       addGrocery: (g) => {
         if (get().connected) { runRemote(get, livingService.addGrocery(g)); return; }
-        set((s) => ({ groceries: [{ id: uid(), date: new Date().toISOString(), ...g }, ...s.groceries] }));
+        set((s) => ({ groceries: [{ id: uid(), date: new Date().toISOString(), createdBy: 'me', ...g }, ...s.groceries] }));
         get().pushActivity('meal', 'Grocery added', `${g.note || 'Meal groceries'} · ৳${Number(g.amount).toLocaleString('en-BD')}`);
       },
       deleteGrocery: (id) => {
@@ -318,8 +318,18 @@ const useLivingStore = create(
       // ── bills ─────────────────────────────────────────────────────────
       addBill: (bill) => {
         if (get().connected) { runRemote(get, livingService.addBill(bill)); return; }
-        set((s) => ({ bills: [...s.bills, { id: uid(), status: 'unpaid', paidDate: null, reminder: true, ...bill }] }));
+        set((s) => ({ bills: [...s.bills, { id: uid(), status: 'unpaid', paidDate: null, reminder: true, createdBy: 'me', ...bill }] }));
         get().pushActivity('bill', 'Bill added', `${bill.type} · ৳${Number(bill.amount).toLocaleString('en-BD')}`);
+      },
+      // Edit a bill's details (type / amount / due date / reminder). Creator-only
+      // in connected mode — the server enforces it too.
+      updateBill: (id, patch) => {
+        if (get().connected) { runRemote(get, livingService.updateBill(id, patch)); return; }
+        set((s) => ({ bills: s.bills.map((b) => (b.id === id ? { ...b, ...patch } : b)) }));
+      },
+      deleteBill: (id) => {
+        if (get().connected) { runRemote(get, livingService.deleteBill(id)); return; }
+        set((s) => ({ bills: s.bills.filter((b) => b.id !== id) }));
       },
       markBillPaid: (id) => {
         if (get().connected) { runRemote(get, livingService.updateBill(id, { status: 'paid' })); return; }
