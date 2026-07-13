@@ -368,3 +368,75 @@ export function buildReminders(state, meId = 'me') {
   const order = { high: 0, medium: 1, low: 2 };
   return out.sort((a, b) => order[a.severity] - order[b.severity]);
 }
+
+// ── mess / meal manager (Bangladeshi mess accounting) ──────────────────────────
+// Period range: 'week' = rolling last 7 days, 'month' = current calendar month.
+export function periodRange(period = 'month') {
+  const now = new Date();
+  if (period === 'week') {
+    const start = new Date();
+    start.setDate(start.getDate() - 6);
+    start.setHours(0, 0, 0, 0);
+    return { start, end: now };
+  }
+  const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  return { start, end };
+}
+
+const inRange = (d, range) => {
+  const t = new Date(d).getTime();
+  return t >= range.start.getTime() && t <= range.end.getTime();
+};
+
+/**
+ * The heart of the mess/meal manager. For a period, computes:
+ *   • totals — deposit (জমা), meals, meal cost (bazar), meal rate, mess balance
+ *   • per member — meals, deposit, meal cost (meals × rate), balance (deposit − cost)
+ * Meal rate = total bazar cost ÷ total meals. A member's balance is what the
+ * mess owes them (+) or what they still need to deposit (−).
+ */
+export function messSummary(state, period = 'month') {
+  const range = periodRange(period);
+  const { meals = [], groceries = [], deposits = [], roommates = [] } = state;
+
+  const perMember = roommates.map((r) => ({
+    id: r.id, name: r.name, color: r.color, isMe: r.isMe,
+    meals: 0, deposit: 0, mealCost: 0, balance: 0,
+  }));
+  const byId = Object.fromEntries(perMember.map((p) => [p.id, p]));
+
+  meals.forEach((m) => {
+    if (!inRange(m.date, range)) return;
+    const p = byId[m.roommateId];
+    if (!p) return;
+    p.meals += (Number(m.breakfast) || 0) + (Number(m.lunch) || 0) + (Number(m.dinner) || 0);
+  });
+  deposits.forEach((d) => {
+    if (!inRange(d.date, range)) return;
+    const p = byId[d.roommateId];
+    if (!p) return;
+    p.deposit += Number(d.amount) || 0;
+  });
+
+  const totalMealCost = groceries.filter((g) => inRange(g.date, range)).reduce((s, g) => s + (Number(g.amount) || 0), 0);
+  const totalMeals = perMember.reduce((s, p) => s + p.meals, 0);
+  const totalDeposit = perMember.reduce((s, p) => s + p.deposit, 0);
+  const mealRate = totalMeals > 0 ? totalMealCost / totalMeals : 0;
+
+  perMember.forEach((p) => {
+    p.mealCost = p.meals * mealRate;
+    p.balance = p.deposit - p.mealCost;
+  });
+
+  return {
+    period,
+    range,
+    totalDeposit,
+    totalMeals,
+    totalMealCost,
+    mealRate,
+    messBalance: totalDeposit - totalMealCost,
+    perMember,
+  };
+}

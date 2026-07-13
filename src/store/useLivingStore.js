@@ -117,6 +117,14 @@ function buildSeed() {
   );
   settlements.push({ id: uid(), from: 'r4', to: 'me', amount: 1200, method: 'nagad', note: 'Prev month share', date: monthAgo(1, 28) });
 
+  // Mess deposits (জমা) — money each member put into the shared meal fund.
+  const deposits = [
+    { id: uid(), roommateId: 'me', amount: 3000, note: 'মাসের জমা', createdBy: 'me', date: dayThis(2) },
+    { id: uid(), roommateId: 'r2', amount: 3000, note: 'মাসের জমা', createdBy: 'r2', date: dayThis(2) },
+    { id: uid(), roommateId: 'r3', amount: 2500, note: 'জমা', createdBy: 'r3', date: dayThis(3) },
+    { id: uid(), roommateId: 'r4', amount: 2000, note: 'জমা', createdBy: 'r4', date: dayThis(5) },
+  ];
+
   const activities = [
     { id: uid(), type: 'expense', title: 'Expense added', detail: 'Weekly bazaar · ৳2,400', date: dayThis(3) },
     { id: uid(), type: 'bill', title: 'Bill paid', detail: 'Internet · ৳1,500', date: dayThis(4) },
@@ -136,6 +144,7 @@ function buildSeed() {
     meals,
     bills,
     settlements,
+    deposits,
     activities,
   };
 }
@@ -195,6 +204,7 @@ const useLivingStore = create(
           bills: h.bills || [],
           meals: h.meals || [],
           groceries: h.groceries || [],
+          deposits: h.deposits || [],
           settlements: h.settlements || [],
           activities: h.activities || [],
           hydrating: false,
@@ -368,6 +378,18 @@ const useLivingStore = create(
         set((s) => ({ settlements: s.settlements.filter((x) => x.id !== id) }));
       },
 
+      // ── mess deposits (জমা) ────────────────────────────────────────────
+      addDeposit: (d) => {
+        if (get().connected) { runRemote(get, livingService.addDeposit(d)); return; }
+        const who = get().roommates.find((r) => r.id === d.roommateId);
+        set((s) => ({ deposits: [{ id: uid(), createdBy: 'me', date: new Date().toISOString(), ...d }, ...s.deposits] }));
+        get().pushActivity('meal', 'Deposit added', `${who?.name || 'Someone'} deposited ৳${Number(d.amount).toLocaleString('en-BD')}`);
+      },
+      deleteDeposit: (id) => {
+        if (get().connected) { runRemote(get, livingService.deleteDeposit(id)); return; }
+        set((s) => ({ deposits: s.deposits.filter((x) => x.id !== id) }));
+      },
+
       // ── budgets / rent ────────────────────────────────────────────────
       setRent: (rent) => {
         if (get().connected) { runRemote(get, livingService.updateConfig({ rent: Math.max(0, Number(rent) || 0) })); return; }
@@ -408,6 +430,7 @@ const useLivingStore = create(
         meals: s.meals,
         bills: s.bills,
         settlements: s.settlements,
+        deposits: s.deposits,
         activities: s.activities,
       }),
     }

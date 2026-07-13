@@ -66,6 +66,10 @@ export const livingService = {
   // settlements
   addSettlement: (s) => req('/settlements', { method: 'POST', body: s }),
   deleteSettlement: (id) => req(`/settlements/${id}`, { method: 'DELETE' }),
+
+  // mess deposits (জমা)
+  addDeposit: (d) => req('/deposits', { method: 'POST', body: d }),
+  deleteDeposit: (id) => req(`/deposits/${id}`, { method: 'DELETE' }),
 };
 
 export default livingService;

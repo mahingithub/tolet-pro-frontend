@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, UtensilsCrossed, ShoppingBasket, Trash2, ChevronLeft, ChevronRight, Coffee, Sun, Moon, Check, ChefHat, Lock } from 'lucide-react';
+import {
+  UtensilsCrossed, ShoppingBasket, Trash2, ChevronLeft, ChevronRight, Coffee, Sun, Moon, Check, ChefHat,
+  Lock, Scale, PiggyBank, Gauge, HandCoins, Wallet, Info,
+} from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
-import { mealSummary, taka, num, dateLabel, roommateById } from './livingUtils';
+import { messSummary, taka, takaSigned, num, dateLabel, roommateById } from './livingUtils';
 import {
-  Card, SectionHeader, IconBadge, Avatar, Stepper, HBar, PrimaryButton, Field, MoneyInput, TextInput,
-  EmptyState, Sheet, ConfirmDialog, cx,
+  Card, SectionHeader, IconBadge, Avatar, Stepper, PrimaryButton, Field, MoneyInput, TextInput,
+  SegmentedControl, EmptyState, Sheet, ConfirmDialog, cx,
 } from './livingUI';
 
 const MEALS = [
@@ -22,6 +25,63 @@ const dayISO = (offset) => {
   return d.toISOString();
 };
 
+// ── Deposit (জমা) sheet ─────────────────────────────────────────────────────
+const DepositSheet = ({ open, onClose, roommates, onSave }) => {
+  const { language } = useLanguage();
+  const isBn = language === 'বাংলা';
+  const [roommateId, setRoommateId] = useState('me');
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setRoommateId(roommates.find((r) => r.isMe)?.id || roommates[0]?.id || 'me');
+      setAmount('');
+      setNote('');
+    }
+  }, [open, roommates]);
+
+  const amt = Number(amount) || 0;
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={isBn ? 'জমা দিন' : 'Add Deposit'}
+      subtitle={isBn ? 'মেস ফান্ডে টাকা জমা' : 'Money into the shared meal fund'}
+      footer={
+        <PrimaryButton className="w-full" disabled={amt <= 0} onClick={() => { onSave({ roommateId, amount: amt, note: note.trim() }); onClose(); }}>
+          <Check size={17} /> {isBn ? 'জমা যোগ করুন' : 'Add deposit'}
+        </PrimaryButton>
+      }
+    >
+      <div className="space-y-4 py-1">
+        <Field label={isBn ? 'কে জমা দিচ্ছে' : 'Who deposited'}>
+          <div className="flex gap-2 flex-wrap">
+            {roommates.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => setRoommateId(r.id)}
+                className={cx('flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border transition active:scale-95', roommateId === r.id ? 'border-[#ba0036] bg-[#ba0036]/5' : 'border-gray-200 bg-white')}
+              >
+                <Avatar roommate={r} size={26} />
+                <span className="text-[12px] font-bold text-gray-700">{r.isMe ? (isBn ? 'আপনি' : 'You') : r.name}</span>
+              </button>
+            ))}
+          </div>
+        </Field>
+        <Field label={isBn ? 'পরিমাণ' : 'Amount'}>
+          <MoneyInput value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" autoFocus />
+        </Field>
+        <Field label={isBn ? 'নোট' : 'Note'}>
+          <TextInput value={note} onChange={(e) => setNote(e.target.value)} placeholder={isBn ? 'ঐচ্ছিক' : 'Optional'} />
+        </Field>
+      </div>
+    </Sheet>
+  );
+};
+
+// ── Bazar (grocery) sheet ────────────────────────────────────────────────────
 const GrocerySheet = ({ open, onClose, roommates, onSave }) => {
   const { language } = useLanguage();
   const isBn = language === 'বাংলা';
@@ -32,21 +92,21 @@ const GrocerySheet = ({ open, onClose, roommates, onSave }) => {
   useEffect(() => {
     if (open) {
       setAmount('');
-      setPaidBy('me');
+      setPaidBy(roommates.find((r) => r.isMe)?.id || roommates[0]?.id || 'me');
       setNote('');
     }
-  }, [open]);
+  }, [open, roommates]);
 
   const amt = Number(amount) || 0;
   return (
     <Sheet
       open={open}
       onClose={onClose}
-      title={isBn ? 'বাজার খরচ' : 'Add Groceries'}
-      subtitle={isBn ? 'মিলের বাজার — মিল অনুযায়ী ভাগ হবে' : 'Meal groceries — split by meal count'}
+      title={isBn ? 'বাজার খরচ' : 'Add Bazar'}
+      subtitle={isBn ? 'মিলের বাজার — মিল অনুযায়ী ভাগ হবে' : 'Meal bazar — split by meals eaten'}
       footer={
         <PrimaryButton className="w-full" disabled={amt <= 0} onClick={() => { onSave({ amount: amt, paidBy, note: note.trim() }); onClose(); }}>
-          <Check size={17} /> {isBn ? 'যোগ করুন' : 'Add groceries'}
+          <Check size={17} /> {isBn ? 'বাজার যোগ করুন' : 'Add bazar'}
         </PrimaryButton>
       }
     >
@@ -54,7 +114,7 @@ const GrocerySheet = ({ open, onClose, roommates, onSave }) => {
         <Field label={isBn ? 'পরিমাণ' : 'Amount'}>
           <MoneyInput value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" autoFocus />
         </Field>
-        <Field label={isBn ? 'কে দিয়েছে' : 'Paid By'}>
+        <Field label={isBn ? 'কে বাজার করেছে' : 'Who shopped'}>
           <div className="flex gap-2 flex-wrap">
             {roommates.map((r) => (
               <button
@@ -70,12 +130,23 @@ const GrocerySheet = ({ open, onClose, roommates, onSave }) => {
           </div>
         </Field>
         <Field label={isBn ? 'নোট' : 'Note'}>
-          <TextInput value={note} onChange={(e) => setNote(e.target.value)} placeholder={isBn ? 'যেমন: চাল, তেল' : 'e.g. Rice, oil'} />
+          <TextInput value={note} onChange={(e) => setNote(e.target.value)} placeholder={isBn ? 'যেমন: চাল, তেল, মাছ' : 'e.g. Rice, oil, fish'} />
         </Field>
       </div>
     </Sheet>
   );
 };
+
+// A small labelled stat used in the mess summary + my-accounts.
+const MiniStat = ({ icon: Icon, label, value, valueClass = 'text-gray-900', sub }) => (
+  <div className="rounded-2xl bg-gray-50 border border-gray-100 p-3">
+    <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-gray-400">
+      {Icon && <Icon size={12} />} {label}
+    </span>
+    <p className={cx('text-[17px] font-black tracking-tight mt-1', valueClass)}>{value}</p>
+    {sub && <p className="text-[10px] font-bold text-gray-400 mt-0.5">{sub}</p>}
+  </div>
+);
 
 const MealManagement = ({ me, language, intent, clearIntent }) => {
   const isBn = language === 'বাংলা';
@@ -83,67 +154,163 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
   const connected = useLivingStore((s) => s.connected);
   const meals = useLivingStore((s) => s.meals);
   const groceries = useLivingStore((s) => s.groceries);
+  const deposits = useLivingStore((s) => s.deposits);
   const setMeal = useLivingStore((s) => s.setMeal);
   const addGrocery = useLivingStore((s) => s.addGrocery);
   const deleteGrocery = useLivingStore((s) => s.deleteGrocery);
+  const addDeposit = useLivingStore((s) => s.addDeposit);
+  const deleteDeposit = useLivingStore((s) => s.deleteDeposit);
   const state = useLivingStore();
 
+  const [period, setPeriod] = useState('month');
   const [dayOffset, setDayOffset] = useState(0);
-  const [open, setOpen] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState(null);
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [bazarOpen, setBazarOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null); // { kind, id }
 
   useEffect(() => {
     if (intent === 'add') {
-      setOpen(true);
+      setDepositOpen(true);
       clearIntent?.();
     }
   }, [intent, clearIntent]);
 
   const iso = dayISO(dayOffset);
   const dayKey = iso.slice(0, 10);
-
   const getMeal = (rid) => {
-    const m = meals.find((x) => x.date.slice(0, 10) === dayKey && x.roommateId === rid);
+    const m = (meals || []).find((x) => x.date.slice(0, 10) === dayKey && x.roommateId === rid);
     return m || { breakfast: 0, lunch: 0, dinner: 0 };
   };
 
-  const summary = useMemo(() => mealSummary(state, 0), [state]);
-  const maxCount = Math.max(1, ...summary.perRoommate.map((p) => p.count));
+  const summary = useMemo(() => messSummary(state, period), [state, period]);
+  const mine = summary.perMember.find((p) => p.id === me) || summary.perMember.find((p) => p.isMe) || summary.perMember[0];
 
-  const recentGroceries = useMemo(() => [...groceries].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5), [groceries]);
+  const recentDeposits = useMemo(() => [...(deposits || [])].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6), [deposits]);
+  const recentBazar = useMemo(() => [...(groceries || [])].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6), [groceries]);
+
+  const canEdit = (item) => !connected || !item.createdBy || item.createdBy === me;
+  const periodLabel = period === 'week' ? (isBn ? 'গত ৭ দিন' : 'Last 7 days') : (isBn ? 'এ মাস' : 'This month');
 
   return (
     <div className="space-y-4">
       <SectionHeader
-        title={isBn ? 'মিল ম্যানেজমেন্ট' : 'Meal Management'}
-        subtitle={isBn ? 'মিল গুনুন ও বাজার ভাগ করুন' : 'Track meals & split grocery cost'}
+        title={isBn ? 'মিল ম্যানেজার' : 'Meal Manager'}
+        subtitle={isBn ? 'মেস জমা, মিল, রেট ও ব্যালেন্স' : 'Mess deposits, meals, rate & balance'}
         right={
-          <button onClick={() => setOpen(true)} className="flex items-center gap-1 bg-[#ba0036] text-white pl-2.5 pr-3.5 py-2 rounded-xl text-[12px] font-black shadow-[0_8px_20px_-8px_rgba(186,0,54,0.55)] active:scale-95 transition">
-            <ShoppingBasket size={15} /> {isBn ? 'বাজার' : 'Grocery'}
+          <button onClick={() => setDepositOpen(true)} className="flex items-center gap-1 bg-[#ba0036] text-white pl-2.5 pr-3.5 py-2 rounded-xl text-[12px] font-black shadow-[0_8px_20px_-8px_rgba(186,0,54,0.55)] active:scale-95 transition">
+            <PiggyBank size={15} /> {isBn ? 'জমা' : 'Deposit'}
           </button>
         }
       />
 
-      {/* month meal totals */}
-      <div className="grid grid-cols-3 gap-2.5">
-        <Card className="p-3.5 text-center">
-          <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">{isBn ? 'মোট মিল' : 'Meals'}</p>
-          <p className="text-xl font-black text-gray-900 mt-1">{num(summary.totalMeals, language)}</p>
-        </Card>
-        <Card className="p-3.5 text-center">
-          <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">{isBn ? 'বাজার' : 'Grocery'}</p>
-          <p className="text-xl font-black text-gray-900 mt-1">{taka(summary.totalGrocery, language)}</p>
-        </Card>
-        <Card className="p-3.5 text-center">
-          <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">{isBn ? 'প্রতি মিল' : 'Per meal'}</p>
-          <p className="text-xl font-black text-[#ba0036] mt-1">{taka(summary.rate, language)}</p>
-        </Card>
+      {/* week / month toggle */}
+      <SegmentedControl
+        value={period}
+        onChange={setPeriod}
+        options={[
+          { value: 'week', label: isBn ? 'সাপ্তাহিক' : 'Weekly' },
+          { value: 'month', label: isBn ? 'মাসিক' : 'Monthly' },
+        ]}
+      />
+
+      {/* mess summary */}
+      <Card className="p-5">
+        <div className="text-center">
+          <span className="flex items-center justify-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-gray-400">
+            <Scale size={13} /> {isBn ? 'মেস ব্যালেন্স' : 'Mess Balance'} · {periodLabel}
+          </span>
+          <p className={cx('text-[32px] leading-none font-black tracking-tight mt-2', summary.messBalance >= 0 ? 'text-emerald-600' : 'text-red-600')}>
+            {takaSigned(summary.messBalance, language)}
+          </p>
+          <p className="text-[11px] font-semibold text-gray-400 mt-1.5">
+            {isBn ? 'মোট জমা − মোট মিল খরচ' : 'Total deposit − total meal cost'}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-2.5 mt-4">
+          <MiniStat icon={HandCoins} label={isBn ? 'মোট জমা' : 'Total deposit'} value={taka(summary.totalDeposit, language)} valueClass="text-emerald-600" />
+          <MiniStat icon={ShoppingBasket} label={isBn ? 'মোট মিল খরচ' : 'Meal cost'} value={taka(summary.totalMealCost, language)} />
+          <MiniStat icon={UtensilsCrossed} label={isBn ? 'মোট মিল' : 'Total meals'} value={num(summary.totalMeals, language)} />
+          <MiniStat icon={Gauge} label={isBn ? 'মিল রেট' : 'Meal rate'} value={taka(summary.mealRate, language)} valueClass="text-[#ba0036]" sub={isBn ? 'প্রতি মিল' : 'per meal'} />
+        </div>
+      </Card>
+
+      {/* quick actions */}
+      <div className="grid grid-cols-2 gap-3">
+        <button onClick={() => setDepositOpen(true)} className="flex items-center justify-center gap-2 bg-white rounded-2xl border border-gray-100 py-3.5 shadow-[0_8px_22px_-16px_rgba(15,23,42,0.3)] active:scale-95 transition">
+          <IconBadge icon={PiggyBank} tint="bg-emerald-50" text="text-emerald-600" size={34} iconSize={16} />
+          <span className="text-[13px] font-black text-gray-800">{isBn ? 'জমা দিন' : 'Add Deposit'}</span>
+        </button>
+        <button onClick={() => setBazarOpen(true)} className="flex items-center justify-center gap-2 bg-white rounded-2xl border border-gray-100 py-3.5 shadow-[0_8px_22px_-16px_rgba(15,23,42,0.3)] active:scale-95 transition">
+          <IconBadge icon={ShoppingBasket} tint="bg-amber-50" text="text-amber-600" size={34} iconSize={16} />
+          <span className="text-[13px] font-black text-gray-800">{isBn ? 'বাজার যোগ' : 'Add Bazar'}</span>
+        </button>
       </div>
+
+      {/* my accounts */}
+      {mine && (
+        <Card className="p-4">
+          <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-3 flex items-center gap-1.5">
+            <Wallet size={15} className="text-[#ba0036]" /> {isBn ? 'আমার হিসাব' : 'My Accounts'}
+          </h3>
+          <div className="grid grid-cols-4 gap-2">
+            <div className="text-center rounded-2xl bg-gray-50 border border-gray-100 py-3">
+              <p className="text-[16px] font-black text-gray-900">{num(mine.meals, language)}</p>
+              <p className="text-[9.5px] font-bold text-gray-400 mt-0.5">{isBn ? 'আমার মিল' : 'Meals'}</p>
+            </div>
+            <div className="text-center rounded-2xl bg-gray-50 border border-gray-100 py-3">
+              <p className="text-[16px] font-black text-emerald-600">{taka(mine.deposit, language)}</p>
+              <p className="text-[9.5px] font-bold text-gray-400 mt-0.5">{isBn ? 'আমার জমা' : 'Deposit'}</p>
+            </div>
+            <div className="text-center rounded-2xl bg-gray-50 border border-gray-100 py-3">
+              <p className="text-[16px] font-black text-gray-900">{taka(mine.mealCost, language)}</p>
+              <p className="text-[9.5px] font-bold text-gray-400 mt-0.5">{isBn ? 'মিল খরচ' : 'Meal cost'}</p>
+            </div>
+            <div className="text-center rounded-2xl bg-gray-50 border border-gray-100 py-3">
+              <p className={cx('text-[16px] font-black', mine.balance >= 0 ? 'text-emerald-600' : 'text-red-600')}>{takaSigned(mine.balance, language)}</p>
+              <p className="text-[9.5px] font-bold text-gray-400 mt-0.5">{isBn ? 'ব্যালেন্স' : 'Balance'}</p>
+            </div>
+          </div>
+          <p className="text-[10.5px] font-semibold text-gray-400 mt-2.5 leading-relaxed flex items-start gap-1.5">
+            <Info size={13} className="shrink-0 mt-0.5" />
+            {isBn
+              ? `ব্যালেন্স = জমা − (মিল × রেট)। + মানে আপনি ফেরত পাবেন, − মানে আরও জমা দিতে হবে।`
+              : `Balance = deposit − (meals × rate). + means you get money back, − means you owe more.`}
+          </p>
+        </Card>
+      )}
+
+      {/* everyone's account (manager table) */}
+      <Card className="p-4">
+        <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-2 flex items-center gap-1.5">
+          <UtensilsCrossed size={15} className="text-gray-400" /> {isBn ? 'সবার হিসাব' : "Everyone's account"}
+        </h3>
+        <div className="grid grid-cols-[1.5fr_0.7fr_1fr_1.05fr] gap-2 px-1 pb-2 text-[10px] font-black uppercase tracking-wider text-gray-400">
+          <span>{isBn ? 'নাম' : 'Name'}</span>
+          <span className="text-right">{isBn ? 'মিল' : 'Meals'}</span>
+          <span className="text-right">{isBn ? 'জমা' : 'Deposit'}</span>
+          <span className="text-right">{isBn ? 'ব্যালেন্স' : 'Balance'}</span>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {summary.perMember.map((p) => (
+            <div key={p.id} className="grid grid-cols-[1.5fr_0.7fr_1fr_1.05fr] gap-2 items-center py-2.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <Avatar roommate={p} size={28} />
+                <span className="text-[12.5px] font-bold text-gray-800 truncate">{p.isMe ? (isBn ? 'আপনি' : 'You') : p.name}</span>
+              </div>
+              <span className="text-right text-[12.5px] font-black text-gray-900 tabular-nums">{num(p.meals, language)}</span>
+              <span className="text-right text-[12.5px] font-bold text-gray-600 tabular-nums">{taka(p.deposit, language)}</span>
+              <span className={cx('text-right text-[12.5px] font-black tabular-nums', p.balance >= 0 ? 'text-emerald-600' : 'text-red-600')}>{takaSigned(p.balance, language)}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       {/* daily meal editor */}
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[14px] font-black text-gray-900 tracking-tight">{isBn ? 'আজকের মিল' : "Today's meals"}</h3>
+          <h3 className="text-[14px] font-black text-gray-900 tracking-tight flex items-center gap-1.5">
+            <ChefHat size={15} className="text-gray-400" /> {isBn ? 'মিল লগ' : 'Log meals'}
+          </h3>
           <div className="flex items-center gap-1">
             <button onClick={() => setDayOffset((o) => o + 1)} className="p-1.5 rounded-lg bg-gray-50 border border-gray-100 text-gray-500 active:scale-90 transition" aria-label="previous day">
               <ChevronLeft size={16} />
@@ -156,7 +323,6 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
             </button>
           </div>
         </div>
-
         <div className="space-y-2.5">
           {roommates.map((r) => {
             const m = getMeal(r.id);
@@ -187,97 +353,84 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
         </div>
       </Card>
 
-      {/* grocery cost distribution */}
+      {/* deposits list */}
       <Card className="p-4">
-        <SectionHeader title={isBn ? 'বাজার খরচ বণ্টন' : 'Grocery Cost Distribution'} subtitle={isBn ? 'মিল অনুযায়ী ভাগ' : 'Split by meals eaten'} />
-        {summary.totalMeals === 0 ? (
-          <EmptyState icon={UtensilsCrossed} title={isBn ? 'কোনো মিল নেই' : 'No meals logged'} subtitle={isBn ? 'মিল যোগ করলে বণ্টন দেখা যাবে' : 'Log meals to see the cost split'} />
+        <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-1 flex items-center gap-1.5">
+          <PiggyBank size={15} className="text-emerald-600" /> {isBn ? 'জমার হিস্ট্রি' : 'Deposits'}
+        </h3>
+        {recentDeposits.length === 0 ? (
+          <EmptyState icon={HandCoins} title={isBn ? 'কোনো জমা নেই' : 'No deposits yet'} subtitle={isBn ? 'মেস ফান্ডে টাকা জমা দিন' : 'Add money to the meal fund'} />
         ) : (
-          <div className="space-y-1">
-            {summary.perRoommate.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 py-1.5">
-                <Avatar roommate={p} size={30} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[12.5px] font-bold text-gray-800">{p.isMe ? (isBn ? 'আপনি' : 'You') : p.name}</span>
-                    <span className="text-[12.5px] font-black text-gray-900">{taka(p.cost, language)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${summary.totalMeals ? (p.count / summary.totalMeals) * 100 : 0}%`, background: p.color }} />
-                    </div>
-                    <span className="text-[10px] font-black text-gray-400 shrink-0">{num(p.count, language)} {isBn ? 'মিল' : 'meals'}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* monthly meal report */}
-      <Card className="p-4">
-        <SectionHeader title={isBn ? 'মাসিক মিল রিপোর্ট' : 'Monthly Meal Report'} subtitle={dateLabel(summary.ref, language) + (isBn ? ' থেকে' : ' →')} />
-        <div className="space-y-1">
-          {summary.perRoommate.map((p) => (
-            <HBar
-              key={p.id}
-              label={p.isMe ? (isBn ? 'আপনি' : 'You') : p.name}
-              value={p.count}
-              max={maxCount}
-              color={p.color}
-              right={`${num(p.count, language)} · ${taka(p.cost, language)}`}
-            />
-          ))}
-        </div>
-        <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-          <span className="flex items-center gap-1.5 text-[12px] font-black text-gray-500"><ChefHat size={14} /> {isBn ? 'মোট মিল খরচ' : 'Total meal cost'}</span>
-          <span className="text-[14px] font-black text-gray-900">{taka(summary.totalGrocery, language)}</span>
-        </div>
-      </Card>
-
-      {/* recent grocery entries */}
-      {recentGroceries.length > 0 && (
-        <Card className="p-4">
-          <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-1">{isBn ? 'সাম্প্রতিক বাজার' : 'Recent groceries'}</h3>
           <div className="divide-y divide-gray-50">
-            {recentGroceries.map((g) => {
-              const payer = roommates.find((r) => r.id === g.paidBy);
-              const editable = !connected || !g.createdBy || g.createdBy === me;
-              const creator = roommateById(roommates, g.createdBy || me);
+            {recentDeposits.map((d) => {
+              const who = roommateById(roommates, d.roommateId);
               return (
-                <div key={g.id} className="flex items-center gap-3 py-2.5">
-                  <IconBadge icon={ShoppingBasket} tint="bg-emerald-50" text="text-emerald-600" size={36} iconSize={16} />
+                <div key={d.id} className="flex items-center gap-3 py-2.5">
+                  <Avatar roommate={who} size={32} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12.5px] font-bold text-gray-800 truncate">{g.note || (isBn ? 'বাজার' : 'Groceries')}</p>
-                    <p className="text-[11px] font-medium text-gray-400">
-                      {payer?.isMe ? (isBn ? 'আপনি' : 'You') : payer?.name} · {dateLabel(g.date, language)}
-                    </p>
+                    <p className="text-[12.5px] font-bold text-gray-800 truncate">{who.isMe ? (isBn ? 'আপনি' : 'You') : who.name}</p>
+                    <p className="text-[11px] font-medium text-gray-400 truncate">{d.note || (isBn ? 'জমা' : 'Deposit')} · {dateLabel(d.date, language)}</p>
                   </div>
-                  <span className="text-[13px] font-black text-gray-900 shrink-0">{taka(g.amount, language)}</span>
-                  {editable ? (
-                    <button onClick={() => setPendingDelete(g)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                  <span className="text-[13px] font-black text-emerald-600 shrink-0">+{taka(d.amount, language)}</span>
+                  {canEdit(d) ? (
+                    <button onClick={() => setPendingDelete({ kind: 'deposit', id: d.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
                       <Trash2 size={14} />
                     </button>
                   ) : (
-                    <span className="p-1.5 text-gray-300" title={isBn ? `শুধু ${creator.name} মুছতে পারবে` : `Only ${creator.name} can delete`}>
-                      <Lock size={13} />
-                    </span>
+                    <span className="p-1.5 text-gray-300" title={isBn ? 'শুধু যিনি যোগ করেছেন' : 'Only the recorder'}><Lock size={13} /></span>
                   )}
                 </div>
               );
             })}
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
 
-      <GrocerySheet open={open} onClose={() => setOpen(false)} roommates={roommates} onSave={addGrocery} />
+      {/* bazar list */}
+      <Card className="p-4">
+        <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-1 flex items-center gap-1.5">
+          <ShoppingBasket size={15} className="text-amber-600" /> {isBn ? 'বাজারের হিস্ট্রি' : 'Bazar'}
+        </h3>
+        {recentBazar.length === 0 ? (
+          <EmptyState icon={ShoppingBasket} title={isBn ? 'কোনো বাজার নেই' : 'No bazar yet'} subtitle={isBn ? 'মিলের বাজার যোগ করুন' : 'Add the meal groceries'} />
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {recentBazar.map((g) => {
+              const payer = roommateById(roommates, g.paidBy);
+              return (
+                <div key={g.id} className="flex items-center gap-3 py-2.5">
+                  <IconBadge icon={ShoppingBasket} tint="bg-amber-50" text="text-amber-600" size={32} iconSize={15} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12.5px] font-bold text-gray-800 truncate">{g.note || (isBn ? 'বাজার' : 'Bazar')}</p>
+                    <p className="text-[11px] font-medium text-gray-400 truncate">{payer.isMe ? (isBn ? 'আপনি' : 'You') : payer.name} · {dateLabel(g.date, language)}</p>
+                  </div>
+                  <span className="text-[13px] font-black text-gray-900 shrink-0">{taka(g.amount, language)}</span>
+                  {canEdit(g) ? (
+                    <button onClick={() => setPendingDelete({ kind: 'grocery', id: g.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                      <Trash2 size={14} />
+                    </button>
+                  ) : (
+                    <span className="p-1.5 text-gray-300" title={isBn ? 'শুধু যিনি যোগ করেছেন' : 'Only the recorder'}><Lock size={13} /></span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      <DepositSheet open={depositOpen} onClose={() => setDepositOpen(false)} roommates={roommates} onSave={addDeposit} />
+      <GrocerySheet open={bazarOpen} onClose={() => setBazarOpen(false)} roommates={roommates} onSave={addGrocery} />
       <ConfirmDialog
         open={!!pendingDelete}
         onClose={() => setPendingDelete(null)}
-        onConfirm={() => deleteGrocery(pendingDelete.id)}
-        title={isBn ? 'বাজার এন্ট্রি মুছবেন?' : 'Delete this grocery entry?'}
-        message={isBn ? 'এটি স্থায়ীভাবে মুছে যাবে, ফেরানো যাবে না।' : "This entry will be permanently removed. This can't be undone."}
+        onConfirm={() => {
+          if (!pendingDelete) return;
+          if (pendingDelete.kind === 'deposit') deleteDeposit(pendingDelete.id);
+          else deleteGrocery(pendingDelete.id);
+        }}
+        title={pendingDelete?.kind === 'deposit' ? (isBn ? 'জমা মুছবেন?' : 'Delete this deposit?') : (isBn ? 'বাজার মুছবেন?' : 'Delete this bazar?')}
+        message={isBn ? 'এটি মুছলে হিসাব আবার আপডেট হবে।' : 'Removing this will recalculate the accounts.'}
         confirmLabel={isBn ? 'মুছে ফেলুন' : 'Delete'}
         cancelLabel={isBn ? 'বাতিল' : 'Cancel'}
       />
