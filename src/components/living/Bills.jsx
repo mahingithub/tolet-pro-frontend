@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Bell, Check, CircleDollarSign, RotateCcw, CalendarClock, Pencil, Trash2, Lock, Info, Users } from 'lucide-react';
+import { Plus, Bell, Check, CircleDollarSign, RotateCcw, CalendarClock, Pencil, Trash2, Lock, Info, Users, HandCoins } from 'lucide-react';
 
 import useLivingStore from '../../store/useLivingStore';
-import { taka, num, dateLabel, daysUntil, deriveBillStatus, isSameMonth, roommateById } from './livingUtils';
+import { taka, num, dateLabel, daysUntil, deriveBillStatus, billPaid, isSameMonth, roommateById } from './livingUtils';
 import { BILL_TYPES, BILL_ORDER, getBillType, BILL_STATUS } from './livingConfig';
-import { Card, SectionHeader, IconBadge, Avatar, Chip, Toggle, PrimaryButton, Field, MoneyInput, Sheet, ConfirmDialog, cx } from './livingUI';
+import { Card, SectionHeader, IconBadge, Avatar, Chip, Toggle, ProgressBar, PrimaryButton, Field, MoneyInput, Sheet, ConfirmDialog, cx } from './livingUI';
 
 const todayInput = () => new Date().toISOString().slice(0, 10);
 
@@ -180,55 +180,158 @@ const BillSheet = ({ open, onClose, editing, onSave, roommates = [], myId = 'me'
   );
 };
 
+// ── Pay sheet — Full / Half(partial) payment ────────────────────────────────
+const PayBillSheet = ({ open, onClose, bill, memberCount, language, onPay }) => {
+  const isBn = language === 'বাংলা';
+  const total = Number(bill?.amount) || 0;
+  const already = billPaid(bill);
+  const share = total / Math.max(1, memberCount);
+  const remaining = Math.max(0, total - already);
+  const [mode, setMode] = useState('full'); // 'full' | 'half'
+  const [amount, setAmount] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    setMode('full');
+    // Default the partial amount to the user's share (or the remaining balance
+    // if that's smaller) — "the specific amount paid (i.e. the user's share)".
+    setAmount(String(Math.round(Math.min(share, remaining || share))));
+  }, [open, bill]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const meta = bill ? getBillType(bill.type) : null;
+  const amt = mode === 'full' ? total : Number(amount) || 0;
+  const invalid = amt <= 0;
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={isBn ? 'বিল পরিশোধ' : 'Pay Bill'}
+      subtitle={bill ? `${isBn ? meta.bn : meta.en} · ${taka(total, language)}` : ''}
+      footer={
+        <PrimaryButton className="w-full" disabled={invalid} onClick={() => { onPay(amt); onClose(); }}>
+          <Check size={17} /> {isBn ? `পরিশোধ নিশ্চিত ${taka(amt, language)}` : `Confirm payment · ${taka(amt, language)}`}
+        </PrimaryButton>
+      }
+    >
+      <div className="space-y-4 py-1">
+        <div className="flex items-center justify-between rounded-2xl bg-gray-50 border border-gray-100 px-3.5 py-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">{isBn ? 'মোট বিল' : 'Total bill'}</p>
+            <p className="text-[15px] font-black text-gray-900">{taka(total, language)}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">{isBn ? 'আপনার ভাগ' : 'Your share'}</p>
+            <p className="text-[15px] font-black text-gray-900">{taka(share, language)}</p>
+          </div>
+        </div>
+
+        {already > 0 && (
+          <p className="text-[11px] font-bold text-blue-600 -mt-1 px-1">
+            {isBn ? `ইতিমধ্যে পরিশোধ ${taka(already, language)} · বাকি ${taka(remaining, language)}` : `Already paid ${taka(already, language)} · ${taka(remaining, language)} left`}
+          </p>
+        )}
+
+        <div className="grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={() => setMode('full')}
+            className={cx('flex flex-col items-start gap-1 p-3.5 rounded-2xl border text-left transition active:scale-[0.98]', mode === 'full' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 bg-gray-50')}
+          >
+            <CircleDollarSign size={18} className={mode === 'full' ? 'text-emerald-600' : 'text-gray-400'} />
+            <span className={cx('text-[13px] font-black', mode === 'full' ? 'text-emerald-700' : 'text-gray-700')}>{isBn ? 'সম্পূর্ণ' : 'Full Payment'}</span>
+            <span className="text-[11px] font-bold text-gray-400">{taka(total, language)}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('half')}
+            className={cx('flex flex-col items-start gap-1 p-3.5 rounded-2xl border text-left transition active:scale-[0.98]', mode === 'half' ? 'border-[#ba0036] bg-[#ba0036]/5' : 'border-gray-200 bg-gray-50')}
+          >
+            <HandCoins size={18} className={mode === 'half' ? 'text-[#ba0036]' : 'text-gray-400'} />
+            <span className={cx('text-[13px] font-black', mode === 'half' ? 'text-[#ba0036]' : 'text-gray-700')}>{isBn ? 'আংশিক / অর্ধেক' : 'Half / Partial'}</span>
+            <span className="text-[11px] font-bold text-gray-400">{isBn ? 'নিজের পরিমাণ' : 'enter amount'}</span>
+          </button>
+        </div>
+
+        {mode === 'half' && (
+          <Field label={isBn ? 'যত টাকা পরিশোধ করলেন (আপনার ভাগ)' : 'Amount paid (your share)'} hint={isBn ? 'এখন কত টাকা দিলেন লিখুন — বাকিটা পরে পরিশোধ করা যাবে।' : 'Enter how much is paid now — the rest can be paid later.'}>
+            <MoneyInput value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" autoFocus />
+            <div className="flex flex-wrap gap-2 mt-2">
+              <button type="button" onClick={() => setAmount(String(Math.round(share)))} className="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 text-[11px] font-black active:scale-95 transition">
+                {isBn ? 'আমার ভাগ' : 'My share'} {taka(share, language)}
+              </button>
+              <button type="button" onClick={() => setAmount(String(Math.round(total / 2)))} className="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 text-[11px] font-black active:scale-95 transition">
+                {isBn ? 'অর্ধেক' : 'Half'} {taka(total / 2, language)}
+              </button>
+              {remaining > 0 && remaining !== total && (
+                <button type="button" onClick={() => setAmount(String(Math.round(remaining)))} className="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 text-[11px] font-black active:scale-95 transition">
+                  {isBn ? 'বাকিটা' : 'Remaining'} {taka(remaining, language)}
+                </button>
+              )}
+            </div>
+          </Field>
+        )}
+      </div>
+    </Sheet>
+  );
+};
+
 const Bills = ({ language }) => {
   const isBn = language === 'বাংলা';
   const bills = useLivingStore((s) => s.bills);
   const roommates = useLivingStore((s) => s.roommates);
   const connected = useLivingStore((s) => s.connected);
   const myId = useLivingStore((s) => s.myId);
+  const isOwner = useLivingStore((s) => s.isOwner);
   const addBill = useLivingStore((s) => s.addBill);
   const updateBill = useLivingStore((s) => s.updateBill);
   const deleteBill = useLivingStore((s) => s.deleteBill);
-  const markBillPaid = useLivingStore((s) => s.markBillPaid);
+  const payBill = useLivingStore((s) => s.payBill);
   const markBillUnpaid = useLivingStore((s) => s.markBillUnpaid);
   const toggleBillReminder = useLivingStore((s) => s.toggleBillReminder);
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [paying, setPaying] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
 
   const memberCount = Math.max(1, roommates.length);
 
   const sorted = useMemo(() => {
-    const rank = { overdue: 0, 'due-soon': 1, unpaid: 2, paid: 3 };
+    const rank = { overdue: 0, 'due-soon': 1, partial: 2, unpaid: 3, paid: 4 };
     return [...bills].sort((a, b) => {
-      const ra = rank[deriveBillStatus(a)];
-      const rb = rank[deriveBillStatus(b)];
+      const ra = rank[deriveBillStatus(a)] ?? 3;
+      const rb = rank[deriveBillStatus(b)] ?? 3;
       if (ra !== rb) return ra - rb;
       return new Date(a.dueDate) - new Date(b.dueDate);
     });
   }, [bills]);
 
+  // Paid = sum of what's actually been paid this month (incl. partial);
+  // Due = the remaining balance on each bill.
   const totals = useMemo(() => {
     let due = 0;
     let paid = 0;
     bills.filter((b) => isSameMonth(b.dueDate)).forEach((b) => {
-      if (b.status === 'paid') paid += Number(b.amount) || 0;
-      else due += Number(b.amount) || 0;
+      const p = billPaid(b);
+      paid += p;
+      due += Math.max(0, (Number(b.amount) || 0) - p);
     });
     return { due, paid };
   }, [bills]);
 
   const openAdd = () => { setEditing(null); setOpen(true); };
   const openEdit = (bill) => { setEditing(bill); setOpen(true); };
+  const openPay = (bill) => setPaying(bill);
   const handleSave = (data) => {
     if (editing) { updateBill(editing.id, data); return; }
     addBill({ ...data, paidDate: data.status === 'paid' ? new Date().toISOString() : null });
   };
 
   // Ownership: in the connected (shared) wallet only the person who added a
-  // bill may change it. The local planner (single device) has no restriction.
-  const canEdit = (b) => !connected || !b.createdBy || b.createdBy === myId;
+  // bill may change it — EXCEPT the household manager (owner), who has full
+  // access to every entry. The local planner (single device) has no restriction.
+  const canEdit = (b) => !connected || !b.createdBy || b.createdBy === myId || isOwner;
 
   return (
     <div className="space-y-4">
@@ -276,7 +379,10 @@ const Bills = ({ language }) => {
           const st = deriveBillStatus(b);
           const stMeta = BILL_STATUS[st];
           const d = daysUntil(b.dueDate);
-          const isPaid = b.status === 'paid';
+          const fullyPaid = st === 'paid';
+          const partly = st === 'partial';
+          const paid = billPaid(b);
+          const remaining = Math.max(0, (Number(b.amount) || 0) - paid);
           const editable = canEdit(b);
           const creator = roommateById(roommates, b.createdBy || myId);
           const payerId = b.paidBy || b.createdBy || myId;
@@ -296,8 +402,10 @@ const Bills = ({ language }) => {
                     )}
                   </div>
                   <p className="text-[11px] font-semibold text-gray-400 mt-0.5">
-                    {isPaid
+                    {fullyPaid
                       ? isBn ? `${dateLabel(b.paidDate || b.dueDate, language)} এ পরিশোধ` : `Paid on ${dateLabel(b.paidDate || b.dueDate, language)}`
+                      : partly
+                      ? isBn ? `আংশিক · শেষ তারিখ ${dateLabel(b.dueDate, language)}` : `Partly paid · due ${dateLabel(b.dueDate, language)}`
                       : d < 0
                       ? isBn ? `শেষ তারিখ ${dateLabel(b.dueDate, language)} · ${num(Math.abs(d), language)} দিন পার` : `Due ${dateLabel(b.dueDate, language)} · ${Math.abs(d)}d overdue`
                       : isBn ? `শেষ তারিখ ${dateLabel(b.dueDate, language)}` : `Due ${dateLabel(b.dueDate, language)}`}
@@ -310,24 +418,41 @@ const Bills = ({ language }) => {
               </div>
 
               {/* who paid + what it means for me (transparent per-bill breakdown) */}
-              {isPaid ? (
-                <div className="flex items-center gap-2 flex-wrap mt-2.5 pl-0.5">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Avatar roommate={payer} size={22} />
-                    <span className="text-[11px] font-semibold text-gray-500">
-                      {isBn ? 'পরিশোধ করেছে' : 'Paid by'}{' '}
-                      <span className="font-black text-gray-700">{payer.isMe ? (isBn ? 'আপনি' : 'You') : payer.name}</span>
+              {fullyPaid || partly ? (
+                <div className="mt-2.5 pl-0.5 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Avatar roommate={payer} size={22} />
+                      <span className="text-[11px] font-semibold text-gray-500">
+                        {isBn ? 'পরিশোধ করেছে' : 'Paid by'}{' '}
+                        <span className="font-black text-gray-700">{payer.isMe ? (isBn ? 'আপনি' : 'You') : payer.name}</span>
+                      </span>
                     </span>
-                  </span>
-                  <span className="text-gray-300">·</span>
-                  {iPaid ? (
-                    <span className="text-[11px] font-black text-emerald-600">
-                      {isBn ? `ফেরত পাবেন ${taka(share * (memberCount - 1), language)}` : `You get back ${taka(share * (memberCount - 1), language)}`}
-                    </span>
-                  ) : (
-                    <span className="text-[11px] font-black text-[#ba0036]">
-                      {isBn ? `আপনি দিবেন ${taka(share, language)}` : `You owe ${taka(share, language)}`}
-                    </span>
+                    <span className="text-gray-300">·</span>
+                    {iPaid ? (
+                      <span className="text-[11px] font-black text-emerald-600">
+                        {isBn ? `ফেরত পাবেন ${taka(Math.max(0, paid - share), language)}` : `You get back ${taka(Math.max(0, paid - share), language)}`}
+                      </span>
+                    ) : fullyPaid ? (
+                      <span className="text-[11px] font-black text-[#ba0036]">
+                        {isBn ? `আপনি দিবেন ${taka(share, language)}` : `You owe ${taka(share, language)}`}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-black text-gray-600">
+                        {isBn ? `আপনার ভাগ ${taka(share, language)}` : `Your share ${taka(share, language)}`}
+                      </span>
+                    )}
+                  </div>
+                  {partly && (
+                    <div>
+                      <div className="flex items-center justify-between text-[10.5px] font-bold mb-1">
+                        <span className="text-blue-600">{isBn ? 'আংশিক পরিশোধ' : 'Partly paid'}</span>
+                        <span className="text-gray-500">
+                          {taka(paid, language)} / {taka(b.amount, language)} · {isBn ? 'বাকি' : 'left'} {taka(remaining, language)}
+                        </span>
+                      </div>
+                      <ProgressBar value={paid} max={Number(b.amount) || 0} color="#3b82f6" />
+                    </div>
                   )}
                 </div>
               ) : (
@@ -364,13 +489,14 @@ const Bills = ({ language }) => {
                       <button onClick={() => setPendingDelete(b)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
                         <Trash2 size={15} />
                       </button>
-                      {isPaid ? (
+                      {paid > 0 && (
                         <button onClick={() => markBillUnpaid(b.id)} className="flex items-center gap-1.5 text-[12px] font-black text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg active:scale-95 transition ml-1">
                           <RotateCcw size={13} /> {isBn ? 'বাকি' : 'Unpay'}
                         </button>
-                      ) : (
-                        <button onClick={() => markBillPaid(b.id)} className="flex items-center gap-1.5 text-[12px] font-black text-white bg-emerald-600 px-3.5 py-1.5 rounded-lg shadow-[0_6px_16px_-6px_rgba(16,133,83,0.6)] active:scale-95 transition ml-1">
-                          <CircleDollarSign size={14} /> {isBn ? 'পরিশোধ' : 'Mark paid'}
+                      )}
+                      {!fullyPaid && (
+                        <button onClick={() => openPay(b)} className="flex items-center gap-1.5 text-[12px] font-black text-white bg-emerald-600 px-3.5 py-1.5 rounded-lg shadow-[0_6px_16px_-6px_rgba(16,133,83,0.6)] active:scale-95 transition ml-1">
+                          <CircleDollarSign size={14} /> {isBn ? (partly ? 'বাকি পরিশোধ' : 'পরিশোধ') : 'Pay'}
                         </button>
                       )}
                     </div>
@@ -388,6 +514,7 @@ const Bills = ({ language }) => {
       </div>
 
       <BillSheet open={open} onClose={() => setOpen(false)} editing={editing} onSave={handleSave} roommates={roommates} myId={myId} language={language} />
+      <PayBillSheet open={!!paying} onClose={() => setPaying(null)} bill={paying} memberCount={memberCount} language={language} onPay={(amt) => { if (paying) payBill(paying.id, amt); }} />
       <ConfirmDialog
         open={!!pendingDelete}
         onClose={() => setPendingDelete(null)}

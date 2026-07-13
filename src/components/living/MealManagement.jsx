@@ -208,6 +208,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
   const isBn = language === 'বাংলা';
   const roommates = useLivingStore((s) => s.roommates);
   const connected = useLivingStore((s) => s.connected);
+  const isOwner = useLivingStore((s) => s.isOwner);
   const meals = useLivingStore((s) => s.meals);
   const groceries = useLivingStore((s) => s.groceries);
   const deposits = useLivingStore((s) => s.deposits);
@@ -247,7 +248,8 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
   const recentDeposits = useMemo(() => [...(deposits || [])].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6), [deposits]);
   const recentBazar = useMemo(() => [...(groceries || [])].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6), [groceries]);
 
-  const canEdit = (item) => !connected || !item.createdBy || item.createdBy === me;
+  // Manager (household owner) has full access — can delete any deposit / bazar.
+  const canEdit = (item) => !connected || !item.createdBy || item.createdBy === me || isOwner;
   const periodLabel = period === 'week' ? (isBn ? 'গত ৭ দিন' : 'Last 7 days') : (isBn ? 'এ মাস' : 'This month');
 
   return (

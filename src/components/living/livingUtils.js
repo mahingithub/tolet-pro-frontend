@@ -121,18 +121,19 @@ export function computeLedger({ expenses = [], groceries = [], meals = [], bills
     });
   });
 
-  // Paid bills feed the ledger exactly like an equal-split expense: whoever
-  // fronted the money (paidBy) is credited the full amount and every member is
-  // debited an equal share. Unpaid bills don't move balances (nobody paid yet).
+  // Paid bills feed the ledger like an equal-split expense: the payer (paidBy)
+  // is credited what they ACTUALLY paid (full or partial), while every member is
+  // debited an equal share of the full bill. For a partial payment the shortfall
+  // stays unmatched (still owed to the utility) → no phantom roommate debt.
+  // Unpaid bills don't move balances (nobody paid yet).
   bills.forEach((b) => {
-    if (b.status !== 'paid') return;
-    const amount = Number(b.amount) || 0;
-    if (amount <= 0) return;
+    const paid = billPaid(b);
+    if (paid <= 0) return;
     const payer = b.paidBy || b.createdBy;
     if (!payer) return; // can't attribute → leave balances untouched
     ensure(payer);
-    net[payer] += amount;
-    const each = amount / (roommates.length || 1);
+    net[payer] += paid;
+    const each = (Number(b.amount) || 0) / (roommates.length || 1);
     roommates.forEach((r) => {
       net[r.id] -= each;
     });
@@ -210,8 +211,9 @@ export function paymentBreakdown(state) {
   expenses.forEach((e) => bump(e.paidBy, e.category || 'other', Number(e.amount) || 0));
   groceries.forEach((g) => bump(g.paidBy, 'groceries', Number(g.amount) || 0));
   bills.forEach((b) => {
-    if (b.status !== 'paid') return;
-    bump(b.paidBy || b.createdBy, b.type || 'other', Number(b.amount) || 0);
+    const paid = billPaid(b);
+    if (paid <= 0) return;
+    bump(b.paidBy || b.createdBy, b.type || 'other', paid);
   });
 
   const grandTotal = Object.values(byMember).reduce((s, m) => s + m.total, 0);
@@ -333,9 +335,26 @@ export function walletSummary(state, meId = 'me') {
 }
 
 // ── bills ──────────────────────────────────────────────────────────────────────
-/** Effective status: 'paid' | 'overdue' | 'due-soon' | 'unpaid'. */
+/**
+ * How much has actually been paid toward a bill (clamped to its total).
+ * Supports partial payment via `paidAmount`; legacy fully-paid bills that
+ * predate the field fall back to their full amount.
+ */
+export function billPaid(bill) {
+  const total = Number(bill?.amount) || 0;
+  if (bill?.paidAmount != null && bill.paidAmount !== '') {
+    return Math.max(0, Math.min(total, Number(bill.paidAmount) || 0));
+  }
+  return bill?.status === 'paid' ? total : 0;
+}
+
+/** Effective status: 'paid' | 'partial' | 'overdue' | 'due-soon' | 'unpaid'. */
 export function deriveBillStatus(bill) {
   if (bill.status === 'paid') return 'paid';
+  const total = Number(bill.amount) || 0;
+  const paid = billPaid(bill);
+  if (paid >= total && total > 0) return 'paid';
+  if (bill.status === 'partial' || (paid > 0 && paid < total)) return 'partial';
   const diffDays = (new Date(bill.dueDate).getTime() - Date.now()) / 86400000;
   if (diffDays < 0) return 'overdue';
   if (diffDays <= 5) return 'due-soon';

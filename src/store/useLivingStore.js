@@ -144,8 +144,11 @@ const useLivingStore = create(
         get().applyHousehold(household);
         return household;
       },
-      leaveHousehold: async () => {
-        try { await livingService.leaveHousehold(); } catch { /* leave locally anyway */ }
+      // Dismiss the shared wallet. Requires the login password (verified
+      // server-side). We do NOT swallow errors here: a wrong password must keep
+      // the user in the household, so the caller surfaces the failure.
+      leaveHousehold: async (password) => {
+        await livingService.leaveHousehold(password);
         get()._clearHousehold();
       },
       regenerateCode: async () => {
@@ -237,18 +240,35 @@ const useLivingStore = create(
         if (get().connected) { runRemote(get, livingService.deleteBill(id)); return; }
         set((s) => ({ bills: s.bills.filter((b) => b.id !== id) }));
       },
-      markBillPaid: (id) => {
-        if (get().connected) { runRemote(get, livingService.updateBill(id, { status: 'paid' })); return; }
+      // Record a payment toward a bill. `amount` >= total → fully paid; 0 <
+      // amount < total → partial ("half") payment; 0 → back to unpaid. The
+      // server recomputes status from paidAmount; local mode mirrors that.
+      payBill: (id, amount) => {
+        const amt = Math.max(0, Number(amount) || 0);
+        if (get().connected) { runRemote(get, livingService.updateBill(id, { paidAmount: amt })); return; }
         const bill = get().bills.find((b) => b.id === id);
+        if (!bill) return;
+        const total = Number(bill.amount) || 0;
+        const capped = Math.min(total, amt);
         const meId = get().myId || 'me';
-        // Attribute the payment (default: me) so it flows into the balances ledger.
-        set((s) => ({ bills: s.bills.map((b) => (b.id === id ? { ...b, status: 'paid', paidDate: new Date().toISOString(), paidBy: b.paidBy || meId } : b)) }));
-        if (bill) get().pushActivity('bill', 'Bill paid', `${bill.type} · ৳${Number(bill.amount).toLocaleString('en-BD')}`);
+        let status;
+        let paidDate;
+        if (capped <= 0) { status = 'unpaid'; paidDate = null; }
+        else if (capped >= total) { status = 'paid'; paidDate = new Date().toISOString(); }
+        else { status = 'partial'; paidDate = new Date().toISOString(); }
+        set((s) => ({
+          bills: s.bills.map((b) => (b.id === id ? { ...b, status, paidAmount: capped, paidDate, paidBy: b.paidBy || meId } : b)),
+        }));
+        const fmt = (n) => Number(n).toLocaleString('en-BD');
+        const label = status === 'paid' ? 'Bill paid' : status === 'partial' ? 'Bill part-paid' : 'Bill updated';
+        const detail = status === 'partial' ? `${bill.type} · ৳${fmt(capped)} / ৳${fmt(total)}` : `${bill.type} · ৳${fmt(capped || total)}`;
+        get().pushActivity('bill', label, detail);
       },
-      markBillUnpaid: (id) => {
-        if (get().connected) { runRemote(get, livingService.updateBill(id, { status: 'unpaid' })); return; }
-        set((s) => ({ bills: s.bills.map((b) => (b.id === id ? { ...b, status: 'unpaid', paidDate: null } : b)) }));
+      markBillPaid: (id) => {
+        const bill = get().bills.find((b) => b.id === id);
+        get().payBill(id, Number(bill?.amount) || 0);
       },
+      markBillUnpaid: (id) => { get().payBill(id, 0); },
       toggleBillReminder: (id) => {
         if (get().connected) {
           const bill = get().bills.find((b) => b.id === id);

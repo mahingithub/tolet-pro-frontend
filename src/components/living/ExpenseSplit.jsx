@@ -313,6 +313,7 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
   const isBn = language === 'বাংলা';
   const roommates = useLivingStore((s) => s.roommates);
   const connected = useLivingStore((s) => s.connected);
+  const isOwner = useLivingStore((s) => s.isOwner);
   const expenses = useLivingStore((s) => s.expenses);
   const addExpense = useLivingStore((s) => s.addExpense);
   const updateExpense = useLivingStore((s) => s.updateExpense);
@@ -415,8 +416,9 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
             const Icon = c.icon;
             const payer = roommates.find((r) => r.id === e.paidBy);
             const myShare = expenseShares(e, roommates)[me] || 0;
-            // Only the person who added an expense may edit/delete it (shared mode).
-            const editable = !connected || !e.createdBy || e.createdBy === me;
+            // The person who added an expense may edit/delete it — and so can
+            // the household manager (owner), who has full access to everything.
+            const editable = !connected || !e.createdBy || e.createdBy === me || isOwner;
             const creator = roommateById(roommates, e.createdBy || me);
             return (
               <Card key={e.id} className="p-3.5">

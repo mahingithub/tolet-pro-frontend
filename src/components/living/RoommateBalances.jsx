@@ -157,6 +157,7 @@ const RoommateBalances = ({ me, language, intent, clearIntent }) => {
   const bills = useLivingStore((s) => s.bills);
   const settlements = useLivingStore((s) => s.settlements);
   const connected = useLivingStore((s) => s.connected);
+  const isOwner = useLivingStore((s) => s.isOwner);
   const addSettlement = useLivingStore((s) => s.addSettlement);
   const deleteSettlement = useLivingStore((s) => s.deleteSettlement);
 
@@ -351,7 +352,7 @@ const RoommateBalances = ({ me, language, intent, clearIntent }) => {
               const to = roommateById(roommates, s.to);
               const m = getMethod(s.method);
               const MIcon = m.icon;
-              const canDelete = !connected || !s.createdBy || s.createdBy === me;
+              const canDelete = !connected || !s.createdBy || s.createdBy === me || isOwner;
               return (
                 <div key={s.id} className="flex items-center gap-3 py-2.5">
                   <IconBadge icon={MIcon} tint={m.tint} text={m.text} size={36} iconSize={16} />

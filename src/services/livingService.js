@@ -40,7 +40,7 @@ export const livingService = {
   getHousehold: (signal) => req('/household', { signal }),
   createHousehold: (name) => req('/household', { method: 'POST', body: { name } }),
   joinHousehold: (code) => req('/household/join', { method: 'POST', body: { code } }),
-  leaveHousehold: () => req('/household/leave', { method: 'POST' }),
+  leaveHousehold: (password) => req('/household/leave', { method: 'POST', body: { password } }),
   regenerateCode: () => req('/household/regenerate-code', { method: 'POST' }),
   updateConfig: (patch) => req('/household', { method: 'PATCH', body: patch }),
 

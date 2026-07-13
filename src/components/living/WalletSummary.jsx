@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import {
   Receipt, UtensilsCrossed, Zap, HandCoins, ArrowUpRight, ArrowDownLeft,
   Wallet, PieChart, Activity, BellRing, UserPlus, ChevronRight, Check, Info,
-  Users, Copy, LogOut, RefreshCw, Wifi, LogIn, X,
+  Users, Copy, LogOut, RefreshCw, Wifi, LogIn, X, AlertTriangle, ShieldCheck,
 } from 'lucide-react';
 
 import useLivingStore from '../../store/useLivingStore';
@@ -155,6 +155,76 @@ const ConnectSheet = ({ open, onClose, isBn }) => {
   );
 };
 
+// ── Leave household — a destructive "dismiss the roommate wall" action gated
+// behind re-entering the login password (verified server-side). ──────────────
+const LeaveHouseholdSheet = ({ open, onClose, isBn, onConfirm }) => {
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) { setPassword(''); setBusy(false); }
+  }, [open]);
+
+  const submit = async () => {
+    if (!password || busy) return;
+    setBusy(true);
+    try {
+      await onConfirm(password);
+      toast.success(isBn ? 'হাউসহোল্ড ছেড়ে দিয়েছেন' : 'Left the household');
+      onClose();
+    } catch (e) {
+      const wrong = e?.code === 'invalid_password' || e?.status === 401;
+      toast.error(wrong ? (isBn ? 'পাসওয়ার্ড ভুল হয়েছে।' : 'Incorrect password.') : (e?.message || (isBn ? 'ব্যর্থ হয়েছে' : 'Something went wrong')));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={isBn ? 'রুমমেট ওয়ালেট ছাড়ুন' : 'Leave Roommate Wallet'}
+      subtitle={isBn ? 'নিশ্চিত করতে লগইন পাসওয়ার্ড দিন' : 'Re-enter your login password to confirm'}
+      footer={
+        <button
+          onClick={submit}
+          disabled={busy || !password}
+          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#ba0036] text-white px-5 py-3.5 font-black text-sm active:scale-[0.98] transition disabled:opacity-50 disabled:active:scale-100"
+        >
+          <LogOut size={17} /> {busy ? (isBn ? 'অপেক্ষা করুন…' : 'Please wait…') : (isBn ? 'হাউসহোল্ড ছাড়ুন' : 'Leave household')}
+        </button>
+      }
+    >
+      <div className="space-y-4 py-1">
+        <div className="flex items-start gap-2 rounded-2xl bg-rose-50 border border-rose-100 p-3">
+          <AlertTriangle size={15} className="text-red-600 shrink-0 mt-0.5" />
+          <p className="text-[11.5px] font-semibold text-red-700 leading-relaxed">
+            {isBn
+              ? 'আপনি এই শেয়ার্ড ওয়ালেট থেকে বেরিয়ে যাবেন। এই ডিভাইসে সিঙ্ক করা ডেটা আর দেখা যাবে না — তবে ইনভাইট কোড দিয়ে আবার জয়েন করতে পারবেন।'
+              : "You'll disconnect from this shared wallet. Its synced data won't show on this device anymore — but you can re-join anytime with the invite code."}
+          </p>
+        </div>
+        <Field label={isBn ? 'লগইন পাসওয়ার্ড' : 'Login password'}>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
+            placeholder="••••••••"
+            autoFocus
+            autoComplete="current-password"
+            className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-semibold text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ba0036]/30"
+          />
+        </Field>
+        <p className="text-[11px] font-semibold text-gray-400 flex items-center gap-1.5">
+          <ShieldCheck size={13} className="text-gray-400" />
+          {isBn ? 'নিরাপত্তার জন্য এই ধাপটি রাখা হয়েছে।' : 'This step protects your wallet from accidental removal.'}
+        </p>
+      </div>
+    </Sheet>
+  );
+};
+
 const MoreRow = ({ icon: Icon, tint, text, label, badge, onClick }) => (
   <button onClick={onClick} className="w-full flex items-center gap-3 py-2.5 active:scale-[0.99] transition">
     <IconBadge icon={Icon} tint={tint} text={text} size={38} iconSize={17} />
@@ -185,7 +255,7 @@ const WalletSummary = ({ go, me, language }) => {
 
   const [addOpen, setAddOpen] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
-  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
   const [pendingRemove, setPendingRemove] = useState(null);
 
   const copyCode = async () => {
@@ -334,21 +404,12 @@ const WalletSummary = ({ go, me, language }) => {
 
           {/* Real roommates join with the invite code above — no manual "add person" needed. */}
           <div className="pt-1">
-            {confirmLeave ? (
-              <button
-                onClick={async () => { await leaveHousehold(); toast.success(isBn ? 'ছেড়ে দিয়েছেন' : 'Left household'); setConfirmLeave(false); }}
-                className="w-full px-4 py-2.5 rounded-2xl bg-rose-50 text-red-600 text-[12px] font-black active:scale-95 transition"
-              >
-                {isBn ? 'নিশ্চিত? — ছেড়ে দিন' : 'Confirm — leave household'}
-              </button>
-            ) : (
-              <button
-                onClick={() => { setConfirmLeave(true); setTimeout(() => setConfirmLeave(false), 3000); }}
-                className="w-full px-3.5 py-2.5 rounded-2xl bg-gray-100 text-gray-500 text-[12px] font-black active:scale-95 transition flex items-center justify-center gap-1.5"
-              >
-                <LogOut size={14} /> {isBn ? 'হাউসহোল্ড ছাড়ুন' : 'Leave household'}
-              </button>
-            )}
+            <button
+              onClick={() => setLeaveOpen(true)}
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-gray-100 text-gray-500 text-[12px] font-black active:scale-95 transition flex items-center justify-center gap-1.5"
+            >
+              <LogOut size={14} /> {isBn ? 'হাউসহোল্ড ছাড়ুন' : 'Leave household'}
+            </button>
           </div>
         </Card>
       ) : (
@@ -392,6 +453,7 @@ const WalletSummary = ({ go, me, language }) => {
 
       <AddRoommateSheet open={addOpen} onClose={() => setAddOpen(false)} isBn={isBn} onAdd={addRoommate} />
       <ConnectSheet open={connectOpen} onClose={() => setConnectOpen(false)} isBn={isBn} />
+      <LeaveHouseholdSheet open={leaveOpen} onClose={() => setLeaveOpen(false)} isBn={isBn} onConfirm={leaveHousehold} />
       <ConfirmDialog
         open={!!pendingRemove}
         onClose={() => setPendingRemove(null)}

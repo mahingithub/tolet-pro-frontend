@@ -48,6 +48,7 @@ export const getBillType = (key) => BILL_TYPES[key] || CATEGORIES.other;
 // ── bill status → colour tokens ────────────────────────────────────────────────
 export const BILL_STATUS = {
   paid: { en: 'Paid', bn: 'পরিশোধিত', tint: 'bg-emerald-50', text: 'text-emerald-600', dot: '#22c55e' },
+  partial: { en: 'Partly Paid', bn: 'আংশিক', tint: 'bg-blue-50', text: 'text-blue-600', dot: '#3b82f6' },
   'due-soon': { en: 'Due Soon', bn: 'শীঘ্রই দিতে হবে', tint: 'bg-amber-50', text: 'text-amber-600', dot: '#f59e0b' },
   overdue: { en: 'Overdue', bn: 'সময় পেরিয়েছে', tint: 'bg-rose-50', text: 'text-red-600', dot: '#f43f5e' },
   unpaid: { en: 'Unpaid', bn: 'বাকি', tint: 'bg-gray-100', text: 'text-gray-600', dot: '#94a3b8' },
