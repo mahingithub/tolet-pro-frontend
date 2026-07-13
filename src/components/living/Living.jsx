@@ -288,11 +288,14 @@ const Living = () => {
         </main>
 
         {/* DESKTOP (xl+): sticky "Featured" wallet snapshot — stays pinned while
-            the module content scrolls. Gives the wide desktop a real 3-column
-            dashboard instead of one narrow mobile column. */}
-        <aside className="hidden xl:block w-72 shrink-0 xl:sticky xl:top-4 pb-12">
-          <FeaturedRail go={go} me={me} language={language} />
-        </aside>
+            the module content scrolls. Hidden on Overview (which IS the summary,
+            so a rail there just duplicates it); shown on the focused modules
+            where a persistent wallet snapshot genuinely helps. */}
+        {module !== 'overview' && (
+          <aside className="hidden xl:block w-72 shrink-0 xl:sticky xl:top-4 pb-12">
+            <FeaturedRail go={go} me={me} language={language} />
+          </aside>
+        )}
       </div>
     </div>
   );

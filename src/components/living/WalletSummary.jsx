@@ -319,6 +319,8 @@ const WalletSummary = ({ go, me, language }) => {
         ))}
       </div>
 
+      {/* Desktop: summary detail flows into two columns; mobile stays stacked. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
       {/* ── This Month + Living Cost ─────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-4">
@@ -450,6 +452,7 @@ const WalletSummary = ({ go, me, language }) => {
           <MoreRow icon={BellRing} tint="bg-rose-50" text="text-red-600" label={isBn ? 'স্মার্ট রিমাইন্ডার' : 'Smart Reminders'} badge={reminders.length} onClick={() => go('reminders')} />
         </div>
       </Card>
+      </div>
 
       <AddRoommateSheet open={addOpen} onClose={() => setAddOpen(false)} isBn={isBn} onAdd={addRoommate} />
       <ConnectSheet open={connectOpen} onClose={() => setConnectOpen(false)} isBn={isBn} />
