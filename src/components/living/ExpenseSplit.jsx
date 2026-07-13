@@ -4,7 +4,7 @@ import { Plus, Receipt, Trash2, Pencil, Camera, X, Check, Lock } from 'lucide-re
 import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
 import { expenseShares, taka, num, dateLabel, isSameMonth, roommateById } from './livingUtils';
-import { CATEGORIES, CATEGORY_ORDER, getCategory, SPLIT_TYPES } from './livingConfig';
+import { CATEGORIES, CATEGORY_ORDER, EXPENSE_CATEGORY_ORDER, getCategory, SPLIT_TYPES } from './livingConfig';
 import {
   Card, SectionHeader, IconBadge, Avatar, AvatarStack, Chip, PrimaryButton, GhostButton,
   Field, MoneyInput, TextArea, SegmentedControl, EmptyState, Sheet, ConfirmDialog, cx,
@@ -80,6 +80,12 @@ const ExpenseSheet = ({ open, onClose, roommates, editing, onSave }) => {
     [amount, splitWith, splitType, shares, roommates]
   );
 
+  // Utilities live in the Bills tab, so they're not offered here. But if we're
+  // editing an older expense saved under a utility category, keep it visible.
+  const catOptions = EXPENSE_CATEGORY_ORDER.includes(category)
+    ? EXPENSE_CATEGORY_ORDER
+    : [category, ...EXPENSE_CATEGORY_ORDER];
+
   const toggleMember = (id) =>
     setSplitWith((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
@@ -135,9 +141,9 @@ const ExpenseSheet = ({ open, onClose, roommates, editing, onSave }) => {
         </Field>
 
         <Field label={isBn ? 'ক্যাটাগরি' : 'Category'}>
-          <div className="grid grid-cols-3 gap-2">
-            {CATEGORY_ORDER.map((key) => {
-              const c = CATEGORIES[key];
+          <div className="grid grid-cols-4 gap-2">
+            {catOptions.map((key) => {
+              const c = CATEGORIES[key] || CATEGORIES.other;
               const Icon = c.icon;
               const active = category === key;
               return (
@@ -158,6 +164,11 @@ const ExpenseSheet = ({ open, onClose, roommates, editing, onSave }) => {
               );
             })}
           </div>
+          <p className="text-[10.5px] font-semibold text-gray-400 mt-2 leading-relaxed">
+            {isBn
+              ? 'বিদ্যুৎ, গ্যাস, পানি, ইন্টারনেট? সেগুলো "বিল" ট্যাবে যোগ করুন — তাহলে একই খরচ দুইবার হিসাব হবে না।'
+              : 'Electricity, gas, water, internet? Add those in the Bills tab so the same cost isn’t counted twice.'}
+          </p>
         </Field>
 
         <Field label={isBn ? 'কে দিয়েছে' : 'Paid By'}>

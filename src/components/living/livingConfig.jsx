@@ -28,6 +28,11 @@ export const CATEGORIES = {
 
 export const CATEGORY_ORDER = ['electricity', 'gas', 'water', 'wifi', 'groceries', 'maid', 'cleaning', 'internet', 'other'];
 
+// Categories offered when ADDING a shared expense. Utilities (electricity, gas,
+// water, wifi, internet) are intentionally excluded here — those belong in the
+// Bills tab, so the same cost can't be entered (and counted) in two places.
+export const EXPENSE_CATEGORY_ORDER = ['groceries', 'maid', 'cleaning', 'other'];
+
 export const getCategory = (key) => CATEGORIES[key] || CATEGORIES.other;
 
 // ── bills ─────────────────────────────────────────────────────────────────────
