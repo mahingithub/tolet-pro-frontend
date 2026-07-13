@@ -422,7 +422,12 @@ export function messSummary(state, period = 'month') {
   const totalMealCost = groceries.filter((g) => inRange(g.date, range)).reduce((s, g) => s + (Number(g.amount) || 0), 0);
   const totalMeals = perMember.reduce((s, p) => s + p.meals, 0);
   const totalDeposit = perMember.reduce((s, p) => s + p.deposit, 0);
-  const mealRate = totalMeals > 0 ? totalMealCost / totalMeals : 0;
+
+  // Rate is either auto (bazar ÷ meals) or a fixed value the manager set.
+  const autoRate = totalMeals > 0 ? totalMealCost / totalMeals : 0;
+  const manualRate = Number(state.mealRate) || 0;
+  const rateMode = manualRate > 0 ? 'manual' : 'auto';
+  const mealRate = manualRate > 0 ? manualRate : autoRate;
 
   perMember.forEach((p) => {
     p.mealCost = p.meals * mealRate;
@@ -436,6 +441,8 @@ export function messSummary(state, period = 'month') {
     totalMeals,
     totalMealCost,
     mealRate,
+    autoRate,
+    rateMode,
     messBalance: totalDeposit - totalMealCost,
     perMember,
   };

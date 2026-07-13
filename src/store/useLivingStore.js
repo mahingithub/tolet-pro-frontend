@@ -138,6 +138,7 @@ function buildSeed() {
     roommates: [...SEED_ROOMMATES],
     rent: 18000,
     monthlyIncome: 60000, // household budget baseline used for the Savings figure
+    mealRate: 0, // 0 = auto (bazar ÷ meals); > 0 = fixed rate the manager set
     budgets: { grocery: 4000, meal: 8000 }, // monthly caps → drive budget reminders
     expenses,
     groceries,
@@ -199,6 +200,7 @@ const useLivingStore = create(
           roommates: h.roommates || [],
           rent: h.rent || 0,
           monthlyIncome: h.monthlyIncome || 0,
+          mealRate: h.mealRate || 0,
           budgets: h.budgets || { grocery: 0, meal: 0 },
           expenses: h.expenses || [],
           bills: h.bills || [],
@@ -403,6 +405,12 @@ const useLivingStore = create(
         if (get().connected) { runRemote(get, livingService.updateConfig({ monthlyIncome: Math.max(0, Number(v) || 0) })); return; }
         set({ monthlyIncome: Math.max(0, Number(v) || 0) });
       },
+      // Fixed meal rate (৳/meal). Pass 0 to go back to auto (bazar ÷ meals).
+      setMealRate: (v) => {
+        const val = Math.max(0, Number(v) || 0);
+        if (get().connected) { runRemote(get, livingService.updateConfig({ mealRate: val })); return; }
+        set({ mealRate: val });
+      },
 
       // ── danger zone (local planner only) ──────────────────────────────
       resetDemoData: () => {
@@ -424,6 +432,7 @@ const useLivingStore = create(
         roommates: s.roommates,
         rent: s.rent,
         monthlyIncome: s.monthlyIncome,
+        mealRate: s.mealRate,
         budgets: s.budgets,
         expenses: s.expenses,
         groceries: s.groceries,

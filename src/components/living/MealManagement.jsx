@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   UtensilsCrossed, ShoppingBasket, Trash2, ChevronLeft, ChevronRight, Coffee, Sun, Moon, Check, ChefHat,
-  Lock, Scale, PiggyBank, Gauge, HandCoins, Wallet, Info,
+  Lock, Scale, PiggyBank, Gauge, HandCoins, Wallet, Info, Pencil,
 } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
@@ -137,6 +137,62 @@ const GrocerySheet = ({ open, onClose, roommates, onSave }) => {
   );
 };
 
+// ── Meal rate (মিল রেট) sheet — auto or a fixed rate the manager sets ─────────
+const RateSheet = ({ open, onClose, autoRate, current, onSave, language }) => {
+  const isBn = language === 'বাংলা';
+  const [mode, setMode] = useState(current > 0 ? 'manual' : 'auto');
+  const [value, setValue] = useState(current > 0 ? String(current) : '');
+
+  useEffect(() => {
+    if (open) {
+      setMode(current > 0 ? 'manual' : 'auto');
+      setValue(current > 0 ? String(current) : '');
+    }
+  }, [open, current]);
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={isBn ? 'মিল রেট সেট করুন' : 'Set Meal Rate'}
+      subtitle={isBn ? 'অটো নাকি নির্দিষ্ট রেট' : 'Auto or a fixed rate'}
+      footer={
+        <PrimaryButton className="w-full" onClick={() => { onSave(mode === 'manual' ? (Number(value) || 0) : 0); onClose(); }}>
+          <Check size={17} /> {isBn ? 'সেভ করুন' : 'Save rate'}
+        </PrimaryButton>
+      }
+    >
+      <div className="space-y-4 py-1">
+        <SegmentedControl
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'auto', label: isBn ? 'অটো' : 'Auto' },
+            { value: 'manual', label: isBn ? 'নির্দিষ্ট রেট' : 'Fixed rate' },
+          ]}
+        />
+        {mode === 'auto' ? (
+          <div className="flex items-start gap-2 rounded-2xl bg-blue-50 border border-blue-100 p-3">
+            <Info size={15} className="text-blue-600 shrink-0 mt-0.5" />
+            <p className="text-[11.5px] font-semibold text-blue-700 leading-relaxed">
+              {isBn
+                ? `রেট স্বয়ংক্রিয়ভাবে হিসাব হবে = মোট বাজার ÷ মোট মিল। এখন ≈ ${taka(autoRate, language)} প্রতি মিল।`
+                : `Rate is calculated automatically = total bazar ÷ total meals. Currently ≈ ${taka(autoRate, language)} per meal.`}
+            </p>
+          </div>
+        ) : (
+          <Field
+            label={isBn ? 'নির্দিষ্ট রেট (৳/মিল)' : 'Fixed rate (৳ per meal)'}
+            hint={isBn ? `অটো রেট এখন ≈ ${taka(autoRate, language)}` : `Auto rate is currently ≈ ${taka(autoRate, language)}`}
+          >
+            <MoneyInput value={value} onChange={(e) => setValue(e.target.value)} placeholder="0" autoFocus />
+          </Field>
+        )}
+      </div>
+    </Sheet>
+  );
+};
+
 // A small labelled stat used in the mess summary + my-accounts.
 const MiniStat = ({ icon: Icon, label, value, valueClass = 'text-gray-900', sub }) => (
   <div className="rounded-2xl bg-gray-50 border border-gray-100 p-3">
@@ -155,6 +211,8 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
   const meals = useLivingStore((s) => s.meals);
   const groceries = useLivingStore((s) => s.groceries);
   const deposits = useLivingStore((s) => s.deposits);
+  const mealRateSetting = useLivingStore((s) => s.mealRate);
+  const setMealRate = useLivingStore((s) => s.setMealRate);
   const setMeal = useLivingStore((s) => s.setMeal);
   const addGrocery = useLivingStore((s) => s.addGrocery);
   const deleteGrocery = useLivingStore((s) => s.deleteGrocery);
@@ -166,6 +224,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
   const [dayOffset, setDayOffset] = useState(0);
   const [depositOpen, setDepositOpen] = useState(false);
   const [bazarOpen, setBazarOpen] = useState(false);
+  const [rateOpen, setRateOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null); // { kind, id }
 
   useEffect(() => {
@@ -230,7 +289,18 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
           <MiniStat icon={HandCoins} label={isBn ? 'মোট জমা' : 'Total deposit'} value={taka(summary.totalDeposit, language)} valueClass="text-emerald-600" />
           <MiniStat icon={ShoppingBasket} label={isBn ? 'মোট মিল খরচ' : 'Meal cost'} value={taka(summary.totalMealCost, language)} />
           <MiniStat icon={UtensilsCrossed} label={isBn ? 'মোট মিল' : 'Total meals'} value={num(summary.totalMeals, language)} />
-          <MiniStat icon={Gauge} label={isBn ? 'মিল রেট' : 'Meal rate'} value={taka(summary.mealRate, language)} valueClass="text-[#ba0036]" sub={isBn ? 'প্রতি মিল' : 'per meal'} />
+          <button onClick={() => setRateOpen(true)} className="rounded-2xl bg-gray-50 border border-gray-100 p-3 text-left active:scale-95 transition">
+            <span className="flex items-center justify-between">
+              <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-gray-400">
+                <Gauge size={12} /> {isBn ? 'মিল রেট' : 'Meal rate'}
+              </span>
+              <Pencil size={12} className="text-gray-400" />
+            </span>
+            <p className="text-[17px] font-black tracking-tight mt-1 text-[#ba0036]">{taka(summary.mealRate, language)}</p>
+            <span className={cx('inline-block text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full mt-1', summary.rateMode === 'manual' ? 'bg-[#ba0036]/10 text-[#ba0036]' : 'bg-gray-200 text-gray-500')}>
+              {summary.rateMode === 'manual' ? (isBn ? 'নির্দিষ্ট রেট' : 'Fixed') : (isBn ? 'অটো' : 'Auto')}
+            </span>
+          </button>
         </div>
       </Card>
 
@@ -421,6 +491,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
 
       <DepositSheet open={depositOpen} onClose={() => setDepositOpen(false)} roommates={roommates} onSave={addDeposit} />
       <GrocerySheet open={bazarOpen} onClose={() => setBazarOpen(false)} roommates={roommates} onSave={addGrocery} />
+      <RateSheet open={rateOpen} onClose={() => setRateOpen(false)} autoRate={summary.autoRate} current={mealRateSetting} onSave={setMealRate} language={language} />
       <ConfirmDialog
         open={!!pendingDelete}
         onClose={() => setPendingDelete(null)}
