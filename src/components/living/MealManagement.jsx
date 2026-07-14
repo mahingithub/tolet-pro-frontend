@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   UtensilsCrossed, ShoppingBasket, Trash2, ChevronLeft, ChevronRight, Coffee, Sun, Moon, Check, ChefHat,
-  Lock, Scale, PiggyBank, Gauge, HandCoins, Wallet, Info, Pencil,
+  Scale, PiggyBank, Gauge, HandCoins, Wallet, Info, Pencil,
 } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
@@ -207,8 +207,6 @@ const MiniStat = ({ icon: Icon, label, value, valueClass = 'text-gray-900', sub 
 const MealManagement = ({ me, language, intent, clearIntent }) => {
   const isBn = language === 'বাংলা';
   const roommates = useLivingStore((s) => s.roommates);
-  const connected = useLivingStore((s) => s.connected);
-  const isOwner = useLivingStore((s) => s.isOwner);
   const meals = useLivingStore((s) => s.meals);
   const groceries = useLivingStore((s) => s.groceries);
   const deposits = useLivingStore((s) => s.deposits);
@@ -248,8 +246,6 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
   const recentDeposits = useMemo(() => [...(deposits || [])].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6), [deposits]);
   const recentBazar = useMemo(() => [...(groceries || [])].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6), [groceries]);
 
-  // Manager (household owner) has full access — can delete any deposit / bazar.
-  const canEdit = (item) => !connected || !item.createdBy || item.createdBy === me || isOwner;
   const periodLabel = period === 'week' ? (isBn ? 'গত ৭ দিন' : 'Last 7 days') : (isBn ? 'এ মাস' : 'This month');
 
   return (
@@ -444,13 +440,9 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                     <p className="text-[11px] font-medium text-gray-400 truncate">{d.note || (isBn ? 'জমা' : 'Deposit')} · {dateLabel(d.date, language)}</p>
                   </div>
                   <span className="text-[13px] font-black text-emerald-600 shrink-0">+{taka(d.amount, language)}</span>
-                  {canEdit(d) ? (
-                    <button onClick={() => setPendingDelete({ kind: 'deposit', id: d.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
-                      <Trash2 size={14} />
-                    </button>
-                  ) : (
-                    <span className="p-1.5 text-gray-300" title={isBn ? 'শুধু যিনি যোগ করেছেন' : 'Only the recorder'}><Lock size={13} /></span>
-                  )}
+                  <button onClick={() => setPendingDelete({ kind: 'deposit', id: d.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               );
             })}
@@ -477,13 +469,9 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                     <p className="text-[11px] font-medium text-gray-400 truncate">{payer.isMe ? (isBn ? 'আপনি' : 'You') : payer.name} · {dateLabel(g.date, language)}</p>
                   </div>
                   <span className="text-[13px] font-black text-gray-900 shrink-0">{taka(g.amount, language)}</span>
-                  {canEdit(g) ? (
-                    <button onClick={() => setPendingDelete({ kind: 'grocery', id: g.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
-                      <Trash2 size={14} />
-                    </button>
-                  ) : (
-                    <span className="p-1.5 text-gray-300" title={isBn ? 'শুধু যিনি যোগ করেছেন' : 'Only the recorder'}><Lock size={13} /></span>
-                  )}
+                  <button onClick={() => setPendingDelete({ kind: 'grocery', id: g.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               );
             })}

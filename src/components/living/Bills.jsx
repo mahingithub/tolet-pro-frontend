@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Bell, Check, CircleDollarSign, RotateCcw, CalendarClock, Pencil, Trash2, Lock, Info, Users, HandCoins } from 'lucide-react';
+import { Plus, Bell, Check, CircleDollarSign, RotateCcw, CalendarClock, Pencil, Trash2, Info, Users, HandCoins } from 'lucide-react';
 
 import useLivingStore from '../../store/useLivingStore';
 import { taka, num, dateLabel, daysUntil, deriveBillStatus, billPaid, isSameMonth, roommateById } from './livingUtils';
@@ -282,7 +282,6 @@ const Bills = ({ language }) => {
   const roommates = useLivingStore((s) => s.roommates);
   const connected = useLivingStore((s) => s.connected);
   const myId = useLivingStore((s) => s.myId);
-  const isOwner = useLivingStore((s) => s.isOwner);
   const addBill = useLivingStore((s) => s.addBill);
   const updateBill = useLivingStore((s) => s.updateBill);
   const deleteBill = useLivingStore((s) => s.deleteBill);
@@ -328,10 +327,8 @@ const Bills = ({ language }) => {
     addBill({ ...data, paidDate: data.status === 'paid' ? new Date().toISOString() : null });
   };
 
-  // Ownership: in the connected (shared) wallet only the person who added a
-  // bill may change it — EXCEPT the household manager (owner), who has full
-  // access to every entry. The local planner (single device) has no restriction.
-  const canEdit = (b) => !connected || !b.createdBy || b.createdBy === myId || isOwner;
+  // Collaborative wallet: every member can edit / pay any bill. We just show who
+  // last edited it (editedBy). The server is open too.
 
   return (
     <div className="space-y-4">
@@ -383,8 +380,8 @@ const Bills = ({ language }) => {
           const partly = st === 'partial';
           const paid = billPaid(b);
           const remaining = Math.max(0, (Number(b.amount) || 0) - paid);
-          const editable = canEdit(b);
           const creator = roommateById(roommates, b.createdBy || myId);
+          const editor = b.editedBy ? roommateById(roommates, b.editedBy) : null;
           const payerId = b.paidBy || b.createdBy || myId;
           const payer = roommateById(roommates, payerId);
           const iPaid = payerId === myId;
@@ -471,42 +468,41 @@ const Bills = ({ language }) => {
                 </div>
               )}
 
-              {/* actions */}
+              {/* who last edited (shown to everyone — collaborative) */}
+              {editor && editor.name && (
+                <p className="mt-2 pl-0.5 flex items-center gap-1 text-[10.5px] font-semibold text-gray-400">
+                  <Pencil size={10} /> {isBn ? 'এডিট করেছে' : 'Edited by'}{' '}
+                  <span className="font-black text-gray-500">{editor.isMe ? (isBn ? 'আপনি' : 'You') : editor.name}</span>
+                </p>
+              )}
+
+              {/* actions — open to every member */}
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-                {editable ? (
-                  <>
-                    <button
-                      onClick={() => toggleBillReminder(b.id)}
-                      className={cx('flex items-center gap-1.5 text-[11px] font-black transition', b.reminder ? 'text-[#ba0036]' : 'text-gray-400')}
-                    >
-                      <Bell size={14} className={b.reminder ? 'fill-[#ba0036]/20' : ''} />
-                      {b.reminder ? (isBn ? 'রিমাইন্ডার চালু' : 'Reminder on') : (isBn ? 'রিমাইন্ডার বন্ধ' : 'Reminder off')}
+                <button
+                  onClick={() => toggleBillReminder(b.id)}
+                  className={cx('flex items-center gap-1.5 text-[11px] font-black transition', b.reminder ? 'text-[#ba0036]' : 'text-gray-400')}
+                >
+                  <Bell size={14} className={b.reminder ? 'fill-[#ba0036]/20' : ''} />
+                  {b.reminder ? (isBn ? 'রিমাইন্ডার চালু' : 'Reminder on') : (isBn ? 'রিমাইন্ডার বন্ধ' : 'Reminder off')}
+                </button>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => openEdit(b)} className="p-2 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition active:scale-90" aria-label="edit">
+                    <Pencil size={15} />
+                  </button>
+                  <button onClick={() => setPendingDelete(b)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                    <Trash2 size={15} />
+                  </button>
+                  {paid > 0 && (
+                    <button onClick={() => markBillUnpaid(b.id)} className="flex items-center gap-1.5 text-[12px] font-black text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg active:scale-95 transition ml-1">
+                      <RotateCcw size={13} /> {isBn ? 'বাকি' : 'Unpay'}
                     </button>
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => openEdit(b)} className="p-2 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition active:scale-90" aria-label="edit">
-                        <Pencil size={15} />
-                      </button>
-                      <button onClick={() => setPendingDelete(b)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
-                        <Trash2 size={15} />
-                      </button>
-                      {paid > 0 && (
-                        <button onClick={() => markBillUnpaid(b.id)} className="flex items-center gap-1.5 text-[12px] font-black text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg active:scale-95 transition ml-1">
-                          <RotateCcw size={13} /> {isBn ? 'বাকি' : 'Unpay'}
-                        </button>
-                      )}
-                      {!fullyPaid && (
-                        <button onClick={() => openPay(b)} className="flex items-center gap-1.5 text-[12px] font-black text-white bg-emerald-600 px-3.5 py-1.5 rounded-lg shadow-[0_6px_16px_-6px_rgba(16,133,83,0.6)] active:scale-95 transition ml-1">
-                          <CircleDollarSign size={14} /> {isBn ? (partly ? 'বাকি পরিশোধ' : 'পরিশোধ') : 'Pay'}
-                        </button>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <span className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400">
-                    <Lock size={13} />
-                    {isBn ? `শুধু ${creator.name} এডিট করতে পারবে` : `Only ${creator.name} can edit this`}
-                  </span>
-                )}
+                  )}
+                  {!fullyPaid && (
+                    <button onClick={() => openPay(b)} className="flex items-center gap-1.5 text-[12px] font-black text-white bg-emerald-600 px-3.5 py-1.5 rounded-lg shadow-[0_6px_16px_-6px_rgba(16,133,83,0.6)] active:scale-95 transition ml-1">
+                      <CircleDollarSign size={14} /> {isBn ? (partly ? 'বাকি পরিশোধ' : 'পরিশোধ') : 'Pay'}
+                    </button>
+                  )}
+                </div>
               </div>
             </Card>
           );

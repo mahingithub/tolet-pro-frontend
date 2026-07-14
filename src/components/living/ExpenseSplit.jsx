@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Receipt, Trash2, Pencil, Camera, X, Check, Lock } from 'lucide-react';
+import { Plus, Receipt, Trash2, Pencil, Camera, X, Check } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
@@ -312,8 +312,6 @@ const ExpenseSheet = ({ open, onClose, roommates, editing, onSave }) => {
 const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
   const isBn = language === 'বাংলা';
   const roommates = useLivingStore((s) => s.roommates);
-  const connected = useLivingStore((s) => s.connected);
-  const isOwner = useLivingStore((s) => s.isOwner);
   const expenses = useLivingStore((s) => s.expenses);
   const addExpense = useLivingStore((s) => s.addExpense);
   const updateExpense = useLivingStore((s) => s.updateExpense);
@@ -416,10 +414,8 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
             const Icon = c.icon;
             const payer = roommates.find((r) => r.id === e.paidBy);
             const myShare = expenseShares(e, roommates)[me] || 0;
-            // The person who added an expense may edit/delete it — and so can
-            // the household manager (owner), who has full access to everything.
-            const editable = !connected || !e.createdBy || e.createdBy === me || isOwner;
-            const creator = roommateById(roommates, e.createdBy || me);
+            // Collaborative: anyone can edit/delete; we just show who last edited.
+            const editor = e.editedBy ? roommateById(roommates, e.editedBy) : null;
             return (
               <Card key={e.id} className="p-3.5">
                 <div className="flex items-center gap-3">
@@ -440,7 +436,7 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
                   </div>
                 </div>
                 <div className="flex items-center justify-between mt-3 pl-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <AvatarStack roommates={roommates} ids={e.splitWith} size={24} />
                     <Chip tint="bg-gray-100" text="text-gray-500">{SPLIT_TYPES[e.splitType]?.[isBn ? 'bn' : 'en'] || e.splitType}</Chip>
                     {e.receipt && (
@@ -448,21 +444,20 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
                         <Camera size={12} /> {isBn ? 'রসিদ' : 'Receipt'}
                       </span>
                     )}
+                    {editor && editor.name && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-gray-400">
+                        <Pencil size={11} /> {isBn ? 'এডিট' : 'edited'}: {editor.isMe ? (isBn ? 'আপনি' : 'You') : editor.name}
+                      </span>
+                    )}
                   </div>
-                  {editable ? (
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => openEdit(e)} className="p-2 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition active:scale-90" aria-label="edit">
-                        <Pencil size={15} />
-                      </button>
-                      <button onClick={() => setPendingDelete(e)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="flex items-center gap-1.5 text-[10.5px] font-bold text-gray-400">
-                      <Lock size={12} /> {isBn ? `শুধু ${creator.name}` : `Only ${creator.name}`}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => openEdit(e)} className="p-2 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition active:scale-90" aria-label="edit">
+                      <Pencil size={15} />
+                    </button>
+                    <button onClick={() => setPendingDelete(e)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </div>
               </Card>
             );

@@ -189,7 +189,8 @@ const useLivingStore = create(
       },
       updateExpense: (id, patch) => {
         if (get().connected) { runRemote(get, livingService.updateExpense(id, stripReceipt(patch))); return; }
-        set((s) => ({ expenses: s.expenses.map((e) => (e.id === id ? { ...e, ...patch } : e)) }));
+        const meId = get().myId || 'me';
+        set((s) => ({ expenses: s.expenses.map((e) => (e.id === id ? { ...e, ...patch, editedBy: meId, editedAt: new Date().toISOString() } : e)) }));
       },
       deleteExpense: (id) => {
         if (get().connected) { runRemote(get, livingService.deleteExpense(id)); return; }
@@ -230,11 +231,12 @@ const useLivingStore = create(
         set((s) => ({ bills: [...s.bills, { id: uid(), status: 'unpaid', paidDate: null, reminder: true, createdBy: 'me', ...bill }] }));
         get().pushActivity('bill', 'Bill added', `${bill.type} · ৳${Number(bill.amount).toLocaleString('en-BD')}`);
       },
-      // Edit a bill's details (type / amount / due date / reminder). Creator-only
-      // in connected mode — the server enforces it too.
+      // Edit a bill's details (type / amount / due date / reminder). Open to every
+      // member — we just stamp who last edited it (editedBy).
       updateBill: (id, patch) => {
         if (get().connected) { runRemote(get, livingService.updateBill(id, patch)); return; }
-        set((s) => ({ bills: s.bills.map((b) => (b.id === id ? { ...b, ...patch } : b)) }));
+        const meId = get().myId || 'me';
+        set((s) => ({ bills: s.bills.map((b) => (b.id === id ? { ...b, ...patch, editedBy: meId, editedAt: new Date().toISOString() } : b)) }));
       },
       deleteBill: (id) => {
         if (get().connected) { runRemote(get, livingService.deleteBill(id)); return; }
