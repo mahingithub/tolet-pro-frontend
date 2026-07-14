@@ -459,6 +459,20 @@ const todayIso = () => {
 // new-booking seat section.
 const isHostelBooking = (b) => !!(b && b.propertyType === 'hostel');
 
+// The property formats the New Lease form supports. Hostel is multi-member
+// (seats); the rest are classic single-tenant.
+const PROPERTY_FORMATS = {
+  flat:        { en: 'Flat',        bn: 'ফ্ল্যাট' },
+  single_room: { en: 'Single Room', bn: 'সিঙ্গেল রুম' },
+  sublet:      { en: 'Sublet',      bn: 'সাবলেট' },
+  hostel:      { en: 'Hostel',      bn: 'হোস্টেল' },
+};
+const formatLabel = (type, isBn) => {
+  const f = PROPERTY_FORMATS[type];
+  if (f) return isBn ? f.bn : f.en;
+  return type || (isBn ? 'অন্যান্য' : 'Other');
+};
+
 const HostDashboard = () => {
   const { t = {}, language = 'English', setLanguage } = useLanguage() || {}; 
   const location = useLocation(); 
@@ -6103,22 +6117,41 @@ const HostDashboard = () => {
                         setLeaseForm(f => ({ ...f, propertyId: val, property: prop?.title || '', location: prop?.location || '' }));
                       }} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all">
                         <option value="">{language === 'বাংলা' ? 'প্রপার্টি সিলেক্ট করুন' : 'Select a property'}</option>
-                        {properties.map(p => (<option key={p.id} value={p.id}>{p.title} · {p.location}</option>))}
+                        {properties.map(p => (<option key={p.id} value={p.id}>{p.title} · {formatLabel(p.type, language === 'বাংলা')} · {p.location}</option>))}
                       </select>
                     </div>
 
-                    {/* Hostel → seats. The entered tenant becomes Seat 1; the host
-                        adds more seats (each with their own rent) after creating. */}
-                    {properties.find(p => String(p.id) === String(leaseForm.propertyId))?.type === 'hostel' && (
-                      <div className="sm:col-span-2 bg-[#ba0036]/5 border border-[#ba0036]/15 rounded-2xl p-3.5 flex items-start gap-2.5">
-                        <Users size={16} className="text-[#ba0036] shrink-0 mt-0.5" />
-                        <p className="text-[11px] font-bold text-gray-700 leading-relaxed">
-                          {language === 'বাংলা'
-                            ? 'এটি একটি হোস্টেল — এই ভাড়াটিয়া "সিট ১" হবে। বুকিং তৈরির পর প্রতিটি সিট (আলাদা নাম, আলাদা ভাড়া, আলাদা রেন্ট বক্স) বুকিং কার্ড থেকে যোগ করুন।'
-                            : 'This is a hostel — this tenant becomes Seat 1. After creating, add each seat (own name, own rent box) from the booking card.'}
-                        </p>
-                      </div>
-                    )}
+                    {/* Selected property FORMAT indicator. Hostel → seat flow
+                        (this tenant = Seat 1, add more seats after). Flat /
+                        single room / sublet → classic single-tenant lease. */}
+                    {(() => {
+                      const sp = properties.find(p => String(p.id) === String(leaseForm.propertyId));
+                      if (!sp) return null;
+                      const isBn = language === 'বাংলা';
+                      const hostel = sp.type === 'hostel';
+                      return (
+                        <div className={`sm:col-span-2 rounded-2xl p-3.5 flex items-start gap-2.5 border ${hostel ? 'bg-[#ba0036]/5 border-[#ba0036]/15' : 'bg-blue-50/70 border-blue-100'}`}>
+                          {hostel
+                            ? <Users size={16} className="text-[#ba0036] shrink-0 mt-0.5" />
+                            : <User size={16} className="text-blue-600 shrink-0 mt-0.5" />}
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-black uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                              <span className={hostel ? 'text-[#ba0036]' : 'text-blue-700'}>{isBn ? 'ফরম্যাট' : 'Format'}</span>
+                              <span className="px-1.5 py-0.5 rounded bg-white text-gray-800 border border-gray-200">{formatLabel(sp.type, isBn)}</span>
+                            </p>
+                            <p className="text-[11px] font-bold text-gray-700 leading-relaxed">
+                              {hostel
+                                ? (isBn
+                                    ? 'হোস্টেল — এই ভাড়াটিয়া "সিট ১" হবে। বুকিং তৈরির পর প্রতিটি সিট (আলাদা নাম, আলাদা ভাড়া, আলাদা রেন্ট বক্স) বুকিং কার্ড থেকে যোগ করুন।'
+                                    : 'Hostel — this tenant becomes Seat 1. After creating, add each seat (own name, own rent box) from the booking card.')
+                                : (isBn
+                                    ? 'একক ভাড়াটিয়া লিজ — একটি রেন্ট বক্স, আগের মতোই।'
+                                    : 'Single-tenant lease — one rent box, exactly as before.')}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Location — auto-populated from the selected property's
                         Add-Property location. Read-only so the booking address
