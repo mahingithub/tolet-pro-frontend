@@ -22,6 +22,7 @@ import { getDynamicFields } from '../constants/propertyFields';
 import { subscriptionService } from '../services/subscriptionService';
 import { listHostInquiries, updateInquiryStatus, deleteInquiry, replyToInquiry, respondVisit, proposeVisit } from "../services/inquiryService.js";
 import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi, cancelBooking as cancelBookingApi, updateBookingSettings as updateBookingSettingsApi } from "../services/bookingService.js";
+import MembersManager from "./MembersManager.jsx";
 import { listMyPaymentMethods } from "../services/paymentMethodService.js";
 import { listHostRentPayments } from "../services/rentPaymentService.js";
 import PaymentSettings from './payments/PaymentSettings';
@@ -1867,6 +1868,14 @@ const HostDashboard = () => {
     showToast(language === 'বাংলা'
       ? `${booking.tenant} কে ${monthLabel} এর রিমাইন্ডার পাঠানো হয়েছে`
       : `Reminder sent to ${booking.tenant} for ${monthLabel}`);
+  };
+
+  // Replace a booking in local state after a member action (add / mark paid /
+  // move out) returns the updated booking from the server, so the Bookings and
+  // Rent tabs (same `bookings` state) both reflect it immediately.
+  const handleBookingUpdated = (updated) => {
+    if (!updated || !updated.id) return;
+    setBookings(prev => prev.map(b => (b.id === updated.id ? updated : b)));
   };
 
   // Toggle auto-reminder on/off for a booking. The server cron reads this flag,
@@ -4359,6 +4368,10 @@ const HostDashboard = () => {
                       </div>
                     </div>
 
+                    {/* Members — multi-member rent (house / room / seat).
+                        Legacy single-tenant bookings show the add-member CTA. */}
+                    <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} />
+
                     {/* Auto-reminder + actions row */}
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-1.5">
                       <button
@@ -4796,6 +4809,13 @@ const HostDashboard = () => {
                 {isExpanded && (
                   <div className="border-t border-gray-100 bg-gray-50/40 px-3 sm:px-4 py-4 animate-in slide-in-from-top-2 fade-in duration-300">
 
+                    {/* Multi-member bookings show the per-member rent register;
+                        legacy single-tenant bookings keep the classic panels. */}
+                    {(Array.isArray(booking.members) && booking.members.length > 0) ? (
+                      <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} />
+                    ) : (
+                    <>
+
                     {/* This-month ledger panel — totals + progress + edit */}
                     <div className="bg-white rounded-2xl p-3.5 border border-gray-100">
                       <div className="flex items-center justify-between mb-2.5 gap-2">
@@ -4989,6 +5009,8 @@ const HostDashboard = () => {
                         })}
                       </div>
                     </details>
+                    </>
+                    )}
                   </div>
                 )}
               </div>

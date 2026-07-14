@@ -86,3 +86,60 @@ export async function cancelBooking(bookingId) {
   });
   return success;
 }
+
+// ── Multi-member occupants ────────────────────────────────────────────────
+
+/** Add an occupant (member) to a booking. */
+export async function addMember(bookingId, data) {
+  const { booking } = await request(`/api/bookings/${bookingId}/members`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  return booking;
+}
+
+/** Update an occupant's details (name, rent, space labels, status, …). */
+export async function updateMember(bookingId, memberId, data) {
+  const { booking } = await request(`/api/bookings/${bookingId}/members/${memberId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  return booking;
+}
+
+/**
+ * Remove an occupant. Soft move-out by default (keeps rent history); pass
+ * { hard: true } to fully delete a member added by mistake.
+ */
+export async function removeMember(bookingId, memberId, { hard = false } = {}) {
+  const qs = hard ? '?hard=true' : '';
+  const { booking } = await request(`/api/bookings/${bookingId}/members/${memberId}${qs}`, {
+    method: 'DELETE',
+  });
+  return booking;
+}
+
+/** Mark a month paid/partial/due in a specific member's rent ledger. */
+export async function updateMemberLedger(bookingId, memberId, monthKey, data) {
+  const { booking } = await request(`/api/bookings/${bookingId}/members/${memberId}/ledger/${monthKey}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  return booking;
+}
+
+/** Undo a member's payment record for a month (deletes ledger entry + receipt). */
+export async function undoMemberLedger(bookingId, memberId, monthKey) {
+  const { booking } = await request(`/api/bookings/${bookingId}/members/${memberId}/ledger/${monthKey}`, {
+    method: 'DELETE',
+  });
+  return booking;
+}
+
+/** A tenant self-joins a booking with an invite code. Returns { booking, memberId }. */
+export async function joinByInvite(inviteCode) {
+  return request('/api/bookings/join', {
+    method: 'POST',
+    body: JSON.stringify({ inviteCode }),
+  });
+}

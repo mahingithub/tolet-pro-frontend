@@ -425,11 +425,32 @@ const TenantDashboard = () => {
 
   // Re-fetch bookings + submissions right after the tenant submits a payment,
   // so the rent card flips to "Pending Verification" without waiting for a poll.
+  // Multi-member bookings: the backend returns THIS tenant's own member (with
+  // their ledger) and strips co-tenants' ledgers. Overlay that member's ledger
+  // + rent onto the booking so the existing rent UI shows the tenant's OWN
+  // per-member data. Legacy single-tenant bookings pass through unchanged.
+  const applyMyMemberLedger = (rows) => (rows || []).map((b) => {
+    if (Array.isArray(b.members) && b.members.length) {
+      const mine = b.members.find((m) => m && m.ledger && typeof m.ledger === 'object');
+      if (mine) {
+        return {
+          ...b,
+          ledger: mine.ledger || {},
+          monthlyRent: Number(mine.monthlyRent) || b.monthlyRent,
+          serviceCharge: mine.serviceCharge != null ? mine.serviceCharge : b.serviceCharge,
+          memberId: mine.id,
+          tenant: b.tenant || mine.name,
+        };
+      }
+    }
+    return b;
+  });
+
   const refreshRentData = async () => {
     try {
       const [subs, rows] = await Promise.all([listTenantRentPayments(), listTenantBookings()]);
       setRentSubmissions(subs);
-      setMyBookings(rows);
+      setMyBookings(applyMyMemberLedger(rows));
     } catch (err) {
       console.warn('[tenant] refresh rent data failed:', err.message || err);
     }
@@ -466,7 +487,7 @@ const TenantDashboard = () => {
       try {
         const rows = await listTenantBookings();
         if (cancelled) return;
-        setMyBookings(rows);
+        setMyBookings(applyMyMemberLedger(rows));
       } catch (err) {
         console.warn('[tenant] failed to load bookings:', err.message || err);
       }
