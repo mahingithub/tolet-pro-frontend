@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import useGoBack from '../hooks/useGoBack';
 import {
   User, Phone, Lock, ArrowLeft, Loader2, CheckCircle2,
   Home, ShieldCheck, Building2, MessageCircle, ChevronRight,
@@ -39,6 +40,7 @@ const STEPS = {
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const goBack = useGoBack('/');
   const [searchParams] = useSearchParams();
   const { login, refresh } = useAuth();
 
@@ -483,7 +485,7 @@ const LoginPage = () => {
       {/* ── RIGHT SIDE: FORM ── */}
       <div className="w-full lg:w-[54%] relative bg-white flex flex-col">
         <button
-          onClick={() => (step !== STEPS.FORM ? setStep(STEPS.FORM) : navigate(-1))}
+          onClick={() => (step !== STEPS.FORM ? setStep(STEPS.FORM) : goBack())}
           className="absolute top-5 left-5 z-30 text-gray-400 hover:text-brandRed transition-colors p-2 rounded-full hover:bg-gray-100"
           aria-label={L('Back', 'পিছনে')}
         >

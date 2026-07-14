@@ -16,10 +16,10 @@
 // ► TO CHANGE: brand colour (#ba0036) + logo glyph are inline below.
 
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import useGoBack from '../../hooks/useGoBack';
 
 export default function LegalPage({ titleEn, titleBn, lastUpdated, lang, setLang, children }) {
-  const navigate = useNavigate();
+  const goBack = useGoBack('/');
   const isBn = lang === 'bn';
 
   return (
@@ -40,7 +40,7 @@ export default function LegalPage({ titleEn, titleBn, lastUpdated, lang, setLang
       >
         {/* Back */}
         <button
-          onClick={() => navigate(-1)}
+          onClick={goBack}
           aria-label="Back"
           style={{
             background: '#f3f4f6', border: 'none', borderRadius: '10px',

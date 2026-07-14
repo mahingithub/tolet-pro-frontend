@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import useGoBack from '../hooks/useGoBack';
 import {
   ArrowLeft, BellRing, AlertTriangle, Clock, CheckCircle2, 
   FileText, CreditCard, Calendar, Home, MessageSquare, X,
@@ -26,7 +26,7 @@ const CATEGORIES = ['all', 'payment', 'lease', 'maintenance', 'inquiry'];
 const categoryLabel = { all: 'All', payment: 'Payment', lease: 'Lease', maintenance: 'Maintenance', inquiry: 'Inquiry' };
 
 export default function SmartAlertsPage({ bookings = [], inquiries = [], today, onMessageTenant, alerts: alertsProp, resolved: resolvedProp, actionLabel }) {
-  const navigate = useNavigate();
+  const goBack = useGoBack('/');
   const { language = 'English' } = useLanguage() || {};
   const bn = language === 'বাংলা';
 
@@ -100,7 +100,7 @@ export default function SmartAlertsPage({ bookings = [], inquiries = [], today, 
         {/* ── Header ── */}
         <div className="flex items-center gap-4 mb-8">
           <button
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             className="w-10 h-10 bg-white border border-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:text-[#ba0036] hover:border-[#ba0036]/30 hover:shadow-md transition-all active:scale-95 shrink-0"
           >
             <ArrowLeft size={18} />

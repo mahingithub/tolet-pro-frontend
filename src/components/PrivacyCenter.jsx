@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import useGoBack from '../hooks/useGoBack';
 import {
   Download, Trash2, Monitor, Sparkles, ShieldCheck, ChevronLeft,
   AlertTriangle, RefreshCcw, CheckCircle2, X, Lock,
@@ -39,6 +40,7 @@ import fcmService from '../services/fcmService';
 
 const PrivacyCenter = () => {
   const navigate = useNavigate();
+  const goBack = useGoBack('/');
   const { user, logout } = useAuth();
 
   const [sessions, setSessions] = useState(/** @type {any[]} */([]));
@@ -191,7 +193,7 @@ const PrivacyCenter = () => {
       <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 transition-all duration-150 active:scale-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-gray-300/60 [-webkit-tap-highlight-color:transparent]"
             aria-label="Back"
           >

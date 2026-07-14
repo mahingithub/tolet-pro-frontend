@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
+import useGoBack from "../hooks/useGoBack";
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
 import { Search, MapPin, BedDouble, Bath, Square, Heart, Star, X, ChevronRight, ShieldCheck, ChevronDown, ChevronUp, Filter, Ruler, Navigation, CheckCircle2, Flame, Building, Wifi, Map, List, LayoutGrid, Home, Users, User, BookOpen, Share2, MessageCircle, ArrowLeft, SlidersHorizontal, ArrowUpDown, Camera, Layers, Crosshair, Loader2 } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
@@ -727,6 +728,7 @@ const MapView = ({ properties, activeId, onMarkerClick, defaultCenter = DEFAULT_
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 const PropertyListing = () => {
 	const navigate = useNavigate();
+	const goBack = useGoBack("/");
 	const { t, language } = useLanguage();
 	const [searchParams, setSearchParams] = useSearchParams();
 	const { scrollY } = useScroll();
@@ -1192,7 +1194,7 @@ const PropertyListing = () => {
 				{/* Row 1: Back arrow · Search bar · Sort icon */}
 				<div className="flex items-center gap-2 px-3 pt-3 pb-2">
 					<button
-						onClick={() => window.history.length > 2 ? navigate(-1) : navigate("/")}
+						onClick={goBack}
 						className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0 active:scale-90 transition-transform"
 						aria-label="Go back">
 						<ArrowLeft size={18} className="text-gray-800" />

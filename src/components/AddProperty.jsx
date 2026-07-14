@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { getDynamicFields } from '../constants/propertyFields';
 import { useNavigate, useLocation } from 'react-router-dom';
+import useGoBack from '../hooks/useGoBack';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, ArrowRight, Check, CheckCircle2, MapPin, BedDouble, Bath,
@@ -1378,6 +1379,7 @@ const AiDescriptionHelper = ({ form, value, onChange, isBn, err: hasError }) => 
 const AddProperty = () => {
   const { language = 'English' } = useLanguage() || {};
   const navigate = useNavigate();
+  const goBack = useGoBack('/host-dashboard');
   const location = useLocation();
   const { user, isAuthenticated } = useAuth();
   const isBn = language === 'বাংলা';
@@ -2656,7 +2658,7 @@ const AddProperty = () => {
               <ArrowLeft size={16} />{isBn ? 'পেছনে' : 'Back'}
             </button>
           ) : (
-            <button onClick={() => navigate(-1)}
+            <button onClick={goBack}
               className="flex items-center gap-2 px-5 py-4 rounded-xl bg-gray-50 hover:bg-gray-100 font-black text-gray-500 text-sm transition-all active:scale-95 shrink-0">
               <X size={16} />{isBn ? 'বাতিল' : 'Cancel'}
             </button>

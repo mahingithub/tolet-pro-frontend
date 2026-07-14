@@ -15,6 +15,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import useGoBack from '../hooks/useGoBack';
 import { toast } from 'sonner';
 import {
   ArrowLeft, LifeBuoy, Send, Plus, MessageSquare, ChevronRight,
@@ -100,6 +101,7 @@ const ASSURANCES = [
 
 export default function SupportPage() {
   const navigate = useNavigate();
+  const goBack = useGoBack('/');
   const { isAuthenticated, user } = useAuth();
   const { language } = useLanguage();
   const isBn = language === 'বাংলা' || language === 'bn';
@@ -360,7 +362,7 @@ export default function SupportPage() {
         <div className="max-w-5xl mx-auto px-5 pt-6 pb-10 md:pt-10 md:pb-16 relative overflow-hidden">
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
           <button
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             className="inline-flex items-center gap-2 text-sm font-bold text-white/90 hover:text-white mb-5 active:scale-95 transition-all"
           >
             <ArrowLeft size={18} /> {tr('Back', 'পেছনে')}

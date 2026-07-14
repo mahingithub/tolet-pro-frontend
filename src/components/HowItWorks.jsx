@@ -17,6 +17,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getSectionGuides } from '../services/aiGuideService';
 import VideoGuides from './shared/VideoGuides';
+import BackButton from './shared/BackButton';
 
 export default function HowItWorks() {
   const navigate = useNavigate();
@@ -100,6 +101,13 @@ export default function HowItWorks() {
         <div className="max-w-5xl mx-auto px-5 pt-12 pb-16 md:pt-16 md:pb-24 relative overflow-hidden text-center">
           <div className="absolute -top-16 -right-10 w-56 h-56 bg-white/10 rounded-full blur-3xl" />
           <div className="absolute -bottom-16 -left-10 w-56 h-56 bg-white/5 rounded-full blur-3xl" />
+          <BackButton
+            fallback="/"
+            label={tr('Back', 'পেছনে')}
+            ariaLabel={tr('Back', 'পেছনে')}
+            size={16}
+            className="absolute left-4 top-5 md:left-6 md:top-6 z-10 inline-flex items-center gap-1.5 text-white/90 hover:text-white bg-white/15 hover:bg-white/25 backdrop-blur px-3 py-2 rounded-full text-xs font-black active:scale-95 transition-all [-webkit-tap-highlight-color:transparent]"
+          />
           <span className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider mb-5">
             <Sparkles size={14} /> {tr('Simple. Safe. Free.', 'সহজ। নিরাপদ। ফ্রি।')}
           </span>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import useGoBack from '../hooks/useGoBack';
 import {
   ArrowLeft, Zap, TrendingUp, TrendingDown, BarChart2,
   MapPin, Home, DollarSign, Target, RefreshCw, Star,
@@ -63,7 +63,7 @@ function formatCurrency(n) {
 }
 
 export default function AIInsightsPage() {
-  const navigate = useNavigate();
+  const goBack = useGoBack('/');
   const { language = 'English' } = useLanguage() || {};
   const bn = language === 'বাংলা';
 
@@ -172,7 +172,7 @@ export default function AIInsightsPage() {
             {bn ? 'আবার চেষ্টা করুন' : 'Retry'}
           </button>
           <button
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             className="block mx-auto mt-3 text-xs font-bold transition-all"
             style={{ color: 'rgba(255,255,255,0.4)' }}
           >
@@ -209,7 +209,7 @@ export default function AIInsightsPage() {
         {/* ── Header ── */}
         <div className="flex items-center gap-4 mb-8">
           <button
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             className="w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95"
             style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)' }}
           >

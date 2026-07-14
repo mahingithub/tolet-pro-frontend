@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import useGoBack from '../hooks/useGoBack';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MapPin, Bed, Bath, Maximize2, Share2, Heart,
@@ -1376,6 +1377,7 @@ const PropertyLocationMap = ({ lat, lng, title }) => {
 const PropertyDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const goBack = useGoBack('/properties/all');
   // Auth-aware CTAs — guests can browse everything, but Inquire / Call /
   // Message are gated so the landlord only ever receives signed-in,
   // contactable leads. Guest taps redirect to /login with the current
@@ -1742,7 +1744,7 @@ const PropertyDetails = () => {
 
           {/* LEFT — Back button */}
           <motion.button
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             whileTap={{ scale: 0.94 }}
             whileHover={{ x: -2 }}
             className="flex items-center gap-1.5 text-xs md:text-sm font-black text-[#ba0036] px-3 md:px-4 py-2 md:py-2.5 rounded-full transition-colors shrink-0"

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import useGoBack from '../../hooks/useGoBack';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Wallet, BellRing } from 'lucide-react';
 
@@ -132,7 +133,7 @@ const Living = () => {
   );
 
   const reminders = useMemo(() => buildReminders(state, ME), [state]);
-  const back = () => (window.history.length > 1 ? navigate(-1) : navigate('/tenant-dashboard'));
+  const back = useGoBack('/tenant-dashboard');
 
   const ActiveModule = MODULE_COMPONENTS[module] || WalletSummary;
 

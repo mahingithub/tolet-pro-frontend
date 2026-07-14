@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import useGoBack from '../hooks/useGoBack';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Star, BadgeCheck, MessageCircle, Phone,
@@ -28,6 +29,7 @@ const staggerContainer = {
 const LandlordProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const goBack = useGoBack('/');
 
   const [landlord, setLandlord] = useState(null);
   const [properties, setProperties] = useState([]);
@@ -144,7 +146,7 @@ const LandlordProfile = () => {
       <div className="bg-white/70 backdrop-blur-2xl border-b border-white/50 sticky top-0 z-50 shadow-[0_4px_30px_rgba(0,0,0,0.03)]">
         <div className="max-w-[1200px] mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             className="flex items-center gap-2 text-sm font-black text-[#ba0036] bg-white/50 border border-red-100/50 px-4 py-2 rounded-full hover:bg-red-50 hover:border-red-200 transition-all active:scale-95 shadow-sm"
           >
             <ArrowLeft size={15} /> Back

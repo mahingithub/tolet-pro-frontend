@@ -24,6 +24,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import useGoBack from '../hooks/useGoBack';
 import {
   ArrowLeft, BadgeCheck, MessageCircle, Phone, Mail,
   Calendar, Briefcase, ShieldCheck, Share2, Lock, Award,
@@ -70,6 +71,7 @@ const staggerContainer = {
 const TenantProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const goBack = useGoBack('/');
   const { user: authUser } = useAuth();
 
   const [tenant, setTenant]   = useState(null);
@@ -162,7 +164,7 @@ const TenantProfile = () => {
             This tenant profile is unavailable or has been removed.
           </p>
           <button
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             className="px-6 py-3 rounded-full bg-blue-500 text-white text-sm font-black hover:bg-blue-600 hover:shadow-lg hover:shadow-blue-500/30 transition-all active:scale-95"
           >
             Go back
@@ -265,7 +267,7 @@ const TenantProfile = () => {
       <div className="bg-white/70 backdrop-blur-2xl border-b border-white/50 sticky top-0 z-50 shadow-[0_4px_30px_rgba(0,0,0,0.03)]">
         <div className="max-w-[1200px] mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             className="flex items-center gap-2 text-sm font-black text-blue-600 bg-white/50 border border-blue-100/50 px-4 py-2 rounded-full hover:bg-blue-50 hover:border-blue-200 transition-all active:scale-95 shadow-sm"
           >
             <ArrowLeft size={15} /> Back

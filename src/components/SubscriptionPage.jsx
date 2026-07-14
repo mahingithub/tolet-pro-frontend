@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import useGoBack from '../hooks/useGoBack';
 import {
   Sparkles, Check, Zap, ArrowLeft, Crown, BellRing,
   Calendar, Wallet, TrendingUp, Folder, ShieldCheck, Clock,
@@ -33,6 +34,7 @@ const FEATURE_META = {
 
 const SubscriptionPage = () => {
   const navigate = useNavigate();
+  const goBack = useGoBack('/host-dashboard');
   const [params] = useSearchParams();
   const { language = 'English' } = useLanguage() || {};
   const isBn = language === 'বাংলা';
@@ -113,9 +115,13 @@ const SubscriptionPage = () => {
       </div>
 
       <div className="relative z-10 max-w-5xl mx-auto px-4 md:px-8 pt-6 md:pt-10 pb-24">
-        <Link to="/host-dashboard" className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-500 hover:text-[#ba0036] transition-colors">
+        <button
+          type="button"
+          onClick={goBack}
+          className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-500 hover:text-[#ba0036] transition-colors"
+        >
           <ArrowLeft size={14} /> {isBn ? 'ড্যাশবোর্ডে ফিরে যান' : 'Back to Dashboard'}
-        </Link>
+        </button>
 
         {/* Status banner */}
         <div className={`mt-5 rounded-[2rem] p-6 md:p-8 text-white shadow-[0_20px_60px_rgba(0,0,0,0.12)] bg-gradient-to-br ${banner.accent}`}>

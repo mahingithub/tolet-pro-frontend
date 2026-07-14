@@ -5508,7 +5508,7 @@ const HostDashboard = () => {
           <div className="w-full max-w-5xl mx-auto animate-in fade-in zoom-in-95 duration-500 space-y-8 pb-10">
             <PendingRentPayments onChange={refreshPendingRent} />
             <div className="h-px bg-gray-100" />
-            <PaymentSettings onChange={(rows) => setPaymentMethods(rows)} />
+            <PaymentSettings onChange={setPaymentMethods} />
           </div>
         )}
 

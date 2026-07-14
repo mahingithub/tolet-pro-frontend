@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus, X, Trash2, Edit3, Star, Copy, Check, CreditCard, Smartphone,
   Landmark, UploadCloud, Image as ImageIcon, Loader2, AlertCircle, ShieldCheck,
@@ -63,20 +63,32 @@ export default function PaymentSettings({ onChange }) {
   const [editing, setEditing] = useState(null);
   const [busyId, setBusyId] = useState(null);
 
+  // Keep the latest onChange in a ref so `load` doesn't depend on its identity.
+  // Parents almost always pass an inline arrow (e.g. onChange={rows => ...}),
+  // which is a NEW function reference on every render. If `load` depended on
+  // `onChange`, that fresh reference would recreate `load` → re-fire the mount
+  // effect → refetch → call onChange → parent re-render → new onChange → …, an
+  // infinite loop that pins the spinner on forever. That was the reported bug:
+  // an added bKash number never appeared, the panel just kept reloading.
+  const onChangeRef = useRef(onChange);
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const rows = await listMyPaymentMethods();
       setMethods(rows);
-      onChange?.(rows);
+      onChangeRef.current?.(rows);
     } catch (err) {
       setError(err.message || (bn ? 'লোড করা যায়নি।' : 'Could not load payment methods.'));
     } finally {
       setLoading(false);
     }
-  }, [onChange, bn]);
+  }, [bn]);
 
+  // Fetch once on mount (and again only if the language flips — rare and
+  // harmless). It no longer re-runs just because the parent re-rendered.
   useEffect(() => { load(); }, [load]);
 
   const handleSetDefault = async (m) => {
