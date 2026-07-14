@@ -31,7 +31,7 @@ import { listDocuments as listDocsApi, uploadDocument as uploadDocApi, deleteDoc
 import tenantService from "../services/tenantService.js";
 import callProvider from "../services/callProvider";
 import { listNotifications, getUnreadCount, markRead, markAllRead } from "../services/notificationService.js";
-import { uploadAvatar } from "../services/authService";
+import { uploadAvatar, uploadVerificationDoc } from "../services/authService";
 import ProfileSection from './shared/ProfileSection';
 import VerificationModal from './VerificationModal';
 import SharedSettings from './shared/SharedSettings';
@@ -457,7 +457,7 @@ const HostDashboard = () => {
   const { t = {}, language = 'English', setLanguage } = useLanguage() || {}; 
   const location = useLocation(); 
   const navigate = useNavigate(); 
-  const { user: authUser, logout: authLogout, updateMe: authUpdateMe } = useAuth();
+  const { user: authUser, logout: authLogout, updateMe: authUpdateMe, submitVerification: authSubmitVerification } = useAuth();
   
   // 🟢 CORE STATES
   const initialTab = new URLSearchParams(location.search).get('tab') || (location.state && location.state.activeTab) || 'dashboard';
@@ -691,6 +691,20 @@ const HostDashboard = () => {
     }));
   }, [authUser]);
 
+  // String status for the shared ProfileSection CTA (it expects
+  // 'unverified' | 'pending' | 'verified' — the exact contract the tenant
+  // passes). Identity KYC lives on tenantProfile.verification (shared across
+  // roles); landlordProfile.verification covers property onboarding. Either
+  // being verified/pending is reflected here so the "Start verification" CTA
+  // shows/hides correctly now that the floating chip is gone.
+  const hostVerificationStatus = (() => {
+    const tvs = authUser?.tenantProfile?.verification?.status;
+    const lvs = authUser?.landlordProfile?.verification?.status;
+    if (tvs === 'verified' || lvs === 'verified') return 'verified';
+    if (tvs === 'pending'  || lvs === 'pending')  return 'pending';
+    return 'unverified';
+  })();
+
   const landlordTrustScore = (() => {
     const lp = landlordProfile || {};
     const v  = verificationStatus || {};
@@ -713,26 +727,73 @@ const HostDashboard = () => {
   })();
 
   const [verifModalOpen, setVerifModalOpen] = useState(false);
-  const [hideHostVerifBanner, setHideHostVerifBanner] = useState(
-    () => window.localStorage.getItem('tolet_hide_host_verif_banner') === '1'
-  );
 
-  const handleHostWizardSubmit = async (picks) => {
-    setVerificationStatus((prev) => ({
-      ...prev,
-      profileCompleted: true,
-      nidUploaded: !!(picks.nidFront?.dataUrl && picks.nidBack?.dataUrl),
-      faceVerified: !!picks.photo?.dataUrl,
-      underReview: true,
-    }));
-    setUploadedDocs((prev) => ({
-      ...prev,
-      nidFront: !!picks.nidFront?.dataUrl,
-      nidBack: !!picks.nidBack?.dataUrl,
-      selfie: !!picks.photo?.dataUrl,
-      utilityBill: !!picks.ownershipProof?.dataUrl,
-    }));
-    setVerifModalOpen(false);
+  // Landlord identity verification — intentionally identical to the tenant
+  // flow (TenantDashboard.handleWizardSubmit). The landlord now opens the very
+  // same VerificationModal (role="tenant"), and this handler does the SAME real
+  // backend round-trip the tenant does, instead of the old local-only stub that
+  // never reached the admin KYC queue:
+  //   1. Upload each touched doc (photo / NID front+back) to the shared
+  //      verification block via uploadVerificationDoc.
+  //   2. Persist the profession field via updateMe.
+  //   3. Flip verification.status → 'pending' via submitVerification so it
+  //      shows up for admins.
+  //   4. Mirror into local state so the Trust Score + Verification Status
+  //      timeline update without waiting for the next authUser refresh.
+  const handleHostWizardSubmit = async (payload) => {
+    const uploads = [];
+    if (payload.photo?.file)    uploads.push(['photo',    payload.photo.file]);
+    if (payload.nidFront?.file) uploads.push(['nidFront', payload.nidFront.file]);
+    if (payload.nidBack?.file)  uploads.push(['nidBack',  payload.nidBack.file]);
+
+    try {
+      for (const [kind, file] of uploads) {
+        await uploadVerificationDoc(kind, file);
+      }
+
+      if (authUpdateMe && payload.professionType) {
+        await authUpdateMe({ tenantProfile: { professionType: payload.professionType } });
+      }
+
+      if (authSubmitVerification) {
+        // Prefer freshly-hydrated flags from authUser; fall back to the files
+        // we just handed off. This is the line that makes "submit" visible to
+        // admins (status → 'pending').
+        const v = authUser?.tenantProfile?.verification || {};
+        await authSubmitVerification({
+          photo:    !!v.photo    || !!payload.photo?.file,
+          nidFront: !!v.nidFront || !!payload.nidFront?.file,
+          nidBack:  !!v.nidBack  || !!payload.nidBack?.file,
+        });
+      }
+
+      // Local mirror so the timeline card + trust score reflect it instantly.
+      setVerificationStatus((prev) => ({
+        ...prev,
+        profileCompleted: true,
+        nidUploaded: !!(payload.nidFront?.file || payload.nidBack?.file) || prev.nidUploaded,
+        faceVerified: !!payload.photo?.file || prev.faceVerified,
+        underReview: true,
+      }));
+      setUploadedDocs((prev) => ({
+        ...prev,
+        nidFront: !!payload.nidFront?.file || prev.nidFront,
+        nidBack:  !!payload.nidBack?.file  || prev.nidBack,
+        selfie:   !!payload.photo?.file    || prev.selfie,
+      }));
+
+      showToast(language === 'বাংলা' ? 'রিভিউয়ের জন্য সাবমিট করা হয়েছে।' : 'Submitted for review.');
+      setVerifModalOpen(false);
+    } catch (err) {
+      console.error('[handleHostWizardSubmit] failed:', err);
+      showToast(
+        language === 'বাংলা'
+          ? `সাবমিট ব্যর্থ: ${err?.message || 'আবার চেষ্টা করুন।'}`
+          : `Submit failed: ${err?.message || 'Please retry.'}`,
+        { type: 'error' },
+      );
+      throw err; // let the modal surface its inline error too
+    }
   };
 
   // 🟢 REFS
@@ -2257,54 +2318,6 @@ const HostDashboard = () => {
       <div className="fixed top-[-20%] left-[-10%] w-[50vw] h-[50vw] bg-gradient-to-br from-[#ba0036]/10 to-transparent rounded-full blur-[120px] pointer-events-none z-0"></div>
       <div className="fixed bottom-[-20%] right-[-10%] w-[50vw] h-[50vw] bg-gradient-to-tl from-blue-600/5 to-transparent rounded-full blur-[120px] pointer-events-none z-0"></div>
 
-      {/* PERSISTENT VERIFICATION CHIP — a quiet floating pill that lives
-          in the bottom-right (above the mobile bottom-nav rail) until the
-          host has uploaded their NID and finished face verification.
-          Soft pulse + slight float so it's noticeable without being
-          aggressive; click → opens the Profile tab where verification
-          lives. The chip stays out of the way of toasts (z-[80] vs
-          z-[100] for toasts) and never blocks input. */}
-      {!(verificationStatus.nidUploaded && verificationStatus.faceVerified) ? (
-        <button
-          onClick={() => { setActiveTab('profile'); setIsProfileDrawerOpen(false); }}
-          className="fixed z-[80] right-4 md:right-6 bottom-[5.5rem] md:bottom-6 group flex items-center gap-2.5 pl-2.5 pr-4 py-2 rounded-full text-white shadow-[0_18px_40px_rgba(186,0,54,0.35)] hover:shadow-[0_24px_50px_rgba(186,0,54,0.5)] hover:-translate-y-0.5 transition-all backdrop-blur-xl"
-          style={{
-            background: 'linear-gradient(135deg, #ba0036 0%, #ff004c 50%, #ba0036 100%)',
-            border: '1px solid rgba(255,255,255,0.25)',
-          }}
-          title={language === 'বাংলা' ? 'প্রোফাইল ভেরিফাই করুন' : 'Verify your profile'}
-        >
-          <span className="relative flex items-center justify-center w-7 h-7 rounded-full bg-white/15">
-            <span className="absolute inline-flex w-full h-full rounded-full bg-white/30 animate-ping" />
-            <ScanFace size={14} className="relative" />
-          </span>
-          <span className="text-[11px] font-black uppercase tracking-widest hidden sm:inline">
-            {language === 'বাংলা' ? 'প্রোফাইল ভেরিফাই' : 'Verify Profile'}
-          </span>
-          <span className="text-[11px] font-black uppercase tracking-widest sm:hidden">
-            {language === 'বাংলা' ? 'ভেরিফাই' : 'Verify'}
-          </span>
-        </button>
-      ) : !hideHostVerifBanner ? (
-        <div className="fixed z-[80] right-4 md:right-6 bottom-[5.5rem] md:bottom-6 flex items-center gap-3 pl-3 pr-2 py-2 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-[0_15px_30px_rgba(16,185,129,0.35)] backdrop-blur-xl border border-white/20">
-          <div className="flex items-center justify-center w-7 h-7 rounded-full bg-white/20">
-            <CheckCircle2 size={15} className="text-white" />
-          </div>
-          <span className="text-[11px] font-black uppercase tracking-widest">
-            {language === 'বাংলা' ? 'আপনি ভেরিফাইড' : "You're verified"}
-          </span>
-          <button 
-            onClick={() => {
-              setHideHostVerifBanner(true);
-              window.localStorage.setItem('tolet_hide_host_verif_banner', '1');
-            }}
-            className="ml-1 p-1.5 rounded-full hover:bg-white/20 transition-colors"
-          >
-            <X size={14} strokeWidth={2.5} />
-          </button>
-        </div>
-      ) : null}
-
       {/* TOAST NOTIFICATION (supports undo + error/success types) */}
       {(() => {
         const toastText = typeof toastMessage === 'string' ? toastMessage : toastMessage?.text;
@@ -2550,7 +2563,7 @@ const HostDashboard = () => {
                   user={userData}
                   profile={landlordProfile}
                   trustScore={landlordTrustScore}
-                  verificationStatus={verificationStatus}
+                  verificationStatus={hostVerificationStatus}
                   language={language}
                   onUpdate={async (patch) => {
                     const next = applyLandlordPatch(landlordProfile, patch);
@@ -2655,18 +2668,21 @@ const HostDashboard = () => {
               </div>
             </div>
             
-            {verifModalOpen && (
-              <VerificationModal
-                isOpen={verifModalOpen}
-                onClose={() => setVerifModalOpen(false)}
-                onSubmit={handleHostWizardSubmit}
-                language={language}
-                role="landlord"
-                initialData={{
-                  nidVerified: authUser?.tenantProfile?.verification?.status === 'verified' || !!authUser?.tenantProfile?.verification?.nidFront || !!authUser?.landlordProfile?.verification?.nidFront
-                }}
-              />
-            )}
+            {/* Identity verification — the SAME pop-up the tenant uses
+                (role="tenant"), wired the same way (open prop + real backend
+                submit). The old landlord-specific variant was removed. */}
+            <VerificationModal
+              role="tenant"
+              open={verifModalOpen}
+              onClose={() => setVerifModalOpen(false)}
+              onSubmit={handleHostWizardSubmit}
+              language={language}
+              initialData={{
+                professionType: authUser?.tenantProfile?.professionType || '',
+                nidVerified: authUser?.tenantProfile?.verification?.status === 'verified'
+                  || !!authUser?.tenantProfile?.verification?.nidFront,
+              }}
+            />
           </div>
         )}
 
