@@ -1023,6 +1023,10 @@ const HostDashboard = () => {
     autoReminder: true,
     notes: '',
   });
+  // Required lease fields that failed validation — drives the red highlight and
+  // the scroll-to-first-empty behaviour on "Create Booking".
+  const [leaseErrors, setLeaseErrors] = useState([]);
+  const leaseErrCls = (f) => (leaseErrors.includes(f) ? '!border-rose-400 ring-2 ring-rose-200' : '');
 
   const [inquiryStatusForm, setInquiryStatusForm] = useState({
     status: 'new',
@@ -2117,7 +2121,8 @@ const HostDashboard = () => {
       paymentMethod: 'bKash',
       occupants: '',
       category: propTypeToCategory(matchingProp?.type),
-      floorNumber: '',
+      // Auto-fill floor from the property; room number stays empty (host provides).
+      floorNumber: (matchingProp?.floorNumber ?? matchingProp?.floor) != null ? String(matchingProp?.floorNumber ?? matchingProp?.floor) : '',
       roomNumber: '',
       manualProperty: false,
       serviceCharge: String(landlordProfile?.serviceCharge ?? authUser?.landlordProfile?.serviceCharge ?? ''),
@@ -2127,6 +2132,7 @@ const HostDashboard = () => {
       notes: inquiry.msg ? `From inquiry: ${inquiry.msg.slice(0, 140)}${inquiry.msg.length > 140 ? '…' : ''}` : '',
     });
     setConfirmDeleteBookingId(null);
+    setLeaseErrors([]);
     setActiveModal('create_lease');
 
     // Prefill "Number of Occupants" from the tenant's family-members count when
@@ -2203,6 +2209,7 @@ const HostDashboard = () => {
       notes: '',
     });
     setConfirmDeleteBookingId(null);
+    setLeaseErrors([]);
     setActiveModal('create_lease');
   };
 
@@ -2212,19 +2219,33 @@ const HostDashboard = () => {
   const submitCreateLease = (keepOpen = false) => {
     if (!isPremium) { setActiveModal('premium_gate'); return; }
     const { tenant, tenantPhone, propertyId, leaseStart, leaseEnd, monthlyRent, manualProperty } = leaseForm;
-    if (!tenant.trim()) { showToast(language === 'বাংলা' ? 'ভাড়াটিয়ার নাম দিন' : 'Tenant name is required'); return; }
-    if (!tenantPhone.trim()) { showToast(language === 'বাংলা' ? 'ফোন নম্বর দিন' : 'Tenant phone is required'); return; }
-    if (manualProperty) {
-      if (!String(leaseForm.property || '').trim()) { showToast(language === 'বাংলা' ? 'প্রপার্টির নাম লিখুন' : 'Type the property name'); return; }
-    } else if (!propertyId) {
-      showToast(language === 'বাংলা' ? 'প্রপার্টি সিলেক্ট করুন' : 'Pick a property'); return;
-    }
-    if (!leaseStart || !leaseEnd) { showToast(language === 'বাংলা' ? 'লিজের তারিখ দিন' : 'Lease dates are required'); return; }
-    if (new Date(leaseEnd) <= new Date(leaseStart)) {
-      showToast(language === 'বাংলা' ? 'শেষ তারিখ শুরুর তারিখের পরে হতে হবে' : 'End date must be after start date'); return;
-    }
+    // Collect EVERY empty required box so they all turn red, then jump to the
+    // first one the host still needs to fill.
+    const scrollToLeaseField = (field) => setTimeout(() => {
+      const el = document.getElementById('lease-' + field);
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); try { el.focus({ preventScroll: true }); } catch { /* focus optional */ } }
+    }, 60);
+    const missing = [];
+    if (!tenant.trim()) missing.push('tenant');
+    if (!tenantPhone.trim()) missing.push('tenantPhone');
+    if (manualProperty ? !String(leaseForm.property || '').trim() : !propertyId) missing.push('property');
+    if ((leaseForm.category === 'single_room' || leaseForm.category === 'hostel') && !String(leaseForm.roomNumber || '').trim()) missing.push('roomNumber');
+    if (!leaseStart || !leaseEnd) missing.push('leaseEnd');
     const rent = Number(monthlyRent) || 0;
-    if (rent <= 0) { showToast(language === 'বাংলা' ? 'মাসিক ভাড়া দিন' : 'Monthly rent is required'); return; }
+    if (rent <= 0) missing.push('monthlyRent');
+    if (missing.length) {
+      setLeaseErrors(missing);
+      showToast(language === 'বাংলা' ? 'লাল ঘরগুলো পূরণ করুন' : 'Please fill the highlighted fields');
+      scrollToLeaseField(missing[0]);
+      return;
+    }
+    if (new Date(leaseEnd) <= new Date(leaseStart)) {
+      setLeaseErrors(['leaseEnd']);
+      showToast(language === 'বাংলা' ? 'শেষ তারিখ শুরুর তারিখের পরে হতে হবে' : 'End date must be after start date');
+      scrollToLeaseField('leaseEnd');
+      return;
+    }
+    setLeaseErrors([]);
 
     // ── Duplicate guard ────────────────────────────────────────────────────
     // One active booking per inquiry, and per unit — EXCEPT hostels, where one
@@ -4315,6 +4336,14 @@ const HostDashboard = () => {
               ? (language === 'বাংলা' ? '১ ভাড়াটিয়া' : '1 Tenant')
               : (language === 'বাংলা' ? `${booking.tenantsCount} ভাড়াটিয়া` : `${booking.tenantsCount} Tenants`);
             const isExpanded = forceOpen || expandedBookingId === booking.id;
+            // HOSTEL bookings are identified by the PROPERTY (house · room · floor),
+            // NOT a tenant — the tenants are the per-seat rent boxes inside. Other
+            // formats keep the tenant name as the card title.
+            const hostelBooking = isHostelBooking(booking);
+            const roomLabelTxt = booking.roomNumber ? `${language === 'বাংলা' ? 'রুম' : 'Room'} ${booking.roomNumber}` : '';
+            const cardTitle = hostelBooking ? [booking.property, roomLabelTxt].filter(Boolean).join(' · ') : booking.tenant;
+            const cardSubLead = hostelBooking ? (booking.floorNumber ? `${language === 'বাংলা' ? 'ফ্লোর' : 'Floor'} ${booking.floorNumber}` : tenantsLabel) : booking.property;
+            const cardAvatarText = hostelBooking ? ((booking.property || 'H').trim()[0] || 'H').toUpperCase() : booking.tenantInit;
             const stageAvatar = stage === 'active' ? 'bg-gradient-to-br from-green-500 to-emerald-600'
                               : stage === 'notice' ? 'bg-gradient-to-br from-amber-500 to-orange-500'
                               : stage === 'draft'  ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
@@ -4330,21 +4359,21 @@ const HostDashboard = () => {
                   className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-3 text-left transition-colors ${forceOpen ? 'cursor-default' : 'hover:bg-gray-50/50'}`}
                 >
                   <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-black text-[11px] sm:text-xs shrink-0 ${stageAvatar} overflow-hidden`}>
-                    {booking.tenantAvatar ? (
+                    {(!hostelBooking && booking.tenantAvatar) ? (
                       <img src={booking.tenantAvatar} alt={booking.tenant} className="w-full h-full object-cover" />
                     ) : (
-                      booking.tenantInit
+                      cardAvatarText
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 mb-0.5">
-                      <h4 className="text-[13px] sm:text-sm font-black text-gray-900 truncate">{booking.tenant}</h4>
+                      <h4 className="text-[13px] sm:text-sm font-black text-gray-900 truncate">{cardTitle}</h4>
                       <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 ${stageBadge(stage)}`}>
                         {stageLabel(stage, language)}
                       </span>
                     </div>
                     <p className="text-[10px] font-bold text-gray-500 truncate">
-                      {booking.property} <span className="mx-0.5 text-gray-300">·</span> <span className="tabular-nums">{formatBDT(monthlyTotal)}</span>
+                      {cardSubLead} <span className="mx-0.5 text-gray-300">·</span> <span className="tabular-nums">{formatBDT(monthlyTotal)}</span>
                       {next && (
                         <>
                           <span className="mx-0.5 text-gray-300">·</span>
@@ -4397,12 +4426,13 @@ const HostDashboard = () => {
                         <p className="text-xs sm:text-sm font-black text-gray-900 tabular-nums mt-0.5">{formatBDT(booking.serviceCharge || 0)}</p>
                       </div>
                       <div className="bg-white rounded-xl p-2.5 border border-gray-100">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ডিপোজিট' : 'Deposit'}</p>
-                        <p className="text-xs sm:text-sm font-black text-gray-900 tabular-nums mt-0.5">{formatBDT(booking.securityDeposit || 0)}</p>
-                        <span className={`mt-1 inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${booking.depositPaid ? 'bg-green-50 text-green-700' : 'bg-rose-50 text-rose-700'}`}>
-                          {booking.depositPaid ? <CheckCircle2 size={8} strokeWidth={3}/> : <AlertCircle size={8} strokeWidth={3}/>}
-                          {booking.depositPaid ? (language === 'বাংলা' ? 'পেইড' : 'Paid') : (language === 'বাংলা' ? 'বকেয়া' : 'Pending')}
-                        </span>
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ডিপোজিট (অগ্রিম)' : 'Deposit (Advance)'}</p>
+                        <p className="text-xs sm:text-sm font-black text-gray-900 tabular-nums mt-0.5">{formatBDT(booking.advancePayment || 0)}</p>
+                        {booking.paymentMethod ? (
+                          <span className="mt-1 inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700">
+                            <CreditCard size={8} strokeWidth={3}/> {booking.paymentMethod}
+                          </span>
+                        ) : null}
                       </div>
                       <div className="bg-gradient-to-br from-[#ba0036]/5 to-[#ff004c]/5 border border-[#ba0036]/10 rounded-xl p-2.5">
                         <p className="text-[8px] font-black text-[#ba0036] uppercase tracking-widest">{language === 'বাংলা' ? 'মোট মাসিক' : 'Total/mo'}</p>
@@ -4411,23 +4441,7 @@ const HostDashboard = () => {
                       </div>
                     </div>
 
-                    {/* Advance Payment deposit — the up-front money collected at
-                        booking time, with the channel it came through. Always
-                        shown so this field is clearly part of the booking record. */}
-                    <div className="mt-2 sm:mt-3 flex items-center justify-between gap-3 bg-white rounded-xl p-3 border border-emerald-100">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><Banknote size={15}/></div>
-                        <div className="min-w-0">
-                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'অ্যাডভান্স পেমেন্ট' : 'Advance Payment'}</p>
-                          <p className="text-sm font-black text-gray-900 tabular-nums">{formatBDT(booking.advancePayment || 0)}</p>
-                        </div>
-                      </div>
-                      {booking.paymentMethod ? (
-                        <span className="text-[10px] font-black px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-widest inline-flex items-center gap-1 shrink-0">
-                          <CreditCard size={11}/> {booking.paymentMethod}
-                        </span>
-                      ) : null}
-                    </div>
+                    {/* Advance money is shown in the "Deposit (Advance)" tile above. */}
 
                     {/* Lease term — Move-In · Next Payment · Lease Expiry */}
                     <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2 sm:gap-3">
@@ -4466,7 +4480,7 @@ const HostDashboard = () => {
                     {/* Seats — HOSTEL bookings only (each seat = a member with
                         their own rent box). Flat / sublet stay single-tenant. */}
                     {isHostelBooking(booking) && (
-                      <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} />
+                      <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} showLedger={false} />
                     )}
 
                     {/* Tenant connection code — non-hostel (hostels show it in
@@ -4930,7 +4944,7 @@ const HostDashboard = () => {
                     {/* Multi-member bookings show the per-member rent register;
                         legacy single-tenant bookings keep the classic panels. */}
                     {isHostelBooking(booking) ? (
-                      <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} />
+                      <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} showLedger={true} showManage={false} />
                     ) : (
                     <>
 
@@ -6212,11 +6226,11 @@ const HostDashboard = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ভাড়াটিয়ার নাম' : 'Tenant Name'}</label>
-                      <input type="text" value={leaseForm.tenant} onChange={e => setLeaseForm(f => ({ ...f, tenant: e.target.value }))} placeholder={language === 'বাংলা' ? 'নাম লিখুন' : 'e.g. John Doe'} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
+                      <input id="lease-tenant" type="text" value={leaseForm.tenant} onChange={e => setLeaseForm(f => ({ ...f, tenant: e.target.value }))} placeholder={language === 'বাংলা' ? 'নাম লিখুন' : 'e.g. John Doe'} className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('tenant')}`} />
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ফোন নম্বর' : 'Tenant Phone'}</label>
-                      <input type="tel" value={leaseForm.tenantPhone} onChange={e => setLeaseForm(f => ({ ...f, tenantPhone: e.target.value }))} placeholder="+880 1xxx xxxxxx" className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
+                      <input id="lease-tenantPhone" type="tel" value={leaseForm.tenantPhone} onChange={e => setLeaseForm(f => ({ ...f, tenantPhone: e.target.value }))} placeholder="+880 1xxx xxxxxx" className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('tenantPhone')}`} />
                     </div>
 
                     <div className="sm:col-span-2">
@@ -6236,11 +6250,12 @@ const HostDashboard = () => {
                       </div>
                       {leaseForm.manualProperty ? (
                         <input
+                          id="lease-property"
                           type="text"
                           value={leaseForm.property}
                           onChange={e => setLeaseForm(f => ({ ...f, property: e.target.value }))}
                           placeholder={language === 'বাংলা' ? 'প্রপার্টির নাম লিখুন' : 'Type the property name'}
-                          className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all"
+                          className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('property')}`}
                         />
                       ) : (
                         <select value={leaseForm.propertyId} onChange={e => {
@@ -6249,7 +6264,7 @@ const HostDashboard = () => {
                           // Mongo ObjectId strings, and auto-fill the property's location.
                           const prop = properties.find(p => String(p.id) === String(val));
                           setLeaseForm(f => ({ ...f, propertyId: val, property: prop?.title || '', location: prop?.location || '' }));
-                        }} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all">
+                        }} id="lease-property" className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('property')}`}>
                           <option value="">{language === 'বাংলা' ? 'প্রপার্টি সিলেক্ট করুন' : 'Select a property'}</option>
                           {properties
                             .filter(p => !leaseForm.category || (CATEGORY_TYPES[leaseForm.category] || []).includes(p.type))
@@ -6327,11 +6342,11 @@ const HostDashboard = () => {
                         <input type="text" value={leaseForm.floorNumber} onChange={e => setLeaseForm(f => ({ ...f, floorNumber: e.target.value }))} placeholder={language === 'বাংলা' ? 'যেমন ৩য়' : 'e.g. 3rd'} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
                       </div>
                     )}
-                    {/* Room number — single room + hostel. */}
-                    {(leaseForm.category === 'single_room' || leaseForm.category === 'hostel') && (
+                    {/* Room number — all categories (flats can have a room no. too). */}
+                    {leaseForm.category && (
                       <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'রুম নম্বর' : 'Room Number'}</label>
-                        <input type="text" value={leaseForm.roomNumber} onChange={e => setLeaseForm(f => ({ ...f, roomNumber: e.target.value }))} placeholder={language === 'বাংলা' ? 'যেমন ৩০১' : 'e.g. 301'} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
+                        <input id="lease-roomNumber" type="text" value={leaseForm.roomNumber} onChange={e => setLeaseForm(f => ({ ...f, roomNumber: e.target.value }))} placeholder={language === 'বাংলা' ? 'যেমন ৩০১' : 'e.g. 301'} className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('roomNumber')}`} />
                       </div>
                     )}
 
@@ -6341,12 +6356,12 @@ const HostDashboard = () => {
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'লিজ শেষ' : 'Lease End'}</label>
-                      <input type="date" value={leaseForm.leaseEnd} onChange={e => setLeaseForm(f => ({ ...f, leaseEnd: e.target.value }))} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
+                      <input id="lease-leaseEnd" type="date" value={leaseForm.leaseEnd} onChange={e => setLeaseForm(f => ({ ...f, leaseEnd: e.target.value }))} className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('leaseEnd')}`} />
                     </div>
 
                     <div>
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'মাসিক ভাড়া (৳)' : 'Monthly Rent (BDT)'}</label>
-                      <input type="number" min="0" value={leaseForm.monthlyRent} onChange={e => setLeaseForm(f => ({ ...f, monthlyRent: e.target.value }))} placeholder="85000" className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
+                      <input id="lease-monthlyRent" type="number" min="0" value={leaseForm.monthlyRent} onChange={e => setLeaseForm(f => ({ ...f, monthlyRent: e.target.value }))} placeholder="85000" className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('monthlyRent')}`} />
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'প্রতি মাসের কত তারিখে?' : 'Rent Due Day'}</label>

@@ -96,7 +96,7 @@ function spaceLabel(m, isBn) {
   return isBn ? 'সিট' : 'Seat';
 }
 
-export default function MembersManager({ booking, language = 'English', onChange, today = new Date() }) {
+export default function MembersManager({ booking, language = 'English', onChange, today = new Date(), showLedger = true, showManage = true }) {
   const isBn = language === 'বাংলা';
   const bookingId = booking._id || booking.id;
   const persistable = isMongoId(bookingId);
@@ -202,6 +202,9 @@ export default function MembersManager({ booking, language = 'English', onChange
 
   return (
     <div className="mt-3 bg-white rounded-xl border border-gray-100 p-3">
+      {/* Management chrome (occupancy, invite, add member) — Bookings tab only.
+          The Rent Collection tab passes showManage={false} for a clean card. */}
+      {showManage && (<>
       {/* Header — occupancy + invite */}
       <div className="flex items-center justify-between gap-2 flex-wrap mb-2.5">
         <div className="flex items-center gap-1.5 text-gray-700">
@@ -304,6 +307,7 @@ export default function MembersManager({ booking, language = 'English', onChange
           </div>
         </div>
       )}
+      </>)}
 
       {/* Member list */}
       {activeMembers.length === 0 ? (
@@ -332,6 +336,7 @@ export default function MembersManager({ booking, language = 'English', onChange
                       </p>
                     </div>
                   </div>
+                  {showManage && (
                   <button
                     type="button"
                     onClick={() => moveOut(m)}
@@ -341,9 +346,12 @@ export default function MembersManager({ booking, language = 'English', onChange
                   >
                     <LogOut size={11} /> {isBn ? 'মুভ-আউট' : 'Move out'}
                   </button>
+                  )}
                 </div>
 
-                {/* Month rent strip */}
+                {/* Rent collection strip — only in the Rent Collection tab.
+                    The Bookings tab hides it (member management only). */}
+                {showLedger && (<>
                 <div className="flex gap-1 overflow-x-auto pb-1">
                   {months.map((key) => {
                     const status = memberRentStatus(booking, ledger, key, today);
@@ -394,6 +402,7 @@ export default function MembersManager({ booking, language = 'English', onChange
                     </button>
                   </div>
                 )}
+                </>)}
               </div>
             );
           })}
