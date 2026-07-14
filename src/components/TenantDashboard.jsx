@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { uploadVerificationDoc, uploadAvatar, getCurrentToken } from '../services/authService';
 import { listMyInquiries, deleteInquiry } from '../services/inquiryService.js';
 import { listTenantReceipts, markReceiptRead as apiMarkReceiptRead } from '../services/receiptService.js';
-import { listTenantBookings } from '../services/bookingService.js';
+import { listTenantBookings, joinByInvite } from '../services/bookingService.js';
 import { listTenantRentPayments } from '../services/rentPaymentService.js';
 import { listPaymentMethodsForBooking } from '../services/paymentMethodService.js';
 import TenantRentPay from './payments/TenantRentPay';
@@ -371,6 +371,10 @@ const TenantDashboard = () => {
   const initialTab = new URLSearchParams(location.search).get('tab') || (location.state && location.state.activeTab) || 'overview';
   const [activeTab, setActiveTab] = useState(initialTab);
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
+  // "Add landlord" — tenant self-joins a booking/seat with an invite code.
+  const [addLandlordOpen, setAddLandlordOpen] = useState(false);
+  const [inviteCodeInput, setInviteCodeInput] = useState('');
+  const [joinBusy, setJoinBusy] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -445,6 +449,25 @@ const TenantDashboard = () => {
     }
     return b;
   });
+
+  // Connect the tenant to their landlord's booking/seat via an invite code. On
+  // success their own rent + receipts start showing (see applyMyMemberLedger).
+  const handleJoinByInvite = async () => {
+    const code = inviteCodeInput.trim().toUpperCase();
+    if (!code) return;
+    setJoinBusy(true);
+    try {
+      await joinByInvite(code);
+      setAddLandlordOpen(false);
+      setInviteCodeInput('');
+      toast.success(language === 'বাংলা' ? 'বাড়িওয়ালার সাথে যুক্ত হয়েছেন — আপনার ভাড়া এখন দেখা যাবে।' : 'Connected — your rent will now appear.');
+      refreshRentData();
+    } catch (err) {
+      toast.error(err.message || (language === 'বাংলা' ? 'কোড মেলেনি।' : 'Invalid code.'));
+    } finally {
+      setJoinBusy(false);
+    }
+  };
 
   const refreshRentData = async () => {
     try {
@@ -1674,6 +1697,45 @@ const handleWizardSubmit = async (payload) => {
             helper, just no longer cluttering the home view). */}
         {activeTab === 'overview' && (
           <>
+            {/* ── CONNECT TO LANDLORD — join a rent/seat by invite code ──── */}
+            <div className="mb-5 md:mb-7 rounded-2xl p-4 bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-[#ba0036]/10 text-[#ba0036] flex items-center justify-center shrink-0"><KeyRound size={18} /></div>
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-gray-900">{language === 'বাংলা' ? 'বাড়িওয়ালার সাথে যুক্ত হোন' : 'Add your landlord'}</p>
+                  <p className="text-[11px] font-bold text-gray-500">{language === 'বাংলা' ? 'ইনভাইট কোড দিয়ে আপনার ভাড়া ও রিসিট দেখুন' : 'Enter an invite code to see your rent & receipts'}</p>
+                </div>
+              </div>
+              <button onClick={() => setAddLandlordOpen(true)} className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#ba0036] text-white font-black text-xs uppercase tracking-widest hover:bg-[#a1002f] transition-colors">
+                <KeyRound size={14} /> {language === 'বাংলা' ? 'কোড যোগ করুন' : 'Add code'}
+              </button>
+            </div>
+
+            {addLandlordOpen && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setAddLandlordOpen(false)}>
+                <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-base font-black text-gray-900">{language === 'বাংলা' ? 'বাড়িওয়ালার কোড' : 'Landlord invite code'}</h3>
+                    <button onClick={() => setAddLandlordOpen(false)} className="p-1 text-gray-400 hover:text-gray-700"><X size={18} /></button>
+                  </div>
+                  <p className="text-[12px] font-bold text-gray-500 mb-3">{language === 'বাংলা' ? 'আপনার বাড়িওয়ালার দেওয়া কোডটি লিখুন।' : 'Enter the code your landlord shared with you.'}</p>
+                  <input
+                    value={inviteCodeInput}
+                    onChange={(e) => setInviteCodeInput(e.target.value.toUpperCase())}
+                    placeholder="A7X2K9"
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm font-black tracking-widest uppercase outline-none focus:border-[#ba0036] mb-3"
+                  />
+                  <button
+                    onClick={handleJoinByInvite}
+                    disabled={joinBusy || !inviteCodeInput.trim()}
+                    className="w-full py-2.5 rounded-xl bg-[#ba0036] text-white font-black text-sm uppercase tracking-widest disabled:opacity-40 hover:bg-[#a1002f] transition-colors"
+                  >
+                    {joinBusy ? (language === 'বাংলা' ? 'যুক্ত হচ্ছে…' : 'Connecting…') : (language === 'বাংলা' ? 'যুক্ত হোন' : 'Connect')}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* ── VERIFICATION REJECTED BANNER ────────────────────────────
                 Surfaces the admin's rejection reason so the user understands
                 what to fix, with a one-tap "resubmit" CTA that re-opens the

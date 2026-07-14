@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Users, UserPlus, Copy, Check, X, LogOut, Undo2, CheckCircle2, Plus, Home, DoorOpen, BedDouble,
+  Users, UserPlus, Copy, Check, X, LogOut, Undo2, CheckCircle2, Plus,
 } from 'lucide-react';
 import {
   addMember as addMemberApi,
@@ -88,12 +88,6 @@ const CELL_STYLE = {
 const taka = (n) => `৳${(Number(n) || 0).toLocaleString('en-IN')}`;
 const isMongoId = (v) => /^[0-9a-fA-F]{24}$/.test(String(v || ''));
 
-const RENT_TYPES = [
-  { id: 'flat', en: 'Flat', bn: 'ফ্ল্যাট', Icon: Home },
-  { id: 'room', en: 'Room', bn: 'রুম', Icon: DoorOpen },
-  { id: 'seat', en: 'Seat', bn: 'সিট', Icon: BedDouble },
-];
-
 function spaceLabel(m, isBn) {
   const parts = [m.floor, m.roomLabel, m.seatLabel].filter(Boolean);
   if (parts.length) return parts.join(' • ');
@@ -120,7 +114,7 @@ export default function MembersManager({ booking, language = 'English', onChange
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [cell, setCell] = useState(null); // { memberId, key }
-  const defaultRentType = booking.rentalType && booking.rentalType !== 'mixed' ? booking.rentalType : 'flat';
+  const defaultRentType = 'seat'; // hostel occupants are seats
   const [form, setForm] = useState({
     name: '', phone: '', rentType: defaultRentType, floor: '', roomLabel: '', seatLabel: '',
     monthlyRent: '',
@@ -268,18 +262,6 @@ export default function MembersManager({ booking, language = 'English', onChange
               className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold outline-none focus:border-[#ba0036]"
             />
           </div>
-          <div className="flex items-center gap-1.5">
-            {RENT_TYPES.map(({ id, en, bn, Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setForm({ ...form, rentType: id })}
-                className={`flex-1 px-2 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border inline-flex items-center justify-center gap-1 ${form.rentType === id ? 'bg-[#ba0036] text-white border-[#ba0036]' : 'bg-white text-gray-600 border-gray-200'}`}
-              >
-                <Icon size={11} /> {isBn ? bn : en}
-              </button>
-            ))}
-          </div>
           <div className="grid grid-cols-3 gap-2">
             <input
               value={form.floor}
@@ -290,16 +272,14 @@ export default function MembersManager({ booking, language = 'English', onChange
             <input
               value={form.roomLabel}
               onChange={(e) => setForm({ ...form, roomLabel: e.target.value })}
-              placeholder={isBn ? 'রুম' : 'Room'}
-              disabled={form.rentType === 'flat'}
-              className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold outline-none focus:border-[#ba0036] disabled:bg-gray-100 disabled:opacity-50"
+              placeholder={isBn ? 'রুম (৩০১)' : 'Room (301)'}
+              className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold outline-none focus:border-[#ba0036]"
             />
             <input
               value={form.seatLabel}
               onChange={(e) => setForm({ ...form, seatLabel: e.target.value })}
-              placeholder={isBn ? 'সিট' : 'Seat'}
-              disabled={form.rentType !== 'seat'}
-              className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold outline-none focus:border-[#ba0036] disabled:bg-gray-100 disabled:opacity-50"
+              placeholder={isBn ? 'সিট (১)' : 'Seat (1)'}
+              className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold outline-none focus:border-[#ba0036]"
             />
           </div>
           <div className="flex items-center gap-2">

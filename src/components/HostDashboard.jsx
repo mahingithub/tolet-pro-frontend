@@ -454,6 +454,11 @@ const todayIso = () => {
 // it was single-browser only and is fully superseded by the backend receipts.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Multi-member seats apply to HOSTELS only — flat / sublet / single-room
+// bookings stay classic single-tenant. Gates the MembersManager UI + the
+// new-booking seat section.
+const isHostelBooking = (b) => !!(b && b.propertyType === 'hostel');
+
 const HostDashboard = () => {
   const { t = {}, language = 'English', setLanguage } = useLanguage() || {}; 
   const location = useLocation(); 
@@ -2194,6 +2199,7 @@ const HostDashboard = () => {
       tenantId: tenantUserId,
       propertyId: pidStr,
       property: matchingProp?.title || leaseForm.property,
+      propertyType: matchingProp?.type || '',
       location: leaseForm.location || matchingProp?.location || '',
       tenant: tenant.trim(),
       tenantInit: initials,
@@ -2217,6 +2223,7 @@ const HostDashboard = () => {
 
     createBookingApi({
       propertyId: matchingProp ? (matchingProp._id || matchingProp.id) : propertyId,
+      propertyType: matchingProp?.type || '',
       tenantId: tenantUserId,
       property: matchingProp?.title || leaseForm.property,
       location: leaseForm.location || matchingProp?.location || '',
@@ -2233,6 +2240,11 @@ const HostDashboard = () => {
       advancePayment,
       paymentMethod,
       monthlyRent: rent,
+      // Hostels: seed Seat 1 from the entered tenant; the host adds more seats
+      // (each with their own rent) afterwards from the booking card.
+      members: (matchingProp?.type === 'hostel')
+        ? [{ name: tenant.trim(), phone: tenantPhone.trim(), rentType: 'seat', monthlyRent: rent }]
+        : undefined,
     }).then(saved => {
       setBookings(prev => prev.map(b => b.id === newBooking.id ? { ...b, ...saved } : b));
     }).catch(err => {
@@ -4368,9 +4380,11 @@ const HostDashboard = () => {
                       </div>
                     </div>
 
-                    {/* Members — multi-member rent (house / room / seat).
-                        Legacy single-tenant bookings show the add-member CTA. */}
-                    <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} />
+                    {/* Seats — HOSTEL bookings only (each seat = a member with
+                        their own rent box). Flat / sublet stay single-tenant. */}
+                    {isHostelBooking(booking) && (
+                      <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} />
+                    )}
 
                     {/* Auto-reminder + actions row */}
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-1.5">
@@ -4811,7 +4825,7 @@ const HostDashboard = () => {
 
                     {/* Multi-member bookings show the per-member rent register;
                         legacy single-tenant bookings keep the classic panels. */}
-                    {(Array.isArray(booking.members) && booking.members.length > 0) ? (
+                    {isHostelBooking(booking) ? (
                       <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} />
                     ) : (
                     <>
@@ -6092,6 +6106,19 @@ const HostDashboard = () => {
                         {properties.map(p => (<option key={p.id} value={p.id}>{p.title} · {p.location}</option>))}
                       </select>
                     </div>
+
+                    {/* Hostel → seats. The entered tenant becomes Seat 1; the host
+                        adds more seats (each with their own rent) after creating. */}
+                    {properties.find(p => String(p.id) === String(leaseForm.propertyId))?.type === 'hostel' && (
+                      <div className="sm:col-span-2 bg-[#ba0036]/5 border border-[#ba0036]/15 rounded-2xl p-3.5 flex items-start gap-2.5">
+                        <Users size={16} className="text-[#ba0036] shrink-0 mt-0.5" />
+                        <p className="text-[11px] font-bold text-gray-700 leading-relaxed">
+                          {language === 'বাংলা'
+                            ? 'এটি একটি হোস্টেল — এই ভাড়াটিয়া "সিট ১" হবে। বুকিং তৈরির পর প্রতিটি সিট (আলাদা নাম, আলাদা ভাড়া, আলাদা রেন্ট বক্স) বুকিং কার্ড থেকে যোগ করুন।'
+                            : 'This is a hostel — this tenant becomes Seat 1. After creating, add each seat (own name, own rent box) from the booking card.'}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Location — auto-populated from the selected property's
                         Add-Property location. Read-only so the booking address
