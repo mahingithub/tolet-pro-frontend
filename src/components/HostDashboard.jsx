@@ -179,6 +179,19 @@ const isRecent = (dateString) => {
   return diffDays <= 3;
 };
 
+// Auto-cleanup countdown for rented listings. A property flips to 'rented'
+// when its booking is created; the backend (rentedCleanup.service.js) then
+// permanently deletes it RENTED_RETENTION_DAYS later. Keep this constant in
+// sync with the backend. Returns whole days remaining (0 = due for removal).
+const RENTED_RETENTION_DAYS = 5;
+const rentedDaysLeft = (rentedAt) => {
+  if (!rentedAt) return RENTED_RETENTION_DAYS;
+  const deleteAtMs = new Date(rentedAt).getTime() + RENTED_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const msLeft = deleteAtMs - Date.now();
+  if (!Number.isFinite(msLeft)) return RENTED_RETENTION_DAYS;
+  return Math.max(0, Math.ceil(msLeft / (24 * 60 * 60 * 1000)));
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // RENT-LEDGER HELPERS
 // Pure date/money utilities used by the rent-tracking grid and the rent-
@@ -3374,9 +3387,22 @@ const HostDashboard = () => {
               dueSoFar: dueSoFar.length,
               ytdCollected,
               ytdExpected,
+              // Does this tenant's lease actually overlap the selected year?
+              // `inLeaseYearMonths` is the intersection of the year's months
+              // with the lease's months, so an empty/missing leaseStart|leaseEnd
+              // (enumerateLeaseMonths → []) yields no overlap → excluded.
+              activeInYear: inLeaseYearMonths.length > 0,
               bucket: score >= 90 ? 'excellent' : score >= 75 ? 'good' : score >= 50 ? 'risk' : 'critical',
             };
-          });
+          })
+          // ── Year scoping (bug fix) ────────────────────────────────────────
+          // Only keep tenants whose lease overlaps `ledgerScopeYear`. Before
+          // this, a lease that ended in 2025 still appeared when viewing 2026:
+          // with 0 due months its score defaulted to 100 → shown as "Excellent",
+          // so changing the year never dropped stale tenants. Scoping the whole
+          // roster here keeps the pills, the N/total counter, and the list all
+          // consistent with the selected year.
+          .filter((c) => c.activeInYear);
 
           // Aggregate KPIs (real numbers, not placeholders)
           const totalRevenueYTD = scorecards.reduce((s, c) => s + c.ytdCollected, 0);
@@ -3648,12 +3674,40 @@ const HostDashboard = () => {
                         <div className="w-14 h-14 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
                           <BarChart3 className="text-gray-300" size={22}/>
                         </div>
-                        <h3 className="text-sm font-black text-gray-900">
-                          {language === 'বাংলা' ? 'কোনো ডেটা নেই' : 'No tenant data yet'}
-                        </h3>
-                        <p className="text-[10px] font-bold text-gray-400 mt-1 max-w-xs mx-auto">
-                          {language === 'বাংলা' ? 'বুকিং তৈরি করলে এখানে স্কোরকার্ড আসবে।' : 'Create a booking and the scorecard will populate here.'}
-                        </p>
+                        {/* Empty-state copy depends on WHY the list is empty:
+                            1. No bookings at all              → onboarding nudge.
+                            2. Bookings exist, none in the year → year-scope hint
+                               (common now that the roster is filtered by year).
+                            3. Active tenants exist but the pill/search hides them
+                               → nudge to relax the filter. */}
+                        {bookings.length === 0 ? (
+                          <>
+                            <h3 className="text-sm font-black text-gray-900">
+                              {language === 'বাংলা' ? 'কোনো ডেটা নেই' : 'No tenant data yet'}
+                            </h3>
+                            <p className="text-[10px] font-bold text-gray-400 mt-1 max-w-xs mx-auto">
+                              {language === 'বাংলা' ? 'বুকিং তৈরি করলে এখানে স্কোরকার্ড আসবে।' : 'Create a booking and the scorecard will populate here.'}
+                            </p>
+                          </>
+                        ) : scorecards.length === 0 ? (
+                          <>
+                            <h3 className="text-sm font-black text-gray-900">
+                              {language === 'বাংলা' ? `${ledgerScopeYear} সালে কোনো সক্রিয় ভাড়াটিয়া নেই` : `No active tenants in ${ledgerScopeYear}`}
+                            </h3>
+                            <p className="text-[10px] font-bold text-gray-400 mt-1 max-w-xs mx-auto">
+                              {language === 'বাংলা' ? 'অন্য একটি বছর নির্বাচন করে দেখুন।' : 'Try selecting a different year.'}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <h3 className="text-sm font-black text-gray-900">
+                              {language === 'বাংলা' ? 'কোনো ফলাফল নেই' : 'No matching tenants'}
+                            </h3>
+                            <p className="text-[10px] font-bold text-gray-400 mt-1 max-w-xs mx-auto">
+                              {language === 'বাংলা' ? 'ফিল্টার বা সার্চ পরিবর্তন করে দেখুন।' : 'Try changing the filter or search.'}
+                            </p>
+                          </>
+                        )}
                       </div>
                     ) : (
                       filteredCards.map((c) => {
@@ -3669,14 +3723,23 @@ const HostDashboard = () => {
                             <div className={`absolute left-0 top-0 bottom-0 w-1 ${badge.dot}`}/>
 
                             <div className="flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-3">
-                              {/* Avatar */}
-                              <div className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-white text-[10px] font-black bg-gradient-to-br ${
+                              {/* Avatar — show the tenant's real profile photo
+                                  when we have one, otherwise fall back to the
+                                  coloured initials chip. `overflow-hidden` clips
+                                  the image to the rounded square. Mirrors the
+                                  Bookings and Inquiries tabs, which already
+                                  render <img> the same way. */}
+                              <div className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-white text-[10px] font-black overflow-hidden bg-gradient-to-br ${
                                 c.bucket === 'excellent' ? 'from-emerald-500 to-green-600' :
                                 c.bucket === 'good'      ? 'from-blue-500 to-indigo-600'   :
                                 c.bucket === 'risk'      ? 'from-amber-500 to-orange-500'  :
                                                             'from-rose-500 to-red-600'
                               }`}>
-                                {init}
+                                {c.booking.tenantAvatar ? (
+                                  <img src={c.booking.tenantAvatar} alt={c.booking.tenant} className="w-full h-full object-cover" />
+                                ) : (
+                                  init
+                                )}
                               </div>
 
                               {/* Main column */}
@@ -5310,9 +5373,24 @@ const HostDashboard = () => {
                           ) : prop.status === 'paused' ? (
                             <span className="text-orange-500 flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>{t?.pausedStatus || (language === 'বাংলা' ? 'পজড' : 'PAUSED')}</span>
                           ) : (
-                            <span className="text-gray-500">{t?.rentedStatus || (language === 'বাংলা' ? 'ভাড়া হয়েছে' : 'RENTED')}</span>
+                            <span className="text-gray-500 flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>{t?.rentedStatus || (language === 'বাংলা' ? 'ভাড়া হয়েছে' : 'RENTED')}</span>
                           )}
                         </div>
+                        {prop.status === 'rented' && (
+                          <div
+                            className="bg-amber-500/95 backdrop-blur-md px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-sm text-white flex items-center gap-1.5"
+                            title={language === 'বাংলা'
+                              ? 'ভাড়া হওয়া লিস্টিং কয়েক দিন পর স্বয়ংক্রিয়ভাবে মুছে ফেলা হয়'
+                              : 'Rented listings are automatically removed after a few days'}
+                          >
+                            <Clock size={11} />
+                            {rentedDaysLeft(prop.rentedAt) > 0
+                              ? (language === 'বাংলা'
+                                  ? `${rentedDaysLeft(prop.rentedAt)} দিন পর মুছে যাবে`
+                                  : `Deletes in ${rentedDaysLeft(prop.rentedAt)}d`)
+                              : (language === 'বাংলা' ? 'মুছে ফেলা হচ্ছে…' : 'Removing…')}
+                          </div>
+                        )}
                         {isRecent(prop.addedDate) && (
                           <div className="bg-[#ba0036] px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-sm text-white flex items-center animate-pulse">
                             {language === 'বাংলা' ? 'নতুন' : 'NEW'}
