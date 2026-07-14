@@ -7,6 +7,8 @@ import {
   updateMemberLedger as updateMemberLedgerApi,
   undoMemberLedger as undoMemberLedgerApi,
   removeMember as removeMemberApi,
+  updateLedger as updateLedgerApi,
+  undoLedger as undoLedgerApi,
 } from '../services/bookingService';
 
 /**
@@ -101,7 +103,27 @@ export default function MembersManager({ booking, language = 'English', onChange
   const bookingId = booking._id || booking.id;
   const persistable = isMongoId(bookingId);
 
-  const members = Array.isArray(booking.members) ? booking.members : [];
+  // Every rent card uses the SAME per-tenant layout. Hostels have real
+  // members[]; single-tenant bookings (flat / single room / sublet) are shown
+  // as ONE synthetic member built from the booking's tenant + booking-level
+  // ledger — so the Rent Collection tab looks identical for every category.
+  const rawMembers = Array.isArray(booking.members) ? booking.members : [];
+  const members = rawMembers.length > 0 ? rawMembers : [{
+    id: '__legacy__',
+    userId: booking.tenantId || null,
+    name: booking.tenant || (isBn ? 'ভাড়াটিয়া' : 'Tenant'),
+    phone: booking.tenantPhone || '',
+    avatar: booking.tenantAvatar || '',
+    rentType: booking.propertyType === 'hostel' ? 'seat' : booking.propertyType === 'single_room' ? 'room' : 'flat',
+    floor: booking.floorNumber || '',
+    roomLabel: booking.roomNumber || '',
+    seatLabel: '',
+    monthlyRent: booking.monthlyRent || 0,
+    serviceCharge: booking.serviceCharge || 0,
+    ledger: booking.ledger || {},
+    status: 'active',
+    __legacy: true,   // mark-paid routes to the booking-level ledger endpoint
+  }];
   const activeMembers = members.filter((m) => m.status !== 'moved-out');
   const capacity = Number(booking.capacity || booking.propertyCapacity || 0);
 
@@ -164,20 +186,27 @@ export default function MembersManager({ booking, language = 'English', onChange
     setCell(null);
     try {
       const monthLabel = monthShort(key, isBn);
+      const legacy = member.__legacy;   // single-tenant → booking-level ledger endpoint
       let updated;
       if (action === 'undo') {
-        updated = await undoMemberLedgerApi(bookingId, member.id, key);
+        updated = legacy
+          ? await undoLedgerApi(bookingId, key)
+          : await undoMemberLedgerApi(bookingId, member.id, key);
       } else if (action === 'due') {
-        updated = await updateMemberLedgerApi(bookingId, member.id, key, {
-          status: 'due', dueNote: '—', monthLabel, totalDue: Number(member.monthlyRent) || 0,
-        });
+        const body = { status: 'due', dueNote: '—', monthLabel, totalDue: Number(member.monthlyRent) || 0 };
+        updated = legacy
+          ? await updateLedgerApi(bookingId, key, body)
+          : await updateMemberLedgerApi(bookingId, member.id, key, body);
       } else {
         const rent = Number(member.monthlyRent) || Number(booking.monthlyRent) || 0;
-        updated = await updateMemberLedgerApi(bookingId, member.id, key, {
+        const body = {
           status: 'full', amount: rent, balance: 0,
           paidOn: new Date().toISOString().slice(0, 10), method: 'Cash',
           monthLabel, totalDue: rent,
-        });
+        };
+        updated = legacy
+          ? await updateLedgerApi(bookingId, key, body)
+          : await updateMemberLedgerApi(bookingId, member.id, key, body);
       }
       emit(updated);
     } catch (err) {

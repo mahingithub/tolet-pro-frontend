@@ -4943,7 +4943,10 @@ const HostDashboard = () => {
 
                     {/* Multi-member bookings show the per-member rent register;
                         legacy single-tenant bookings keep the classic panels. */}
-                    {isHostelBooking(booking) ? (
+                    {/* Unified rent card — every category (flat / single room /
+                        hostel) renders the SAME per-tenant layout. Single-tenant
+                        bookings show one synthetic member (see MembersManager). */}
+                    {true ? (
                       <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} showLedger={true} showManage={false} />
                     ) : (
                     <>
