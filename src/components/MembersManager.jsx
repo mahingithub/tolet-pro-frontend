@@ -116,7 +116,10 @@ export default function MembersManager({ booking, language = 'English', onChange
   const [cell, setCell] = useState(null); // { memberId, key }
   const defaultRentType = 'seat'; // hostel occupants are seats
   const [form, setForm] = useState({
-    name: '', phone: '', rentType: defaultRentType, floor: '', roomLabel: '', seatLabel: '',
+    name: '', phone: '', rentType: defaultRentType,
+    // New seats inherit the booking's floor + room, so adding occupants to the
+    // same room only needs the seat label + tenant name.
+    floor: booking.floorNumber || '', roomLabel: booking.roomNumber || '', seatLabel: '',
     monthlyRent: '',
   });
 
@@ -146,7 +149,7 @@ export default function MembersManager({ booking, language = 'English', onChange
         monthlyRent: form.monthlyRent ? Number(form.monthlyRent) : undefined,
       });
       emit(updated);
-      setForm({ name: '', phone: '', rentType: defaultRentType, floor: '', roomLabel: '', seatLabel: '', monthlyRent: '' });
+      setForm({ name: '', phone: '', rentType: defaultRentType, floor: booking.floorNumber || '', roomLabel: booking.roomNumber || '', seatLabel: '', monthlyRent: '' });
       setShowAdd(false);
     } catch (err) {
       console.warn('[members] add failed:', err.message || err);

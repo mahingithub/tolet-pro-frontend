@@ -1015,6 +1015,9 @@ const HostDashboard = () => {
     category: '',
     floorNumber: '',
     roomNumber: '',
+    // When true, the host types a property name instead of picking a listing —
+    // so a booking isn't limited to one-per-listing.
+    manualProperty: false,
     rentDueDay: 5,
     reminderLeadDays: 3,
     autoReminder: true,
@@ -2116,6 +2119,7 @@ const HostDashboard = () => {
       category: propTypeToCategory(matchingProp?.type),
       floorNumber: '',
       roomNumber: '',
+      manualProperty: false,
       serviceCharge: String(landlordProfile?.serviceCharge ?? authUser?.landlordProfile?.serviceCharge ?? ''),
       rentDueDay: 5,
       reminderLeadDays: 3,
@@ -2185,6 +2189,7 @@ const HostDashboard = () => {
       category: propTypeToCategory(properties[0]?.type),
       floorNumber: '',
       roomNumber: '',
+      manualProperty: false,
       serviceCharge: String(landlordProfile?.serviceCharge ?? authUser?.landlordProfile?.serviceCharge ?? ''),
       rentDueDay: 5,
       reminderLeadDays: 3,
@@ -2198,12 +2203,16 @@ const HostDashboard = () => {
   // Persist a new booking + initialise an empty ledger.
   // TODO(backend): POST /api/host/bookings  body: { ...leaseForm }
   //   On success the inquiry should be marked converted server-side.
-  const submitCreateLease = () => {
+  const submitCreateLease = (keepOpen = false) => {
     if (!isPremium) { setActiveModal('premium_gate'); return; }
-    const { tenant, tenantPhone, propertyId, leaseStart, leaseEnd, monthlyRent } = leaseForm;
+    const { tenant, tenantPhone, propertyId, leaseStart, leaseEnd, monthlyRent, manualProperty } = leaseForm;
     if (!tenant.trim()) { showToast(language === 'বাংলা' ? 'ভাড়াটিয়ার নাম দিন' : 'Tenant name is required'); return; }
     if (!tenantPhone.trim()) { showToast(language === 'বাংলা' ? 'ফোন নম্বর দিন' : 'Tenant phone is required'); return; }
-    if (!propertyId) { showToast(language === 'বাংলা' ? 'প্রপার্টি সিলেক্ট করুন' : 'Pick a property'); return; }
+    if (manualProperty) {
+      if (!String(leaseForm.property || '').trim()) { showToast(language === 'বাংলা' ? 'প্রপার্টির নাম লিখুন' : 'Type the property name'); return; }
+    } else if (!propertyId) {
+      showToast(language === 'বাংলা' ? 'প্রপার্টি সিলেক্ট করুন' : 'Pick a property'); return;
+    }
     if (!leaseStart || !leaseEnd) { showToast(language === 'বাংলা' ? 'লিজের তারিখ দিন' : 'Lease dates are required'); return; }
     if (new Date(leaseEnd) <= new Date(leaseStart)) {
       showToast(language === 'বাংলা' ? 'শেষ তারিখ শুরুর তারিখের পরে হতে হবে' : 'End date must be after start date'); return;
@@ -2222,7 +2231,7 @@ const HostDashboard = () => {
     const guardIsHostel = guardProp?.type === 'hostel';
     const dupe = bookings.find(b => b.status !== 'cancelled' && (
       (leaseForm.inquiryId && b.inquiryId === leaseForm.inquiryId) ||
-      (!guardIsHostel && String(b.propertyId) === pidStr)
+      (!guardIsHostel && pidStr && String(b.propertyId) === pidStr)
     ));
     if (dupe) {
       showToast(language === 'বাংলা' ? 'এই প্রপার্টির জন্য বুকিং আগে থেকেই আছে।' : 'A booking already exists for this property.');
@@ -2246,7 +2255,7 @@ const HostDashboard = () => {
       tenantId: tenantUserId,
       propertyId: pidStr,
       property: matchingProp?.title || leaseForm.property,
-      propertyType: matchingProp?.type || '',
+      propertyType: matchingProp?.type || leaseForm.category || '',
       location: leaseForm.location || matchingProp?.location || '',
       floorNumber: leaseForm.floorNumber || '',
       roomNumber: leaseForm.roomNumber || '',
@@ -2272,7 +2281,7 @@ const HostDashboard = () => {
 
     createBookingApi({
       propertyId: matchingProp ? (matchingProp._id || matchingProp.id) : propertyId,
-      propertyType: matchingProp?.type || '',
+      propertyType: matchingProp?.type || leaseForm.category || '',
       tenantId: tenantUserId,
       property: matchingProp?.title || leaseForm.property,
       location: leaseForm.location || matchingProp?.location || '',
@@ -2298,6 +2307,12 @@ const HostDashboard = () => {
         : undefined,
     }).then(saved => {
       setBookings(prev => prev.map(b => b.id === newBooking.id ? { ...b, ...saved } : b));
+      // Surface the tenant connection code so the host can share it right away.
+      if (saved?.inviteCode) {
+        showToast(language === 'বাংলা'
+          ? `কানেকশন কোড: ${saved.inviteCode} — ভাড়াটিয়াকে দিন`
+          : `Connection code: ${saved.inviteCode} — share it with the tenant`);
+      }
     }).catch(err => {
       console.warn('[host] booking create sync failed:', err.message || err);
       // Save fail হলে fake-id card মুছে দাও — নাহলে এটা পরে delete করা যায় না।
@@ -2315,9 +2330,18 @@ const HostDashboard = () => {
       // Backend-এও sync (createBooking-ও এটাই mark করে — idempotent, কোনো race নেই)।
       updateInquiryStatus(leaseForm.inquiryId, 'final_booking').catch(err => console.warn('[host] inquiry convert sync failed:', err.message || err));
     }
-    showToast(language === 'বাংলা' ? 'বুকিং তৈরি হয়েছে! রেন্ট লেজার চালু হয়েছে।' : 'Booking created — rent ledger is live.');
-    setActiveModal(null);
-    setActiveTab('bookings');
+    if (keepOpen) {
+      // Rapid multi-entry: keep the common fields (property, category, floor,
+      // dates, rent, due day, reminder, payment) and clear only the per-booking
+      // ones so the host can add the next room/tenant immediately — the way to
+      // set 20+ bookings without re-typing everything.
+      setLeaseForm(f => ({ ...f, tenant: '', tenantPhone: '', roomNumber: '', occupants: '', inquiryId: null, inquirerUserId: null }));
+      showToast(language === 'বাংলা' ? 'বুকিং তৈরি হয়েছে — পরের রুম/ভাড়াটিয়া যোগ করুন' : 'Booking created — add the next room / tenant');
+    } else {
+      showToast(language === 'বাংলা' ? 'বুকিং তৈরি হয়েছে! রেন্ট লেজার চালু হয়েছে।' : 'Booking created — rent ledger is live.');
+      setActiveModal(null);
+      setActiveTab('bookings');
+    }
   };
 
   // 🟢 100% FIXED: Moved logic inside the component to prevent White Screen Error!
@@ -4439,6 +4463,27 @@ const HostDashboard = () => {
                       <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} />
                     )}
 
+                    {/* Tenant connection code — non-hostel (hostels show it in
+                        the members panel). Share so the tenant can self-connect. */}
+                    {!isHostelBooking(booking) && booking.inviteCode && (
+                      <div className="mt-3 bg-white rounded-xl border border-gray-100 p-3 flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Lock size={14} className="text-[#ba0036] shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'টেন্যান্ট কানেকশন কোড' : 'Tenant Connection Code'}</p>
+                            <p className="text-sm font-black text-gray-900 tracking-widest tabular-nums">{booking.inviteCode}</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { try { navigator.clipboard.writeText(booking.inviteCode); showToast(language === 'বাংলা' ? 'কোড কপি হয়েছে' : 'Code copied'); } catch { /* clipboard unavailable */ } }}
+                          className="shrink-0 px-2.5 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 text-[10px] font-black text-gray-700 inline-flex items-center gap-1"
+                        >
+                          <ClipboardCheck size={12} /> {language === 'বাংলা' ? 'কপি' : 'Copy'}
+                        </button>
+                      </div>
+                    )}
+
                     {/* Auto-reminder + actions row */}
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-1.5">
                       <button
@@ -6169,29 +6214,55 @@ const HostDashboard = () => {
                     </div>
 
                     <div className="sm:col-span-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'প্রপার্টি' : 'Property'}</label>
-                      <select value={leaseForm.propertyId} onChange={e => {
-                        const val = e.target.value;
-                        // Match on String() so this works for both numeric demo ids and
-                        // Mongo ObjectId strings, and auto-fill the property's location.
-                        const prop = properties.find(p => String(p.id) === String(val));
-                        setLeaseForm(f => ({ ...f, propertyId: val, property: prop?.title || '', location: prop?.location || '' }));
-                      }} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all">
-                        <option value="">{language === 'বাংলা' ? 'প্রপার্টি সিলেক্ট করুন' : 'Select a property'}</option>
-                        {properties
-                          .filter(p => !leaseForm.category || (CATEGORY_TYPES[leaseForm.category] || []).includes(p.type))
-                          .map(p => (<option key={p.id} value={p.id}>{p.title} · {formatLabel(p.type, language === 'বাংলা')} · {p.location}</option>))}
-                      </select>
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'প্রপার্টি' : 'Property'}</label>
+                        {/* Toggle: pick an existing listing OR type a name manually
+                            (manual bypasses the one-booking-per-listing limit). */}
+                        <button
+                          type="button"
+                          onClick={() => setLeaseForm(f => ({ ...f, manualProperty: !f.manualProperty, propertyId: '', property: '', location: '' }))}
+                          className="text-[10px] font-black text-[#ba0036] hover:underline underline-offset-2"
+                        >
+                          {leaseForm.manualProperty
+                            ? (language === 'বাংলা' ? 'লিস্ট থেকে বাছুন' : 'Pick from list')
+                            : (language === 'বাংলা' ? '✎ ম্যানুয়ালি লিখুন' : '✎ Enter manually')}
+                        </button>
+                      </div>
+                      {leaseForm.manualProperty ? (
+                        <input
+                          type="text"
+                          value={leaseForm.property}
+                          onChange={e => setLeaseForm(f => ({ ...f, property: e.target.value }))}
+                          placeholder={language === 'বাংলা' ? 'প্রপার্টির নাম লিখুন' : 'Type the property name'}
+                          className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all"
+                        />
+                      ) : (
+                        <select value={leaseForm.propertyId} onChange={e => {
+                          const val = e.target.value;
+                          // Match on String() so this works for both numeric demo ids and
+                          // Mongo ObjectId strings, and auto-fill the property's location.
+                          const prop = properties.find(p => String(p.id) === String(val));
+                          setLeaseForm(f => ({ ...f, propertyId: val, property: prop?.title || '', location: prop?.location || '' }));
+                        }} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all">
+                          <option value="">{language === 'বাংলা' ? 'প্রপার্টি সিলেক্ট করুন' : 'Select a property'}</option>
+                          {properties
+                            .filter(p => !leaseForm.category || (CATEGORY_TYPES[leaseForm.category] || []).includes(p.type))
+                            .map(p => (<option key={p.id} value={p.id}>{p.title} · {formatLabel(p.type, language === 'বাংলা')} · {p.location}</option>))}
+                        </select>
+                      )}
+                      {leaseForm.manualProperty && (
+                        <p className="text-[9px] font-bold text-gray-400 mt-1">{language === 'বাংলা' ? 'লিস্টিং ছাড়া বুকিং — এক প্রপার্টিতে একাধিক বুকিং করা যায়।' : 'Booking without a listing — lets you add multiple bookings for one property.'}</p>
+                      )}
                     </div>
 
                     {/* Selected property FORMAT indicator. Hostel → seat flow
                         (this tenant = Seat 1, add more seats after). Flat /
                         single room / sublet → classic single-tenant lease. */}
                     {(() => {
-                      const sp = properties.find(p => String(p.id) === String(leaseForm.propertyId));
-                      if (!sp) return null;
+                      if (!leaseForm.category) return null;
                       const isBn = language === 'বাংলা';
-                      const hostel = sp.type === 'hostel';
+                      const hostel = leaseForm.category === 'hostel';
+                      const catLabel = { flat: isBn ? 'ফ্ল্যাট' : 'Flat', single_room: isBn ? 'সিঙ্গেল রুম' : 'Single Room', hostel: isBn ? 'হোস্টেল' : 'Hostel' }[leaseForm.category] || leaseForm.category;
                       return (
                         <div className={`sm:col-span-2 rounded-2xl p-3.5 flex items-start gap-2.5 border ${hostel ? 'bg-[#ba0036]/5 border-[#ba0036]/15' : 'bg-blue-50/70 border-blue-100'}`}>
                           {hostel
@@ -6200,7 +6271,7 @@ const HostDashboard = () => {
                           <div className="min-w-0">
                             <p className="text-[10px] font-black uppercase tracking-widest mb-1 flex items-center gap-1.5">
                               <span className={hostel ? 'text-[#ba0036]' : 'text-blue-700'}>{isBn ? 'ফরম্যাট' : 'Format'}</span>
-                              <span className="px-1.5 py-0.5 rounded bg-white text-gray-800 border border-gray-200">{formatLabel(sp.type, isBn)}</span>
+                              <span className="px-1.5 py-0.5 rounded bg-white text-gray-800 border border-gray-200">{catLabel}</span>
                             </p>
                             <p className="text-[11px] font-bold text-gray-700 leading-relaxed">
                               {hostel
@@ -6223,12 +6294,24 @@ const HostDashboard = () => {
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
                         <MapPin size={11} className="text-[#ba0036]" /> {language === 'বাংলা' ? 'লোকেশন' : 'Location'}
                       </label>
-                      <div className="w-full mt-1.5 p-4 bg-gray-100/70 rounded-xl text-sm font-bold text-gray-700 border border-transparent flex items-center gap-2 min-h-[52px]">
-                        <span className="truncate">
-                          {leaseForm.location || (language === 'বাংলা' ? 'প্রপার্টি সিলেক্ট করলে অটো-ফিল হবে' : 'Auto-fills when you pick a property')}
-                        </span>
-                      </div>
-                      <p className="text-[9px] font-bold text-gray-400 mt-1">{language === 'বাংলা' ? 'প্রপার্টির ঠিকানা থেকে অটো-ফিল' : 'Auto-filled from the property address'}</p>
+                      {leaseForm.manualProperty ? (
+                        <input
+                          type="text"
+                          value={leaseForm.location}
+                          onChange={e => setLeaseForm(f => ({ ...f, location: e.target.value }))}
+                          placeholder={language === 'বাংলা' ? 'ঠিকানা লিখুন' : 'Type the address'}
+                          className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all"
+                        />
+                      ) : (
+                        <>
+                          <div className="w-full mt-1.5 p-4 bg-gray-100/70 rounded-xl text-sm font-bold text-gray-700 border border-transparent flex items-center gap-2 min-h-[52px]">
+                            <span className="truncate">
+                              {leaseForm.location || (language === 'বাংলা' ? 'প্রপার্টি সিলেক্ট করলে অটো-ফিল হবে' : 'Auto-fills when you pick a property')}
+                            </span>
+                          </div>
+                          <p className="text-[9px] font-bold text-gray-400 mt-1">{language === 'বাংলা' ? 'প্রপার্টির ঠিকানা থেকে অটো-ফিল' : 'Auto-filled from the property address'}</p>
+                        </>
+                      )}
                     </div>
 
                     {/* Floor number — all formats once a category is chosen. */}
@@ -6336,9 +6419,20 @@ const HostDashboard = () => {
                     </div>
                   </div>
 
-                  <button onClick={submitCreateLease} className="w-full mt-2 bg-green-600 text-white py-4 rounded-xl font-black shadow-[0_8px_15px_rgba(22,163,74,0.2)] hover:-translate-y-0.5 hover:shadow-[0_12px_20px_rgba(22,163,74,0.3)] transition-all text-sm flex items-center justify-center gap-2">
-                    <Check size={18} /> {language === 'বাংলা' ? 'বুকিং তৈরি করুন' : 'Create Booking & Start Ledger'}
-                  </button>
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {/* Save & Add Another — keeps common fields for rapid 20+ entry. */}
+                    <button onClick={() => submitCreateLease(true)} className="w-full bg-white border-2 border-green-600 text-green-700 py-4 rounded-xl font-black hover:bg-green-50 active:scale-[0.99] transition-all text-sm flex items-center justify-center gap-2">
+                      <Plus size={18} /> {language === 'বাংলা' ? 'সেভ করে আরেকটি' : 'Save & Add Another'}
+                    </button>
+                    <button onClick={() => submitCreateLease(false)} className="w-full bg-green-600 text-white py-4 rounded-xl font-black shadow-[0_8px_15px_rgba(22,163,74,0.2)] hover:-translate-y-0.5 hover:shadow-[0_12px_20px_rgba(22,163,74,0.3)] transition-all text-sm flex items-center justify-center gap-2">
+                      <Check size={18} /> {language === 'বাংলা' ? 'বুকিং তৈরি করুন' : 'Create Booking'}
+                    </button>
+                  </div>
+                  <p className="text-[10px] font-bold text-gray-400 text-center mt-2">
+                    {language === 'বাংলা'
+                      ? '"সেভ করে আরেকটি" — কমন তথ্য (প্রপার্টি, ক্যাটাগরি, তারিখ, ভাড়া) রেখে দ্রুত ২০+ বুকিং যোগ করুন। শুধু রুম + ভাড়াটিয়া বদলান।'
+                      : '"Save & Add Another" keeps the common fields (property, category, dates, rent) so you can add 20+ bookings fast — just change the room + tenant.'}
+                  </p>
                 </div>
               )}
 
