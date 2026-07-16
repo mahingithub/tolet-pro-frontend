@@ -20,7 +20,7 @@ import InquiryModal from './InquiryModal';
 import { propertyService } from '../services/Propertyservice.js';
 // Same field config the Add-Property wizard + dashboard editor use, so the
 // details we RENDER here always match the fields a host can ENTER.
-import { getDynamicFields } from '../constants/propertyFields';
+import { getDynamicFields, hasBedsBaths } from '../constants/propertyFields';
 import { toast } from 'sonner';
 
 // ╔══════════════════════════════════════════════════════════════════════════╗
@@ -1615,7 +1615,6 @@ const PropertyDetails = () => {
   const isUnavailable = property?.status === 'rented' || property?.status === 'sold';
   const isOwnProperty = auth?.user && (String(auth.user.id || auth.user._id) === String(landlord?.id || property?.landlordId || property?.ownerUserId));
   const priceLabel = INTENT_CONFIG[property?.intent]?.priceLabel || '/mo';
-  const group = property ? (TYPE_GROUP_MAP[property.rentalCategory || property.type] || 'residential') : 'residential';
 
   // Human-readable list of the intent/type-specific answers the host entered in
   // the wizard (stored in property.specificDetails — commercial fire safety, gas
@@ -1657,36 +1656,45 @@ const PropertyDetails = () => {
     return out;
   }, [property, langKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const getPremiumStats = () => {
-    const stats = [];
-    if (group === 'residential') {
-      stats.push({ icon: Bed,       label: lt('bedrooms'),  value: `${property.beds}`,  unit: 'Beds' });
-      stats.push({ icon: Bath,      label: lt('bathrooms'), value: `${property.baths}`, unit: 'Baths' });
-      stats.push({ icon: Maximize2, label: lt('area'),      value: Number(property.sqft).toLocaleString(), unit: 'sqft' });
-      stats.push({ icon: Building2, label: lt('floor'),     value: `${property.floor ?? '—'}`, unit: lt('floorUnit') || 'Fl' });
-    } else if (group === 'land') {
-      stats.push({ icon: Maximize2, label: 'জমির পরিমাণ', value: property.landAmount || '—', unit: property.landUnit || 'Katha' });
-      stats.push({ icon: MapPin, label: 'রাস্তার প্রশস্ততা', value: property.roadWidth || '—', unit: 'ft' });
-      stats.push({ icon: ShieldCheck, label: 'খতিয়ান নং', value: property.khatianNo || '—', unit: '' });
-      stats.push({ icon: Layers, label: 'দাগ নং', value: property.dagNo || '—', unit: '' });
-    } else if (group === 'commercial_shop' || group === 'restaurant') {
-      stats.push({ icon: Maximize2, label: 'মোট আয়তন', value: Number(property.sqft).toLocaleString(), unit: 'sqft' });
-      stats.push({ icon: Building2, label: 'ফ্লোর লেভেল', value: `${property.floor ?? '—'}`, unit: 'Fl' });
-      stats.push({ icon: Store, label: 'শাটার/গেট', value: property.shutters || '—', unit: 'টি' });
-      stats.push({ icon: Zap, label: 'বিদ্যুৎ সংযোগ', value: property.electricityLoad || '—', unit: 'KW' });
-    } else if (group === 'office') {
-      stats.push({ icon: Maximize2, label: 'মোট আয়তন', value: Number(property.sqft).toLocaleString(), unit: 'sqft' });
-      stats.push({ icon: Building2, label: 'ফ্লোর লেভেল', value: `${property.floor ?? '—'}`, unit: 'Fl' });
-      stats.push({ icon: Briefcase, label: 'কেবিন', value: property.cabins || '—', unit: 'টি' });
-      stats.push({ icon: Users, label: 'মিটিং রুম', value: property.conferenceRoom || '—', unit: 'টি' });
-    } else if (group === 'warehouse') {
-      stats.push({ icon: Maximize2, label: 'মোট আয়তন', value: Number(property.sqft).toLocaleString(), unit: 'sqft' });
-      stats.push({ icon: Building, label: 'ভিতরের উচ্চতা', value: property.height || '—', unit: 'ft' });
-      stats.push({ icon: Car, label: 'ট্রাক এন্ট্রি', value: property.truckAccess === 'Yes' ? 'হ্যাঁ' : 'না', unit: '' });
-      stats.push({ icon: Store, label: 'লোডিং বে', value: property.loadingBay || '—', unit: 'টি' });
+  // Beds/baths only apply where people live — every rental, plus flats & houses
+  // that are for sale. Commercial units and land have none (the Add-Property
+  // wizard hides those inputs), so mirroring that rule here stops a commercial
+  // listing from ever showing a phantom "1 Bed / 1 Bath" on its hero strip.
+  const showBedsBaths = property ? hasBedsBaths(property.intent, property.type) : false;
+
+  // Hero "stat strip" tiles + the specific details left over for the grid below.
+  //   • Beds/baths appear ONLY where they apply; Area + Floor are universal.
+  //   • For commercial/land (no beds/baths) we top the strip up to 4 tiles with
+  //     the listing's own highlights (fire safety, frontage, land size, …) so it
+  //     stays informative instead of padded with blank/"—" tiles.
+  //   • Anything promoted into the hero is REMOVED from the Property Details grid
+  //     below (detailItems), so nothing is ever shown twice on the page.
+  const { heroStats, detailItems } = useMemo(() => {
+    if (!property) return { heroStats: [], detailItems: [] };
+    const base = [];
+    if (showBedsBaths) {
+      base.push({ icon: Bed,  label: lt('bedrooms'),  value: `${property.beds ?? 0}`,  unit: 'Beds' });
+      base.push({ icon: Bath, label: lt('bathrooms'), value: `${property.baths ?? 0}`, unit: 'Baths' });
     }
-    return stats;
-  };
+    if (Number(property.sqft) > 0) {
+      base.push({ icon: Maximize2, label: lt('area'), value: Number(property.sqft).toLocaleString(), unit: 'sqft' });
+    }
+    // Floor is universal for built units, but a "0 Fl" tile is noise for land —
+    // so only show it when set, unless residential (where 0 means ground floor).
+    const floorVal = property.floor ?? property.floorNumber ?? 0;
+    if (showBedsBaths || Number(floorVal) !== 0) {
+      base.push({ icon: Building2, label: lt('floor'), value: `${floorVal}`, unit: lt('floorUnit') || 'Fl' });
+    }
+    const slots = Math.max(0, 4 - base.length);
+    const promoted = specificDetailItems.slice(0, slots).map((item) => {
+      const cfg = specificDetailIcon[item.key];
+      return { icon: (cfg && cfg.icon) || CheckCircle2, label: item.label, value: item.value, unit: '' };
+    });
+    return {
+      heroStats: [...base, ...promoted],
+      detailItems: specificDetailItems.slice(promoted.length),
+    };
+  }, [property, showBedsBaths, specificDetailItems, langKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const galleryImages = useMemo(() => buildGallery(property), [property]);
 
@@ -2068,7 +2076,7 @@ const PropertyDetails = () => {
                 whole tile and amplifies the glow. */}
             <GlassCard className="p-4 md:p-7">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
-                {getPremiumStats().map((stat, i) => (
+                {heroStats.map((stat, i) => (
                   <motion.div key={i}
                     initial={{ opacity: 0, y: 14, scale: 0.94 }}
                     whileInView={{ opacity: 1, y: 0, scale: 1 }}
@@ -2180,11 +2188,11 @@ const PropertyDetails = () => {
                 size, …). Built from the shared wizard field config, so it always
                 matches the form and covers every listing type. Hidden entirely
                 when the listing carries no specific details. */}
-            {specificDetailItems.length > 0 && (
+            {detailItems.length > 0 && (
               <GlassCard className="p-5 md:p-7">
                 <h3 className="text-xl font-black text-slate-900 mb-5" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('propertyDetails')}</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {specificDetailItems.map((item) => {
+                  {detailItems.map((item) => {
                     const cfg = specificDetailIcon[item.key] || { icon: item.isToggle ? CheckCircle2 : Info, color: 'text-[#ba0036]', bg: 'bg-red-50' };
                     const Icon = cfg.icon;
                     return (

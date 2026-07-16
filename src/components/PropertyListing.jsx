@@ -11,6 +11,9 @@ import { propertyService, subscribeUserProperties, propertyLocationHaystack } fr
 import usePropertyStore from "../store/usePropertyStore";
 import { normaliseIntent } from "../constants/listingIntents";
 import { roomLabel } from "../constants/roomCategories";
+// Beds/baths only apply to residential listings — commercial & land must not
+// show phantom bed/bath chips (shared rule, same one the detail page uses).
+import { hasBedsBaths } from "../constants/propertyFields";
 // ─── INTENT-AWARE FILTER CONFIG (single source of truth for all filter data) ──
 import {
 	getFilterConfig,
@@ -393,12 +396,16 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 						<MapPin size={14} className="text-gray-400" /> {property.location}
 					</p>
 					<div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] font-bold text-gray-600 bg-gray-50 p-2.5 rounded-xl">
-						<span className="flex items-center gap-1.5">
-							<BedDouble size={14} className="text-gray-400" /> {property.beds} {t.beds || "Beds"}
-						</span>
-						<span className="flex items-center gap-1.5">
-							<Bath size={14} className="text-gray-400" /> {property.baths} {t.baths || "Baths"}
-						</span>
+						{hasBedsBaths(property.intent, property.type) && (
+							<>
+								<span className="flex items-center gap-1.5">
+									<BedDouble size={14} className="text-gray-400" /> {property.beds} {t.beds || "Beds"}
+								</span>
+								<span className="flex items-center gap-1.5">
+									<Bath size={14} className="text-gray-400" /> {property.baths} {t.baths || "Baths"}
+								</span>
+							</>
+						)}
 						<span className="flex items-center gap-1.5">
 							<Square size={14} className="text-gray-400" /> {property.sqft} {t.sqft || "sqft"}
 						</span>

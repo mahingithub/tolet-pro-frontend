@@ -184,4 +184,20 @@ export function getDynamicFields(intent, type, category) {
   return fields;
 }
 
+// Whether a property of this intent+type has bedrooms/bathrooms worth showing.
+// SINGLE SOURCE OF TRUTH mirroring the Add-Property wizard's `showBedsBaths`:
+// every rental has them, plus flats & houses that are for SALE. Commercial units
+// (office/shop/showroom/restaurant) and land never do — the wizard hides those
+// inputs, so their stored beds/baths are meaningless and must NOT be displayed.
+// Accepts both the canonical 'sale' and the wizard's legacy 'purchase' alias;
+// 'apartment' is treated as 'flat' (legacy alias).
+export function hasBedsBaths(intent, type) {
+  // A missing intent defaults to a rental (the backend model's default), so we
+  // never hide beds/baths from legacy residential listings that predate the
+  // intent field. Only an EXPLICIT commercial/sale-non-home hides them.
+  if (!intent || intent === 'rent') return true;
+  const isSale = intent === 'sale' || intent === 'buy' || intent === 'sell' || intent === 'purchase';
+  return isSale && ['flat', 'apartment', 'house'].includes(type);
+}
+
 export { SPECIFIC_FIELDS, SPECIFIC_FIELDS_BY_TYPE, FACING_OPTIONS };
