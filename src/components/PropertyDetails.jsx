@@ -301,9 +301,9 @@ const LOCAL_TRANSLATIONS = {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DATA — live properties come from `propertyService`; no demo property data is
-// embedded in this component anymore. Reviews are still stored locally on the
-// component (until a /api/properties/{id}/reviews endpoint exists) but they
-// start empty for every property — no fake review history.
+// embedded in this component anymore. Property-level reviews were removed:
+// reviews are now person-to-person (landlord <-> tenant) and live on the
+// profile pages, so reputation persists after a listing is gone.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -588,18 +588,6 @@ const specificDetailIcon = {
   attachedBath:     { icon: Bath,        color: 'text-cyan-600',    bg: 'bg-cyan-50'    },
   sharedKitchen:    { icon: Utensils,    color: 'text-orange-600',  bg: 'bg-orange-50'  },
 };
-
-// ─── STAR RATING INPUT ────────────────────────────────────────────────────────
-const StarInput = ({ value, onChange }) => (
-  <div className="flex gap-2">
-    {[1, 2, 3, 4, 5].map((star) => (
-      <button key={star} type="button" onClick={() => onChange(star)}
-        className="transition-transform hover:scale-110 active:scale-95">
-        <Star size={28} className={star <= value ? 'fill-yellow-400 text-yellow-400' : 'text-slate-300'} />
-      </button>
-    ))}
-  </div>
-);
 
 // ─── BADGES ───────────────────────────────────────────────────────────────────
 const IntentBadge = ({ intent }) => {
@@ -1703,28 +1691,6 @@ const PropertyDetails = () => {
   const [showInquiry, setShowInquiry] = useState(false);
   const [showPhotoGrid, setShowPhotoGrid] = useState(false);
   const [fullscreenPhoto, setFullscreenPhoto] = useState(null);
-  // Reviews start empty for every property — no fake review history. They'll
-  // come from /api/properties/{id}/reviews when that endpoint exists.
-  const [reviews, setReviews] = useState([]);
-  useEffect(() => { setReviews([]); }, [id]);
-
-  useEffect(() => {
-    if (location.state?.scrollTo === 'reviews') {
-      setTimeout(() => {
-        const el = document.getElementById('reviews');
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.classList.add('ring-2', 'ring-[#ba0036]', 'ring-offset-2', 'transition-all', 'duration-500');
-          setTimeout(() => el.classList.remove('ring-2', 'ring-[#ba0036]', 'ring-offset-2'), 3000);
-        }
-      }, 500);
-    }
-  }, [location.state]);
-  // Reviewer name is sourced from the authenticated profile; the form no
-  // longer asks for a name. Once auth is wired, replace 'You' with profile.name.
-  const reviewerName = (langCtx?.user?.name) || 'You';
-  const [newReview, setNewReview] = useState({ rating: 5, comment: '' });
-  const [reviewDone, setReviewDone] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
   const [expandAbout, setExpandAbout] = useState(false);
 
@@ -1807,27 +1773,6 @@ const PropertyDetails = () => {
     }
   };
 
-  const handleSubmitReview = (e) => {
-    e.preventDefault();
-    if (!newReview.comment.trim()) return;
-    setReviews((prev) => [{
-      id: Date.now(),
-      name: reviewerName,
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(reviewerName)}&background=1a0510&color=ba0036`,
-      rating: newReview.rating,
-      date: new Date().toISOString().split('T')[0],
-      comment: newReview.comment,
-    }, ...prev]);
-    setNewReview({ rating: 5, comment: '' });
-    setReviewDone(true);
-    showToast('Review submitted! Thank you 🙏');
-    setTimeout(() => setReviewDone(false), 5000);
-  };
-
-  const avgRating = reviews.length > 0
-    ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
-    : (property?.rating || 0);
-
   const amenities = property?.amenities || [];
   const mapLat = parseFloat(property?.gpsLat) || 23.7925;
   const mapLng = parseFloat(property?.gpsLng) || 90.4078;
@@ -1844,13 +1789,6 @@ const PropertyDetails = () => {
     });
     return () => { cancelled = true; };
   }, [mapLat, mapLng]);
-
-  // Shared input style for review form (light theme)
-  const reviewInputStyle = {
-    background: '#ffffff',
-    border: '1px solid rgba(15,23,42,0.1)',
-    color: '#0f172a',
-  };
 
   // Suppress lint warnings for retained-but-currently-unused language vars (logic kept intact)
   void ctxLanguage; void setLanguage;
@@ -2024,11 +1962,6 @@ const PropertyDetails = () => {
                 <BadgeCheck size={11} /> {lt('verified')}
               </span>
             )}
-            <span className="inline-flex items-center gap-1.5 text-amber-700 text-[10px] font-black px-3 py-1.5 rounded-full"
-              style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
-              <Star size={10} className="fill-yellow-400 text-yellow-400" />
-              {avgRating} · {reviews.length} reviews
-            </span>
             <span className="inline-flex items-center gap-1.5 text-blue-700 text-[10px] font-black px-3 py-1.5 rounded-full capitalize"
               style={{ background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.2)' }}>
               {property.furnishing}
@@ -2338,80 +2271,6 @@ const PropertyDetails = () => {
                 style={{ background: '#fafbfc', border: '1px solid rgba(15,23,42,0.08)' }}>
                 {lt('viewProfile')} <ChevronRight size={15} />
               </Link>
-            </GlassCard>
-
-            {/* REVIEWS — heading removed per request; rating + count remain on the right edge for context */}
-            <GlassCard id="reviews" className="p-5 md:p-7">
-              <div className="flex items-center justify-end mb-5">
-                <div className="flex items-center gap-2">
-                  <Star size={17} className="fill-yellow-400 text-yellow-400" />
-                  <span className="text-2xl font-black text-slate-900" style={{ fontFamily: 'Oxanium, sans-serif' }}>{avgRating}</span>
-                  <span className="text-xs text-slate-500 font-bold">({reviews.length})</span>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3 mb-7">
-                {reviews.length === 0 && (
-                  <div className="text-center py-8">
-                    <Star size={36} className="mx-auto mb-2 text-slate-300" />
-                    <p className="font-bold text-sm text-slate-500">{lt('noReviewsYet')}</p>
-                  </div>
-                )}
-                {reviews.map((review) => (
-                  <motion.div key={review.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                    className="p-4 rounded-2xl" style={{ background: '#fafbfc', border: '1px solid rgba(15,23,42,0.06)' }}>
-                    <div className="flex items-start gap-3">
-                      <img src={review.avatar} alt={review.name} className="w-10 h-10 rounded-full shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-                          <div>
-                            <p className="font-black text-slate-900 text-sm">{review.name}</p>
-                            <p className="text-[10px] font-bold text-slate-500">
-                              {new Date(review.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            </p>
-                          </div>
-                          <div className="flex gap-0.5">
-                            {[1, 2, 3, 4, 5].map((s) => (
-                              <Star key={s} size={13} className={s <= review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-300'} />
-                            ))}
-                          </div>
-                        </div>
-                        <p className="text-sm text-slate-600 font-medium leading-relaxed">{review.comment}</p>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-
-              {/* Review form — name is sourced from the authenticated profile,
-                  so we no longer ask for it. */}
-              {!reviewDone ? (
-                <form onSubmit={handleSubmitReview} className="flex flex-col gap-3 pt-5" style={{ borderTop: '1px solid rgba(15,23,42,0.06)' }}>
-                  <h4 className="font-black text-slate-900 text-base" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('leaveReview')}</h4>
-                  <p className="text-xs font-bold text-slate-500">
-                    {lt('postingAs') || 'Posting as'} <span className="text-[#ba0036]">{reviewerName}</span>
-                  </p>
-                  <StarInput value={newReview.rating} onChange={(r) => setNewReview(p => ({ ...p, rating: r }))} />
-                  <textarea
-                    style={reviewInputStyle}
-                    className="futuristic-input w-full p-4 rounded-2xl text-sm font-bold resize-none transition-all"
-                    rows={3}
-                    placeholder={lt('shareExperience')}
-                    value={newReview.comment}
-                    onChange={e => setNewReview(p => ({ ...p, comment: e.target.value }))}
-                  />
-                  <button type="submit"
-                    className="cyber-btn text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2"
-                    style={{ background: 'linear-gradient(135deg, #ba0036 0%, #7c0026 100%)', boxShadow: '0 8px 22px rgba(186,0,54,0.22)' }}>
-                    <Send size={15} /> {lt('submitReview')}
-                  </button>
-                </form>
-              ) : (
-                <div className="text-center py-6 pt-5" style={{ borderTop: '1px solid rgba(15,23,42,0.06)' }}>
-                  <CheckCircle2 size={32} className="text-emerald-500 mx-auto mb-2" />
-                  <p className="font-black text-slate-700">{lt('thankYouReview')}</p>
-                </div>
-              )}
             </GlassCard>
 
           </div>
