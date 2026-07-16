@@ -243,6 +243,15 @@ const WelcomeRobotOverlay = () => {
   const avatarInitial = (firstName || 'T').charAt(0).toUpperCase();
   const isSignup = eventInfo?.type === 'signup';
 
+  // সময়-সচেতন শুভেচ্ছা — login "welcome back" ব্যানারকে আরও ব্যক্তিগত করে তোলে।
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return { emoji: '🌅', label: 'শুভ সকাল' };
+    if (h < 16) return { emoji: '☀️', label: 'শুভ দুপুর' };
+    if (h < 19) return { emoji: '🌇', label: 'শুভ বিকাল' };
+    return { emoji: '🌙', label: 'শুভ সন্ধ্যা' };
+  })();
+
   /* ── অ্যাডমিন-কনফিগার করা welcome ভিডিও fetch (শুধু signup-এ) ──
      signup ছাড়া fetch করি না — login ওয়েলকাম হালকা রাখতে ও প্রতি
      লগইনে অকারণ API কল এড়াতে। */
@@ -434,73 +443,93 @@ const WelcomeRobotOverlay = () => {
               </div>
             )}
 
-            {/* ═════════════ LOGIN: নতুন "welcome back" কার্ড ═════════════ */}
+            {/* ═════════════ LOGIN: প্রিমিয়াম "welcome back" ব্যানার ═════════════ */}
             {!isSignup && (
               <motion.div
-                initial={{ opacity: 0, y: 26, scale: 0.96 }}
+                initial={{ opacity: 0, y: 32, scale: 0.94 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 16, scale: 0.97, transition: { duration: 0.25 } }}
-                transition={{ type: 'spring', damping: 24, stiffness: 210 }}
-                className="relative z-10 w-full max-w-[380px] rounded-[1.75rem] bg-white shadow-[0_30px_80px_rgba(0,0,0,0.45)] overflow-hidden"
+                exit={{ opacity: 0, y: 20, scale: 0.96, transition: { duration: 0.25 } }}
+                transition={{ type: 'spring', damping: 24, stiffness: 220 }}
+                className="relative z-10 w-full max-w-[372px] rounded-[2rem] bg-white shadow-[0_40px_100px_-20px_rgba(186,0,54,0.55)] overflow-hidden"
               >
-                {/* ওপরের ব্র্যান্ড অ্যাকসেন্ট বার */}
-                <div className="h-1.5 w-full bg-gradient-to-r from-[#ba0036] via-[#ff2d55] to-[#ff8aa0]" />
+                {/* ── গ্রেডিয়েন্ট হিরো হেডার ── */}
+                <div className="relative px-6 pt-6 pb-14 bg-gradient-to-br from-[#ba0036] via-[#9a002d] to-[#5e001b] overflow-hidden">
+                  {/* সাজসজ্জা: গ্লো অর্ব + সূক্ষ্ম ডট-গ্রিড */}
+                  <div className="pointer-events-none absolute -top-12 -right-10 w-44 h-44 rounded-full bg-white/10 blur-2xl" />
+                  <div className="pointer-events-none absolute -bottom-8 -left-12 w-40 h-40 rounded-full bg-[#ff4d6d]/30 blur-3xl" />
+                  <div
+                    className="pointer-events-none absolute inset-0 opacity-[0.13]"
+                    style={{
+                      backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)',
+                      backgroundSize: '18px 18px',
+                    }}
+                  />
 
-                <div className="p-6">
-                  {/* হেডার: অ্যাভাটার + হাত নাড়া + নাম (আনুভূমিক — signup থেকে আলাদা) */}
-                  <div className="flex items-center gap-3.5">
-                    <div className="relative shrink-0">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#ba0036] to-[#7a0026] flex items-center justify-center text-white text-xl font-black shadow-lg">
+                  {/* সময়-সচেতন শুভেচ্ছা পিল */}
+                  <div className="relative inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 backdrop-blur-sm border border-white/25 text-white text-[11px] font-bold">
+                    <span aria-hidden="true">{greeting.emoji}</span> {greeting.label}
+                  </div>
+
+                  {/* অ্যাভাটার + নাম */}
+                  <div className="relative mt-4 flex items-center gap-3.5">
+                    <motion.div
+                      className="relative shrink-0"
+                      animate={{ y: [0, -4, 0] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                    >
+                      <span className="absolute inset-0 rounded-2xl bg-white/40 blur-lg" />
+                      <div className="relative w-16 h-16 rounded-2xl bg-white flex items-center justify-center text-[#ba0036] text-2xl font-black shadow-xl ring-2 ring-white/50">
                         {avatarInitial}
                       </div>
                       <motion.span
-                        className="absolute -bottom-1.5 -right-1.5 text-xl"
-                        animate={{ rotate: [0, 18, -8, 18, 0] }}
-                        transition={{ duration: 1.4, repeat: Infinity, repeatDelay: 1.2 }}
+                        className="absolute -bottom-1.5 -right-1.5 text-2xl drop-shadow"
+                        animate={{ rotate: [0, 20, -6, 20, 0] }}
+                        transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 1.4 }}
                         aria-hidden="true"
                       >
                         👋
                       </motion.span>
-                    </div>
+                    </motion.div>
                     <div className="min-w-0">
-                      <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#ba0036]">
-                        আবার স্বাগতম
-                      </p>
-                      <h3 className="text-2xl font-black text-slate-900 tracking-tight truncate">
-                        {firstName || 'বন্ধু'}
+                      <p className="text-white/75 text-[12.5px] font-bold">আবার স্বাগতম,</p>
+                      <h3 className="text-white text-[26px] leading-tight font-black tracking-tight truncate">
+                        {firstName || 'বন্ধু'}!
                       </h3>
                     </div>
                   </div>
+                </div>
 
-                  <p className="mt-4 text-[13px] font-medium text-slate-600 leading-relaxed">
+                {/* ── বডি (হেডারের ওপর গোলাকারভাবে ওভারল্যাপ করে) ── */}
+                <div className="relative -mt-6 rounded-t-[1.75rem] bg-white px-6 pt-5 pb-6">
+                  <p className="text-[13.5px] font-medium text-slate-600 leading-relaxed text-center">
                     {loginCopy.tagline}
                   </p>
 
                   {/* কুইক চিপস */}
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="mt-4 flex flex-wrap justify-center gap-2">
                     {loginCopy.chips.map(({ icon: Icon, label }) => (
                       <span
                         key={label}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-[11.5px] font-semibold text-slate-700"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-50 border border-rose-100 text-[12px] font-bold text-[#ba0036]"
                       >
-                        <Icon size={12} className="text-[#ba0036]" />
+                        <Icon size={13} />
                         {label}
                       </span>
                     ))}
                   </div>
 
-                  {/* প্রাইমারি বাটন */}
+                  {/* প্রাইমারি CTA */}
                   <button
                     onClick={() => closeLogin(false)}
-                    className="mt-5 w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-[1.2rem] bg-gradient-to-r from-[#ba0036] to-[#ff2d55] text-white font-bold text-[14px] shadow-[0_12px_28px_rgba(186,0,54,0.4)] hover:shadow-[0_16px_36px_rgba(186,0,54,0.55)] hover:-translate-y-0.5 transition-all"
+                    className="mt-5 w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-[#ba0036] to-[#ff2d55] text-white font-black text-[14.5px] shadow-[0_14px_30px_-6px_rgba(186,0,54,0.6)] hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-6px_rgba(186,0,54,0.7)] active:translate-y-0 transition-all"
                   >
-                    চলুন, শুরু করি <ArrowRight size={16} />
+                    চলুন, শুরু করি <ArrowRight size={17} />
                   </button>
 
                   {/* "আর দেখাবেন না" — চিরতরে বন্ধ */}
                   <button
                     onClick={() => closeLogin(true)}
-                    className="mt-2.5 w-full text-center text-[12.5px] font-semibold text-slate-400 hover:text-slate-600 transition-colors"
+                    className="mt-3 w-full text-center text-[12.5px] font-semibold text-slate-400 hover:text-[#ba0036] transition-colors"
                   >
                     আর দেখাবেন না
                   </button>
