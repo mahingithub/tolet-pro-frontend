@@ -467,3 +467,30 @@ html.dark .bg-clip-text.to-slate-800 { --tw-gradient-to: var(--tp-text-2) var(--
   background: linear-gradient(150deg, rgba(186, 0, 54, 0.6), rgba(255, 77, 109, 0.28) 42%, rgba(148, 163, 184, 0.16) 100%);
   box-shadow: 0 34px 90px -34px rgba(186, 0, 54, 0.55), 0 0 46px -18px rgba(186, 0, 54, 0.5);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DARK THEME — round 4: list-row hovers + brand crimson tints.
+   These utility/variant combos slipped through the earlier rounds and caused
+   real "invisible content" bugs. Most visible in the Location Search modal:
+   hovering a "Popular areas" row turned it near-white while its text stayed
+   light (row text vanished), and the active suggestion row (bg-crimson-50) sat
+   as a light-pink fill under light text. All shared classes, so this also
+   fixes dropdowns / menus / list rows elsewhere in the app.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Row hovers: round 1 only remapped hover:bg-gray-50; the slate / neutral /
+   zinc -50 hovers (search rows, dropdowns, menu items) were left light. */
+html.dark .hover\:bg-slate-50:hover,
+html.dark .hover\:bg-neutral-50:hover,
+html.dark .hover\:bg-zinc-50:hover { background-color: var(--tp-surface-3) !important; }
+
+/* Brand crimson tint fills (crimson-50 / -100) + hover — active/selected rows,
+   soft brand chips, icon holders. Matches the existing rose/red tint treatment
+   so brand text (lightened to --tp-brand-text) reads on top. */
+html.dark .bg-crimson-50,
+html.dark .bg-crimson-100 { background-color: rgba(244, 63, 94, 0.16) !important; }
+html.dark .hover\:bg-crimson-50:hover { background-color: rgba(244, 63, 94, 0.22) !important; }
+
+/* Brand crimson tint borders (crimson-100 / -200) → toned crimson hairline. */
+html.dark .border-crimson-100,
+html.dark .border-crimson-200 { border-color: rgba(244, 63, 94, 0.32) !important; }

@@ -428,13 +428,50 @@ const fetchNearbyPlaces = async (lat, lng) => {
 // Each room now carries BOTH a futuristic lucide Icon (used in the gallery
 // overlays + stats cards) and an emoji (used by the Photo tour modal where
 // the legacy emoji-led design still feels right).
-const ROOM_TYPES = [
-  { id: 'bedroom',  label: 'Bedroom',     emoji: '🛏️', Icon: Bed },
-  { id: 'bathroom', label: 'Bathroom',    emoji: '🚿', Icon: ShowerHead },
-  { id: 'living',   label: 'Living Room', emoji: '🛋️', Icon: Sofa },
-  { id: 'kitchen',  label: 'Kitchen',     emoji: '🍳', Icon: Utensils },
-  { id: 'other',    label: 'Other',       emoji: '📷', Icon: Camera },
-];
+// Metadata for EVERY room/area category a listing can carry — residential AND
+// commercial/office/land. The old residential-only `ROOM_TYPES` list caused
+// commercial photos (workspace / reception / meeting / washroom …) to be
+// dropped from the gallery entirely; keying off this superset map fixes that
+// and gives each area a proper label + emoji + icon in the gallery overlays
+// and the photo-tour rail. Unknown ids fall back to prettifyRoom().
+const ROOM_META = {
+  cover:          { label: 'Cover Photo',       emoji: '🏠', Icon: Home },
+  // ── Residential ──
+  bedroom:        { label: 'Bedroom',           emoji: '🛏️', Icon: Bed },
+  bathroom:       { label: 'Bathroom',          emoji: '🚿', Icon: ShowerHead },
+  living:         { label: 'Living Room',       emoji: '🛋️', Icon: Sofa },
+  kitchen:        { label: 'Kitchen',           emoji: '🍳', Icon: Utensils },
+  balcony:        { label: 'Balcony',           emoji: '🏙️', Icon: Eye },
+  // ── Commercial / office ──
+  workspace:      { label: 'Workspace / Floor', emoji: '🏢', Icon: Building },
+  reception:      { label: 'Reception',         emoji: '🛎️', Icon: Users },
+  meeting:        { label: 'Meeting Room',      emoji: '👥', Icon: Users },
+  meeting_room:   { label: 'Meeting Room',      emoji: '👥', Icon: Users },
+  cabin:          { label: 'Cabin',             emoji: '🚪', Icon: Building2 },
+  front_view:     { label: 'Front View',        emoji: '🏪', Icon: Store },
+  inside_floor:   { label: 'Inside Floor',      emoji: '🏬', Icon: Building },
+  inside_hall:    { label: 'Dining Hall',       emoji: '🍽️', Icon: Utensils },
+  kitchen_area:   { label: 'Kitchen Area',      emoji: '🍽️', Icon: Utensils },
+  electric_panel: { label: 'Electric Panel',    emoji: '⚡', Icon: Zap },
+  inside_view:    { label: 'Interior',          emoji: '🏭', Icon: Building },
+  entrance:       { label: 'Entrance / Gate',   emoji: '🚪', Icon: Building2 },
+  loading_area:   { label: 'Loading Area',      emoji: '🚚', Icon: Car },
+  washroom:       { label: 'Washroom',          emoji: '🚻', Icon: ShowerHead },
+  // ── Land ──
+  plot_area:      { label: 'Plot Area',         emoji: '🗺️', Icon: MapPin },
+  road_view:      { label: 'Road View',         emoji: '🛣️', Icon: MapPin },
+  surrounding:    { label: 'Surroundings',      emoji: '🌳', Icon: Globe },
+  surroundings:   { label: 'Surroundings',      emoji: '🌳', Icon: Globe },
+  map:            { label: 'Mouza Map',         emoji: '🧭', Icon: FileText },
+  // ── Fallback ──
+  other:          { label: 'Other',             emoji: '📷', Icon: Camera },
+};
+
+// Turn an unknown room id (e.g. 'loading_area') into a readable label
+// ('Loading Area') so a category we haven't explicitly mapped still looks good.
+function prettifyRoom(id) {
+  return String(id || 'Photo').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 // ─── INTENT CONFIG ────────────────────────────────────────────────────────────
 
@@ -728,27 +765,74 @@ const FullscreenPhoto = ({ src, onClose }) => (
 // ─────────────────────────────────────────────────────────────────────────────
 // GALLERY BUILDER
 // ─────────────────────────────────────────────────────────────────────────────
-const GALLERY_ROOM_ORDER = ['bedroom', 'bathroom', 'living', 'kitchen', 'other'];
+// Preferred room order PER LAYOUT so the FIRST photos shown are the most
+// representative for that kind of property — this is what surfaces the "best
+// 3-4" by layout. A home leads with bedroom→living→kitchen; a commercial space
+// leads with its main floor→reception→meeting; land leads with the plot→road.
+// Mirrors AddProperty's getRoomTypes() branching so the ids line up with what
+// was actually saved. Any id NOT listed here is still shown (appended) — we
+// never drop a photo.
+function galleryRoomOrder(property) {
+  const type = property?.type;
+  const intent = property?.intent;
+  if (type === 'land') {
+    return ['plot_area', 'road_view', 'surrounding', 'surroundings', 'map', 'front_view', 'other'];
+  }
+  if (intent === 'commercial' || ['office', 'shop', 'showroom', 'restaurant', 'warehouse'].includes(type)) {
+    return [
+      'workspace', 'reception', 'meeting', 'meeting_room', 'cabin',
+      'front_view', 'inside_floor', 'inside_hall', 'kitchen_area',
+      'inside_view', 'entrance', 'loading_area', 'electric_panel',
+      'washroom', 'other',
+    ];
+  }
+  return ['bedroom', 'living', 'kitchen', 'bathroom', 'balcony', 'front_view', 'other'];
+}
 
 function buildGallery(property) {
   if (!property) return [];
   const items = [];
+
+  // Cover photo always leads the gallery.
   if (property.coverPhoto) {
-    items.push({ url: property.coverPhoto, room: 'cover', label: 'Cover Photo', emoji: '🏠', Icon: Home });
+    const m = ROOM_META.cover;
+    items.push({ url: property.coverPhoto, room: 'cover', label: m.label, emoji: m.emoji, Icon: m.Icon });
   }
-  // Accept BOTH the form-time shape `{ room, preview }` AND the persisted /
-  // API shape `{ room, url }`. The room category is preserved through the
-  // entire pipeline so the gallery groups by bedroom / bathroom / kitchen
-  // / living / other instead of dumping all photos in one bucket.
-  for (const roomId of GALLERY_ROOM_ORDER) {
-    const rt = ROOM_TYPES.find(r => r.id === roomId);
-    const photos = (property.roomPhotos || []).filter(p => (p.room || 'other') === roomId);
-    photos.forEach(p => {
-      const url = p.preview || p.url;
-      if (!url) return;
-      items.push({ url, room: roomId, label: rt?.label || roomId, emoji: rt?.emoji || '📷', Icon: rt?.Icon || Camera });
+
+  // Accept BOTH the form-time shape `{ room, preview }` AND the persisted / API
+  // shape `{ room, url }`. Every room category is preserved through the whole
+  // pipeline. We order rooms by the layout that fits this listing (home vs
+  // commercial vs land) so the best photos come first, then append any room id
+  // we didn't explicitly order — so a commercial listing's workspace /
+  // reception / meeting / washroom photos ALWAYS appear (the previous
+  // residential-only whitelist silently dropped them: that was the bug).
+  const roomPhotos = Array.isArray(property.roomPhotos) ? property.roomPhotos : [];
+  const preferred = galleryRoomOrder(property);
+  const ordered = [];
+  const seen = new Set();
+  const pushRoom = (id) => { if (!seen.has(id)) { seen.add(id); ordered.push(id); } };
+  preferred.forEach((id) => { if (roomPhotos.some(p => (p.room || 'other') === id)) pushRoom(id); });
+  roomPhotos.forEach((p) => pushRoom(p.room || 'other'));
+
+  ordered.forEach((roomId) => {
+    const m = ROOM_META[roomId] || { label: prettifyRoom(roomId), emoji: '📷', Icon: Camera };
+    roomPhotos
+      .filter((p) => (p.room || 'other') === roomId)
+      .forEach((p) => {
+        const url = p.preview || p.url;
+        if (url) items.push({ url, room: roomId, label: m.label, emoji: m.emoji, Icon: m.Icon });
+      });
+  });
+
+  // Legacy safety net: very old listings stored a flat `images[]` with no room
+  // tags and no coverPhoto. Surface them so the gallery is never empty.
+  if (items.length === 0 && Array.isArray(property.images)) {
+    property.images.filter(Boolean).forEach((url, i) => {
+      const m = i === 0 ? ROOM_META.cover : ROOM_META.other;
+      items.push({ url, room: i === 0 ? 'cover' : 'other', label: m.label, emoji: m.emoji, Icon: m.Icon });
     });
   }
+
   return items;
 }
 
@@ -1105,7 +1189,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property }) => 
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Rooms</p>
                 <div className="flex flex-col gap-1">
                   {orderedRooms.map((room) => {
-                    const rt = ROOM_TYPES.find(r => r.id === room) || { label: room === 'cover' ? 'Cover Photo' : room, emoji: '📷' };
+                    const rt = ROOM_META[room] || { label: prettifyRoom(room), emoji: '📷' };
                     const isActive = activeRoom === room;
                     return (
                       <button key={room}
@@ -1151,7 +1235,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property }) => 
               <div className="md:hidden absolute top-[68px] left-0 right-0 z-[5] px-4 py-2.5 flex gap-2 overflow-x-auto"
                 style={{ borderBottom: '1px solid rgba(15,23,42,0.05)', background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(16px)', scrollbarWidth: 'none' }}>
                 {orderedRooms.map((room) => {
-                  const rt = ROOM_TYPES.find(r => r.id === room) || { label: room === 'cover' ? 'Cover' : room, emoji: '📷' };
+                  const rt = ROOM_META[room] || { label: prettifyRoom(room), emoji: '📷' };
                   const isActive = activeRoom === room;
                   return (
                     <button key={room} onClick={() => scrollToRoom(room)}
@@ -1185,7 +1269,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property }) => 
                 style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 #ffffff' }}>
 
                 {orderedRooms.map((room, sIdx) => {
-                  const rt = ROOM_TYPES.find(r => r.id === room) || { label: room === 'cover' ? 'Cover Photo' : room, emoji: '📷' };
+                  const rt = ROOM_META[room] || { label: prettifyRoom(room), emoji: '📷' };
                   const roomImages = grouped[room] || [];
                   if (!roomImages.length) return null;
                   const [hero, ...rest] = roomImages;
