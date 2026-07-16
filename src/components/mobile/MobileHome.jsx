@@ -92,14 +92,30 @@ const friendlyArea = (loc = '') => {
 
 /** Maps a property's rentalCategory + type into the pill stack labels
  *  ("APARTMENT", "FAMILY FLAT") shown on the card. */
-const cardLabels = (property, t) => {
-  const typeMap = {
-    apartment:   t.mobApartment,
-    independent: t.mobApartment,
-    duplex:      t.mobApartment,
-    studio:      t.mobStudio,
-    penthouse:   t.mobApartment,
-  };
+// Human-readable property TYPE label so the card clearly says WHAT it is —
+// Office / Shop / Restaurant / Showroom / Hostel / House / Single Room /
+// Apartment / Land … The old map defaulted EVERYTHING to "Apartment", which
+// mislabelled offices, shops, hostels, etc. on the home feed.
+const TYPE_LABELS_MOB = {
+  flat:        { en: 'Apartment',   bn: 'অ্যাপার্টমেন্ট' },
+  apartment:   { en: 'Apartment',   bn: 'অ্যাপার্টমেন্ট' },
+  house:       { en: 'House',       bn: 'বাড়ি' },
+  independent: { en: 'House',       bn: 'বাড়ি' },
+  duplex:      { en: 'Duplex',      bn: 'ডুপ্লেক্স' },
+  studio:      { en: 'Studio',      bn: 'স্টুডিও' },
+  penthouse:   { en: 'Penthouse',   bn: 'পেন্টহাউস' },
+  sublet:      { en: 'Sublet',      bn: 'সাবলেট' },
+  hostel:      { en: 'Hostel',      bn: 'হোস্টেল' },
+  single_room: { en: 'Single Room', bn: 'সিঙ্গেল রুম' },
+  building:    { en: 'Building',    bn: 'বিল্ডিং' },
+  office:      { en: 'Office',      bn: 'অফিস' },
+  shop:        { en: 'Shop',        bn: 'দোকান' },
+  showroom:    { en: 'Showroom',    bn: 'শোরুম' },
+  restaurant:  { en: 'Restaurant',  bn: 'রেস্টুরেন্ট' },
+  land:        { en: 'Land',        bn: 'জমি' },
+};
+
+const cardLabels = (property, t, isBn = false) => {
   const catMap = {
     family:          t.mobFamilyFlat,
     bachelor_male:   t.mobBachelor,
@@ -107,9 +123,15 @@ const cardLabels = (property, t) => {
     sublet:          t.mobSublet,
     student:         t.mobStudent,
   };
+  const tl = TYPE_LABELS_MOB[property.type];
+  const typeLabel = tl
+    ? (isBn ? tl.bn : tl.en)
+    : (property.type
+        ? String(property.type).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+        : (isBn ? 'প্রপার্টি' : 'Property'));
   return {
-    typeLabel: typeMap[property.type] || t.mobApartment,
-    catLabel:  catMap[property.rentalCategory] || null,
+    typeLabel,
+    catLabel: catMap[property.rentalCategory] || null,
   };
 };
 
@@ -581,23 +603,32 @@ const LandlordCTA = ({ t }) => {
 // Build a tiny per-room collage (one photo per category) so the right-hand
 // Dynamically builds the collage using the actual room photos uploaded by the user.
 const mobBuildCollage = (property) => {
-  const seen = new Set();
+  const cover = property.coverPhoto || property.img || (property.images || [])[0] || '';
+  // One tile per unique room category (labelled), first-seen order.
   const tiles = [];
+  const seen = new Set();
   if (Array.isArray(property.roomPhotos)) {
     for (const p of property.roomPhotos) {
+      const url = p.url || p.preview;
       const r = (p.room || 'other').toLowerCase();
-      if (!seen.has(r) && (p.url || p.preview)) {
-        tiles.push({ url: p.url || p.preview, room: r });
-        seen.add(r);
-      }
+      if (url && !seen.has(r)) { tiles.push({ url, room: r }); seen.add(r); }
     }
   }
-  const cover = property.coverPhoto || property.img || tiles[0]?.url || (property.images || [])[0] || '';
-  const remaining = tiles.filter((t) => t.url !== cover);
-  if (remaining.length === 0 && Array.isArray(property.images)) {
-    remaining.push(...property.images.filter((u) => u && u !== cover).map(u => ({ url: u, room: null })));
+  // Prefer photos that DIFFER from the cover (so the strip isn't three copies
+  // of the same building) but KEEP the labelled same-as-cover rooms as fillers
+  // — so a commercial listing still reads "Workspace / Reception / Washroom"
+  // instead of padding with duplicate cover photos.
+  const distinct    = tiles.filter((tile) => tile.url && tile.url !== cover);
+  const sameAsCover = tiles.filter((tile) => tile.url && tile.url === cover);
+  const thumbs = [...distinct, ...sameAsCover];
+  // Legacy listings with no room tags: backfill from the flat images list.
+  if (thumbs.length < 3 && Array.isArray(property.images)) {
+    for (const u of property.images) {
+      if (thumbs.length >= 3) break;
+      if (u && u !== cover && !thumbs.some((s) => s.url === u)) thumbs.push({ url: u, room: null });
+    }
   }
-  return { cover, thumbs: remaining.slice(0, 3) };
+  return { cover, thumbs: thumbs.slice(0, 3) };
 };
 
 const PropertyCardSkeleton = () => (
@@ -622,7 +653,7 @@ const PropertyCard = ({ property, t, landlord }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const [liked, setLiked] = useState(false);
-  const { typeLabel, catLabel } = cardLabels(property, t);
+  const { typeLabel, catLabel } = cardLabels(property, t, language === 'বাংলা');
 
   const daysAgo = computeDaysAgo(property.date || property.createdAt);
   const ageLabel = daysAgo === 0
@@ -635,8 +666,10 @@ const PropertyCard = ({ property, t, landlord }) => {
   // (legacy base64). SafeImg renders a clean placeholder for any empty/dead
   // tile instead.
   const { cover: primary, thumbs: rawThumbs } = mobBuildCollage(property);
-  // Ensure we have 3 thumbs for the layout (pad with empty objects if needed)
-  const padThumbs = [{ url: primary, room: null }, { url: primary, room: null }];
+  // Fill the 3-slot layout. Pad with EMPTY tiles (SafeImg draws a clean
+  // placeholder) — never with the cover, which used to make the strip look
+  // like two or three duplicate cover photos.
+  const padThumbs = [{ url: '', room: null }, { url: '', room: null }];
   const thumbs = [...rawThumbs, ...padThumbs].slice(0, 3);
   const extraImages = Array.isArray(property.images) ? property.images.length : 0;
 
@@ -702,7 +735,10 @@ const PropertyCard = ({ property, t, landlord }) => {
               // Convert shot string (fallback) to object just in case
               const s = typeof shot === 'string' ? { url: shot, room: null } : shot;
               const ROOM_LABEL_FALLBACK = {
-                bedroom: "Bedroom", bathroom: "Bathroom", living: "Living", kitchen: "Kitchen", other: "Other"
+                bedroom: "Bedroom", bathroom: "Bathroom", washroom: "Washroom", living: "Living", kitchen: "Kitchen", kitchen_area: "Kitchen", balcony: "Balcony",
+                workspace: "Workspace", reception: "Reception", meeting: "Meeting", meeting_room: "Meeting", cabin: "Cabin",
+                front_view: "Front", inside_floor: "Floor", inside_hall: "Hall", inside_view: "Interior", entrance: "Entrance", loading_area: "Loading", electric_panel: "Panel",
+                plot_area: "Plot", road_view: "Road", surrounding: "Area", map: "Map", other: "Other"
               };
               return (
                 <div key={i} className="relative rounded-[16px] overflow-hidden bg-gray-100">
@@ -748,11 +784,21 @@ const PropertyCard = ({ property, t, landlord }) => {
           </div>
 
           <div className="flex items-center gap-3 mt-2 text-[11px] text-gray-600 font-semibold">
-            <span className="inline-flex items-center gap-1">
-              <Building2 size={12} /> {property.beds.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} {t.mobBed} · {property.baths.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} {t.mobBath}
-            </span>
-            <span className="text-gray-300">·</span>
-            <span>{property.sqft.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} sqft</span>
+            {(property.intent === 'commercial' || property.type === 'land' || (!property.beds && !property.baths)) ? (
+              /* Commercial / land don't have beds & baths — showing "1 bed 1 bath"
+                 on an office is exactly the confusion the user flagged. */
+              <span className="inline-flex items-center gap-1">
+                <Building2 size={12} /> {Number(property.sqft || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} sqft
+              </span>
+            ) : (
+              <>
+                <span className="inline-flex items-center gap-1">
+                  <Building2 size={12} /> {property.beds.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} {t.mobBed} · {property.baths.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} {t.mobBath}
+                </span>
+                <span className="text-gray-300">·</span>
+                <span>{property.sqft.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} sqft</span>
+              </>
+            )}
           </div>
 
           <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100">

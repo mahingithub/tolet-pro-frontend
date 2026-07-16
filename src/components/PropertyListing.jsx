@@ -156,9 +156,56 @@ const validDivisions = ["dhaka", "chittagong", "sylhet", "rajshahi", "khulna", "
 const ROOM_LABEL_FALLBACK = {
 	bedroom:  "Bedroom",
 	bathroom: "Bathroom",
+	washroom: "Washroom",
 	living:   "Living",
 	kitchen:  "Kitchen",
-	other:    "Other",
+	kitchen_area: "Kitchen",
+	balcony:  "Balcony",
+	workspace: "Workspace",
+	reception: "Reception",
+	meeting:   "Meeting",
+	meeting_room: "Meeting",
+	cabin:     "Cabin",
+	front_view: "Front",
+	inside_floor: "Floor",
+	inside_hall: "Hall",
+	inside_view: "Interior",
+	entrance:  "Entrance",
+	loading_area: "Loading",
+	electric_panel: "Panel",
+	plot_area: "Plot",
+	road_view: "Road",
+	surrounding: "Area",
+	map:       "Map",
+	other:     "Other",
+};
+
+// Human-readable property TYPE label so a card clearly says WHAT it is —
+// Office / Shop / Restaurant / Hostel / House / Single Room / Apartment / Land.
+const PROPERTY_TYPE_LABELS = {
+	flat: { en: 'Apartment', bn: 'অ্যাপার্টমেন্ট' },
+	apartment: { en: 'Apartment', bn: 'অ্যাপার্টমেন্ট' },
+	house: { en: 'House', bn: 'বাড়ি' },
+	independent: { en: 'House', bn: 'বাড়ি' },
+	duplex: { en: 'Duplex', bn: 'ডুপ্লেক্স' },
+	studio: { en: 'Studio', bn: 'স্টুডিও' },
+	penthouse: { en: 'Penthouse', bn: 'পেন্টহাউস' },
+	sublet: { en: 'Sublet', bn: 'সাবলেট' },
+	hostel: { en: 'Hostel', bn: 'হোস্টেল' },
+	single_room: { en: 'Single Room', bn: 'সিঙ্গেল রুম' },
+	building: { en: 'Building', bn: 'বিল্ডিং' },
+	office: { en: 'Office', bn: 'অফিস' },
+	shop: { en: 'Shop', bn: 'দোকান' },
+	showroom: { en: 'Showroom', bn: 'শোরুম' },
+	restaurant: { en: 'Restaurant', bn: 'রেস্টুরেন্ট' },
+	land: { en: 'Land', bn: 'জমি' },
+};
+const propertyTypeLabel = (type, isBn) => {
+	const tl = PROPERTY_TYPE_LABELS[type];
+	if (tl) return isBn ? tl.bn : tl.en;
+	return type
+		? String(type).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+		: (isBn ? 'প্রপার্টি' : 'Property');
 };
 
 // ─── ROOM COLLAGE HELPER ──────────────────────────────────────────────────────
@@ -181,7 +228,12 @@ function buildRoomCollage(property) {
 	}
 
 	const cover = property.coverPhoto || property.img || (uniqueRoomShots[0]?.url) || (property.images || [])[0] || "";
-	const thumbs = uniqueRoomShots.filter(s => s.url !== cover).slice(0, 3);
+	// Prefer photos that DIFFER from the cover, then keep the labelled
+	// same-as-cover rooms so a commercial listing shows Workspace / Reception /
+	// Washroom instead of a single stray thumbnail beside the cover.
+	const distinctShots = uniqueRoomShots.filter(s => s.url && s.url !== cover);
+	const sameAsCoverShots = uniqueRoomShots.filter(s => s.url && s.url === cover);
+	const thumbs = [...distinctShots, ...sameAsCoverShots].slice(0, 3);
 
 	// If we have no real per-room photos at all, fall back to the flat `images` array
 	if (!thumbs.length && !hasRoomPhotos && Array.isArray(property.images)) {
@@ -297,6 +349,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 									<ShieldCheck size={12} /> {t.verified || "Verified"}
 								</div>
 							)}
+							<span className="bg-gray-900/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm">{propertyTypeLabel(property.type, isBn)}</span>
 							<span className="bg-brandRed/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm">{catLabel}</span>
 							{property.intent && (
 								<span className={`backdrop-blur-md text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm ${
