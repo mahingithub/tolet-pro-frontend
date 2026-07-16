@@ -1013,6 +1013,13 @@ const HostDashboard = () => {
     // New Lease category (flat / single_room / hostel) — drives the dynamic
     // fields. Plus unit location captured per category.
     category: '',
+    // ── Commercial deal fields (used only when dealType === 'commercial') ──
+    // Commercial leases capture the business identity + a fixed tenure instead
+    // of family occupants / hostel seats. Derived from the property's intent.
+    dealType: 'residential',
+    businessName: '',
+    licenseNumber: '',      // trade licence — optional
+    leaseTermMonths: '',    // tenure in months → computes leaseEnd
     floorNumber: '',
     roomNumber: '',
     // When true, the host types a property name instead of picking a listing —
@@ -2101,6 +2108,8 @@ const HostDashboard = () => {
     // marks the inquiry 'converted'.
     // Pre-fill from inquiry; host adjusts dates + rent before confirming.
     const matchingProp = properties.find(p => p.id === inquiry.propertyId) || null;
+    // Commercial when the inquiry (denormalised) or the property says so.
+    const inqCommercial = inquiry.dealType === 'commercial' || matchingProp?.intent === 'commercial';
     const start = todayIso();
     // Default to a 12-month lease ending the day before the same date next year.
     const startDate = new Date(start);
@@ -2120,7 +2129,12 @@ const HostDashboard = () => {
       advancePayment: '',
       paymentMethod: 'bKash',
       occupants: '',
-      category: propTypeToCategory(matchingProp?.type),
+      dealType: inqCommercial ? 'commercial' : 'residential',
+      businessName: '',
+      licenseNumber: '',
+      leaseTermMonths: inqCommercial ? '24' : '',
+      // Commercial deals don't use the residential flat/room/hostel category.
+      category: inqCommercial ? '' : propTypeToCategory(matchingProp?.type),
       // Auto-fill floor from the property; room number stays empty (host provides).
       floorNumber: (matchingProp?.floorNumber ?? matchingProp?.floor) != null ? String(matchingProp?.floorNumber ?? matchingProp?.floor) : '',
       roomNumber: '',
@@ -2198,7 +2212,11 @@ const HostDashboard = () => {
       advancePayment: '',
       paymentMethod: 'bKash',
       occupants: '',
-      category: propTypeToCategory(properties[0]?.type),
+      dealType: properties[0]?.intent === 'commercial' ? 'commercial' : 'residential',
+      businessName: '',
+      licenseNumber: '',
+      leaseTermMonths: properties[0]?.intent === 'commercial' ? '24' : '',
+      category: properties[0]?.intent === 'commercial' ? '' : propTypeToCategory(properties[0]?.type),
       floorNumber: '',
       roomNumber: '',
       manualProperty: false,
@@ -2225,12 +2243,28 @@ const HostDashboard = () => {
       const el = document.getElementById('lease-' + field);
       if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); try { el.focus({ preventScroll: true }); } catch { /* focus optional */ } }
     }, 60);
+    const isCommercial = leaseForm.dealType === 'commercial';
+    // Commercial deals collect a lease TERM (months); we derive the end date
+    // from start + term. Residential keeps the explicit end-date picker.
+    const termMonths = Number(leaseForm.leaseTermMonths) || 0;
+    let effLeaseEnd = leaseEnd;
+    if (isCommercial && leaseStart && termMonths > 0) {
+      const sd = new Date(leaseStart);
+      const ed = new Date(sd.getFullYear(), sd.getMonth() + termMonths, sd.getDate());
+      effLeaseEnd = `${ed.getFullYear()}-${String(ed.getMonth() + 1).padStart(2, '0')}-${String(ed.getDate()).padStart(2, '0')}`;
+    }
     const missing = [];
     if (!tenant.trim()) missing.push('tenant');
     if (!tenantPhone.trim()) missing.push('tenantPhone');
     if (manualProperty ? !String(leaseForm.property || '').trim() : !propertyId) missing.push('property');
-    if ((leaseForm.category === 'single_room' || leaseForm.category === 'hostel') && !String(leaseForm.roomNumber || '').trim()) missing.push('roomNumber');
-    if (!leaseStart || !leaseEnd) missing.push('leaseEnd');
+    if (isCommercial) {
+      if (!String(leaseForm.businessName || '').trim()) missing.push('businessName');
+      if (!leaseStart) missing.push('leaseStart');
+      if (termMonths <= 0) missing.push('leaseTermMonths');
+    } else {
+      if ((leaseForm.category === 'single_room' || leaseForm.category === 'hostel') && !String(leaseForm.roomNumber || '').trim()) missing.push('roomNumber');
+      if (!leaseStart || !leaseEnd) missing.push('leaseEnd');
+    }
     const rent = Number(monthlyRent) || 0;
     if (rent <= 0) missing.push('monthlyRent');
     if (missing.length) {
@@ -2239,7 +2273,7 @@ const HostDashboard = () => {
       scrollToLeaseField(missing[0]);
       return;
     }
-    if (new Date(leaseEnd) <= new Date(leaseStart)) {
+    if (new Date(effLeaseEnd) <= new Date(leaseStart)) {
       setLeaseErrors(['leaseEnd']);
       showToast(language === 'বাংলা' ? 'শেষ তারিখ শুরুর তারিখের পরে হতে হবে' : 'End date must be after start date');
       scrollToLeaseField('leaseEnd');
@@ -2291,7 +2325,9 @@ const HostDashboard = () => {
       tenantPhone: tenantPhone.trim(),
       tenantEmail: '',
       tenantsCount: occupants,
-      leaseStart, leaseEnd,
+      leaseStart, leaseEnd: effLeaseEnd,
+      dealType: isCommercial ? 'commercial' : 'residential',
+      ...(isCommercial ? { commercialTerms: { businessName: String(leaseForm.businessName || '').trim(), licenseNumber: String(leaseForm.licenseNumber || '').trim(), leaseTermMonths: termMonths } } : {}),
       monthlyRent: rent,
       advancePayment,
       paymentMethod,
@@ -2314,7 +2350,9 @@ const HostDashboard = () => {
       location: leaseForm.location || matchingProp?.location || '',
       serviceCharge: Number(leaseForm.serviceCharge) || 0,
       inquiryId: leaseForm.inquiryId,
-      leaseStart, leaseEnd,
+      leaseStart, leaseEnd: effLeaseEnd,
+      dealType: isCommercial ? 'commercial' : 'residential',
+      ...(isCommercial ? { commercialTerms: { businessName: String(leaseForm.businessName || '').trim(), licenseNumber: String(leaseForm.licenseNumber || '').trim(), leaseTermMonths: termMonths } } : {}),
       rentDueDay: Number(leaseForm.rentDueDay) || 5,
       reminderLeadDays: Number(leaseForm.reminderLeadDays) || 3,
       autoReminder: !!leaseForm.autoReminder,
@@ -2362,7 +2400,7 @@ const HostDashboard = () => {
       // dates, rent, due day, reminder, payment) and clear only the per-booking
       // ones so the host can add the next room/tenant immediately — the way to
       // set 20+ bookings without re-typing everything.
-      setLeaseForm(f => ({ ...f, tenant: '', tenantPhone: '', roomNumber: '', occupants: '', inquiryId: null, inquirerUserId: null }));
+      setLeaseForm(f => ({ ...f, tenant: '', tenantPhone: '', roomNumber: '', occupants: '', businessName: '', licenseNumber: '', inquiryId: null, inquirerUserId: null }));
       showToast(language === 'বাংলা' ? 'বুকিং তৈরি হয়েছে — পরের রুম/ভাড়াটিয়া যোগ করুন' : 'Booking created — add the next room / tenant');
     } else {
       showToast(language === 'বাংলা' ? 'বুকিং তৈরি হয়েছে! রেন্ট লেজার চালু হয়েছে।' : 'Booking created — rent ledger is live.');
@@ -4368,6 +4406,11 @@ const HostDashboard = () => {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 mb-0.5">
                       <h4 className="text-[13px] sm:text-sm font-black text-gray-900 truncate">{cardTitle}</h4>
+                      {booking.dealType === 'commercial' && (
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border border-violet-200 bg-violet-50 text-violet-700 shrink-0">
+                          🏢 {language === 'বাংলা' ? 'কমার্শিয়াল' : 'Commercial'}
+                        </span>
+                      )}
                       <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 ${stageBadge(stage)}`}>
                         {stageLabel(stage, language)}
                       </span>
@@ -4410,9 +4453,23 @@ const HostDashboard = () => {
                           </div>
                         )}
                       </div>
-                      <div className="px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[10px] font-black text-gray-700 inline-flex items-center gap-1.5 shrink-0">
-                        <User size={11}/> {tenantsLabel}
-                      </div>
+                      {booking.dealType === 'commercial' ? (
+                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                          {booking.commercialTerms?.businessName && (
+                            <span className="px-2.5 py-1 bg-violet-50 border border-violet-100 rounded-lg text-[10px] font-black text-violet-700 inline-flex items-center gap-1.5 shrink-0">🏢 {booking.commercialTerms.businessName}</span>
+                          )}
+                          {Number(booking.commercialTerms?.leaseTermMonths) > 0 && (
+                            <span className="px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[10px] font-black text-gray-700 inline-flex items-center gap-1.5 shrink-0">{language === 'বাংলা' ? 'মেয়াদ' : 'Term'}: {booking.commercialTerms.leaseTermMonths}{language === 'বাংলা' ? ' মাস' : 'mo'}</span>
+                          )}
+                          {booking.commercialTerms?.licenseNumber && (
+                            <span className="px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[10px] font-bold text-gray-600 inline-flex items-center gap-1.5 shrink-0">{language === 'বাংলা' ? 'লাইসেন্স' : 'License'}: {booking.commercialTerms.licenseNumber}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[10px] font-black text-gray-700 inline-flex items-center gap-1.5 shrink-0">
+                          <User size={11}/> {tenantsLabel}
+                        </div>
+                      )}
                     </div>
 
                     {/* Financial breakdown — Monthly Rent / Service / Deposit / Total */}
@@ -6204,27 +6261,53 @@ const HostDashboard = () => {
                     </p>
                   </div>
 
-                  {/* Category — click to switch. Drives the dynamic fields below
-                      and filters the property list to that format. */}
-                  <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ক্যাটাগরি' : 'Category'}</label>
-                    <div className="grid grid-cols-3 gap-2 mt-1.5">
-                      {[
-                        { id: 'flat', en: 'Flat', bn: 'ফ্ল্যাট' },
-                        { id: 'single_room', en: 'Single Room', bn: 'সিঙ্গেল রুম' },
-                        { id: 'hostel', en: 'Hostel', bn: 'হোস্টেল' },
-                      ].map(({ id, en, bn }) => (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => setLeaseForm(f => ({ ...f, category: id, propertyId: '', property: '', location: '' }))}
-                          className={`px-2 py-2.5 rounded-xl text-[11px] font-black border transition-all ${leaseForm.category === id ? 'bg-[#ba0036] text-white border-[#ba0036] shadow-[0_4px_12px_rgba(186,0,54,0.25)]' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
-                        >
-                          {language === 'বাংলা' ? bn : en}
-                        </button>
-                      ))}
+                  {leaseForm.dealType === 'commercial' ? (
+                    /* Commercial lease — business identity instead of a
+                       residential flat/room/hostel category. */
+                    <div className="space-y-3">
+                      <div className="rounded-2xl p-3.5 flex items-start gap-2.5 border bg-violet-50/70 border-violet-100">
+                        <span className="text-lg leading-none shrink-0" aria-hidden="true">🏢</span>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-violet-700 mb-1">{language === 'বাংলা' ? 'কমার্শিয়াল লিজ' : 'Commercial Lease'}</p>
+                          <p className="text-[11px] font-bold text-gray-700 leading-relaxed">
+                            {language === 'বাংলা'
+                              ? 'ব্যবসায়িক ভাড়া — ব্যবসার নাম, লিজ মেয়াদ ও অ্যাডভান্স নিন (ফ্যামিলি/সিট নয়)।'
+                              : 'Business tenancy — capture the business name, lease term and advance (no family occupants / seats).'}
+                          </p>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ব্যবসার নাম' : 'Business / Trade Name'}</label>
+                        <input id="lease-businessName" type="text" value={leaseForm.businessName} onChange={e => setLeaseForm(f => ({ ...f, businessName: e.target.value }))} placeholder={language === 'বাংলা' ? 'যেমন: রহিম এন্টারপ্রাইজ' : 'e.g. Rahim Enterprise'} className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('businessName')}`} />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ট্রেড লাইসেন্স নম্বর (ঐচ্ছিক)' : 'Trade License No. (optional)'}</label>
+                        <input type="text" value={leaseForm.licenseNumber} onChange={e => setLeaseForm(f => ({ ...f, licenseNumber: e.target.value }))} placeholder={language === 'বাংলা' ? 'যেমন: TRAD/DNCC/123456' : 'e.g. TRAD/DNCC/123456'} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    /* Category — click to switch. Drives the dynamic fields below
+                       and filters the property list to that format. */
+                    <div>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ক্যাটাগরি' : 'Category'}</label>
+                      <div className="grid grid-cols-3 gap-2 mt-1.5">
+                        {[
+                          { id: 'flat', en: 'Flat', bn: 'ফ্ল্যাট' },
+                          { id: 'single_room', en: 'Single Room', bn: 'সিঙ্গেল রুম' },
+                          { id: 'hostel', en: 'Hostel', bn: 'হোস্টেল' },
+                        ].map(({ id, en, bn }) => (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => setLeaseForm(f => ({ ...f, category: id, propertyId: '', property: '', location: '' }))}
+                            className={`px-2 py-2.5 rounded-xl text-[11px] font-black border transition-all ${leaseForm.category === id ? 'bg-[#ba0036] text-white border-[#ba0036] shadow-[0_4px_12px_rgba(186,0,54,0.25)]' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
+                          >
+                            {language === 'বাংলা' ? bn : en}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -6266,7 +6349,18 @@ const HostDashboard = () => {
                           // Match on String() so this works for both numeric demo ids and
                           // Mongo ObjectId strings, and auto-fill the property's location.
                           const prop = properties.find(p => String(p.id) === String(val));
-                          setLeaseForm(f => ({ ...f, propertyId: val, property: prop?.title || '', location: prop?.location || '' }));
+                          // Switching to a commercial listing flips the form to
+                          // the commercial variant (and clears the residential category).
+                          const commercial = prop?.intent === 'commercial';
+                          setLeaseForm(f => ({
+                            ...f,
+                            propertyId: val,
+                            property: prop?.title || '',
+                            location: prop?.location || '',
+                            dealType: commercial ? 'commercial' : 'residential',
+                            category: commercial ? '' : (f.category || propTypeToCategory(prop?.type)),
+                            leaseTermMonths: commercial ? (f.leaseTermMonths || '24') : f.leaseTermMonths,
+                          }));
                         }} id="lease-property" className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('property')}`}>
                           <option value="">{language === 'বাংলা' ? 'প্রপার্টি সিলেক্ট করুন' : 'Select a property'}</option>
                           {properties
@@ -6357,10 +6451,18 @@ const HostDashboard = () => {
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'লিজ শুরু' : 'Lease Start'}</label>
                       <input type="date" value={leaseForm.leaseStart} onChange={e => setLeaseForm(f => ({ ...f, leaseStart: e.target.value }))} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
                     </div>
-                    <div>
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'লিজ শেষ' : 'Lease End'}</label>
-                      <input id="lease-leaseEnd" type="date" value={leaseForm.leaseEnd} onChange={e => setLeaseForm(f => ({ ...f, leaseEnd: e.target.value }))} className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('leaseEnd')}`} />
-                    </div>
+                    {leaseForm.dealType === 'commercial' ? (
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'লিজ মেয়াদ (মাস)' : 'Lease Term (months)'}</label>
+                        <input id="lease-leaseTermMonths" type="number" min="1" max="600" value={leaseForm.leaseTermMonths} onChange={e => setLeaseForm(f => ({ ...f, leaseTermMonths: e.target.value }))} placeholder="24" className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('leaseTermMonths')}`} />
+                        <p className="text-[9px] font-bold text-gray-400 mt-1">{language === 'বাংলা' ? 'শুরুর তারিখ + মেয়াদ থেকে শেষ তারিখ হিসাব হয়' : 'Lease end is computed from start + term'}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'লিজ শেষ' : 'Lease End'}</label>
+                        <input id="lease-leaseEnd" type="date" value={leaseForm.leaseEnd} onChange={e => setLeaseForm(f => ({ ...f, leaseEnd: e.target.value }))} className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('leaseEnd')}`} />
+                      </div>
+                    )}
 
                     <div>
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'মাসিক ভাড়া (৳)' : 'Monthly Rent (BDT)'}</label>

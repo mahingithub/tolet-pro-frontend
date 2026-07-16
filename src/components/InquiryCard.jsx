@@ -106,6 +106,11 @@ export default function InquiryCard({ inquiry, propertyStatus, onStatusChange, o
             <Home size={12} />
             <span>{propertyTitle}</span>
           </div>
+          {inquiry?.dealType === 'commercial' && (
+            <div className="flex items-center gap-1.5 text-[10px] font-black text-violet-700 bg-violet-50 border border-violet-100 px-2.5 py-1 rounded-lg w-fit ml-10 mt-1.5 uppercase tracking-wider">
+              🏢 {language === 'বাংলা' ? 'কমার্শিয়াল' : 'Commercial'}
+            </div>
+          )}
         </div>
         <div>
           {getStatusBadge()}

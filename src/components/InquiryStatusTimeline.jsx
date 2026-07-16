@@ -16,10 +16,25 @@ const STEPS = [
   { id: 'decision', bn: 'সিদ্ধান্ত', en: 'Decision', icon: Flag }
 ];
 
+// Commercial deals speak a different language: a site visit + terms negotiation
+// ending in a signed lease agreement (not a residential viewing → move-in).
+// Same ids so the status → step-index mapping is unchanged; only the labels
+// differ.
+const STEPS_COMMERCIAL = [
+  { id: 'sent', bn: 'পাঠানো হয়েছে', en: 'Sent', icon: Clock },
+  { id: 'delivered', bn: 'পৌঁছেছে', en: 'Delivered', icon: Check },
+  { id: 'viewed', bn: 'দেখা হয়েছে', en: 'Viewed', icon: Eye },
+  { id: 'answered', bn: 'আলোচনা', en: 'Discussion', icon: MessageSquare },
+  { id: 'visit', bn: 'সাইট ভিজিট', en: 'Site Visit', icon: Calendar, optional: true },
+  { id: 'decision', bn: 'লিজ চুক্তি', en: 'Lease Agreement', icon: Flag }
+];
+
 export default function InquiryStatusTimeline({ inquiry, onCancelVisit }) {
   const { language } = useLanguage();
   const isBn = language === 'bn';
   const inquiryId = inquiry?.id || inquiry?._id;
+  const isCommercial = inquiry?.dealType === 'commercial';
+  const STEP_SET = isCommercial ? STEPS_COMMERCIAL : STEPS;
 
   const [currentStatus, setCurrentStatus] = useState(inquiry?.status || 'sent');
   const [messages, setMessages] = useState(inquiry?.messages || []);
@@ -141,6 +156,11 @@ export default function InquiryStatusTimeline({ inquiry, onCancelVisit }) {
 
   return (
     <div className="bg-white rounded-2xl p-5 sm:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100">
+      {isCommercial && (
+        <div className="mb-4 inline-flex items-center gap-1.5 text-[10px] font-black text-violet-700 bg-violet-50 border border-violet-100 px-2.5 py-1 rounded-lg uppercase tracking-wider">
+          🏢 {isBn ? 'কমার্শিয়াল লিজ' : 'Commercial Lease'}
+        </div>
+      )}
       {/* Timeline */}
       <div className="relative flex justify-between items-center mb-10 sm:mb-12 mt-4 px-2 sm:px-4">
         <div className="absolute top-1/2 left-0 w-full h-1.5 bg-gray-100 -translate-y-1/2 rounded-full z-0"></div>
@@ -149,7 +169,7 @@ export default function InquiryStatusTimeline({ inquiry, onCancelVisit }) {
           style={{ width: `${(Math.min(currentIndex, 5) / 5) * 100}%` }}
         ></div>
 
-        {STEPS.map((step, index) => {
+        {STEP_SET.map((step, index) => {
           const Icon = step.icon;
           const isCompleted = index < currentIndex;
           const isCurrent = index === currentIndex;

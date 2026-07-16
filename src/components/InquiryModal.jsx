@@ -52,12 +52,27 @@ const maskPhone = (raw) => {
 // would return ({ id, icon, label, message }). Each suggestion is composed
 // from the property the user is inquiring about, so two listings produce
 // different chip text — i.e. the "AI" feels live, not boilerplate.
-const useAiSuggestions = (property, t) => {
+const useAiSuggestions = (property, t, isBn = false) => {
 	return useMemo(() => {
 		if (!property) return [];
 
 		const priceFmt = property.price ? `৳${Number(property.price).toLocaleString('en-IN')}` : t.listedRentFallback;
 		const location = property.location || t.thisAreaFallback;
+
+		// ── Commercial listings get a BUSINESS-oriented chip set (lease term,
+		//    business-use permission, handover, deposit, parking/utilities) —
+		//    deliberately distinct from the residential rent / visit / move-in
+		//    questions below. ──
+		if (property.intent === 'commercial') {
+			return [
+				{ id: 'c_term',    icon: CalendarClock, label: isBn ? 'লিজের মেয়াদ' : 'Lease term',          message: isBn ? 'লিজের সর্বনিম্ন মেয়াদ কত এবং নবায়নের শর্ত কী?' : 'What is the minimum lease term and the renewal terms?' },
+				{ id: 'c_rent',    icon: BadgePercent,  label: isBn ? 'ভাড়া আলোচনা' : 'Rent negotiation',     message: isBn ? `মাসিক ভাড়া ${priceFmt} — এটি কি আলোচনাসাপেক্ষ? বার্ষিক বৃদ্ধির হার কত?` : `The monthly rent is ${priceFmt} — is it negotiable, and what's the yearly increment?` },
+				{ id: 'c_use',     icon: CheckCircle2,  label: isBn ? 'ব্যবসার অনুমতি' : 'Business use',       message: isBn ? 'এই স্পেসে আমার ধরনের ব্যবসা চালানো যাবে কি? ট্রেড লাইসেন্স/সাইনবোর্ডে কোনো সমস্যা আছে?' : 'Is my type of business allowed here? Any issue with trade license / signage?' },
+				{ id: 'c_possn',   icon: KeyRound,      label: isBn ? 'হ্যান্ডওভার' : 'Possession',           message: isBn ? 'স্পেসটি কবে বুঝিয়ে দেওয়া হবে এবং ফিট-আউট/সাজসজ্জার অনুমতি আছে কি?' : 'When can I take possession, and is fit-out / renovation allowed?' },
+				{ id: 'c_deposit', icon: Sparkles,      label: isBn ? 'অ্যাডভান্স ও জামানত' : 'Advance & deposit', message: isBn ? 'কত মাসের অ্যাডভান্স এবং সিকিউরিটি ডিপোজিট লাগবে?' : 'How many months of advance and security deposit are required?' },
+				{ id: 'c_util',    icon: MapPin,        label: isBn ? 'পার্কিং ও ইউটিলিটি' : 'Parking & utilities', message: isBn ? 'পার্কিং/লোডিং সুবিধা, জেনারেটর ও বিদ্যুৎ লোড কেমন?' : 'What about parking / loading access, generator, and electricity load?' },
+			];
+		}
 		const beds = property.beds ?? null;
 		const baths = property.baths ?? null;
 		const sqft = property.sqft ?? null;
@@ -113,13 +128,14 @@ const useAiSuggestions = (property, t) => {
 		}
 
 		return chips;
-	}, [property, t]);
+	}, [property, t, isBn]);
 };
 
 
 // ─── component ──────────────────────────────────────────────────────────────
 const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
-	const { t } = useLanguage();
+	const { t, language } = useLanguage();
+	const isBn = language === 'বাংলা';
 	const [step, setStep] = useState('form');           // 'form' | 'success'
 	const [phone, setPhone] = useState('');
 	const [message, setMessage] = useState('');
@@ -137,7 +153,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 	const displayProperty = property || persistedData.property;
 	const displayLandlord = landlord || persistedData.landlord;
 
-	const aiSuggestions = useAiSuggestions(displayProperty, t);
+	const aiSuggestions = useAiSuggestions(displayProperty, t, isBn);
 	const selectedChips = useMemo(
 		() => selectedIds.map((id) => aiSuggestions.find((c) => c.id === id)).filter(Boolean),
 		[selectedIds, aiSuggestions],
