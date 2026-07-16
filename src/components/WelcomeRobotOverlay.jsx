@@ -23,14 +23,38 @@ const FALLBACK_TARGET = { right: 24, bottom: 112 };
 
 const MINI_ICON_SIZE = 56;       // মিনি রোবটের সাইজ (px)
 const MINI_LINGER_MS = 5000;     // মিনি রোবট কতক্ষণ থেকে তারপর মিলিয়ে যাবে
-const AUTO_WAKE_MS = 6000;       // intro-তে ট্যাপ না করলে কত ms পরে নিজে খুলবে (ভয়েস ছাড়া)
 
 // API বেস — AIGuidesManager-এর মতোই, যাতে env কনফিগ এক জায়গায় মেলে।
 const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
 
+/* ═══════════════════════════════════════════════════════════════
+   🔑 "একবারই দেখাও" / "আর দেখাবেন না" মেমরি (localStorage)
+   ─────────────────────────────────────────────────────────────
+   • signup ওয়েলকাম প্রতি অ্যাকাউন্টে একবারই দেখাবে।
+   • login ওয়েলকাম প্রতিবার লগইনে দেখাবে, যতক্ষণ না ইউজার
+     "আর দেখাবেন না" চাপে — তখন device-লেভেলে চিরতরে বন্ধ।
+     (KEY_LOGIN_HIDDEN authService-এর DEVICE_KEEP_KEYS-এ আছে, তাই
+      logout-এর ডেটা মোছা সত্ত্বেও এই পছন্দ টিকে থাকে।)
+═══════════════════════════════════════════════════════════════ */
+const KEY_SIGNUP_SEEN  = 'welcome:signup:seen';
+const KEY_LOGIN_HIDDEN = 'welcome:login:hidden';
+
+const isSignupWelcomeSeen = () => {
+  try { return window.localStorage.getItem(KEY_SIGNUP_SEEN) === '1'; } catch { return false; }
+};
+const markSignupWelcomeSeen = () => {
+  try { window.localStorage.setItem(KEY_SIGNUP_SEEN, '1'); } catch { /* ignore */ }
+};
+const isLoginWelcomeHidden = () => {
+  try { return window.localStorage.getItem(KEY_LOGIN_HIDDEN) === '1'; } catch { return false; }
+};
+const hideLoginWelcomeForever = () => {
+  try { window.localStorage.setItem(KEY_LOGIN_HIDDEN, '1'); } catch { /* ignore */ }
+};
+
 // ভিডিও এখন আর হার্ডকোড নয় — অ্যাডমিন প্যানেল (AI Video Guides → Placement
 // "Welcome") থেকে আসে, role অনুযায়ী `GET /ai-guides/welcome?audience=...`।
-// কোনো welcome ভিডিও না থাকলে রোবটের ভিডিও বাটন নিজে থেকেই hide হয়ে যাবে।
+// শুধুমাত্র signup ওয়েলকামে দেখাই; login ওয়েলকাম হালকা রাখা হয়।
 
 const ROLE_COPY = {
   tenant: {
@@ -53,77 +77,50 @@ const ROLE_COPY = {
   },
 };
 
-/* ═══════════════════════════════════════════════════════════════
-   🔊 বাংলা ভয়েস হেল্পার (আগের voice-picking লজিকই, এক জায়গায়)
-═══════════════════════════════════════════════════════════════ */
-
-function speakBn(text, onDone) {
-  let finished = false;
-  const done = () => {
-    if (finished) return;
-    finished = true;
-    onDone?.();
-  };
-
-  try {
-    if (!('speechSynthesis' in window)) {
-      setTimeout(done, 300);
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-
-    const start = () => {
-      const voices = window.speechSynthesis.getVoices();
-      const bnVoices = voices.filter((v) => v.lang?.includes('bn'));
-      const bestVoice = bnVoices.find((v) => v.name.includes('Google')) || bnVoices[0];
-      if (bestVoice) utterance.voice = bestVoice;
-      utterance.lang = 'bn-BD';
-      window.speechSynthesis.speak(utterance);
-    };
-
-    if (window.speechSynthesis.getVoices().length > 0) {
-      start();
-    } else {
-      let fired = false;
-      const onVoicesChanged = () => {
-        if (fired) return;
-        fired = true;
-        start();
-      };
-      window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged, { once: true });
-      setTimeout(onVoicesChanged, 1000);
-    }
-
-    utterance.onend = done;
-    utterance.onerror = done;
-    setTimeout(done, 3000); // ভয়েস আটকে গেলেও ফ্লো থেমে থাকবে না
-  } catch {
-    setTimeout(done, 300);
-  }
-}
+// login "welcome back" কার্ডের কনটেন্ট — signup থেকে আলাদা, হালকা ও দ্রুত।
+const LOGIN_COPY = {
+  tenant: {
+    tagline: 'নতুন ভেরিফায়েড লিস্টিং আর মেসেজ আপনার জন্য অপেক্ষা করছে।',
+    chips: [
+      { icon: MapPin, label: 'নিয়ার মি সার্চ' },
+      { icon: MessageCircle, label: 'নতুন মেসেজ' },
+    ],
+  },
+  landlord: {
+    tagline: 'আপনার প্রপার্টি আর ভাড়াটিয়ার আপডেট এক ঝলকে দেখে নিন।',
+    chips: [
+      { icon: LayoutDashboard, label: 'ড্যাশবোর্ড' },
+      { icon: MessageCircle, label: 'নতুন মেসেজ' },
+    ],
+  },
+};
 
 /* ═══════════════════════════════════════════════════════════════
    🤖 WelcomeRobotOverlay
-   ফেইজ: hidden → intro (ট্যাপ করে জাগান) → open (কার্ড)
-          → minimized (অ্যাসিস্ট্যান্ট আইকনে উড়ে যায়, ৫ সে. থাকে) → hidden
+   ─────────────────────────────────────────────────────────────
+   ভয়েস (TTS) ও "ট্যাপ করে জাগান" ইন্ট্রো সরানো হয়েছে — পপআপ এখন
+   সরাসরি খোলে।
+
+   ফেইজ:
+     • signup : hidden → open → minimized (অ্যাসিস্ট্যান্ট আইকনে
+                উড়ে যায়, ৫ সে. থাকে) → hidden
+     • login  : hidden → open → hidden (সিম্পল ফেড, আলাদা ডিজাইন)
 ═══════════════════════════════════════════════════════════════ */
 
 const WelcomeRobotOverlay = () => {
   const { user, isAdmin, activeRole } = useAuth();
   const location = useLocation();
 
-  const [phase, setPhase] = useState('hidden');
+  const [phase, setPhase] = useState('hidden');   // 'hidden' | 'open' | 'minimized'
   const [showOptions, setShowOptions] = useState(false);
   const [typed, setTyped] = useState('');
   const [eventInfo, setEventInfo] = useState(null); // { role, name, type }
   const [fly, setFly] = useState(null);             // { from:{x,y}, to:{x,y} }
   const [activeVideo, setActiveVideo] = useState({ isOpen: false, url: '', title: '' });
-  const [welcomeGuides, setWelcomeGuides] = useState([]); // অ্যাডমিন থেকে আসা ভিডিও (role-অনুযায়ী)
+  const [welcomeGuides, setWelcomeGuides] = useState([]); // অ্যাডমিন থেকে আসা ভিডিও (signup-এ)
 
   const phaseRef = useRef(phase);
   const headRef = useRef(null);          // রোবটের মাথা — উড়ান শুরুর পজিশন মাপতে
-  const voiceEnabledRef = useRef(false); // ইউজার ট্যাপ করেছে কি না (TTS-এর জন্য gesture লাগে)
   const minimizingRef = useRef(false);
 
   useEffect(() => {
@@ -139,57 +136,45 @@ const WelcomeRobotOverlay = () => {
       if (detail.role && /admin|moderator|support/i.test(String(detail.role))) return;
       if (window.location.pathname.startsWith('/admin')) return;
 
-      window.speechSynthesis?.cancel?.();
+      const type = detail.type === 'signup' ? 'signup' : 'login';
+
+      // "একবারই / আর দেখাবেন না" মেমরি যাচাই
+      if (type === 'signup' && isSignupWelcomeSeen()) return;
+      if (type === 'login' && isLoginWelcomeHidden()) return;
+
       minimizingRef.current = false;
-      voiceEnabledRef.current = false;
       setEventInfo({
         role: detail.role || null,
         name: detail.name || '',
-        type: detail.type || 'login',
+        type,
       });
       setShowOptions(false);
       setTyped('');
       setFly(null);
-      setPhase('intro');
+      setPhase('open');
+
+      // signup ওয়েলকাম একবারই — ট্রিগার হওয়ামাত্রই "seen" মার্ক করি।
+      if (type === 'signup') markSignupWelcomeSeen();
     };
 
     window.addEventListener('triggerWelcomeRobot', handleTrigger);
-    return () => {
-      window.removeEventListener('triggerWelcomeRobot', handleTrigger);
-      window.speechSynthesis?.cancel?.();
-    };
+    return () => window.removeEventListener('triggerWelcomeRobot', handleTrigger);
   }, []);
 
-  /* ── রোবট জাগানো ─────────────────────────────────────────── */
-  const wake = useCallback((withVoice) => {
-    if (phaseRef.current !== 'intro') return;
-    setPhase('open');
-    if (withVoice) {
-      voiceEnabledRef.current = true; // ট্যাপ = user gesture, তাই ভয়েস চলবে
-      speakBn('স্বাগতম!', () => setShowOptions(true));
-    } else {
-      setTimeout(() => setShowOptions(true), 500);
-    }
-  }, []);
-
-  // intro-তে কেউ ট্যাপ না করলে নিজে নিজেই খুলবে (ভয়েস ছাড়া)
+  /* ── কার্ড খোলার পর কনটেন্ট রিভিল (signup-এর স্ট্যাগার্ড অ্যানিমেশন) ── */
   useEffect(() => {
-    if (phase !== 'intro') return undefined;
-    const id = setTimeout(() => wake(false), AUTO_WAKE_MS);
+    if (phase !== 'open') return undefined;
+    const id = setTimeout(() => setShowOptions(true), 350);
     return () => clearTimeout(id);
-  }, [phase, wake]);
+  }, [phase]);
 
-  /* ── মিনিমাইজ: কার্ড → মিনি রোবট → অ্যাসিস্ট্যান্ট আইকনে ── */
-  const minimize = useCallback(() => {
+  /* ── signup: মিনিমাইজ → মিনি রোবট → অ্যাসিস্ট্যান্ট আইকনে উড়ে যায় ── */
+  const dismissToAssistant = useCallback(() => {
     if (minimizingRef.current) return;
-    if (phaseRef.current !== 'intro' && phaseRef.current !== 'open') return;
+    if (phaseRef.current !== 'open') return;
     minimizingRef.current = true;
 
-    // বিদায়ী ভয়েস — শুধু যদি ইউজার আগে ট্যাপ করে ভয়েস চালু করে থাকে
-    if (voiceEnabledRef.current) speakBn('সি ইউ এগেইন!');
-    else window.speechSynthesis?.cancel?.();
-
-    // আগের আচরণ অক্ষুণ্ণ: নির্ভরশীল UI এখনই জানুক যে রোবট শেষ
+    // নির্ভরশীল UI (GlobalAIAssistant আইকন টাইমার) জানুক রোবট শেষ
     window.dispatchEvent(new Event('welcomeRobotFinished'));
 
     const half = MINI_ICON_SIZE / 2;
@@ -216,7 +201,16 @@ const WelcomeRobotOverlay = () => {
     }, 180);
   }, []);
 
-  // মিনি রোবট ৫ সেকেন্ড থেকে মিলিয়ে যাবে
+  /* ── login: সিম্পল ফেড-আউট ক্লোজ (forever হলে চিরতরে বন্ধ) ── */
+  const closeLogin = useCallback((forever) => {
+    if (forever) hideLoginWelcomeForever();
+    window.dispatchEvent(new Event('welcomeRobotFinished'));
+    setShowOptions(false);
+    setPhase('hidden');
+    minimizingRef.current = false;
+  }, []);
+
+  // মিনি রোবট ৫ সেকেন্ড থেকে মিলিয়ে যাবে (signup only)
   useEffect(() => {
     if (phase !== 'minimized') return undefined;
     const id = setTimeout(() => {
@@ -224,31 +218,36 @@ const WelcomeRobotOverlay = () => {
       setFly(null);
       setShowOptions(false);
       minimizingRef.current = false;
-      voiceEnabledRef.current = false;
     }, MINI_LINGER_MS);
     return () => clearTimeout(id);
   }, [phase]);
 
-  // Escape চাপলে মিনিমাইজ
+  // Escape চাপলে টাইপ অনুযায়ী বন্ধ হবে
   useEffect(() => {
-    if (phase !== 'intro' && phase !== 'open') return undefined;
-    const onKey = (e) => e.key === 'Escape' && minimize();
+    if (phase !== 'open') return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      if (eventInfo?.type === 'signup') dismissToAssistant();
+      else closeLogin(false);
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [phase, minimize]);
+  }, [phase, eventInfo, dismissToAssistant, closeLogin]);
 
   /* ── role-ভিত্তিক কনটেন্ট ─────────────────────────────────── */
   const effectiveRole = eventInfo?.role || activeRole;
   const isTenant = effectiveRole !== 'landlord';
   const copy = isTenant ? ROLE_COPY.tenant : ROLE_COPY.landlord;
+  const loginCopy = isTenant ? LOGIN_COPY.tenant : LOGIN_COPY.landlord;
   const firstName = (eventInfo?.name || user?.name || '').trim().split(/\s+/)[0] || '';
+  const avatarInitial = (firstName || 'T').charAt(0).toUpperCase();
+  const isSignup = eventInfo?.type === 'signup';
 
-  /* ── অ্যাডমিন-কনফিগার করা welcome ভিডিও fetch ──────────────
-     রোবট ট্রিগার হলে role অনুযায়ী active welcome গাইড আনি। endpoint
-     পাবলিক, তাই টোকেন লাগে না। ব্যর্থ হলে welcomeGuide = null → ভিডিও
-     বাটন এমনিতেই দেখাবে না, বাকি রোবট ঠিকঠাক চলবে। */
+  /* ── অ্যাডমিন-কনফিগার করা welcome ভিডিও fetch (শুধু signup-এ) ──
+     signup ছাড়া fetch করি না — login ওয়েলকাম হালকা রাখতে ও প্রতি
+     লগইনে অকারণ API কল এড়াতে। */
   useEffect(() => {
-    if (!eventInfo) {
+    if (!eventInfo || eventInfo.type !== 'signup') {
       setWelcomeGuides([]);
       return undefined;
     }
@@ -270,9 +269,9 @@ const WelcomeRobotOverlay = () => {
     return () => { cancelled = true; };
   }, [eventInfo, activeRole]);
 
-  /* ── টাইপরাইটার (প্রশ্নের লাইনটা টাইপ হয়ে লেখা হয়) ───────── */
+  /* ── টাইপরাইটার (signup কার্ডের প্রশ্ন লাইনটা টাইপ হয়ে লেখা হয়) ── */
   useEffect(() => {
-    if (!showOptions) {
+    if (!showOptions || eventInfo?.type !== 'signup') {
       setTyped('');
       return undefined;
     }
@@ -284,93 +283,54 @@ const WelcomeRobotOverlay = () => {
       if (i >= full.length) clearInterval(id);
     }, 24);
     return () => clearInterval(id);
-  }, [showOptions, copy.question]);
+  }, [showOptions, copy.question, eventInfo]);
 
   /* ── অ্যাডমিন গার্ড (রেন্ডার লেভেলে) ─────────────────────── */
   // অ্যাডমিন ইউজার বা /admin রুটে এই ওভারলে কখনোই রেন্ডার হবে না।
   if (isAdmin || location.pathname.startsWith('/admin')) return null;
 
+  const handleBackdrop = () => (isSignup ? dismissToAssistant() : closeLogin(false));
+
   return (
     <>
-      {/* ═════════ মূল ওভারলে (intro + open) ═════════ */}
+      {/* ═════════ মূল ওভারলে (open) ═════════ */}
       <AnimatePresence>
-        {(phase === 'intro' || phase === 'open') && (
+        {phase === 'open' && eventInfo && (
           <motion.div
             key="wr-root"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.35 } }}
+            exit={{ opacity: 0, transition: { duration: 0.3 } }}
             className="fixed inset-0 z-[99999] flex items-center justify-center p-4"
           >
-            {/* ব্যাকড্রপ — ক্লিক করলে মিনিমাইজ */}
+            {/* ব্যাকড্রপ — ক্লিক করলে বন্ধ */}
             <div
               className="absolute inset-0 bg-slate-950/60 backdrop-blur-xl"
-              onClick={minimize}
+              onClick={handleBackdrop}
             />
 
-            {/* কোণার ক্লোজ (মিনিমাইজ) বাটন */}
+            {/* কোণার ক্লোজ বাটন */}
             <motion.button
               initial={{ opacity: 0, y: -16 }}
               animate={{ opacity: 1, y: 0 }}
-              onClick={minimize}
+              onClick={handleBackdrop}
               className="absolute top-5 right-5 z-[100000] p-3 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md shadow-lg transition-all"
               aria-label="বন্ধ করুন"
             >
               <X size={22} />
             </motion.button>
 
-            {/* ───── INTRO: ভাসমান রোবট, ট্যাপ করে জাগাতে হয় ───── */}
-            {phase === 'intro' && (
-              <div className="relative z-10 flex flex-col items-center">
-                <motion.button
-                  layoutId="wr-orb"
-                  ref={headRef}
-                  onClick={() => wake(true)}
-                  initial={{ scale: 0.6, opacity: 0, y: 30 }}
-                  animate={{ scale: 1, opacity: 1, y: 0 }}
-                  transition={{ type: 'spring', damping: 16, stiffness: 140 }}
-                  whileTap={{ scale: 0.92 }}
-                  className="relative outline-none"
-                  aria-label="রোবট চালু করুন"
-                >
-                  {/* ঘূর্ণায়মান এনার্জি হেলো */}
-                  <div
-                    className="absolute -inset-5 rounded-full blur-md opacity-70 animate-[spin_4s_linear_infinite]"
-                    style={{
-                      background:
-                        'conic-gradient(from 0deg, transparent 0deg, #ff4d6d 110deg, #ba0036 200deg, transparent 290deg)',
-                    }}
-                  />
-                  {/* পালস রিং */}
-                  <span className="absolute inset-0 rounded-full border-2 border-[#ff4d6d]/50 animate-ping" />
-                  <div className="absolute inset-0 bg-[#ba0036] blur-[40px] opacity-40 rounded-full scale-150 animate-pulse" />
-                  {/* রোবটের মাথা */}
-                  <div className="relative w-28 h-28 bg-gradient-to-br from-[#ba0036] to-[#7a0026] rounded-full flex items-center justify-center shadow-2xl border-4 border-white/20 overflow-hidden">
-                    <Bot size={56} className="text-white relative z-10" />
-                    <motion.div
-                      className="absolute left-3 right-3 h-[2px] bg-white/40 rounded"
-                      animate={{ y: [-30, 30, -30] }}
-                      transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
-                    />
-                  </div>
-                </motion.button>
-
-                <motion.p
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.35 }}
-                  className="mt-7 px-5 py-2 rounded-full bg-white/10 border border-white/15 backdrop-blur-md text-white text-sm font-bold tracking-wide"
-                >
-                  🤖 আমাকে ট্যাপ করুন
-                </motion.p>
-              </div>
-            )}
-
-            {/* ───── OPEN: রোবট + ফিউচারিস্টিক কার্ড ───── */}
-            {phase === 'open' && (
+            {/* ═════════════ SIGNUP: উদযাপন কার্ড ═════════════ */}
+            {isSignup && (
               <div className="relative z-10 flex flex-col items-center w-full max-w-[350px]">
-                {/* রোবটের মাথা (intro থেকে layoutId দিয়ে মর্ফ হয়ে আসে) */}
-                <motion.div layoutId="wr-orb" ref={headRef} className="relative z-20">
+                {/* রোবটের মাথা (সরাসরি ঢুকে আসে — আর ট্যাপ লাগে না) */}
+                <motion.div
+                  ref={headRef}
+                  initial={{ scale: 0.6, opacity: 0, y: 24 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  transition={{ type: 'spring', damping: 16, stiffness: 150 }}
+                  className="relative z-20"
+                >
                   <div
                     className="absolute -inset-4 rounded-full blur-md opacity-60 animate-[spin_4s_linear_infinite]"
                     style={{
@@ -400,11 +360,9 @@ const WelcomeRobotOverlay = () => {
                   <div className="pointer-events-none absolute -top-16 -left-16 w-48 h-48 rounded-full bg-[#ba0036]/30 blur-[60px]" />
                   <div className="pointer-events-none absolute -bottom-20 -right-16 w-52 h-52 rounded-full bg-rose-400/20 blur-[70px]" />
 
-                  {eventInfo?.type === 'signup' && (
-                    <div className="relative inline-flex items-center gap-1.5 mb-2 px-3.5 py-1.5 rounded-full bg-[#ba0036]/15 border border-[#ff4d6d]/30 text-[#ff8aa0] text-[11px] font-bold">
-                      <Sparkles size={12} /> অ্যাকাউন্ট তৈরি সম্পন্ন
-                    </div>
-                  )}
+                  <div className="relative inline-flex items-center gap-1.5 mb-2 px-3.5 py-1.5 rounded-full bg-[#ba0036]/15 border border-[#ff4d6d]/30 text-[#ff8aa0] text-[11px] font-bold">
+                    <Sparkles size={12} /> অ্যাকাউন্ট তৈরি সম্পন্ন
+                  </div>
 
                   <h3 className="relative text-3xl font-black text-white tracking-tight">
                     স্বাগতম{firstName ? `, ${firstName}` : ''}!
@@ -464,7 +422,7 @@ const WelcomeRobotOverlay = () => {
                         )}
 
                         <button
-                          onClick={minimize}
+                          onClick={dismissToAssistant}
                           className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-[1.2rem] bg-gradient-to-r from-[#ba0036] to-[#ff2d55] text-white font-bold text-[14px] shadow-[0_12px_30px_rgba(186,0,54,0.45)] hover:shadow-[0_16px_40px_rgba(186,0,54,0.6)] hover:-translate-y-0.5 transition-all"
                         >
                           ঠিক আছে, শুরু করি! <ArrowRight size={16} />
@@ -475,11 +433,85 @@ const WelcomeRobotOverlay = () => {
                 </motion.div>
               </div>
             )}
+
+            {/* ═════════════ LOGIN: নতুন "welcome back" কার্ড ═════════════ */}
+            {!isSignup && (
+              <motion.div
+                initial={{ opacity: 0, y: 26, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 16, scale: 0.97, transition: { duration: 0.25 } }}
+                transition={{ type: 'spring', damping: 24, stiffness: 210 }}
+                className="relative z-10 w-full max-w-[380px] rounded-[1.75rem] bg-white shadow-[0_30px_80px_rgba(0,0,0,0.45)] overflow-hidden"
+              >
+                {/* ওপরের ব্র্যান্ড অ্যাকসেন্ট বার */}
+                <div className="h-1.5 w-full bg-gradient-to-r from-[#ba0036] via-[#ff2d55] to-[#ff8aa0]" />
+
+                <div className="p-6">
+                  {/* হেডার: অ্যাভাটার + হাত নাড়া + নাম (আনুভূমিক — signup থেকে আলাদা) */}
+                  <div className="flex items-center gap-3.5">
+                    <div className="relative shrink-0">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#ba0036] to-[#7a0026] flex items-center justify-center text-white text-xl font-black shadow-lg">
+                        {avatarInitial}
+                      </div>
+                      <motion.span
+                        className="absolute -bottom-1.5 -right-1.5 text-xl"
+                        animate={{ rotate: [0, 18, -8, 18, 0] }}
+                        transition={{ duration: 1.4, repeat: Infinity, repeatDelay: 1.2 }}
+                        aria-hidden="true"
+                      >
+                        👋
+                      </motion.span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#ba0036]">
+                        আবার স্বাগতম
+                      </p>
+                      <h3 className="text-2xl font-black text-slate-900 tracking-tight truncate">
+                        {firstName || 'বন্ধু'}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <p className="mt-4 text-[13px] font-medium text-slate-600 leading-relaxed">
+                    {loginCopy.tagline}
+                  </p>
+
+                  {/* কুইক চিপস */}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {loginCopy.chips.map(({ icon: Icon, label }) => (
+                      <span
+                        key={label}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-[11.5px] font-semibold text-slate-700"
+                      >
+                        <Icon size={12} className="text-[#ba0036]" />
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* প্রাইমারি বাটন */}
+                  <button
+                    onClick={() => closeLogin(false)}
+                    className="mt-5 w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-[1.2rem] bg-gradient-to-r from-[#ba0036] to-[#ff2d55] text-white font-bold text-[14px] shadow-[0_12px_28px_rgba(186,0,54,0.4)] hover:shadow-[0_16px_36px_rgba(186,0,54,0.55)] hover:-translate-y-0.5 transition-all"
+                  >
+                    চলুন, শুরু করি <ArrowRight size={16} />
+                  </button>
+
+                  {/* "আর দেখাবেন না" — চিরতরে বন্ধ */}
+                  <button
+                    onClick={() => closeLogin(true)}
+                    className="mt-2.5 w-full text-center text-[12.5px] font-semibold text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    আর দেখাবেন না
+                  </button>
+                </div>
+              </motion.div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ═════════ মিনি রোবট: অ্যাসিস্ট্যান্ট আইকনে উড়ে যায় ═════════ */}
+      {/* ═════════ মিনি রোবট: অ্যাসিস্ট্যান্ট আইকনে উড়ে যায় (signup only) ═════════ */}
       <AnimatePresence>
         {phase === 'minimized' && fly && (
           <motion.div

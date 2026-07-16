@@ -31,18 +31,21 @@ const KEY_USER  = 'auth:user';
 const KEY_TOKEN = 'auth:token';
 const KEY_EXPIRES = 'auth:expiresAt';
 
-// Website sessions are capped at 7 days — like apple.com signing you out of a
-// browser after a while. Installed apps (native / standalone PWA) ignore this
-// entirely: see isSessionExpired().
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// Website sessions persist for a full year so a freshly signed-up user isn't
+// kicked back to the login screen while they're still using the app. Installed
+// apps (native / standalone PWA) ignore this entirely and never time out: see
+// isSessionExpired(). Keep this in sync with the backend token lifetime
+// (jwtExpiresIn in config/env.js).
+const SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
 // localStorage keys that are DEVICE-level, not account-level. clearAllAppData()
 // preserves ONLY these so a logout / auto-expiry doesn't reset the user's
 // language choice or re-trigger the PWA install banner.
 const DEVICE_KEEP_KEYS = new Set([
-  'tolet_lang',    // LanguageContext — chosen language
-  'pwa:visits',    // InstallPrompt — visit counter
-  'pwa:dismissed', // InstallPrompt — "not now" memory
+  'tolet_lang',           // LanguageContext — chosen language
+  'pwa:visits',           // InstallPrompt — visit counter
+  'pwa:dismissed',        // InstallPrompt — "not now" memory
+  'welcome:login:hidden', // WelcomeRobotOverlay — "never show the login welcome again"
 ]);
 
 const ADMIN_ROLES = ['support_agent', 'moderator', 'super_admin'];

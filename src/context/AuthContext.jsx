@@ -51,15 +51,22 @@ export const AuthProvider = ({ children }) => {
     let cancelled = false;
     fetchMe()
       .then((u) => { if (!cancelled) setUser(u); })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return;
         // If the token in localStorage changed (or was cleared) while /me
         // was pending, treat the failure as belonging to the previous
         // session. The new session is the source of truth — leave it alone.
         if (getCurrentToken() !== initialToken) return;
-        // Token genuinely bad — drop the session quietly via the service so
-        // the localStorage key namespace stays consistent.
-        svcLogout().finally(() => setUser(null));
+        // ONLY drop the session on a genuine auth failure (HTTP 401 — an
+        // expired, invalid, or server-revoked token, or a deleted account).
+        // Transient problems — the device being offline, a backend restart, a
+        // 5xx — must NOT log the user out: those have no `status` (network
+        // reject) or a non-401 status. We keep the cached session (set in the
+        // useState initializer above) so a blip can't bounce a freshly
+        // signed-up user back to the login screen.
+        if (err?.status === 401) {
+          svcLogout().finally(() => setUser(null));
+        }
       });
     return () => { cancelled = true; };
   }, []);

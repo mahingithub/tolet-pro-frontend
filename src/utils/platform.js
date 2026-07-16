@@ -6,8 +6,8 @@
  * PWA running in standalone display mode).
  *
  * This distinction drives the session policy:
- *   • Website  → sessions expire after 7 days and local data is wiped, the
- *                same way apple.com logs you out of a browser after a while.
+ *   • Website  → sessions persist for 1 year, then local data is wiped and the
+ *                user must sign in again (a sane security backstop).
  *   • Installed app → the session stays put until the user logs out or
  *                uninstalls the app, so data is always there on next launch.
  */
@@ -47,8 +47,8 @@ export function isStandalonePwa() {
 
 /**
  * True when the app is "installed" — either the native build or an installed
- * PWA. Used to decide whether the 7-day auto-logout applies (it does NOT for
- * installed apps).
+ * PWA. Used to decide whether the website session cap applies (it does NOT for
+ * installed apps — those never auto-logout).
  */
 export function isInstalledApp() {
   return isNativeCapacitor() || isStandalonePwa();
