@@ -442,6 +442,11 @@ const ROOM_META = {
   living:         { label: 'Living Room',       emoji: '🛋️', Icon: Sofa },
   kitchen:        { label: 'Kitchen',           emoji: '🍳', Icon: Utensils },
   balcony:        { label: 'Balcony',           emoji: '🏙️', Icon: Eye },
+  // ── Residential subtypes (hostel / mess / sublet / single room) ──
+  single_seat:    { label: 'Single Seat',       emoji: '🛏️', Icon: Bed },
+  room:           { label: 'Room',              emoji: '🚪', Icon: Home },
+  common_area:    { label: 'Common Area',       emoji: '🛋️', Icon: Users },
+  dining:         { label: 'Dining',            emoji: '🍽️', Icon: Utensils },
   // ── Commercial / office ──
   workspace:      { label: 'Workspace / Floor', emoji: '🏢', Icon: Building },
   reception:      { label: 'Reception',         emoji: '🛎️', Icon: Users },
@@ -786,7 +791,7 @@ function galleryRoomOrder(property) {
       'washroom', 'other',
     ];
   }
-  return ['bedroom', 'living', 'kitchen', 'bathroom', 'balcony', 'front_view', 'other'];
+  return ['single_seat', 'room', 'bedroom', 'living', 'kitchen', 'bathroom', 'common_area', 'dining', 'balcony', 'front_view', 'other'];
 }
 
 function buildGallery(property) {

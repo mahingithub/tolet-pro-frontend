@@ -22,7 +22,7 @@ import { getDynamicFields } from '../constants/propertyFields';
 import { subscriptionService } from '../services/subscriptionService';
 import { listHostInquiries, updateInquiryStatus, deleteInquiry, replyToInquiry, respondVisit, proposeVisit } from "../services/inquiryService.js";
 import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi, cancelBooking as cancelBookingApi, updateBookingSettings as updateBookingSettingsApi } from "../services/bookingService.js";
-import { getRoomTypes, firstRoomTypeId } from '../constants/roomCategories';
+import { getRoomTypes, firstRoomTypeId, roomLabel } from '../constants/roomCategories';
 import MembersManager from "./MembersManager.jsx";
 import { listMyPaymentMethods } from "../services/paymentMethodService.js";
 import { listHostRentPayments } from "../services/rentPaymentService.js";
@@ -5557,12 +5557,6 @@ const HostDashboard = () => {
                   }
                   
                   const extraRoomCount = Math.max(0, uniqueRoomShots.length - 1 - thumbs.length);
-                  const ROOM_LABEL_FALLBACK = {
-                    bedroom: "Bedroom", bathroom: "Bathroom", washroom: "Washroom", living: "Living", kitchen: "Kitchen", kitchen_area: "Kitchen", balcony: "Balcony",
-                    workspace: "Workspace", reception: "Reception", meeting: "Meeting", meeting_room: "Meeting", cabin: "Cabin",
-                    front_view: "Front", inside_floor: "Floor", inside_hall: "Hall", inside_view: "Interior", entrance: "Entrance", loading_area: "Loading", electric_panel: "Panel",
-                    plot_area: "Plot", road_view: "Road", surrounding: "Area", surroundings: "Area", map: "Map", other: "Other",
-                  };
 
                   const hasSpecs = prop.beds || prop.baths || prop.sqft || prop.furnishing;
                   const ownerLabel = prop.ownerName || userData.fullName;
@@ -5599,7 +5593,7 @@ const HostDashboard = () => {
                                 <img src={shot.url} alt="" className="w-full h-full object-cover" />
                                 {shot.room && (
                                   <span className="absolute bottom-1 left-1 px-1.5 py-[2px] rounded-md bg-black/55 text-white text-[8px] font-black uppercase tracking-wider z-10">
-                                    {ROOM_LABEL_FALLBACK[shot.room] || shot.room}
+                                    {roomLabel(shot.room, language === 'বাংলা')}
                                   </span>
                                 )}
                                 {i === 2 && extraRoomCount > 0 && (

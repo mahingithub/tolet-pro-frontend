@@ -10,6 +10,7 @@ import InquiryModal from "./InquiryModal";
 import { propertyService, subscribeUserProperties, propertyLocationHaystack } from "../services/Propertyservice.js";
 import usePropertyStore from "../store/usePropertyStore";
 import { normaliseIntent } from "../constants/listingIntents";
+import { roomLabel } from "../constants/roomCategories";
 // ─── INTENT-AWARE FILTER CONFIG (single source of truth for all filter data) ──
 import {
 	getFilterConfig,
@@ -153,33 +154,9 @@ const IntentTabBar = ({ activeIntent, onChange }) => (
 // ─── VALID DIVISIONS (To catch custom area searches) ──────────────────────────
 const validDivisions = ["dhaka", "chittagong", "sylhet", "rajshahi", "khulna", "barishal", "rangpur", "mymensingh"];
 
-const ROOM_LABEL_FALLBACK = {
-	bedroom:  "Bedroom",
-	bathroom: "Bathroom",
-	washroom: "Washroom",
-	living:   "Living",
-	kitchen:  "Kitchen",
-	kitchen_area: "Kitchen",
-	balcony:  "Balcony",
-	workspace: "Workspace",
-	reception: "Reception",
-	meeting:   "Meeting",
-	meeting_room: "Meeting",
-	cabin:     "Cabin",
-	front_view: "Front",
-	inside_floor: "Floor",
-	inside_hall: "Hall",
-	inside_view: "Interior",
-	entrance:  "Entrance",
-	loading_area: "Loading",
-	electric_panel: "Panel",
-	plot_area: "Plot",
-	road_view: "Road",
-	surrounding: "Area",
-	surroundings: "Area",
-	map:       "Map",
-	other:     "Other",
-};
+// Room labels come from the shared source of truth (roomLabel from
+// constants/roomCategories) so cards, the dashboard and the photo tour all read
+// categories identically — no per-file duplication that can drift.
 
 // Human-readable property TYPE label so a card clearly says WHAT it is —
 // Office / Shop / Restaurant / Hostel / House / Single Room / Apartment / Land.
@@ -376,10 +353,10 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 					<div className="w-[25%] flex flex-col gap-1.5 h-full">
 						{collageThumbs.map((shot, idx) => (
 							<div key={`${shot.room || "x"}-${idx}`} className="relative flex-1 overflow-hidden cursor-pointer bg-gray-200" onClick={() => navigate(`/property/${property.id}`)}>
-								<img src={shot.url} className="w-full h-full object-cover hover:opacity-80 transition-opacity duration-300" alt={shot.room ? (ROOM_LABEL_FALLBACK[shot.room] || shot.room) : ""} loading="lazy" decoding="async" />
+								<img src={shot.url} className="w-full h-full object-cover hover:opacity-80 transition-opacity duration-300" alt={shot.room ? roomLabel(shot.room, isBn) : ""} loading="lazy" decoding="async" />
 								{shot.room && (
 									<span className="absolute bottom-1 left-1 px-1.5 py-[2px] rounded-md bg-black/55 text-white text-[8px] font-black uppercase tracking-wider">
-										{ROOM_LABEL_FALLBACK[shot.room] || shot.room}
+										{roomLabel(shot.room, isBn)}
 									</span>
 								)}
 								{idx === collageThumbs.length - 1 && extraRoomCount > 0 && (

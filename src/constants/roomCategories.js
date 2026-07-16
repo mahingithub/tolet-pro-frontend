@@ -81,12 +81,54 @@ export const ROOM_TYPES_BY_GROUP = {
   ],
 };
 
+// Some specific rental TYPES want their OWN photo set instead of the broad
+// residential one — this is what makes the upload categories DYNAMIC per rental
+// type (not one bedroom/bathroom list for everything):
+//   • hostel / mess → a single-seat + shared room + dining + common-area tour
+//   • sublet        → the room + shared bath/kitchen + common area
+//   • single room   → just the room + attached bath/kitchen
+// Anything not listed here uses ROOM_TYPES_BY_GROUP (flats, houses, commercial…).
+export const ROOM_TYPES_BY_TYPE = {
+  hostel: [
+    { id: 'single_seat', label: 'Single Seat', labelBn: 'সিঙ্গেল সিট', icon: BedDouble },
+    { id: 'room',        label: 'Room',        labelBn: 'রুম',          icon: Home },
+    { id: 'bathroom',    label: 'Bathroom',    labelBn: 'বাথরুম',       icon: Bath },
+    { id: 'dining',      label: 'Dining',      labelBn: 'ডাইনিং',       icon: Utensils },
+    { id: 'common_area', label: 'Common Area', labelBn: 'কমন এরিয়া',    icon: Users },
+    { id: 'other',       label: 'Other',       labelBn: 'অন্যান্য',     icon: Camera },
+  ],
+  mess: [
+    { id: 'single_seat', label: 'Single Seat', labelBn: 'সিঙ্গেল সিট', icon: BedDouble },
+    { id: 'room',        label: 'Room',        labelBn: 'রুম',          icon: Home },
+    { id: 'bathroom',    label: 'Bathroom',    labelBn: 'বাথরুম',       icon: Bath },
+    { id: 'dining',      label: 'Dining',      labelBn: 'ডাইনিং',       icon: Utensils },
+    { id: 'common_area', label: 'Common Area', labelBn: 'কমন এরিয়া',    icon: Users },
+    { id: 'other',       label: 'Other',       labelBn: 'অন্যান্য',     icon: Camera },
+  ],
+  sublet: [
+    { id: 'room',        label: 'Room',        labelBn: 'রুম',       icon: Home },
+    { id: 'bathroom',    label: 'Bathroom',    labelBn: 'বাথরুম',    icon: Bath },
+    { id: 'kitchen',     label: 'Kitchen',     labelBn: 'রান্নাঘর',  icon: Utensils },
+    { id: 'common_area', label: 'Common Area', labelBn: 'কমন এরিয়া', icon: Users },
+    { id: 'other',       label: 'Other',       labelBn: 'অন্যান্য',  icon: Camera },
+  ],
+  single_room: [
+    { id: 'room',     label: 'Room',     labelBn: 'রুম',      icon: Home },
+    { id: 'bathroom', label: 'Bathroom', labelBn: 'বাথরুম',   icon: Bath },
+    { id: 'kitchen',  label: 'Kitchen',  labelBn: 'রান্নাঘর', icon: Utensils },
+    { id: 'other',    label: 'Other',    labelBn: 'অন্যান্য', icon: Camera },
+  ],
+};
+
 /**
  * Resolve the photo categories for a listing. Uses the `type` first; before a
  * type is chosen it falls back to the intent (commercial → shop-style, else
  * residential) so the upload tabs are always sensible.
  */
 export function getRoomTypes(intent, type) {
+  // A specific type may define its OWN photo set (hostel / mess / sublet /
+  // single room). Otherwise fall back to the broad group.
+  if (ROOM_TYPES_BY_TYPE[type]) return ROOM_TYPES_BY_TYPE[type];
   const group = TYPE_GROUP_MAP[type] || (intent === 'commercial' ? 'commercial_shop' : 'residential');
   return ROOM_TYPES_BY_GROUP[group] || ROOM_TYPES_BY_GROUP.residential;
 }
@@ -100,7 +142,7 @@ export function firstRoomTypeId(intent, type) {
 // Built from the groups above + a few legacy/alias ids so old listings that
 // were tagged with the previous vocabulary still read correctly.
 const _pairs = {};
-Object.values(ROOM_TYPES_BY_GROUP).forEach((arr) =>
+[...Object.values(ROOM_TYPES_BY_GROUP), ...Object.values(ROOM_TYPES_BY_TYPE)].forEach((arr) =>
   arr.forEach((r) => { _pairs[r.id] = { en: r.label, bn: r.labelBn }; }),
 );
 export const ROOM_LABELS = {

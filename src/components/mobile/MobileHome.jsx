@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
+import { roomLabel } from '../../constants/roomCategories';
 import usePropertyStore from '../../store/usePropertyStore';
 import {
   DIVISIONS,
@@ -734,12 +735,6 @@ const PropertyCard = ({ property, t, landlord }) => {
             {thumbs.map((shot, i) => {
               // Convert shot string (fallback) to object just in case
               const s = typeof shot === 'string' ? { url: shot, room: null } : shot;
-              const ROOM_LABEL_FALLBACK = {
-                bedroom: "Bedroom", bathroom: "Bathroom", washroom: "Washroom", living: "Living", kitchen: "Kitchen", kitchen_area: "Kitchen", balcony: "Balcony",
-                workspace: "Workspace", reception: "Reception", meeting: "Meeting", meeting_room: "Meeting", cabin: "Cabin",
-                front_view: "Front", inside_floor: "Floor", inside_hall: "Hall", inside_view: "Interior", entrance: "Entrance", loading_area: "Loading", electric_panel: "Panel",
-                plot_area: "Plot", road_view: "Road", surrounding: "Area", surroundings: "Area", map: "Map", other: "Other"
-              };
               return (
                 <div key={i} className="relative rounded-[16px] overflow-hidden bg-gray-100">
                   <SafeImg
@@ -750,7 +745,7 @@ const PropertyCard = ({ property, t, landlord }) => {
                   />
                   {s?.room && (
                     <span className="absolute bottom-1.5 left-1.5 px-1.5 py-[2px] rounded-md bg-black/60 text-white text-[8px] font-black uppercase tracking-wider shadow-sm z-10">
-                      {ROOM_LABEL_FALLBACK[s.room] || s.room}
+                      {roomLabel(s.room, language === 'বাংলা')}
                     </span>
                   )}
                   {i === 2 && extraImages > 4 && (
