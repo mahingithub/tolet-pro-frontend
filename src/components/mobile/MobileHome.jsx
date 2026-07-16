@@ -116,6 +116,32 @@ const TYPE_LABELS_MOB = {
   land:        { en: 'Land',        bn: 'জমি' },
 };
 
+// Commercial (+ misc residential) category labels the translation-driven
+// `catMap` below doesn't cover. Mirrors PropertyListing's CATEGORY_LABELS so a
+// commercial card on the mobile home feed shows the SAME category pill the
+// desktop listing does — instead of dropping to null (which used to hide it).
+const CAT_LABELS_MOB = {
+  commercial_space: { en: 'Commercial Space',    bn: 'কমার্শিয়াল স্পেস' },
+  office:           { en: 'Office Space',        bn: 'অফিস স্পেস' },
+  co_working:       { en: 'Co-working Space',    bn: 'কো-ওয়ার্কিং স্পেস' },
+  shop:             { en: 'Shop',                bn: 'দোকান' },
+  showroom:         { en: 'Showroom',            bn: 'শোরুম' },
+  restaurant:       { en: 'Restaurant',          bn: 'রেস্টুরেন্ট' },
+  fast_food:        { en: 'Fast Food',           bn: 'ফাস্ট ফুড' },
+  warehouse:        { en: 'Warehouse',           bn: 'গুদামঘর' },
+  garage:           { en: 'Garage',              bn: 'গ্যারেজ' },
+  building:         { en: 'Building',            bn: 'পুরো বিল্ডিং' },
+  plot:             { en: 'Plot / Land',         bn: 'প্লট / জমি' },
+  hostel:           { en: 'Hostel',              bn: 'হোস্টেল' },
+  working_professional: { en: 'Working Professional', bn: 'চাকরিজীবী' },
+  student_male:     { en: 'Student (Male)',      bn: 'ছাত্র' },
+  student_female:   { en: 'Student (Female)',    bn: 'ছাত্রী' },
+  other:            { en: 'Others',              bn: 'অন্যান্য' },
+};
+
+const prettifyId = (v) =>
+  String(v).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
 const cardLabels = (property, t, isBn = false) => {
   const catMap = {
     family:          t.mobFamilyFlat,
@@ -127,13 +153,33 @@ const cardLabels = (property, t, isBn = false) => {
   const tl = TYPE_LABELS_MOB[property.type];
   const typeLabel = tl
     ? (isBn ? tl.bn : tl.en)
-    : (property.type
-        ? String(property.type).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-        : (isBn ? 'প্রপার্টি' : 'Property'));
-  return {
-    typeLabel,
-    catLabel: catMap[property.rentalCategory] || null,
-  };
+    : (property.type ? prettifyId(property.type) : (isBn ? 'প্রপার্টি' : 'Property'));
+
+  // Category pill: residential via translation keys first, then the commercial
+  // bilingual map, then a prettified raw id — so it's NEVER null when a
+  // rentalCategory exists (commercial listings now surface their category).
+  let catLabel = catMap[property.rentalCategory] || null;
+  if (!catLabel && property.rentalCategory) {
+    const cc = CAT_LABELS_MOB[property.rentalCategory];
+    catLabel = cc ? (isBn ? cc.bn : cc.en) : prettifyId(property.rentalCategory);
+  }
+
+  // Intent pill (rent / sale / commercial) — same 3-way split PropertyListing
+  // renders, so the mobile card shows the same badge count as the desktop list.
+  let intentLabel = null;
+  let intentKind = null;
+  if (property.intent === 'sale') {
+    intentLabel = isBn ? 'বিক্রির জন্য' : 'For Sale';
+    intentKind = 'sale';
+  } else if (property.intent === 'commercial') {
+    intentLabel = isBn ? 'কমার্শিয়াল' : 'Commercial';
+    intentKind = 'commercial';
+  } else if (property.intent) {
+    intentLabel = isBn ? 'ভাড়ার জন্য' : 'For Rent';
+    intentKind = 'rent';
+  }
+
+  return { typeLabel, catLabel, intentLabel, intentKind };
 };
 
 // ─── SUB-COMPONENTS ──────────────────────────────────────────────────────────
@@ -654,7 +700,7 @@ const PropertyCard = ({ property, t, landlord }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const [liked, setLiked] = useState(false);
-  const { typeLabel, catLabel } = cardLabels(property, t, language === 'বাংলা');
+  const { typeLabel, catLabel, intentLabel, intentKind } = cardLabels(property, t, language === 'বাংলা');
 
   const daysAgo = computeDaysAgo(property.date || property.createdAt);
   const ageLabel = daysAgo === 0
@@ -706,6 +752,15 @@ const PropertyCard = ({ property, t, landlord }) => {
               {catLabel && (
                 <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#ba0036] text-white text-[10px] font-black uppercase tracking-wider shadow-[0_6px_18px_-6px_rgba(186,0,54,0.55)]">
                   {catLabel}
+                </span>
+              )}
+              {intentLabel && (
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-white text-[10px] font-black uppercase tracking-wider shadow-md ${
+                  intentKind === 'sale' ? 'bg-blue-600' :
+                  intentKind === 'commercial' ? 'bg-purple-600' :
+                  'bg-green-600'
+                }`}>
+                  {intentLabel}
                 </span>
               )}
             </div>

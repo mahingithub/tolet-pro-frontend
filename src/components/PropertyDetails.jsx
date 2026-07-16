@@ -9,7 +9,7 @@ import {
   Star, Play, Award, Calendar, Clock, Send,
   Shield, BadgeCheck, Home, Users, MessageCircle, Sparkles,
   Building, Building2, ShoppingBag, Briefcase, Store, Layers, Globe,
-  Eye, FileText, Video, ShowerHead, Sofa, Utensils, Camera, Loader2
+  Eye, FileText, Video, ShowerHead, Sofa, Utensils, Camera, Loader2, Info
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -18,6 +18,9 @@ import { useAuth } from '../context/AuthContext.jsx';
 import InquiryModal from './InquiryModal';
 // ─── DATA SOURCE: live property + landlord. NO demo data. ─────────────────────
 import { propertyService } from '../services/Propertyservice.js';
+// Same field config the Add-Property wizard + dashboard editor use, so the
+// details we RENDER here always match the fields a host can ENTER.
+import { getDynamicFields } from '../constants/propertyFields';
 import { toast } from 'sonner';
 
 // ╔══════════════════════════════════════════════════════════════════════════╗
@@ -194,6 +197,7 @@ const LOCAL_TRANSLATIONS = {
     sendInquiry: 'Send Inquiry', inquireNow: 'Inquire Now',
     notAvailable: 'Not Available', verified: 'Verified',
     aboutProperty: 'About This Property', amenities: 'Amenities',
+    propertyDetails: 'Property Details', yes: 'Yes',
     location: 'Location', tenantReviews: 'Tenant Reviews',
     leaveReview: 'Leave a Review', submitReview: 'Submit Review',
     postingAs: 'Posting as',
@@ -229,6 +233,7 @@ const LOCAL_TRANSLATIONS = {
     sendInquiry: 'তথ্য পাঠান', inquireNow: 'এখনই জিজ্ঞেস করুন',
     notAvailable: 'পাওয়া যাচ্ছে না', verified: 'যাচাইকৃত',
     aboutProperty: 'সম্পত্তি সম্পর্কে', amenities: 'সুযোগ-সুবিধা',
+    propertyDetails: 'প্রপার্টির বিবরণ', yes: 'হ্যাঁ',
     location: 'অবস্থান', tenantReviews: 'ভাড়াটে পর্যালোচনা',
     leaveReview: 'পর্যালোচনা দিন', submitReview: 'পর্যালোচনা জমা দিন',
     postingAs: 'হিসেবে পোস্ট করছেন',
@@ -264,6 +269,7 @@ const LOCAL_TRANSLATIONS = {
     sendInquiry: 'إرسال استفسار', inquireNow: 'استفسر الآن',
     notAvailable: 'غير متاح', verified: 'موثق',
     aboutProperty: 'عن هذا العقار', amenities: 'المرافق',
+    propertyDetails: 'تفاصيل العقار', yes: 'نعم',
     location: 'الموقع', tenantReviews: 'تقييمات المستأجرين',
     leaveReview: 'اترك تقييمًا', submitReview: 'إرسال التقييم',
     postingAs: 'النشر باسم',
@@ -539,6 +545,48 @@ const amenityConfig = {
   'Pool Access':      { icon: Sparkles,    color: 'text-cyan-600',    bg: 'bg-cyan-50'    },
   'Balcony':          { icon: Eye,         color: 'text-violet-600',  bg: 'bg-violet-50'  },
   'Intercom':         { icon: Globe,       color: 'text-sky-600',     bg: 'bg-sky-50'     },
+};
+
+// ─── SPECIFIC-DETAIL ICONS MAP ────────────────────────────────────────────────
+// Maps the wizard's `specificDetails` field keys (see constants/propertyFields.js)
+// to a glyph for the "Property Details" section. Any key without an entry falls
+// back to a generic icon, so newly-added fields still render — just plainer.
+const specificDetailIcon = {
+  // ── Commercial ──
+  fireSafety:       { icon: ShieldCheck, color: 'text-[#ba0036]',   bg: 'bg-red-50'     },
+  gasLine:          { icon: Utensils,    color: 'text-orange-600',  bg: 'bg-orange-50'  },
+  ducting:          { icon: Building2,   color: 'text-slate-600',   bg: 'bg-slate-100'  },
+  kitchenArea:      { icon: Utensils,    color: 'text-orange-600',  bg: 'bg-orange-50'  },
+  seatingCapacity:  { icon: Users,       color: 'text-indigo-600',  bg: 'bg-indigo-50'  },
+  shutters:         { icon: Store,       color: 'text-slate-600',   bg: 'bg-slate-100'  },
+  electricityLoad:  { icon: Zap,         color: 'text-amber-600',   bg: 'bg-amber-50'   },
+  floorPlan:        { icon: Layers,      color: 'text-violet-600',  bg: 'bg-violet-50'  },
+  cabins:           { icon: Briefcase,   color: 'text-sky-600',     bg: 'bg-sky-50'     },
+  meetingRooms:     { icon: Users,       color: 'text-indigo-600',  bg: 'bg-indigo-50'  },
+  washrooms:        { icon: ShowerHead,  color: 'text-cyan-600',    bg: 'bg-cyan-50'    },
+  backupPower:      { icon: Zap,         color: 'text-amber-600',   bg: 'bg-amber-50'   },
+  frontageWidth:    { icon: Maximize2,   color: 'text-slate-600',   bg: 'bg-slate-100'  },
+  mainRoadFacing:   { icon: MapPin,      color: 'text-[#ba0036]',   bg: 'bg-red-50'     },
+  mezzanine:        { icon: Layers,      color: 'text-violet-600',  bg: 'bg-violet-50'  },
+  glassFront:       { icon: Eye,         color: 'text-sky-600',     bg: 'bg-sky-50'     },
+  numberOfDesks:    { icon: Briefcase,   color: 'text-sky-600',     bg: 'bg-sky-50'     },
+  height:           { icon: Building,    color: 'text-slate-600',   bg: 'bg-slate-100'  },
+  truckAccess:      { icon: Car,         color: 'text-slate-600',   bg: 'bg-slate-100'  },
+  // ── Sale / land ──
+  landMeasurement:  { icon: Maximize2,   color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  frontRoadWidth:   { icon: MapPin,      color: 'text-[#ba0036]',   bg: 'bg-red-50'     },
+  khatian:          { icon: FileText,    color: 'text-slate-600',   bg: 'bg-slate-100'  },
+  mutationDone:     { icon: FileText,    color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  totalFloors:      { icon: Layers,      color: 'text-violet-600',  bg: 'bg-violet-50'  },
+  facing:           { icon: Globe,       color: 'text-sky-600',     bg: 'bg-sky-50'     },
+  parking:          { icon: Car,         color: 'text-slate-600',   bg: 'bg-slate-100'  },
+  // ── Rent ──
+  tenantPreference: { icon: Users,       color: 'text-indigo-600',  bg: 'bg-indigo-50'  },
+  utilities:        { icon: Zap,         color: 'text-amber-600',   bg: 'bg-amber-50'   },
+  seatsPerRoom:     { icon: Bed,         color: 'text-slate-600',   bg: 'bg-slate-100'  },
+  genderPolicy:     { icon: Users,       color: 'text-indigo-600',  bg: 'bg-indigo-50'  },
+  attachedBath:     { icon: Bath,        color: 'text-cyan-600',    bg: 'bg-cyan-50'    },
+  sharedKitchen:    { icon: Utensils,    color: 'text-orange-600',  bg: 'bg-orange-50'  },
 };
 
 // ─── STAR RATING INPUT ────────────────────────────────────────────────────────
@@ -1568,7 +1616,47 @@ const PropertyDetails = () => {
   const isOwnProperty = auth?.user && (String(auth.user.id || auth.user._id) === String(landlord?.id || property?.landlordId || property?.ownerUserId));
   const priceLabel = INTENT_CONFIG[property?.intent]?.priceLabel || '/mo';
   const group = property ? (TYPE_GROUP_MAP[property.rentalCategory || property.type] || 'residential') : 'residential';
-  
+
+  // Human-readable list of the intent/type-specific answers the host entered in
+  // the wizard (stored in property.specificDetails — commercial fire safety, gas
+  // line, ducting, office cabins, land measurement, …). Driven by the SAME field
+  // config the Add-Property form uses (getDynamicFields), so any field a host can
+  // enter is surfaced here without hand-maintaining a second list. Falsy toggles,
+  // blank strings and zero-value numbers are skipped so only real answers show.
+  const specificDetailItems = useMemo(() => {
+    if (!property) return [];
+    const bag = (property.specificDetails && typeof property.specificDetails === 'object')
+      ? property.specificDetails
+      : {};
+    const fields = getDynamicFields(
+      property.intent,
+      property.type,
+      property.rentalCategory || property.category
+    );
+    const pickLabel = (o) => (langKey === 'bn' && o.labelBn) ? o.labelBn : o.label;
+    const out = [];
+    for (const f of fields) {
+      const raw = bag[f.key];
+      if (f.kind === 'toggle') {
+        // A toggle only carries meaning when it's ON — render it like a feature.
+        if (raw === true || raw === 'true') {
+          out.push({ key: f.key, label: pickLabel(f), value: lc.yes || 'Yes', isToggle: true });
+        }
+        continue;
+      }
+      if (raw == null || String(raw).trim() === '') continue;
+      // A 0 on a numeric field is the untouched default — skip it as noise.
+      if (f.kind === 'number' && Number(raw) === 0) continue;
+      let display = raw;
+      if (f.kind === 'select' && Array.isArray(f.options)) {
+        const opt = f.options.find((o) => String(o.id) === String(raw));
+        if (opt) display = pickLabel(opt);
+      }
+      out.push({ key: f.key, label: pickLabel(f), value: String(display) });
+    }
+    return out;
+  }, [property, langKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const getPremiumStats = () => {
     const stats = [];
     if (group === 'residential') {
@@ -2086,6 +2174,35 @@ const PropertyDetails = () => {
                 })}
               </div>
             </GlassCard>
+
+            {/* PROPERTY DETAILS — the intent/type-specific answers the host
+                entered (commercial fire safety, gas line, ducting, cabins, land
+                size, …). Built from the shared wizard field config, so it always
+                matches the form and covers every listing type. Hidden entirely
+                when the listing carries no specific details. */}
+            {specificDetailItems.length > 0 && (
+              <GlassCard className="p-5 md:p-7">
+                <h3 className="text-xl font-black text-slate-900 mb-5" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('propertyDetails')}</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {specificDetailItems.map((item) => {
+                    const cfg = specificDetailIcon[item.key] || { icon: item.isToggle ? CheckCircle2 : Info, color: 'text-[#ba0036]', bg: 'bg-red-50' };
+                    const Icon = cfg.icon;
+                    return (
+                      <div key={item.key} className="flex items-center gap-3 p-3 md:p-4 rounded-2xl"
+                        style={{ background: '#fafbfc', border: '1px solid rgba(15,23,42,0.06)' }}>
+                        <div className={`w-9 h-9 rounded-xl ${cfg.bg} flex items-center justify-center shrink-0`}>
+                          <Icon size={16} className={cfg.color} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-wide leading-tight">{item.label}</p>
+                          <p className="text-xs font-bold text-slate-700 leading-tight mt-0.5 break-words" title={item.value}>{item.value}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </GlassCard>
+            )}
 
             {/* MAP + NEARBY */}
             <GlassCard className="p-5 md:p-7">
