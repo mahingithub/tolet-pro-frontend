@@ -5516,6 +5516,25 @@ const HostDashboard = () => {
                   const catDict = CATEGORY_LABELS[prop.rentalCategory];
                   const catLabel = catDict ? (language === 'বাংলা' ? catDict.bn : catDict.en) : (prop.rentalCategory || "Others");
 
+                  // Property TYPE label (Office / Shop / Showroom / Restaurant /
+                  // Hostel / House / Single Room / Apartment / Land …) so the host
+                  // card clearly states WHAT the property is, alongside its
+                  // category (= business category for commercial) + intent.
+                  const TYPE_LABELS_HD = {
+                    flat: { en: 'Apartment', bn: 'অ্যাপার্টমেন্ট' }, apartment: { en: 'Apartment', bn: 'অ্যাপার্টমেন্ট' },
+                    house: { en: 'House', bn: 'বাড়ি' }, independent: { en: 'House', bn: 'বাড়ি' },
+                    duplex: { en: 'Duplex', bn: 'ডুপ্লেক্স' }, studio: { en: 'Studio', bn: 'স্টুডিও' }, penthouse: { en: 'Penthouse', bn: 'পেন্টহাউস' },
+                    sublet: { en: 'Sublet', bn: 'সাবলেট' }, hostel: { en: 'Hostel', bn: 'হোস্টেল' }, single_room: { en: 'Single Room', bn: 'সিঙ্গেল রুম' }, building: { en: 'Building', bn: 'বিল্ডিং' },
+                    office: { en: 'Office', bn: 'অফিস' }, shop: { en: 'Shop', bn: 'দোকান' }, showroom: { en: 'Showroom', bn: 'শোরুম' }, restaurant: { en: 'Restaurant', bn: 'রেস্টুরেন্ট' }, land: { en: 'Land', bn: 'জমি' },
+                  };
+                  const tlDict = TYPE_LABELS_HD[prop.type];
+                  const typeLabel = tlDict
+                    ? (language === 'বাংলা' ? tlDict.bn : tlDict.en)
+                    : (prop.type ? String(prop.type).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '');
+                  // Hide the type pill when it would just duplicate the category
+                  // pill (e.g. a showroom whose category is also "Showroom").
+                  const showTypePill = typeLabel && String(typeLabel).toLowerCase() !== String(catLabel).toLowerCase();
+
                   const uniqueRoomShots = [];
                   const usedRooms = new Set();
                   const hasRoomPhotos = Array.isArray(prop.roomPhotos) && prop.roomPhotos.length > 0;
@@ -5531,14 +5550,33 @@ const HostDashboard = () => {
                   }
                   
                   const coverImg = prop.coverPhoto || prop.img || (uniqueRoomShots[0]?.url) || (prop.images || [])[0] || '';
-                  let thumbs = uniqueRoomShots.filter(s => s.url !== coverImg).slice(0, 3);
+                  // Show up to 3 room thumbnails (→ 4 images incl. the cover),
+                  // drawn from the uploaded set. Prefer photos that DIFFER from
+                  // the cover, but KEEP the labelled same-as-cover rooms so a
+                  // commercial listing still shows Workspace / Reception /
+                  // Washroom instead of empty slots.
+                  let thumbs = [
+                    ...uniqueRoomShots.filter(s => s.url && s.url !== coverImg),
+                    ...uniqueRoomShots.filter(s => s.url && s.url === coverImg),
+                  ].slice(0, 3);
+                  if (thumbs.length < 3 && Array.isArray(prop.images)) {
+                    for (const u of prop.images) {
+                      if (thumbs.length >= 3) break;
+                      if (u && u !== coverImg && !thumbs.some(s => s.url === u)) thumbs.push({ url: u, room: null });
+                    }
+                  }
                   
                   if (!thumbs.length && !hasRoomPhotos && Array.isArray(prop.images)) {
                     thumbs = prop.images.filter(u => u && u !== coverImg).slice(0, 3).map(u => ({ url: u, room: null }));
                   }
                   
                   const extraRoomCount = Math.max(0, uniqueRoomShots.length - 1 - thumbs.length);
-                  const ROOM_LABEL_FALLBACK = { bedroom: "Bedroom", bathroom: "Bathroom", living: "Living", kitchen: "Kitchen", other: "Other" };
+                  const ROOM_LABEL_FALLBACK = {
+                    bedroom: "Bedroom", bathroom: "Bathroom", washroom: "Washroom", living: "Living", kitchen: "Kitchen", kitchen_area: "Kitchen", balcony: "Balcony",
+                    workspace: "Workspace", reception: "Reception", meeting: "Meeting", meeting_room: "Meeting", cabin: "Cabin",
+                    front_view: "Front", inside_floor: "Floor", inside_hall: "Hall", inside_view: "Interior", entrance: "Entrance", loading_area: "Loading", electric_panel: "Panel",
+                    plot_area: "Plot", road_view: "Road", surrounding: "Area", map: "Map", other: "Other",
+                  };
 
                   const hasSpecs = prop.beds || prop.baths || prop.sqft || prop.furnishing;
                   const ownerLabel = prop.ownerName || userData.fullName;
@@ -5629,6 +5667,11 @@ const HostDashboard = () => {
                       </div>
                       {/* ── Category & Intent badges (PropertyListing style) ── */}
                       <div className="absolute top-3 right-3 flex flex-col gap-2 items-end z-10">
+                        {showTypePill && (
+                          <span className="bg-gray-900/90 backdrop-blur-md text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest px-2.5 py-1 md:px-3 md:py-1.5 rounded-lg shadow-sm">
+                            {typeLabel}
+                          </span>
+                        )}
                         <span className="bg-[#ba0036]/90 backdrop-blur-md text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest px-2.5 py-1 md:px-3 md:py-1.5 rounded-lg shadow-sm">
                           {catLabel}
                         </span>
