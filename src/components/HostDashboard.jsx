@@ -22,6 +22,7 @@ import { getDynamicFields } from '../constants/propertyFields';
 import { subscriptionService } from '../services/subscriptionService';
 import { listHostInquiries, updateInquiryStatus, deleteInquiry, replyToInquiry, respondVisit, proposeVisit } from "../services/inquiryService.js";
 import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi, cancelBooking as cancelBookingApi, updateBookingSettings as updateBookingSettingsApi } from "../services/bookingService.js";
+import { getRoomTypes, firstRoomTypeId } from '../constants/roomCategories';
 import MembersManager from "./MembersManager.jsx";
 import { listMyPaymentMethods } from "../services/paymentMethodService.js";
 import { listHostRentPayments } from "../services/rentPaymentService.js";
@@ -63,34 +64,10 @@ const toPortfolioCard = (p) => ({
   inquiries: p.inquiries ?? 0,
 });
 
-const ROOM_TYPES_RESIDENTIAL = [
-  { id: 'bedroom',    label: 'Bedroom',     labelBn: 'শোবার ঘর',  icon: BedDouble },
-  { id: 'bathroom',   label: 'Bathroom',    labelBn: 'বাথরুম',    icon: Bath },
-  { id: 'living',     label: 'Living Room', labelBn: 'বসার ঘর',   icon: Home },
-  { id: 'kitchen',    label: 'Kitchen',     labelBn: 'রান্নাঘর',  icon: Utensils },
-  { id: 'other',      label: 'Other',       labelBn: 'অন্যান্য',  icon: Camera },
-];
-
-const ROOM_TYPES_COMMERCIAL = [
-  { id: 'workspace',  label: 'Workspace / Floor', labelBn: 'ওয়ার্কস্পেস / ফ্লোর',  icon: Building },
-  { id: 'reception',  label: 'Reception / Front', labelBn: 'রিসেপশন / সামনের অংশ',icon: Users },
-  { id: 'meeting',    label: 'Meeting Room',      labelBn: 'মিটিং রুম',         icon: Coffee },
-  { id: 'washroom',   label: 'Washroom',          labelBn: 'ওয়াশরুম',          icon: Bath },
-  { id: 'other',      label: 'Other',             labelBn: 'অন্যান্য',          icon: Camera },
-];
-
-const ROOM_TYPES_LAND = [
-  { id: 'plot_area',  label: 'Plot Area',         labelBn: 'প্লটের এরিয়া',      icon: Map },
-  { id: 'road_view',  label: 'Road View',         labelBn: 'রাস্তার ছবি',         icon: MapPin },
-  { id: 'surrounding',label: 'Surroundings',      labelBn: 'আশপাশের এলাকা',     icon: Leaf },
-  { id: 'other',      label: 'Other',             labelBn: 'অন্যান্য',          icon: Camera },
-];
-
-const getRoomTypes = (intent, type) => {
-  if (type === 'land') return ROOM_TYPES_LAND;
-  if (intent === 'commercial' || ['shop', 'restaurant', 'office', 'showroom'].includes(type)) return ROOM_TYPES_COMMERCIAL;
-  return ROOM_TYPES_RESIDENTIAL;
-};
+// Room photo categories now come from the shared source of truth
+// (src/constants/roomCategories.js). getRoomTypes + firstRoomTypeId are
+// imported at the top of this file so the dashboard editor offers the SAME
+// per-type categories as the Add Property wizard.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CROSS-MODULE DATA CONTRACT (frontend stub — backend wires it together later)
@@ -867,6 +844,15 @@ const HostDashboard = () => {
   const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM);
   const [selectedRoomType, setSelectedRoomType] = useState('bedroom');
   const [activeDropdownId, setActiveDropdownId] = useState(null);
+
+  // Keep the edit-modal's active photo-category tab valid for the property's
+  // kind, so editing a commercial listing never tags an upload 'bedroom'
+  // (residential). Reseed to the first category when the edited property changes.
+  useEffect(() => {
+    if (!modalData) return;
+    const ids = getRoomTypes(modalData.intent, modalData.type).map((r) => r.id);
+    if (!ids.includes(selectedRoomType)) setSelectedRoomType(firstRoomTypeId(modalData.intent, modalData.type));
+  }, [modalData]); // eslint-disable-line react-hooks/exhaustive-deps
   // NOTE: in-dashboard chat panel removed — all message CTAs now route to
   // /messages (the standalone ChatSystem) so there's a single source of
   // truth for conversations across the app.
@@ -5575,7 +5561,7 @@ const HostDashboard = () => {
                     bedroom: "Bedroom", bathroom: "Bathroom", washroom: "Washroom", living: "Living", kitchen: "Kitchen", kitchen_area: "Kitchen", balcony: "Balcony",
                     workspace: "Workspace", reception: "Reception", meeting: "Meeting", meeting_room: "Meeting", cabin: "Cabin",
                     front_view: "Front", inside_floor: "Floor", inside_hall: "Hall", inside_view: "Interior", entrance: "Entrance", loading_area: "Loading", electric_panel: "Panel",
-                    plot_area: "Plot", road_view: "Road", surrounding: "Area", map: "Map", other: "Other",
+                    plot_area: "Plot", road_view: "Road", surrounding: "Area", surroundings: "Area", map: "Map", other: "Other",
                   };
 
                   const hasSpecs = prop.beds || prop.baths || prop.sqft || prop.furnishing;

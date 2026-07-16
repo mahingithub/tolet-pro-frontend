@@ -176,6 +176,7 @@ const ROOM_LABEL_FALLBACK = {
 	plot_area: "Plot",
 	road_view: "Road",
 	surrounding: "Area",
+	surroundings: "Area",
 	map:       "Map",
 	other:     "Other",
 };

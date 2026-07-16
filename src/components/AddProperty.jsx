@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { getDynamicFields } from '../constants/propertyFields';
+import { getRoomTypes, firstRoomTypeId } from '../constants/roomCategories';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useGoBack from '../hooks/useGoBack';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -694,35 +695,10 @@ const INITIAL_FORM = {
   specificDetails: {},
 };
 
-// Room photo categories
-const ROOM_TYPES_RESIDENTIAL = [
-  { id: 'bedroom',    label: 'Bedroom',     labelBn: 'শোবার ঘর',  icon: BedDouble },
-  { id: 'bathroom',   label: 'Bathroom',    labelBn: 'বাথরুম',    icon: Bath },
-  { id: 'living',     label: 'Living Room', labelBn: 'বসার ঘর',   icon: Home },
-  { id: 'kitchen',    label: 'Kitchen',     labelBn: 'রান্নাঘর',  icon: Utensils },
-  { id: 'other',      label: 'Other',       labelBn: 'অন্যান্য',  icon: Camera },
-];
-
-const ROOM_TYPES_COMMERCIAL = [
-  { id: 'workspace',  label: 'Workspace / Floor', labelBn: 'ওয়ার্কস্পেস / ফ্লোর',  icon: Building },
-  { id: 'reception',  label: 'Reception / Front', labelBn: 'রিসেপশন / সামনের অংশ',icon: Users },
-  { id: 'meeting',    label: 'Meeting Room',      labelBn: 'মিটিং রুম',         icon: Coffee },
-  { id: 'washroom',   label: 'Washroom',          labelBn: 'ওয়াশরুম',          icon: Bath },
-  { id: 'other',      label: 'Other',             labelBn: 'অন্যান্য',          icon: Camera },
-];
-
-const ROOM_TYPES_LAND = [
-  { id: 'plot_area',  label: 'Plot Area',         labelBn: 'প্লটের এরিয়া',      icon: Map },
-  { id: 'road_view',  label: 'Road View',         labelBn: 'রাস্তার ছবি',         icon: MapPin },
-  { id: 'surrounding',label: 'Surroundings',      labelBn: 'আশপাশের এলাকা',     icon: Leaf },
-  { id: 'other',      label: 'Other',             labelBn: 'অন্যান্য',          icon: Camera },
-];
-
-const getRoomTypes = (intent, type) => {
-  if (type === 'land') return ROOM_TYPES_LAND;
-  if (intent === 'commercial' || ['shop', 'restaurant', 'office', 'showroom'].includes(type)) return ROOM_TYPES_COMMERCIAL;
-  return ROOM_TYPES_RESIDENTIAL;
-};
+// Room photo categories now live in the shared source of truth
+// (src/constants/roomCategories.js) so Add Property, the dashboard editor and
+// the listing cards all agree on the per-type categories. getRoomTypes +
+// firstRoomTypeId are imported at the top of this file.
 
 // ─── HELPER: Input Field ──────────────────────────────────────────────────────
 const Field = ({ label, required, children, hint }) => (
@@ -1410,6 +1386,14 @@ const AddProperty = () => {
   const coverInputRef = useRef(null);
   const roomInputRef  = useRef(null);
   const [selectedRoomType, setSelectedRoomType] = useState('bedroom');
+
+  // Keep the active photo-category tab valid for the current property kind, so
+  // a commercial upload is never tagged 'bedroom' (residential). Reseed to the
+  // first category whenever intent/type changes and the current pick is invalid.
+  useEffect(() => {
+    const ids = getRoomTypes(form.intent, form.type).map((r) => r.id);
+    if (!ids.includes(selectedRoomType)) setSelectedRoomType(firstRoomTypeId(form.intent, form.type));
+  }, [form.intent, form.type]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
   // Nested setter for the intent-specific details bag (form.specificDetails).

@@ -738,7 +738,7 @@ const PropertyCard = ({ property, t, landlord }) => {
                 bedroom: "Bedroom", bathroom: "Bathroom", washroom: "Washroom", living: "Living", kitchen: "Kitchen", kitchen_area: "Kitchen", balcony: "Balcony",
                 workspace: "Workspace", reception: "Reception", meeting: "Meeting", meeting_room: "Meeting", cabin: "Cabin",
                 front_view: "Front", inside_floor: "Floor", inside_hall: "Hall", inside_view: "Interior", entrance: "Entrance", loading_area: "Loading", electric_panel: "Panel",
-                plot_area: "Plot", road_view: "Road", surrounding: "Area", map: "Map", other: "Other"
+                plot_area: "Plot", road_view: "Road", surrounding: "Area", surroundings: "Area", map: "Map", other: "Other"
               };
               return (
                 <div key={i} className="relative rounded-[16px] overflow-hidden bg-gray-100">
