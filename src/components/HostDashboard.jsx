@@ -4979,12 +4979,23 @@ const HostDashboard = () => {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 mb-0.5">
                       <h4 className="text-[13px] sm:text-sm font-black text-gray-900 truncate">{booking.tenant}</h4>
+                      {booking.floorNumber && (
+                        <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 border border-indigo-200 shrink-0 inline-flex items-center gap-0.5">
+                          {language === 'বাংলা' ? 'ফ্লোর' : 'Floor'} {booking.floorNumber}
+                        </span>
+                      )}
                       <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 inline-flex items-center gap-0.5 ${theme.cls}`}>
                         {theme.icon} <span className="hidden sm:inline">{theme.label}</span>
                       </span>
                     </div>
                     <p className="text-[10px] font-bold text-gray-500 truncate">
-                      {booking.property}
+                      <span className="text-gray-700 font-black">{booking.property}</span>
+                      {booking.roomNumber && (
+                        <>
+                          <span className="mx-1 text-gray-300">·</span>
+                          {language === 'বাংলা' ? 'রুম' : 'Room'} {booking.roomNumber}
+                        </>
+                      )}
                       {monthInLease && (
                         <>
                           <span className="mx-1 text-gray-300">·</span>
@@ -5024,14 +5035,9 @@ const HostDashboard = () => {
                 {isExpanded && (
                   <div className="border-t border-gray-100 bg-gray-50/40 px-3 sm:px-4 py-4 animate-in slide-in-from-top-2 fade-in duration-300">
 
-                    {/* Hostel rooms show the per-seat rent register (each seat =
-                        name + room + floor + its split share of the room rent);
-                        flat / single-room / sublet keep the classic single-tenant
-                        ledger panels below. */}
-                    {isHostelBooking(booking) ? (
-                      <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} showLedger={true} showManage={false} />
-                    ) : (
-                    <>
+                    {/* Every rent card — flat / single-room / hostel — uses the
+                        SAME classic ledger layout so Rent Collection looks
+                        uniform. Per-seat management stays on the Bookings tab. */}
 
                     {/* This-month ledger panel — totals + progress + edit */}
                     <div className="bg-white rounded-2xl p-3.5 border border-gray-100">
@@ -5226,8 +5232,6 @@ const HostDashboard = () => {
                         })}
                       </div>
                     </details>
-                    </>
-                    )}
                   </div>
                 )}
               </div>
