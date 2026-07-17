@@ -87,6 +87,18 @@ const CELL_STYLE = {
   upcoming:     'bg-gray-50 text-gray-400 border-gray-200',
 };
 
+// Short status word shown beneath the month on the MOBILE (touch) boxes. Desktop
+// keeps the compact colour-only chips; mobile's larger boxes add a readable label
+// so they're self-explanatory without relying on colour alone.
+const CELL_STATUS_LABEL = {
+  paid:         { en: 'Paid',     bn: 'পেইড' },
+  partial:      { en: 'Partial',  bn: 'আংশিক' },
+  'due-marked': { en: 'Due',      bn: 'বকেয়া' },
+  overdue:      { en: 'Overdue',  bn: 'বকেয়া' },
+  'due-soon':   { en: 'Soon',     bn: 'শীঘ্রই' },
+  upcoming:     { en: 'Upcoming', bn: 'আসন্ন' },
+};
+
 const taka = (n) => `৳${(Number(n) || 0).toLocaleString('en-IN')}`;
 const isMongoId = (v) => /^[0-9a-fA-F]{24}$/.test(String(v || ''));
 
@@ -381,7 +393,15 @@ export default function MembersManager({ booking, language = 'English', onChange
                 {/* Rent collection strip — only in the Rent Collection tab.
                     The Bookings tab hides it (member management only). */}
                 {showLedger && (<>
-                <div className="flex gap-1 overflow-x-auto pb-1">
+                {/* ── Month boxes ──────────────────────────────────────────
+                    Desktop (sm+): the original compact colour-coded scroll strip
+                    — unchanged. Mobile (<sm): a wrapping grid of large, easy-to-
+                    tap boxes with a readable status label. Both write the SAME
+                    `cell` selection, so the Paid / Due / Undo popover below works
+                    identically on either layout. */}
+
+                {/* Desktop — compact scroll strip (unchanged) */}
+                <div className="hidden sm:flex gap-1 overflow-x-auto pb-1">
                   {months.map((key) => {
                     const status = memberRentStatus(booking, ledger, key, today);
                     const isSel = cell && cell.memberId === m.id && cell.key === key;
@@ -394,6 +414,26 @@ export default function MembersManager({ booking, language = 'English', onChange
                         title={monthShort(key, isBn)}
                       >
                         {monthShort(key, isBn)}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Mobile — large, tappable month boxes (≥52px tall, wraps to rows) */}
+                <div className="grid grid-cols-3 gap-2 sm:hidden">
+                  {months.map((key) => {
+                    const status = memberRentStatus(booking, ledger, key, today);
+                    const isSel = cell && cell.memberId === m.id && cell.key === key;
+                    const label = (CELL_STATUS_LABEL[status] || {})[isBn ? 'bn' : 'en'] || '';
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setCell(isSel ? null : { memberId: m.id, key })}
+                        className={`flex flex-col items-center justify-center gap-0.5 min-h-[52px] rounded-xl border text-[12px] font-black tabular-nums leading-tight transition-all active:scale-95 ${CELL_STYLE[status]} ${isSel ? 'ring-2 ring-offset-2 ring-[#ba0036]' : ''}`}
+                      >
+                        <span>{monthShort(key, isBn)}</span>
+                        <span className="text-[8px] font-black uppercase tracking-wider opacity-80">{label}</span>
                       </button>
                     );
                   })}
