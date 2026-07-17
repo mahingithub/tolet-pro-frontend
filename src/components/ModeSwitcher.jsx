@@ -8,7 +8,7 @@ import { useLanguage } from '../context/LanguageContext';
 // 'sale' reads as "Buy" on the browse tabs (the visitor is a buyer); the
 // underlying intent value stays 'sale' everywhere in state / URL / API.
 const LABELS = {
-  rent:       { en: 'Rent',       bn: 'ভাড়া' },
+  rent:       { en: 'Residential', bn: 'আবাসিক' },
   sale:       { en: 'Buy',        bn: 'কিনুন' },
   commercial: { en: 'Commercial', bn: 'কমার্শিয়াল' },
 };

@@ -66,7 +66,7 @@ import { locationQueryMatches } from '../../data/locationAliases';
 const HERO_YOUTUBE_ID = 'PpeE86P9TnA';
 
 const SEARCH_TYPES = [
-  { id: 'rent',       labelKey: 'tabRent' },
+  { id: 'rent',       labelKey: 'tabResidential' },
   { id: 'buy',        labelKey: 'tabBuy' },
   { id: 'commercial', labelKey: 'tabCommercial' },
 ].filter((type) => type.id !== 'buy' || SALE_INTENT_ENABLED);

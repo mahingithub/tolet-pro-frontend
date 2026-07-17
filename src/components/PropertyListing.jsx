@@ -121,7 +121,7 @@ const ICON_MAP = { home: Home, user: User, users: Users, book: BookOpen };
 
 // ─── INTENT TABS (Filter_Panel header) ────────────────────────────────────────
 const INTENT_TABS = [
-	{ intent: "rent",       labelBn: "ভাড়া" },
+	{ intent: "rent",       labelBn: "আবাসিক" },
 	{ intent: "sale",       labelBn: "ক্রয়" },
 	{ intent: "commercial", labelBn: "বাণিজ্যিক" },
 	// Buying/selling is handled off-platform for now — drop the "ক্রয়" (Buy) tab

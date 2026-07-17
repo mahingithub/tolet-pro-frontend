@@ -631,7 +631,7 @@ const HeroSection = () => {
           <div className="flex lg:hidden flex-col bg-gradient-to-br from-white/60 via-white/30 to-white/50 backdrop-blur-[24px] backdrop-saturate-[180%] rounded-3xl shadow-[inset_0_1.5px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(255,255,255,0.25),0_22px_60px_rgba(15,23,42,0.30)] border border-white/60 p-3 relative z-[100] ring-1 ring-inset ring-white/25">
 
             <div className="flex bg-white/35 backdrop-blur-md p-1 rounded-full w-full mb-3 border border-white/55 ring-1 ring-inset ring-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
-              {[{ id: 'rent', label: t?.tabRent || 'Rent' }, { id: 'buy', label: t?.tabBuy || 'Buy' }, { id: 'commercial', label: t?.tabCommercial || 'Commercial' }].filter(tab => tab.id !== 'buy' || SALE_INTENT_ENABLED).map(tab => (
+              {[{ id: 'rent', label: t?.tabResidential || 'Residential' }, { id: 'buy', label: t?.tabBuy || 'Buy' }, { id: 'commercial', label: t?.tabCommercial || 'Commercial' }].filter(tab => tab.id !== 'buy' || SALE_INTENT_ENABLED).map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setSearchType(tab.id)}
@@ -714,7 +714,7 @@ const HeroSection = () => {
               
               <div className="flex justify-center mb-3">
                 <div className="flex bg-slate-100/60 p-1 rounded-full border border-slate-200/50 shadow-inner">
-                  {[{ id: 'rent', label: t?.tabRent || 'RENT' }, { id: 'buy', label: t?.tabBuy || 'BUY' }, { id: 'commercial', label: t?.tabCommercial || 'COMMERCIAL' }].filter(tab => tab.id !== 'buy' || SALE_INTENT_ENABLED).map(tab => (
+                  {[{ id: 'rent', label: t?.tabResidential || 'RESIDENTIAL' }, { id: 'buy', label: t?.tabBuy || 'BUY' }, { id: 'commercial', label: t?.tabCommercial || 'COMMERCIAL' }].filter(tab => tab.id !== 'buy' || SALE_INTENT_ENABLED).map(tab => (
                     <button
                       key={tab.id}
                       onClick={() => setSearchType(tab.id)}
