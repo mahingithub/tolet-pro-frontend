@@ -11,6 +11,7 @@ import {
 import { propertyService } from '../services/Propertyservice';
 import TrustGauge from './shared/TrustGauge';
 import VerifStep  from './shared/VerifStep';
+import ProfileReviews from './shared/ProfileReviews';
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -404,6 +405,11 @@ const LandlordProfile = () => {
               </div>
             </motion.div>
           </div>
+        </div>
+
+        {/* ── REVIEWS (person-to-person reputation — replaces property reviews) ── */}
+        <div className="mb-8 md:mb-12">
+          <ProfileReviews revieweeId={id} revieweeRole="landlord" revieweeName={landlord.name} />
         </div>
 
         {/* ── ACTIVE LISTINGS ── */}

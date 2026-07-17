@@ -37,6 +37,7 @@ import { listHostBookings } from '../services/bookingService';
 import { useAuth } from '../context/AuthContext.jsx';
 import TrustGauge from './shared/TrustGauge';
 import VerifStep  from './shared/VerifStep';
+import ProfileReviews from './shared/ProfileReviews';
 
 // ── Payment helpers (module scope, pure) ────────────────────────────────────
 const bdt = (n) => `৳ ${(Number(n) || 0).toLocaleString('en-IN')}`;
@@ -692,6 +693,11 @@ const TenantProfile = () => {
               </div>
             </motion.div>
           </div>
+        </div>
+
+        {/* ── REVIEWS (person-to-person reputation — replaces property reviews) ── */}
+        <div className="mt-6 md:mt-8">
+          <ProfileReviews revieweeId={id} revieweeRole="tenant" revieweeName={tenant.name} />
         </div>
       </motion.div>
     </div>

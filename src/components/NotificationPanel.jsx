@@ -164,9 +164,16 @@ export default function NotificationPanel({ onClose }) {
           navigate(`/property/${targetId}`, { state: { autoOpen: true, scrollTo: true } });
           break;
 
-        case 'review':
-          navigate(`/property/${targetId}`, { state: { scrollTo: 'reviews' } });
+        case 'review': {
+          // Property reviews were removed — reputation reviews now live on the
+          // user's PROFILE. A review notification means the recipient was
+          // reviewed, so deep-link to their own (role-appropriate) profile
+          // where the review appears.
+          const myId = user?.id || user?._id;
+          if (myId) navigate(isLandlord ? `/landlord/${myId}` : `/tenant/${myId}`);
+          else navigate('/notifications');
           break;
+        }
 
         case 'maintenance':
           navigate('/host-dashboard?tab=maintenance', {
