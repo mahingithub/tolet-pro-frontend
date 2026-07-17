@@ -14,6 +14,9 @@ import { roomLabel } from "../constants/roomCategories";
 // Beds/baths only apply to residential listings — commercial & land must not
 // show phantom bed/bath chips (shared rule, same one the detail page uses).
 import { hasBedsBaths } from "../constants/propertyFields";
+// Falls back to an approximate area/division coordinate for listings created
+// without precise GPS, so they still appear on the map instead of vanishing.
+import { effectiveCoords } from "../constants/geoCentroids";
 // ─── INTENT-AWARE FILTER CONFIG (single source of truth for all filter data) ──
 import {
 	getFilterConfig,
@@ -121,9 +124,9 @@ const ICON_MAP = { home: Home, user: User, users: Users, book: BookOpen };
 
 // ─── INTENT TABS (Filter_Panel header) ────────────────────────────────────────
 const INTENT_TABS = [
-	{ intent: "rent",       labelBn: "আবাসিক" },
-	{ intent: "sale",       labelBn: "ক্রয়" },
-	{ intent: "commercial", labelBn: "বাণিজ্যিক" },
+	{ intent: "rent",       labelBn: "আবাসিক",   labelEn: "Residential" },
+	{ intent: "sale",       labelBn: "ক্রয়",      labelEn: "Buy" },
+	{ intent: "commercial", labelBn: "বাণিজ্যিক", labelEn: "Commercial" },
 	// Buying/selling is handled off-platform for now — drop the "ক্রয়" (Buy) tab
 	// while SALE_INTENT_ENABLED is false. See constants/listingIntents.js.
 ].filter((tab) => tab.intent !== "sale" || SALE_INTENT_ENABLED);
@@ -132,7 +135,10 @@ const INTENT_TABS = [
 // desktop sidebar and the mobile bottom-sheet). The tab matching the active
 // intent is visually selected and carries aria-selected for accessibility.
 // (Requirement 2)
-const IntentTabBar = ({ activeIntent, onChange }) => (
+const IntentTabBar = ({ activeIntent, onChange }) => {
+	const { language } = useLanguage();
+	const isBn = language === 'বাংলা';
+	return (
 	<div role="tablist" aria-label="Listing intent" className={`grid ${INTENT_TABS.length === 2 ? "grid-cols-2" : "grid-cols-3"} gap-2 mb-6`}>
 		{INTENT_TABS.map((tab) => {
 			const active = activeIntent === tab.intent;
@@ -149,12 +155,13 @@ const IntentTabBar = ({ activeIntent, onChange }) => (
 							: "bg-white text-gray-700 border-gray-200 hover:border-gray-900"
 					}`}
 				>
-					{tab.labelBn}
+					{isBn ? tab.labelBn : (tab.labelEn || tab.labelBn)}
 				</button>
 			);
 		})}
 	</div>
-);
+	);
+};
 
 // ─── VALID DIVISIONS (To catch custom area searches) ──────────────────────────
 const validDivisions = ["dhaka", "chittagong", "sylhet", "rajshahi", "khulna", "barishal", "rangpur", "mymensingh"];
@@ -233,6 +240,12 @@ function buildRoomCollage(property) {
 // ─── PROPERTY CARD ────────────────────────────────────────────────────────────
 const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover, onHoverEnd, onInquire }) => {
 	const [isSaved, setIsSaved] = useState(false);
+	// Drive the card's language off the real LanguageContext value so every
+	// label follows the app toggle. (The old `t.forRent === 'ভাড়ার জন্য'`
+	// heuristic below was always false — that key doesn't exist — so cards were
+	// stuck rendering English type labels + Bengali fallback badges regardless
+	// of the selected language.)
+	const { language } = useLanguage();
 
 	const { cover: coverImg, thumbs: collageThumbs, totalRoomCategories } = useMemo(
 		() => buildRoomCollage(property),
@@ -289,14 +302,40 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 		warehouse: { en: 'Warehouse', bn: 'গুদামঘর' },
 		garage: { en: 'Garage', bn: 'গ্যারেজ' },
 		student: { en: 'Student', bn: 'ছাত্র' },
+		// ── Commercial sub-categories (office / shop / showroom / restaurant) ──
+		corporate: { en: 'Corporate', bn: 'কর্পোরেট' },
+		startup: { en: 'Startup', bn: 'স্টার্টআপ' },
+		retail: { en: 'Retail', bn: 'রিটেইল' },
+		wholesale: { en: 'Wholesale', bn: 'হোলসেল' },
+		brand_outlet: { en: 'Brand Outlet', bn: 'ব্র্যান্ড আউটলেট' },
+		vehicle_showroom: { en: 'Vehicle Showroom', bn: 'গাড়ির শোরুম' },
+		dine_in: { en: 'Dine-in', bn: 'ডাইন-ইন' },
+		cafe: { en: 'Cafe', bn: 'ক্যাফে' },
+		fine_dining: { en: 'Fine Dining', bn: 'ফাইন ডাইনিং' },
+		// ── Sale sub-categories (flat / house / land / building) ──
+		ready_flat: { en: 'Ready Flat', bn: 'রেডি ফ্ল্যাট' },
+		used: { en: 'Used', bn: 'ইউজড' },
+		used_flat: { en: 'Used Flat', bn: 'ব্যবহৃত ফ্ল্যাট' },
+		new_project: { en: 'New Project', bn: 'নতুন প্রজেক্ট' },
+		single_story: { en: 'Single Story', bn: 'এক তলা' },
+		residential: { en: 'Residential', bn: 'আবাসিক' },
+		commercial: { en: 'Commercial', bn: 'বাণিজ্যিক' },
+		agricultural: { en: 'Agricultural', bn: 'কৃষি' },
+		road_side: { en: 'Road Side', bn: 'রোড সাইড' },
+		commercial_building: { en: 'Commercial Building', bn: 'বাণিজ্যিক বিল্ডিং' },
+		residential_building: { en: 'Residential Building', bn: 'আবাসিক বিল্ডিং' },
 		other: { en: 'Others', bn: 'অন্যান্য' }
 	};
-	const currentLang = typeof t?.language === 'string' ? t.language : 'en'; // Usually passed inside t or just fallback to en if not available.
-	// We check if language object has it, wait, useLanguage returns { language, t } but PropertyCard only gets t.
-	// Actually we can just check if t.forRent is in Bengali.
-	const isBn = t?.forRent === 'ভাড়ার জন্য';
+	const isBn = language === 'বাংলা';
 	const catDict = CATEGORY_LABELS[property.rentalCategory];
-	const catLabel = catDict ? (isBn ? catDict.bn : catDict.en) : (property.rentalCategory || "Others");
+	// When the category id isn't in the map, prettify the raw id (e.g.
+	// "brand_outlet" → "Brand Outlet") instead of leaking the raw enum that CSS
+	// then upper-cases into "BRAND_OUTLET".
+	const catLabel = catDict
+		? (isBn ? catDict.bn : catDict.en)
+		: (property.rentalCategory
+			? String(property.rentalCategory).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+			: (isBn ? 'অন্যান্য' : 'Others'));
 
 	const extraRoomCount = Math.max(0, totalRoomCategories - 1 - collageThumbs.length);
 
@@ -340,9 +379,9 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 									property.intent === 'commercial' ? 'bg-purple-600/90 text-white' :
 									'bg-green-600/90 text-white'
 								}`}>
-									{property.intent === 'sale' ? (t.forSale || 'বিক্রির জন্য') :
-									 property.intent === 'commercial' ? (t.commercial || 'কমার্শিয়াল') :
-									 (t.forRent || 'ভাড়ার জন্য')}
+									{property.intent === 'sale' ? (t.forSale || (isBn ? 'বিক্রির জন্য' : 'For Sale')) :
+									 property.intent === 'commercial' ? (t.commercial || (isBn ? 'কমার্শিয়াল' : 'Commercial')) :
+									 (t.forRent || (isBn ? 'ভাড়ার জন্য' : 'For Rent'))}
 								</span>
 							)}
 						</div>
@@ -434,9 +473,8 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 							)}
 						</div>
 						<p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
-							{property.intent === 'sale' ? (t.totalPrice || 'মোট মূল্য') :
-							 property.intent === 'commercial' ? (t.perMonth || 'প্রতি মাসে') :
-							 (t.perMonth || 'প্রতি মাসে')}
+							{property.intent === 'sale' ? (t.totalPrice || (isBn ? 'মোট মূল্য' : 'Total Price')) :
+							 (t.perMonth || (isBn ? 'প্রতি মাসে' : 'Per Month'))}
 						</p>
 					</div>
 					<div className="flex items-center gap-3 w-full sm:w-auto">
@@ -565,11 +603,12 @@ const MapView = ({ properties, activeId, onMarkerClick, defaultCenter = DEFAULT_
 	const points = useMemo(
 		() =>
 			(properties || [])
-				.filter((p) => p.lat && p.lng)
-				.map((p) => ({
+				.map((p) => ({ p, c: effectiveCoords(p) }))
+				.filter(({ c }) => c && Number.isFinite(c.lat) && Number.isFinite(c.lng))
+				.map(({ p, c }) => ({
 					type: "Feature",
-					properties: { cluster: false, propertyId: p.id, property: p },
-					geometry: { type: "Point", coordinates: [Number(p.lng), Number(p.lat)] },
+					properties: { cluster: false, propertyId: p.id, property: p, approximate: c.approximate },
+					geometry: { type: "Point", coordinates: [c.lng, c.lat] },
 				})),
 		[properties]
 	);
@@ -610,7 +649,9 @@ const MapView = ({ properties, activeId, onMarkerClick, defaultCenter = DEFAULT_
 	// selecting/deselecting a marker never triggers a re-fit on its own).
 	useEffect(() => {
 		if (!mapInstance || !window.google || activeId) return;
-		const pts = (properties || []).filter((p) => p.lat && p.lng);
+		const pts = (properties || [])
+			.map((p) => effectiveCoords(p))
+			.filter((c) => c && Number.isFinite(c.lat) && Number.isFinite(c.lng));
 		if (pts.length === 0) return;
 		if (pts.length === 1) {
 			mapInstance.panTo({ lat: pts[0].lat, lng: pts[0].lng });
@@ -618,7 +659,7 @@ const MapView = ({ properties, activeId, onMarkerClick, defaultCenter = DEFAULT_
 			return;
 		}
 		const b = new window.google.maps.LatLngBounds();
-		pts.forEach((p) => b.extend({ lat: p.lat, lng: p.lng }));
+		pts.forEach((c) => b.extend({ lat: c.lat, lng: c.lng }));
 		mapInstance.fitBounds(b, 64);
 	}, [properties, mapInstance]);
 
@@ -651,7 +692,8 @@ const MapView = ({ properties, activeId, onMarkerClick, defaultCenter = DEFAULT_
 	// parent to select it (which springs up the bottom sheet + inverts the pill).
 	const handleMarkerClick = useCallback(
 		(property) => {
-			if (mapInstance) panToWithPadding(mapInstance, { lat: property.lat, lng: property.lng });
+			const c = effectiveCoords(property);
+			if (mapInstance && c) panToWithPadding(mapInstance, { lat: c.lat, lng: c.lng });
 			onMarkerClick && onMarkerClick(property);
 		},
 		[mapInstance, onMarkerClick, panToWithPadding]
@@ -1202,6 +1244,11 @@ const PropertyListing = () => {
 	// exactly ONE type is chosen — that's when sub-categories and the sale→land
 	// override apply (multi-select keeps the broader behaviour).
 	const cfg = getFilterConfig(selectedIntent);
+	// Language-aware label for config-driven filter items (types, pills,
+	// categories, sub-categories). Falls back to whichever label exists so a
+	// missing translation degrades to the other language instead of blank.
+	const isBn = language === 'বাংলা';
+	const fL = (o) => (o ? (isBn ? (o.labelBn || o.labelEn || '') : (o.labelEn || o.labelBn || '')) : '');
 	const selectedType = selectedTypes.length === 1 ? selectedTypes[0] : null;
 	const sections = resolveSections(selectedIntent, selectedType);
 	const subCategories = getSubCategories(selectedIntent, selectedType);
@@ -1419,7 +1466,7 @@ const PropertyListing = () => {
 						<FilterSection title={t.filterPrice || "Price Range"}>
 							<div className="px-2 pb-4">
 								{/* Intent-specific price meaning (per month / total). */}
-								<p className="text-[10px] font-black text-brandRed mb-3 uppercase tracking-wider">{cfg.priceLabel}</p>
+								<p className="text-[10px] font-black text-brandRed mb-3 uppercase tracking-wider">{isBn ? cfg.priceLabel : (cfg.priceLabelEn || cfg.priceLabel)}</p>
 								{/* Quick budget pills — one tap sets the min/max range (Requirement 4.1, 4.2, 4.7). */}
 								<div className="mb-5">
 									<p className="text-[10px] font-black text-gray-400 mb-2 uppercase tracking-wider">{t.quickBudgetLabel || "Quick budget"}</p>
@@ -1437,7 +1484,7 @@ const PropertyListing = () => {
 															: "bg-white text-gray-700 border-gray-200 hover:border-gray-900"
 													}`}
 												>
-													{pill.labelBn}
+													{fL(pill)}
 												</button>
 											);
 										})}
@@ -1471,7 +1518,7 @@ const PropertyListing = () => {
 							<div className="grid grid-cols-1 gap-2">
 								{cfg.propertyTypes.map((type) => (
 									<label key={type.id} className={`flex items-center gap-3 cursor-pointer px-3 py-2 rounded-lg border-2 text-xs font-bold transition-all ${selectedTypes.includes(type.id) ? 'border-gray-900 bg-gray-50' : 'border-transparent hover:border-gray-300'}`}>
-										<input type="checkbox" checked={selectedTypes.includes(type.id)} onChange={() => handleTypeToggle(type.id)} className="w-4 h-4 rounded accent-gray-900" /> {type.labelBn}
+										<input type="checkbox" checked={selectedTypes.includes(type.id)} onChange={() => handleTypeToggle(type.id)} className="w-4 h-4 rounded accent-gray-900" /> {fL(type)}
 									</label>
 								))}
 							</div>
@@ -1497,7 +1544,7 @@ const PropertyListing = () => {
 												}`}
 											>
 												<Icon size={18} className={active ? "text-white" : "text-brandRed"} />
-												<span>{cat.labelBn}</span>
+												<span>{fL(cat)}</span>
 											</button>
 										);
 									})}
@@ -1522,7 +1569,7 @@ const PropertyListing = () => {
 														: "bg-white text-gray-700 border-gray-200 hover:border-gray-900 hover:text-gray-900"
 												}`}
 											>
-												{sub.labelBn}
+												{fL(sub)}
 											</button>
 										);
 									})}
