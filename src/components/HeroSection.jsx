@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import usePropertyStore from '../store/usePropertyStore';
+import { SALE_INTENT_ENABLED } from '../constants/listingIntents';
 import { DIVISIONS, POPULAR_AREAS, POPULAR_AREA_IMAGES, POPULAR_AREA_IMAGES_DESKTOP, POPULAR_AREA_TAGLINES, POPULAR_AREA_SUBZONES, buildSearchUrl } from '../data/searchData';
 import LocationSearchModal from './shared/LocationSearchModal';
 
@@ -630,7 +631,7 @@ const HeroSection = () => {
           <div className="flex lg:hidden flex-col bg-gradient-to-br from-white/60 via-white/30 to-white/50 backdrop-blur-[24px] backdrop-saturate-[180%] rounded-3xl shadow-[inset_0_1.5px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(255,255,255,0.25),0_22px_60px_rgba(15,23,42,0.30)] border border-white/60 p-3 relative z-[100] ring-1 ring-inset ring-white/25">
 
             <div className="flex bg-white/35 backdrop-blur-md p-1 rounded-full w-full mb-3 border border-white/55 ring-1 ring-inset ring-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
-              {[{ id: 'rent', label: t?.tabRent || 'Rent' }, { id: 'buy', label: t?.tabBuy || 'Buy' }, { id: 'commercial', label: t?.tabCommercial || 'Commercial' }].map(tab => (
+              {[{ id: 'rent', label: t?.tabRent || 'Rent' }, { id: 'buy', label: t?.tabBuy || 'Buy' }, { id: 'commercial', label: t?.tabCommercial || 'Commercial' }].filter(tab => tab.id !== 'buy' || SALE_INTENT_ENABLED).map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setSearchType(tab.id)}
@@ -713,7 +714,7 @@ const HeroSection = () => {
               
               <div className="flex justify-center mb-3">
                 <div className="flex bg-slate-100/60 p-1 rounded-full border border-slate-200/50 shadow-inner">
-                  {[{ id: 'rent', label: t?.tabRent || 'RENT' }, { id: 'buy', label: t?.tabBuy || 'BUY' }, { id: 'commercial', label: t?.tabCommercial || 'COMMERCIAL' }].map(tab => (
+                  {[{ id: 'rent', label: t?.tabRent || 'RENT' }, { id: 'buy', label: t?.tabBuy || 'BUY' }, { id: 'commercial', label: t?.tabCommercial || 'COMMERCIAL' }].filter(tab => tab.id !== 'buy' || SALE_INTENT_ENABLED).map(tab => (
                     <button
                       key={tab.id}
                       onClick={() => setSearchType(tab.id)}
@@ -1416,15 +1417,17 @@ const HeroSection = () => {
                   <p className="text-xs font-bold text-slate-500">{t?.mobRentDesc || 'Apartments, sublets, bachelor flats'}</p>
                 </div>
               </button>
-              <button onClick={() => handleCategoryChoice('buy')} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-blue-500/50 hover:bg-blue-50 transition-all group text-left">
-                <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <Wallet size={22} strokeWidth={2.5} />
-                </div>
-                <div>
-                  <h4 className="text-base font-black text-slate-900 group-hover:text-blue-600">{t?.buyMenu || 'Buy'}</h4>
-                  <p className="text-xs font-bold text-slate-500">{t?.mobBuyDesc || 'Houses, flats, land'}</p>
-                </div>
-              </button>
+              {SALE_INTENT_ENABLED && (
+                <button onClick={() => handleCategoryChoice('buy')} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-blue-500/50 hover:bg-blue-50 transition-all group text-left">
+                  <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <Wallet size={22} strokeWidth={2.5} />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-black text-slate-900 group-hover:text-blue-600">{t?.buyMenu || 'Buy'}</h4>
+                    <p className="text-xs font-bold text-slate-500">{t?.mobBuyDesc || 'Houses, flats, land'}</p>
+                  </div>
+                </button>
+              )}
               <button onClick={() => handleCategoryChoice('commercial')} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-amber-500/50 hover:bg-amber-50 transition-all group text-left">
                 <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
                   <Building size={22} strokeWidth={2.5} />

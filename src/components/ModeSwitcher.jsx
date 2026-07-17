@@ -1,6 +1,6 @@
 import React from 'react';
 import usePropertyStore from '../store/usePropertyStore';
-import { LISTING_INTENTS } from '../constants/listingIntents';
+import { VISIBLE_LISTING_INTENTS } from '../constants/listingIntents';
 import { useLanguage } from '../context/LanguageContext';
 
 // Display copy for each canonical intent. The VALUES live in the shared
@@ -38,7 +38,7 @@ export default function ModeSwitcher({ className = '', fullWidth = false }) {
       aria-label="Listing mode"
       className={`inline-flex items-center gap-1 p-1 rounded-full bg-gray-100/80 border border-gray-200/60 backdrop-blur-sm ${fullWidth ? 'w-full' : ''} ${className}`}
     >
-      {LISTING_INTENTS.map((intent) => {
+      {VISIBLE_LISTING_INTENTS.map((intent) => {
         const active = activeMode === intent;
         return (
           <button

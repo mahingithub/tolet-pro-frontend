@@ -25,6 +25,7 @@ import {
 import { useLanguage } from '../../context/LanguageContext';
 import { roomLabel } from '../../constants/roomCategories';
 import usePropertyStore from '../../store/usePropertyStore';
+import { SALE_INTENT_ENABLED } from '../../constants/listingIntents';
 import {
   DIVISIONS,
   POPULAR_AREAS,
@@ -68,7 +69,7 @@ const SEARCH_TYPES = [
   { id: 'rent',       labelKey: 'tabRent' },
   { id: 'buy',        labelKey: 'tabBuy' },
   { id: 'commercial', labelKey: 'tabCommercial' },
-];
+].filter((type) => type.id !== 'buy' || SALE_INTENT_ENABLED);
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
@@ -921,21 +922,23 @@ const CategoryPromptSheet = ({ open, locationName, onClose, onPickCategory, t })
             <ChevronRight size={18} className="text-gray-400 group-hover:text-[#ba0036]" />
           </button>
 
-          <button
-            onClick={() => onPickCategory('buy')}
-            className="w-full flex items-center justify-between p-4 rounded-2xl border border-gray-200 hover:border-blue-500/50 hover:bg-blue-50/30 active:scale-[0.98] transition-all group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                <Wallet size={20} strokeWidth={2.5} />
+          {SALE_INTENT_ENABLED && (
+            <button
+              onClick={() => onPickCategory('buy')}
+              className="w-full flex items-center justify-between p-4 rounded-2xl border border-gray-200 hover:border-blue-500/50 hover:bg-blue-50/30 active:scale-[0.98] transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                  <Wallet size={20} strokeWidth={2.5} />
+                </div>
+                <div className="text-left">
+                  <h4 className="text-[15px] font-black text-gray-900 group-hover:text-blue-600">{t.buyMenu || 'Buy'}</h4>
+                  <p className="text-[11px] font-bold text-gray-500">{t.mobBuyDesc || 'Houses, flats, land'}</p>
+                </div>
               </div>
-              <div className="text-left">
-                <h4 className="text-[15px] font-black text-gray-900 group-hover:text-blue-600">{t.buyMenu || 'Buy'}</h4>
-                <p className="text-[11px] font-bold text-gray-500">{t.mobBuyDesc || 'Houses, flats, land'}</p>
-              </div>
-            </div>
-            <ChevronRight size={18} className="text-gray-400 group-hover:text-blue-600" />
-          </button>
+              <ChevronRight size={18} className="text-gray-400 group-hover:text-blue-600" />
+            </button>
+          )}
 
           <button
             onClick={() => onPickCategory('commercial')}
@@ -1086,6 +1089,11 @@ const MobileHome = () => {
     return (properties || [])
       .map((p) => ({ ...p, _daysAgo: computeDaysAgo(p.date || p.createdAt) }))
       .filter((p) => {
+        // Buying/selling is handled off-platform for now — keep 'sale' listings
+        // out of the public feed while SALE_INTENT_ENABLED is false, so the
+        // mobile home matches the browse page (which filters by the now
+        // rent/commercial-only intent). Flip the flag to bring them back.
+        if (!SALE_INTENT_ENABLED && p.intent === 'sale') return false;
         if (!needle) return true;
         // Bilingual (English↔Bengali) match against every location-ish field —
         // address line, area dropdown, district, division, GPS address, title —

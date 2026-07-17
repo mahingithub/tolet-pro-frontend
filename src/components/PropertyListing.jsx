@@ -9,7 +9,7 @@ import InquiryModal from "./InquiryModal";
 // ─── DATA SOURCE: live properties (API + user uploads). NO demo data. ─────────
 import { propertyService, subscribeUserProperties, propertyLocationHaystack } from "../services/Propertyservice.js";
 import usePropertyStore from "../store/usePropertyStore";
-import { normaliseIntent } from "../constants/listingIntents";
+import { normaliseIntent, SALE_INTENT_ENABLED } from "../constants/listingIntents";
 import { roomLabel } from "../constants/roomCategories";
 // Beds/baths only apply to residential listings — commercial & land must not
 // show phantom bed/bath chips (shared rule, same one the detail page uses).
@@ -124,14 +124,16 @@ const INTENT_TABS = [
 	{ intent: "rent",       labelBn: "ভাড়া" },
 	{ intent: "sale",       labelBn: "ক্রয়" },
 	{ intent: "commercial", labelBn: "বাণিজ্যিক" },
-];
+	// Buying/selling is handled off-platform for now — drop the "ক্রয়" (Buy) tab
+	// while SALE_INTENT_ENABLED is false. See constants/listingIntents.js.
+].filter((tab) => tab.intent !== "sale" || SALE_INTENT_ENABLED);
 
 // Three-up tab row at the very top of the filter panel (shown in BOTH the
 // desktop sidebar and the mobile bottom-sheet). The tab matching the active
 // intent is visually selected and carries aria-selected for accessibility.
 // (Requirement 2)
 const IntentTabBar = ({ activeIntent, onChange }) => (
-	<div role="tablist" aria-label="Listing intent" className="grid grid-cols-3 gap-2 mb-6">
+	<div role="tablist" aria-label="Listing intent" className={`grid ${INTENT_TABS.length === 2 ? "grid-cols-2" : "grid-cols-3"} gap-2 mb-6`}>
 		{INTENT_TABS.map((tab) => {
 			const active = activeIntent === tab.intent;
 			return (

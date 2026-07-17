@@ -1,6 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { getDynamicFields } from '../constants/propertyFields';
 import { getRoomTypes, firstRoomTypeId } from '../constants/roomCategories';
+import { SALE_INTENT_ENABLED } from '../constants/listingIntents';
+import SellInterestModal from './SellInterestModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useGoBack from '../hooks/useGoBack';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -148,6 +150,20 @@ const LISTING_INTENTS = [
     accent: '#7c3aed',
   },
 ];
+
+// Buying/selling is handled off-platform for now, so hosts can only list for
+// Rent or Commercial — the "Purchase / Buy" intent is hidden while
+// SALE_INTENT_ENABLED is false (see constants/listingIntents.js). The full
+// array above is kept intact so re-enabling the flag restores it instantly.
+const AVAILABLE_LISTING_INTENTS = SALE_INTENT_ENABLED
+  ? LISTING_INTENTS
+  : LISTING_INTENTS.filter((intent) => intent.id !== 'purchase');
+
+// While self-service selling is off, the intent step shows an extra "Sell" card
+// that opens the Coming-Soon interest modal (NOT the listing wizard). So the
+// selector grid holds the available wizard intents + that one extra card.
+const SHOW_SELL_INTEREST = !SALE_INTENT_ENABLED;
+const INTENT_CARD_COUNT = AVAILABLE_LISTING_INTENTS.length + (SHOW_SELL_INTEREST ? 1 : 0);
 
 // ─── PROPERTY TYPES & CATEGORIES BY INTENT ───────────────────────────────────
 const INTENT_DATA = {
@@ -1381,6 +1397,8 @@ const AddProperty = () => {
   const [toast, setToast] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  // "I am interested in selling" Coming-Soon modal (opened from the intent step).
+  const [sellInterestOpen, setSellInterestOpen] = useState(false);
 
   // Media refs
   const coverInputRef = useRef(null);
@@ -1729,6 +1747,9 @@ const AddProperty = () => {
       <div className="fixed top-[-20%] left-[-10%] w-[50vw] h-[50vw] bg-gradient-to-br from-[#ba0036]/10 to-transparent rounded-full blur-[120px] pointer-events-none z-0" />
       <div className="fixed bottom-[-20%] right-[-10%] w-[50vw] h-[50vw] bg-gradient-to-tl from-blue-600/5 to-transparent rounded-full blur-[120px] pointer-events-none z-0" />
 
+      {/* Sell — "Coming Soon" interest modal, opened from the intent step. */}
+      <SellInterestModal open={sellInterestOpen} onClose={() => setSellInterestOpen(false)} isBn={isBn} />
+
       {/* Toast */}
       <AnimatePresence>
         {toast && (
@@ -1819,8 +1840,8 @@ const AddProperty = () => {
 
                 {/* ── INTENT SELECTOR ── */}
                 <Field label={isBn ? 'আপনি কী করতে চান?' : 'What are you listing for?'} required>
-                  <div className="grid grid-cols-3 gap-3">
-                    {LISTING_INTENTS.map(({ id, label, labelBn, icon: Icon, desc, descBn, color, bg }) => (
+                  <div className={`grid ${INTENT_CARD_COUNT >= 3 ? 'grid-cols-3' : 'grid-cols-2'} gap-3`}>
+                    {AVAILABLE_LISTING_INTENTS.map(({ id, label, labelBn, icon: Icon, desc, descBn, color, bg }) => (
                       <button key={id} type="button"
                         onClick={() => {
                           set('intent', id);
@@ -1841,6 +1862,20 @@ const AddProperty = () => {
                         </span>
                       </button>
                     ))}
+
+                    {/* Sell — self-service selling is Coming Soon, so this card
+                        opens the interest modal instead of the listing wizard. */}
+                    {SHOW_SELL_INTEREST && (
+                      <button
+                        type="button"
+                        onClick={() => setSellInterestOpen(true)}
+                        className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-dashed border-gray-200 bg-white text-emerald-600 hover:border-[#ba0036]/40 hover:bg-red-50/20 transition-all duration-200 active:scale-95 text-center"
+                      >
+                        <ShoppingBag size={22} />
+                        <span className="text-xs font-black leading-tight text-gray-800">{isBn ? 'বিক্রি' : 'Sell'}</span>
+                        <span className="text-[10px] font-bold leading-tight text-gray-400">{isBn ? 'শীঘ্রই আসছে' : 'Coming soon'}</span>
+                      </button>
+                    )}
                   </div>
                   {err('intent') && <ErrMsg text={isBn ? 'উদ্দেশ্য বেছে নিন' : 'Please select a listing intent'} />}
                 </Field>
