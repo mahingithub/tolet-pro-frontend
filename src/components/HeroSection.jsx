@@ -600,7 +600,16 @@ const HeroSection = () => {
     navigate(`/properties/${targetLocation}?${params.toString()}`);
   };
 
-  const sliderItems = [...popularCities, ...popularCities];
+  // Divisions strip is now a real, user-scrollable carousel (was a locked
+  // auto-marquee). One card per division — no duplicate set for a fake loop.
+  const divisionsRef = useRef(null);
+  const scrollDivisions = (dir) => {
+    const el = divisionsRef.current;
+    if (!el) return;
+    // Page by ~80% of the visible width so each click reveals fresh cards.
+    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' });
+  };
+  const sliderItems = popularCities;
 
   return (
     <>
@@ -938,18 +947,50 @@ const HeroSection = () => {
           </div>
 
           <style>{`
-            @keyframes scroll-x { 0% { transform: translateX(0); } 100% { transform: translateX(calc(-50% - 0.5rem)); } }
-            .animate-marquee { animation: scroll-x 40s linear infinite; display: flex; width: max-content; }
-            .animate-marquee:hover { animation-play-state: paused; }
             .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
             .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
             .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
           `}</style>
 
-          <div className="relative w-full flex overflow-hidden">
+          {/* Real, user-driven horizontal carousel. The previous version was a
+              CSS-transform marquee inside an `overflow-hidden` wrapper that also
+              paused on :hover — so it couldn't be scrolled by hand and froze the
+              moment the cursor entered it (the "stuck / locked" report). It's now
+              a native scroll container: trackpad / touch swipe anywhere, plus
+              shadow-only arrow controls for mouse users. Scrollbar is hidden and
+              the edges fade — keeping the No-Line (tonal + shadow) aesthetic. */}
+          <div className="relative w-full">
+            {/* Decorative edge fades — a tonal cue that more cards exist. Never
+                intercept input (pointer-events-none) so they can't block scroll. */}
             <div className="absolute left-0 top-0 bottom-0 w-16 md:w-32 bg-gradient-to-r from-slate-50 to-transparent z-10 pointer-events-none" />
             <div className="absolute right-0 top-0 bottom-0 w-16 md:w-32 bg-gradient-to-l from-slate-50 to-transparent z-10 pointer-events-none" />
-            <div className="animate-marquee gap-4 px-4">
+
+            {/* Prev / Next — shadow-only (No-Line), layered above the fades. */}
+            <button
+              type="button"
+              onClick={() => scrollDivisions(-1)}
+              aria-label="Scroll to previous divisions"
+              className="hidden md:flex absolute left-3 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/90 backdrop-blur-md text-slate-800 items-center justify-center shadow-[0_10px_30px_rgba(15,23,42,0.18)] hover:bg-white hover:scale-105 active:scale-95 transition-all"
+            >
+              <ArrowLeft size={18} strokeWidth={2.5} />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollDivisions(1)}
+              aria-label="Scroll to next divisions"
+              className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/90 backdrop-blur-md text-slate-800 items-center justify-center shadow-[0_10px_30px_rgba(15,23,42,0.18)] hover:bg-white hover:scale-105 active:scale-95 transition-all"
+            >
+              <ArrowRight size={18} strokeWidth={2.5} />
+            </button>
+
+            {/* Scroll track: native horizontal scroll + gentle (proximity) snap +
+                hidden scrollbar (No-Line) + contained overscroll so it never
+                hijacks the browser back-swipe or the vertical page scroll. */}
+            <div
+              ref={divisionsRef}
+              className="flex gap-4 px-4 py-2 overflow-x-auto overscroll-x-contain snap-x snap-proximity scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
               {sliderItems.map((div, idx) => (
                 <div
                   key={idx}
@@ -961,7 +1002,7 @@ const HeroSection = () => {
                       navigate(`/properties/${div.id}`);
                     }
                   }}
-                  className="group w-[260px] md:w-[320px] h-[300px] md:h-[360px] rounded-[1.5rem] md:rounded-[2rem] overflow-hidden relative cursor-pointer shadow-[0_10px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgba(186,0,54,0.15)] transition-all duration-500 shrink-0 bg-white"
+                  className="snap-start group w-[260px] md:w-[320px] h-[300px] md:h-[360px] rounded-[1.5rem] md:rounded-[2rem] overflow-hidden relative cursor-pointer shadow-[0_10px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgba(186,0,54,0.15)] transition-all duration-500 shrink-0 bg-white"
                 >
                   <div className="absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-700 ease-out" style={{ backgroundImage: `url(${div.image})` }} />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
@@ -1425,7 +1466,7 @@ const HeroSection = () => {
                   <HomeIcon size={22} strokeWidth={2.5} />
                 </div>
                 <div>
-                  <h4 className="text-base font-black text-slate-900 group-hover:text-[#ba0036]">{t?.rentMenu || 'Rent'}</h4>
+                  <h4 className="text-base font-black text-slate-900 group-hover:text-[#ba0036]">{t?.tabResidential || 'Residential'}</h4>
                   <p className="text-xs font-bold text-slate-500">{t?.mobRentDesc || 'Apartments, sublets, bachelor flats'}</p>
                 </div>
               </button>

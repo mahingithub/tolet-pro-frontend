@@ -915,7 +915,7 @@ const CategoryPromptSheet = ({ open, locationName, onClose, onPickCategory, t })
                 <HomeIcon size={20} strokeWidth={2.5} />
               </div>
               <div className="text-left">
-                <h4 className="text-[15px] font-black text-gray-900 group-hover:text-[#ba0036]">{t.rentMenu || 'Rent'}</h4>
+                <h4 className="text-[15px] font-black text-gray-900 group-hover:text-[#ba0036]">{t.tabResidential || 'Residential'}</h4>
                 <p className="text-[11px] font-bold text-gray-500">{t.mobRentDesc || 'Apartments, sublets, bachelor flats'}</p>
               </div>
             </div>
