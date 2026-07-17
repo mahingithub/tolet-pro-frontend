@@ -4960,6 +4960,18 @@ const HostDashboard = () => {
             const isExpanded = forceOpen || expandedRentId === booking.id;
             const collectedPctRow = expectedThisMonth > 0 ? Math.min(100, Math.round((paidThisMonth / expectedThisMonth) * 100)) : 0;
 
+            // Show the REAL occupant. When a tenant joins the room via invite
+            // code they become a member; the booking's original `tenant` (typed
+            // at creation) can go stale — e.g. the card shows "Mahin" while the
+            // person on the booking is "Mofizul Islam". Prefer the primary active
+            // member's name + avatar so Rent Collection matches the Bookings tab.
+            const rentMembers = Array.isArray(booking.members) ? booking.members.filter(m => m && m.status !== 'moved-out') : [];
+            const primaryMember = rentMembers[0] || null;
+            const displayTenant = String(primaryMember?.name || booking.tenant || (language === 'বাংলা' ? 'ভাড়াটিয়া' : 'Tenant')).trim();
+            const displayAvatar = primaryMember?.avatar || booking.tenantAvatar || '';
+            const displayInit = (displayTenant[0] || '?').toUpperCase();
+            const extraMembers = Math.max(0, rentMembers.length - 1);
+
             return (
               <div id={`rent-${booking.id}`} key={booking.id} className={`bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
 
@@ -4970,15 +4982,18 @@ const HostDashboard = () => {
                   className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-3 text-left transition-colors ${forceOpen ? 'cursor-default' : 'hover:bg-gray-50/50'}`}
                 >
                   <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-black text-[11px] sm:text-xs shrink-0 ${theme.avatar} overflow-hidden`}>
-                    {booking.tenantAvatar ? (
-                      <img src={booking.tenantAvatar} alt={booking.tenant} className="w-full h-full object-cover" />
+                    {displayAvatar ? (
+                      <img src={displayAvatar} alt={displayTenant} className="w-full h-full object-cover" />
                     ) : (
-                      booking.tenantInit
+                      displayInit
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 mb-0.5">
-                      <h4 className="text-[13px] sm:text-sm font-black text-gray-900 truncate">{booking.tenant}</h4>
+                      <h4 className="text-[13px] sm:text-sm font-black text-gray-900 truncate">{displayTenant}</h4>
+                      {extraMembers > 0 && (
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-gray-100 text-gray-600 border border-gray-200 shrink-0 tabular-nums" title={language === 'বাংলা' ? 'আরও সদস্য' : 'more members'}>+{extraMembers}</span>
+                      )}
                       {booking.floorNumber && (
                         <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 border border-indigo-200 shrink-0 inline-flex items-center gap-0.5">
                           {language === 'বাংলা' ? 'ফ্লোর' : 'Floor'} {booking.floorNumber}
@@ -6716,6 +6731,11 @@ const HostDashboard = () => {
               {activeModal === 'mark_paid' && (() => {
                 const booking = bookings.find(b => b.id === payForm.bookingId);
                 if (!booking) return null;
+                // Real occupant (a member who joined via invite) over the stale
+                // typed tenant — keeps this modal consistent with the rent card.
+                const mpMembers = Array.isArray(booking.members) ? booking.members.filter(m => m && m.status !== 'moved-out') : [];
+                const mpTenant = String(mpMembers[0]?.name || booking.tenant || (language === 'বাংলা' ? 'ভাড়াটিয়া' : 'Tenant')).trim();
+                const mpInit = (mpTenant[0] || '?').toUpperCase();
                 const due = getDueDate(payForm.monthKey, booking.rentDueDay);
                 const expected = Number(booking.monthlyRent || 0);
                 const amt = Number(payForm.amount) || 0;
@@ -6737,11 +6757,11 @@ const HostDashboard = () => {
                       <div className="absolute -top-10 -right-10 w-36 h-36 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
                       <div className="relative z-10 flex items-center gap-3">
                         <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/20">
-                          <span className="text-sm font-black tracking-tight">{booking.tenantInit || (booking.tenant?.[0] ?? '?')}</span>
+                          <span className="text-sm font-black tracking-tight">{mpInit}</span>
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/70">{language === 'বাংলা' ? 'রেন্ট অ্যাকশন' : 'Rent Action'}</p>
-                          <p className="text-base font-black truncate">{booking.tenant} · {booking.property}</p>
+                          <p className="text-base font-black truncate">{mpTenant} · {booking.property}</p>
                           <p className="text-[10px] font-bold text-white/80 mt-0.5">
                             {monthFullLabel(payForm.monthKey, language)}
                             {' · '}{language === 'বাংলা' ? 'ডিউ' : 'Due'} {formatDate(due?.toISOString(), language)}
