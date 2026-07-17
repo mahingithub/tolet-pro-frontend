@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import useGoBack from "../hooks/useGoBack";
+import useRequireAuth from "../hooks/useRequireAuth";
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
 import { Search, MapPin, BedDouble, Bath, Square, Heart, Star, X, ChevronRight, ShieldCheck, ChevronDown, ChevronUp, Filter, Ruler, Navigation, CheckCircle2, Flame, Building, Wifi, Map, List, LayoutGrid, Home, Users, User, BookOpen, Share2, MessageCircle, ArrowLeft, SlidersHorizontal, ArrowUpDown, Camera, Layers, Crosshair, Loader2 } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
@@ -240,6 +241,8 @@ function buildRoomCollage(property) {
 // ─── PROPERTY CARD ────────────────────────────────────────────────────────────
 const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover, onHoverEnd, onInquire }) => {
 	const [isSaved, setIsSaved] = useState(false);
+	// Saving is an ACTION → gate behind login (viewing the card stays open).
+	const requireAuth = useRequireAuth();
 	// Drive the card's language off the real LanguageContext value so every
 	// label follows the app toggle. (The old `t.forRent === 'ভাড়ার জন্য'`
 	// heuristic below was always false — that key doesn't exist — so cards were
@@ -260,18 +263,20 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 	const handleSave = (e) => {
 		e.preventDefault();
 		e.stopPropagation();
-		let savedProps = JSON.parse(localStorage.getItem("savedProperties") || "[]");
-		const isCurrentlySaved = savedProps.some((p) => p.id === property.id);
-		if (isCurrentlySaved) {
-			savedProps = savedProps.filter((p) => p.id !== property.id);
-			setIsSaved(false);
-			showToast("Removed from Saved");
-		} else {
-			savedProps.push({ id: property.id, title: property.title, location: property.location, price: String(property.price ?? ""), beds: property.beds, baths: property.baths, img: coverImg });
-			setIsSaved(true);
-			showToast("Property Saved Successfully!");
-		}
-		localStorage.setItem("savedProperties", JSON.stringify(savedProps));
+		requireAuth(() => {
+			let savedProps = JSON.parse(localStorage.getItem("savedProperties") || "[]");
+			const isCurrentlySaved = savedProps.some((p) => p.id === property.id);
+			if (isCurrentlySaved) {
+				savedProps = savedProps.filter((p) => p.id !== property.id);
+				setIsSaved(false);
+				showToast("Removed from Saved");
+			} else {
+				savedProps.push({ id: property.id, title: property.title, location: property.location, price: String(property.price ?? ""), beds: property.beds, baths: property.baths, img: coverImg });
+				setIsSaved(true);
+				showToast("Property Saved Successfully!");
+			}
+			localStorage.setItem("savedProperties", JSON.stringify(savedProps));
+		});
 	};
 
 	const discountPercent = property.originalPrice && property.originalPrice > property.price
@@ -852,7 +857,10 @@ const PropertyListing = () => {
 	const [inquiryTarget, setInquiryTarget] = useState(null);
 	const [inquiryLandlord, setInquiryLandlord] = useState(null);
 
-	const openInquiry = (property) => setInquiryTarget(property);
+	// Inquiry is an ACTION → gate behind login. Browsing/searching/viewing
+	// (incl. the full-screen map) stays open to guests; only sending does not.
+	const requireAuth = useRequireAuth();
+	const openInquiry = (property) => requireAuth(() => setInquiryTarget(property));
 	const closeInquiry = () => { setInquiryTarget(null); setInquiryLandlord(null); };
 
 	// ── LIVE PROPERTY DATA ──────────────────────────────────────────────────────

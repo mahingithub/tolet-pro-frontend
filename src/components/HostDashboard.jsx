@@ -4996,16 +4996,6 @@ const HostDashboard = () => {
                 {isExpanded && (
                   <div className="border-t border-gray-100 bg-gray-50/40 px-3 sm:px-4 py-4 animate-in slide-in-from-top-2 fade-in duration-300">
 
-                    {/* Multi-member bookings show the per-member rent register;
-                        legacy single-tenant bookings keep the classic panels. */}
-                    {/* Unified rent card — every category (flat / single room /
-                        hostel) renders the SAME per-tenant layout. Single-tenant
-                        bookings show one synthetic member (see MembersManager). */}
-                    {true ? (
-                      <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} showLedger={true} showManage={false} />
-                    ) : (
-                    <>
-
                     {/* This-month ledger panel — totals + progress + edit */}
                     <div className="bg-white rounded-2xl p-3.5 border border-gray-100">
                       <div className="flex items-center justify-between mb-2.5 gap-2">
@@ -5199,8 +5189,6 @@ const HostDashboard = () => {
                         })}
                       </div>
                     </details>
-                    </>
-                    )}
                   </div>
                 )}
               </div>

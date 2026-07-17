@@ -1716,17 +1716,20 @@ const PropertyDetails = () => {
   };
 
   const handleSave = () => {
-    let saved = JSON.parse(localStorage.getItem('savedProperties') || '[]');
-    if (isSaved) {
-      saved = saved.filter((p) => String(p.id) !== String(id));
-      setIsSaved(false);
-      showToast('Removed from saved list');
-    } else {
-      saved.push({ ...property, id });
-      setIsSaved(true);
-      showToast('Saved to favorites! ❤️');
-    }
-    localStorage.setItem('savedProperties', JSON.stringify(saved));
+    // Saving is an ACTION → gate behind login (browsing this page stays open).
+    requireAuthFor(() => {
+      let saved = JSON.parse(localStorage.getItem('savedProperties') || '[]');
+      if (isSaved) {
+        saved = saved.filter((p) => String(p.id) !== String(id));
+        setIsSaved(false);
+        showToast('Removed from saved list');
+      } else {
+        saved.push({ ...property, id });
+        setIsSaved(true);
+        showToast('Saved to favorites! ❤️');
+      }
+      localStorage.setItem('savedProperties', JSON.stringify(saved));
+    });
   };
 
   const handleShare = async () => {

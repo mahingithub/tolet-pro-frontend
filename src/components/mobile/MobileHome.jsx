@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
+import useRequireAuth from '../../hooks/useRequireAuth';
 import { roomLabel } from '../../constants/roomCategories';
 import usePropertyStore from '../../store/usePropertyStore';
 import { SALE_INTENT_ENABLED } from '../../constants/listingIntents';
@@ -701,6 +702,8 @@ const PropertyCard = ({ property, t, landlord }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const [liked, setLiked] = useState(false);
+  // Saving (heart) is an ACTION → gate behind login; viewing the card stays open.
+  const requireAuth = useRequireAuth();
   const { typeLabel, catLabel, intentLabel, intentKind } = cardLabels(property, t, language === 'বাংলা');
 
   const daysAgo = computeDaysAgo(property.date || property.createdAt);
@@ -768,7 +771,7 @@ const PropertyCard = ({ property, t, landlord }) => {
 
             {/* TOP-RIGHT: heart button */}
             <button
-              onClick={(e) => { e.stopPropagation(); setLiked((v) => !v); }}
+              onClick={(e) => { e.stopPropagation(); requireAuth(() => setLiked((v) => !v)); }}
               className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/85 backdrop-blur-md flex items-center justify-center shadow-md active:scale-90 transition-transform z-10"
               aria-label={liked ? 'Unlike' : 'Like'}
             >

@@ -25,6 +25,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import useGoBack from '../hooks/useGoBack';
+import useRequireAuth from '../hooks/useRequireAuth';
 import {
   ArrowLeft, BadgeCheck, MessageCircle, Phone, Mail,
   Calendar, Briefcase, ShieldCheck, Share2, Lock, Award,
@@ -74,6 +75,8 @@ const TenantProfile = () => {
   const navigate = useNavigate();
   const goBack = useGoBack('/');
   const { user: authUser } = useAuth();
+  // Call / Message are ACTIONS → gate behind login (viewing the profile stays open).
+  const requireAuth = useRequireAuth();
 
   const [tenant, setTenant]   = useState(null);
   const [loading, setLoading] = useState(true);
@@ -321,13 +324,13 @@ const TenantProfile = () => {
                 </div>
 
                 <button
-                  onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } })}
+                  onClick={() => requireAuth(() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } }))}
                   className="bg-white text-gray-800 py-3.5 px-6 rounded-2xl font-black text-sm border border-gray-200 hover:border-green-300 hover:bg-green-50 hover:text-green-600 shadow-sm transition-all flex items-center gap-2 group"
                 >
                   <Phone size={18} className="group-hover:rotate-12 transition-transform" /> Call
                 </button>
                 <button
-                  onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar } })}
+                  onClick={() => requireAuth(() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar } }))}
                   className="bg-gradient-to-r from-blue-600 to-blue-500 text-white py-3.5 px-7 rounded-2xl font-black text-sm shadow-[0_8px_20px_rgba(37,99,235,0.25)] hover:shadow-[0_12px_25px_rgba(37,99,235,0.35)] hover:-translate-y-0.5 active:scale-95 transition-all flex items-center gap-2"
                 >
                   <MessageCircle size={18} /> Send Message
@@ -371,13 +374,13 @@ const TenantProfile = () => {
 
                 <div className="flex gap-3 w-full">
                   <button
-                    onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } })}
+                    onClick={() => requireAuth(() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } }))}
                     className="flex-1 py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-800 shadow-sm active:scale-95"
                   >
                     <Phone size={18} /> Call
                   </button>
                   <button
-                    onClick={() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar } })}
+                    onClick={() => requireAuth(() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar } }))}
                     className="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 text-white py-4 rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
                   >
                     <MessageCircle size={18} /> Message
