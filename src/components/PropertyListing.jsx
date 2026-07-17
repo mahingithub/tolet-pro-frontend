@@ -986,30 +986,59 @@ const PropertyListing = () => {
 			setSearchArea(newSearchArea);
 		}
 
+		// ── Intent / Purpose (resolved FIRST: the budget "above_*" buckets cap at
+		//    the active intent's slider max) ──────────────────────────────────────
+		const initialIntentParam = searchParams.get("intent") || searchParams.get("purpose");
+		// normaliseIntent maps legacy 'buy'→'sale' and unknown→default.
+		const parsedIntent = initialIntentParam ? normaliseIntent(initialIntentParam) : selectedIntent;
+
 		// ── Budget ────────────────────────────────────────────────────────────────
+		// Accept BOTH the shared search-box ids (under_10k / 10k_20k / 20k_50k /
+		// above_50k — emitted by HeroSection + MobileHome) AND the older
+		// low/mid/high/premium aliases and a raw "min-max" custom range. The old
+		// parser only understood low/mid/high/premium|min-max, so the hero/mobile
+		// budget was silently dropped — the "Budget filter doesn't work" bug.
 		const initialBudget = searchParams.get("budget");
-		if (initialBudget === "low") { setMinPrice(5000);   setMaxPrice(20000); }
-		else if (initialBudget === "mid")     { setMinPrice(20000);  setMaxPrice(50000); }
-		else if (initialBudget === "high")    { setMinPrice(50000);  setMaxPrice(100000); }
-		else if (initialBudget === "premium") { setMinPrice(100000); setMaxPrice(300000); }
-		else if (initialBudget && initialBudget.includes("-")) {
-			const [mn, mx] = initialBudget.split("-").map(Number);
-			if (!isNaN(mn) && !isNaN(mx)) { setMinPrice(mn); setMaxPrice(mx); }
+		if (initialBudget) {
+			if (initialBudget.includes("-")) {
+				const [mn, mx] = initialBudget.split("-").map(Number);
+				if (!isNaN(mn) && !isNaN(mx)) { setMinPrice(mn); setMaxPrice(mx); }
+			} else {
+				// "above_*" buckets have no natural ceiling → cap at the active
+				// intent's slider max so pricier (esp. commercial) listings aren't
+				// wrongly excluded.
+				const cap = getFilterConfig(parsedIntent).budgetSlider.max;
+				const BUDGET_ID_RANGES = {
+					under_10k: [0, 10000],
+					"10k_20k": [10000, 20000],
+					"20k_50k": [20000, 50000],
+					above_50k: [50000, cap],
+					// legacy aliases (older shared links)
+					low: [5000, 20000],
+					mid: [20000, 50000],
+					high: [50000, 100000],
+					premium: [100000, 300000],
+				};
+				const range = BUDGET_ID_RANGES[initialBudget];
+				if (range) { setMinPrice(range[0]); setMaxPrice(range[1]); }
+			}
 		}
 
 		// ── Intent / Purpose ──────────────────────────────────────────────────────
-		const initialIntentParam = searchParams.get("intent") || searchParams.get("purpose");
 		if (initialIntentParam) {
-			// normaliseIntent maps legacy 'buy'→'sale' and unknown→default, then we
-			// push it into the global store so the navbar + hero sync to the URL
-			// (a shared ?intent= link wins over the persisted mode).
-			setActiveMode(normaliseIntent(initialIntentParam));
+			// Push the intent into the global store so the navbar + hero sync to the
+			// URL (a shared ?intent= link wins over the persisted mode).
+			setActiveMode(parsedIntent);
 		}
 
-		// ── Property Type (prop.type: apartment / studio / duplex …) ─────────────
-		// Comes from the sidebar "Property Type" checkboxes.
+		// ── Property Type (prop.type: office / shop / apartment / studio …) ──────
+		// Commercial + Buy "Type" selections arrive here — the hero/mobile now send
+		// them as ?type= (matched against prop.type). Ignore the "any …" sentinels
+		// so they never become a real filter.
 		const initialType = searchParams.get("type");
-		if (initialType && initialType !== "any") setSelectedTypes([initialType]);
+		if (initialType && !["any", "any_commercial", "any_buy"].includes(initialType)) {
+			setSelectedTypes([initialType]);
+		}
 
 		// ── Rental Category (prop.rentalCategory: family / bachelor_male …) ──────
 		// ⚠️  This is the FIX: Hero & Navbar both send ?category=… (NOT ?type=…)

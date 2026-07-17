@@ -575,20 +575,29 @@ const HeroSection = () => {
     e?.preventDefault();
     setIsTypeOpen(false);
     setIsBudgetOpen(false);
-    const queryParams = new URLSearchParams({
+    const params = new URLSearchParams({
       // Canonical listing intent ('rent' | 'sale' | 'commercial') — the primary
       // filter the listing page + backend key off. `purpose` is kept for now so
       // the current PropertyListing keeps working until it's switched to read
       // `intent`; it can be dropped in that step.
       intent:   activeMode,
       purpose:  searchType,
-      // ── 'category' maps to prop.rentalCategory (family / bachelor_male / etc.)
-      // ── This is intentionally separate from 'type' (apartment / studio / etc.)
-      category: selectedType.id,
       budget:   customMin && customMax ? `${customMin}-${customMax}` : selectedBudget.id,
-    }).toString();
+    });
+    // The "Type" dropdown maps to a DIFFERENT property field per tab, so it must
+    // ride the matching URL param or PropertyListing can't filter on it:
+    //   • Residential      → a rentalCategory (family / bachelor_male / …) → ?category=
+    //   • Commercial / Buy → a property TYPE  (office / shop / …)          → ?type=
+    // (Sending a commercial type as ?category= matched it against rentalCategory
+    // and never narrowed results — the reported "Commercial Type" bug.)
+    const selId = selectedType.id;
+    const isAnyType = selId === 'any' || selId === 'any_commercial' || selId === 'any_buy';
+    if (!isAnyType) {
+      if (searchType === 'commercial' || searchType === 'buy') params.set('type', selId);
+      else params.set('category', selId);
+    }
     const targetLocation = location.trim() ? location.toLowerCase().replace(/,?\s+/g, '-') : 'all';
-    navigate(`/properties/${targetLocation}?${queryParams}`);
+    navigate(`/properties/${targetLocation}?${params.toString()}`);
   };
 
   const sliderItems = [...popularCities, ...popularCities];

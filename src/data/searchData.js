@@ -350,11 +350,23 @@ export function toSlug(s) {
  */
 export function buildSearchUrl({ location = '', purpose = 'rent', categoryId, budgetId, customMin, customMax }) {
   const slug = toSlug(location);
-  const params = new URLSearchParams({
-    purpose,
-    category: categoryId || 'any',
-    budget:   customMin && customMax ? `${customMin}-${customMax}` : (budgetId || 'any'),
-  });
+  const params = new URLSearchParams({ purpose });
+
+  // The "Type" dropdown means different things per purpose, and PropertyListing
+  // matches each against a DIFFERENT property field:
+  //   • residential (rent) → a rentalCategory (family / bachelor_male / …) → ?category=  (matched vs prop.rentalCategory)
+  //   • commercial / buy   → a property TYPE  (office / shop / apartment / …) → ?type=   (matched vs prop.type)
+  // Sending a commercial type as ?category= (the old behaviour) matched it
+  // against rentalCategory and therefore never narrowed the list — that's the
+  // "Commercial Type filter doesn't work" bug. "Any …" sentinels emit no param.
+  const selId = categoryId || 'any';
+  const isAnyType = selId === 'any' || selId === 'any_commercial' || selId === 'any_buy';
+  if (!isAnyType) {
+    if (purpose === 'commercial' || purpose === 'buy') params.set('type', selId);
+    else params.set('category', selId);
+  }
+
+  params.set('budget', customMin && customMax ? `${customMin}-${customMax}` : (budgetId || 'any'));
   return `/properties/${slug}?${params.toString()}`;
 }
 
