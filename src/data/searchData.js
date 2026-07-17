@@ -284,12 +284,17 @@ export const RESIDENTIAL_TYPES = [
   { id: 'student',         label: { en: 'Student',           bn: 'ছাত্র/ছাত্রী' } },
 ];
 
+// Commercial categories — MUST mirror the canonical set in
+// constants/filterConfig.js (commercial.propertyTypes) and the desktop copy in
+// HeroSection.jsx `commercialTypes`. IDs match the `type` values a listing
+// stores, so each option actually filters results.
 export const COMMERCIAL_TYPES = [
   { id: 'any_commercial',  label: { en: 'Any Commercial',     bn: 'যেকোনো কমার্শিয়াল' } },
   { id: 'office',          label: { en: 'Office Space',       bn: 'অফিস স্পেস' } },
   { id: 'shop',            label: { en: 'Shop / Retail',      bn: 'দোকান / রিটেইল' } },
-  { id: 'warehouse',       label: { en: 'Warehouse',          bn: 'গুদাম ঘর' } },
+  { id: 'showroom',        label: { en: 'Showroom',           bn: 'শোরুম' } },
   { id: 'restaurant',      label: { en: 'Restaurant Space',   bn: 'রেস্টুরেন্ট স্পেস' } },
+  { id: 'warehouse',       label: { en: 'Warehouse',          bn: 'গুদাম ঘর' } },
 ];
 
 export const BUY_TYPES = [

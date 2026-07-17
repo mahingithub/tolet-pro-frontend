@@ -574,6 +574,14 @@ const MapView = ({ properties, activeId, onMarkerClick, defaultCenter = DEFAULT_
 		[properties]
 	);
 
+	// The filter panel gates results to a single intent, so if any listing here
+	// is commercial the whole view is commercial. Used to tint cluster bubbles
+	// indigo to match the individual commercial pins (see MapMarker/ClusterMarker).
+	const isCommercialView = useMemo(
+		() => (properties || []).some((p) => p && p.intent === "commercial"),
+		[properties]
+	);
+
 	const { clusters, supercluster } = useSupercluster({
 		points,
 		bounds,
@@ -736,6 +744,7 @@ const MapView = ({ properties, activeId, onMarkerClick, defaultCenter = DEFAULT_
 								lng={lng}
 								count={pointCount}
 								totalPoints={points.length}
+								isCommercial={isCommercialView}
 								onClick={() => handleClusterClick(item.id, lat, lng)}
 							/>
 						);
@@ -750,6 +759,7 @@ const MapView = ({ properties, activeId, onMarkerClick, defaultCenter = DEFAULT_
 							lng={lng}
 							price={prop.price}
 							title={prop.title}
+							intent={prop.intent}
 							isActive={activeId === prop.id}
 							onClick={() => handleMarkerClick(prop)}
 						/>

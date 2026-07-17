@@ -42,6 +42,7 @@ import SmartAlertsPopup from './SmartAlertsPopup';
 import { buildRentAlerts, buildLeaseAlerts, buildInquiryAlerts } from '../utils/rentAlerts';
 import Aiinsightspage from './Aiinsightspage';
 import { jsPDF } from 'jspdf';
+import useDeepLinkHighlight, { highlightNotifTarget } from '../hooks/useDeepLinkHighlight';
 
 // Payment channels offered when converting an inquiry into a booking / recording
 // an advance. Order matches the most-used mobile-money + bank rails in Bangladesh.
@@ -480,6 +481,10 @@ const HostDashboard = () => {
       setActiveTab(tab);
     }
   }, [location.search]);
+  // Scroll to + flash the specific row a notification points at (uses
+  // location.state.highlightId set by NotificationPanel). The row ids are
+  // stamped on each inquiry/booking/rent card below.
+  useDeepLinkHighlight();
 
   // Keep the URL in sync with the currently active tab so that hitting the "Back" button
   // from another page returns the user to the exact tab they were on.
@@ -1522,16 +1527,23 @@ const HostDashboard = () => {
     const d = notif?.data || {};
     switch (notif?.type) {
       case 'message_new':
-        if (d.conversationId) openChatPanel(d.conversationId, { source: 'notification' });
+      case 'message':
+        if (d.conversationId || d.targetId) openChatPanel(d.conversationId || d.targetId, { source: 'notification' });
         break;
       case 'inquiry_new':
       case 'inquiry_status':
+      case 'inquiry':
         setActiveTab('inquiries');
+        // The row mounts right after the tab switch — highlightNotifTarget
+        // polls the DOM for #inquiry-<targetId> and scrolls/flashes it.
+        if (d.targetId) highlightNotifTarget(d.targetId);
         break;
       case 'rent_receipt':
       case 'rent_invoice':
       case 'rent_overdue':
+      case 'payment':
         setActiveTab('rent');
+        if (d.targetId) highlightNotifTarget(d.targetId);
         break;
       default:
         break;

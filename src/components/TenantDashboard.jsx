@@ -13,6 +13,7 @@ import { buildTenantAlerts } from '../utils/rentAlerts';
 import SmartAlertsPage from './Smartalertspage';
 import SmartAlertsPopup from './SmartAlertsPopup';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import useDeepLinkHighlight from '../hooks/useDeepLinkHighlight';
 import {
   Building2, Search, Bell, Globe, LayoutDashboard, Heart,
   MessageSquare, MessageCircle, Settings, HelpCircle,
@@ -636,6 +637,11 @@ const TenantDashboard = () => {
       setActiveTab(tab);
     }
   }, [location.search]);
+
+  // Scroll to + flash the specific row a notification points at (uses
+  // location.state.highlightId set by NotificationPanel). Matches the
+  // #application-<id> / #receipt-<id> / #payment-<id> row ids rendered below.
+  useDeepLinkHighlight();
 
   // Keep the URL in sync with the currently active tab so that hitting the "Back" button
   // from another page returns the user to the exact tab they were on.
@@ -2809,7 +2815,9 @@ const handleWizardSubmit = async (payload) => {
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {activeLeases.map((b) => (
-                  <TenantRentPay key={b.id || b._id} booking={b} submissions={rentSubmissions} onSubmitted={refreshRentData} />
+                  <div key={b.id || b._id} id={`payment-${b.id || b._id}`}>
+                    <TenantRentPay booking={b} submissions={rentSubmissions} onSubmitted={refreshRentData} />
+                  </div>
                 ))}
               </div>
             </div>

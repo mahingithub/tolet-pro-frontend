@@ -84,12 +84,15 @@ const residentialTypes = [
   { id: 'student',        label: { en: 'Student',             bn: 'ছাত্র/ছাত্রী' } },
 ];
 
+// Keep in sync with data/searchData.js COMMERCIAL_TYPES (mobile) and the
+// canonical set in constants/filterConfig.js (commercial.propertyTypes).
 const commercialTypes = [
   { id: 'any_commercial', label: { en: 'Any Commercial', bn: 'যেকোনো কমার্শিয়াল' } },
   { id: 'office',         label: { en: 'Office Space',    bn: 'অফিস স্পেস' } },
   { id: 'shop',           label: { en: 'Shop / Retail',   bn: 'দোকান / রিটেইল' } },
-  { id: 'warehouse',      label: { en: 'Warehouse',       bn: 'গুদাম ঘর' } },
+  { id: 'showroom',       label: { en: 'Showroom',        bn: 'শোরুম' } },
   { id: 'restaurant',     label: { en: 'Restaurant Space',bn: 'রেস্টুরেন্ট স্পেস' } },
+  { id: 'warehouse',      label: { en: 'Warehouse',       bn: 'গুদাম ঘর' } },
 ];
 
 const buyTypes = [

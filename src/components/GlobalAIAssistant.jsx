@@ -243,7 +243,7 @@ const GlobalAIAssistant = () => {
 
     try {
       const historyPayload = aiMessages
-        .filter(m => !m.videoAction && m.text !== "Sorry, I am having trouble connecting to my brain right now. Please try again or speak to a human teammate.")
+        .filter(m => m.text && m.text !== "Sorry, I am having trouble connecting to my brain right now. Please try again or speak to a human teammate.")
         .slice(-15);
         
       const response = await fetch(`${API}/ai-chat/ask`, {
@@ -258,12 +258,18 @@ const GlobalAIAssistant = () => {
       
       const data = await response.json();
 
-      if (data?.text || (Array.isArray(data?.properties) && data.properties.length)) {
+      if (data?.text || (Array.isArray(data?.properties) && data.properties.length) || data?.videoGuide) {
         setAiMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
           sender: 'ai',
           text: data.text || '',
           properties: Array.isArray(data.properties) && data.properties.length ? data.properties : undefined,
+          // The AI can attach ONE admin-published walkthrough video when the
+          // question matches a guide (e.g. "how do I rent a house?"). It renders
+          // as a "Watch" button under the reply that opens the video modal.
+          videoAction: data.videoGuide?.videoUrl
+            ? { label: `Watch: ${data.videoGuide.title}`, url: data.videoGuide.videoUrl, title: data.videoGuide.title }
+            : undefined,
         }]);
         setUnhelpfulStreak(0); // reset streak on success
       }

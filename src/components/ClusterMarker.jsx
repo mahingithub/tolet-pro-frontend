@@ -12,11 +12,18 @@ import { toLocalizedDigits } from "../utils/formatCurrency";
 //
 // The bubble grows a little with the cluster size so denser groups read as
 // heavier without ever getting large enough to cover the map.
-const ClusterMarker = ({ lat, lng, count, totalPoints = 1, onClick }) => {
+const ClusterMarker = ({ lat, lng, count, totalPoints = 1, isCommercial = false, onClick }) => {
 	const { language } = useLanguage();
 
 	// 40px base → up to +24px, scaled by this cluster's share of all points.
 	const size = 40 + Math.min((count / Math.max(totalPoints, 1)) * 40, 24);
+
+	// Commercial clusters take the indigo identity used by the individual
+	// commercial pins so a group of commercial listings still reads as
+	// commercial before you zoom in; everything else keeps the brand-red bubble.
+	const colorClasses = isCommercial
+		? "bg-indigo-600 shadow-[0_6px_20px_rgba(79,70,229,0.5)]"
+		: "bg-brandRed shadow-[0_6px_20px_rgba(186,0,54,0.45)]";
 
 	return (
 		<OverlayViewF
@@ -31,8 +38,8 @@ const ClusterMarker = ({ lat, lng, count, totalPoints = 1, onClick }) => {
 					e.stopPropagation();
 					onClick && onClick();
 				}}
-				aria-label={`${count} properties — zoom in`}
-				className="flex items-center justify-center rounded-full bg-brandRed text-white font-black ring-4 ring-white/70 shadow-[0_6px_20px_rgba(186,0,54,0.45)] transition-transform duration-200 ease-out hover:scale-105 active:scale-95"
+				aria-label={`${count} ${isCommercial ? "commercial " : ""}properties — zoom in`}
+				className={`flex items-center justify-center rounded-full text-white font-black ring-4 ring-white/70 transition-transform duration-200 ease-out hover:scale-105 active:scale-95 ${colorClasses}`}
 				style={{
 					width: size,
 					height: size,

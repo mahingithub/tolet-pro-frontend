@@ -131,7 +131,6 @@ export default function NotificationPanel({ onClose }) {
           break;
         }
 
-        case 'inquiry':
         case 'inquiry_new':
           navigate('/host-dashboard?tab=inquiries', {
             state: { highlightId: targetId || n?.data?.inquiryId, autoOpen: true, scrollTo: true }
@@ -142,6 +141,17 @@ export default function NotificationPanel({ onClose }) {
           navigate('/tenant-dashboard?tab=applications', {
             state: { highlightId: targetId || n?.data?.inquiryId, autoOpen: true, scrollTo: true }
           });
+          break;
+
+        // Legacy untyped inquiry notifications (created before the
+        // inquiry_new / inquiry_status split) don't record which surface they
+        // belong to. Route by the viewer's role so a tenant lands on their
+        // applications and a landlord on the host inbox.
+        case 'inquiry':
+          navigate(
+            isLandlord ? '/host-dashboard?tab=inquiries' : '/tenant-dashboard?tab=applications',
+            { state: { highlightId: targetId || n?.data?.inquiryId, autoOpen: true, scrollTo: true } }
+          );
           break;
 
         case 'booking':
