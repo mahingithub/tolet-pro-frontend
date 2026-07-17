@@ -139,6 +139,27 @@ export default function MembersManager({ booking, language = 'English', onChange
   const activeMembers = members.filter((m) => m.status !== 'moved-out');
   const capacity = Number(booking.capacity || booking.propertyCapacity || 0);
 
+  // ── Seat-rent split ────────────────────────────────────────────────────
+  // For a hostel room the ROOM rent (booking.monthlyRent) is shared equally
+  // across the active seats — ৳6000 ÷ 4 seats = ৳1500 each; ÷ 2 seats = ৳3000.
+  // The share auto-updates as seats are added / moved out. A seat may still
+  // carry its OWN explicit rent (host typed a custom amount) which overrides
+  // the split. Single-tenant bookings have one member holding the full rent,
+  // so the split is a no-op for them.
+  const isHostel = booking.propertyType === 'hostel';
+  const roomRent = Number(booking.monthlyRent) || 0;
+  const seatCount = Math.max(1, activeMembers.length);
+  const equalShare = isHostel ? Math.round(roomRent / seatCount) : roomRent;
+  // Resolve one member's effective monthly rent. A positive explicit value wins,
+  // EXCEPT the legacy seeding artifact where a multi-seat room's seat "inherited"
+  // the full room rent — that is really un-split, so we divide it.
+  const effectiveRent = (m) => {
+    const explicit = Number(m && m.monthlyRent) || 0;
+    if (!isHostel) return explicit > 0 ? explicit : roomRent;
+    if (explicit > 0 && !(seatCount > 1 && explicit === roomRent)) return explicit;
+    return equalShare;
+  };
+
   const months = useMemo(
     () => enumerateLeaseMonths(booking.leaseStart, booking.leaseEnd),
     [booking.leaseStart, booking.leaseEnd],
@@ -205,12 +226,12 @@ export default function MembersManager({ booking, language = 'English', onChange
           ? await undoLedgerApi(bookingId, key)
           : await undoMemberLedgerApi(bookingId, member.id, key);
       } else if (action === 'due') {
-        const body = { status: 'due', dueNote: '—', monthLabel, totalDue: Number(member.monthlyRent) || 0 };
+        const body = { status: 'due', dueNote: '—', monthLabel, totalDue: effectiveRent(member) };
         updated = legacy
           ? await updateLedgerApi(bookingId, key, body)
           : await updateMemberLedgerApi(bookingId, member.id, key, body);
       } else {
-        const rent = Number(member.monthlyRent) || Number(booking.monthlyRent) || 0;
+        const rent = effectiveRent(member);
         const body = {
           status: 'full', amount: rent, balance: 0,
           paidOn: new Date().toISOString().slice(0, 10), method: 'Cash',
@@ -333,7 +354,7 @@ export default function MembersManager({ booking, language = 'English', onChange
             <input
               value={form.monthlyRent}
               onChange={(e) => setForm({ ...form, monthlyRent: e.target.value.replace(/[^0-9]/g, '') })}
-              placeholder={isBn ? `মাসিক ভাড়া (ডিফল্ট ${taka(booking.monthlyRent)})` : `Monthly rent (default ${taka(booking.monthlyRent)})`}
+              placeholder={isBn ? `ভাড়া (খালি = সমান ভাগ ${taka(equalShare)})` : `Rent (blank = equal split ${taka(equalShare)})`}
               inputMode="numeric"
               className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold outline-none focus:border-[#ba0036]"
             />
@@ -349,6 +370,17 @@ export default function MembersManager({ booking, language = 'English', onChange
         </div>
       )}
       </>)}
+
+      {/* Room-rent split summary — hostels only. Makes the ÷seats math visible
+          so the host trusts the per-seat amounts below. */}
+      {isHostel && roomRent > 0 && activeMembers.length > 0 && (
+        <div className="mb-2.5 flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-[#ba0036]/5 border border-[#ba0036]/10">
+          <span className="text-[9px] font-black uppercase tracking-widest text-[#ba0036] shrink-0">{isBn ? 'রুম ভাড়া ভাগ' : 'Room Rent Split'}</span>
+          <span className="text-[10px] font-bold text-gray-700 tabular-nums text-right">
+            {taka(roomRent)} ÷ {activeMembers.length} {isBn ? 'সিট' : 'seats'} = <span className="font-black text-gray-900">{taka(equalShare)}</span> {isBn ? '/সিট' : 'each'}
+          </span>
+        </div>
+      )}
 
       {/* Member list */}
       {activeMembers.length === 0 ? (
@@ -373,7 +405,7 @@ export default function MembersManager({ booking, language = 'English', onChange
                         {m.userId && <CheckCircle2 size={11} className="text-blue-500 shrink-0" title={isBn ? 'অ্যাকাউন্ট যুক্ত' : 'Account linked'} />}
                       </div>
                       <p className="text-[9px] font-bold text-gray-500 truncate">
-                        {spaceLabel(m, isBn)} <span className="text-gray-300">·</span> <span className="tabular-nums">{taka(m.monthlyRent || booking.monthlyRent)}</span>
+                        {spaceLabel(m, isBn)} <span className="text-gray-300">·</span> <span className="tabular-nums">{taka(effectiveRent(m))}</span>
                       </p>
                     </div>
                   </div>

@@ -1016,6 +1016,9 @@ const HostDashboard = () => {
     // When true, the host types a property name instead of picking a listing —
     // so a booking isn't limited to one-per-listing.
     manualProperty: false,
+    // Hostel seats added up-front in the modal (beyond the main tenant = Seat 1).
+    // Each: { name, phone, monthlyRent }. Rent blank ⇒ equal split of the room rent.
+    seats: [],
     rentDueDay: 5,
     reminderLeadDays: 3,
     autoReminder: true,
@@ -2137,6 +2140,7 @@ const HostDashboard = () => {
       floorNumber: (matchingProp?.floorNumber ?? matchingProp?.floor) != null ? String(matchingProp?.floorNumber ?? matchingProp?.floor) : '',
       roomNumber: '',
       manualProperty: false,
+      seats: [],
       serviceCharge: String(landlordProfile?.serviceCharge ?? authUser?.landlordProfile?.serviceCharge ?? ''),
       rentDueDay: 5,
       reminderLeadDays: 3,
@@ -2218,6 +2222,7 @@ const HostDashboard = () => {
       floorNumber: '',
       roomNumber: '',
       manualProperty: false,
+      seats: [],
       serviceCharge: String(landlordProfile?.serviceCharge ?? authUser?.landlordProfile?.serviceCharge ?? ''),
       rentDueDay: 5,
       reminderLeadDays: 3,
@@ -2308,6 +2313,29 @@ const HostDashboard = () => {
     const tenantUserId = /^[0-9a-fA-F]{24}$/.test(String(leaseForm.inquirerUserId || ''))
       ? leaseForm.inquirerUserId
       : null;
+    // ── Hostel seats ─────────────────────────────────────────────────────
+    // Seat 1 = the main tenant (name/phone above); any seats the host added in
+    // the modal follow as Seat 2, 3 … and inherit this room's floor + room. A
+    // seat only carries an explicit monthlyRent when the host typed a custom
+    // amount — otherwise the room rent is split equally across the seats
+    // (handled in MembersManager). We deliberately DON'T stamp Seat 1 with the
+    // full room rent, or the ÷seats split would skip it.
+    const hostelMembers = (leaseForm.category === 'hostel')
+      ? [
+          { name: tenant.trim(), phone: tenantPhone.trim(), rentType: 'seat', floor: leaseForm.floorNumber || '', roomLabel: leaseForm.roomNumber || '', seatLabel: language === 'বাংলা' ? 'সিট ১' : 'Seat 1' },
+          ...(Array.isArray(leaseForm.seats) ? leaseForm.seats : [])
+            .filter(s => (s.name || '').trim() || (s.phone || '').trim() || Number(s.monthlyRent) > 0)
+            .map((s, i) => ({
+              name: (s.name || '').trim(),
+              phone: (s.phone || '').trim(),
+              rentType: 'seat',
+              floor: leaseForm.floorNumber || '',
+              roomLabel: leaseForm.roomNumber || '',
+              seatLabel: `${language === 'বাংলা' ? 'সিট' : 'Seat'} ${i + 2}`,
+              ...(Number(s.monthlyRent) > 0 ? { monthlyRent: Number(s.monthlyRent) } : {}),
+            })),
+        ]
+      : undefined;
     const newBooking = {
       id: `BKG-${String(Date.now()).slice(-6)}`,
       inquiryId: leaseForm.inquiryId,
@@ -2337,6 +2365,7 @@ const HostDashboard = () => {
       notes: leaseForm.notes || '',
       status: 'active',
       ledger: {},
+      ...(hostelMembers ? { members: hostelMembers } : {}),
     };
     setBookings(prev => [newBooking, ...prev]);
 
@@ -2363,11 +2392,10 @@ const HostDashboard = () => {
       monthlyRent: rent,
       floorNumber: leaseForm.floorNumber || '',
       roomNumber: leaseForm.roomNumber || '',
-      // Hostels: seed Seat 1 from the entered tenant, labelled with the room;
-      // the host adds more seats (each their own rent) from the booking card.
-      members: (leaseForm.category === 'hostel')
-        ? [{ name: tenant.trim(), phone: tenantPhone.trim(), rentType: 'seat', monthlyRent: rent, floor: leaseForm.floorNumber || '', roomLabel: leaseForm.roomNumber || '', seatLabel: language === 'বাংলা' ? 'সিট ১' : 'Seat 1' }]
-        : undefined,
+      // Hostels: Seat 1 = the entered tenant + any seats added in the modal.
+      // Seats split the room rent equally unless the host set a custom per-seat
+      // amount (see MembersManager / hostelMembers above).
+      members: hostelMembers,
     }).then(saved => {
       setBookings(prev => prev.map(b => b.id === newBooking.id ? { ...b, ...saved } : b));
       // Surface the tenant connection code so the host can share it right away.
@@ -2398,7 +2426,7 @@ const HostDashboard = () => {
       // dates, rent, due day, reminder, payment) and clear only the per-booking
       // ones so the host can add the next room/tenant immediately — the way to
       // set 20+ bookings without re-typing everything.
-      setLeaseForm(f => ({ ...f, tenant: '', tenantPhone: '', roomNumber: '', occupants: '', businessName: '', licenseNumber: '', inquiryId: null, inquirerUserId: null }));
+      setLeaseForm(f => ({ ...f, tenant: '', tenantPhone: '', roomNumber: '', occupants: '', businessName: '', licenseNumber: '', seats: [], inquiryId: null, inquirerUserId: null }));
       showToast(language === 'বাংলা' ? 'বুকিং তৈরি হয়েছে — পরের রুম/ভাড়াটিয়া যোগ করুন' : 'Booking created — add the next room / tenant');
     } else {
       showToast(language === 'বাংলা' ? 'বুকিং তৈরি হয়েছে! রেন্ট লেজার চালু হয়েছে।' : 'Booking created — rent ledger is live.');
@@ -4996,6 +5024,15 @@ const HostDashboard = () => {
                 {isExpanded && (
                   <div className="border-t border-gray-100 bg-gray-50/40 px-3 sm:px-4 py-4 animate-in slide-in-from-top-2 fade-in duration-300">
 
+                    {/* Hostel rooms show the per-seat rent register (each seat =
+                        name + room + floor + its split share of the room rent);
+                        flat / single-room / sublet keep the classic single-tenant
+                        ledger panels below. */}
+                    {isHostelBooking(booking) ? (
+                      <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} showLedger={true} showManage={false} />
+                    ) : (
+                    <>
+
                     {/* This-month ledger panel — totals + progress + edit */}
                     <div className="bg-white rounded-2xl p-3.5 border border-gray-100">
                       <div className="flex items-center justify-between mb-2.5 gap-2">
@@ -5189,6 +5226,8 @@ const HostDashboard = () => {
                         })}
                       </div>
                     </details>
+                    </>
+                    )}
                   </div>
                 )}
               </div>
@@ -6290,7 +6329,7 @@ const HostDashboard = () => {
                     <div className="space-y-3">
                       <div className="rounded-2xl p-3.5 flex items-start gap-2.5 border bg-violet-50/70 border-violet-100">
                         <span className="text-lg leading-none shrink-0" aria-hidden="true">🏢</span>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="text-[10px] font-black uppercase tracking-widest text-violet-700 mb-1">{language === 'বাংলা' ? 'কমার্শিয়াল লিজ' : 'Commercial Lease'}</p>
                           <p className="text-[11px] font-bold text-gray-700 leading-relaxed">
                             {language === 'বাংলা'
@@ -6298,6 +6337,14 @@ const HostDashboard = () => {
                               : 'Business tenancy — capture the business name, lease term and advance (no family occupants / seats).'}
                           </p>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => setLeaseForm(f => ({ ...f, dealType: 'residential', leaseTermMonths: '', businessName: '', licenseNumber: '' }))}
+                          className="shrink-0 text-[10px] font-black text-violet-700 hover:underline underline-offset-2 whitespace-nowrap"
+                          title={language === 'বাংলা' ? 'আবাসিক লিজে ফিরে যান' : 'Switch back to residential'}
+                        >
+                          {language === 'বাংলা' ? '← আবাসিক' : '← Residential'}
+                        </button>
                       </div>
                       <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ব্যবসার নাম' : 'Business / Trade Name'}</label>
@@ -6329,6 +6376,16 @@ const HostDashboard = () => {
                           </button>
                         ))}
                       </div>
+                      {/* Commercial — switches the whole booking to a commercial
+                          lease (business name + fixed term instead of a
+                          residential flat/room/hostel category). */}
+                      <button
+                        type="button"
+                        onClick={() => setLeaseForm(f => ({ ...f, dealType: 'commercial', category: '', propertyId: '', property: '', location: '', leaseTermMonths: f.leaseTermMonths || '24' }))}
+                        className="mt-2 w-full px-2 py-2.5 rounded-xl text-[11px] font-black border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition-all flex items-center justify-center gap-1.5"
+                      >
+                        🏢 {language === 'বাংলা' ? 'কমার্শিয়াল এরিয়া / লিজ' : 'Commercial Area / Lease'}
+                      </button>
                     </div>
                   )}
 
@@ -6470,6 +6527,67 @@ const HostDashboard = () => {
                       </div>
                     )}
 
+                    {/* Seats / tenants — HOSTEL only. Add each seat up-front
+                        (Seat 1 = the tenant entered above). The room rent is
+                        entered ONCE below and splits equally across the seats;
+                        typing a per-seat amount overrides that seat's share. */}
+                    {leaseForm.category === 'hostel' && (() => {
+                      const isBn = language === 'বাংলা';
+                      const roomRent = Number(leaseForm.monthlyRent) || 0;
+                      const totalSeats = 1 + (leaseForm.seats?.length || 0);
+                      const share = totalSeats > 0 ? Math.round(roomRent / totalSeats) : roomRent;
+                      const fmt = (n) => `৳${(Number(n) || 0).toLocaleString('en-IN')}`;
+                      const setSeat = (idx, patch) => setLeaseForm(f => ({ ...f, seats: (f.seats || []).map((s, i) => (i === idx ? { ...s, ...patch } : s)) }));
+                      const addSeat = () => setLeaseForm(f => ({ ...f, seats: [...(f.seats || []), { name: '', phone: '', monthlyRent: '' }] }));
+                      const removeSeat = (idx) => setLeaseForm(f => ({ ...f, seats: (f.seats || []).filter((_, i) => i !== idx) }));
+                      return (
+                        <div className="sm:col-span-2 rounded-2xl border border-[#ba0036]/15 bg-[#ba0036]/5 p-3.5">
+                          <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                              <Users size={14} className="text-[#ba0036]" />
+                              <span className="text-[11px] font-black text-gray-900 uppercase tracking-widest">{isBn ? 'সিট / ভাড়াটিয়া' : 'Seats / Tenants'}</span>
+                              <span className="px-1.5 py-0.5 rounded bg-white text-[9px] font-black text-gray-600 tabular-nums border border-gray-200">{totalSeats}</span>
+                            </div>
+                            {roomRent > 0 && (
+                              <span className="text-[10px] font-bold text-gray-700 tabular-nums">
+                                {fmt(roomRent)} ÷ {totalSeats} = <span className="font-black text-[#ba0036]">{fmt(share)}</span>{isBn ? '/সিট' : ' each'}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Seat 1 — mirrors the main tenant entered above. */}
+                          <div className="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-white border border-gray-100 mb-2">
+                            <span className="w-6 h-6 rounded-lg bg-[#ba0036] text-white text-[10px] font-black flex items-center justify-center shrink-0">1</span>
+                            <span className="text-xs font-bold text-gray-900 truncate flex-1">{leaseForm.tenant?.trim() || (isBn ? 'সিট ১ — উপরে ভাড়াটিয়ার নাম দিন' : 'Seat 1 — enter the tenant name above')}</span>
+                            <span className="text-[10px] font-black text-gray-500 tabular-nums shrink-0">{roomRent > 0 ? fmt(share) : '—'}</span>
+                          </div>
+
+                          {/* Additional seats */}
+                          {(leaseForm.seats || []).length > 0 && (
+                            <div className="space-y-2">
+                              {(leaseForm.seats || []).map((s, idx) => (
+                                <div key={idx} className="flex items-center gap-1.5">
+                                  <span className="w-6 h-6 rounded-lg bg-gray-900 text-white text-[10px] font-black flex items-center justify-center shrink-0">{idx + 2}</span>
+                                  <input value={s.name} onChange={e => setSeat(idx, { name: e.target.value })} placeholder={isBn ? 'নাম' : 'Name'} className="flex-1 min-w-0 px-2.5 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-900 outline-none focus:border-[#ba0036] bg-white" />
+                                  <input value={s.monthlyRent} onChange={e => setSeat(idx, { monthlyRent: e.target.value.replace(/[^0-9]/g, '') })} inputMode="numeric" placeholder={roomRent > 0 ? fmt(share) : (isBn ? 'ভাড়া' : 'Rent')} title={isBn ? 'খালি রাখলে সমান ভাগ' : 'Blank = equal split'} className="w-20 shrink-0 px-2 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-900 outline-none focus:border-[#ba0036] bg-white tabular-nums" />
+                                  <button type="button" onClick={() => removeSeat(idx)} className="p-2 rounded-lg bg-white border border-gray-200 text-gray-400 hover:text-rose-600 hover:border-rose-200 shrink-0" title={isBn ? 'সরান' : 'Remove seat'}><X size={13} /></button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <button type="button" onClick={addSeat} className="mt-2 w-full py-2 rounded-xl border-2 border-dashed border-[#ba0036]/30 text-[#ba0036] text-[11px] font-black uppercase tracking-widest hover:bg-white/60 transition-colors flex items-center justify-center gap-1.5">
+                            <Plus size={14} /> {isBn ? 'সিট যোগ করুন' : 'Add Seat'}
+                          </button>
+                          <p className="text-[9px] font-bold text-gray-400 mt-2 leading-relaxed">
+                            {isBn
+                              ? 'রুমের ভাড়া নিচে একবারই লিখুন — সিটগুলোতে সমানভাবে ভাগ হবে। কোনো সিটে আলাদা ভাড়া দিলে সেটি প্রাধান্য পাবে।'
+                              : 'Enter the room rent once below — it splits equally across the seats. A custom per-seat rent overrides that seat.'}
+                          </p>
+                        </div>
+                      );
+                    })()}
+
                     <div>
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'লিজ শুরু' : 'Lease Start'}</label>
                       <input type="date" value={leaseForm.leaseStart} onChange={e => setLeaseForm(f => ({ ...f, leaseStart: e.target.value }))} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
@@ -6488,7 +6606,7 @@ const HostDashboard = () => {
                     )}
 
                     <div>
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'মাসিক ভাড়া (৳)' : 'Monthly Rent (BDT)'}</label>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{leaseForm.category === 'hostel' ? (language === 'বাংলা' ? 'রুম ভাড়া (৳) — সিটে ভাগ হবে' : 'Room Rent (BDT) — split across seats') : (language === 'বাংলা' ? 'মাসিক ভাড়া (৳)' : 'Monthly Rent (BDT)')}</label>
                       <input id="lease-monthlyRent" type="number" min="0" value={leaseForm.monthlyRent} onChange={e => setLeaseForm(f => ({ ...f, monthlyRent: e.target.value }))} placeholder="85000" className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('monthlyRent')}`} />
                     </div>
                     <div>
