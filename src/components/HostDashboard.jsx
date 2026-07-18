@@ -2535,8 +2535,10 @@ const HostDashboard = () => {
     { id: 'properties', icon: Building, label: t?.myProperties || (language === 'বাংলা' ? 'আমার বাসাসমূহ' : "My Properties") },
     { id: 'inquiries', icon: Zap, label: t?.inquiries || (language === 'বাংলা' ? 'যোগাযোগ সমূহ' : "Inquiries") },
     { id: 'messages', icon: MessageCircle, label: t?.messages || (language === 'বাংলা' ? 'বার্তা' : "Messages"), isLink: true, path: '/messages' },
-    { id: 'bookings', icon: Calendar, label: t?.bookings || (language === 'বাংলা' ? 'বুকিং' : "Bookings") },
-    { id: 'rent',     icon: Wallet,   label: language === 'বাংলা' ? 'ভাড়া কালেকশন' : "Rent Collection" },
+    // Bookings + Rent Collection share the same `bookings` data and now live
+    // under ONE sidebar entry; a segmented toggle at the top of the view
+    // switches between the two (setActiveTab still uses 'bookings' | 'rent').
+    { id: 'bookings', icon: Calendar, label: language === 'বাংলা' ? 'বুকিং ও রেন্ট' : "Bookings & Rent" },
     { id: 'payments', icon: CreditCard, label: language === 'বাংলা' ? 'পেমেন্ট সেটিংস' : 'Payment Settings' },
     { id: 'smartAlerts', icon: BellRing, label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্টস' : 'Smart Alerts' },
     { id: 'aiInsights',  icon: Sparkles, label: language === 'বাংলা' ? 'এআই ইনসাইটস'   : 'AI Insights' },
@@ -2719,7 +2721,8 @@ const HostDashboard = () => {
 
         <nav className="flex-1 px-3 space-y-1 overflow-y-auto custom-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {menuItems.map((item) => {
-             const isActive = activeTab === item.id && !item.isLink;
+             // 'bookings' entry stays active for its Rent Collection sub-view too.
+             const isActive = !item.isLink && (activeTab === item.id || (item.id === 'bookings' && activeTab === 'rent'));
              // Premium feature locked after trial expires → click sends
              // the host to /subscription with a `from` param so the page
              // can highlight exactly which feature triggered the gate.
@@ -4424,6 +4427,32 @@ const HostDashboard = () => {
             collection summaries, overdue list) lives on the new
             `rent` tab — they share the same `bookings` state + helpers, so
             both tabs always reflect the same source of truth. */}
+        {/* Combined section toggle — Booking ⇄ Rent Collection. Both views use
+            the same `bookings` state, so they share one sidebar entry with this
+            segmented switch pinned on top. */}
+        {(activeTab === 'bookings' || activeTab === 'rent') && (
+          <div className="w-full mb-4 md:mb-5 animate-in fade-in duration-300">
+            <div className="flex items-stretch gap-1.5 p-1.5 rounded-2xl bg-white shadow-[0_2px_12px_rgba(0,0,0,0.05)] border border-gray-100">
+              {[
+                { id: 'bookings', label: language === 'বাংলা' ? 'বুকিং' : 'Booking' },
+                { id: 'rent', label: language === 'বাংলা' ? 'রেন্ট কালেকশন' : 'Rent Collection' },
+              ].map(({ id, label }) => {
+                const on = activeTab === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setActiveTab(id)}
+                    className={`flex-1 flex items-center justify-center py-3.5 sm:py-4 rounded-xl text-sm sm:text-base font-black tracking-tight transition-all duration-300 ${on ? 'bg-gradient-to-r from-[#ba0036] to-[#ff004c] text-white shadow-[0_8px_22px_rgba(186,0,54,0.35)]' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'bookings' && (() => {
           const todayDate = today;
           const leaseSummary = getLeaseSummary(bookings, todayDate);
