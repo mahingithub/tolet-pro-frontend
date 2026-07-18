@@ -2275,7 +2275,10 @@ const HostDashboard = () => {
       advancePayment: '',
       paymentMethod: 'bKash',
       occupants: '',
-      dealType: properties[0]?.intent === 'commercial' ? 'commercial' : 'residential',
+      // Blank "New Lease" always opens on the RESIDENTIAL form first; the host
+      // taps "Commercial Area / Lease" to switch. (Converting a commercial
+      // inquiry still opens commercial — that path is context-driven.)
+      dealType: 'residential',
       businessName: '',
       licenseNumber: '',
       leaseTermMonths: properties[0]?.intent === 'commercial' ? '24' : '',
