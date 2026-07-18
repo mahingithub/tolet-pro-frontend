@@ -21,7 +21,7 @@ import { propertyService, subscribeUserProperties } from '../services/Propertyse
 import { getDynamicFields } from '../constants/propertyFields';
 import { subscriptionService } from '../services/subscriptionService';
 import { listHostInquiries, updateInquiryStatus, deleteInquiry, replyToInquiry, respondVisit, proposeVisit } from "../services/inquiryService.js";
-import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi, cancelBooking as cancelBookingApi, updateBookingSettings as updateBookingSettingsApi } from "../services/bookingService.js";
+import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi, cancelBooking as cancelBookingApi, updateBookingSettings as updateBookingSettingsApi, updateMemberLedger as updateMemberLedgerApi, undoMemberLedger as undoMemberLedgerApi } from "../services/bookingService.js";
 import { getRoomTypes, firstRoomTypeId, roomLabel } from '../constants/roomCategories';
 import MembersManager from "./MembersManager.jsx";
 import { listMyPaymentMethods } from "../services/paymentMethodService.js";
@@ -436,6 +436,44 @@ const todayIso = () => {
 // bookings stay classic single-tenant. Gates the MembersManager UI + the
 // new-booking seat section.
 const isHostelBooking = (b) => !!(b && b.propertyType === 'hostel');
+
+// Equal room-rent split for one seat — mirrors MembersManager. The room rent
+// (booking.monthlyRent) is divided across the active seats: ৳6000 ÷ 4 = ৳1500,
+// ÷ 2 = ৳3000. A seat keeps its OWN explicit rent when the host set one, except
+// the legacy artifact where a multi-seat seat "inherited" the full room rent
+// (that is really un-split, so we divide it).
+const seatShare = (booking, member, activeCount) => {
+  const roomRent = Number(booking?.monthlyRent) || 0;
+  const explicit = Number(member?.monthlyRent) || 0;
+  if (explicit > 0 && !(activeCount > 1 && explicit === roomRent)) return explicit;
+  return activeCount > 0 ? Math.round(roomRent / activeCount) : roomRent;
+};
+
+// Expand a booking into rent UNITS for Rent Collection: ONE unit per active
+// member — carrying that member's split share, own ledger, name + avatar — or
+// the booking itself when it has no members. So a hostel room with roommates
+// shows each occupant as their own uniform card with their divided rent, and
+// the KPI totals count per person. Units carry __realId + __memberId so the
+// mark-paid flow writes to the correct member ledger.
+const rentUnitsOf = (booking) => {
+  const mems = Array.isArray(booking?.members) ? booking.members.filter((m) => m && m.status !== 'moved-out') : [];
+  if (mems.length === 0) return [booking];
+  return mems.map((m, i) => ({
+    ...booking,
+    // Unique row id even before a freshly-added member has a server id (index
+    // fallback avoids React key collisions); __memberId stays the real id (or
+    // null → routes to the booking ledger) for the mark-paid API.
+    id: `${booking.id}::${m.id || i}`,
+    __realId: booking.id,
+    __memberId: m.id || null,
+    members: undefined,
+    tenant: m.name || booking.tenant,
+    tenantAvatar: m.avatar || booking.tenantAvatar,
+    tenantInit: (String(m.name || booking.tenant || '?').trim().charAt(0) || '?').toUpperCase(),
+    monthlyRent: seatShare(booking, m, mems.length),
+    ledger: m.ledger || {},
+  }));
+};
 
 // The property formats the New Lease form supports. Hostel is multi-member
 // (seats); the rest are classic single-tenant.
@@ -941,6 +979,7 @@ const HostDashboard = () => {
   // `status` is the choice carried across steps; downstream handlers branch on it.
   const [payForm, setPayForm] = useState({
     bookingId: null,
+    memberId: null,                // set when marking a specific hostel seat's rent
     monthKey: '',
     step: 'choose',                // 'choose' | 'form'
     status: 'full',                // 'full' | 'partial' | 'due'
@@ -1775,7 +1814,11 @@ const HostDashboard = () => {
     if (existing?.status === 'partial') initialStatus = 'partial';
     else if (existing?.status === 'due') initialStatus = 'due';
     setPayForm({
-      bookingId: booking.id,
+      // Rent rows are per-occupant "units" (see rentUnitsOf): __realId is the
+      // real booking, __memberId the seat. Fall back to the plain id for
+      // single-tenant bookings that render the booking directly.
+      bookingId: booking.__realId || booking.id,
+      memberId: booking.__memberId || null,
       monthKey: key,
       step: startStep,
       status: initialStatus,
@@ -1815,12 +1858,17 @@ const HostDashboard = () => {
   //   body: { status, paid, paidOn, method, txnId, amount, balance }
   //   On success the server emits a webhook to /api/tenants/{id}/receipts.
   const submitMarkPaid = () => {
-    const { bookingId, monthKey: key, status, paidOn, method, txnId, amount, dueNote, expectedPayBy } = payForm;
+    const { bookingId, memberId, monthKey: key, status, paidOn, method, txnId, amount, dueNote, expectedPayBy } = payForm;
     if (!bookingId || !key) return;
     const booking = bookings.find(b => b.id === bookingId);
     if (!booking) return;
 
-    const expected = Number(booking.monthlyRent || 0);
+    // Marking a hostel seat's rent → target that member (their split share +
+    // own ledger). Otherwise it's the whole booking (room / single tenant).
+    const activeMems = Array.isArray(booking.members) ? booking.members.filter(m => m && m.status !== 'moved-out') : [];
+    const payMember = memberId ? activeMems.find(m => m.id === memberId) : null;
+    const payName = payMember?.name || booking.tenant;
+    const expected = payMember ? seatShare(booking, payMember, activeMems.length) : Number(booking.monthlyRent || 0);
     const amt = Number(amount) || 0;
 
     // ── Branch validation ──────────────────────────────────────────────────
@@ -1853,10 +1901,13 @@ const HostDashboard = () => {
       ? { paid: false, status: 'due', dueNote: dueNote.trim(), expectedPayBy, amount: 0, balance }
       : { paid: true, status, paidOn, method, txnId, amount: amt, balance };
 
-    setBookings(prev => prev.map(b => b.id === bookingId
-      ? { ...b, ledger: { ...(b.ledger || {}), [key]: entry } }
-      : b
-    ));
+    setBookings(prev => prev.map(b => {
+      if (b.id !== bookingId) return b;
+      if (payMember) {
+        return { ...b, members: (b.members || []).map(m => m.id === memberId ? { ...m, ledger: { ...(m.ledger || {}), [key]: entry } } : m) };
+      }
+      return { ...b, ledger: { ...(b.ledger || {}), [key]: entry } };
+    }));
 
     // Receipt is created/updated (or cleared for 'due') server-side by the
     // ledger API call below — no local receipt handling needed.
@@ -1865,8 +1916,8 @@ const HostDashboard = () => {
     const monthLabel = monthFullLabel(key, language);
     if (status === 'full') {
       showToast(language === 'বাংলা'
-        ? `${monthLabel} এর সম্পূর্ণ ভাড়া পেইড — ${booking.tenant} কে রিসিট পাঠানো হয়েছে`
-        : `${monthLabel} fully paid — receipt sent to ${booking.tenant}`);
+        ? `${monthLabel} এর সম্পূর্ণ ভাড়া পেইড — ${payName} কে রিসিট পাঠানো হয়েছে`
+        : `${monthLabel} fully paid — receipt sent to ${payName}`);
     } else if (status === 'partial') {
       showToast(language === 'বাংলা'
         ? `${monthLabel} এ আংশিক পেমেন্ট সেভ — বাকি ${formatBDT(balance)}`
@@ -1878,11 +1929,11 @@ const HostDashboard = () => {
     }
 
     const bookingMongoId = booking._id || bookingId;
-    updateLedgerApi(bookingMongoId, key, {
-      ...entry,
-      monthLabel: monthFullLabel(key, language),
-      totalDue: expected,
-    }).catch(err => {
+    const apiBody = { ...entry, monthLabel: monthFullLabel(key, language), totalDue: expected };
+    (payMember
+      ? updateMemberLedgerApi(bookingMongoId, memberId, key, apiBody)
+      : updateLedgerApi(bookingMongoId, key, apiBody)
+    ).catch(err => {
       console.warn('[host] mark paid sync failed:', err.message || err);
     });
 
@@ -1893,21 +1944,31 @@ const HostDashboard = () => {
   // Also pulls the receipt from the tenant's inbox so they don't see a
   // stale "Paid" notification for a payment that never happened.
   // TODO(backend): DELETE /api/host/bookings/{bookingId}/ledger/{monthKey}
-  const undoMarkPaid = (bookingId, key) => {
+  const undoMarkPaid = (bookingId, key, memberId = null) => {
     const booking = bookings.find(b => b.id === bookingId);
+    const activeMems = Array.isArray(booking?.members) ? booking.members.filter(m => m && m.status !== 'moved-out') : [];
+    const undoMember = memberId ? activeMems.find(m => m.id === memberId) : null;
     setBookings(prev => prev.map(b => {
       if (b.id !== bookingId) return b;
+      if (undoMember) {
+        return { ...b, members: (b.members || []).map(m => {
+          if (m.id !== memberId) return m;
+          const nx = { ...(m.ledger || {}) };
+          delete nx[key];
+          return { ...m, ledger: nx };
+        }) };
+      }
       const next = { ...(b.ledger || {}) };
       delete next[key];
       return { ...b, ledger: next };
     }));
-    // The receipt is removed server-side by undoLedgerApi() below.
+    // The receipt is removed server-side by the undo API call below.
     showToast(language === 'বাংলা' ? 'পেমেন্ট রেকর্ড মুছে ফেলা হয়েছে — রিসিটও সরানো হয়েছে' : 'Payment record removed — receipt withdrawn');
     setActiveModal(null);
 
     if (booking) {
       const mongoId = booking._id || bookingId;
-      undoLedgerApi(mongoId, key).catch(err => {
+      (undoMember ? undoMemberLedgerApi(mongoId, memberId, key) : undoLedgerApi(mongoId, key)).catch(err => {
         console.warn('[host] undo ledger sync failed:', err.message || err);
       });
     }
@@ -4870,7 +4931,12 @@ const HostDashboard = () => {
             Only the rendering layer is compact-mode. */}
         {activeTab === 'rent' && (() => {
           const todayDate = today;
-          const sm = getMonthCollectionSummary(bookings, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
+          // Rent Collection counts one unit per occupant: expand each booking
+          // into its active members (each carrying their split share + own
+          // ledger), so the KPI hero + overdue list are per person and match the
+          // per-roommate cards below.
+          const rentUnits = bookings.flatMap(rentUnitsOf);
+          const sm = getMonthCollectionSummary(rentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
           const collectedPct = sm.expectedTotal > 0 ? Math.min(100, Math.round((sm.collectedTotal / sm.expectedTotal) * 100)) : 0;
           const yearMonths = Array.from({ length: 12 }, (_, i) => monthKey(ledgerYear, i + 1));
           // Bucket tenants by their CURRENT-month rent state — drives the
@@ -4910,12 +4976,16 @@ const HostDashboard = () => {
             if (!viewingPastYear && computeLeaseStage(b, today) === 'done') return false;
             return true;
           });
-          const filteredBookings = yearBookings.filter(b => {
+          // One card per occupant: expand each in-scope booking into its active
+          // members (each carrying their divided share + own ledger). Bookings
+          // without members render as a single card exactly as before.
+          const rentRows = yearBookings.flatMap(rentUnitsOf);
+          const filteredBookings = rentRows.filter(b => {
             if (!matchesQuery(b)) return false;
             if (rentPriorityFilter === 'all') return true;
             return tenantBucket(b) === rentPriorityFilter;
           });
-          const counts = yearBookings.reduce((acc, b) => { const k = tenantBucket(b); acc[k] = (acc[k] || 0) + 1; return acc; }, {});
+          const counts = rentRows.reduce((acc, b) => { const k = tenantBucket(b); acc[k] = (acc[k] || 0) + 1; return acc; }, {});
           // Auto-pin: overdue + partial when filter is "all" — the rows the
           // host actually needs to do something about.
           const attentionRent = rentPriorityFilter === 'all'
@@ -4999,12 +5069,18 @@ const HostDashboard = () => {
                           {language === 'বাংলা' ? 'ফ্লোর' : 'Floor'} {booking.floorNumber}
                         </span>
                       )}
+                      {/* Residential / Commercial property badge */}
+                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 inline-flex items-center gap-0.5 ${booking.dealType === 'commercial' ? 'bg-violet-50 text-violet-700 border-violet-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                        {booking.dealType === 'commercial'
+                          ? (<>🏢<span className="hidden sm:inline"> {language === 'বাংলা' ? 'কমার্শিয়াল' : 'Commercial'}</span></>)
+                          : (<>🏠<span className="hidden sm:inline"> {language === 'বাংলা' ? 'আবাসিক' : 'Residential'}</span></>)}
+                      </span>
                       <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 inline-flex items-center gap-0.5 ${theme.cls}`}>
                         {theme.icon} <span className="hidden sm:inline">{theme.label}</span>
                       </span>
                     </div>
                     <p className="text-[10px] font-bold text-gray-500 truncate">
-                      <span className="text-gray-700 font-black">{booking.property}</span>
+                      <span className="text-emerald-600 font-black">{booking.property}</span>
                       {booking.roomNumber && (
                         <>
                           <span className="mx-1 text-gray-300">·</span>
@@ -6346,7 +6422,7 @@ const HostDashboard = () => {
                     /* Commercial lease — business identity instead of a
                        residential flat/room/hostel category. */
                     <div className="space-y-3">
-                      <div className="rounded-2xl p-3.5 flex items-start gap-2.5 border bg-violet-50/70 border-violet-100">
+                      <div className="rounded-2xl p-3.5 flex items-start gap-2.5 border bg-violet-50 border-violet-100">
                         <span className="text-lg leading-none shrink-0" aria-hidden="true">🏢</span>
                         <div className="min-w-0 flex-1">
                           <p className="text-[10px] font-black uppercase tracking-widest text-violet-700 mb-1">{language === 'বাংলা' ? 'কমার্শিয়াল লিজ' : 'Commercial Lease'}</p>
@@ -6531,8 +6607,9 @@ const HostDashboard = () => {
                       )}
                     </div>
 
-                    {/* Floor number — all formats once a category is chosen. */}
-                    {leaseForm.category && (
+                    {/* Floor number — every residential category AND commercial
+                        leases (a shop/office sits on a floor too). */}
+                    {(leaseForm.category || leaseForm.dealType === 'commercial') && (
                       <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ফ্লোর নম্বর' : 'Floor Number'}</label>
                         <input type="text" value={leaseForm.floorNumber} onChange={e => setLeaseForm(f => ({ ...f, floorNumber: e.target.value }))} placeholder={language === 'বাংলা' ? 'যেমন ৩য়' : 'e.g. 3rd'} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
@@ -6733,14 +6810,17 @@ const HostDashboard = () => {
                 if (!booking) return null;
                 // Real occupant (a member who joined via invite) over the stale
                 // typed tenant — keeps this modal consistent with the rent card.
-                const mpMembers = Array.isArray(booking.members) ? booking.members.filter(m => m && m.status !== 'moved-out') : [];
-                const mpTenant = String(mpMembers[0]?.name || booking.tenant || (language === 'বাংলা' ? 'ভাড়াটিয়া' : 'Tenant')).trim();
+                // Per-seat when marking a hostel member's rent: show that
+                // member's name + their split share + their own ledger entry.
+                const mpActive = Array.isArray(booking.members) ? booking.members.filter(m => m && m.status !== 'moved-out') : [];
+                const mpMember = payForm.memberId ? mpActive.find(m => m.id === payForm.memberId) : null;
+                const mpTenant = String(mpMember?.name || booking.tenant || (language === 'বাংলা' ? 'ভাড়াটিয়া' : 'Tenant')).trim();
                 const mpInit = (mpTenant[0] || '?').toUpperCase();
                 const due = getDueDate(payForm.monthKey, booking.rentDueDay);
-                const expected = Number(booking.monthlyRent || 0);
+                const expected = mpMember ? seatShare(booking, mpMember, mpActive.length) : Number(booking.monthlyRent || 0);
                 const amt = Number(payForm.amount) || 0;
                 const balance = payForm.status === 'due' ? expected : Math.max(0, expected - amt);
-                const existing = booking.ledger?.[payForm.monthKey];
+                const existing = mpMember ? (mpMember.ledger?.[payForm.monthKey]) : (booking.ledger?.[payForm.monthKey]);
                 const isEditing = !!existing?.paid || existing?.status === 'due';
 
                 // Per-status visual theme (drives the gradient header + pill colour).
@@ -6854,7 +6934,7 @@ const HostDashboard = () => {
 
                         {isEditing && (
                           <button
-                            onClick={() => undoMarkPaid(booking.id, payForm.monthKey)}
+                            onClick={() => undoMarkPaid(booking.id, payForm.monthKey, payForm.memberId)}
                             className="w-full bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-red-600 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest border border-gray-100 transition-all flex items-center justify-center gap-2"
                           >
                             <XCircle size={14}/> {language === 'বাংলা' ? 'এই মাসের রেকর্ড মুছুন' : 'Remove this month\u2019s record'}
@@ -6979,7 +7059,7 @@ const HostDashboard = () => {
                             {payForm.status === 'due' && <><AlertCircle size={18} strokeWidth={3}/> {language === 'বাংলা' ? 'বকেয়া হিসেবে সেভ' : 'Save as Due'}</>}
                           </button>
                           {isEditing && (
-                            <button onClick={() => undoMarkPaid(booking.id, payForm.monthKey)} className="flex-1 bg-red-50 text-red-600 py-4 rounded-xl font-black hover:bg-red-100 transition-all text-xs flex items-center justify-center gap-1.5 border border-red-100">
+                            <button onClick={() => undoMarkPaid(booking.id, payForm.monthKey, payForm.memberId)} className="flex-1 bg-red-50 text-red-600 py-4 rounded-xl font-black hover:bg-red-100 transition-all text-xs flex items-center justify-center gap-1.5 border border-red-100">
                               <XCircle size={14} /> {language === 'বাংলা' ? 'রেকর্ড মুছুন' : 'Remove'}
                             </button>
                           )}
