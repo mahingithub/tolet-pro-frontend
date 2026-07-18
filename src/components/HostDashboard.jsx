@@ -385,7 +385,13 @@ const getLeaseSummary = (bookings, today = new Date()) => {
     else if (stage === 'done') doneCount += 1;
     if (stage === 'active' || stage === 'notice') {
       totalMonthlyRevenue += Number(b.monthlyRent || 0) + Number(b.serviceCharge || 0);
-      totalSecurityDeposits += Number(b.securityDeposit || 0);
+    }
+    // Deposit / advance is collected up front (the card's "Deposit (Advance)" =
+    // booking.advancePayment) and held until the lease ends — so it counts for
+    // every LIVE lease, DRAFT included, and drops off once done or cancelled.
+    // (`securityDeposit` added too for any data that carries it separately.)
+    if (b.status !== 'cancelled' && stage !== 'done') {
+      totalSecurityDeposits += Number(b.advancePayment || 0) + Number(b.securityDeposit || 0);
     }
   });
   return { totalMonthlyRevenue, activeCount, noticeCount, draftCount, doneCount, totalSecurityDeposits };
@@ -4619,16 +4625,18 @@ const HostDashboard = () => {
 
                     {/* Advance money is shown in the "Deposit (Advance)" tile above. */}
 
-                    {/* Lease term — Move-In · Next Payment · Lease Expiry */}
-                    <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2 sm:gap-3">
-                      <div className="rounded-xl p-2.5 border border-gray-100 bg-white">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><Calendar size={9}/> {language === 'বাংলা' ? 'মুভ-ইন' : 'Move-In'}</p>
-                        <p className="text-[11px] sm:text-xs font-black text-gray-900 mt-0.5">{formatDate(booking.leaseStart, language)}</p>
+                    {/* Lease term — Move-In · Next Payment · Lease Expiry.
+                        3 columns on EVERY width (matches the mobile card design)
+                        instead of stacking to one column on phones. */}
+                    <div className="mt-3 grid grid-cols-3 gap-1.5 sm:gap-3">
+                      <div className="rounded-xl p-2 sm:p-2.5 border border-gray-100 bg-white min-w-0">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><Calendar size={9} className="shrink-0"/> <span className="truncate">{language === 'বাংলা' ? 'মুভ-ইন' : 'Move-In'}</span></p>
+                        <p className="text-[10px] sm:text-xs font-black text-gray-900 mt-0.5">{formatDate(booking.leaseStart, language)}</p>
                       </div>
-                      <div className="rounded-xl p-2.5 border border-gray-100 bg-white">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><Clock size={9}/> {language === 'বাংলা' ? 'পরবর্তী পেমেন্ট' : 'Next Payment'}</p>
-                        <p className="text-[11px] sm:text-xs font-black text-gray-900 mt-0.5">
-                          {next ? formatDate(next.due.toISOString(), language) : (language === 'বাংলা' ? 'কোনো বকেয়া নেই' : 'No upcoming')}
+                      <div className="rounded-xl p-2 sm:p-2.5 border border-gray-100 bg-white min-w-0">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><Clock size={9} className="shrink-0"/> <span className="truncate">{language === 'বাংলা' ? 'পরবর্তী পেমেন্ট' : 'Next Payment'}</span></p>
+                        <p className="text-[10px] sm:text-xs font-black text-gray-900 mt-0.5">
+                          {next ? formatDate(next.due.toISOString(), language) : (language === 'বাংলা' ? 'বকেয়া নেই' : 'No upcoming')}
                         </p>
                         {next && (
                           <p className={`text-[9px] font-bold mt-0.5 ${next.daysFromNow < 0 ? 'text-rose-600' : next.daysFromNow <= (booking.reminderLeadDays || 3) ? 'text-amber-600' : 'text-gray-500'}`}>
@@ -4636,9 +4644,9 @@ const HostDashboard = () => {
                           </p>
                         )}
                       </div>
-                      <div className="rounded-xl p-2.5 border border-gray-100 bg-white">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><CalendarRange size={9}/> {language === 'বাংলা' ? 'লিজ এক্সপায়ারি' : 'Lease Expiry'}</p>
-                        <p className="text-[11px] sm:text-xs font-black text-gray-900 mt-0.5">{formatDate(booking.leaseEnd, language)}</p>
+                      <div className="rounded-xl p-2 sm:p-2.5 border border-gray-100 bg-white min-w-0">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><CalendarRange size={9} className="shrink-0"/> <span className="truncate">{language === 'বাংলা' ? 'লিজ এক্সপায়ারি' : 'Lease Expiry'}</span></p>
+                        <p className="text-[10px] sm:text-xs font-black text-gray-900 mt-0.5">{formatDate(booking.leaseEnd, language)}</p>
                       </div>
                     </div>
 
