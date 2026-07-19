@@ -24,7 +24,8 @@ import {
   LogOut, CheckCircle2, Calendar, Clock, Eye, Send, ThumbsUp, ThumbsDown,
   Inbox, Home, Sparkles, KeyRound, CalendarCheck, DollarSign, Navigation,
   ChevronLeft, Filter, Zap, RefreshCw, Share2,
-  FolderOpen, Lock, Info, Wallet, HeartPulse, Link2
+  FolderOpen, Lock, Info, Wallet, HeartPulse, Link2,
+  Wrench, ChevronRight, ChevronDown
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -192,6 +193,167 @@ const findClosestArea = (lat, lng) => {
   return best;
 };
 
+// ╔════════════════════════════════════════════════════════════════════════╗
+// ║  QUICK_SEARCH_AREAS + BUDGET_OPTIONS — power the overview Quick Search. ║
+// ║  Each area's slug maps 1:1 to the listing route (`/properties/<slug>`)  ║
+// ║  and the budget ids match the buckets PropertyListing already parses    ║
+// ║  (under_10k / 10k_20k / 20k_50k / above_50k). Kept in sync with the     ║
+// ║  home hero so a deep link behaves identically from either surface.      ║
+// ╚════════════════════════════════════════════════════════════════════════╝
+const QUICK_SEARCH_AREAS = [
+  { slug: 'dhanmondi',   en: 'Dhanmondi',   bn: 'ধানমন্ডি' },
+  { slug: 'gulshan',     en: 'Gulshan',     bn: 'গুলশান' },
+  { slug: 'banani',      en: 'Banani',      bn: 'বনানী' },
+  { slug: 'bashundhara', en: 'Bashundhara', bn: 'বসুন্ধরা' },
+  { slug: 'mirpur',      en: 'Mirpur',      bn: 'মিরপুর' },
+  { slug: 'mohammadpur', en: 'Mohammadpur', bn: 'মোহাম্মদপুর' },
+  { slug: 'uttara',      en: 'Uttara',      bn: 'উত্তরা' },
+];
+
+const BUDGET_OPTIONS = [
+  { id: '',          en: 'Any budget',  bn: 'যেকোনো বাজেট' },
+  { id: 'under_10k', en: 'Under ৳10k',  bn: '৳১০k এর নিচে' },
+  { id: '10k_20k',   en: '৳10k – ৳20k', bn: '৳১০k – ৳২০k' },
+  { id: '20k_50k',   en: '৳20k – ৳50k', bn: '৳২০k – ৳৫০k' },
+  { id: 'above_50k', en: 'Above ৳50k',  bn: '৳৫০k এর উপরে' },
+];
+
+// Localised month labels for the rent-proof month strip.
+const RENT_MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const RENT_MONTHS_BN = ['জানু', 'ফেব', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগ', 'সেপ্ট', 'অক্টো', 'নভে', 'ডিসে'];
+
+const RENT_MS_DAY = 86400000;
+const rentStartOfDay = (v) => {
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return null;
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+const rentMonthKey = (y, m0) => `${y}-${String(m0 + 1).padStart(2, '0')}`;
+
+// ╔════════════════════════════════════════════════════════════════════════╗
+// ║  getBookingRentSnapshot — the single source of truth for the tenant's   ║
+// ║  rent status. Pure (no React). Given a booking, the tenant's receipts,  ║
+// ║  a calendar year and "today", it returns:                               ║
+// ║    months[]     → 12 entries, each with a status the UI colour-codes     ║
+// ║                   (paid | partial | submitted | overdue | due |          ║
+// ║                    upcoming | inactive)                                  ║
+// ║    paidCount    → paid months within the lease this year                 ║
+// ║    activeCount  → months this year that fall inside the lease            ║
+// ║    outstanding  → total unpaid amount up to & including this month        ║
+// ║    current      → this month's { total, paid, remaining, daysLate }      ║
+// ║                                                                          ║
+// ║  Status is derived from the booking ledger FIRST (server truth), then    ║
+// ║  reconciled against receipts, then finally against the due-date + grace  ║
+// ║  window — mirroring rentAlerts.js so the overview never disagrees with   ║
+// ║  Smart Alerts.                                                           ║
+// ╚════════════════════════════════════════════════════════════════════════╝
+function getBookingRentSnapshot(booking, receipts = [], year, today = new Date()) {
+  const rent = Math.max(Number(booking?.monthlyRent) || 0, 0);
+  const service = Math.max(Number(booking?.serviceCharge) || 0, 0);
+  const perMonth = rent + service;
+  const dueDay = Math.min(Math.max(Number(booking?.rentDueDay) || 5, 1), 28);
+  const grace = Math.max(Number(booking?.gracePeriodDays) || 0, 0);
+  const ledger = booking?.ledger || {};
+  const t0 = rentStartOfDay(today) || new Date();
+
+  // Receipts for THIS booking's property, keyed by monthKey.
+  const rcptByMonth = {};
+  for (const r of (receipts || [])) {
+    if (!r?.monthKey) continue;
+    if (booking?.property && r.propertyTitle && r.propertyTitle !== booking.property) continue;
+    rcptByMonth[r.monthKey] = r;
+  }
+
+  const monthFloor = (iso) => {
+    const d = iso ? new Date(iso) : null;
+    return d && !isNaN(d.getTime()) ? new Date(d.getFullYear(), d.getMonth(), 1) : null;
+  };
+  const leaseStartMonth = monthFloor(booking?.leaseStart);
+  const leaseEndMonth = monthFloor(booking?.leaseEnd);
+
+  const months = [];
+  let paidCount = 0;
+  let activeCount = 0;
+  let outstanding = 0;
+
+  for (let m = 0; m < 12; m++) {
+    const key = rentMonthKey(year, m);
+    const monthStart = new Date(year, m, 1);
+    const dueDate = new Date(year, m, dueDay);
+    const inLease =
+      (!leaseStartMonth || monthStart >= leaseStartMonth) &&
+      (!leaseEndMonth || monthStart <= leaseEndMonth);
+
+    const entry = ledger[key] || null;
+    const rcpt = rcptByMonth[key] || null;
+    const rcptPaid = rcpt ? (Number(rcpt.totalPaid) || 0) : 0;
+    const rcptBalance = rcpt
+      ? Number(rcpt.balance ?? ((Number(rcpt.totalDue) || 0) - rcptPaid))
+      : null;
+
+    const isPaid =
+      (entry && (entry.paid === true || entry.status === 'full')) ||
+      (rcpt && (rcpt.status === 'full' || (rcptBalance != null && rcptBalance <= 0)));
+    const isSubmitted = !isPaid && entry && entry.status === 'submitted';
+    const isPartial =
+      !isPaid && ((entry && entry.status === 'partial') || (rcpt && rcptPaid > 0 && rcptBalance > 0));
+
+    let paidAmt = 0;
+    if (isPaid) paidAmt = rcpt ? (rcptPaid || perMonth) : perMonth;
+    else if (isPartial) paidAmt = rcptPaid;
+    const remaining = Math.max(perMonth - paidAmt, 0);
+
+    let status;
+    if (!inLease) status = 'inactive';
+    else if (isPaid) status = 'paid';
+    else if (isSubmitted) status = 'submitted';
+    else if (isPartial) status = 'partial';
+    else {
+      const graceEnd = new Date(dueDate);
+      graceEnd.setDate(graceEnd.getDate() + grace);
+      if (t0 > graceEnd) status = 'overdue';
+      else if (t0 >= dueDate) status = 'due';
+      else status = 'upcoming';
+    }
+
+    if (inLease) {
+      activeCount += 1;
+      if (status === 'paid') paidCount += 1;
+      const isPastOrCurrent =
+        year < t0.getFullYear() || (year === t0.getFullYear() && m <= t0.getMonth());
+      if (isPastOrCurrent && status !== 'paid' && status !== 'submitted') outstanding += remaining;
+    }
+
+    months.push({ key, monthIndex: m, status, perMonth, paidAmt, remaining, dueDate, inLease });
+  }
+
+  // Current-month summary — only meaningful when viewing the current year.
+  let current = null;
+  if (year === t0.getFullYear()) {
+    const cm = months[t0.getMonth()];
+    const daysLate =
+      cm.status === 'overdue' || cm.status === 'due'
+        ? Math.max(Math.round((t0 - cm.dueDate) / RENT_MS_DAY), 0)
+        : 0;
+    current = { ...cm, daysLate };
+  }
+
+  return { months, paidCount, activeCount, outstanding, perMonth, current };
+}
+
+// Sum of every active lease's outstanding rent (this year, up to this month).
+// Drives the "Due Amount" stat card on the overview.
+function computeTenantDue(bookings = [], receipts = [], today = new Date()) {
+  const y = (today instanceof Date && !isNaN(today.getTime()) ? today : new Date()).getFullYear();
+  let due = 0;
+  for (const b of (bookings || [])) {
+    if (!b || b.status === 'cancelled' || b.deletedAt) continue;
+    due += getBookingRentSnapshot(b, receipts, y, today).outstanding;
+  }
+  return due;
+}
+
 // ────────────────────────────────────────────────────────────────────────
 // NearbyAreaSuggestion — the "AI"-flavoured location hint shown below the
 // "Browse all properties" CTA in the overview. Reads the device's coarse
@@ -203,29 +365,6 @@ const findClosestArea = (lat, lng) => {
 const NearbyAreaSuggestion = ({ language }) => {
   const [area, setArea] = React.useState(null);
   const [denied, setDenied] = React.useState(false);
-
-  React.
-  // Setup real-time socket listeners for inquiry and visit updates
-  useEffect(() => {
-    const socket = callProvider.getSocket();
-    if (!socket) return;
-
-    const handleUpdate = () => {
-      fetchMyInquiries(); // simply refresh inquiries
-    };
-
-    socket.on('inquiry:status_updated', handleUpdate);
-    socket.on('visit:scheduled', handleUpdate);
-    socket.on('visit:cancelled', handleUpdate);
-    socket.on('rent:updated', handleUpdate); // deal confirmed
-
-    return () => {
-      socket.off('inquiry:status_updated', handleUpdate);
-      socket.off('visit:scheduled', handleUpdate);
-      socket.off('visit:cancelled', handleUpdate);
-      socket.off('rent:updated', handleUpdate);
-    };
-  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !navigator.geolocation || !navigator.permissions) {
@@ -498,6 +637,39 @@ const TenantDashboard = () => {
       cancelled = true;
       clearInterval(interval);
     };
+  }, []);
+
+  // 🟢 Real-time refresh — when the landlord accepts/updates an inquiry,
+  // schedules a visit, or updates rent, the socket pushes an event and we
+  // re-pull the affected data so the tenant sees it within a second instead
+  // of waiting for the 30s poll. (Previously this listener lived — broken —
+  // inside NearbyAreaSuggestion and called an undefined `fetchMyInquiries`,
+  // which threw the moment any of these events fired.)
+  useEffect(() => {
+    const socket = callProvider.getSocket();
+    if (!socket) return undefined;
+
+    const refreshInquiries = async () => {
+      if (!getCurrentToken()) return;
+      try {
+        const rows = await listMyInquiries();
+        setMyInquiries(rows);
+      } catch { /* poll will catch up */ }
+    };
+    const refreshRent = () => { refreshRentData(); };
+
+    socket.on('inquiry:status_updated', refreshInquiries);
+    socket.on('visit:scheduled', refreshInquiries);
+    socket.on('visit:cancelled', refreshInquiries);
+    socket.on('rent:updated', refreshRent);
+
+    return () => {
+      socket.off('inquiry:status_updated', refreshInquiries);
+      socket.off('visit:scheduled', refreshInquiries);
+      socket.off('visit:cancelled', refreshInquiries);
+      socket.off('rent:updated', refreshRent);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 🟢 NEW: hydrate the tenant's bookings on mount + poll every 30s so a
@@ -1359,6 +1531,19 @@ const handleWizardSubmit = async (payload) => {
 
   const unreadReceiptsCount = paymentReceipts.filter(r => !r.read).length;
 
+  // 🟢 Overview rent summary — active leases drive both the "Due Amount"
+  // stat card and the Payment Proof rent tracker below. Kept as memoised
+  // derivations so the overview never recomputes on unrelated re-renders.
+  const activeLeases = useMemo(
+    () => (myBookings || []).filter((b) => b && b.status !== 'cancelled' && !b.deletedAt),
+    [myBookings],
+  );
+  const primaryLease = activeLeases[0] || null;
+  const totalDueAmount = useMemo(
+    () => computeTenantDue(activeLeases, paymentReceipts, new Date()),
+    [activeLeases, paymentReceipts],
+  );
+
   const downloadModernPdf = async (receipt) => {
     if (!pdfReceiptRef.current) return;
     const toastId = toast.loading(language === 'বাংলা' ? 'PDF জেনারেট হচ্ছে...' : 'Generating PDF...');
@@ -1499,7 +1684,51 @@ const handleWizardSubmit = async (payload) => {
             header. Since this is the tenant surface, there is intentionally
             NO "Add Property" or list-FAB here — tenants list nothing. */}
 
-        <div className="flex items-center gap-3 md:gap-4 z-10 ml-auto">
+        <div className="flex items-center gap-2 md:gap-3 z-10 ml-auto">
+          {/* Roommate Wallet — shared-cost hub (/living). Icon-only on phones,
+              full pill on md+ so the small header never overflows. */}
+          <Link
+            to="/living"
+            className="group flex items-center gap-2 p-2 md:pr-3.5 bg-white/60 rounded-xl border border-white/80 shadow-sm hover:shadow-md hover:bg-white transition-all active:scale-95"
+            title={language === 'বাংলা' ? 'রুমমেট ওয়ালেট' : 'Roommate Wallet'}
+          >
+            <span className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 group-hover:scale-105 transition-transform">
+              <Wallet size={14} strokeWidth={2.5} />
+            </span>
+            <span className="hidden md:block text-left leading-none">
+              <span className="block text-[11px] font-black text-gray-800">{language === 'বাংলা' ? 'রুমমেট ওয়ালেট' : 'Roommate Wallet'}</span>
+              <span className="block text-[8px] font-black text-emerald-500 uppercase tracking-[0.16em] mt-0.5">Living</span>
+            </span>
+          </Link>
+
+          {/* Language toggle — English / বাংলা. Reuses the langRef + isLangOpen
+              plumbing already wired into the click-outside handler. */}
+          <div className="relative" ref={langRef}>
+            <button
+              onClick={() => setIsLangOpen((v) => !v)}
+              className="flex items-center gap-1.5 p-2 md:pl-3 md:pr-2.5 bg-white/60 rounded-xl border border-white/80 shadow-sm hover:bg-white transition-all active:scale-95"
+              title={language === 'বাংলা' ? 'ভাষা' : 'Language'}
+            >
+              <Globe size={16} className="text-gray-500" />
+              <span className="hidden md:block text-[11px] font-black text-gray-700">{language === 'বাংলা' ? 'বাংলা' : 'English'}</span>
+              <ChevronDown size={13} className={`text-gray-400 transition-transform ${isLangOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isLangOpen && (
+              <div className="absolute right-0 mt-2 w-36 bg-white/95 backdrop-blur-3xl border border-white shadow-[0_20px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[100] animate-in fade-in zoom-in-95 origin-top-right">
+                {['English', 'বাংলা'].map((lng) => (
+                  <button
+                    key={lng}
+                    onClick={() => { setLanguage(lng); setIsLangOpen(false); }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[12px] font-black transition-colors ${language === lng ? 'bg-red-50 text-[#ba0036]' : 'text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    {lng === 'বাংলা' ? 'বাংলা' : 'English'}
+                    {language === lng && <Check size={14} />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Notifications — host-style chip with ping. */}
           <div className="relative cursor-pointer" ref={notifRef}>
             <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="p-2 bg-white/60 rounded-xl hover:bg-white transition-all border border-white/80 shadow-sm relative group">
@@ -1742,30 +1971,154 @@ const handleWizardSubmit = async (payload) => {
               </div>
             )}
 
-            {/* Quick actions — one-tap jumps to the tenant's key surfaces.
-                Roommate Wallet (shared-cost hub at /living) + Messages are the
-                highlighted shortcuts; clean soft-tint tiles (light + dark). */}
-            <div className="mb-5 md:mb-7 grid grid-cols-5 gap-2 sm:gap-3 md:gap-4">
+            {/* ── STAT CARDS — Saved · Inquiries · Payments · Due Amount ──
+                2-up on phones, 4-up on desktop. Each tile is a tap-target that
+                drills into the matching tab. The Due Amount tile carries a
+                dark accent so an outstanding balance is impossible to miss. */}
+            <div className="mb-4 md:mb-6 grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
               {[
-                { label: language === 'বাংলা' ? 'রুমমেট ওয়ালেট' : 'Roommate Wallet', Icon: Wallet,        iconBg: 'bg-emerald-50 border-emerald-100', iconColor: 'text-emerald-600', onClick: () => navigate('/living') },
-                { label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',                 Icon: MessageSquare, iconBg: 'bg-blue-50 border-blue-100',        iconColor: 'text-blue-600',    onClick: () => navigate('/messages') },
-                { label: language === 'বাংলা' ? 'পেমেন্ট' : 'Payments',               Icon: Receipt,       iconBg: 'bg-indigo-50 border-indigo-100',    iconColor: 'text-indigo-600',  onClick: () => setActiveTab('payments') },
-                { label: language === 'বাংলা' ? 'ইনকোয়ারি' : 'My Inquiries',         Icon: MessageCircle, iconBg: 'bg-violet-50 border-violet-100',    iconColor: 'text-violet-600',  onClick: () => setActiveTab('applications') },
-                { label: language === 'বাংলা' ? 'অ্যালার্ট' : 'Smart Alerts',          Icon: Bell,          iconBg: 'bg-amber-50 border-amber-100',      iconColor: 'text-amber-600',   onClick: () => setActiveTab('alerts') },
-              ].map(({ label, Icon, iconBg, iconColor, onClick }) => (
+                {
+                  id: 'saved', icon: Heart, iconBg: 'bg-rose-100', iconColor: 'text-[#ba0036]', bar: 'bg-[#ba0036]',
+                  label: language === 'বাংলা' ? 'সেভ করা প্রপার্টি' : 'Saved Properties',
+                  sub: language === 'বাংলা' ? 'সেভ করা লিস্টিং দেখুন' : 'View your saved listings',
+                  value: savedProperties.length, onClick: () => setActiveTab('saved'),
+                },
+                {
+                  id: 'applications', icon: MessageCircle, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', bar: 'bg-emerald-500',
+                  label: language === 'বাংলা' ? 'ইনকোয়ারি' : 'Inquiries',
+                  sub: language === 'বাংলা' ? 'যেসব প্রপার্টিতে যোগাযোগ' : 'Properties you inquired',
+                  value: myInquiries.length, onClick: () => setActiveTab('applications'),
+                },
+                {
+                  id: 'payments', icon: DollarSign, iconBg: 'bg-violet-100', iconColor: 'text-violet-600', bar: 'bg-violet-500',
+                  label: language === 'বাংলা' ? 'পেমেন্ট' : 'Payments',
+                  sub: language === 'বাংলা' ? 'মোট পেমেন্ট' : 'Total payments made',
+                  value: paymentReceipts.length, badge: unreadReceiptsCount > 0 ? unreadReceiptsCount : null,
+                  onClick: () => setActiveTab('payments'),
+                },
+              ].map((stat) => (
+                <button
+                  key={stat.id}
+                  onClick={stat.onClick}
+                  className="relative text-left bg-white/90 backdrop-blur-sm p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] border border-white shadow-[0_4px_20px_rgba(15,23,42,0.04)] flex flex-col gap-2 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)] transition-all duration-300 overflow-hidden"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className={`w-10 h-10 md:w-11 md:h-11 rounded-2xl ${stat.iconBg} ${stat.iconColor} flex items-center justify-center shadow-sm`}>
+                      <stat.icon size={18} className="md:w-[20px] md:h-[20px]" strokeWidth={2.4} />
+                    </div>
+                    {stat.badge ? (
+                      <span className="inline-flex items-center gap-1 bg-[#ba0036] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm">
+                        <span className="w-1 h-1 bg-white rounded-full animate-pulse" />{stat.badge}
+                      </span>
+                    ) : null}
+                  </div>
+                  <h3 className="text-2xl md:text-[2rem] font-black text-gray-900 leading-none tabular-nums tracking-tight mt-1">{stat.value}</h3>
+                  <div>
+                    <p className="text-[12px] md:text-sm font-black text-gray-800 leading-tight">{stat.label}</p>
+                    <p className="text-[10px] md:text-[11px] font-bold text-gray-400 leading-tight mt-0.5 truncate">{stat.sub}</p>
+                  </div>
+                  <div className={`h-1 rounded-full ${stat.bar} w-8 md:w-10 mt-0.5`} />
+                </button>
+              ))}
+
+              {/* Due Amount — dark accent tile (mockup's 4th card). Amount is
+                  live from the tenant's active-lease ledger; turns emerald and
+                  reads "All clear" when nothing is owed. */}
+              <button
+                onClick={() => setActiveTab('payments')}
+                className="relative text-left p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] border border-white/10 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.4)] flex flex-col gap-2 hover:-translate-y-0.5 transition-all duration-300 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-[#3a0011]"
+              >
+                <div className="absolute -bottom-10 -right-8 w-32 h-32 rounded-full blur-3xl pointer-events-none bg-amber-500/10" />
+                <div className="relative flex items-start justify-between">
+                  <div className={`w-10 h-10 md:w-11 md:h-11 rounded-2xl flex items-center justify-center shadow-sm ${totalDueAmount > 0 ? 'bg-amber-400/15 text-amber-300' : 'bg-emerald-400/15 text-emerald-300'}`}>
+                    <Wallet size={18} className="md:w-[20px] md:h-[20px]" strokeWidth={2.4} />
+                  </div>
+                </div>
+                <h3 className={`relative text-xl md:text-[1.65rem] font-black leading-none tabular-nums tracking-tight mt-1 ${totalDueAmount > 0 ? 'text-white' : 'text-emerald-300'}`}>
+                  {totalDueAmount > 0
+                    ? `৳${totalDueAmount.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}`
+                    : (language === 'বাংলা' ? 'ক্লিয়ার' : 'All clear')}
+                </h3>
+                <div className="relative">
+                  <p className="text-[12px] md:text-sm font-black text-white leading-tight">{language === 'বাংলা' ? 'বকেয়া' : 'Due Amount'}</p>
+                  <p className="text-[10px] md:text-[11px] font-bold text-white/50 leading-tight mt-0.5 truncate">{language === 'বাংলা' ? 'মোট বকেয়া পরিমাণ' : 'Total amount due'}</p>
+                </div>
+                <div className={`relative h-1 rounded-full w-8 md:w-10 mt-0.5 ${totalDueAmount > 0 ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+              </button>
+            </div>
+
+            {/* ── NAV CARDS — Messages · Services · Smart Alerts ──────────
+                Wider horizontal cards (icon + title + subtitle + chevron).
+                Stack to full-width rows on phones for big tap targets. */}
+            <div className="mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+              {[
+                {
+                  label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',
+                  sub: language === 'বাংলা' ? 'আপনার চ্যাট দেখুন' : 'View your chats',
+                  Icon: MessageSquare, iconBg: 'bg-blue-50 border-blue-100', iconColor: 'text-blue-600',
+                  onClick: () => navigate('/messages'),
+                },
+                {
+                  label: language === 'বাংলা' ? 'সার্ভিস' : 'Services',
+                  sub: language === 'বাংলা' ? 'সার্ভিস রিকোয়েস্ট করুন' : 'Raise or track a service',
+                  Icon: Wrench, iconBg: 'bg-gray-100 border-gray-200', iconColor: 'text-gray-600',
+                  onClick: () => navigate('/support'),
+                },
+                {
+                  label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts',
+                  sub: language === 'বাংলা' ? 'নোটিফিকেশন ম্যানেজ করুন' : 'Manage notifications',
+                  Icon: Bell, iconBg: 'bg-amber-50 border-amber-100', iconColor: 'text-amber-600',
+                  badge: tenantAlertCount > 0 ? tenantAlertCount : null,
+                  onClick: () => setActiveTab('alerts'),
+                },
+              ].map(({ label, sub, Icon, iconBg, iconColor, badge, onClick }) => (
                 <button
                   key={label}
                   type="button"
                   onClick={onClick}
-                  className="group flex flex-col items-center gap-2 p-2.5 sm:p-3 md:p-4 rounded-2xl bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-95 transition-all duration-300"
+                  className="group flex items-center gap-3 p-4 rounded-2xl bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 text-left"
                 >
-                  <span className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-2xl border flex items-center justify-center ${iconBg} ${iconColor} group-hover:scale-110 transition-transform duration-300`}>
-                    <Icon size={18} className="sm:w-5 sm:h-5 md:w-6 md:h-6" strokeWidth={2.4} />
+                  <span className={`relative w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 ${iconBg} ${iconColor} group-hover:scale-105 transition-transform`}>
+                    <Icon size={19} strokeWidth={2.4} />
+                    {badge ? (
+                      <span className="absolute -top-1.5 -right-1.5 bg-[#ba0036] text-white text-[9px] font-black min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center shadow-sm border border-white">{badge}</span>
+                    ) : null}
                   </span>
-                  <span className="text-[9px] sm:text-[11px] md:text-xs font-black text-gray-700 text-center leading-tight">{label}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-black text-gray-900 leading-tight truncate">{label}</span>
+                    <span className="block text-[11px] font-bold text-gray-400 leading-tight mt-0.5 truncate">{sub}</span>
+                  </span>
+                  <ChevronRight size={16} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all shrink-0" />
                 </button>
               ))}
             </div>
+
+            {/* ── PAYMENT PROOF — live rent tracker for the active lease ──
+                Renders only when the tenant has a booking. Year navigator +
+                12-month status strip + this-month summary + one-tap "Pay".
+                Multiple leases: primary shows here, the rest live in Payments. */}
+            {primaryLease && (
+              <div className="mb-4 md:mb-6">
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <div className="w-7 h-7 rounded-lg bg-[#ba0036]/10 text-[#ba0036] flex items-center justify-center"><Receipt size={14} /></div>
+                  <h3 className="text-[13px] font-black text-gray-800 uppercase tracking-[0.14em]">{language === 'বাংলা' ? 'পেমেন্ট প্রুফ' : 'Payment Proof'}</h3>
+                  {activeLeases.length > 1 && (
+                    <button onClick={() => setActiveTab('payments')} className="ml-auto text-[10px] font-black text-[#ba0036] hover:underline">
+                      +{activeLeases.length - 1} {language === 'বাংলা' ? 'আরও লিজ' : 'more'} →
+                    </button>
+                  )}
+                </div>
+                <RentProofCard
+                  booking={primaryLease}
+                  receipts={paymentReceipts}
+                  language={language}
+                  tenantName={loggedInUser}
+                  avatar={authUser?.avatar}
+                  isVerified={isVerified}
+                  onPay={() => setActiveTab('payments')}
+                />
+              </div>
+            )}
 
             {/* ── VERIFICATION REJECTED BANNER ────────────────────────────
                 Surfaces the admin's rejection reason so the user understands
@@ -2013,103 +2366,14 @@ const handleWizardSubmit = async (payload) => {
               </div>
             )}
 
-            {/* ── 3 STAT CARDS — Saved · Applications · Payments ─────────
-                Each card carries: pastel rounded-square icon, big tabular
-                number, a colored underline bar (mockup uses a short
-                colored stripe under the count). Tap → drills into the
-                matching tab. The Applications count uses a stub today
-                (matches the 3-row sample list in the Applications tab);
-                swap to the backend's `GET /api/tenant/applications`
-                response when wiring real data. */}
-            <div className="grid grid-cols-3 gap-3 md:gap-5 mb-5 md:mb-7">
-              {[
-                {
-                  id: 'saved',
-                  icon: Heart,
-                  iconBg: 'bg-rose-100',
-                  iconColor: 'text-[#ba0036]',
-                  label: language === 'বাংলা' ? 'সেভ করা' : 'SAVED',
-                  value: savedProperties.length,
-                  bar: 'bg-[#ba0036]',
-                  onClick: () => setActiveTab('saved'),
-                },
-                {
-                  // 🔵 Same destination as the drawer's "My Inquiries"
-                  // entry — the two used to read as different features
-                  // ("Applications" vs "Inquiries"). Unified copy here so
-                  // the user never has to wonder whether they are the same
-                  // thing. They are.
-                  id: 'applications',
-                  icon: CalendarCheck,
-                  iconBg: 'bg-emerald-100',
-                  iconColor: 'text-emerald-600',
-                  label: language === 'বাংলা' ? 'ইনকোয়ারি' : 'INQUIRIES',
-                  value: myInquiries.length,
-                  bar: 'bg-emerald-500',
-                  onClick: () => setActiveTab('applications'),
-                },
-                {
-                  id: 'payments',
-                  icon: DollarSign,
-                  iconBg: 'bg-violet-100',
-                  iconColor: 'text-violet-600',
-                  label: language === 'বাংলা' ? 'পেমেন্ট' : 'PAYMENTS',
-                  value: paymentReceipts.length,
-                  bar: 'bg-violet-500',
-                  badge: unreadReceiptsCount > 0 ? unreadReceiptsCount : null,
-                  onClick: () => setActiveTab('payments'),
-                },
-              ].map((stat) => (
-                <button
-                  key={stat.id}
-                  onClick={stat.onClick}
-                  className="relative text-left bg-white/90 backdrop-blur-sm p-4 md:p-6 rounded-2xl md:rounded-[1.5rem] border border-white shadow-[0_4px_20px_rgba(15,23,42,0.04)] flex flex-col items-center md:items-start gap-2 md:gap-3 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(15,23,42,0.08)] transition-all duration-300"
-                >
-                  <div className={`w-9 h-9 md:w-11 md:h-11 rounded-2xl ${stat.iconBg} ${stat.iconColor} flex items-center justify-center shadow-sm`}>
-                    <stat.icon size={16} className="md:w-[20px] md:h-[20px]" strokeWidth={2.4} />
-                  </div>
-                  <p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-[0.14em] leading-tight">{stat.label}</p>
-                  <div className="flex items-end gap-2">
-                    <h3 className="text-3xl md:text-[2.75rem] font-black text-gray-900 leading-none tabular-nums tracking-tight">{stat.value}</h3>
-                    {stat.badge ? (
-                      <span className="inline-flex items-center gap-1 bg-[#ba0036] text-white text-[8px] md:text-[10px] font-black px-1.5 md:px-2 py-0.5 rounded-full mb-1 shadow-sm">
-                        <span className="w-1 h-1 bg-white rounded-full animate-pulse" />
-                        {stat.badge}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className={`h-1 rounded-full ${stat.bar} w-8 md:w-10 mt-0.5`} />
-                </button>
-              ))}
-            </div>
+            {/* Stat cards + nav cards + Payment Proof now render at the top of
+                the overview (right after the "Add landlord" banner). */}
 
-            {/* ── QUICK SEARCH — single CTA, plus an AI-detected
-                location suggestion line. We read the device's coarse
-                location (Geolocation API, prompts the user once and
-                caches), reverse-geocode the closest popular area, and
-                surface it as "Looking around <Area>? See nearby homes →".
-                Falls back gracefully (no permission / no API key) to a
-                generic suggestion string so the card layout is stable. */}
-            <div className="mb-5 md:mb-7 rounded-[1.5rem] md:rounded-[2rem] border border-white bg-white/95 backdrop-blur-sm shadow-[0_4px_20px_rgba(15,23,42,0.04)] p-5 md:p-7">
-              <p className="text-[10px] font-black text-[#ba0036] uppercase tracking-[0.18em] mb-1">{language === 'বাংলা' ? 'কুইক সার্চ' : 'Quick Search'}</p>
-              <h3 className="text-xl md:text-2xl font-black text-gray-900 mb-4">
-                {language === 'বাংলা' ? 'আপনার পরবর্তী বাড়ি খুঁজুন' : 'Find your next home'}
-              </h3>
-              <Link
-                to="/properties/all"
-                className="w-full inline-flex items-center justify-center gap-2 bg-[#ba0036] hover:bg-[#90002a] text-white py-3.5 md:py-4 rounded-2xl font-black text-sm shadow-[0_10px_25px_rgba(186,0,54,0.25)] hover:shadow-[0_14px_30px_rgba(186,0,54,0.35)] transition-all"
-              >
-                <Search size={16} /> {language === 'বাংলা' ? 'সব প্রপার্টি দেখুন' : 'Browse all properties'} <ArrowRight size={14} />
-              </Link>
-
-              {/* AI suggestion line — reads the tenant's coarse location
-                  once, reverse-maps to the nearest popular area, and
-                  presents a one-tap deep link into the matching listing
-                  feed. The hook lives in `useNearbyAreaSuggestion()`
-                  below and gracefully no-ops when geolocation is
-                  unavailable or the user denies the prompt. */}
-              <NearbyAreaSuggestion language={language} />
-            </div>
+            {/* ── QUICK SEARCH — free-text + area + budget, popular-area
+                chips, and the geolocation "homes near you" hint. Deep-links
+                into /properties using the same URL contract as the home
+                hero, so results behave identically from either surface. */}
+            <QuickSearchCard language={language} />
 
             {/* ── UPCOMING TOURS ─────────────────────────────────────── */}
             {(!hideUpcomingTours && myInquiries.some(inq => inq.visitSchedule?.date && inq.status !== 'rejected')) && (
@@ -3695,6 +3959,260 @@ const QuickWinsCard = ({ breakdown, language, onJump }) => {
           </button>
         ))}
       </div>
+    </div>
+  );
+};
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  RentProofCard — the overview "Payment Proof" widget. A per-lease     ║
+// ║  rent tracker: identity + status, a year navigator, this-month        ║
+// ║  summary (total / paid / remaining), and a 12-month status strip.     ║
+// ║  The "Make payment" CTA jumps to the Payments tab where the full      ║
+// ║  submit-proof flow (TenantRentPay) already lives — no duplicated       ║
+// ║  payment logic. All amounts are derived by getBookingRentSnapshot so  ║
+// ║  the card can never disagree with Smart Alerts / the Payments tab.    ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+const RentProofCard = ({ booking, receipts = [], language, tenantName, avatar, isVerified, onPay }) => {
+  const bn = language === 'বাংলা';
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const snap = useMemo(
+    () => getBookingRentSnapshot(booking, receipts, year, new Date()),
+    [booking, receipts, year],
+  );
+  const months = bn ? RENT_MONTHS_BN : RENT_MONTHS_EN;
+  const cur = snap.current;
+  const fmt = (n) => Number(n || 0).toLocaleString(bn ? 'bn-BD' : 'en-IN');
+
+  // Status → month-chip palette.
+  const chipCls = (status) => {
+    const base = 'relative rounded-2xl border p-2.5 text-left transition-all';
+    switch (status) {
+      case 'paid':      return `${base} bg-emerald-50 border-emerald-100 text-emerald-800`;
+      case 'partial':   return `${base} bg-amber-50 border-amber-100 text-amber-800`;
+      case 'submitted': return `${base} bg-blue-50 border-blue-100 text-blue-800`;
+      case 'overdue':
+      case 'due':       return `${base} bg-[#ba0036] border-[#ba0036] text-white shadow-md`;
+      case 'upcoming':  return `${base} bg-white border-gray-100 text-gray-500`;
+      default:          return `${base} bg-gray-50/60 border-dashed border-gray-200 text-gray-300`;
+    }
+  };
+
+  const headStatus = cur?.status || 'upcoming';
+  const statusPill = {
+    paid:      { en: 'Paid',     bn: 'পরিশোধিত', cls: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+    partial:   { en: 'Partial',  bn: 'আংশিক',    cls: 'bg-amber-50 text-amber-600 border-amber-100' },
+    submitted: { en: 'Pending',  bn: 'যাচাই',    cls: 'bg-blue-50 text-blue-600 border-blue-100' },
+    overdue:   { en: 'Overdue',  bn: 'বকেয়া',    cls: 'bg-rose-50 text-rose-600 border-rose-100' },
+    due:       { en: 'Due',      bn: 'বকেয়া',    cls: 'bg-rose-50 text-rose-600 border-rose-100' },
+    upcoming:  { en: 'Upcoming', bn: 'আসন্ন',     cls: 'bg-gray-50 text-gray-500 border-gray-100' },
+    inactive:  { en: '—',        bn: '—',        cls: 'bg-gray-50 text-gray-400 border-gray-100' },
+  }[headStatus];
+
+  const initial = (tenantName || 'T').charAt(0).toUpperCase();
+
+  return (
+    <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] border border-gray-100 shadow-[0_4px_20px_rgba(15,23,42,0.04)] overflow-hidden">
+      {/* Header: identity + status + year nav */}
+      <div className="p-4 md:p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="relative shrink-0">
+            <div className="w-11 h-11 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-black text-lg border border-blue-100 overflow-hidden">
+              {avatar
+                ? <img src={avatar} alt={tenantName} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                : initial}
+            </div>
+            {isVerified && <div className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full border-2 border-white text-white p-[1px]"><BadgeCheck size={11} /></div>}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-black text-gray-900 truncate">{tenantName}</p>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border shrink-0 ${statusPill.cls}`}>{bn ? statusPill.bn : statusPill.en}</span>
+            </div>
+            <p className="text-[11px] font-bold text-gray-500 truncate flex items-center gap-1.5 mt-0.5">
+              <Home size={11} className="text-gray-400 shrink-0" />
+              <span className="truncate">{booking.property || (bn ? 'আপনার ভাড়া' : 'Your rental')}</span>
+              {snap.outstanding > 0 && <span className="text-[#ba0036] shrink-0">• ৳{fmt(snap.outstanding)} {bn ? 'বকেয়া' : 'due'}</span>}
+              {cur?.daysLate > 0 && <span className="text-rose-500 shrink-0">• {cur.daysLate}d late</span>}
+            </p>
+          </div>
+        </div>
+        {/* Year nav + paid count */}
+        <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+          <div className="flex items-center gap-1 bg-gray-50 rounded-xl border border-gray-100 p-1">
+            <button onClick={() => setYear((y) => y - 1)} className="w-7 h-7 rounded-lg hover:bg-white flex items-center justify-center text-gray-500 transition-colors" aria-label="Previous year"><ChevronLeft size={15} /></button>
+            <span className="text-[13px] font-black text-gray-800 tabular-nums px-1 min-w-[40px] text-center">{year}</span>
+            <button onClick={() => setYear((y) => Math.min(y + 1, now.getFullYear()))} disabled={year >= now.getFullYear()} className="w-7 h-7 rounded-lg hover:bg-white flex items-center justify-center text-gray-500 disabled:opacity-30 transition-colors" aria-label="Next year"><ChevronRight size={15} /></button>
+          </div>
+          <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gray-50 border border-gray-100 text-[11px] font-black text-gray-600 tabular-nums">
+            {fmt(snap.paidCount)}/{fmt(snap.activeCount)} {bn ? 'মাস' : 'mo'}
+          </span>
+        </div>
+      </div>
+
+      {/* This-month summary */}
+      {cur && (
+        <div className="p-4 md:p-5 border-b border-gray-100">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest truncate">
+              {bn ? 'এই মাস' : 'This month'} — {months[cur.monthIndex]} {year}
+            </p>
+            {cur.status !== 'paid' && cur.status !== 'submitted' && (
+              <button onClick={onPay} className="inline-flex items-center gap-1.5 bg-[#ba0036] hover:bg-[#a1002f] text-white px-3.5 py-2 rounded-xl text-[11px] font-black shadow-[0_6px_14px_rgba(186,0,54,0.25)] active:scale-95 transition-all shrink-0">
+                <Wallet size={13} /> {bn ? 'পেমেন্ট দিন' : 'Make payment'}
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-2 md:gap-3">
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{bn ? 'মোট ভাড়া' : 'Total rent'}</p>
+              <p className="text-base md:text-lg font-black text-gray-900 tabular-nums leading-tight mt-0.5">৳{fmt(cur.perMonth)}</p>
+            </div>
+            <div className="bg-emerald-50 rounded-xl p-3">
+              <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">{bn ? 'পেমেন্ট' : 'Paid'}</p>
+              <p className="text-base md:text-lg font-black text-emerald-700 tabular-nums leading-tight mt-0.5">৳{fmt(cur.paidAmt)}</p>
+            </div>
+            <div className={`${cur.remaining > 0 ? 'bg-rose-50' : 'bg-gray-50'} rounded-xl p-3`}>
+              <p className={`text-[9px] font-black uppercase tracking-widest ${cur.remaining > 0 ? 'text-rose-500' : 'text-gray-400'}`}>{bn ? 'বাকি' : 'Remaining'}</p>
+              <p className={`text-base md:text-lg font-black tabular-nums leading-tight mt-0.5 ${cur.remaining > 0 ? 'text-[#ba0036]' : 'text-gray-900'}`}>৳{fmt(cur.remaining)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 12-month strip */}
+      <div className="p-4 md:p-5">
+        <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-2">
+          {snap.months.map((mo) => {
+            const isCurrent = year === now.getFullYear() && mo.monthIndex === now.getMonth();
+            const isDue = mo.status === 'due' || mo.status === 'overdue';
+            return (
+              <div key={mo.key} className={chipCls(mo.status) + (isCurrent && !isDue ? ' ring-2 ring-[#ba0036]/30' : '')}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider opacity-80">{months[mo.monthIndex]}</span>
+                  {mo.status === 'paid' && <CheckCheck size={11} />}
+                  {(mo.status === 'submitted' || mo.status === 'partial') && <Hourglass size={11} />}
+                </div>
+                {isDue ? (
+                  <p className="text-[9px] font-black uppercase tracking-widest mt-1">{bn ? 'বকেয়া' : 'DUE'}</p>
+                ) : mo.status === 'paid' ? (
+                  <p className="text-[10px] font-black tabular-nums mt-1 truncate">৳{fmt(mo.paidAmt)}</p>
+                ) : mo.status === 'inactive' ? (
+                  <p className="text-[10px] font-black mt-1">—</p>
+                ) : (
+                  <p className="text-[10px] font-black tabular-nums mt-1 truncate opacity-70">৳{fmt(mo.perMonth)}</p>
+                )}
+                {isCurrent && (
+                  <span className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full animate-pulse ${isDue ? 'bg-white' : 'bg-[#ba0036]'}`} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {/* Late badge */}
+        {cur?.daysLate > 0 && (
+          <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-50 border border-rose-100 text-rose-600 text-[11px] font-black">
+            <Clock size={12} /> {cur.daysLate}d {bn ? 'দেরি' : 'late'} — {months[cur.monthIndex]} {String(year).slice(-2)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  QuickSearchCard — overview home search. Free-text + area + budget,   ║
+// ║  popular-area chips, "View All Areas", and the geolocation hint.       ║
+// ║  Deep-links to /properties/<slug>?q=&budget= (same URL contract the   ║
+// ║  home hero + navbar use, so results behave identically everywhere).    ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+const QuickSearchCard = ({ language }) => {
+  const bn = language === 'বাংলা';
+  const navigate = useNavigate();
+  const [q, setQ] = useState('');
+  const [area, setArea] = useState('');
+  const [budget, setBudget] = useState('');
+
+  const runSearch = () => {
+    const params = new URLSearchParams();
+    if (budget) params.set('budget', budget);
+    let slug = 'all';
+    const text = q.trim();
+    if (text) { params.set('q', text); slug = 'all'; }
+    else if (area) { slug = area; }
+    const qs = params.toString();
+    navigate(`/properties/${slug}${qs ? `?${qs}` : ''}`);
+  };
+
+  return (
+    <div className="mb-5 md:mb-7 rounded-[1.5rem] md:rounded-[2rem] border border-white bg-white/95 backdrop-blur-sm shadow-[0_4px_20px_rgba(15,23,42,0.04)] p-5 md:p-7">
+      <p className="text-[10px] font-black text-[#ba0036] uppercase tracking-[0.18em] mb-1">{bn ? 'কুইক সার্চ' : 'Quick Search'}</p>
+      <h3 className="text-xl md:text-2xl font-black text-gray-900 mb-4">
+        {bn ? 'আপনার পরবর্তী বাড়ি খুঁজুন' : 'Find your next home'}
+      </h3>
+
+      {/* Search row — stacks on mobile, single row on desktop */}
+      <form onSubmit={(e) => { e.preventDefault(); runSearch(); }} className="flex flex-col md:flex-row gap-2.5 md:gap-3">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={bn ? 'লোকেশন, এলাকা বা প্রপার্টির নাম...' : 'Search by location, area or property name...'}
+            className="w-full bg-gray-50 pl-11 pr-4 py-3 rounded-2xl text-[13px] font-bold text-gray-700 placeholder:text-gray-400 border border-gray-100 focus:bg-white focus:border-[#ba0036] focus:ring-4 focus:ring-[#ba0036]/10 outline-none transition-all"
+          />
+        </div>
+        <div className="grid grid-cols-2 md:flex gap-2.5 md:gap-3">
+          {/* Area select */}
+          <div className="relative">
+            <MapPin size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
+            <select
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+              className="appearance-none w-full md:w-auto bg-gray-50 pl-9 pr-8 py-3 rounded-2xl text-[13px] font-black text-gray-700 border border-gray-100 focus:bg-white focus:border-[#ba0036] outline-none transition-all cursor-pointer"
+            >
+              <option value="">{bn ? 'এলাকা বাছুন' : 'Select Area'}</option>
+              {QUICK_SEARCH_AREAS.map((a) => <option key={a.slug} value={a.slug}>{bn ? a.bn : a.en}</option>)}
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+          {/* Budget select */}
+          <div className="relative">
+            <Wallet size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
+            <select
+              value={budget}
+              onChange={(e) => setBudget(e.target.value)}
+              className="appearance-none w-full md:w-auto bg-gray-50 pl-9 pr-8 py-3 rounded-2xl text-[13px] font-black text-gray-700 border border-gray-100 focus:bg-white focus:border-[#ba0036] outline-none transition-all cursor-pointer"
+            >
+              {BUDGET_OPTIONS.map((b) => <option key={b.id || 'any'} value={b.id}>{bn ? b.bn : b.en}</option>)}
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+        </div>
+        <button type="submit" className="inline-flex items-center justify-center gap-2 bg-[#ba0036] hover:bg-[#90002a] text-white px-6 py-3 rounded-2xl font-black text-sm shadow-[0_10px_25px_rgba(186,0,54,0.25)] hover:shadow-[0_14px_30px_rgba(186,0,54,0.35)] active:scale-95 transition-all whitespace-nowrap">
+          <Search size={16} /> {bn ? 'খুঁজুন' : 'Search'}
+        </button>
+      </form>
+
+      {/* Popular areas + View All Areas */}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-black text-gray-400 mr-1">{bn ? 'জনপ্রিয় এলাকা:' : 'Popular Areas:'}</span>
+        {QUICK_SEARCH_AREAS.slice(0, 6).map((a) => (
+          <Link
+            key={a.slug}
+            to={`/properties/${a.slug}`}
+            className="px-3 py-1.5 rounded-full bg-gray-50 hover:bg-[#ba0036]/5 border border-gray-100 hover:border-[#ba0036]/30 text-[11px] font-black text-gray-600 hover:text-[#ba0036] transition-all active:scale-95"
+          >
+            {bn ? a.bn : a.en}
+          </Link>
+        ))}
+        <Link to="/properties/all" className="ml-auto inline-flex items-center gap-1 text-[11px] font-black text-[#ba0036] hover:underline">
+          {bn ? 'সব এলাকা দেখুন' : 'View All Areas'} <ArrowRight size={12} />
+        </Link>
+      </div>
+
+      {/* Geolocation "homes near you" hint (unchanged behaviour) */}
+      <NearbyAreaSuggestion language={language} />
     </div>
   );
 };
