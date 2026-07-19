@@ -2536,8 +2536,10 @@ const HostDashboard = () => {
   // route changes, so any old in-app links still work.
   const menuItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: t?.dashboard || (language === 'বাংলা' ? 'ড্যাশবোর্ড' : "Dashboard") },
-    { id: 'analytics', icon: TrendingUp, label: language === 'বাংলা' ? 'অ্যানালিটিক্স' : "Analytics" },
-    { id: 'documents', icon: Folder, label: language === 'বাংলা' ? 'ডকুমেন্ট ভল্ট' : "Documents" },
+    // Documents + Analytics now live under ONE sidebar entry; a segmented
+    // toggle at the top of the view switches between them (setActiveTab still
+    // uses 'documents' | 'analytics').
+    { id: 'documents', icon: Folder, label: language === 'বাংলা' ? 'ডকুমেন্ট ও অ্যানালিটিক্স' : "Documents & Analytics" },
     { id: 'properties', icon: Building, label: t?.myProperties || (language === 'বাংলা' ? 'আমার বাসাসমূহ' : "My Properties") },
     { id: 'inquiries', icon: Zap, label: t?.inquiries || (language === 'বাংলা' ? 'যোগাযোগ সমূহ' : "Inquiries") },
     { id: 'messages', icon: MessageCircle, label: t?.messages || (language === 'বাংলা' ? 'বার্তা' : "Messages"), isLink: true, path: '/messages' },
@@ -2727,8 +2729,13 @@ const HostDashboard = () => {
 
         <nav className="flex-1 px-3 space-y-1 overflow-y-auto custom-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {menuItems.map((item) => {
-             // 'bookings' entry stays active for its Rent Collection sub-view too.
-             const isActive = !item.isLink && (activeTab === item.id || (item.id === 'bookings' && activeTab === 'rent'));
+             // Merged entries stay active for their sub-views too:
+             // 'bookings' ⊃ Rent Collection, 'documents' ⊃ Analytics.
+             const isActive = !item.isLink && (
+               activeTab === item.id ||
+               (item.id === 'bookings' && activeTab === 'rent') ||
+               (item.id === 'documents' && activeTab === 'analytics')
+             );
              // Premium feature locked after trial expires → click sends
              // the host to /subscription with a `from` param so the page
              // can highlight exactly which feature triggered the gate.
@@ -3034,8 +3041,16 @@ const HostDashboard = () => {
                   value: inquiries.length, shadow: 'shadow-[0_4px_20px_rgba(124,58,237,0.08)]',
                   indicator: 'bg-violet-500'
                 },
-              ].map((stat, i) => (
-                <div key={i} className={`bg-white p-3 md:p-7 rounded-2xl md:rounded-[1.5rem] ${stat.shadow} border border-white/80 flex flex-col items-center md:items-start justify-center group hover:scale-[1.02] transition-all duration-300 cursor-default relative overflow-hidden`}>
+              ].map((stat, i) => {
+                // KPI boxes are one-tap deep links: Properties → all listings,
+                // Active → active-filtered listings, Inquiries → the inquiries tab.
+                const onCardClick = i === 0
+                  ? () => { setPropertyFilter('all'); setActiveTab('properties'); }
+                  : i === 1
+                    ? () => { setPropertyFilter('active'); setActiveTab('properties'); }
+                    : () => setActiveTab('inquiries');
+                return (
+                <div key={i} onClick={onCardClick} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(); } }} className={`bg-white p-3 md:p-7 rounded-2xl md:rounded-[1.5rem] ${stat.shadow} border border-white/80 flex flex-col items-center md:items-start justify-center group hover:scale-[1.02] hover:shadow-[0_12px_35px_rgba(0,0,0,0.10)] active:scale-95 transition-all duration-300 cursor-pointer relative overflow-hidden`}>
                   <div className={`absolute top-0 right-0 w-16 h-16 md:w-24 md:h-24 rounded-full -translate-y-1/2 translate-x-1/2 ${stat.bg} blur-2xl opacity-60 pointer-events-none`}></div>
                   <div className={`w-8 h-8 md:w-11 md:h-11 rounded-xl ${stat.bg} flex items-center justify-center ${stat.iconColor} mb-2 md:mb-3 shrink-0`}>
                     <stat.icon size={15} className="md:w-5 md:h-5" />
@@ -3044,6 +3059,31 @@ const HostDashboard = () => {
                   <h3 className="text-2xl md:text-5xl font-black text-gray-900 leading-none mt-0.5 md:mt-1">{stat.value}</h3>
                   <div className={`w-6 h-1 rounded-full mt-2 md:mt-3 ${stat.indicator} opacity-40`}></div>
                 </div>
+                );
+              })}
+            </div>
+
+            {/* ১.২ Quick actions — one-tap jumps to the key sections. Clean
+                soft-tint tiles (works in light + dark) instead of heavy icons. */}
+            <div className="grid grid-cols-5 gap-2 sm:gap-3 md:gap-4">
+              {[
+                { label: language === 'বাংলা' ? 'বুকিং' : 'Booking',              Icon: Calendar,      iconBg: 'bg-indigo-50 border-indigo-100',   iconColor: 'text-indigo-600',  onClick: () => setActiveTab('bookings') },
+                { label: language === 'বাংলা' ? 'রেন্ট কালেকশন' : 'Rent Collection', Icon: Wallet,        iconBg: 'bg-emerald-50 border-emerald-100', iconColor: 'text-emerald-600', onClick: () => setActiveTab('rent') },
+                { label: language === 'বাংলা' ? 'বার্তা' : 'Messages',            Icon: MessageCircle, iconBg: 'bg-blue-50 border-blue-100',       iconColor: 'text-blue-600',    onClick: () => navigate('/messages') },
+                { label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts', Icon: BellRing,      iconBg: 'bg-amber-50 border-amber-100',     iconColor: 'text-amber-600',   onClick: () => setActiveTab('smartAlerts') },
+                { label: language === 'বাংলা' ? 'ডক ও অ্যানা' : 'Doc & Ana',      Icon: FileText,      iconBg: 'bg-violet-50 border-violet-100',   iconColor: 'text-violet-600',  onClick: () => setActiveTab('documents') },
+              ].map(({ label, Icon, iconBg, iconColor, onClick }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={onClick}
+                  className="group flex flex-col items-center gap-2 p-2.5 sm:p-3 md:p-4 rounded-2xl bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-95 transition-all duration-300"
+                >
+                  <span className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-2xl border flex items-center justify-center ${iconBg} ${iconColor} group-hover:scale-110 transition-transform duration-300`}>
+                    <Icon size={18} className="sm:w-5 sm:h-5 md:w-6 md:h-6" strokeWidth={2.4} />
+                  </span>
+                  <span className="text-[9px] sm:text-[11px] md:text-xs font-black text-gray-700 text-center leading-tight">{label}</span>
+                </button>
               ))}
             </div>
 
@@ -3262,6 +3302,31 @@ const HostDashboard = () => {
               </div>
             </div>
 
+          </div>
+        )}
+
+        {/* Combined section toggle — Documents ⇄ Analytics under one sidebar
+            entry, mirroring the Booking ⇄ Rent Collection switch. */}
+        {(activeTab === 'documents' || activeTab === 'analytics') && (
+          <div className="w-full mb-4 md:mb-5 animate-in fade-in duration-300">
+            <div className="flex items-stretch gap-1.5 p-1.5 rounded-2xl bg-white shadow-[0_2px_12px_rgba(0,0,0,0.05)] border border-gray-100">
+              {[
+                { id: 'documents', label: language === 'বাংলা' ? 'ডকুমেন্ট' : 'Documents' },
+                { id: 'analytics', label: language === 'বাংলা' ? 'অ্যানালিটিক্স' : 'Analytics' },
+              ].map(({ id, label }) => {
+                const on = activeTab === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setActiveTab(id)}
+                    className={`flex-1 flex items-center justify-center py-3.5 sm:py-4 rounded-xl text-sm sm:text-base font-black tracking-tight transition-all duration-300 ${on ? 'bg-gradient-to-r from-[#ba0036] to-[#ff004c] text-white shadow-[0_8px_22px_rgba(186,0,54,0.35)]' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
