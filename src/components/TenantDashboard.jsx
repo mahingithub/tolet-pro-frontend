@@ -1742,6 +1742,31 @@ const handleWizardSubmit = async (payload) => {
               </div>
             )}
 
+            {/* Quick actions — one-tap jumps to the tenant's key surfaces.
+                Roommate Wallet (shared-cost hub at /living) + Messages are the
+                highlighted shortcuts; clean soft-tint tiles (light + dark). */}
+            <div className="mb-5 md:mb-7 grid grid-cols-5 gap-2 sm:gap-3 md:gap-4">
+              {[
+                { label: language === 'বাংলা' ? 'রুমমেট ওয়ালেট' : 'Roommate Wallet', Icon: Wallet,        iconBg: 'bg-emerald-50 border-emerald-100', iconColor: 'text-emerald-600', onClick: () => navigate('/living') },
+                { label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',                 Icon: MessageSquare, iconBg: 'bg-blue-50 border-blue-100',        iconColor: 'text-blue-600',    onClick: () => navigate('/messages') },
+                { label: language === 'বাংলা' ? 'পেমেন্ট' : 'Payments',               Icon: Receipt,       iconBg: 'bg-indigo-50 border-indigo-100',    iconColor: 'text-indigo-600',  onClick: () => setActiveTab('payments') },
+                { label: language === 'বাংলা' ? 'ইনকোয়ারি' : 'My Inquiries',         Icon: MessageCircle, iconBg: 'bg-violet-50 border-violet-100',    iconColor: 'text-violet-600',  onClick: () => setActiveTab('applications') },
+                { label: language === 'বাংলা' ? 'অ্যালার্ট' : 'Smart Alerts',          Icon: Bell,          iconBg: 'bg-amber-50 border-amber-100',      iconColor: 'text-amber-600',   onClick: () => setActiveTab('alerts') },
+              ].map(({ label, Icon, iconBg, iconColor, onClick }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={onClick}
+                  className="group flex flex-col items-center gap-2 p-2.5 sm:p-3 md:p-4 rounded-2xl bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-95 transition-all duration-300"
+                >
+                  <span className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-2xl border flex items-center justify-center ${iconBg} ${iconColor} group-hover:scale-110 transition-transform duration-300`}>
+                    <Icon size={18} className="sm:w-5 sm:h-5 md:w-6 md:h-6" strokeWidth={2.4} />
+                  </span>
+                  <span className="text-[9px] sm:text-[11px] md:text-xs font-black text-gray-700 text-center leading-tight">{label}</span>
+                </button>
+              ))}
+            </div>
+
             {/* ── VERIFICATION REJECTED BANNER ────────────────────────────
                 Surfaces the admin's rejection reason so the user understands
                 what to fix, with a one-tap "resubmit" CTA that re-opens the

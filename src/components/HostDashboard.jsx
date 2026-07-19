@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Building, Building2, MessageSquare, Calendar,
-  Settings, HelpCircle, Plus, Search, Bell, Filter, ArrowUpDown,
+  Settings, HelpCircle, Plus, PlusCircle, Search, Bell, Filter, ArrowUpDown,
   Edit3, PauseCircle, PlayCircle, FileText, MapPin, Globe, CheckCircle2,
   X, CreditCard, MoreVertical, Download, Trash2, MessageCircle, Archive,
   Send, Paperclip, Smile, Mail, Shield, ShieldCheck, LogOut, BadgeCheck, Camera, Check,
@@ -2677,6 +2677,45 @@ const HostDashboard = () => {
                     )}
                   </div>
                 </div>
+              )}
+            </div>
+
+            {/* List Property CTA — jumps straight to the listing wizard. */}
+            <button
+              onClick={() => navigate('/list-property')}
+              className="hidden sm:inline-flex items-center gap-1.5 pl-2.5 pr-3 py-2 rounded-xl border border-[#ba0036]/30 text-[#ba0036] bg-white/60 hover:bg-[#ba0036]/[0.06] hover:border-[#ba0036]/50 transition-all shadow-sm active:scale-95"
+            >
+              <PlusCircle size={16} strokeWidth={2.5} />
+              <span className="text-[12px] font-black">{language === 'বাংলা' ? 'বাড়ি দিন' : 'List Property'}</span>
+              <span className="text-[8px] font-black uppercase tracking-wider bg-[#ba0036]/10 px-1.5 py-0.5 rounded-md">{language === 'বাংলা' ? 'ফ্রি' : 'Free'}</span>
+            </button>
+
+            {/* Language switcher — English ⇄ বাংলা (persisted via LanguageContext). */}
+            <div className="relative hidden sm:block">
+              <button
+                onClick={() => setIsLangMenuOpen(v => !v)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/60 border border-white/80 shadow-sm hover:bg-white transition-all active:scale-95"
+              >
+                <Globe size={16} className="text-gray-500" />
+                <span className="text-[12px] font-black text-gray-700">{language === 'বাংলা' ? 'বাংলা' : 'English'}</span>
+                <ChevronDown size={14} className={`text-gray-400 transition-transform duration-200 ${isLangMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {isLangMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-[90]" onClick={() => setIsLangMenuOpen(false)} />
+                  <div className="absolute right-0 mt-2 w-36 bg-white/95 backdrop-blur-3xl border border-white shadow-[0_30px_60px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[100] animate-in fade-in zoom-in-95 origin-top-right">
+                    {['English', 'বাংলা'].map((lang) => (
+                      <button
+                        key={lang}
+                        onClick={() => { setLanguage(lang); setIsLangMenuOpen(false); }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[12px] font-black transition-colors ${language === lang ? 'bg-[#ba0036]/10 text-[#ba0036]' : 'text-gray-700 hover:bg-gray-50'}`}
+                      >
+                        {lang}
+                        {language === lang && <Check size={14} strokeWidth={3} />}
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
 
