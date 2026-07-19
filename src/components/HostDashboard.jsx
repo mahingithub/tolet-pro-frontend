@@ -3050,14 +3050,21 @@ const HostDashboard = () => {
                     ? () => { setPropertyFilter('active'); setActiveTab('properties'); }
                     : () => setActiveTab('inquiries');
                 return (
-                <div key={i} onClick={onCardClick} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(); } }} className={`bg-white p-3 md:p-7 rounded-2xl md:rounded-[1.5rem] ${stat.shadow} border border-white/80 flex flex-col items-center md:items-start justify-center group hover:scale-[1.02] hover:shadow-[0_12px_35px_rgba(0,0,0,0.10)] active:scale-95 transition-all duration-300 cursor-pointer relative overflow-hidden`}>
+                <div key={i} onClick={onCardClick} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(); } }} className={`bg-white p-3 md:px-7 md:py-6 rounded-2xl md:rounded-[1.5rem] ${stat.shadow} border border-white/80 flex flex-col items-center justify-center md:flex-row md:items-center md:justify-between md:gap-3 group hover:scale-[1.02] hover:shadow-[0_12px_35px_rgba(0,0,0,0.10)] active:scale-95 transition-all duration-300 cursor-pointer relative overflow-hidden`}>
                   <div className={`absolute top-0 right-0 w-16 h-16 md:w-24 md:h-24 rounded-full -translate-y-1/2 translate-x-1/2 ${stat.bg} blur-2xl opacity-60 pointer-events-none`}></div>
-                  <div className={`w-8 h-8 md:w-11 md:h-11 rounded-xl ${stat.bg} flex items-center justify-center ${stat.iconColor} mb-2 md:mb-3 shrink-0`}>
-                    <stat.icon size={15} className="md:w-5 md:h-5" />
+                  {/* Left cluster — icon + label. On desktop this sits on the left
+                      of the horizontal card; on mobile it stays centered on top. */}
+                  <div className="flex flex-col items-center md:items-start shrink-0">
+                    <div className={`w-8 h-8 md:w-11 md:h-11 rounded-xl ${stat.bg} flex items-center justify-center ${stat.iconColor} mb-2 shrink-0`}>
+                      <stat.icon size={15} className="md:w-5 md:h-5" />
+                    </div>
+                    <p className="text-[7px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest text-center md:text-left leading-tight">{stat.label}</p>
                   </div>
-                  <p className="text-[7px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest text-center md:text-left leading-tight">{stat.label}</p>
-                  <h3 className="text-2xl md:text-5xl font-black text-gray-900 leading-none mt-0.5 md:mt-1">{stat.value}</h3>
-                  <div className={`w-6 h-1 rounded-full mt-2 md:mt-3 ${stat.indicator} opacity-40`}></div>
+                  {/* Right cluster — big value + accent bar, right-aligned on desktop. */}
+                  <div className="flex flex-col items-center md:items-end mt-0.5 md:mt-0">
+                    <h3 className="text-2xl md:text-5xl font-black text-gray-900 leading-none">{stat.value}</h3>
+                    <div className={`w-6 h-1 rounded-full mt-2 md:mt-3 ${stat.indicator} opacity-40`}></div>
+                  </div>
                 </div>
                 );
               })}
