@@ -3069,11 +3069,13 @@ const HostDashboard = () => {
               <button
                 onClick={() => setIsLangMenuOpen(v => !v)}
                 aria-label={language === 'বাংলা' ? 'ভাষা' : 'Language'}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl bg-white/60 border border-white/80 shadow-sm hover:bg-white transition-all active:scale-95"
+                className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl bg-white/60 border border-white/80 shadow-sm hover:bg-white transition-all active:scale-95"
               >
                 <Globe size={16} className="text-gray-500" />
-                <span className="text-[12px] font-black text-gray-700">{language === 'বাংলা' ? 'বাংলা' : 'English'}</span>
-                <ChevronDown size={14} className={`text-gray-400 transition-transform duration-200 ${isLangMenuOpen ? 'rotate-180' : ''}`} />
+                {/* On mobile it's just the globe logo (like the bell beside it);
+                    the label + chevron only appear from sm up. */}
+                <span className="hidden sm:block text-[12px] font-black text-gray-700">{language === 'বাংলা' ? 'বাংলা' : 'English'}</span>
+                <ChevronDown size={14} className={`hidden sm:block text-gray-400 transition-transform duration-200 ${isLangMenuOpen ? 'rotate-180' : ''}`} />
               </button>
               {isLangMenuOpen && (
                 <>
@@ -5038,6 +5040,34 @@ const HostDashboard = () => {
                       )}
                     </p>
                   </div>
+                  {/* Desktop-only inline detail strip — surfaces the key figures
+                      right in the collapsed row so a host scanning a large
+                      portfolio on a wide screen doesn't need to expand each
+                      lease. Hidden once the row is expanded (details live in the
+                      body) and on mobile (where small portfolios auto-expand). */}
+                  {!isExpanded && (
+                    <div className="hidden xl:flex items-center gap-5 shrink-0 mr-1">
+                      <div className="text-right">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">{language === 'বাংলা' ? 'মোট/মাস' : 'Total/mo'}</p>
+                        <p className="text-[13px] font-black text-gray-900 tabular-nums leading-none">{formatBDT(monthlyTotal)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">{language === 'বাংলা' ? 'ডিপোজিট' : 'Deposit'}</p>
+                        <p className="text-[13px] font-black text-gray-900 tabular-nums leading-none">{formatBDT(booking.advancePayment || 0)}</p>
+                      </div>
+                      <div className="text-right min-w-[56px]">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">{language === 'বাংলা' ? 'পরবর্তী' : 'Next'}</p>
+                        {next ? (
+                          <p className={`text-[13px] font-black tabular-nums leading-none ${next.daysFromNow < 0 ? 'text-rose-600' : next.daysFromNow <= (booking.reminderLeadDays || 3) ? 'text-amber-600' : 'text-gray-900'}`}>
+                            {next.daysFromNow < 0 ? `${Math.abs(next.daysFromNow)}d ${language === 'বাংলা' ? 'দেরি' : 'late'}` : next.daysFromNow === 0 ? (language === 'বাংলা' ? 'আজ' : 'today') : `${next.daysFromNow}d`}
+                          </p>
+                        ) : (
+                          <p className="text-[13px] font-black text-gray-300 leading-none">—</p>
+                        )}
+                      </div>
+                      <div className="w-px h-8 bg-gray-100" />
+                    </div>
+                  )}
                   <div className="hidden sm:flex flex-col items-end gap-0.5 shrink-0 mr-1">
                     <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest tabular-nums">{progress}%</span>
                     <div className="w-12 h-1 bg-gray-100 rounded-full overflow-hidden">
@@ -5237,10 +5267,14 @@ const HostDashboard = () => {
           return (
           <div className="w-full animate-in fade-in zoom-in-95 duration-500">
 
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 lg:gap-6 xl:h-[calc(100vh-140px)] overflow-visible xl:overflow-hidden">
+            {/* Two-column split now starts at `lg` (1024px) instead of `xl`, so
+                laptops/tablets-landscape get the sidebar + list layout rather
+                than a stretched single column. The fixed-height independent
+                scroll stays `xl`-only so mid-size screens scroll naturally. */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 xl:h-[calc(100vh-140px)] overflow-visible xl:overflow-hidden">
 
               {/* ── LEFT RAIL — full Financial Overview ALWAYS visible (mobile + desktop) ── */}
-              <aside className="xl:col-span-4 w-full flex flex-col gap-3 xl:gap-5 xl:h-full xl:overflow-y-auto custom-scrollbar xl:pt-1 xl:pb-4 xl:pr-1">
+              <aside className="lg:col-span-4 w-full flex flex-col gap-3 xl:gap-5 xl:h-full xl:overflow-y-auto custom-scrollbar xl:pt-1 xl:pb-4 xl:pr-1">
 
                 {/* Financial Overview — full hero card, always visible.
                     Padding/font sizes scale down on mobile so the entire KPI
@@ -5336,7 +5370,7 @@ const HostDashboard = () => {
               </aside>
 
               {/* ── RIGHT MAIN — main IS the scroll container; sticky toolbar pins inside it ── */}
-              <main className="xl:col-span-8 w-full xl:h-full xl:overflow-y-auto custom-scrollbar pb-24 xl:pr-3 min-w-0">
+              <main className="lg:col-span-8 w-full xl:h-full xl:overflow-y-auto custom-scrollbar pb-24 xl:pr-3 min-w-0">
 
                 {/* Sticky toolbar — ONE row. Title is a tiny chip in the
                     corner; search + filter pills + New Lease share the same
