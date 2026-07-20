@@ -1806,7 +1806,7 @@ const PropertyDetails = () => {
     return (
       <div className="w-full min-h-screen flex items-center justify-center futuristic-bg">
         <FuturisticTheme />
-        <FullScreenLoader inline message={lt('loading') || 'Loading this home…'} />
+        <FullScreenLoader inline message={lt('loading') || 'Loading this home'} />
       </div>
     );
   }

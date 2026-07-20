@@ -529,35 +529,83 @@ html.dark .border-crimson-200 { border-color: rgba(244, 63, 94, 0.32) !important
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   HOME LOADER (Phase Load-1)
+   HOME LOADER (Phase Load-1 · futuristic)
    ──────────────────────────────────────────────────────────────────────────
-   Shared animation primitives for the in-app <FullScreenLoader /> — the same
-   "little house whose windows light up" motif used by the instant boot splash
-   in index.html, but as reusable classes so any server-data-loading surface
-   can show the branded loader. These inherit the html.reduce-motion override
-   near the top of this file (durations collapse to ~0ms), so motion-sensitive
-   users get a static, functional loader automatically.
+   Reusable primitives for the in-app <FullScreenLoader /> — the React twin of
+   the instant boot splash in index.html. A rotating conic "scanner" orbit with
+   a glowing node circles a neon-glowing glass house whose windows light up
+   while a light beam sweeps over it; a holographic bar and spark particles
+   round out the sci-fi look. All colours map through the global dark-theme
+   rules, and the html.reduce-motion overrides at the bottom pin a calm,
+   static resting state for motion-sensitive users.
    ══════════════════════════════════════════════════════════════════════════ */
-@keyframes tpHomeBob  { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
-@keyframes tpHomeRing { 0% { opacity: .55; transform: translate(-50%, -50%) scale(.82); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.7); } }
-@keyframes tpHomeBar  { 0% { left: -45%; } 100% { left: 100%; } }
-@keyframes tpHomeWin  { 0%, 100% { fill: rgba(255, 255, 255, .92); } 45% { fill: #ffd37a; } }
-@keyframes tpHomeDot  { 0%, 80%, 100% { transform: scale(.6); opacity: .4; } 40% { transform: scale(1); opacity: 1; } }
+@keyframes tpHomeSpin    { to { transform: rotate(360deg); } }
+@keyframes tpHomeSpinRev { to { transform: rotate(-360deg); } }
+@keyframes tpHomeGlow {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(255,255,255,.18), 0 18px 44px -14px rgba(186,0,54,.55), 0 0 22px rgba(186,0,54,.30); }
+  50%      { box-shadow: inset 0 0 0 1px rgba(255,255,255,.30), 0 20px 52px -10px rgba(186,0,54,.85), 0 0 42px rgba(255,93,126,.55); }
+}
+@keyframes tpHomeScan    { 0% { transform: translateY(-120%); } 100% { transform: translateY(320%); } }
+@keyframes tpHomeWin     { 0%, 100% { fill: rgba(255,255,255,.9); } 45% { fill: #ffd37a; } }
+@keyframes tpHomeBar     { 0% { left: -45%; } 100% { left: 105%; } }
+@keyframes tpHomeTwinkle { 0%, 100% { opacity: 0; transform: scale(.4); } 50% { opacity: .9; transform: scale(1); } }
+@keyframes tpHomeDots    { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
 
-.tp-home-bob      { animation: tpHomeBob 1.8s ease-in-out infinite; }
-.tp-home-ring     { animation: tpHomeRing 1.8s ease-out infinite; will-change: transform, opacity; }
-.tp-home-ring--2  { animation-delay: .9s; }
-.tp-home-bar-fill { animation: tpHomeBar 1.35s cubic-bezier(.65, 0, .35, 1) infinite; }
-.tp-home-win      { animation: tpHomeWin 1.8s ease-in-out infinite; transform-origin: center; }
-.tp-home-win--2   { animation-delay: .35s; }
-.tp-home-dot      { animation: tpHomeDot 1.2s ease-in-out infinite; }
-.tp-home-dot--2   { animation-delay: .15s; }
-.tp-home-dot--3   { animation-delay: .3s; }
+/* orbital stage */
+.tp-home-stage { position: relative; display: flex; align-items: center; justify-content: center; }
+.tp-home-orbit {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(186,0,54,0) 0deg, rgba(186,0,54,0) 200deg, rgba(186,0,54,.28) 280deg, #ba0036 335deg, #ff5d7e 360deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  animation: tpHomeSpin 1.5s linear infinite;
+}
+.tp-home-orbit-2 {
+  position: absolute; inset: 13px; border-radius: 50%; opacity: .5;
+  background: conic-gradient(from 180deg, rgba(186,0,54,0) 0deg, rgba(186,0,54,0) 240deg, rgba(255,93,126,.5) 320deg, #ba0036 360deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+  animation: tpHomeSpinRev 2.8s linear infinite;
+}
+.tp-home-node { position: absolute; inset: 0; animation: tpHomeSpin 1.5s linear infinite; pointer-events: none; }
+.tp-home-node::before {
+  content: ""; position: absolute; top: -2px; left: 50%; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 9px 2px rgba(255,93,126,.9), 0 0 18px 6px rgba(186,0,54,.5);
+}
 
-/* Reduce-motion: hide the pulsing rings and show a static, fully-filled brand
-   bar so the loader stays clear without any movement. (The global
-   html.reduce-motion rule already collapses the keyframe durations; these just
-   pin the resting appearance so nothing looks half-drawn.) */
-html.reduce-motion .tp-home-ring { display: none !important; }
+/* glass house tile */
+.tp-home-tile {
+  position: relative; z-index: 2; border-radius: 25px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(150deg, #ba0036, #e60045 62%, #ff5d7e);
+  animation: tpHomeGlow 2.4s ease-in-out infinite;
+}
+.tp-home-scan {
+  position: absolute; left: 0; right: 0; top: 0; height: 34%; z-index: 3; pointer-events: none;
+  background: linear-gradient(to bottom, transparent, rgba(255,255,255,.6), transparent);
+  animation: tpHomeScan 2.4s ease-in-out infinite;
+}
+.tp-home-win   { animation: tpHomeWin 2s ease-in-out infinite; transform-origin: center; }
+.tp-home-win-2 { animation-delay: .4s; }
+.tp-home-spark { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: radial-gradient(circle, #ff7d9d, rgba(186,0,54,.3)); animation: tpHomeTwinkle 2.4s ease-in-out infinite; }
+
+/* holographic progress bar */
+.tp-home-bar-fill {
+  position: absolute; top: 0; left: -45%; height: 100%; width: 45%; border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255,93,126,.25), #ba0036, #ff5d7e);
+  box-shadow: 0 0 12px rgba(255,93,126,.7);
+  animation: tpHomeBar 1.4s cubic-bezier(.65, 0, .35, 1) infinite;
+}
+.tp-home-dot   { animation: tpHomeDots 1.4s ease-in-out infinite; }
+.tp-home-dot-2 { animation-delay: .2s; }
+.tp-home-dot-3 { animation-delay: .4s; }
+
+/* Reduce-motion: drop the moving parts (orbiting node, scan beam, sparks) and
+   pin a static, fully-filled brand bar + lit windows so nothing looks
+   half-drawn. The global html.reduce-motion rule already collapses durations;
+   the spinning rings simply freeze into a calm static arc. */
+html.reduce-motion .tp-home-node,
+html.reduce-motion .tp-home-scan,
+html.reduce-motion .tp-home-spark { display: none !important; }
 html.reduce-motion .tp-home-bar-fill { left: 0 !important; width: 100% !important; }
 html.reduce-motion .tp-home-win { fill: #ffd37a !important; }
