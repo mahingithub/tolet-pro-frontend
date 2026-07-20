@@ -13,6 +13,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
 import NotificationBell from './NotificationBell';
 import ModeSwitcher from './ModeSwitcher';
+import LandlordHomeChoiceModal from './shared/LandlordHomeChoiceModal';
 
 const languages = [{ code: 'en', name: 'English' }, { code: 'bn', name: 'বাংলা' }];
 
@@ -212,6 +213,8 @@ const Navbar = () => {
 
   const [showAuthModal,     setShowAuthModal]     = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
+  // Landlord logo → "where to?" popup (their home is the dashboard).
+  const [showHomeChoice,    setShowHomeChoice]    = useState(false);
   const [isLangMenuOpen,    setIsLangMenuOpen]    = useState(false);
   const [isMobileMenuOpen,  setIsMobileMenuOpen]  = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -342,6 +345,20 @@ useEffect(() => {
     else { setShowAuthModal(true); setIsMobileMenuOpen(false); }
   };
 
+  // Logo tap. For a landlord the dashboard is home, so instead of silently
+  // leaving for the public site we ask via the "where to?" popup. Everyone
+  // else goes straight to the homepage. `fromDrawer` closes the mobile
+  // slide-out first so the popup isn't hidden behind it.
+  const handleLogoClick = ({ fromDrawer = false } = {}) => {
+    if (isLoggedIn && userRole === 'landlord') {
+      if (fromDrawer) closeAll();
+      setShowHomeChoice(true);
+    } else {
+      navigate('/');
+      if (fromDrawer) closeAll();
+    }
+  };
+
   const initials = name => {
     const n = (name || '').trim();
     if (!n) return 'U';
@@ -449,7 +466,11 @@ useEffect(() => {
 
         <div className="w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 flex items-center gap-2.5 md:gap-4 h-[56px] md:h-[64px]">
 
-          <a href="/" className="flex items-center gap-2 md:gap-2.5 cursor-pointer group shrink-0">
+          <a
+            href="/"
+            onClick={(e) => { e.preventDefault(); handleLogoClick(); }}
+            className="flex items-center gap-2 md:gap-2.5 cursor-pointer group shrink-0"
+          >
             <div className="bg-[#ba0036] p-1.5 md:p-2 rounded-xl shadow-[0_4px_15px_rgba(186,0,54,0.3)] group-hover:scale-105 transition-transform duration-300">
               <Building2 className="text-white w-4 h-4 md:w-[18px] md:h-[18px]" />
             </div>
@@ -582,6 +603,18 @@ useEffect(() => {
                 <Link to="/how-it-works#pricing" className="hover:text-[#ba0036] transition-colors">{t?.navPricing || 'Pricing'}</Link>
                 <Link to="/support" className="hover:text-[#ba0036] transition-colors">{t?.navHelp || 'Help'}</Link>
               </nav>
+            )}
+
+            {/* ── Landlord: the dashboard is home, so surface it as the primary
+                nav tab (mirrors "he sees only a Dashboard tab"). ── */}
+            {isLoggedIn && userRole === 'landlord' && (
+              <Link
+                to="/host-dashboard"
+                className="hidden lg:flex items-center gap-1.5 mr-1 font-bold text-gray-700 hover:text-[#ba0036] transition-colors"
+              >
+                <LayoutDashboard size={16} />
+                {langCode === 'bn' ? 'ড্যাশবোর্ড' : 'Dashboard'}
+              </Link>
             )}
 
             {/* Desktop notification bell with unread badge + dropdown. */}
@@ -912,7 +945,7 @@ useEffect(() => {
           {/* Header — real brand logo (matches main navbar) + close */}
           <div className="flex items-center justify-between mb-4">
             <button
-              onClick={() => { navigate('/'); closeAll(); }}
+              onClick={() => handleLogoClick({ fromDrawer: true })}
               className="flex items-center gap-2 group"
               aria-label="TO-LET PRO home"
             >
@@ -1241,6 +1274,16 @@ useEffect(() => {
           </div>
         </div>
       )}
+
+      {/* LANDLORD "WHERE TO?" POPUP — the dashboard is a landlord's home, so the
+          logo asks whether to visit the public site or go to their dashboard. */}
+      <LandlordHomeChoiceModal
+        open={showHomeChoice}
+        onClose={() => setShowHomeChoice(false)}
+        onGoHome={() => { setShowHomeChoice(false); navigate('/'); }}
+        onGoDashboard={() => { setShowHomeChoice(false); navigate('/host-dashboard'); }}
+        isBn={langCode === 'bn'}
+      />
     </>
   );
 };

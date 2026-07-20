@@ -33,6 +33,7 @@ import { listDocuments as listDocsApi, uploadDocument as uploadDocApi, deleteDoc
 import tenantService from "../services/tenantService.js";
 import callProvider from "../services/callProvider";
 import { listNotifications, getUnreadCount, markRead, markAllRead } from "../services/notificationService.js";
+import { openConversation, sendMessage, sendMediaMessage } from "../services/chatService.js";
 import { uploadAvatar, uploadVerificationDoc } from "../services/authService";
 import ProfileSection from './shared/ProfileSection';
 import VerificationModal from './VerificationModal';
@@ -43,6 +44,7 @@ import { buildRentAlerts, buildLeaseAlerts, buildInquiryAlerts } from '../utils/
 import Aiinsightspage from './Aiinsightspage';
 import { jsPDF } from 'jspdf';
 import useDeepLinkHighlight, { highlightNotifTarget } from '../hooks/useDeepLinkHighlight';
+import LandlordHomeChoiceModal from './shared/LandlordHomeChoiceModal';
 
 // Payment channels offered when converting an inquiry into a booking / recording
 // an advance. Order matches the most-used mobile-money + bank rails in Bangladesh.
@@ -528,6 +530,10 @@ const HostDashboard = () => {
   // 🟢 CORE STATES
   const initialTab = new URLSearchParams(location.search).get('tab') || (location.state && location.state.activeTab) || 'dashboard';
   const [activeTab, setActiveTab] = useState(initialTab);
+  // Logo → "where to?" popup. For a landlord the dashboard IS home, so tapping
+  // the TO-LET PRO logo asks whether to visit the public site or stay here
+  // (see LandlordHomeChoiceModal at the bottom of the render).
+  const [showHomeChoice, setShowHomeChoice] = useState(false);
   // Honor ?tab=… deep-links (e.g. notification bell → /host-dashboard?tab=inquiries).
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
@@ -890,6 +896,16 @@ const HostDashboard = () => {
   const [propertyFilter, setPropertyFilter] = useState('all');
   const [activeModal, setActiveModal] = useState(null); 
   const [modalData, setModalData] = useState(null);
+  // ── Quick-action modal state (broadcast / reminders / export report) ────────
+  // These three dashboard actions used to be toast-only stubs; they now drive
+  // real work, so they need backing form + in-flight state.
+  const [broadcastText, setBroadcastText] = useState('');       // message_all textarea
+  const [broadcastFile, setBroadcastFile] = useState(null);     // optional image attachment
+  const [isBroadcasting, setIsBroadcasting] = useState(false);  // send-in-progress guard
+  const [reminderSelected, setReminderSelected] = useState(() => new Set()); // booking ids to remind
+  const [isSendingReminders, setIsSendingReminders] = useState(false);
+  const [reportType, setReportType] = useState('financial');    // 'financial' | 'payments' | 'leases'
+  const [reportRange, setReportRange] = useState('month');      // 'month' | '3months' | 'ytd'
   // Edit modal form state — covers every field the host can change from
   // the dashboard (matches the AddProperty wizard fields one-to-one so the
   // backend's PATCH /api/properties/:id can accept the same shape).
@@ -912,6 +928,26 @@ const HostDashboard = () => {
     const ids = getRoomTypes(modalData.intent, modalData.type).map((r) => r.id);
     if (!ids.includes(selectedRoomType)) setSelectedRoomType(firstRoomTypeId(modalData.intent, modalData.type));
   }, [modalData]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Seed / reset the quick-action modals when they open. Reminders default to
+  // "all overdue + partial tenants checked"; the broadcast composer opens clean.
+  useEffect(() => {
+    if (activeModal === 'send_reminders') {
+      const now = new Date();
+      const sm = getMonthCollectionSummary(bookings, now.getFullYear(), now.getMonth() + 1, now);
+      // Default-check only tenants we can actually reach (linked account); the
+      // rest render as disabled+unchecked so the "Send (N)" count stays honest.
+      setReminderSelected(new Set(
+        [...sm.overdueTenants, ...sm.partialTenants]
+          .filter((b) => !!resolveTenantUserId(b))
+          .map((b) => b.id),
+      ));
+    }
+    if (activeModal === 'message_all') {
+      setBroadcastText('');
+      setBroadcastFile(null);
+    }
+  }, [activeModal]); // eslint-disable-line react-hooks/exhaustive-deps
   // NOTE: in-dashboard chat panel removed — all message CTAs now route to
   // /messages (the standalone ChatSystem) so there's a single source of
   // truth for conversations across the app.
@@ -2171,6 +2207,313 @@ const HostDashboard = () => {
     showToast(language === 'বাংলা' ? 'CSV এক্সপোর্ট হয়েছে ✓' : 'CSV exported ✓');
   };
 
+  // ───────────────────────────────────────────────────────────────────────
+  // DASHBOARD QUICK ACTIONS — broadcast message, payment reminders, export.
+  // Previously these three were toast-only stubs (and send_reminders actually
+  // threw once any booking existed). They now perform the real action against
+  // live data + the existing chat / PDF infrastructure.
+  // ───────────────────────────────────────────────────────────────────────
+
+  // Live (non-cancelled) bookings that are linked to a real tenant account —
+  // the addressable audience for in-app broadcasts / reminders. Manual bookings
+  // with no linked user are excluded because we can't open a conversation with
+  // them. De-dupes by tenant user id so a tenant with two units is messaged once.
+  const getMessagableBookings = () => {
+    const seen = new Set();
+    const out = [];
+    bookings
+      .filter((b) => b.status !== 'cancelled')
+      .forEach((b) => {
+        const userId = resolveTenantUserId(b);
+        if (!userId || seen.has(String(userId))) return;
+        seen.add(String(userId));
+        out.push({ booking: b, userId });
+      });
+    return out;
+  };
+
+  // Broadcast the typed announcement to every messagable tenant. Sends the text
+  // (or, for an image attachment, the image with the text as caption) into each
+  // tenant's in-app conversation. Best-effort per recipient: one failure doesn't
+  // abort the rest, and we report the real success count.
+  const handleBroadcast = async () => {
+    const text = broadcastText.trim();
+    if (!text) {
+      showToast(language === 'বাংলা' ? 'একটি মেসেজ লিখুন' : 'Write a message first');
+      return;
+    }
+    const recipients = getMessagableBookings();
+    if (recipients.length === 0) {
+      showToast(language === 'বাংলা'
+        ? 'কোনো লিংকড ভাড়াটিয়া নেই — মেসেজ পাঠানো যাচ্ছে না।'
+        : 'No linked tenants to message yet.');
+      return;
+    }
+    setIsBroadcasting(true);
+    const asImage = !!broadcastFile && String(broadcastFile.type || '').startsWith('image/');
+    let sent = 0;
+    for (const { booking, userId } of recipients) {
+      try {
+        const convo = await openConversation({ peerUserId: userId, propertyId: booking.propertyId });
+        const convoId = convo?.id || convo?._id;
+        if (!convoId) continue;
+        if (asImage) await sendMediaMessage(convoId, broadcastFile, { kind: 'image', caption: text });
+        else await sendMessage(convoId, text);
+        sent += 1;
+      } catch (err) {
+        console.warn('[broadcast] failed for tenant', userId, err?.message || err);
+      }
+    }
+    setIsBroadcasting(false);
+    setActiveModal(null);
+    setBroadcastText('');
+    setBroadcastFile(null);
+    showToast(sent > 0
+      ? (language === 'বাংলা' ? `${sent} জন ভাড়াটিয়াকে মেসেজ পাঠানো হয়েছে ✓` : `Message sent to ${sent} tenant(s) ✓`)
+      : (language === 'বাংলা' ? 'মেসেজ পাঠানো যায়নি।' : 'Could not send the message.'));
+  };
+
+  // Overdue + partial tenants for the CURRENT month — the reminder audience,
+  // each with the amount still outstanding. Overdue = nothing paid past the due
+  // date; partial = paid but a balance remains. (Pending-but-not-yet-due leases
+  // are intentionally excluded — no reminder before the rent is actually due.)
+  const buildReminderRows = () => {
+    const now = new Date();
+    const sm = getMonthCollectionSummary(bookings, now.getFullYear(), now.getMonth() + 1, now);
+    const key = sm.key;
+    const dueOf = (b) => {
+      const expected = Number(b.monthlyRent || 0) + Number(b.serviceCharge || 0);
+      const entry = b.ledger?.[key];
+      if (entry?.paid) {
+        const bal = Number(entry.balance);
+        return Number.isFinite(bal) && bal > 0 ? bal : Math.max(0, expected - Number(entry.amount || 0));
+      }
+      return expected;
+    };
+    return {
+      monthLabel: monthFullLabel(key, language),
+      monthLabelEn: monthFullLabel(key, 'English'),
+      rows: [...sm.overdueTenants, ...sm.partialTenants].map((b) => ({ booking: b, due: dueOf(b) })),
+    };
+  };
+
+  const toggleReminder = (id) => {
+    setReminderSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  // Send a payment reminder to each SELECTED tenant that has a linked account,
+  // delivered as an in-app chat message stating the outstanding amount. Tenants
+  // without a linked account are counted as "skipped" and reported to the host.
+  const handleSendReminders = async () => {
+    const { rows, monthLabel } = buildReminderRows();
+    const chosen = rows.filter((r) => reminderSelected.has(r.booking.id));
+    if (chosen.length === 0) {
+      showToast(language === 'বাংলা' ? 'অন্তত একজনকে নির্বাচন করুন' : 'Select at least one tenant');
+      return;
+    }
+    setIsSendingReminders(true);
+    const landlord = userData?.fullName || authUser?.name || authUser?.fullName || (language === 'বাংলা' ? 'বাড়িওয়ালা' : 'Your landlord');
+    let sent = 0, skipped = 0;
+    for (const { booking, due } of chosen) {
+      const userId = resolveTenantUserId(booking);
+      if (!userId) { skipped += 1; continue; }
+      const msg = language === 'বাংলা'
+        ? `আসসালামু আলাইকুম ${booking.tenant || 'ভাড়াটিয়া'}, ${monthLabel} মাসের ভাড়া বাবদ ${formatBDT(due)} বকেয়া রয়েছে। অনুগ্রহ করে সুবিধামতো পরিশোধ করুন। ধন্যবাদ। — ${landlord}`
+        : `Hello ${booking.tenant || 'there'}, this is a friendly reminder that ${formatBDT(due)} of rent for ${monthLabel} is still outstanding. Please clear it at your earliest convenience. Thank you. — ${landlord}`;
+      try {
+        const convo = await openConversation({ peerUserId: userId, propertyId: booking.propertyId });
+        const convoId = convo?.id || convo?._id;
+        if (!convoId) { skipped += 1; continue; }
+        await sendMessage(convoId, msg);
+        sent += 1;
+      } catch (err) {
+        console.warn('[reminders] failed for tenant', userId, err?.message || err);
+        skipped += 1;
+      }
+    }
+    setIsSendingReminders(false);
+    setActiveModal(null);
+    if (sent > 0) {
+      const head = language === 'বাংলা' ? `${sent} জনকে রিমাইন্ডার পাঠানো হয়েছে ✓` : `Reminder sent to ${sent} tenant(s) ✓`;
+      const tail = skipped > 0
+        ? (language === 'বাংলা' ? ` (${skipped} জন লিংকড অ্যাকাউন্ট ছাড়া বাদ পড়েছে)` : ` (${skipped} skipped — no linked account)`)
+        : '';
+      showToast(head + tail);
+    } else {
+      showToast(language === 'বাংলা'
+        ? 'রিমাইন্ডার পাঠানো যায়নি — ভাড়াটিয়াদের লিংকড অ্যাকাউন্ট নেই।'
+        : 'Could not send reminders — the selected tenants have no linked account.');
+    }
+  };
+
+  // ── Export report (dashboard Quick Action) ─────────────────────────────────
+  // Builds a report from LIVE data for the chosen type + range, then offers a
+  // real CSV (Blob) or PDF (jsPDF) download. Report CONTENT is kept English so
+  // the jsPDF core (helvetica) fonts render it — they don't carry Bangla glyphs.
+  const reportRangeKeys = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth() + 1; // 1-indexed
+    if (reportRange === '3months') {
+      return [2, 1, 0].map((back) => {
+        const d = new Date(y, m - 1 - back, 1);
+        return monthKey(d.getFullYear(), d.getMonth() + 1);
+      });
+    }
+    if (reportRange === 'ytd') {
+      const keys = [];
+      for (let mm = 1; mm <= m; mm += 1) keys.push(monthKey(y, mm));
+      return keys;
+    }
+    return [monthKey(y, m)]; // 'month'
+  };
+
+  const reportRangeLabel = () => (
+    reportRange === '3months' ? 'Last 3 Months'
+      : reportRange === 'ytd' ? 'This Year (YTD)'
+        : 'This Month'
+  );
+
+  // → { title, columns: string[], rows: string[][], totals: string[]|null }
+  // Amounts are plain integers (no symbol/commas) so a single representation
+  // works for both CSV columns and the PDF table.
+  const buildReportData = () => {
+    const now = new Date();
+    if (reportType === 'payments') {
+      const columns = ['Tenant', 'Property', 'Phone', 'Paid Months', 'Expected Months', 'On-time %'];
+      const rows = bookings.filter((b) => b.status !== 'cancelled').map((b) => {
+        const expected = Array.isArray(b.ledgerKeys) && b.ledgerKeys.length
+          ? b.ledgerKeys.length
+          : enumerateLeaseMonths(b.leaseStart, b.leaseEnd).length;
+        const paid = b.ledger ? Object.values(b.ledger).filter((e) => e?.paid && e?.status !== 'due').length : 0;
+        const pct = expected > 0 ? Math.round((paid / expected) * 100) : 0;
+        return [b.tenant || b.tenantName || '—', b.property || '—', b.tenantPhone || '—', String(paid), String(expected), `${pct}%`];
+      });
+      return { title: 'Tenant Payment History', columns, rows, totals: null };
+    }
+    if (reportType === 'leases') {
+      const columns = ['Tenant', 'Property', 'Location', 'Monthly Rent', 'Service', 'Lease Start', 'Lease End', 'Stage', 'Deposit'];
+      const rows = bookings
+        .filter((b) => b.status !== 'cancelled' && computeLeaseStage(b, now) !== 'done')
+        .map((b) => [
+          b.tenant || b.tenantName || '—', b.property || '—', b.location || '—',
+          String(Number(b.monthlyRent) || 0), String(Number(b.serviceCharge) || 0),
+          b.leaseStart || '—', b.leaseEnd || '—',
+          stageLabel(computeLeaseStage(b, now), 'English'),
+          String((Number(b.advancePayment) || 0) + (Number(b.securityDeposit) || 0)),
+        ]);
+      return { title: 'Active Lease List', columns, rows, totals: null };
+    }
+    // financial (default) — one row per month in the selected range.
+    const columns = ['Month', 'Expected', 'Collected', 'Outstanding', 'Collection %'];
+    let te = 0, tc = 0, to = 0;
+    const rows = reportRangeKeys().map((k) => {
+      const { year, month } = parseMonthKey(k);
+      const sm = getMonthCollectionSummary(bookings, year, month, now);
+      te += sm.expectedTotal; tc += sm.collectedTotal; to += sm.outstandingTotal;
+      const pct = sm.expectedTotal > 0 ? Math.round((sm.collectedTotal / sm.expectedTotal) * 100) : 0;
+      return [monthFullLabel(k, 'English'), String(sm.expectedTotal), String(sm.collectedTotal), String(sm.outstandingTotal), `${pct}%`];
+    });
+    const totalPct = te > 0 ? Math.round((tc / te) * 100) : 0;
+    return { title: 'Financial Overview', columns, rows, totals: ['Total', String(te), String(tc), String(to), `${totalPct}%`] };
+  };
+
+  const reportFileBase = () => {
+    const kind = reportType === 'payments' ? 'payment-history' : reportType === 'leases' ? 'active-leases' : 'financial-overview';
+    return `tolet-${kind}-${todayIso()}`;
+  };
+
+  const downloadTextFile = (content, filename, mime) => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const exportReportCSV = () => {
+    const { columns, rows, totals } = buildReportData();
+    if (rows.length === 0) {
+      showToast(language === 'বাংলা' ? 'এক্সপোর্ট করার মতো ডেটা নেই' : 'No data to export yet');
+      return;
+    }
+    const esc = (v) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const all = [columns, ...rows, ...(totals ? [totals] : [])];
+    const csv = all.map((r) => r.map(esc).join(',')).join('\n');
+    // BOM so Excel opens UTF-8 correctly.
+    downloadTextFile(`\ufeff${csv}`, `${reportFileBase()}.csv`, 'text/csv;charset=utf-8;');
+    setActiveModal(null);
+    showToast(language === 'বাংলা' ? 'CSV এক্সপোর্ট হয়েছে ✓' : 'CSV exported ✓');
+  };
+
+  const exportReportPDF = () => {
+    const { title, columns, rows, totals } = buildReportData();
+    if (rows.length === 0) {
+      showToast(language === 'বাংলা' ? 'এক্সপোর্ট করার মতো ডেটা নেই' : 'No data to export yet');
+      return;
+    }
+    try {
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const margin = 40;
+      let y = margin;
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(186, 0, 54);
+      doc.text('TO-LET PRO', margin, y); y += 20;
+      doc.setFontSize(13); doc.setTextColor(30, 30, 30);
+      doc.text(title, margin, y); y += 16;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(120, 120, 120);
+      doc.text(`${reportRangeLabel()}  ·  Generated: ${formatDate(todayIso(), 'English')}`, margin, y); y += 18;
+      doc.setDrawColor(214); doc.line(margin, y, pageW - margin, y); y += 16;
+
+      const usableW = pageW - margin * 2;
+      const colW = usableW / columns.length;
+      const drawRow = (cells, { bold = false, color = [40, 40, 40] } = {}) => {
+        doc.setFont('helvetica', bold ? 'bold' : 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(color[0], color[1], color[2]);
+        let maxLines = 1;
+        const wrapped = cells.map((c) => {
+          const w = doc.splitTextToSize(String(c ?? ''), colW - 6);
+          maxLines = Math.max(maxLines, w.length);
+          return w;
+        });
+        wrapped.forEach((w, i) => doc.text(w, margin + i * colW, y));
+        y += maxLines * 12 + 6;
+      };
+
+      drawRow(columns, { bold: true, color: [90, 90, 90] });
+      doc.setDrawColor(230); doc.line(margin, y - 6, pageW - margin, y - 6);
+      rows.forEach((r) => {
+        if (y > pageH - margin) { doc.addPage(); y = margin; drawRow(columns, { bold: true, color: [90, 90, 90] }); }
+        drawRow(r);
+      });
+      if (totals) {
+        doc.setDrawColor(214); doc.line(margin, y - 4, pageW - margin, y - 4);
+        drawRow(totals, { bold: true, color: [20, 20, 20] });
+      }
+
+      doc.save(`${reportFileBase()}.pdf`);
+      setActiveModal(null);
+      showToast(language === 'বাংলা' ? 'PDF ডাউনলোড হয়েছে ✓' : 'PDF downloaded ✓');
+    } catch (err) {
+      console.warn('[host] report PDF failed:', err?.message || err);
+      showToast(language === 'বাংলা' ? 'PDF তৈরি ব্যর্থ' : 'Could not generate PDF');
+    }
+  };
+
   // Convert an inquiry into a booking. PREMIUM-GATED — non-premium hosts get
   // an upgrade prompt instead. Pre-fills the lease form from the inquiry so
   // the host doesn't retype the tenant name / phone / property.
@@ -2585,6 +2928,17 @@ const HostDashboard = () => {
         onAddMethod={() => setActiveTab('payments')}
       />
 
+      {/* 🏠 LOGO "WHERE TO?" POPUP — the dashboard is the landlord's home, so the
+          logo asks where to go rather than silently leaving for the public site. */}
+      <LandlordHomeChoiceModal
+        open={showHomeChoice}
+        onClose={() => setShowHomeChoice(false)}
+        onGoHome={() => { setShowHomeChoice(false); navigate('/'); }}
+        onGoDashboard={() => setShowHomeChoice(false)}
+        onDashboardPage
+        isBn={language === 'বাংলা'}
+      />
+
       {/* ✨ GLOWING ORBS ✨ */}
       <div className="fixed top-[-20%] left-[-10%] w-[50vw] h-[50vw] bg-gradient-to-br from-[#ba0036]/10 to-transparent rounded-full blur-[120px] pointer-events-none z-0"></div>
       <div className="fixed bottom-[-20%] right-[-10%] w-[50vw] h-[50vw] bg-gradient-to-tl from-blue-600/5 to-transparent rounded-full blur-[120px] pointer-events-none z-0"></div>
@@ -2620,7 +2974,14 @@ const HostDashboard = () => {
       {/* --- TOP HEADER --- */}
       <div className="w-full max-w-[1600px] mx-auto z-40 relative">
         <header className="mx-4 md:mx-8 mt-4 bg-white/60 backdrop-blur-3xl border border-white/80 rounded-[2rem] px-4 md:px-8 py-3.5 flex items-center justify-between shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-          <Link to="/" className="flex items-center gap-3 z-10 group">
+          {/* Logo → opens the "where to?" popup instead of jumping straight to
+              the public homepage, because the dashboard is the landlord's home. */}
+          <button
+            type="button"
+            onClick={() => setShowHomeChoice(true)}
+            className="flex items-center gap-3 z-10 group"
+            aria-label={language === 'বাংলা' ? 'নেভিগেশন মেনু' : 'Navigation menu'}
+          >
             <div className="bg-gradient-to-br from-[#ba0036] to-[#ff004c] p-2.5 rounded-xl shadow-[0_4px_15px_rgba(186,0,54,0.3)] group-hover:scale-105 transition-transform">
               <Building2 className="text-white w-4 h-4 md:w-[18px] md:h-[18px]" />
             </div>
@@ -2631,7 +2992,7 @@ const HostDashboard = () => {
             <span className="ml-1 px-1.5 py-0.5 text-[9px] md:text-[10px] font-black uppercase tracking-wider text-[#ba0036] bg-red-50 border border-[#ba0036]/30 rounded-md leading-none self-center hidden sm:block">
               Beta
             </span>
-          </Link>
+          </button>
           
           {/* Header trimmed to match the public homepage navbar: logo +
               notification bell + profile. The search bar and the language
@@ -6265,19 +6626,14 @@ const HostDashboard = () => {
               )}
 
               {activeModal === 'send_reminders' && (() => {
-                // Derive overdue / pending tenants from the live bookings state.
-                // No hardcoded names — until a real lease is in arrears, the
-                // host sees a clean "all caught up" panel.
-                const overdueRows = bookings
-                  .map(b => {
-                    const summary = getMonthCollectionSummary(b);
-                    const due = (summary.overdue || 0) + (summary.partial || 0);
-                    return { booking: b, due };
-                  })
-                  .filter(r => r.due > 0);
-                const totalDue = overdueRows.reduce((acc, r) => acc + r.due, 0);
+                // Overdue + partial tenants for the CURRENT month, derived from
+                // the live rent ledger (buildReminderRows). Until a lease is
+                // actually in arrears the host sees a clean "all caught up" panel.
+                const { rows } = buildReminderRows();
+                const selectedRows = rows.filter((r) => reminderSelected.has(r.booking.id));
+                const totalDue = selectedRows.reduce((acc, r) => acc + r.due, 0);
 
-                if (overdueRows.length === 0) {
+                if (rows.length === 0) {
                   return (
                     <div className="space-y-4">
                       <div className="bg-green-50 p-6 rounded-2xl border border-green-100 text-center">
@@ -6306,11 +6662,11 @@ const HostDashboard = () => {
                       <div>
                         <p className="text-sm font-black text-[#ba0036]">
                           {language === 'বাংলা'
-                            ? `${overdueRows.length} জন ভাড়াটিয়ার পেমেন্ট বকেয়া আছে`
-                            : `${overdueRows.length} tenant(s) have pending dues`}
+                            ? `${rows.length} জন ভাড়াটিয়ার পেমেন্ট বকেয়া আছে`
+                            : `${rows.length} tenant(s) have pending dues`}
                         </p>
                         <p className="text-[10px] font-bold text-red-700 mt-0.5">
-                          {language === 'বাংলা' ? 'মোট বকেয়া টাকার পরিমাণ: ' : 'Total pending amount: '}{formatBDT(totalDue)}
+                          {language === 'বাংলা' ? 'নির্বাচিত বকেয়ার পরিমাণ: ' : 'Selected due amount: '}{formatBDT(totalDue)}
                         </p>
                       </div>
                     </div>
@@ -6319,30 +6675,56 @@ const HostDashboard = () => {
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">
                         {language === 'বাংলা' ? 'যাদের রিমাইন্ডার পাঠানো হবে' : 'Recipients'}
                       </label>
-                      {overdueRows.map(({ booking, due }) => (
-                        <div key={booking.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl border border-gray-100">
-                          <div className="flex items-center gap-3">
-                            <input type="checkbox" defaultChecked className="w-4 h-4 rounded text-[#ba0036] focus:ring-[#ba0036] cursor-pointer" />
-                            <div>
-                              <p className="text-xs font-black text-gray-900">{booking.tenant || booking.tenantName || '—'}</p>
-                              <p className="text-[9px] font-bold text-gray-500">{language === 'বাংলা' ? 'বকেয়া: ' : 'Due: '}{formatBDT(due)}</p>
+                      {rows.map(({ booking, due }) => {
+                        const linked = !!resolveTenantUserId(booking);
+                        return (
+                          <label key={booking.id} className={`flex justify-between items-center p-3 bg-gray-50 rounded-xl border border-gray-100 ${linked ? 'cursor-pointer' : 'opacity-70'}`}>
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                checked={reminderSelected.has(booking.id)}
+                                onChange={() => toggleReminder(booking.id)}
+                                disabled={!linked}
+                                className="w-4 h-4 rounded text-[#ba0036] focus:ring-[#ba0036] cursor-pointer disabled:cursor-not-allowed"
+                              />
+                              <div>
+                                <p className="text-xs font-black text-gray-900">{booking.tenant || booking.tenantName || '—'}</p>
+                                <p className="text-[9px] font-bold text-gray-500">
+                                  {language === 'বাংলা' ? 'বকেয়া: ' : 'Due: '}{formatBDT(due)}
+                                  {!linked && (language === 'বাংলা' ? ' · লিংকড অ্যাকাউন্ট নেই' : ' · no linked account')}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                          <span className="text-[10px] font-black text-orange-600 bg-orange-100 px-2 py-1 rounded">
-                            {language === 'বাংলা' ? 'বকেয়া' : 'Pending'}
-                          </span>
-                        </div>
-                      ))}
+                            <span className="text-[10px] font-black text-orange-600 bg-orange-100 px-2 py-1 rounded">
+                              {language === 'বাংলা' ? 'বকেয়া' : 'Pending'}
+                            </span>
+                          </label>
+                        );
+                      })}
                     </div>
 
+                    <p className="text-[10px] font-bold text-gray-400 text-center">
+                      {language === 'বাংলা'
+                        ? 'রিমাইন্ডার ভাড়াটিয়ার ইন-অ্যাপ চ্যাটে পাঠানো হবে।'
+                        : 'Reminders are delivered to each tenant\u2019s in-app chat.'}
+                    </p>
+
                     <button
-                      onClick={() => {
-                        showToast(language === 'বাংলা' ? 'অটোমেটেড SMS এবং ইমেইল পাঠানো হয়েছে!' : 'Automated SMS & Email Sent!');
-                        setActiveModal(null);
-                      }}
-                      className="w-full mt-2 bg-gray-900 text-white py-4 rounded-xl font-black shadow-[0_8px_15px_rgba(0,0,0,0.1)] hover:bg-[#ba0036] hover:-translate-y-0.5 transition-all text-sm flex items-center justify-center gap-2"
+                      onClick={handleSendReminders}
+                      disabled={isSendingReminders || selectedRows.length === 0}
+                      className="w-full mt-1 bg-gray-900 text-white py-4 rounded-xl font-black shadow-[0_8px_15px_rgba(0,0,0,0.1)] hover:bg-[#ba0036] hover:-translate-y-0.5 transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-900 disabled:hover:translate-y-0"
                     >
-                      <Send size={18} /> {language === 'বাংলা' ? 'SMS ও ইমেইল পাঠান' : 'Send SMS & Email'}
+                      {isSendingReminders ? (
+                        <>
+                          <RefreshCw size={16} className="animate-spin" />
+                          {language === 'বাংলা' ? 'পাঠানো হচ্ছে…' : 'Sending…'}
+                        </>
+                      ) : (
+                        <>
+                          <Send size={18} />
+                          {language === 'বাংলা' ? `রিমাইন্ডার পাঠান (${selectedRows.length})` : `Send Reminder (${selectedRows.length})`}
+                        </>
+                      )}
                     </button>
                   </div>
                 );
@@ -6352,30 +6734,46 @@ const HostDashboard = () => {
                 <div className="space-y-4">
                   <div>
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'রিপোর্টের ধরন' : 'Report Type'}</label>
-                    <select className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(249,115,22,0.08)] border border-transparent focus:border-orange-500/20 transition-all cursor-pointer appearance-none">
-                      <option>{language === 'বাংলা' ? 'ফাইন্যান্সিয়াল ওভারভিউ (আয়-ব্যয়)' : 'Financial Overview (Income/Expense)'}</option>
-                      <option>{language === 'বাংলা' ? 'ভাড়াটিয়া পেমেন্ট হিস্ট্রি' : 'Tenant Payment History'}</option>
-                      <option>{language === 'বাংলা' ? 'অ্যাক্টিভ লিজ তালিকা' : 'Active Lease List'}</option>
+                    <select
+                      value={reportType}
+                      onChange={(e) => setReportType(e.target.value)}
+                      className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(249,115,22,0.08)] border border-transparent focus:border-orange-500/20 transition-all cursor-pointer appearance-none"
+                    >
+                      <option value="financial">{language === 'বাংলা' ? 'ফাইন্যান্সিয়াল ওভারভিউ (আয়-ব্যয়)' : 'Financial Overview (Income/Expense)'}</option>
+                      <option value="payments">{language === 'বাংলা' ? 'ভাড়াটিয়া পেমেন্ট হিস্ট্রি' : 'Tenant Payment History'}</option>
+                      <option value="leases">{language === 'বাংলা' ? 'অ্যাক্টিভ লিজ তালিকা' : 'Active Lease List'}</option>
                     </select>
                   </div>
                   
                   <div>
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'সময়কাল' : 'Date Range'}</label>
-                    <select className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(249,115,22,0.08)] border border-transparent focus:border-orange-500/20 transition-all cursor-pointer appearance-none">
-                      <option>{language === 'বাংলা' ? 'চলতি মাস' : 'This Month'}</option>
-                      <option>{language === 'বাংলা' ? 'গত ৩ মাস' : 'Last 3 Months'}</option>
-                      <option>{language === 'বাংলা' ? 'এই বছর (YTD)' : 'This Year (YTD)'}</option>
+                    <select
+                      value={reportRange}
+                      onChange={(e) => setReportRange(e.target.value)}
+                      disabled={reportType !== 'financial'}
+                      className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(249,115,22,0.08)] border border-transparent focus:border-orange-500/20 transition-all cursor-pointer appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="month">{language === 'বাংলা' ? 'চলতি মাস' : 'This Month'}</option>
+                      <option value="3months">{language === 'বাংলা' ? 'গত ৩ মাস' : 'Last 3 Months'}</option>
+                      <option value="ytd">{language === 'বাংলা' ? 'এই বছর (YTD)' : 'This Year (YTD)'}</option>
                     </select>
+                    {reportType !== 'financial' && (
+                      <p className="text-[10px] font-bold text-gray-400 mt-1.5">
+                        {language === 'বাংলা'
+                          ? 'সময়কাল শুধু ফাইন্যান্সিয়াল রিপোর্টে প্রযোজ্য; বাকি রিপোর্টে সব সক্রিয় রেকর্ড থাকে।'
+                          : 'Date range applies to the financial report only; the others cover all active records.'}
+                      </p>
+                    )}
                   </div>
 
                   <div className="pt-2">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">{language === 'বাংলা' ? 'ফরম্যাট সিলেক্ট করে ডাউনলোড করুন' : 'Select Format to Download'}</label>
                     <div className="grid grid-cols-2 gap-3">
-                      <button onClick={() => { showToast(language === 'বাংলা' ? 'PDF ডাউনলোড হচ্ছে...' : 'Downloading PDF...'); setActiveModal(null); }} className="py-4 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-black transition-all border border-red-100 hover:border-red-200 flex flex-col items-center justify-center gap-1">
+                      <button onClick={exportReportPDF} className="py-4 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-black transition-all border border-red-100 hover:border-red-200 flex flex-col items-center justify-center gap-1 active:scale-95">
                         <FileText size={20} />
                         <span>PDF Format</span>
                       </button>
-                      <button onClick={() => { showToast(language === 'বাংলা' ? 'Excel ডাউনলোড হচ্ছে...' : 'Downloading Excel...'); setActiveModal(null); }} className="py-4 bg-green-50 text-green-600 hover:bg-green-100 rounded-xl text-xs font-black transition-all border border-green-100 hover:border-green-200 flex flex-col items-center justify-center gap-1">
+                      <button onClick={exportReportCSV} className="py-4 bg-green-50 text-green-600 hover:bg-green-100 rounded-xl text-xs font-black transition-all border border-green-100 hover:border-green-200 flex flex-col items-center justify-center gap-1 active:scale-95">
                         <FileSpreadsheet size={20} />
                         <span>Excel / CSV</span>
                       </button>
@@ -6384,13 +6782,22 @@ const HostDashboard = () => {
                 </div>
               )}
 
-             {activeModal === 'message_all' && (
+             {activeModal === 'message_all' && (() => {
+                // Real audience = live bookings linked to a tenant account.
+                const recipients = getMessagableBookings();
+                const count = recipients.length;
+                const isImage = !!broadcastFile && String(broadcastFile.type || '').startsWith('image/');
+                return (
                 <div className="space-y-4">
                   <div className="bg-green-50/80 p-4 rounded-2xl border border-green-100 flex items-start gap-3">
                     <Megaphone size={20} className="text-green-600 shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-black text-green-900">{language === 'বাংলা' ? 'সকল অ্যাক্টিভ ভাড়াটিয়াকে পাঠানো হচ্ছে' : 'Sending to all active tenants'}</p>
-                      <p className="text-[10px] font-bold text-green-700 mt-0.5">{language === 'বাংলা' ? 'বর্তমানে ১২ জন ভাড়াটিয়া অ্যাক্টিভ আছেন।' : 'Currently 12 tenants are active.'}</p>
+                      <p className="text-sm font-black text-green-900">{language === 'বাংলা' ? 'অ্যাক্টিভ ভাড়াটিয়াদের পাঠানো হবে' : 'Sending to your active tenants'}</p>
+                      <p className="text-[10px] font-bold text-green-700 mt-0.5">
+                        {count > 0
+                          ? (language === 'বাংলা' ? `${count} জন ভাড়াটিয়া এই মেসেজ পাবেন।` : `${count} tenant(s) will receive this message.`)
+                          : (language === 'বাংলা' ? 'কোনো লিংকড ভাড়াটিয়া নেই — মেসেজ পাঠানো যাবে না।' : 'No linked tenants yet — nothing to send to.')}
+                      </p>
                     </div>
                   </div>
 
@@ -6398,6 +6805,8 @@ const HostDashboard = () => {
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">{language === 'বাংলা' ? 'আপনার মেসেজ লিখুন' : 'Write your announcement'}</label>
                     <textarea 
                       rows="4" 
+                      value={broadcastText}
+                      onChange={(e) => setBroadcastText(e.target.value)}
                       placeholder={language === 'বাংলা' ? 'যেমন: আগামীকাল সকাল ১০টা থেকে দুপুর ১২টা পর্যন্ত পানি সরবরাহ বন্ধ থাকবে...' : 'e.g. Water supply will be interrupted tomorrow from 10 AM to 12 PM...'} 
                       className="w-full p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(22,163,74,0.1)] border border-transparent focus:border-green-500/20 transition-all resize-none custom-scrollbar" 
                     />
@@ -6409,11 +6818,7 @@ const HostDashboard = () => {
                       id="broadcast-attachment" 
                       className="hidden" 
                       accept="image/*,.pdf" 
-                      onChange={(e) => {
-                        if(e.target.files && e.target.files.length > 0) {
-                          showToast(language === 'বাংলা' ? `ফাইল যুক্ত হয়েছে: ${e.target.files[0].name}` : `Attachment added: ${e.target.files[0].name}`);
-                        }
-                      }} 
+                      onChange={(e) => setBroadcastFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)} 
                     />
                     <label 
                       htmlFor="broadcast-attachment" 
@@ -6422,23 +6827,48 @@ const HostDashboard = () => {
                       <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-gray-400 group-hover:text-green-500 transition-colors">
                         <UploadCloud size={16} />
                       </div>
-                      <span className="flex-1 text-left">
-                        {language === 'বাংলা' ? 'ছবি বা নোটিশ আপলোড করুন (ঐচ্ছিক)' : 'Upload Image or Notice (Optional)'}
+                      <span className="flex-1 text-left truncate">
+                        {broadcastFile
+                          ? broadcastFile.name
+                          : (language === 'বাংলা' ? 'ছবি আপলোড করুন (ঐচ্ছিক)' : 'Upload Image (Optional)')}
                       </span>
+                      {broadcastFile && (
+                        <X
+                          size={15}
+                          className="text-gray-400 hover:text-red-500 shrink-0"
+                          onClick={(e) => { e.preventDefault(); setBroadcastFile(null); }}
+                        />
+                      )}
                     </label>
+                    {broadcastFile && !isImage && (
+                      <p className="text-[10px] font-bold text-amber-600 mt-1.5">
+                        {language === 'বাংলা'
+                          ? 'শুধু ছবি চ্যাটে পাঠানো যায় — এই ফাইলটি সংযুক্ত হবে না, শুধু টেক্সট যাবে।'
+                          : 'Only images can be delivered in chat — this file won\u2019t be attached; text will still send.'}
+                      </p>
+                    )}
                   </div>
 
                   <button 
-                    onClick={() => { 
-                      showToast(language === 'বাংলা' ? 'সবার কাছে মেসেজ পাঠানো হয়েছে!' : 'Broadcast message sent successfully!'); 
-                      setActiveModal(null); 
-                    }} 
-                    className="w-full mt-2 bg-green-600 text-white py-4 rounded-xl font-black shadow-[0_8px_15px_rgba(22,163,74,0.2)] hover:bg-green-700 hover:-translate-y-0.5 hover:shadow-[0_12px_20px_rgba(22,163,74,0.3)] transition-all text-sm flex items-center justify-center gap-2"
+                    onClick={handleBroadcast}
+                    disabled={isBroadcasting || !broadcastText.trim() || count === 0}
+                    className="w-full mt-2 bg-green-600 text-white py-4 rounded-xl font-black shadow-[0_8px_15px_rgba(22,163,74,0.2)] hover:bg-green-700 hover:-translate-y-0.5 hover:shadow-[0_12px_20px_rgba(22,163,74,0.3)] transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-green-600 disabled:hover:translate-y-0"
                   >
-                    <Send size={18} /> {language === 'বাংলা' ? 'সবার কাছে পাঠান' : 'Send to Everyone'}
+                    {isBroadcasting ? (
+                      <>
+                        <RefreshCw size={16} className="animate-spin" />
+                        {language === 'বাংলা' ? 'পাঠানো হচ্ছে…' : 'Sending…'}
+                      </>
+                    ) : (
+                      <>
+                        <Send size={18} />
+                        {language === 'বাংলা' ? 'সবার কাছে পাঠান' : 'Send to Everyone'}
+                      </>
+                    )}
                   </button>
                 </div>
-              )}
+                );
+              })()}
 
               {activeModal === 'download_user_document' && (() => {
                 // No hardcoded tenant. Use the modalData if the caller passed

@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import React, { useEffect, useRef } from "react";
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { LanguageProvider } from "./context/LanguageContext";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { SettingsProvider } from "./context/SettingsContext.jsx";
@@ -95,6 +95,8 @@ const GlobalCallSocket = () => {
 
 const AppLayout = () => {
 	const location = useLocation();
+	const navigate = useNavigate();
+	const { isAuthenticated, activeRole } = useAuth();
 
 	// Tell the instant boot splash (index.html) that React has painted, so it
 	// can fade itself out. rAF waits for the first real frame so we don't
@@ -105,6 +107,28 @@ const AppLayout = () => {
 		});
 		return () => cancelAnimationFrame(id);
 	}, []);
+
+	// ── Landlord: "the dashboard is home" ──────────────────────────────────
+	// A landlord's home base is their Host Dashboard, not the public marketing
+	// page. On each app open (fresh load / PWA reopen), an authenticated
+	// landlord who lands on "/" is sent straight to /host-dashboard.
+	//
+	// The guard ref makes this fire AT MOST ONCE per app load: later in-session
+	// visits to "/" — e.g. via the logo popup's "Go to main Home" — are honored
+	// because the guard is already tripped. A page reload resets the ref (it's
+	// in-memory), so reopening the app always lands on the dashboard again.
+	const landlordBootHandled = useRef(false);
+	useEffect(() => {
+		if (landlordBootHandled.current) return;
+		// Hold off until auth is actually resolved; acting on a null user would
+		// either no-op or fight the user's own navigation once /me resolves.
+		if (!isAuthenticated) return;
+		landlordBootHandled.current = true;
+		const isLandlord = activeRole === 'landlord' || activeRole === 'host';
+		if (isLandlord && location.pathname === '/') {
+			navigate('/host-dashboard', { replace: true });
+		}
+	}, [isAuthenticated, activeRole, location.pathname, navigate]);
 
 	// Hide the marketing Navbar on dashboards, auth, admin, and the privacy center
 	// (the privacy center has its own header with a back button).

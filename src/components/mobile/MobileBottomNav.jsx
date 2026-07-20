@@ -56,9 +56,15 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   // the "+ List" FAB. The four flat tabs are identical for everyone, so the
   // rail is always a clean 5 targets (2 · FAB · 2).
   const isTenant = isAuthenticated && user?.role === 'tenant';
+  // Landlords treat the Host Dashboard as home. The server-side role may be
+  // 'landlord' or 'host', so accept both.
+  const isLandlord = isAuthenticated && (user?.role === 'landlord' || user?.role === 'host');
 
   const LEFT = [
-    { id: 'home',    label: 'Home',    icon: Home,   to: '/' },
+    // For a landlord, "Home" is their dashboard — not the public marketing
+    // page. `?tab=dashboard` guarantees a tap always lands on the overview,
+    // even if they were sitting on another dashboard tab.
+    { id: 'home', label: 'Home', icon: Home, to: isLandlord ? '/host-dashboard?tab=dashboard' : '/' },
     { id: 'explore', label: 'Explore', icon: Search, to: '/properties/all' },
   ];
 
@@ -68,7 +74,9 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
     const base = { id: 'profile', label: 'Profile', icon: User, action: 'drawer' };
     if (!isAuthenticated) return base;
     if (isAdmin)           return { ...base, to: '/admin' };
-    if (user?.role === 'landlord') return { ...base, to: '/host-dashboard' };
+    // Landlord Home already points at the dashboard overview, so send Profile
+    // to the dashboard's Settings tab to keep the two tabs distinct.
+    if (isLandlord)        return { ...base, to: '/host-dashboard?tab=settings' };
     // default to tenant
     return { ...base, to: '/tenant-dashboard' };
   })();
@@ -80,7 +88,19 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
 
   const isActive = (item) => {
     if (item.action === 'drawer' && !item.to) return false;
-    if (item.id === 'home') return location.pathname === '/';
+
+    // Split any ?tab= off the target so we can compare pathname + tab
+    // (landlord Home → dashboard overview, Profile → dashboard settings).
+    const [toPath, toQuery = ''] = (item.to || '').split('?');
+    const targetTab  = new URLSearchParams(toQuery).get('tab');
+    const currentTab = new URLSearchParams(location.search).get('tab');
+
+    if (item.id === 'home') {
+      if (toPath === '/') return location.pathname === '/';
+      // Landlord home = the dashboard overview (no tab, or the dashboard tab).
+      if (location.pathname !== toPath) return false;
+      return !currentTab || currentTab === 'dashboard';
+    }
     // Tenant Saved + Profile both point at /tenant-dashboard —
     // disambiguate via the `tab` flag in location.state so only the
     // matching button shows the active treatment.
@@ -92,7 +112,11 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
       if (!item.tab)             return !activeTab || activeTab === 'overview' || activeTab === 'profile';
       return activeTab === item.tab;
     }
-    return location.pathname === item.to || location.pathname.startsWith(item.to + '/');
+    // Host dashboard with an explicit ?tab= (landlord Profile → settings).
+    if (toPath === '/host-dashboard' && targetTab) {
+      return location.pathname === '/host-dashboard' && currentTab === targetTab;
+    }
+    return location.pathname === toPath || location.pathname.startsWith(toPath + '/');
   };
 
   const handleClick = (item) => {

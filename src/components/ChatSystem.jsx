@@ -848,12 +848,25 @@ const ChatSystem = () => {
         pinned:  c.pinned,
       }]));
 
-      const next = [...initialChats];
-      // Anything in `prev` that's a backend convo (id is not 'ai-bot') will be
-      // refreshed from `list`. AI bot + any in-flight dynamic threads stay.
-      const aiAndDynamic = prev.filter(
-        (c) => c.id === 'ai-bot' || !list.find((b) => b.id === c.id),
+      // Peers the backend already returns a (deduped) thread for. Used to drop
+      // stale local rows for the SAME peer so one person never shows twice.
+      const backendPeerIds = new Set(
+        list.map((b) => (b.peerUserId ? String(b.peerUserId) : null)).filter(Boolean),
       );
+
+      const next = [...initialChats];
+      // Keep the AI bot + genuinely in-flight threads (a conversation the user
+      // just opened that the 15s poll hasn't returned yet). But DROP any prior
+      // row whose id was refreshed by the backend OR whose PEER the backend
+      // already lists — the latter is the stale duplicate (e.g. an empty
+      // "New conversation" left behind when the backend's one-thread-per-peer
+      // pick points at a different Conversation doc than the local row).
+      const aiAndDynamic = prev.filter((c) => {
+        if (c.id === 'ai-bot') return true;
+        if (list.find((b) => b.id === c.id)) return false;                          // refreshed below by id
+        if (c.peerUserId && backendPeerIds.has(String(c.peerUserId))) return false; // stale same-peer dup
+        return true;                                                                // truly in-flight
+      });
       for (const c of aiAndDynamic) {
         if (c.id === 'ai-bot') continue;
         if (!next.find((x) => x.id === c.id)) next.push(c);
@@ -884,7 +897,25 @@ const ChatSystem = () => {
           propertyId: b.propertyId,
         });
       }
-      return next;
+
+      // Final safety net: collapse any rows that still share a peer (the AI bot
+      // has no peerUserId, so it's never touched), keeping the one with the most
+      // recent activity — a real thread beats an empty "New conversation" dup.
+      const activityMs = (c) => (c.time && c.time !== 'Just now' ? (Date.parse(c.time) || 0) : 0);
+      const peerIndex = new Map();
+      const deduped = [];
+      for (const c of next) {
+        const pid = c.peerUserId ? String(c.peerUserId) : null;
+        if (!pid) { deduped.push(c); continue; }
+        if (!peerIndex.has(pid)) {
+          peerIndex.set(pid, deduped.length);
+          deduped.push(c);
+        } else {
+          const idx = peerIndex.get(pid);
+          if (activityMs(c) >= activityMs(deduped[idx])) deduped[idx] = c;
+        }
+      }
+      return deduped;
     });
   }, []);
 

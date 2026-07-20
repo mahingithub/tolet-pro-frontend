@@ -105,7 +105,13 @@ export function describeCall(call, currentUserId) {
     peer: peer && typeof peer === 'object' ? {
       id: String(peer._id || peer.id),
       name: peer.name || 'User',
-      profilePicture: peer.profilePicture || null,
+      // The User avatar lives on `avatar` (data/https URL) — older code read a
+      // non-existent `profilePicture`, which is why Calls-tab avatars were
+      // blank. Resolve it the same way the chat sidebar does.
+      profilePicture: peer.avatar || peer.avatarUrl
+                        || peer.tenantProfile?.avatar
+                        || peer.landlordProfile?.avatar
+                        || peer.profilePicture || null,
       phone: peer.phone || null,
       role: peer.role || null, // 'landlord' | 'tenant' | null — used for "View Profile"
     } : null,
