@@ -161,7 +161,7 @@
         50%      { box-shadow: inset 0 0 0 1px rgba(255,255,255,.30), 0 20px 52px -10px rgba(186,0,54,.85), 0 0 42px rgba(255,93,126,.55); }
       }
       @keyframes tpScan { 0% { transform: translateY(-120%); } 100% { transform: translateY(320%); } }
-      @keyframes tpWin { 0%, 100% { fill: rgba(255,255,255,.9); } 45% { fill: #ffd37a; } }
+      @keyframes tpWin { 0%, 100% { fill: rgba(255,211,122,0); } 45% { fill: rgba(255,211,122,.95); } }
       @keyframes tpBar { 0% { left: -45%; } 100% { left: 105%; } }
       @keyframes tpTwinkle { 0%, 100% { opacity: 0; transform: scale(.4); } 50% { opacity: .9; transform: scale(1); } }
       @keyframes tpDots { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
@@ -208,11 +208,20 @@
           <span class="tp-splash__tile">
             <span class="tp-splash__scan"></span>
             <svg viewBox="0 0 64 64" aria-hidden="true">
-              <path d="M6 31.5 L32 9 L58 31.5" fill="none" stroke="#ffffff" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round" />
-              <path d="M12 29 L12 53 Q12 55 14 55 L50 55 Q52 55 52 53 L52 29 Z" fill="#ffffff" />
-              <rect class="tp-splash__win" x="18.5" y="34" width="9" height="9" rx="2" fill="rgba(255,255,255,.92)" />
-              <rect class="tp-splash__win tp-splash__win--2" x="36.5" y="34" width="9" height="9" rx="2" fill="rgba(255,255,255,.92)" />
-              <rect x="27" y="45" width="10" height="10" rx="1.6" fill="#ba0036" />
+              <!-- base -->
+              <rect x="9" y="48.5" width="46" height="5.5" rx="2.75" fill="#ffffff" />
+              <!-- side wings -->
+              <rect x="12.5" y="28" width="12" height="21" rx="3" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linejoin="round" />
+              <rect x="39.5" y="28" width="12" height="21" rx="3" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linejoin="round" />
+              <!-- central tower -->
+              <rect x="24.5" y="13" width="15" height="36" rx="4.5" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linejoin="round" />
+              <!-- tower nameplate slot -->
+              <rect x="29" y="19.5" width="6" height="2.8" rx="1.4" fill="#ffffff" />
+              <!-- arched door -->
+              <path d="M28.5 49 V44.5 a3.5 3.5 0 0 1 7 0 V49" fill="none" stroke="#ffffff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" />
+              <!-- wing windows (glow) -->
+              <rect class="tp-splash__win" x="15" y="32" width="7" height="8" rx="1.4" fill="rgba(255,211,122,0)" stroke="#ffffff" stroke-width="2.2" stroke-linejoin="round" />
+              <rect class="tp-splash__win tp-splash__win--2" x="42" y="32" width="7" height="8" rx="1.4" fill="rgba(255,211,122,0)" stroke="#ffffff" stroke-width="2.2" stroke-linejoin="round" />
             </svg>
           </span>
         </div>

@@ -27,24 +27,24 @@ import React from 'react';
  * @param {string}  [props.className]    Extra classes on the wrapper.
  */
 
-const HouseGlyph = () => (
-  <svg viewBox="0 0 64 64" className="relative z-[2] w-[54%] h-[54%] block" aria-hidden="true">
-    {/* roof */}
-    <path
-      d="M6 31.5 L32 9 L58 31.5"
-      fill="none"
-      stroke="#ffffff"
-      strokeWidth="4.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    {/* body */}
-    <path d="M12 29 L12 53 Q12 55 14 55 L50 55 Q52 55 52 53 L52 29 Z" fill="#ffffff" />
-    {/* windows — light up in sequence */}
-    <rect className="tp-home-win" x="18.5" y="34" width="9" height="9" rx="2" fill="rgba(255,255,255,.92)" />
-    <rect className="tp-home-win tp-home-win-2" x="36.5" y="34" width="9" height="9" rx="2" fill="rgba(255,255,255,.92)" />
-    {/* door */}
-    <rect x="27" y="45" width="10" height="10" rx="1.6" fill="#ba0036" />
+// The TO-LET PRO building mark, recreated as inline SVG so it stays crisp at
+// any size and can animate (windows glow) — matching the brand logo.
+const BuildingGlyph = () => (
+  <svg viewBox="0 0 64 64" className="relative z-[2] w-[56%] h-[56%] block" aria-hidden="true">
+    {/* base */}
+    <rect x="9" y="48.5" width="46" height="5.5" rx="2.75" fill="#ffffff" />
+    {/* side wings */}
+    <rect x="12.5" y="28" width="12" height="21" rx="3" fill="none" stroke="#ffffff" strokeWidth="3.4" strokeLinejoin="round" />
+    <rect x="39.5" y="28" width="12" height="21" rx="3" fill="none" stroke="#ffffff" strokeWidth="3.4" strokeLinejoin="round" />
+    {/* central tower */}
+    <rect x="24.5" y="13" width="15" height="36" rx="4.5" fill="none" stroke="#ffffff" strokeWidth="3.4" strokeLinejoin="round" />
+    {/* tower nameplate slot */}
+    <rect x="29" y="19.5" width="6" height="2.8" rx="1.4" fill="#ffffff" />
+    {/* arched door */}
+    <path d="M28.5 49 V44.5 a3.5 3.5 0 0 1 7 0 V49" fill="none" stroke="#ffffff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+    {/* wing windows — glow in sequence */}
+    <rect className="tp-home-win" x="15" y="32" width="7" height="8" rx="1.4" fill="rgba(255,211,122,0)" stroke="#ffffff" strokeWidth="2.2" strokeLinejoin="round" />
+    <rect className="tp-home-win tp-home-win-2" x="42" y="32" width="7" height="8" rx="1.4" fill="rgba(255,211,122,0)" stroke="#ffffff" strokeWidth="2.2" strokeLinejoin="round" />
   </svg>
 );
 
@@ -71,7 +71,7 @@ export const HomeLoaderMark = ({ message, subMessage, compact = false }) => {
         ))}
         <span className="tp-home-tile" style={{ width: tile, height: tile }}>
           <span className="tp-home-scan" />
-          <HouseGlyph />
+          <BuildingGlyph />
         </span>
       </div>
 

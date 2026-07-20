@@ -546,7 +546,7 @@ html.dark .border-crimson-200 { border-color: rgba(244, 63, 94, 0.32) !important
   50%      { box-shadow: inset 0 0 0 1px rgba(255,255,255,.30), 0 20px 52px -10px rgba(186,0,54,.85), 0 0 42px rgba(255,93,126,.55); }
 }
 @keyframes tpHomeScan    { 0% { transform: translateY(-120%); } 100% { transform: translateY(320%); } }
-@keyframes tpHomeWin     { 0%, 100% { fill: rgba(255,255,255,.9); } 45% { fill: #ffd37a; } }
+@keyframes tpHomeWin     { 0%, 100% { fill: rgba(255,211,122,0); } 45% { fill: rgba(255,211,122,.95); } }
 @keyframes tpHomeBar     { 0% { left: -45%; } 100% { left: 105%; } }
 @keyframes tpHomeTwinkle { 0%, 100% { opacity: 0; transform: scale(.4); } 50% { opacity: .9; transform: scale(1); } }
 @keyframes tpHomeDots    { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
@@ -608,4 +608,5 @@ html.reduce-motion .tp-home-node,
 html.reduce-motion .tp-home-scan,
 html.reduce-motion .tp-home-spark { display: none !important; }
 html.reduce-motion .tp-home-bar-fill { left: 0 !important; width: 100% !important; }
-html.reduce-motion .tp-home-win { fill: #ffd37a !important; }
+/* windows rest as simple crimson openings (logo-faithful) when motion is off */
+html.reduce-motion .tp-home-win { fill: rgba(255,211,122,0) !important; }
