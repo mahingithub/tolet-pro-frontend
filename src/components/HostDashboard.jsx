@@ -5001,35 +5001,13 @@ const HostDashboard = () => {
                               : 'bg-gradient-to-br from-gray-400 to-gray-500';
 
             return (
-              <div id={`booking-${booking.id}`} key={booking.id} className={`relative bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 ${activeDropdownId === booking.id ? 'overflow-visible' : 'overflow-hidden'} transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
-
-                {/* Top-right actions menu — moved out of the footer so the 3-dot
-                    always sits at the card's corner (per the mobile design). */}
-                <div className="absolute top-2.5 right-2.5 z-20">
-                  <button
-                    type="button"
-                    onClick={() => setActiveDropdownId(activeDropdownId === booking.id ? null : booking.id)}
-                    className="p-1.5 rounded-lg bg-white/80 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"
-                    aria-label={language === 'বাংলা' ? 'আরও অপশন' : 'More options'}
-                  >
-                    <MoreVertical size={15}/>
-                  </button>
-                  {activeDropdownId === booking.id && (
-                    <div className="absolute right-0 top-full mt-1.5 w-52 bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[50] animate-in fade-in zoom-in-95 origin-top-right border border-gray-100">
-                      <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
-                      <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
-                      <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
-                      <div className="h-px w-full bg-gray-100 my-1"></div>
-                      <button onClick={() => { setActiveDropdownId(null); setConfirmDeleteBookingId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
-                    </div>
-                  )}
-                </div>
+              <div id={`booking-${booking.id}`} key={booking.id} className={`bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
 
                 {/* Compact row — always visible. Click-to-toggle suppressed in forceOpen mode. */}
                 <button
                   type="button"
                   onClick={forceOpen ? undefined : () => setExpandedBookingId(isExpanded ? null : booking.id)}
-                  className={`w-full flex items-center gap-2.5 sm:gap-3 pl-3 sm:pl-4 pr-11 py-3 text-left transition-colors ${forceOpen ? 'cursor-default' : 'hover:bg-gray-50/50'}`}
+                  className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-3 text-left transition-colors ${forceOpen ? 'cursor-default' : 'hover:bg-gray-50/50'}`}
                 >
                   <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-black text-[11px] sm:text-xs shrink-0 ${stageAvatar} overflow-hidden`}>
                     {(!hostelBooking && booking.tenantAvatar) ? (
@@ -5108,40 +5086,28 @@ const HostDashboard = () => {
                     </div>
 
                     {/* Financial breakdown — Monthly Rent / Service / Deposit / Total */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                      <div className="bg-white rounded-xl p-2.5 border border-gray-100 flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ভাড়া / মাস' : 'Rent / mo'}</p>
-                          <p className="text-xs sm:text-sm font-black text-gray-900 tabular-nums mt-0.5">{formatBDT(booking.monthlyRent)}</p>
-                        </div>
-                        <span className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><Home size={13} className="text-[#ba0036]"/></span>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
+                      <div className="bg-white rounded-xl p-2.5 border border-gray-100">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'মাসিক ভাড়া' : 'Monthly Rent'}</p>
+                        <p className="text-xs sm:text-sm font-black text-gray-900 tabular-nums mt-0.5">{formatBDT(booking.monthlyRent)}</p>
                       </div>
-                      <div className="bg-white rounded-xl p-2.5 border border-gray-100 flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'সার্ভিস' : 'Service'}</p>
-                          <p className="text-xs sm:text-sm font-black text-gray-900 tabular-nums mt-0.5">{formatBDT(booking.serviceCharge || 0)}</p>
-                        </div>
-                        <span className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><Settings size={13} className="text-blue-500"/></span>
+                      <div className="bg-white rounded-xl p-2.5 border border-gray-100">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'সার্ভিস' : 'Service'}</p>
+                        <p className="text-xs sm:text-sm font-black text-gray-900 tabular-nums mt-0.5">{formatBDT(booking.serviceCharge || 0)}</p>
                       </div>
-                      <div className="bg-white rounded-xl p-2.5 border border-gray-100 flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ডিপোজিট' : 'Deposit'}</p>
-                          <p className="text-xs sm:text-sm font-black text-gray-900 tabular-nums mt-0.5">{formatBDT(booking.advancePayment || 0)}</p>
-                          {booking.paymentMethod ? (
-                            <span className="mt-1 inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700">
-                              <CreditCard size={8} strokeWidth={3}/> {booking.paymentMethod}
-                            </span>
-                          ) : null}
-                        </div>
-                        <span className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0"><CreditCard size={13} className="text-emerald-600"/></span>
+                      <div className="bg-white rounded-xl p-2.5 border border-gray-100">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ডিপোজিট (অগ্রিম)' : 'Deposit (Advance)'}</p>
+                        <p className="text-xs sm:text-sm font-black text-gray-900 tabular-nums mt-0.5">{formatBDT(booking.advancePayment || 0)}</p>
+                        {booking.paymentMethod ? (
+                          <span className="mt-1 inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700">
+                            <CreditCard size={8} strokeWidth={3}/> {booking.paymentMethod}
+                          </span>
+                        ) : null}
                       </div>
-                      <div className="bg-gradient-to-br from-[#ba0036]/5 to-[#ff004c]/5 border border-[#ba0036]/10 rounded-xl p-2.5 flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-[8px] font-black text-[#ba0036] uppercase tracking-widest">{language === 'বাংলা' ? 'মোট / মাস' : 'Total / mo'}</p>
-                          <p className="text-xs sm:text-sm font-black text-[#ba0036] tabular-nums mt-0.5">{formatBDT(monthlyTotal)}</p>
-                          <p className="text-[8px] font-bold text-gray-500 mt-1">{language === 'বাংলা' ? 'ভাড়া + সার্ভিস' : 'Rent + Service'}</p>
-                        </div>
-                        <span className="w-7 h-7 rounded-lg bg-white/70 flex items-center justify-center shrink-0"><Receipt size={13} className="text-[#ba0036]"/></span>
+                      <div className="bg-gradient-to-br from-[#ba0036]/5 to-[#ff004c]/5 border border-[#ba0036]/10 rounded-xl p-2.5">
+                        <p className="text-[8px] font-black text-[#ba0036] uppercase tracking-widest">{language === 'বাংলা' ? 'মোট মাসিক' : 'Total/mo'}</p>
+                        <p className="text-xs sm:text-sm font-black text-[#ba0036] tabular-nums mt-0.5">{formatBDT(monthlyTotal)}</p>
+                        <p className="text-[8px] font-bold text-gray-500 mt-1">{language === 'বাংলা' ? 'ভাড়া + সার্ভিস' : 'Rent + Service'}</p>
                       </div>
                     </div>
 
@@ -5152,11 +5118,11 @@ const HostDashboard = () => {
                         instead of stacking to one column on phones. */}
                     <div className="mt-3 grid grid-cols-3 gap-1.5 sm:gap-3">
                       <div className="rounded-xl p-2 sm:p-2.5 border border-gray-100 bg-white min-w-0">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><Calendar size={9} className="shrink-0 text-violet-500"/> <span className="truncate">{language === 'বাংলা' ? 'মুভ-ইন' : 'Move-In'}</span></p>
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><Calendar size={9} className="shrink-0"/> <span className="truncate">{language === 'বাংলা' ? 'মুভ-ইন' : 'Move-In'}</span></p>
                         <p className="text-[10px] sm:text-xs font-black text-gray-900 mt-0.5">{formatDate(booking.leaseStart, language)}</p>
                       </div>
                       <div className="rounded-xl p-2 sm:p-2.5 border border-gray-100 bg-white min-w-0">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><Clock size={9} className="shrink-0 text-blue-500"/> <span className="truncate">{language === 'বাংলা' ? 'পরবর্তী পেমেন্ট' : 'Next Payment'}</span></p>
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><Clock size={9} className="shrink-0"/> <span className="truncate">{language === 'বাংলা' ? 'পরবর্তী পেমেন্ট' : 'Next Payment'}</span></p>
                         <p className="text-[10px] sm:text-xs font-black text-gray-900 mt-0.5">
                           {next ? formatDate(next.due.toISOString(), language) : (language === 'বাংলা' ? 'বকেয়া নেই' : 'No upcoming')}
                         </p>
@@ -5167,7 +5133,7 @@ const HostDashboard = () => {
                         )}
                       </div>
                       <div className="rounded-xl p-2 sm:p-2.5 border border-gray-100 bg-white min-w-0">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><CalendarRange size={9} className="shrink-0 text-orange-500"/> <span className="truncate">{language === 'বাংলা' ? 'লিজ এক্সপায়ারি' : 'Lease Expiry'}</span></p>
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><CalendarRange size={9} className="shrink-0"/> <span className="truncate">{language === 'বাংলা' ? 'লিজ এক্সপায়ারি' : 'Lease Expiry'}</span></p>
                         <p className="text-[10px] sm:text-xs font-black text-gray-900 mt-0.5">{formatDate(booking.leaseEnd, language)}</p>
                       </div>
                     </div>
@@ -5210,48 +5176,59 @@ const HostDashboard = () => {
                       </div>
                     )}
 
-                    {/* Auto-reminder + primary actions. The 3-dot menu now lives
-                        at the card's top-right, so this row only holds the four
-                        primary actions — a 4-up grid on phones (never overflows)
-                        that relaxes to a content-sized row from sm up. */}
-                    <div className="mt-3 space-y-2">
+                    {/* Auto-reminder + actions row */}
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-1.5">
                       <button
                         onClick={() => toggleAutoReminder(booking.id)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${booking.autoReminder ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+                        className={`px-2.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1 ${booking.autoReminder ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
                         title={booking.autoReminder ? `Auto-remind ${booking.reminderLeadDays}d before due` : 'Auto-reminder off'}
                       >
                         {booking.autoReminder ? <BellRing size={12}/> : <BellOff size={12}/>}
                         <span className="hidden sm:inline">{language === 'বাংলা' ? 'অটো রিমাইন্ডার' : 'Auto Reminder'}</span> · {booking.reminderLeadDays}d
                       </button>
 
-                      <div className="grid grid-cols-4 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         {/* Profile — opens the tenant's trust card (/tenant/:id). */}
                         <button
                           onClick={() => openTenantProfile(resolveTenantUserId(booking), { name: booking.tenant, avatar: booking.tenantAvatar })}
-                          className="flex items-center justify-center gap-1 px-1.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-wide active:scale-95 min-w-0"
+                          className="px-2.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1"
                           title={language === 'বাংলা' ? 'টেন্যান্ট প্রোফাইল' : 'Tenant profile'}
                         >
-                          <UserCircle size={13} className="shrink-0"/> <span className="truncate">{language === 'বাংলা' ? 'প্রোফাইল' : 'Profile'}</span>
+                          <UserCircle size={12}/> {language === 'বাংলা' ? 'প্রোফাইল' : 'Profile'}
                         </button>
-                        {/* Message — routes to /messages (ChatSystem hydrates the thread). */}
+                        {/* Message — single button. Routes to /messages so every conversation
+                            lives in one place; ChatSystem hydrates the right thread from
+                            location.state. */}
                         <button
                           onClick={() => openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-bookings', peerUserId: resolveTenantUserId(booking), peerName: booking.tenant, peerAvatar: booking.tenantAvatar, tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property })}
-                          className="flex items-center justify-center gap-1 px-1.5 py-2 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-xl text-[10px] font-black uppercase tracking-wide active:scale-95 shadow-md min-w-0"
+                          className="px-3 py-2 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-md flex items-center gap-1"
                         >
-                          <MessageCircle size={13} className="shrink-0"/> <span className="truncate">{language === 'বাংলা' ? 'মেসেজ' : 'Message'}</span>
+                          <MessageCircle size={12}/> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
                         </button>
                         {/* Invoice — jumps to Rent Collection focused on this tenant. */}
                         <button
                           onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); }}
-                          className="flex items-center justify-center gap-1 px-1.5 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-wide active:scale-95 min-w-0"
+                          className="px-2.5 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1"
                           title={language === 'বাংলা' ? 'রেন্ট কালেকশনে দেখুন' : 'Open in Rent Collection'}
                         >
-                          <Wallet size={13} className="shrink-0"/> <span className="truncate">{language === 'বাংলা' ? 'ইনভয়েস' : 'Invoice'}</span>
+                          <Wallet size={12}/> {language === 'বাংলা' ? 'ইনভয়েস' : 'Invoice'}
                         </button>
                         {/* Docs — agreement document vault */}
-                        <button onClick={() => openModal('download_user_document')} className="flex items-center justify-center gap-1 px-1.5 py-2 bg-gray-50 text-gray-700 hover:bg-gray-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-wide active:scale-95 min-w-0">
-                          <Folder size={13} className="shrink-0"/> <span className="truncate">{language === 'বাংলা' ? 'ডকস' : 'Docs'}</span>
+                        <button onClick={() => openModal('download_user_document')} className="px-2.5 py-2 bg-gray-50 text-gray-700 hover:bg-gray-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1">
+                          <Folder size={12}/> {language === 'বাংলা' ? 'ডকস' : 'Docs'}
                         </button>
+                        <div className="relative">
+                          <button onClick={() => setActiveDropdownId(activeDropdownId === booking.id ? null : booking.id)} className="p-2 rounded-xl bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"><MoreVertical size={13}/></button>
+                          {activeDropdownId === booking.id && (
+                            <div className="absolute right-0 bottom-full mb-2 w-52 bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[50] animate-in fade-in zoom-in-95 origin-bottom-right border border-gray-100">
+                              <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
+                              <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
+                              <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
+                              <div className="h-px w-full bg-gray-100 my-1"></div>
+                              <button onClick={() => { setActiveDropdownId(null); setConfirmDeleteBookingId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -5262,21 +5239,19 @@ const HostDashboard = () => {
           return (
           <div className="w-full animate-in fade-in zoom-in-95 duration-500">
 
-            {/* Mobile: one stacked column (Financial Overview → toolbar → list).
-                Desktop (xl+): the original two-column architecture — Financial
-                Overview sidebar on the left, leases toolbar + list on the right.
-                The extra sidebar cards are desktop-only so the phone layout stays
-                the clean stacked design. */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 lg:gap-6 items-start">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 lg:gap-6 xl:h-[calc(100vh-140px)] overflow-visible xl:overflow-hidden">
 
-              {/* ── LEFT: Financial Overview (mobile: top · desktop: sticky sidebar) ── */}
-              <aside className="xl:col-span-4 w-full flex flex-col gap-4 xl:sticky xl:top-4 xl:self-start">
+              {/* ── LEFT RAIL — full Financial Overview ALWAYS visible (mobile + desktop) ── */}
+              <aside className="xl:col-span-4 w-full flex flex-col gap-3 xl:gap-5 xl:h-full xl:overflow-y-auto custom-scrollbar xl:pt-1 xl:pb-4 xl:pr-1">
 
-                {/* Financial Overview hero card. */}
-                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-[2rem] p-5 sm:p-7 text-white shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden">
+                {/* Financial Overview — full hero card, always visible.
+                    Padding/font sizes scale down on mobile so the entire KPI
+                    block fits comfortably on a 6.7" viewport. No accordion,
+                    no toggle — the host always sees their portfolio at a glance. */}
+                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl xl:rounded-[2rem] p-5 xl:p-7 text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] xl:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-10 translate-x-10"></div>
                   <div className="flex items-start justify-between mb-1 relative z-10">
-                    <h3 className="text-xl sm:text-2xl font-black">{language === 'বাংলা' ? 'ফাইন্যান্সিয়াল ওভারভিউ' : 'Financial Overview'}</h3>
+                    <h3 className="text-lg xl:text-2xl font-black">{language === 'বাংলা' ? 'ফাইন্যান্সিয়াল ওভারভিউ' : 'Financial Overview'}</h3>
                     {isPremium ? (
                       <div className="bg-[#ba0036] text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md">
                          <Crown size={10} /> PRO
@@ -5287,143 +5262,130 @@ const HostDashboard = () => {
                       </button>
                     )}
                   </div>
-                  <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest mb-5 relative z-10">
+                  <p className="text-white/50 text-[9px] xl:text-[10px] font-bold uppercase tracking-widest mb-4 xl:mb-7 relative z-10">
                     {language === 'বাংলা' ? 'লিজ পোর্টফোলিও সারাংশ' : 'Lease Portfolio Snapshot'}
                   </p>
-                  {/* Top row — total monthly revenue (left) + security deposits
-                      (right box), SIDE-BY-SIDE on every width so mobile matches
-                      the reference image. Numbers scale down on phones to fit. */}
-                  <div className="grid grid-cols-2 gap-2.5 sm:gap-4 relative z-10">
-                    <div className="min-w-0">
-                      <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1 leading-tight">{language === 'বাংলা' ? 'মোট মাসিক আয়' : 'Total Monthly Revenue'}</p>
-                      <p className="text-2xl sm:text-4xl font-black text-white tracking-tight tabular-nums">{formatBDT(leaseSummary.totalMonthlyRevenue)}</p>
-                      <p className="text-[9px] font-bold text-white/50 mt-1 leading-tight">{language === 'বাংলা' ? 'অ্যাক্টিভ + নোটিশ লিজ থেকে (ভাড়া + সার্ভিস)' : 'from active + notice leases (rent + service)'}</p>
+                  <div className="space-y-4 xl:space-y-6 relative z-10">
+                    <div>
+                      <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'মোট মাসিক আয়' : 'Total Monthly Revenue'}</p>
+                      <p className="text-3xl xl:text-4xl font-black text-white tracking-tight tabular-nums">{formatBDT(leaseSummary.totalMonthlyRevenue)}</p>
+                      <p className="text-[9px] font-bold text-white/50 mt-1">{language === 'বাংলা' ? 'অ্যাক্টিভ + নোটিশ লিজ থেকে (ভাড়া + সার্ভিস)' : 'from active + notice leases (rent + service)'}</p>
                     </div>
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-2.5 sm:p-4 flex flex-col justify-center min-w-0">
-                      <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1 leading-tight">{language === 'বাংলা' ? 'মোট সিকিউরিটি ডিপোজিট' : 'Total Security Deposits'}</p>
-                      <p className="text-lg sm:text-2xl font-black text-white tabular-nums">{formatBDT(leaseSummary.totalSecurityDeposits)}</p>
-                      <p className="text-[9px] font-bold text-white/50 mt-1 leading-tight">{language === 'বাংলা' ? 'লিজ শেষে রিটার্নযোগ্য' : 'returnable at lease end'}</p>
+                    <div className="grid grid-cols-2 gap-2 xl:gap-3">
+                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2.5 xl:p-3">
+                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{stageLabel('active', language)}</p>
+                        <p className="text-xl xl:text-2xl font-black text-green-400 tabular-nums">{leaseSummary.activeCount}</p>
+                      </div>
+                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2.5 xl:p-3">
+                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{stageLabel('notice', language)}</p>
+                        <p className="text-xl xl:text-2xl font-black text-amber-300 tabular-nums">{leaseSummary.noticeCount}</p>
+                      </div>
+                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2.5 xl:p-3">
+                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{stageLabel('draft', language)}</p>
+                        <p className="text-xl xl:text-2xl font-black text-blue-300 tabular-nums">{leaseSummary.draftCount}</p>
+                      </div>
+                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2.5 xl:p-3">
+                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{stageLabel('done', language)}</p>
+                        <p className="text-xl xl:text-2xl font-black text-white/70 tabular-nums">{leaseSummary.doneCount}</p>
+                      </div>
+                    </div>
+                    <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2.5 xl:p-3">
+                      <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'মোট সিকিউরিটি ডিপোজিট' : 'Total Security Deposits'}</p>
+                      <p className="text-lg xl:text-xl font-black text-white tabular-nums">{formatBDT(leaseSummary.totalSecurityDeposits)}</p>
+                      <p className="text-[9px] font-bold text-white/50 mt-1">{language === 'বাংলা' ? 'লিজ শেষে রিটার্নযোগ্য' : 'returnable at lease end'}</p>
                     </div>
                   </div>
-                  {/* Stage counters — 2×2 grid on all widths, each box filters the list */}
-                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3 mt-4 relative z-10">
+                </div>
+
+                {/* Lease status flow — always visible on mobile + desktop. */}
+                <div className="bg-white rounded-2xl xl:rounded-[2rem] p-4 xl:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none shrink-0">
+                  <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3 xl:mb-4 flex items-center gap-2">
+                    <Activity size={14} className="text-gray-400" />
+                    {language === 'বাংলা' ? 'লিজ স্ট্যাটাস ফ্লো' : 'Lease Status Flow'}
+                  </h4>
+                  <div className="space-y-2 xl:space-y-3">
                     {[
-                      { stage: 'active', count: leaseSummary.activeCount, color: 'text-green-400' },
-                      { stage: 'notice', count: leaseSummary.noticeCount, color: 'text-amber-300' },
-                      { stage: 'draft',  count: leaseSummary.draftCount,  color: 'text-blue-300' },
-                      { stage: 'done',   count: leaseSummary.doneCount,   color: 'text-white/70' },
-                    ].map(({ stage, count, color }) => (
-                      <button
-                        key={stage}
-                        type="button"
-                        onClick={() => setLeaseStageFilter(stage)}
-                        className={`text-left bg-white/5 border rounded-2xl p-3 transition-colors ${leaseStageFilter === stage ? 'border-white/40 bg-white/10' : 'border-white/10 hover:bg-white/10'}`}
-                      >
-                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{stageLabel(stage, language)}</p>
-                        <p className={`text-2xl font-black tabular-nums ${color}`}>{count}</p>
+                      { stage: 'draft',  count: leaseSummary.draftCount,  dot: 'bg-blue-500',  bg: 'bg-blue-50',  text: 'text-blue-700',  hint: language === 'বাংলা' ? 'মুভ-ইনের অপেক্ষায়' : 'awaiting move-in' },
+                      { stage: 'active', count: leaseSummary.activeCount, dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700', hint: language === 'বাংলা' ? 'বর্তমানে রেসিডেন্স' : 'currently in residence' },
+                      { stage: 'notice', count: leaseSummary.noticeCount, dot: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', hint: language === 'বাংলা' ? 'রিনিউয়াল উইন্ডো · শেষ ৩০ দিন' : 'renewal window · last 30 days' },
+                      { stage: 'done',   count: leaseSummary.doneCount,   dot: 'bg-gray-400',  bg: 'bg-gray-100', text: 'text-gray-600',  hint: language === 'বাংলা' ? 'মেয়াদ শেষ' : 'lease ended' },
+                    ].map(row => (
+                      <button key={row.stage} onClick={() => setLeaseStageFilter(row.stage)} className="w-full flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-gray-50 transition-colors text-left">
+                        <span className={`w-2 h-2 rounded-full ${row.dot}`}></span>
+                        <span className="text-xs font-black text-gray-900 w-20 capitalize">{stageLabel(row.stage, language)}</span>
+                        <span className="text-[10px] font-bold text-gray-500 flex-1 truncate">{row.hint}</span>
+                        <span className={`${row.bg} ${row.text} px-2.5 py-1 rounded-lg text-xs font-black tabular-nums`}>{row.count}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Desktop-only sidebar extras — restore the pre-update
-                    architecture (Lease Status Flow + Rent Collection shortcut).
-                    Hidden on phones so mobile stays FO → toolbar → list. */}
-                <div className="hidden xl:flex flex-col gap-4">
-                  <div className="bg-white rounded-[2rem] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
-                    <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                      <Activity size={14} className="text-gray-400" />
-                      {language === 'বাংলা' ? 'লিজ স্ট্যাটাস ফ্লো' : 'Lease Status Flow'}
-                    </h4>
-                    <div className="space-y-3">
-                      {[
-                        { stage: 'draft',  count: leaseSummary.draftCount,  dot: 'bg-blue-500',  bg: 'bg-blue-50',  text: 'text-blue-700',  hint: language === 'বাংলা' ? 'মুভ-ইনের অপেক্ষায়' : 'awaiting move-in' },
-                        { stage: 'active', count: leaseSummary.activeCount, dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700', hint: language === 'বাংলা' ? 'বর্তমানে রেসিডেন্স' : 'currently in residence' },
-                        { stage: 'notice', count: leaseSummary.noticeCount, dot: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', hint: language === 'বাংলা' ? 'রিনিউয়াল উইন্ডো · শেষ ৩০ দিন' : 'renewal window · last 30 days' },
-                        { stage: 'done',   count: leaseSummary.doneCount,   dot: 'bg-gray-400',  bg: 'bg-gray-100', text: 'text-gray-600',  hint: language === 'বাংলা' ? 'মেয়াদ শেষ' : 'lease ended' },
-                      ].map(row => (
-                        <button key={row.stage} onClick={() => setLeaseStageFilter(row.stage)} className="w-full flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-gray-50 transition-colors text-left">
-                          <span className={`w-2 h-2 rounded-full ${row.dot}`}></span>
-                          <span className="text-xs font-black text-gray-900 w-20 capitalize">{stageLabel(row.stage, language)}</span>
-                          <span className="text-[10px] font-bold text-gray-500 flex-1 truncate">{row.hint}</span>
-                          <span className={`${row.bg} ${row.text} px-2.5 py-1 rounded-lg text-xs font-black tabular-nums`}>{row.count}</span>
+                <button
+                  onClick={() => setActiveTab('rent')}
+                  className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 rounded-2xl xl:rounded-[2rem] p-4 xl:p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center justify-between gap-3 transition-colors shrink-0 group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                      <Wallet size={16} />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs font-black text-emerald-900">{language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent Collection'}</p>
+                      <p className="text-[10px] font-bold text-emerald-700/70 leading-tight">{language === 'বাংলা' ? '১২ মাসের লেজার, পেমেন্ট আপডেট' : '12-month ledger, mark paid, reminders'}</p>
+                    </div>
+                  </div>
+                  <ArrowUpRight size={16} className="text-emerald-700 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                </button>
+              </aside>
+
+              {/* ── RIGHT MAIN — main IS the scroll container; sticky toolbar pins inside it ── */}
+              <main className="xl:col-span-8 w-full xl:h-full xl:overflow-y-auto custom-scrollbar pb-24 xl:pr-3 min-w-0">
+
+                {/* Sticky toolbar — ONE row. Title is a tiny chip in the
+                    corner; search + filter pills + New Lease share the same
+                    sticky line. Because <main> is the scroll container, this
+                    bar pins to the top of the list as the host scrolls (works
+                    on both desktop and mobile). */}
+                <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:-mx-4 xl:mx-0 px-3 sm:px-4 xl:px-0 pt-2 pb-3 mb-2 xl:pt-1">
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap xl:flex-nowrap">
+                    {/* Title corner chip — small, gray, with live count. */}
+                    <span className="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/70 text-[9px] xl:text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                      <CalendarRange size={11} className="text-[#ba0036]"/>
+                      <span className="hidden sm:inline">{language === 'বাংলা' ? 'লিজ' : 'Leases'}</span>
+                      <span className="text-gray-400 tabular-nums">{filtered.length}</span>
+                    </span>
+                    {/* Search input — flexes to fill, capped on desktop. */}
+                    <div className="relative flex-1 min-w-[120px] xl:max-w-[260px] order-3 sm:order-none basis-full sm:basis-auto">
+                      <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                      <input
+                        type="search"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder={language === 'বাংলা' ? 'খুঁজুন...' : 'Search tenants...'}
+                        className="w-full pl-7 pr-2 py-2 rounded-xl bg-white text-[11px] font-bold text-gray-900 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-transparent focus:border-gray-200 focus:outline-none placeholder:text-gray-400"
+                      />
+                    </div>
+                    {/* Filter pills — horizontal scroll on narrow viewports. */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 xl:flex-none order-2 sm:order-none min-w-0">
+                      {['all', 'draft', 'active', 'notice', 'done'].map(f => (
+                        <button
+                          key={f}
+                          onClick={() => setLeaseStageFilter(f)}
+                          className={`shrink-0 px-2.5 sm:px-3 py-2 rounded-xl text-[10px] font-black capitalize transition-all whitespace-nowrap ${leaseStageFilter === f ? 'bg-gray-900 text-white shadow-[0_2px_8px_rgba(0,0,0,0.15)]' : 'bg-white text-gray-500 hover:text-gray-900 shadow-[0_2px_6px_rgba(0,0,0,0.03)]'}`}
+                        >
+                          {stageLabel(f, language)}
                         </button>
                       ))}
                     </div>
-                  </div>
-                  <button
-                    onClick={() => setActiveTab('rent')}
-                    className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 rounded-[2rem] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center justify-between gap-3 transition-colors group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-                        <Wallet size={16} />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-xs font-black text-emerald-900">{language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent Collection'}</p>
-                        <p className="text-[10px] font-bold text-emerald-700/70 leading-tight">{language === 'বাংলা' ? '১২ মাসের লেজার, পেমেন্ট আপডেট' : '12-month ledger, mark paid, reminders'}</p>
-                      </div>
-                    </div>
-                    <ArrowUpRight size={16} className="text-emerald-700 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                  </button>
-                </div>
-              </aside>
-
-              {/* ── RIGHT: leases toolbar + list (mobile: below the overview) ── */}
-              <main className="xl:col-span-8 w-full min-w-0">
-
-              {/* ── Toolbar (two rows, mirrors the reference image) ──
-                  Row 1: Leases + live count · New Lease (+) · stage pills.
-                  Row 2: search tenants · filter-reset button. Sticky so it
-                  pins to the top of the list while the host scrolls. */}
-              <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:mx-0 px-3 sm:px-0 pt-1 pb-2 flex flex-col gap-2.5">
-                {/* Row 1 */}
-                <div className="flex items-center gap-2">
-                  <span className="shrink-0 inline-flex items-center gap-1.5 text-sm font-black text-gray-900 uppercase tracking-tight">
-                    <CalendarRange size={16} className="text-[#ba0036]"/>
-                    {language === 'বাংলা' ? 'লিজ' : 'Leases'}
-                    <span className="text-gray-400 tabular-nums">{filtered.length}</span>
-                  </span>
-                  <button
-                    onClick={() => isPremium ? openBlankLease() : setActiveModal('premium_gate')}
-                    title={language === 'বাংলা' ? 'নতুন লিজ' : 'New Lease'}
-                    className="shrink-0 w-9 h-9 rounded-full bg-[#ba0036] hover:bg-[#90002a] text-white flex items-center justify-center shadow-[0_4px_12px_rgba(186,0,54,0.25)] transition-all active:scale-95"
-                  >
-                    {isPremium ? <Plus size={18}/> : <Crown size={16}/>}
-                  </button>
-                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 min-w-0 justify-end">
-                    {['all', 'draft', 'active', 'notice', 'done'].map(f => (
-                      <button
-                        key={f}
-                        onClick={() => setLeaseStageFilter(f)}
-                        className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-black capitalize transition-all whitespace-nowrap ${leaseStageFilter === f ? 'bg-gray-900 text-white shadow-[0_2px_8px_rgba(0,0,0,0.15)]' : 'bg-white text-gray-500 hover:text-gray-900 shadow-[0_2px_6px_rgba(0,0,0,0.03)]'}`}
-                      >
-                        {stageLabel(f, language)}
-                      </button>
-                    ))}
+                    {/* New Lease action — corner-pinned. */}
+                    <button
+                      onClick={() => isPremium ? openBlankLease() : setActiveModal('premium_gate')}
+                      className="shrink-0 bg-[#ba0036] hover:bg-[#90002a] text-white px-3 py-2 rounded-xl font-black text-[10px] shadow-[0_4px_12px_rgba(186,0,54,0.25)] transition-all flex items-center gap-1.5 active:scale-95 order-1 sm:order-none ml-auto sm:ml-0"
+                    >
+                      {isPremium ? <Plus size={13}/> : <Crown size={13}/>}
+                      <span className="hidden sm:inline">{language === 'বাংলা' ? 'নতুন লিজ' : 'New Lease'}</span>
+                    </button>
                   </div>
                 </div>
-                {/* Row 2 */}
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                    <input
-                      type="search"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder={language === 'বাংলা' ? 'ভাড়াটিয়া খুঁজুন...' : 'Search tenants...'}
-                      className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-white text-[13px] font-bold text-gray-900 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 focus:border-[#ba0036]/40 focus:outline-none placeholder:text-gray-400"
-                    />
-                  </div>
-                  <button
-                    onClick={() => { setLeaseStageFilter('all'); setSearchQuery(''); }}
-                    title={language === 'বাংলা' ? 'ফিল্টার রিসেট' : 'Reset filters'}
-                    className={`shrink-0 w-11 h-11 rounded-2xl border flex items-center justify-center transition-all active:scale-95 ${(leaseStageFilter !== 'all' || searchQuery) ? 'bg-[#ba0036] border-[#ba0036] text-white shadow-[0_4px_12px_rgba(186,0,54,0.25)]' : 'bg-white border-gray-100 text-[#ba0036] shadow-[0_2px_8px_rgba(0,0,0,0.04)]'}`}
-                  >
-                    <Filter size={16}/>
-                  </button>
-                </div>
-              </div>
 
                 {/* List — flat sequence of compact rows. Sticky toolbar above
                     floats on scroll. forceOpen auto-engages when the filtered
@@ -5473,14 +5435,8 @@ const HostDashboard = () => {
                     </div>
                   );
                 })()}
-
-              {/* Footer — mirrors the reference "X of Y tenants" line. */}
-              {bookings.length > 0 && (
-                <p className="text-center text-[11px] font-bold text-gray-400 pt-1 pb-2">
-                  {filtered.length} {language === 'বাংলা' ? '/' : 'of'} {bookings.length} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}
-                </p>
-              )}
               </main>
+
             </div>
           </div>
           );
