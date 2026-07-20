@@ -5001,13 +5001,35 @@ const HostDashboard = () => {
                               : 'bg-gradient-to-br from-gray-400 to-gray-500';
 
             return (
-              <div id={`booking-${booking.id}`} key={booking.id} className={`bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
+              <div id={`booking-${booking.id}`} key={booking.id} className={`relative bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 ${activeDropdownId === booking.id ? 'overflow-visible' : 'overflow-hidden'} transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
+
+                {/* Top-right actions menu — moved out of the footer so the 3-dot
+                    always sits at the card's corner (per the mobile design). */}
+                <div className="absolute top-2.5 right-2.5 z-20">
+                  <button
+                    type="button"
+                    onClick={() => setActiveDropdownId(activeDropdownId === booking.id ? null : booking.id)}
+                    className="p-1.5 rounded-lg bg-white/80 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"
+                    aria-label={language === 'বাংলা' ? 'আরও অপশন' : 'More options'}
+                  >
+                    <MoreVertical size={15}/>
+                  </button>
+                  {activeDropdownId === booking.id && (
+                    <div className="absolute right-0 top-full mt-1.5 w-52 bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[50] animate-in fade-in zoom-in-95 origin-top-right border border-gray-100">
+                      <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
+                      <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
+                      <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
+                      <div className="h-px w-full bg-gray-100 my-1"></div>
+                      <button onClick={() => { setActiveDropdownId(null); setConfirmDeleteBookingId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
+                    </div>
+                  )}
+                </div>
 
                 {/* Compact row — always visible. Click-to-toggle suppressed in forceOpen mode. */}
                 <button
                   type="button"
                   onClick={forceOpen ? undefined : () => setExpandedBookingId(isExpanded ? null : booking.id)}
-                  className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-3 text-left transition-colors ${forceOpen ? 'cursor-default' : 'hover:bg-gray-50/50'}`}
+                  className={`w-full flex items-center gap-2.5 sm:gap-3 pl-3 sm:pl-4 pr-11 py-3 text-left transition-colors ${forceOpen ? 'cursor-default' : 'hover:bg-gray-50/50'}`}
                 >
                   <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-black text-[11px] sm:text-xs shrink-0 ${stageAvatar} overflow-hidden`}>
                     {(!hostelBooking && booking.tenantAvatar) ? (
@@ -5188,59 +5210,48 @@ const HostDashboard = () => {
                       </div>
                     )}
 
-                    {/* Auto-reminder + actions row */}
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-1.5">
+                    {/* Auto-reminder + primary actions. The 3-dot menu now lives
+                        at the card's top-right, so this row only holds the four
+                        primary actions — a 4-up grid on phones (never overflows)
+                        that relaxes to a content-sized row from sm up. */}
+                    <div className="mt-3 space-y-2">
                       <button
                         onClick={() => toggleAutoReminder(booking.id)}
-                        className={`px-2.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1 ${booking.autoReminder ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+                        className={`inline-flex items-center gap-1 px-2.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${booking.autoReminder ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
                         title={booking.autoReminder ? `Auto-remind ${booking.reminderLeadDays}d before due` : 'Auto-reminder off'}
                       >
                         {booking.autoReminder ? <BellRing size={12}/> : <BellOff size={12}/>}
                         <span className="hidden sm:inline">{language === 'বাংলা' ? 'অটো রিমাইন্ডার' : 'Auto Reminder'}</span> · {booking.reminderLeadDays}d
                       </button>
 
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                      <div className="grid grid-cols-4 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
                         {/* Profile — opens the tenant's trust card (/tenant/:id). */}
                         <button
                           onClick={() => openTenantProfile(resolveTenantUserId(booking), { name: booking.tenant, avatar: booking.tenantAvatar })}
-                          className="px-2.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1"
+                          className="flex items-center justify-center gap-1 px-1.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-wide active:scale-95 min-w-0"
                           title={language === 'বাংলা' ? 'টেন্যান্ট প্রোফাইল' : 'Tenant profile'}
                         >
-                          <UserCircle size={12}/> {language === 'বাংলা' ? 'প্রোফাইল' : 'Profile'}
+                          <UserCircle size={13} className="shrink-0"/> <span className="truncate">{language === 'বাংলা' ? 'প্রোফাইল' : 'Profile'}</span>
                         </button>
-                        {/* Message — single button. Routes to /messages so every conversation
-                            lives in one place; ChatSystem hydrates the right thread from
-                            location.state. */}
+                        {/* Message — routes to /messages (ChatSystem hydrates the thread). */}
                         <button
                           onClick={() => openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-bookings', peerUserId: resolveTenantUserId(booking), peerName: booking.tenant, peerAvatar: booking.tenantAvatar, tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property })}
-                          className="px-3 py-2 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-md flex items-center gap-1"
+                          className="flex items-center justify-center gap-1 px-1.5 py-2 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-xl text-[10px] font-black uppercase tracking-wide active:scale-95 shadow-md min-w-0"
                         >
-                          <MessageCircle size={12}/> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
+                          <MessageCircle size={13} className="shrink-0"/> <span className="truncate">{language === 'বাংলা' ? 'মেসেজ' : 'Message'}</span>
                         </button>
                         {/* Invoice — jumps to Rent Collection focused on this tenant. */}
                         <button
                           onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); }}
-                          className="px-2.5 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1"
+                          className="flex items-center justify-center gap-1 px-1.5 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-wide active:scale-95 min-w-0"
                           title={language === 'বাংলা' ? 'রেন্ট কালেকশনে দেখুন' : 'Open in Rent Collection'}
                         >
-                          <Wallet size={12}/> {language === 'বাংলা' ? 'ইনভয়েস' : 'Invoice'}
+                          <Wallet size={13} className="shrink-0"/> <span className="truncate">{language === 'বাংলা' ? 'ইনভয়েস' : 'Invoice'}</span>
                         </button>
                         {/* Docs — agreement document vault */}
-                        <button onClick={() => openModal('download_user_document')} className="px-2.5 py-2 bg-gray-50 text-gray-700 hover:bg-gray-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1">
-                          <Folder size={12}/> {language === 'বাংলা' ? 'ডকস' : 'Docs'}
+                        <button onClick={() => openModal('download_user_document')} className="flex items-center justify-center gap-1 px-1.5 py-2 bg-gray-50 text-gray-700 hover:bg-gray-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-wide active:scale-95 min-w-0">
+                          <Folder size={13} className="shrink-0"/> <span className="truncate">{language === 'বাংলা' ? 'ডকস' : 'Docs'}</span>
                         </button>
-                        <div className="relative">
-                          <button onClick={() => setActiveDropdownId(activeDropdownId === booking.id ? null : booking.id)} className="p-2 rounded-xl bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"><MoreVertical size={13}/></button>
-                          {activeDropdownId === booking.id && (
-                            <div className="absolute right-0 bottom-full mb-2 w-52 bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[50] animate-in fade-in zoom-in-95 origin-bottom-right border border-gray-100">
-                              <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
-                              <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
-                              <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
-                              <div className="h-px w-full bg-gray-100 my-1"></div>
-                              <button onClick={() => { setActiveDropdownId(null); setConfirmDeleteBookingId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
-                            </div>
-                          )}
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -5251,13 +5262,17 @@ const HostDashboard = () => {
           return (
           <div className="w-full animate-in fade-in zoom-in-95 duration-500">
 
-            {/* Single centred column — mirrors the mobile Booking layout on
-                every width (per the reference design). No sidebar split; the
-                Financial Overview, toolbar, list and footer stack in one
-                readable, centred column that scales cleanly from phone to desktop. */}
-            <div className="max-w-3xl mx-auto w-full flex flex-col gap-4">
+            {/* Mobile: one stacked column (Financial Overview → toolbar → list).
+                Desktop (xl+): the original two-column architecture — Financial
+                Overview sidebar on the left, leases toolbar + list on the right.
+                The extra sidebar cards are desktop-only so the phone layout stays
+                the clean stacked design. */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 lg:gap-6 items-start">
 
-                {/* Financial Overview hero card (identical structure on mobile + desktop). */}
+              {/* ── LEFT: Financial Overview (mobile: top · desktop: sticky sidebar) ── */}
+              <aside className="xl:col-span-4 w-full flex flex-col gap-4 xl:sticky xl:top-4 xl:self-start">
+
+                {/* Financial Overview hero card. */}
                 <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-[2rem] p-5 sm:p-7 text-white shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-10 translate-x-10"></div>
                   <div className="flex items-start justify-between mb-1 relative z-10">
@@ -5310,6 +5325,52 @@ const HostDashboard = () => {
                     ))}
                   </div>
                 </div>
+
+                {/* Desktop-only sidebar extras — restore the pre-update
+                    architecture (Lease Status Flow + Rent Collection shortcut).
+                    Hidden on phones so mobile stays FO → toolbar → list. */}
+                <div className="hidden xl:flex flex-col gap-4">
+                  <div className="bg-white rounded-[2rem] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
+                    <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <Activity size={14} className="text-gray-400" />
+                      {language === 'বাংলা' ? 'লিজ স্ট্যাটাস ফ্লো' : 'Lease Status Flow'}
+                    </h4>
+                    <div className="space-y-3">
+                      {[
+                        { stage: 'draft',  count: leaseSummary.draftCount,  dot: 'bg-blue-500',  bg: 'bg-blue-50',  text: 'text-blue-700',  hint: language === 'বাংলা' ? 'মুভ-ইনের অপেক্ষায়' : 'awaiting move-in' },
+                        { stage: 'active', count: leaseSummary.activeCount, dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700', hint: language === 'বাংলা' ? 'বর্তমানে রেসিডেন্স' : 'currently in residence' },
+                        { stage: 'notice', count: leaseSummary.noticeCount, dot: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', hint: language === 'বাংলা' ? 'রিনিউয়াল উইন্ডো · শেষ ৩০ দিন' : 'renewal window · last 30 days' },
+                        { stage: 'done',   count: leaseSummary.doneCount,   dot: 'bg-gray-400',  bg: 'bg-gray-100', text: 'text-gray-600',  hint: language === 'বাংলা' ? 'মেয়াদ শেষ' : 'lease ended' },
+                      ].map(row => (
+                        <button key={row.stage} onClick={() => setLeaseStageFilter(row.stage)} className="w-full flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-gray-50 transition-colors text-left">
+                          <span className={`w-2 h-2 rounded-full ${row.dot}`}></span>
+                          <span className="text-xs font-black text-gray-900 w-20 capitalize">{stageLabel(row.stage, language)}</span>
+                          <span className="text-[10px] font-bold text-gray-500 flex-1 truncate">{row.hint}</span>
+                          <span className={`${row.bg} ${row.text} px-2.5 py-1 rounded-lg text-xs font-black tabular-nums`}>{row.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('rent')}
+                    className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 rounded-[2rem] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center justify-between gap-3 transition-colors group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                        <Wallet size={16} />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-xs font-black text-emerald-900">{language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent Collection'}</p>
+                        <p className="text-[10px] font-bold text-emerald-700/70 leading-tight">{language === 'বাংলা' ? '১২ মাসের লেজার, পেমেন্ট আপডেট' : '12-month ledger, mark paid, reminders'}</p>
+                      </div>
+                    </div>
+                    <ArrowUpRight size={16} className="text-emerald-700 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  </button>
+                </div>
+              </aside>
+
+              {/* ── RIGHT: leases toolbar + list (mobile: below the overview) ── */}
+              <main className="xl:col-span-8 w-full min-w-0">
 
               {/* ── Toolbar (two rows, mirrors the reference image) ──
                   Row 1: Leases + live count · New Lease (+) · stage pills.
@@ -5419,6 +5480,7 @@ const HostDashboard = () => {
                   {filtered.length} {language === 'বাংলা' ? '/' : 'of'} {bookings.length} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}
                 </p>
               )}
+              </main>
             </div>
           </div>
           );
