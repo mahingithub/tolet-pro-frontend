@@ -5085,29 +5085,33 @@ const HostDashboard = () => {
                       )}
                     </div>
 
-                    {/* Financial breakdown — Monthly Rent / Service / Deposit / Total */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
-                      <div className="bg-white rounded-xl p-2.5 border border-gray-100">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'মাসিক ভাড়া' : 'Monthly Rent'}</p>
-                        <p className="text-xs sm:text-sm font-black text-gray-900 tabular-nums mt-0.5">{formatBDT(booking.monthlyRent)}</p>
+                    {/* Financial breakdown — Monthly Rent / Service / Deposit / Total.
+                        4 columns on EVERY width so the boxes never reflow between
+                        phone, tablet & desktop. Only the font + padding shrink on
+                        small screens (min-w-0 lets the tiles compress); the layout
+                        and positions stay identical across all devices. */}
+                    <div className="grid grid-cols-4 gap-1.5 sm:gap-2 md:gap-3">
+                      <div className="bg-white rounded-lg sm:rounded-xl p-1.5 sm:p-2 md:p-2.5 border border-gray-100 min-w-0">
+                        <p className="text-[7px] sm:text-[8px] font-black text-gray-400 uppercase tracking-wide sm:tracking-widest leading-tight">{language === 'বাংলা' ? 'মাসিক ভাড়া' : 'Monthly Rent'}</p>
+                        <p className="text-[10px] sm:text-xs md:text-sm font-black text-gray-900 tabular-nums mt-0.5 leading-tight">{formatBDT(booking.monthlyRent)}</p>
                       </div>
-                      <div className="bg-white rounded-xl p-2.5 border border-gray-100">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'সার্ভিস' : 'Service'}</p>
-                        <p className="text-xs sm:text-sm font-black text-gray-900 tabular-nums mt-0.5">{formatBDT(booking.serviceCharge || 0)}</p>
+                      <div className="bg-white rounded-lg sm:rounded-xl p-1.5 sm:p-2 md:p-2.5 border border-gray-100 min-w-0">
+                        <p className="text-[7px] sm:text-[8px] font-black text-gray-400 uppercase tracking-wide sm:tracking-widest leading-tight">{language === 'বাংলা' ? 'সার্ভিস' : 'Service'}</p>
+                        <p className="text-[10px] sm:text-xs md:text-sm font-black text-gray-900 tabular-nums mt-0.5 leading-tight">{formatBDT(booking.serviceCharge || 0)}</p>
                       </div>
-                      <div className="bg-white rounded-xl p-2.5 border border-gray-100">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ডিপোজিট (অগ্রিম)' : 'Deposit (Advance)'}</p>
-                        <p className="text-xs sm:text-sm font-black text-gray-900 tabular-nums mt-0.5">{formatBDT(booking.advancePayment || 0)}</p>
+                      <div className="bg-white rounded-lg sm:rounded-xl p-1.5 sm:p-2 md:p-2.5 border border-gray-100 min-w-0">
+                        <p className="text-[7px] sm:text-[8px] font-black text-gray-400 uppercase tracking-wide sm:tracking-widest leading-tight">{language === 'বাংলা' ? 'ডিপোজিট (অগ্রিম)' : 'Deposit (Advance)'}</p>
+                        <p className="text-[10px] sm:text-xs md:text-sm font-black text-gray-900 tabular-nums mt-0.5 leading-tight">{formatBDT(booking.advancePayment || 0)}</p>
                         {booking.paymentMethod ? (
-                          <span className="mt-1 inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700">
-                            <CreditCard size={8} strokeWidth={3}/> {booking.paymentMethod}
+                          <span className="mt-1 inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[7px] sm:text-[8px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 max-w-full">
+                            <CreditCard size={8} strokeWidth={3} className="shrink-0"/> <span className="truncate">{booking.paymentMethod}</span>
                           </span>
                         ) : null}
                       </div>
-                      <div className="bg-gradient-to-br from-[#ba0036]/5 to-[#ff004c]/5 border border-[#ba0036]/10 rounded-xl p-2.5">
-                        <p className="text-[8px] font-black text-[#ba0036] uppercase tracking-widest">{language === 'বাংলা' ? 'মোট মাসিক' : 'Total/mo'}</p>
-                        <p className="text-xs sm:text-sm font-black text-[#ba0036] tabular-nums mt-0.5">{formatBDT(monthlyTotal)}</p>
-                        <p className="text-[8px] font-bold text-gray-500 mt-1">{language === 'বাংলা' ? 'ভাড়া + সার্ভিস' : 'Rent + Service'}</p>
+                      <div className="bg-gradient-to-br from-[#ba0036]/5 to-[#ff004c]/5 border border-[#ba0036]/10 rounded-lg sm:rounded-xl p-1.5 sm:p-2 md:p-2.5 min-w-0">
+                        <p className="text-[7px] sm:text-[8px] font-black text-[#ba0036] uppercase tracking-wide sm:tracking-widest leading-tight">{language === 'বাংলা' ? 'মোট মাসিক' : 'Total/mo'}</p>
+                        <p className="text-[10px] sm:text-xs md:text-sm font-black text-[#ba0036] tabular-nums mt-0.5 leading-tight">{formatBDT(monthlyTotal)}</p>
+                        <p className="text-[7px] sm:text-[8px] font-bold text-gray-500 mt-1 leading-tight">{language === 'বাংলা' ? 'ভাড়া + সার্ভিস' : 'Rent + Service'}</p>
                       </div>
                     </div>
 
@@ -5266,10 +5270,22 @@ const HostDashboard = () => {
                     {language === 'বাংলা' ? 'লিজ পোর্টফোলিও সারাংশ' : 'Lease Portfolio Snapshot'}
                   </p>
                   <div className="space-y-4 xl:space-y-6 relative z-10">
-                    <div>
-                      <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'মোট মাসিক আয়' : 'Total Monthly Revenue'}</p>
-                      <p className="text-3xl xl:text-4xl font-black text-white tracking-tight tabular-nums">{formatBDT(leaseSummary.totalMonthlyRevenue)}</p>
-                      <p className="text-[9px] font-bold text-white/50 mt-1">{language === 'বাংলা' ? 'অ্যাক্টিভ + নোটিশ লিজ থেকে (ভাড়া + সার্ভিস)' : 'from active + notice leases (rent + service)'}</p>
+                    {/* Revenue + Security Deposits sit side by side across every
+                        breakpoint (mobile · tablet · desktop). Two equal columns
+                        so the deposit KPI reads beside the monthly revenue rather
+                        than stacking at the bottom. min-w-0 + break-words keep the
+                        currency figures from overflowing narrow phone columns. */}
+                    <div className="grid grid-cols-2 gap-2.5 xl:gap-3 items-stretch">
+                      <div className="min-w-0">
+                        <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-1 leading-tight">{language === 'বাংলা' ? 'মোট মাসিক আয়' : 'Total Monthly Revenue'}</p>
+                        <p className="text-2xl sm:text-3xl xl:text-4xl font-black text-white tracking-tight tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalMonthlyRevenue)}</p>
+                        <p className="text-[8px] xl:text-[9px] font-bold text-white/50 mt-1.5 leading-tight">{language === 'বাংলা' ? 'অ্যাক্টিভ + নোটিশ লিজ থেকে (ভাড়া + সার্ভিস)' : 'from active + notice leases (rent + service)'}</p>
+                      </div>
+                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2.5 xl:p-3 min-w-0">
+                        <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-1 leading-tight">{language === 'বাংলা' ? 'মোট সিকিউরিটি ডিপোজিট' : 'Total Security Deposits'}</p>
+                        <p className="text-lg sm:text-xl xl:text-2xl font-black text-white tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalSecurityDeposits)}</p>
+                        <p className="text-[8px] xl:text-[9px] font-bold text-white/50 mt-1.5 leading-tight">{language === 'বাংলা' ? 'লিজ শেষে রিটার্নযোগ্য' : 'returnable at lease end'}</p>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2 xl:gap-3">
                       <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2.5 xl:p-3">
@@ -5289,16 +5305,14 @@ const HostDashboard = () => {
                         <p className="text-xl xl:text-2xl font-black text-white/70 tabular-nums">{leaseSummary.doneCount}</p>
                       </div>
                     </div>
-                    <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2.5 xl:p-3">
-                      <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'মোট সিকিউরিটি ডিপোজিট' : 'Total Security Deposits'}</p>
-                      <p className="text-lg xl:text-xl font-black text-white tabular-nums">{formatBDT(leaseSummary.totalSecurityDeposits)}</p>
-                      <p className="text-[9px] font-bold text-white/50 mt-1">{language === 'বাংলা' ? 'লিজ শেষে রিটার্নযোগ্য' : 'returnable at lease end'}</p>
-                    </div>
                   </div>
                 </div>
 
-                {/* Lease status flow — always visible on mobile + desktop. */}
-                <div className="bg-white rounded-2xl xl:rounded-[2rem] p-4 xl:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none shrink-0">
+                {/* Lease status flow — desktop only. Hidden on mobile + tablet
+                    (iPad); the stacked rail would push the lease list too far
+                    down on those widths, and the same stage counts are already
+                    reachable via the toolbar filter pills. Shown from xl up. */}
+                <div className="hidden xl:block bg-white rounded-2xl xl:rounded-[2rem] p-4 xl:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none shrink-0">
                   <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3 xl:mb-4 flex items-center gap-2">
                     <Activity size={14} className="text-gray-400" />
                     {language === 'বাংলা' ? 'লিজ স্ট্যাটাস ফ্লো' : 'Lease Status Flow'}
