@@ -3096,11 +3096,15 @@ const handleWizardSubmit = async (payload) => {
             .filter((r) => (r.balance || 0) > 0)
             .sort((a, b) => (a.monthKey || '').localeCompare(b.monthKey || ''))[0];
 
-          // Active leases drive the "Pay Your Rent" cards. Each card now also
-          // surfaces the lease details (advance + tenancy period) and a "New"
-          // badge for freshly-created bookings, so the old separate "Your
-          // Bookings" section is no longer needed (removed to cut clutter and
-          // shorten the mobile scroll).
+          // ── "Your Bookings" banner — notifies the tenant the moment a host
+          //    creates a booking / lease for them (shows even before any rent
+          //    is paid, so a fresh booking is never invisible). Newly-created
+          //    bookings get a pulsing "New" badge.
+          const fmtLeaseDate = (iso) => {
+            const d = iso ? new Date(iso) : null;
+            if (!d || Number.isNaN(d.getTime())) return '';
+            return d.toLocaleDateString(language === 'বাংলা' ? 'bn-BD' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+          };
           const activeLeases = (myBookings || []).filter((b) => b.status !== 'cancelled');
 
           // 🟢 V1 manual rent — a "Pay Your Rent" card per active lease. Shows
@@ -3118,18 +3122,70 @@ const handleWizardSubmit = async (payload) => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {activeLeases.map((b) => (
                   <div key={b.id || b._id} id={`payment-${b.id || b._id}`}>
-                    <TenantRentPay booking={b} submissions={rentSubmissions} fresh={isFreshBooking(b)} onSubmitted={refreshRentData} />
+                    <TenantRentPay booking={b} submissions={rentSubmissions} onSubmitted={refreshRentData} />
                   </div>
                 ))}
               </div>
             </div>
           ) : null;
 
-          // empty state — no receipts at all (still show the pay-rent cards)
+          const leaseBanner = activeLeases.length > 0 ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 px-1">
+                <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center"><KeyRound size={14} /></div>
+                <h3 className="text-sm font-black text-gray-800">{language === 'বাংলা' ? 'আপনার বুকিং / লিজ' : 'Your Bookings'}</h3>
+                <span className="text-[10px] font-black text-gray-400 tabular-nums">{activeLeases.length}</span>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {activeLeases.map((b) => {
+                  const fresh = isFreshBooking(b);
+                  return (
+                    <div key={b.id || b._id} className={`relative bg-white rounded-2xl p-4 border shadow-sm transition-all ${fresh ? 'border-indigo-200 ring-2 ring-indigo-100' : 'border-gray-100'}`}>
+                      {fresh && (
+                        <span className="absolute top-3 right-3 inline-flex items-center gap-1 bg-indigo-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest shadow-md">
+                          <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />{language === 'বাংলা' ? 'নতুন' : 'New'}
+                        </span>
+                      )}
+                      <div className="flex items-center gap-2.5 mb-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0"><Home size={16} /></div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-black text-gray-900 truncate">{b.property || (language === 'বাংলা' ? 'আপনার ভাড়া' : 'Your rental')}</p>
+                          {b.location && <p className="text-[10px] font-bold text-gray-400 truncate flex items-center gap-1"><MapPin size={9} /> {b.location}</p>}
+                        </div>
+                      </div>
+                      <p className="text-[11px] font-bold text-indigo-700 bg-indigo-50/70 rounded-lg px-2.5 py-1.5 mb-3">
+                        {language === 'বাংলা' ? 'আপনার হোস্ট একটি বুকিং তৈরি করেছেন।' : 'Your host created a booking for you.'}
+                      </p>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-gray-50 rounded-xl p-2">
+                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ভাড়া' : 'Rent'}</p>
+                          <p className="text-xs font-black text-gray-900 tabular-nums">৳{(Number(b.monthlyRent) || 0).toLocaleString('en-IN')}</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-xl p-2">
+                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'অ্যাডভান্স' : 'Advance'}</p>
+                          <p className="text-xs font-black text-gray-900 tabular-nums">৳{(Number(b.advancePayment) || 0).toLocaleString('en-IN')}</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-xl p-2">
+                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'মেথড' : 'Method'}</p>
+                          <p className="text-[10px] font-black text-gray-900 truncate">{b.paymentMethod || '—'}</p>
+                        </div>
+                      </div>
+                      {(b.leaseStart && b.leaseEnd) && (
+                        <p className="text-[10px] font-bold text-gray-400 mt-2.5 flex items-center gap-1.5"><Calendar size={11} /> {fmtLeaseDate(b.leaseStart)} – {fmtLeaseDate(b.leaseEnd)}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null;
+
+          // empty state — no receipts at all (still show any booking banner)
           if (paymentReceipts.length === 0) {
             return (
               <div className="animate-in fade-in duration-500 space-y-5">
                 {rentPaySection}
+                {leaseBanner}
                 <div className="text-center py-24 bg-white/40 backdrop-blur-md rounded-[3rem] border border-white shadow-sm flex flex-col items-center">
                   <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4">
                     <Receipt className="text-blue-400" size={36} />
@@ -3152,6 +3208,9 @@ const handleWizardSubmit = async (payload) => {
 
               {/* ─── PAY YOUR RENT (V1 manual rent) ──────────────────── */}
               {rentPaySection}
+
+              {/* ─── YOUR BOOKINGS (host-created leases) ─────────────── */}
+              {leaseBanner}
 
               {/* ─── HERO SUMMARY ───────────────────────────────────────
                   Mobile-first: the two key numbers (paid / outstanding) sit

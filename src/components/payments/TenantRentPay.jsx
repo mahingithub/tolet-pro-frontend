@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   CreditCard, Copy, Check, Smartphone, Landmark, X, UploadCloud, Loader2,
   CheckCircle2, Hourglass, AlertCircle, Wallet, Calendar, Hash, StickyNote,
-  Image as ImageIcon, BadgeCheck, ArrowRight, MapPin, ChevronDown, KeyRound,
+  Image as ImageIcon, BadgeCheck, ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '../../context/LanguageContext';
@@ -32,7 +32,7 @@ function currentMonthKey(d = new Date()) {
  *   submissions : tenant's rent submissions (used to reflect pending/rejected status)
  *   onSubmitted : ()=>void — called after a successful submit so the parent refreshes
  */
-export default function TenantRentPay({ booking, submissions = [], fresh = false, onSubmitted }) {
+export default function TenantRentPay({ booking, submissions = [], onSubmitted }) {
   const { language } = useLanguage();
   const bn = language === 'বাংলা';
 
@@ -42,9 +42,6 @@ export default function TenantRentPay({ booking, submissions = [], fresh = false
   const [modalOpen, setModalOpen] = useState(false);
   const [autoUpload, setAutoUpload] = useState(false);
   const [qrZoom, setQrZoom] = useState('');
-  // When rent is already paid we collapse the account details by default so
-  // the card stays compact on mobile — the tenant can still expand it.
-  const [showAccount, setShowAccount] = useState(false);
 
   const monthKey = currentMonthKey();
   const monthLabel = useMemo(
@@ -52,15 +49,6 @@ export default function TenantRentPay({ booking, submissions = [], fresh = false
     [bn],
   );
   const totalDue = (Number(booking.monthlyRent) || 0) + (Number(booking.serviceCharge) || 0);
-
-  const fmtLeaseDate = (iso) => {
-    const d = iso ? new Date(iso) : null;
-    if (!d || Number.isNaN(d.getTime())) return '';
-    return d.toLocaleDateString(bn ? 'bn-BD' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-  };
-  const advance = Number(booking.advancePayment) || 0;
-  const hasLeaseDates = booking.leaseStart && booking.leaseEnd;
-  const hasFooter = advance > 0 || hasLeaseDates || !!booking.location;
 
   useEffect(() => {
     let cancelled = false;
@@ -92,33 +80,6 @@ export default function TenantRentPay({ booking, submissions = [], fresh = false
 
   const selected = methods.find((m) => m.id === selectedId) || methods[0] || null;
 
-  // Landlord's payment account(s) — the method chips (when >1) + the selected
-  // account's copyable details. Reused by both the "due" and "paid" states.
-  const accountBlock = (
-    <>
-      {methods.length > 1 && (
-        <div className="flex items-center gap-2 flex-wrap mb-4">
-          {methods.map((m) => {
-            const meta = METHOD_META[m.type] || METHOD_META.bank;
-            const Icon = meta.icon;
-            const active = m.id === selectedId;
-            return (
-              <button
-                key={m.id}
-                onClick={() => setSelectedId(m.id)}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-black transition-all active:scale-95 ${active ? `${meta.tint} ring-2 ${meta.ring} border-transparent` : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
-              >
-                <Icon size={13} /> {meta.label}
-                {m.isDefault && <BadgeCheck size={12} className="text-amber-500" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {selected && <AccountDetails method={selected} bn={bn} language={language} onZoomQr={setQrZoom} />}
-    </>
-  );
-
   const openModal = (auto = false) => {
     if (!methods.length) {
       toast.error(bn ? 'মালিক এখনো পেমেন্ট অ্যাকাউন্ট যোগ করেননি।' : 'Your landlord has not added a payment account yet.');
@@ -129,29 +90,18 @@ export default function TenantRentPay({ booking, submissions = [], fresh = false
   };
 
   return (
-    <div className={`relative bg-white rounded-[1.5rem] border shadow-sm overflow-hidden transition-all ${fresh ? 'border-indigo-200 ring-2 ring-indigo-100' : 'border-gray-100'}`}>
-      {fresh && (
-        <span className="absolute top-3.5 right-3.5 z-10 inline-flex items-center gap-1 bg-indigo-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest shadow-md">
-          <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />{bn ? 'নতুন' : 'New'}
-        </span>
-      )}
+    <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden">
       {/* Rent header */}
       <div className="p-5 bg-gradient-to-br from-gray-50 to-white border-b border-gray-100">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{bn ? 'মাসিক ভাড়া' : 'Monthly Rent'}</p>
             <h3 className="text-3xl font-black text-gray-900 leading-none mt-1 tabular-nums">{fmtAmount(totalDue)}</h3>
-            <p className="text-xs font-bold text-gray-700 mt-1.5 truncate">
-              {booking.property || (bn ? 'আপনার বাসা' : 'Your rental')}
-            </p>
-            <p className="text-[11px] font-bold text-gray-400 mt-0.5 flex items-center gap-1 truncate">
-              <Calendar size={10} className="shrink-0" /> {monthLabel}
-              {booking.location && <span className="inline-flex items-center gap-1 truncate"><span className="text-gray-300">•</span><MapPin size={10} className="shrink-0" /> {booking.location}</span>}
+            <p className="text-xs font-bold text-gray-500 mt-1.5 truncate">
+              {booking.property || (bn ? 'আপনার বাসা' : 'Your rental')} • {monthLabel}
             </p>
           </div>
-          <div className={fresh ? 'mt-6' : ''}>
-            <StatusPill isPaid={isPaid} isPending={isPending} isRejected={isRejected} bn={bn} />
-          </div>
+          <StatusPill isPaid={isPaid} isPending={isPending} isRejected={isRejected} bn={bn} />
         </div>
         {isRejected && latestSub?.rejectionReason && (
           <p className="mt-3 text-[11px] font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
@@ -172,44 +122,56 @@ export default function TenantRentPay({ booking, submissions = [], fresh = false
                 : "Your landlord hasn't added a payment account yet. Please contact them to arrange payment."}
             </p>
           </div>
-        ) : isPaid ? (
-          /* ── PAID: keep the card compact. Show a confirmation and tuck the
-                account details behind a toggle (collapsed by default). ── */
-          <>
-            <div className="flex items-center gap-2.5 text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3.5">
-              <CheckCircle2 size={20} className="shrink-0" />
-              <span className="text-[13px] font-black leading-snug">{bn ? 'এই মাসের ভাড়া পরিশোধিত — রিসিট তৈরি হয়েছে।' : "This month's rent is paid — a receipt has been generated."}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowAccount((v) => !v)}
-              className="mt-3 w-full inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-500 text-[11px] font-black uppercase tracking-widest transition-colors active:scale-[0.99]"
-            >
-              {showAccount ? (bn ? 'অ্যাকাউন্ট লুকান' : 'Hide payment account') : (bn ? 'পেমেন্ট অ্যাকাউন্ট দেখুন' : 'View payment account')}
-              <ChevronDown size={14} className={`transition-transform duration-200 ${showAccount ? 'rotate-180' : ''}`} />
-            </button>
-            {showAccount && <div className="mt-3">{accountBlock}</div>}
-          </>
         ) : (
           <>
-            {/* Landlord's payment account(s) */}
-            {accountBlock}
+            {/* Method selector (only when >1) */}
+            {methods.length > 1 && (
+              <div className="flex items-center gap-2 flex-wrap mb-4">
+                {methods.map((m) => {
+                  const meta = METHOD_META[m.type] || METHOD_META.bank;
+                  const Icon = meta.icon;
+                  const active = m.id === selectedId;
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => setSelectedId(m.id)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-black transition-all ${active ? `${meta.tint} ring-2 ${meta.ring} border-transparent` : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
+                    >
+                      <Icon size={13} /> {meta.label}
+                      {m.isDefault && <BadgeCheck size={12} className="text-amber-500" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
-            {/* Primary actions — full-width, thumb-friendly on mobile */}
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              <button
-                onClick={() => openModal(false)}
-                className="inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white py-3.5 rounded-xl font-black text-sm shadow-[0_6px_12px_rgba(16,185,129,0.2)] active:scale-95 transition-all"
-              >
-                <CheckCircle2 size={16} /> {bn ? 'আমি পরিশোধ করেছি' : 'I Have Paid'}
-              </button>
-              <button
-                onClick={() => openModal(true)}
-                className="inline-flex items-center justify-center gap-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 py-3.5 rounded-xl font-black text-sm active:scale-95 transition-all"
-              >
-                <UploadCloud size={16} /> {bn ? 'প্রুফ আপলোড' : 'Upload Proof'}
-              </button>
-            </div>
+            {/* Selected account details */}
+            {selected && <AccountDetails method={selected} bn={bn} language={language} onZoomQr={setQrZoom} />}
+
+            {/* Buttons */}
+            {!isPaid && (
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                <button
+                  onClick={() => openModal(false)}
+                  className="inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-black text-sm shadow-[0_6px_12px_rgba(16,185,129,0.2)] active:scale-95 transition-all"
+                >
+                  <CheckCircle2 size={16} /> {bn ? 'আমি পরিশোধ করেছি' : 'I Have Paid'}
+                </button>
+                <button
+                  onClick={() => openModal(true)}
+                  className="inline-flex items-center justify-center gap-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 py-3 rounded-xl font-black text-sm active:scale-95 transition-all"
+                >
+                  <UploadCloud size={16} /> {bn ? 'প্রুফ আপলোড' : 'Upload Proof'}
+                </button>
+              </div>
+            )}
+
+            {isPaid && (
+              <div className="mt-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
+                <CheckCircle2 size={18} />
+                <span className="text-sm font-black">{bn ? 'এই মাসের ভাড়া পরিশোধিত — রিসিট তৈরি হয়েছে।' : "This month's rent is paid — a receipt has been generated."}</span>
+              </div>
+            )}
 
             {isPending && (
               <p className="mt-3 text-[11px] font-bold text-amber-600 flex items-center gap-1.5">
@@ -219,28 +181,6 @@ export default function TenantRentPay({ booking, submissions = [], fresh = false
           </>
         )}
       </div>
-
-      {/* Lease details footer — advance + tenancy period. Folds the old
-          standalone "Your Bookings" card into this one so the tenant sees
-          everything about a lease in a single place. */}
-      {hasFooter && (
-        <div className="px-5 pb-4">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-bold text-gray-500 border-t border-gray-100 pt-3">
-            {advance > 0 && (
-              <span className="inline-flex items-center gap-1.5">
-                <Wallet size={12} className="text-gray-400" />
-                {bn ? 'অ্যাডভান্স' : 'Advance'} <span className="text-gray-800 tabular-nums">{fmtAmount(advance)}</span>
-              </span>
-            )}
-            {hasLeaseDates && (
-              <span className="inline-flex items-center gap-1.5">
-                <KeyRound size={12} className="text-gray-400" />
-                {fmtLeaseDate(booking.leaseStart)} – {fmtLeaseDate(booking.leaseEnd)}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
 
       {modalOpen && (
         <SubmitPaymentModal
