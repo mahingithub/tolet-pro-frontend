@@ -91,26 +91,12 @@ export default function TenantRentPay({ booking, submissions = [], onSubmitted }
 
   return (
     <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden">
-      {/* Rent header */}
-      <div className="p-5 bg-gradient-to-br from-gray-50 to-white border-b border-gray-100">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{bn ? 'মাসিক ভাড়া' : 'Monthly Rent'}</p>
-            <h3 className="text-3xl font-black text-gray-900 leading-none mt-1 tabular-nums">{fmtAmount(totalDue)}</h3>
-            <p className="text-xs font-bold text-gray-500 mt-1.5 truncate">
-              {booking.property || (bn ? 'আপনার বাসা' : 'Your rental')} • {monthLabel}
-            </p>
-          </div>
-          <StatusPill isPaid={isPaid} isPending={isPending} isRejected={isRejected} bn={bn} />
-        </div>
+      <div className="p-5">
         {isRejected && latestSub?.rejectionReason && (
-          <p className="mt-3 text-[11px] font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+          <p className="mb-4 text-[11px] font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
             {bn ? 'বাতিলের কারণ: ' : 'Rejected: '}{latestSub.rejectionReason}
           </p>
         )}
-      </div>
-
-      <div className="p-5">
         {loadingMethods ? (
           <div className="flex items-center justify-center py-8 text-gray-400"><Loader2 size={20} className="animate-spin" /></div>
         ) : methods.length === 0 ? (
