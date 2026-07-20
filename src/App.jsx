@@ -31,6 +31,7 @@ import TenantProfile from "./components/TenantProfile";
 import PrivacyCenter from "./components/PrivacyCenter.jsx";
 import SubscriptionPage from "./components/SubscriptionPage";
 import SupportPage from "./components/SupportPage";
+import ServicesPage from "./components/ServicesPage";
 import HowItWorks from "./components/HowItWorks";
 
 // --- Mobile Shell ---
@@ -144,6 +145,9 @@ const AppLayout = () => {
 
 				{/* Help & Support — public; ticket features handle auth internally */}
 				<Route path="/support" element={<SupportPage />} />
+
+				{/* Services hub — tenant home-services catalogue (icon boxes) */}
+				<Route path="/services" element={<ServicesPage />} />
 
 				{/* How it Works — public marketing page */}
 				<Route path="/how-it-works" element={<HowItWorks />} />

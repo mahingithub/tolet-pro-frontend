@@ -433,8 +433,8 @@ const NearbyAreaSuggestion = ({ language }) => {
         </span>
         <span className="leading-snug">
           {language === 'বাংলা'
-            ? <>আপনি <span className="font-black text-gray-900">{label}</span>-এর কাছে আছেন বলে মনে হচ্ছে — নিকটবর্তী বাড়ি দেখুন</>
-            : <>Looks like you\u2019re near <span className="font-black text-gray-900">{label}</span> — see homes nearby</>}
+            ? <><span className="font-black text-gray-900">{label}</span>-এর কাছের বাড়িগুলো দেখুন</>
+            : <>See homes near you in <span className="font-black text-gray-900">{label}</span></>}
         </span>
         <ArrowRight size={12} className="text-gray-400 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all" />
       </Link>
@@ -1943,15 +1943,15 @@ const handleWizardSubmit = async (payload) => {
         {activeTab === 'overview' && (
           <>
             {/* ── CONNECT TO LANDLORD — join a rent/seat by invite code ──── */}
-            <div className="mb-5 md:mb-7 rounded-2xl p-4 bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 flex-wrap">
+            <div className="mb-5 md:mb-7 rounded-2xl p-4 bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-[#ba0036]/10 text-[#ba0036] flex items-center justify-center shrink-0"><KeyRound size={18} /></div>
                 <div className="min-w-0">
                   <p className="text-sm font-black text-gray-900">{language === 'বাংলা' ? 'বাড়িওয়ালার সাথে যুক্ত হোন' : 'Add your landlord'}</p>
-                  <p className="text-[11px] font-bold text-gray-500">{language === 'বাংলা' ? 'ইনভাইট কোড দিয়ে আপনার ভাড়া ও রিসিট দেখুন' : 'Enter an invite code to see your rent & receipts'}</p>
+                  <p className="text-[11px] font-bold text-gray-500 leading-snug">{language === 'বাংলা' ? 'ইনভাইট কোড দিয়ে আপনার ভাড়া ও রিসিট দেখুন' : 'Enter an invite code to see your rent & receipts'}</p>
                 </div>
               </div>
-              <button onClick={() => setAddLandlordOpen(true)} className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#ba0036] text-white font-black text-xs uppercase tracking-widest hover:bg-[#a1002f] transition-colors">
+              <button onClick={() => setAddLandlordOpen(true)} className="w-full sm:w-auto shrink-0 inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#ba0036] text-white font-black text-xs uppercase tracking-widest hover:bg-[#a1002f] active:scale-95 transition-all">
                 <KeyRound size={14} /> {language === 'বাংলা' ? 'কোড যোগ করুন' : 'Add code'}
               </button>
             </div>
@@ -2076,7 +2076,7 @@ const handleWizardSubmit = async (payload) => {
                   label: language === 'বাংলা' ? 'সার্ভিস' : 'Services',
                   sub: language === 'বাংলা' ? 'সার্ভিস রিকোয়েস্ট করুন' : 'Raise or track a service',
                   Icon: Wrench, iconBg: 'bg-gray-100 border-gray-200', iconColor: 'text-gray-600',
-                  onClick: () => navigate('/support'),
+                  onClick: () => navigate('/services'),
                 },
                 {
                   label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts',

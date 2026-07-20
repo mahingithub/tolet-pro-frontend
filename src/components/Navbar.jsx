@@ -396,7 +396,7 @@ useEffect(() => {
     return () => clearTimeout(timer);
   }, [mobileNavLoc]);
 
-  const hiddenPaths = ['/inquire', '/success', '/login', '/host-dashboard', '/tenant-dashboard', '/list-property'];
+  const hiddenPaths = ['/inquire', '/success', '/login', '/host-dashboard', '/tenant-dashboard', '/list-property', '/services'];
   if (hiddenPaths.some(p => location.pathname.includes(p))) return null;
 
   // `compactHeader` keeps the centred search bar visible by default on the
