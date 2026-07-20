@@ -29,6 +29,7 @@ import { listHostRentPayments } from "../services/rentPaymentService.js";
 import PaymentSettings from './payments/PaymentSettings';
 import PendingRentPayments from './payments/PendingRentPayments';
 import PaymentSettingsPopup from './payments/PaymentSettingsPopup';
+import RentPaymentHistory from './payments/RentPaymentHistory';
 import { listDocuments as listDocsApi, uploadDocument as uploadDocApi, deleteDocument as deleteDocApi, downloadUrlFor } from "../services/documentService.js";
 import tenantService from "../services/tenantService.js";
 import callProvider from "../services/callProvider";
@@ -6464,6 +6465,8 @@ const HostDashboard = () => {
             <PendingRentPayments onChange={refreshPendingRent} />
             <div className="h-px bg-gray-100" />
             <PaymentSettings onChange={setPaymentMethods} />
+            <div className="h-px bg-gray-100" />
+            <RentPaymentHistory />
           </div>
         )}
 

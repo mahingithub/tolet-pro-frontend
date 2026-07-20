@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   CreditCard, Copy, Check, Smartphone, Landmark, X, UploadCloud, Loader2,
   CheckCircle2, Hourglass, AlertCircle, Wallet, Calendar, Hash, StickyNote,
-  Image as ImageIcon, BadgeCheck, ArrowRight,
+  Image as ImageIcon, BadgeCheck, ArrowRight, Home, MapPin,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '../../context/LanguageContext';
@@ -81,10 +81,9 @@ export default function TenantRentPay({ booking, submissions = [], onSubmitted }
   const selected = methods.find((m) => m.id === selectedId) || methods[0] || null;
 
   const openModal = (auto = false) => {
-    if (!methods.length) {
-      toast.error(bn ? 'মালিক এখনো পেমেন্ট অ্যাকাউন্ট যোগ করেননি।' : 'Your landlord has not added a payment account yet.');
-      return;
-    }
+    // Note: we intentionally allow submitting even when the landlord hasn't
+    // added an account yet (e.g. rent was arranged/paid offline) — the tenant
+    // can still record the payment for the landlord to verify.
     setAutoUpload(auto);
     setModalOpen(true);
   };
@@ -92,51 +91,91 @@ export default function TenantRentPay({ booking, submissions = [], onSubmitted }
   return (
     <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden">
       <div className="p-5">
+        {/* Which lease this is for — property / owner name. Slim on purpose
+            (the big "Monthly Rent" amount box was removed by request). */}
+        <div className="flex items-center gap-2.5 mb-4">
+          <div className="w-8 h-8 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center shrink-0"><Home size={15} /></div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-black text-gray-900 truncate leading-tight">
+              {booking.property || selected?.accountHolderName || (bn ? 'আপনার বাসা' : 'Your rental')}
+            </p>
+            <p className="text-[10px] font-bold text-gray-400 truncate leading-tight flex items-center gap-1">
+              {booking.location
+                ? (<><MapPin size={9} className="shrink-0" /> {booking.location}</>)
+                : (bn ? 'ভাড়া পরিশোধ করুন' : 'Pay your rent')}
+            </p>
+          </div>
+          {isPaid && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 text-[9px] font-black uppercase tracking-widest shrink-0"><CheckCircle2 size={10} /> {bn ? 'পরিশোধিত' : 'Paid'}</span>
+          )}
+          {isPending && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100 text-[9px] font-black uppercase tracking-widest shrink-0"><Hourglass size={10} /> {bn ? 'যাচাই চলছে' : 'Pending'}</span>
+          )}
+        </div>
+
         {isRejected && latestSub?.rejectionReason && (
           <p className="mb-4 text-[11px] font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
             {bn ? 'বাতিলের কারণ: ' : 'Rejected: '}{latestSub.rejectionReason}
           </p>
         )}
+
         {loadingMethods ? (
           <div className="flex items-center justify-center py-8 text-gray-400"><Loader2 size={20} className="animate-spin" /></div>
-        ) : methods.length === 0 ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 flex items-start gap-3">
-            <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
-            <p className="text-xs font-bold text-amber-800">
-              {bn
-                ? 'আপনার মালিক এখনো কোনো পেমেন্ট অ্যাকাউন্ট যোগ করেননি। অনুগ্রহ করে মালিকের সাথে যোগাযোগ করুন।'
-                : "Your landlord hasn't added a payment account yet. Please contact them to arrange payment."}
-            </p>
-          </div>
         ) : (
           <>
-            {/* Method selector (only when >1) */}
-            {methods.length > 1 && (
-              <div className="flex items-center gap-2 flex-wrap mb-4">
-                {methods.map((m) => {
-                  const meta = METHOD_META[m.type] || METHOD_META.bank;
-                  const Icon = meta.icon;
-                  const active = m.id === selectedId;
-                  return (
-                    <button
-                      key={m.id}
-                      onClick={() => setSelectedId(m.id)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-black transition-all ${active ? `${meta.tint} ring-2 ${meta.ring} border-transparent` : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
-                    >
-                      <Icon size={13} /> {meta.label}
-                      {m.isDefault && <BadgeCheck size={12} className="text-amber-500" />}
-                    </button>
-                  );
-                })}
-              </div>
+            {/* Landlord's payment account(s). If the landlord hasn't set one
+                we hide the whole block (no warning) but still show the Pay
+                buttons below so the tenant can record an offline payment. */}
+            {methods.length > 0 && (
+              <>
+                {/* MOBILE — chip selector + the single selected account card */}
+                <div className="md:hidden">
+                  {methods.length > 1 && (
+                    <div className="flex items-center gap-2 flex-wrap mb-3">
+                      {methods.map((m) => {
+                        const meta = METHOD_META[m.type] || METHOD_META.bank;
+                        const Icon = meta.icon;
+                        const active = m.id === selected?.id;
+                        return (
+                          <button
+                            key={m.id}
+                            onClick={() => setSelectedId(m.id)}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-black transition-all active:scale-95 ${active ? `${meta.tint} ring-2 ${meta.ring} border-transparent` : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
+                          >
+                            <Icon size={13} /> {meta.label}
+                            {m.isDefault && <BadgeCheck size={12} className="text-amber-500" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {selected && <AccountDetails method={selected} bn={bn} language={language} onZoomQr={setQrZoom} />}
+                </div>
+
+                {/* DESKTOP — every method shown side-by-side, each with its own
+                    chip label + account card */}
+                <div className={`hidden md:grid gap-4 ${methods.length > 1 ? 'md:grid-cols-2' : 'md:grid-cols-1'}`}>
+                  {methods.map((m) => {
+                    const meta = METHOD_META[m.type] || METHOD_META.bank;
+                    const Icon = meta.icon;
+                    return (
+                      <div key={m.id} className="space-y-2">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-black ${meta.tint}`}>
+                          <Icon size={13} /> {meta.label}
+                          {m.isDefault && <BadgeCheck size={12} className="text-amber-500" />}
+                        </span>
+                        <AccountDetails method={m} bn={bn} language={language} onZoomQr={setQrZoom} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
 
-            {/* Selected account details */}
-            {selected && <AccountDetails method={selected} bn={bn} language={language} onZoomQr={setQrZoom} />}
-
-            {/* Buttons */}
-            {!isPaid && (
-              <div className="grid grid-cols-2 gap-2 mt-4">
+            {/* Pay actions — available with or without a preset method (unless
+                the month is already paid). */}
+            {!isPaid ? (
+              <div className={`grid grid-cols-2 gap-2 ${methods.length > 0 ? 'mt-4' : ''}`}>
                 <button
                   onClick={() => openModal(false)}
                   className="inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-black text-sm shadow-[0_6px_12px_rgba(16,185,129,0.2)] active:scale-95 transition-all"
@@ -150,9 +189,7 @@ export default function TenantRentPay({ booking, submissions = [], onSubmitted }
                   <UploadCloud size={16} /> {bn ? 'প্রুফ আপলোড' : 'Upload Proof'}
                 </button>
               </div>
-            )}
-
-            {isPaid && (
+            ) : (
               <div className="mt-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
                 <CheckCircle2 size={18} />
                 <span className="text-sm font-black">{bn ? 'এই মাসের ভাড়া পরিশোধিত — রিসিট তৈরি হয়েছে।' : "This month's rent is paid — a receipt has been generated."}</span>
@@ -316,10 +353,10 @@ function SubmitPaymentModal({ booking, methods, selectedMethod, totalDue, monthK
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="bg-white rounded-[2rem] w-full max-w-md relative z-10 overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+      <div className="bg-white rounded-t-[2rem] sm:rounded-[2rem] w-full sm:max-w-md relative z-10 overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in slide-in-from-bottom-6 sm:zoom-in-95 duration-300">
+        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-gray-100">
           <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
             <CreditCard className="text-emerald-600" size={22} />
             {bn ? 'পেমেন্ট সাবমিট করুন' : 'Submit Payment'}

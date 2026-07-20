@@ -100,3 +100,8 @@ export async function rejectRentPayment(id, reason) {
   });
   return submission;
 }
+
+/** Delete a reviewed (approved/rejected) submission from the landlord's history. */
+export async function deleteRentPayment(id) {
+  return request(`/api/rent-payments/${id}`, { method: 'DELETE' });
+}

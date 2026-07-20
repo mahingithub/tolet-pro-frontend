@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   CheckCircle2, XCircle, Clock, Copy, Check, RefreshCw, Loader2, Image as ImageIcon,
-  Hourglass, X, Receipt, User, Building2, Calendar, Hash, StickyNote,
+  Hourglass, X, Receipt, User, Building2, Calendar, Hash, StickyNote, CalendarClock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '../../context/LanguageContext';
@@ -12,6 +12,14 @@ import { METHOD_META } from './PaymentSettings';
 
 function fmtAmount(n) {
   return `৳${Number(n || 0).toLocaleString('en-IN')}`;
+}
+
+// Submitted-at date + time, formatted for a highlighted pill.
+function fmtSubmitted(value, bn) {
+  const d = value ? new Date(value) : null;
+  if (!d || Number.isNaN(d.getTime())) return '';
+  const locale = bn ? 'bn-BD' : 'en-GB';
+  return `${d.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' })} • ${d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}`;
 }
 
 /**
@@ -161,6 +169,11 @@ export default function PendingRentPayments({ onChange }) {
                             {s.paymentMethodLabel || meta.label}
                           </span>
                         )}
+                        {fmtSubmitted(s.createdAt, bn) && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black tabular-nums">
+                            <CalendarClock size={11} className="shrink-0" /> {fmtSubmitted(s.createdAt, bn)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -181,9 +194,9 @@ export default function PendingRentPayments({ onChange }) {
                         )}
                       </div>
                     </div>
-                    <div className="bg-gray-50 rounded-xl px-3 py-2">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><Calendar size={10} /> {bn ? 'পেমেন্ট তারিখ' : 'Payment Date'}</p>
-                      <p className="text-xs font-black text-gray-900 truncate">{s.paymentDate || '—'}</p>
+                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2">
+                      <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-1"><Calendar size={10} /> {bn ? 'পেমেন্ট তারিখ' : 'Payment Date'}</p>
+                      <p className="text-xs font-black text-indigo-800 truncate tabular-nums">{s.paymentDate || '—'}</p>
                     </div>
                   </div>
 
@@ -269,10 +282,10 @@ function RejectModal({ submission, language, busy, onCancel, onConfirm }) {
   const bn = language === 'বাংলা';
   const [reason, setReason] = useState('');
   return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onCancel} />
-      <div className="bg-white rounded-[2rem] w-full max-w-sm relative z-10 overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+      <div className="bg-white rounded-t-[2rem] sm:rounded-[2rem] w-full sm:max-w-sm relative z-10 overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-6 sm:zoom-in-95 duration-300">
+        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-gray-100">
           <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
             <XCircle className="text-red-500" size={22} />
             {bn ? 'পেমেন্ট বাতিল করুন' : 'Reject Payment'}

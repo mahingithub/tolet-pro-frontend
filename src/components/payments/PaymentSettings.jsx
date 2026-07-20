@@ -240,12 +240,12 @@ export default function PaymentSettings({ onChange }) {
                   )}
                 </div>
 
-                {/* Actions */}
+                {/* Actions — thumb-friendly targets on mobile */}
                 <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
                   <button
                     disabled={busy || m.isDefault}
                     onClick={() => handleSetDefault(m)}
-                    className={`flex-1 inline-flex items-center justify-center gap-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${m.isDefault ? 'bg-amber-50 text-amber-400 cursor-default' : 'bg-gray-50 text-gray-600 hover:bg-amber-50 hover:text-amber-600'}`}
+                    className={`flex-1 inline-flex items-center justify-center gap-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${m.isDefault ? 'bg-amber-50 text-amber-400 cursor-default' : 'bg-gray-50 text-gray-600 hover:bg-amber-50 hover:text-amber-600'}`}
                   >
                     <Star size={12} className={m.isDefault ? 'fill-amber-300 text-amber-300' : ''} />
                     {bn ? 'ডিফল্ট' : 'Default'}
@@ -253,25 +253,25 @@ export default function PaymentSettings({ onChange }) {
                   <button
                     disabled={busy}
                     onClick={() => handleToggleActive(m)}
-                    className="flex-1 inline-flex items-center justify-center gap-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors"
+                    className="flex-1 inline-flex items-center justify-center gap-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors"
                   >
                     {m.isActive ? (bn ? 'বন্ধ করুন' : 'Disable') : (bn ? 'চালু করুন' : 'Enable')}
                   </button>
                   <button
                     disabled={busy}
                     onClick={() => { setEditing(m); setFormOpen(true); }}
-                    className="w-9 h-9 inline-flex items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors shrink-0"
+                    className="w-10 h-10 inline-flex items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors shrink-0"
                     title={bn ? 'এডিট' : 'Edit'}
                   >
-                    <Edit3 size={14} />
+                    <Edit3 size={15} />
                   </button>
                   <button
                     disabled={busy}
                     onClick={() => handleDelete(m)}
-                    className="w-9 h-9 inline-flex items-center justify-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors shrink-0"
+                    className="w-10 h-10 inline-flex items-center justify-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors shrink-0"
                     title={bn ? 'মুছুন' : 'Delete'}
                   >
-                    {busy ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    {busy ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
                   </button>
                 </div>
               </div>
@@ -309,7 +309,23 @@ function PaymentMethodFormModal({ method, language, onClose, onSaved }) {
   const bn = language === 'বাংলা';
   const isEdit = !!method;
 
-  const [type, setType] = useState(method?.type || 'bkash');
+  // Add mode supports selecting MULTIPLE wallet types that share ONE number
+  // (e.g. the same 01XXXXXXXXX is used for bKash + Nagad). Bank is exclusive
+  // (its own account number + branch). Edit mode stays single-type.
+  const [selectedTypes, setSelectedTypes] = useState(() => new Set([method?.type || 'bkash']));
+  const hasBank = selectedTypes.has('bank');
+  const toggleType = (id) => {
+    if (isEdit) { setSelectedTypes(new Set([id])); return; }
+    setSelectedTypes((prev) => {
+      if (id === 'bank') return prev.has('bank') ? new Set(['bkash']) : new Set(['bank']);
+      const next = new Set(prev);
+      next.delete('bank');
+      if (next.has(id)) { if (next.size > 1) next.delete(id); }
+      else next.add(id);
+      return next.size ? next : new Set([id]);
+    });
+  };
+
   const [accountHolderName, setHolder] = useState(method?.accountHolderName || '');
   const [accountNumber, setNumber] = useState(method?.accountNumber || '');
   const [bankName, setBankName] = useState(method?.bankName || '');
@@ -334,28 +350,43 @@ function PaymentMethodFormModal({ method, language, onClose, onSaved }) {
     e.preventDefault();
     if (!accountHolderName.trim()) { setErr(bn ? 'অ্যাকাউন্ট হোল্ডারের নাম দিন।' : 'Enter the account holder name.'); return; }
     if (!accountNumber.trim()) { setErr(bn ? 'মোবাইল/অ্যাকাউন্ট নম্বর দিন।' : 'Enter the mobile / account number.'); return; }
+    const typesArr = [...selectedTypes];
+    if (!typesArr.length) { setErr(bn ? 'অন্তত একটি পেমেন্ট টাইপ বেছে নিন।' : 'Pick at least one payment type.'); return; }
     setSaving(true);
     setErr('');
     try {
-      const payload = {
-        type,
+      const base = {
         accountHolderName: accountHolderName.trim(),
         accountNumber: accountNumber.trim(),
-        bankName: type === 'bank' ? bankName.trim() : '',
-        branchName: type === 'bank' ? branchName.trim() : '',
-        isDefault,
       };
-      let saved;
       if (isEdit) {
-        saved = await updatePaymentMethod(method.id, payload);
+        const t = typesArr[0];
+        const saved = await updatePaymentMethod(method.id, {
+          ...base,
+          type: t,
+          bankName: t === 'bank' ? bankName.trim() : '',
+          branchName: t === 'bank' ? branchName.trim() : '',
+          isDefault,
+        });
+        if (qrFile && saved?.id) {
+          await uploadPaymentMethodQr(saved.id, qrFile);
+        } else if (removeQr && method.qrImageUrl) {
+          await deletePaymentMethodQr(method.id);
+        }
       } else {
-        saved = await createPaymentMethod(payload);
-      }
-      // QR handling — upload new file, or remove existing on request.
-      if (qrFile && saved?.id) {
-        await uploadPaymentMethodQr(saved.id, qrFile);
-      } else if (removeQr && isEdit && method.qrImageUrl) {
-        await deletePaymentMethodQr(method.id);
+        // One PaymentMethod per selected type, all sharing the same number —
+        // this is how "2-3 methods on one number" shows up as separate cards.
+        for (let i = 0; i < typesArr.length; i++) {
+          const t = typesArr[i];
+          const saved = await createPaymentMethod({
+            ...base,
+            type: t,
+            bankName: t === 'bank' ? bankName.trim() : '',
+            branchName: t === 'bank' ? branchName.trim() : '',
+            isDefault: isDefault && i === 0,
+          });
+          if (qrFile && saved?.id) await uploadPaymentMethodQr(saved.id, qrFile);
+        }
       }
       toast.success(isEdit ? (bn ? 'আপডেট হয়েছে' : 'Updated') : (bn ? 'যোগ হয়েছে' : 'Added'));
       onSaved();
@@ -366,10 +397,10 @@ function PaymentMethodFormModal({ method, language, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="bg-white rounded-[2rem] w-full max-w-md relative z-10 overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+      <div className="bg-white rounded-t-[2rem] sm:rounded-[2rem] w-full sm:max-w-md relative z-10 overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in slide-in-from-bottom-6 sm:zoom-in-95 duration-300">
+        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-gray-100">
           <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
             <CreditCard className="text-[#ba0036]" size={22} />
             {isEdit ? (bn ? 'পেমেন্ট মেথড এডিট' : 'Edit Payment Method') : (bn ? 'নতুন পেমেন্ট মেথড' : 'Add Payment Method')}
@@ -380,23 +411,31 @@ function PaymentMethodFormModal({ method, language, onClose, onSaved }) {
         </div>
 
         <form onSubmit={submit} className="p-6 overflow-y-auto custom-scrollbar space-y-4">
-          {/* Type selector */}
+          {/* Type selector — multi-select in add mode (one number ⇒ many wallets) */}
           <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{bn ? 'পেমেন্ট টাইপ' : 'Payment Type'}</label>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+              {bn ? 'পেমেন্ট টাইপ' : 'Payment Type'}
+              {!isEdit && (
+                <span className="ml-1 text-gray-300 normal-case tracking-normal font-bold">
+                  {bn ? '(একই নম্বরে একাধিক বেছে নিন)' : '(pick one or more that share this number)'}
+                </span>
+              )}
+            </label>
             <div className="grid grid-cols-2 gap-2">
               {TYPE_OPTIONS.map((opt) => {
                 const meta = METHOD_META[opt.id];
                 const Icon = meta.icon;
-                const active = type === opt.id;
+                const active = selectedTypes.has(opt.id);
                 return (
                   <button
                     key={opt.id}
                     type="button"
-                    onClick={() => setType(opt.id)}
-                    className={`flex items-center gap-2 px-3 py-3 rounded-xl border text-left transition-all ${active ? `${meta.tint} ring-2 ${meta.ring} border-transparent` : 'bg-gray-50 border-transparent text-gray-600 hover:bg-gray-100'}`}
+                    onClick={() => toggleType(opt.id)}
+                    className={`relative flex items-center gap-2 px-3 py-3 rounded-xl border text-left transition-all ${active ? `${meta.tint} ring-2 ${meta.ring} border-transparent` : 'bg-gray-50 border-transparent text-gray-600 hover:bg-gray-100'}`}
                   >
                     <Icon size={16} className="shrink-0" />
                     <span className="text-[11px] font-black leading-tight">{bn ? opt.labelBn : opt.labelEn}</span>
+                    {active && !isEdit && <Check size={14} className="absolute top-1.5 right-1.5 text-emerald-600" strokeWidth={3} />}
                   </button>
                 );
               })}
@@ -414,16 +453,16 @@ function PaymentMethodFormModal({ method, language, onClose, onSaved }) {
 
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-              {type === 'bank' ? (bn ? 'অ্যাকাউন্ট নম্বর' : 'Account Number') : (bn ? 'মোবাইল নম্বর' : 'Mobile Number')}
+              {hasBank ? (bn ? 'অ্যাকাউন্ট নম্বর' : 'Account Number') : (bn ? 'মোবাইল নম্বর' : 'Mobile Number')}
             </label>
             <input
-              type="text" inputMode={type === 'bank' ? 'text' : 'tel'} value={accountNumber} onChange={(e) => setNumber(e.target.value)}
-              placeholder={type === 'bank' ? '0000000000000' : '01XXXXXXXXX'}
+              type="text" inputMode={hasBank ? 'text' : 'tel'} value={accountNumber} onChange={(e) => setNumber(e.target.value)}
+              placeholder={hasBank ? '0000000000000' : '01XXXXXXXXX'}
               className="w-full p-3.5 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(37,99,235,0.08)] border border-transparent focus:border-blue-500/20 transition-all"
             />
           </div>
 
-          {type === 'bank' && (
+          {hasBank && (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{bn ? 'ব্যাংকের নাম' : 'Bank Name'}</label>

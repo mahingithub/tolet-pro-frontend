@@ -3454,13 +3454,14 @@ const handleWizardSubmit = async (payload) => {
                             <p className="text-base font-black text-gray-900 leading-tight truncate">{r.propertyTitle}</p>
                             <p className="text-[11px] font-bold text-gray-500 mt-0.5 flex items-center gap-1.5">
                               <Calendar size={11} className="text-gray-400" />
-                              {r.monthLabel || r.monthKey}{rDate ? ` · ${rDate}` : ''}
+                              {r.monthLabel || r.monthKey}
                             </p>
-                            {rTime && (
-                              <p className="text-[10px] font-bold text-gray-400 mt-0.5 flex items-center gap-1.5">
-                                <Clock size={10} className="text-gray-400" />
-                                {language === 'বাংলা' ? 'সময়' : 'Received'} {rTime}
-                              </p>
+                            {(rDate || rTime) && (
+                              <span className="inline-flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black tabular-nums">
+                                <Clock size={11} className="shrink-0" />
+                                {language === 'বাংলা' ? 'গৃহীত' : 'Received'}
+                                {rDate ? ` ${rDate}` : ''}{rTime ? ` • ${rTime}` : ''}
+                              </span>
                             )}
                           </div>
                         </div>
@@ -3667,9 +3668,9 @@ const handleWizardSubmit = async (payload) => {
                 return (
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'তারিখ ও সময়' : 'Date & Time'}</span>
-                    <span className="text-sm font-black text-gray-900 text-right">
-                      {dt.date || '—'}
-                      {dt.time && <span className="block text-[11px] font-bold text-gray-500 mt-0.5 flex items-center justify-end gap-1"><Clock size={11} className="text-gray-400" /> {dt.time}</span>}
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 text-[11px] font-black tabular-nums">
+                      <Clock size={12} className="shrink-0" />
+                      {dt.date || '—'}{dt.time ? ` • ${dt.time}` : ''}
                     </span>
                   </div>
                 );
