@@ -16,6 +16,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 // Single shared inquiry modal — same component the listing page uses, so the
 // experience is identical regardless of where the user clicks "Inquire".
 import InquiryModal from './InquiryModal';
+import FullScreenLoader from './shared/FullScreenLoader';
 // ─── DATA SOURCE: live property + landlord. NO demo data. ─────────────────────
 import { propertyService } from '../services/Propertyservice.js';
 // Same field config the Add-Property wizard + dashboard editor use, so the
@@ -1805,10 +1806,7 @@ const PropertyDetails = () => {
     return (
       <div className="w-full min-h-screen flex items-center justify-center futuristic-bg">
         <FuturisticTheme />
-        <div className="text-center">
-          <div className="w-12 h-12 mx-auto mb-4 rounded-full border-4 border-[#ba0036]/30 border-t-[#ba0036] animate-spin" />
-          <p className="text-slate-600 text-sm font-semibold">{lt('loading') || 'Loading…'}</p>
-        </div>
+        <FullScreenLoader inline message={lt('loading') || 'Loading this home…'} />
       </div>
     );
   }

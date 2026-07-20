@@ -294,7 +294,7 @@ const getMonthCollectionSummary = (bookings, year, month, today = new Date()) =>
     const months = enumerateLeaseMonths(b.leaseStart, b.leaseEnd);
     if (!months.includes(key)) return;
     dueCount += 1;
-    expectedTotal += Number(b.monthlyRent || 0);
+    expectedTotal += Number(b.monthlyRent || 0) + Number(b.serviceCharge || 0);
     const entry = b.ledger?.[key];
     if (entry?.paid) {
       collectedTotal += Number(entry.amount || 0);
@@ -450,9 +450,11 @@ const isHostelBooking = (b) => !!(b && b.propertyType === 'hostel');
 // (that is really un-split, so we divide it).
 const seatShare = (booking, member, activeCount) => {
   const roomRent = Number(booking?.monthlyRent) || 0;
+  const service = Number(booking?.serviceCharge) || 0;
+  const roomTotal = roomRent + service;   // seats split the full obligation (rent + service)
   const explicit = Number(member?.monthlyRent) || 0;
   if (explicit > 0 && !(activeCount > 1 && explicit === roomRent)) return explicit;
-  return activeCount > 0 ? Math.round(roomRent / activeCount) : roomRent;
+  return activeCount > 0 ? Math.round(roomTotal / activeCount) : roomTotal;
 };
 
 // Expand a booking into rent UNITS for Rent Collection: ONE unit per active
@@ -463,7 +465,14 @@ const seatShare = (booking, member, activeCount) => {
 // mark-paid flow writes to the correct member ledger.
 const rentUnitsOf = (booking) => {
   const mems = Array.isArray(booking?.members) ? booking.members.filter((m) => m && m.status !== 'moved-out') : [];
-  if (mems.length === 0) return [booking];
+  if (mems.length === 0) {
+    // Single-tenant / no-member: the monthly obligation is rent + service.
+    // Fold service INTO monthlyRent and zero serviceCharge so KPI totals
+    // (monthlyRent + serviceCharge) don't double-count it.
+    const rent = Number(booking?.monthlyRent) || 0;
+    const service = Number(booking?.serviceCharge) || 0;
+    return service > 0 ? [{ ...booking, monthlyRent: rent + service, serviceCharge: 0 }] : [booking];
+  }
   return mems.map((m, i) => ({
     ...booking,
     // Unique row id even before a freshly-added member has a server id (index
@@ -477,6 +486,7 @@ const rentUnitsOf = (booking) => {
     tenantAvatar: m.avatar || booking.tenantAvatar,
     tenantInit: (String(m.name || booking.tenant || '?').trim().charAt(0) || '?').toUpperCase(),
     monthlyRent: seatShare(booking, m, mems.length),
+    serviceCharge: 0,   // service is already folded into the per-seat monthlyRent above
     ledger: m.ledger || {},
   }));
 };
@@ -1874,7 +1884,7 @@ const HostDashboard = () => {
     const activeMems = Array.isArray(booking.members) ? booking.members.filter(m => m && m.status !== 'moved-out') : [];
     const payMember = memberId ? activeMems.find(m => m.id === memberId) : null;
     const payName = payMember?.name || booking.tenant;
-    const expected = payMember ? seatShare(booking, payMember, activeMems.length) : Number(booking.monthlyRent || 0);
+    const expected = payMember ? seatShare(booking, payMember, activeMems.length) : (Number(booking.monthlyRent || 0) + Number(booking.serviceCharge || 0));
     const amt = Number(amount) || 0;
 
     // ── Branch validation ──────────────────────────────────────────────────
@@ -6968,7 +6978,7 @@ const HostDashboard = () => {
                 const mpTenant = String(mpMember?.name || booking.tenant || (language === 'বাংলা' ? 'ভাড়াটিয়া' : 'Tenant')).trim();
                 const mpInit = (mpTenant[0] || '?').toUpperCase();
                 const due = getDueDate(payForm.monthKey, booking.rentDueDay);
-                const expected = mpMember ? seatShare(booking, mpMember, mpActive.length) : Number(booking.monthlyRent || 0);
+                const expected = mpMember ? seatShare(booking, mpMember, mpActive.length) : (Number(booking.monthlyRent || 0) + Number(booking.serviceCharge || 0));
                 const amt = Number(payForm.amount) || 0;
                 const balance = payForm.status === 'due' ? expected : Math.max(0, expected - amt);
                 const existing = mpMember ? (mpMember.ledger?.[payForm.monthKey]) : (booking.ledger?.[payForm.monthKey]);

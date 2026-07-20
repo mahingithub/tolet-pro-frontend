@@ -53,9 +53,127 @@
     <meta name="twitter:title" content="TO-LET PRO — Rental Properties in Bangladesh" />
     <meta name="twitter:description" content="Find and list rental properties across Bangladesh. Verified listings, chat, and calls in one app." />
     <meta name="twitter:image" content="https://tolet-pro.vercel.app/icons/icon-512.png" />
+
+    <!-- ─── Instant boot splash (Phase Load-1) ──────────────────────────────
+         Pure HTML/CSS so it paints the INSTANT the document loads — before the
+         JS bundle is even downloaded/parsed. This is what a visitor sees on a
+         hard reload or a slow connection instead of a blank white screen. It
+         removes itself once React signals `app-ready` (see the script at the
+         bottom of <body>), with a graceful fade. Self-contained styles (no
+         Tailwind dependency) + reduced-motion + dark-mode aware. -->
+    <style>
+      #tp-splash {
+        position: fixed; inset: 0; z-index: 2147483647;
+        display: flex; align-items: center; justify-content: center;
+        background: radial-gradient(120% 120% at 50% 0%, #ffffff 0%, #fdf2f5 55%, #f6e9ee 100%);
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        transition: opacity .45s ease, visibility .45s ease;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #tp-splash.tp-splash--hide { opacity: 0; visibility: hidden; }
+      .tp-splash__center { display: flex; flex-direction: column; align-items: center; gap: 22px; padding: 24px; transform: translateY(-4%); }
+      .tp-splash__badge { position: relative; width: 104px; height: 104px; display: flex; align-items: center; justify-content: center; }
+      .tp-splash__tile {
+        position: relative; z-index: 2; width: 78px; height: 78px; border-radius: 22px;
+        display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(145deg, #ba0036, #e60045);
+        box-shadow: 0 18px 40px -12px rgba(186,0,54,.55), 0 6px 16px rgba(186,0,54,.28), inset 0 1px 0 rgba(255,255,255,.25);
+        animation: tpSplashBob 1.8s ease-in-out infinite;
+      }
+      .tp-splash__tile svg { width: 42px; height: 42px; display: block; }
+      .tp-splash__ring {
+        position: absolute; top: 50%; left: 50%; width: 78px; height: 78px; border-radius: 24px;
+        transform: translate(-50%, -50%); border: 2px solid rgba(186,0,54,.42);
+        animation: tpSplashRing 1.8s ease-out infinite; pointer-events: none;
+      }
+      .tp-splash__ring--2 { animation-delay: .9s; }
+      .tp-splash__win { animation: tpSplashWin 1.8s ease-in-out infinite; transform-origin: center; }
+      .tp-splash__win--2 { animation-delay: .35s; }
+      .tp-splash__brand { font-weight: 900; letter-spacing: -.03em; font-size: 23px; line-height: 1; }
+      .tp-splash__brand-1 { color: #111827; }
+      .tp-splash__brand-2 { color: #ba0036; }
+      .tp-splash__bar {
+        position: relative; width: 172px; height: 5px; border-radius: 999px;
+        background: rgba(186,0,54,.14); overflow: hidden;
+      }
+      .tp-splash__bar-fill {
+        position: absolute; top: 0; left: -45%; height: 100%; width: 42%; border-radius: 999px;
+        background: linear-gradient(90deg, #ba0036, #e60045);
+        animation: tpSplashBar 1.35s cubic-bezier(.65, 0, .35, 1) infinite;
+      }
+      .tp-splash__caption { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #a68b93; }
+
+      @keyframes tpSplashBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+      @keyframes tpSplashRing { 0% { opacity: .55; transform: translate(-50%, -50%) scale(.82); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.7); } }
+      @keyframes tpSplashBar { 0% { left: -45%; } 100% { left: 100%; } }
+      @keyframes tpSplashWin { 0%, 100% { fill: rgba(255,255,255,.92); } 45% { fill: #ffd37a; } }
+
+      @media (prefers-color-scheme: dark) {
+        #tp-splash { background: radial-gradient(120% 120% at 50% 0%, #111a2b 0%, #0b1220 60%, #080d17 100%); }
+        .tp-splash__brand-1 { color: #eef2f8; }
+        .tp-splash__brand-2 { color: #ff7d9d; }
+        .tp-splash__caption { color: #667488; }
+        .tp-splash__bar { background: rgba(255,125,157,.16); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .tp-splash__tile, .tp-splash__win { animation: none !important; }
+        .tp-splash__ring { display: none; }
+        .tp-splash__bar-fill { left: 0; width: 100%; animation: tpSplashPulse 1.2s ease-in-out infinite; }
+        @keyframes tpSplashPulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- Instant boot splash markup — a little house whose windows light up
+         while TO-LET PRO loads. Removed by the script below once React mounts. -->
+    <div id="tp-splash" role="status" aria-live="polite" aria-label="Loading TO-LET PRO">
+      <div class="tp-splash__center">
+        <div class="tp-splash__badge">
+          <span class="tp-splash__ring"></span>
+          <span class="tp-splash__ring tp-splash__ring--2"></span>
+          <span class="tp-splash__tile">
+            <svg viewBox="0 0 64 64" aria-hidden="true">
+              <path d="M6 31.5 L32 9 L58 31.5" fill="none" stroke="#ffffff" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M12 29 L12 53 Q12 55 14 55 L50 55 Q52 55 52 53 L52 29 Z" fill="#ffffff" />
+              <rect class="tp-splash__win" x="18.5" y="34" width="9" height="9" rx="2" fill="rgba(255,255,255,.92)" />
+              <rect class="tp-splash__win tp-splash__win--2" x="36.5" y="34" width="9" height="9" rx="2" fill="rgba(255,255,255,.92)" />
+              <rect x="27" y="45" width="10" height="10" rx="1.6" fill="#ba0036" />
+            </svg>
+          </span>
+        </div>
+        <div class="tp-splash__brand"><span class="tp-splash__brand-1">TO-LET</span> <span class="tp-splash__brand-2">PRO</span></div>
+        <div class="tp-splash__bar"><span class="tp-splash__bar-fill"></span></div>
+        <div class="tp-splash__caption">Finding your next home…</div>
+      </div>
+    </div>
+
+    <script>
+      // Remove the boot splash once the app is ready. Primary trigger is the
+      // `app-ready` event React dispatches after its first paint; `load` and a
+      // hard MAX timeout are safety nets so the splash can never get stuck.
+      (function () {
+        var MIN_MS = 350;    // keep it up briefly so a fast boot doesn't "flash"
+        var MAX_MS = 10000;  // absolute failsafe
+        var started = Date.now();
+        var done = false;
+        function removeSplash() {
+          if (done) return; done = true;
+          var el = document.getElementById('tp-splash');
+          if (!el) return;
+          var wait = Math.max(0, MIN_MS - (Date.now() - started));
+          setTimeout(function () {
+            el.classList.add('tp-splash--hide');
+            setTimeout(function () { if (el && el.parentNode) el.parentNode.removeChild(el); }, 500);
+          }, wait);
+        }
+        window.addEventListener('app-ready', removeSplash);
+        window.addEventListener('load', function () { setTimeout(removeSplash, 500); });
+        setTimeout(removeSplash, MAX_MS);
+      })();
+    </script>
+
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

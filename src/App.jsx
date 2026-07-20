@@ -96,6 +96,16 @@ const GlobalCallSocket = () => {
 const AppLayout = () => {
 	const location = useLocation();
 
+	// Tell the instant boot splash (index.html) that React has painted, so it
+	// can fade itself out. rAF waits for the first real frame so we don't
+	// dismiss the splash before the UI is actually on screen.
+	useEffect(() => {
+		const id = requestAnimationFrame(() => {
+			window.dispatchEvent(new Event('app-ready'));
+		});
+		return () => cancelAnimationFrame(id);
+	}, []);
+
 	// Hide the marketing Navbar on dashboards, auth, admin, and the privacy center
 	// (the privacy center has its own header with a back button).
 	const hideNavbarRoutes = [
