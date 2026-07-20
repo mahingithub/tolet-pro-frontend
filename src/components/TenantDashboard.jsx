@@ -3096,15 +3096,11 @@ const handleWizardSubmit = async (payload) => {
             .filter((r) => (r.balance || 0) > 0)
             .sort((a, b) => (a.monthKey || '').localeCompare(b.monthKey || ''))[0];
 
-          // ── "Your Bookings" banner — notifies the tenant the moment a host
-          //    creates a booking / lease for them (shows even before any rent
-          //    is paid, so a fresh booking is never invisible). Newly-created
-          //    bookings get a pulsing "New" badge.
-          const fmtLeaseDate = (iso) => {
-            const d = iso ? new Date(iso) : null;
-            if (!d || Number.isNaN(d.getTime())) return '';
-            return d.toLocaleDateString(language === 'বাংলা' ? 'bn-BD' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-          };
+          // Active leases drive the "Pay Your Rent" cards. Each card now also
+          // surfaces the lease details (advance + tenancy period) and a "New"
+          // badge for freshly-created bookings, so the old separate "Your
+          // Bookings" section is no longer needed (removed to cut clutter and
+          // shorten the mobile scroll).
           const activeLeases = (myBookings || []).filter((b) => b.status !== 'cancelled');
 
           // 🟢 V1 manual rent — a "Pay Your Rent" card per active lease. Shows
@@ -3112,77 +3108,28 @@ const handleWizardSubmit = async (payload) => {
           // and the "I Have Paid" / "Upload Proof" submission flow.
           const rentPaySection = activeLeases.length > 0 ? (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 px-1">
-                <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center"><Wallet size={14} /></div>
-                <h3 className="text-sm font-black text-gray-800">{language === 'বাংলা' ? 'ভাড়া পরিশোধ করুন' : 'Pay Your Rent'}</h3>
+              <div className="flex items-center gap-2.5 px-1">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><Wallet size={15} /></div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-black text-gray-800 leading-tight">{language === 'বাংলা' ? 'ভাড়া পরিশোধ করুন' : 'Pay Your Rent'}</h3>
+                  <p className="text-[10px] font-bold text-gray-400 leading-tight">{language === 'বাংলা' ? 'এই মাসের ভাড়া ও পেমেন্ট তথ্য' : "This month's rent & payment details"}</p>
+                </div>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {activeLeases.map((b) => (
                   <div key={b.id || b._id} id={`payment-${b.id || b._id}`}>
-                    <TenantRentPay booking={b} submissions={rentSubmissions} onSubmitted={refreshRentData} />
+                    <TenantRentPay booking={b} submissions={rentSubmissions} fresh={isFreshBooking(b)} onSubmitted={refreshRentData} />
                   </div>
                 ))}
               </div>
             </div>
           ) : null;
 
-          const leaseBanner = activeLeases.length > 0 ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 px-1">
-                <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center"><KeyRound size={14} /></div>
-                <h3 className="text-sm font-black text-gray-800">{language === 'বাংলা' ? 'আপনার বুকিং / লিজ' : 'Your Bookings'}</h3>
-                <span className="text-[10px] font-black text-gray-400 tabular-nums">{activeLeases.length}</span>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                {activeLeases.map((b) => {
-                  const fresh = isFreshBooking(b);
-                  return (
-                    <div key={b.id || b._id} className={`relative bg-white rounded-2xl p-4 border shadow-sm transition-all ${fresh ? 'border-indigo-200 ring-2 ring-indigo-100' : 'border-gray-100'}`}>
-                      {fresh && (
-                        <span className="absolute top-3 right-3 inline-flex items-center gap-1 bg-indigo-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest shadow-md">
-                          <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />{language === 'বাংলা' ? 'নতুন' : 'New'}
-                        </span>
-                      )}
-                      <div className="flex items-center gap-2.5 mb-2.5">
-                        <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0"><Home size={16} /></div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-black text-gray-900 truncate">{b.property || (language === 'বাংলা' ? 'আপনার ভাড়া' : 'Your rental')}</p>
-                          {b.location && <p className="text-[10px] font-bold text-gray-400 truncate flex items-center gap-1"><MapPin size={9} /> {b.location}</p>}
-                        </div>
-                      </div>
-                      <p className="text-[11px] font-bold text-indigo-700 bg-indigo-50/70 rounded-lg px-2.5 py-1.5 mb-3">
-                        {language === 'বাংলা' ? 'আপনার হোস্ট একটি বুকিং তৈরি করেছেন।' : 'Your host created a booking for you.'}
-                      </p>
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                        <div className="bg-gray-50 rounded-xl p-2">
-                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ভাড়া' : 'Rent'}</p>
-                          <p className="text-xs font-black text-gray-900 tabular-nums">৳{(Number(b.monthlyRent) || 0).toLocaleString('en-IN')}</p>
-                        </div>
-                        <div className="bg-gray-50 rounded-xl p-2">
-                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'অ্যাডভান্স' : 'Advance'}</p>
-                          <p className="text-xs font-black text-gray-900 tabular-nums">৳{(Number(b.advancePayment) || 0).toLocaleString('en-IN')}</p>
-                        </div>
-                        <div className="bg-gray-50 rounded-xl p-2">
-                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'মেথড' : 'Method'}</p>
-                          <p className="text-[10px] font-black text-gray-900 truncate">{b.paymentMethod || '—'}</p>
-                        </div>
-                      </div>
-                      {(b.leaseStart && b.leaseEnd) && (
-                        <p className="text-[10px] font-bold text-gray-400 mt-2.5 flex items-center gap-1.5"><Calendar size={11} /> {fmtLeaseDate(b.leaseStart)} – {fmtLeaseDate(b.leaseEnd)}</p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null;
-
-          // empty state — no receipts at all (still show any booking banner)
+          // empty state — no receipts at all (still show the pay-rent cards)
           if (paymentReceipts.length === 0) {
             return (
               <div className="animate-in fade-in duration-500 space-y-5">
                 {rentPaySection}
-                {leaseBanner}
                 <div className="text-center py-24 bg-white/40 backdrop-blur-md rounded-[3rem] border border-white shadow-sm flex flex-col items-center">
                   <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4">
                     <Receipt className="text-blue-400" size={36} />
@@ -3206,46 +3153,46 @@ const handleWizardSubmit = async (payload) => {
               {/* ─── PAY YOUR RENT (V1 manual rent) ──────────────────── */}
               {rentPaySection}
 
-              {/* ─── YOUR BOOKINGS (host-created leases) ─────────────── */}
-              {leaseBanner}
-
-              {/* ─── HERO SUMMARY ───────────────────────────────────── */}
-              <div className="relative overflow-hidden rounded-[2rem] border border-white/80 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white shadow-[0_20px_50px_-20px_rgba(59,7,100,0.55)] p-5 md:p-7">
+              {/* ─── HERO SUMMARY ───────────────────────────────────────
+                  Mobile-first: the two key numbers (paid / outstanding) sit
+                  side-by-side, and "next due" spans full width below with its
+                  CTA inline. On md+ it opens back up into three columns. */}
+              <div className="relative overflow-hidden rounded-[1.75rem] md:rounded-[2rem] border border-white/80 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white shadow-[0_20px_50px_-20px_rgba(59,7,100,0.55)] p-5 md:p-7">
                 <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full bg-white/10 blur-3xl pointer-events-none" />
                 <div className="absolute -bottom-20 -left-10 w-56 h-56 rounded-full bg-cyan-300/10 blur-3xl pointer-events-none" />
-                <div className="relative grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="relative grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-4 md:gap-5">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-70">
+                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.16em] opacity-70">
                       {language === 'বাংলা' ? `${payYear} সালে পরিশোধ` : `Paid in ${payYear}`}
                     </p>
-                    <p className="mt-1 text-3xl md:text-4xl font-black leading-none tabular-nums tracking-tight">
-                      ৳ {paidThisYear.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}
+                    <p className="mt-1 text-2xl md:text-4xl font-black leading-none tabular-nums tracking-tight">
+                      ৳{paidThisYear.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}
                     </p>
-                    <p className="mt-2 text-[11px] font-bold opacity-80">
+                    <p className="mt-1.5 text-[10px] md:text-[11px] font-bold opacity-80">
                       {paymentReceipts.filter((r) => r.monthKey?.startsWith(`${payYear}-`)).length}{' '}
                       {language === 'বাংলা' ? 'রিসিট' : 'receipts'} · {unreadReceiptsCount}{' '}
                       {language === 'বাংলা' ? 'নতুন' : 'new'}
                     </p>
                   </div>
                   <div className="md:border-l md:border-white/20 md:pl-5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-70">
+                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.16em] opacity-70">
                       {language === 'বাংলা' ? 'বাকি' : 'Outstanding'}
                     </p>
-                    <p className={`mt-1 text-3xl md:text-4xl font-black leading-none tabular-nums tracking-tight ${outstanding > 0 ? 'text-rose-200' : 'text-emerald-200'}`}>
-                      ৳ {outstanding.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}
+                    <p className={`mt-1 text-2xl md:text-4xl font-black leading-none tabular-nums tracking-tight ${outstanding > 0 ? 'text-rose-200' : 'text-emerald-200'}`}>
+                      ৳{outstanding.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}
                     </p>
-                    <p className="mt-2 text-[11px] font-bold opacity-80">
+                    <p className="mt-1.5 text-[10px] md:text-[11px] font-bold opacity-80">
                       {partialCount > 0
-                        ? `${partialCount} ${language === 'বাংলা' ? 'মাসে আংশিক পরিশোধ' : 'months partially paid'}`
-                        : (language === 'বাংলা' ? 'সবকিছু পরিশোধিত' : 'You are fully up to date')}
+                        ? `${partialCount} ${language === 'বাংলা' ? 'মাসে আংশিক' : 'months partial'}`
+                        : (language === 'বাংলা' ? 'সব পরিশোধিত' : 'Fully up to date')}
                     </p>
                   </div>
-                  <div className="md:border-l md:border-white/20 md:pl-5 flex flex-col justify-between">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-70">
+                  <div className="col-span-2 md:col-span-1 flex items-center justify-between gap-3 border-t border-white/15 pt-4 mt-1 md:border-t-0 md:pt-0 md:mt-0 md:border-l md:border-white/20 md:pl-5 md:flex-col md:items-start md:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.16em] opacity-70">
                         {language === 'বাংলা' ? 'পরবর্তী বকেয়া' : 'Next due'}
                       </p>
-                      <p className="mt-1 text-base md:text-lg font-black leading-tight">
+                      <p className="mt-1 text-sm md:text-lg font-black leading-tight truncate">
                         {nextDue
                           ? `${nextDue.monthLabel || nextDue.monthKey} · ৳${(nextDue.balance || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}`
                           : (language === 'বাংলা' ? 'কিছু বাকি নেই' : 'Nothing due')}
@@ -3254,12 +3201,21 @@ const handleWizardSubmit = async (payload) => {
                     {nextDue && (
                       <button
                         onClick={() => { setActiveReceipt(nextDue); markReceiptRead(nextDue.id); }}
-                        className="mt-3 self-start inline-flex items-center gap-1.5 bg-white text-indigo-700 px-3.5 py-2 rounded-xl text-[11px] font-black active:scale-95 transition-all shadow-md hover:shadow-lg"
+                        className="shrink-0 md:mt-3 inline-flex items-center gap-1.5 bg-white text-indigo-700 px-3.5 py-2 rounded-xl text-[11px] font-black active:scale-95 transition-all shadow-md hover:shadow-lg"
                       >
-                        {language === 'বাংলা' ? 'রিসিট দেখুন' : 'Open receipt'} <ArrowRight size={12} />
+                        {language === 'বাংলা' ? 'রিসিট' : 'Open'} <ArrowRight size={12} />
                       </button>
                     )}
                   </div>
+                </div>
+              </div>
+
+              {/* ─── PAYMENT HISTORY HEADER ─────────────────────────── */}
+              <div className="flex items-center gap-2.5 px-1 pt-1">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><Receipt size={15} /></div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-black text-gray-800 leading-tight">{language === 'বাংলা' ? 'পেমেন্ট হিস্ট্রি' : 'Payment history'}</h3>
+                  <p className="text-[10px] font-bold text-gray-400 leading-tight">{language === 'বাংলা' ? 'রিসিট ফিল্টার করতে মাসে ট্যাপ করুন' : 'Tap a month to filter your receipts'}</p>
                 </div>
               </div>
 
@@ -3299,8 +3255,8 @@ const handleWizardSubmit = async (payload) => {
               {/* ─── MONTH STRIP (12 chips, scrollable on small screens) ─
                   Status per chip: full / partial / empty (no receipt).
                   Current month gets a subtle ring. Click → filter list. */}
-              <div className="-mx-1 md:mx-0 overflow-x-auto md:overflow-visible [&::-webkit-scrollbar]:hidden">
-                <div className="px-1 md:px-0 grid grid-flow-col md:grid-flow-row auto-cols-[88px] md:auto-cols-auto md:grid-cols-6 lg:grid-cols-12 gap-2">
+              <div className="-mx-4 px-4 md:mx-0 md:px-0 overflow-x-auto md:overflow-visible snap-x snap-mandatory scroll-px-4 [&::-webkit-scrollbar]:hidden">
+                <div className="grid grid-flow-col md:grid-flow-row auto-cols-[84px] md:auto-cols-auto md:grid-cols-6 lg:grid-cols-12 gap-2">
                   {monthNames.map((label, i) => {
                     const mm = String(i + 1).padStart(2, '0');
                     const list = buckets[mm] || [];
@@ -3315,7 +3271,7 @@ const handleWizardSubmit = async (payload) => {
                       <button
                         key={mm}
                         onClick={() => setPayMonth(isActive ? null : mm)}
-                        className={`relative text-left p-3 rounded-2xl border transition-all duration-200 active:scale-95 ${
+                        className={`relative snap-start text-left p-3 rounded-2xl border transition-all duration-200 active:scale-95 ${
                           isActive
                             ? 'bg-gray-900 text-white border-gray-900 shadow-lg'
                             : isFull
@@ -3348,7 +3304,7 @@ const handleWizardSubmit = async (payload) => {
               </div>
 
               {/* ─── PROPERTY FILTER + SEARCH + MARK READ ─────────── */}
-              <div className="flex flex-col md:flex-row gap-3 md:items-center">
+              <div className="flex flex-col md:flex-row gap-2.5 md:gap-3 md:items-center">
                 <div className="relative flex-1">
                   <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
@@ -3356,31 +3312,36 @@ const handleWizardSubmit = async (payload) => {
                     value={paySearch}
                     onChange={(e) => setPaySearch(e.target.value)}
                     placeholder={language === 'বাংলা' ? 'প্রপার্টি, মাস বা রিসিট খুঁজুন…' : 'Find a receipt by property, month or amount…'}
-                    className="w-full bg-white pl-10 pr-4 py-2.5 rounded-2xl text-[12px] font-bold text-gray-700 placeholder:text-gray-400 border border-gray-100 focus:border-[#ba0036] focus:ring-4 focus:ring-[#ba0036]/10 outline-none transition-all"
+                    className="w-full bg-white pl-10 pr-4 py-3 rounded-2xl text-[12px] font-bold text-gray-700 placeholder:text-gray-400 border border-gray-100 focus:border-[#ba0036] focus:ring-4 focus:ring-[#ba0036]/10 outline-none transition-all"
                   />
                 </div>
-                {properties.length > 1 && (
-                  <div className="relative">
-                    <Filter size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                    <select
-                      value={payProperty}
-                      onChange={(e) => setPayProperty(e.target.value)}
-                      className="appearance-none bg-white pl-9 pr-9 py-2.5 rounded-2xl text-[12px] font-black text-gray-700 border border-gray-100 focus:border-[#ba0036] focus:ring-4 focus:ring-[#ba0036]/10 outline-none transition-all"
-                    >
-                      <option value="all">{language === 'বাংলা' ? 'সব প্রপার্টি' : 'All properties'}</option>
-                      {properties.map(([id, title]) => (
-                        <option key={id} value={id}>{title}</option>
-                      ))}
-                    </select>
+                {(properties.length > 1 || unreadReceiptsCount > 0) && (
+                  <div className="flex items-center gap-2.5">
+                    {properties.length > 1 && (
+                      <div className="relative flex-1 md:flex-none">
+                        <Filter size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                        <select
+                          value={payProperty}
+                          onChange={(e) => setPayProperty(e.target.value)}
+                          className="w-full appearance-none bg-white pl-9 pr-9 py-3 rounded-2xl text-[12px] font-black text-gray-700 border border-gray-100 focus:border-[#ba0036] focus:ring-4 focus:ring-[#ba0036]/10 outline-none transition-all"
+                        >
+                          <option value="all">{language === 'বাংলা' ? 'সব প্রপার্টি' : 'All properties'}</option>
+                          {properties.map(([id, title]) => (
+                            <option key={id} value={id}>{title}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                      </div>
+                    )}
+                    {unreadReceiptsCount > 0 && (
+                      <button
+                        onClick={markAllReceiptsRead}
+                        className="shrink-0 px-4 py-3 bg-white border border-gray-100 hover:border-[#ba0036] hover:text-[#ba0036] text-gray-600 rounded-2xl text-[11px] font-black shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                      >
+                        {language === 'বাংলা' ? 'সব পড়া' : 'Mark all read'}
+                      </button>
+                    )}
                   </div>
-                )}
-                {unreadReceiptsCount > 0 && (
-                  <button
-                    onClick={markAllReceiptsRead}
-                    className="px-4 py-2.5 bg-white border border-gray-100 hover:border-[#ba0036] hover:text-[#ba0036] text-gray-600 rounded-2xl text-[11px] font-black shadow-sm transition-all active:scale-95"
-                  >
-                    {language === 'বাংলা' ? 'সব পড়া' : 'Mark all read'}
-                  </button>
                 )}
               </div>
 
@@ -3407,7 +3368,7 @@ const handleWizardSubmit = async (payload) => {
                         id={`receipt-${r.id}`}
                         key={r.id}
                         onClick={() => { setActiveReceipt(r); markReceiptRead(r.id); }}
-                        className={`text-left bg-white/80 backdrop-blur-xl p-6 rounded-[2rem] border shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.99] relative overflow-hidden ${
+                        className={`text-left bg-white/80 backdrop-blur-xl p-5 md:p-6 rounded-3xl md:rounded-[2rem] border shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.99] relative overflow-hidden ${
                           !r.read ? 'border-[#ba0036]/30 ring-2 ring-[#ba0036]/10' : 'border-gray-100'
                         }`}
                       >
