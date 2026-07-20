@@ -5086,32 +5086,32 @@ const HostDashboard = () => {
                     </div>
 
                     {/* Financial breakdown — Monthly Rent / Service / Deposit / Total.
-                        4 columns on EVERY width so the boxes never reflow between
-                        phone, tablet & desktop. Only the font + padding shrink on
-                        small screens (min-w-0 lets the tiles compress); the layout
-                        and positions stay identical across all devices. */}
-                    <div className="grid grid-cols-4 gap-1.5 sm:gap-2 md:gap-3">
-                      <div className="bg-white rounded-lg sm:rounded-xl p-1.5 sm:p-2 md:p-2.5 border border-gray-100 min-w-0">
-                        <p className="text-[7px] sm:text-[8px] font-black text-gray-400 uppercase tracking-wide sm:tracking-widest leading-tight">{language === 'বাংলা' ? 'মাসিক ভাড়া' : 'Monthly Rent'}</p>
-                        <p className="text-[10px] sm:text-xs md:text-sm font-black text-gray-900 tabular-nums mt-0.5 leading-tight">{formatBDT(booking.monthlyRent)}</p>
+                        Full-responsive: a spacious 2×2 grid on phones so every tile
+                        stays readable (no cramped 4-across squeeze), then a single
+                        row of 4 from the sm breakpoint up (tablet · desktop) to match
+                        the wide card. Padding + font stay generous at all sizes. */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                      <div className="bg-white rounded-xl p-3 border border-gray-100 min-w-0">
+                        <p className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest leading-tight">{language === 'বাংলা' ? 'মাসিক ভাড়া' : 'Monthly Rent'}</p>
+                        <p className="text-sm font-black text-gray-900 tabular-nums mt-1 leading-tight">{formatBDT(booking.monthlyRent)}</p>
                       </div>
-                      <div className="bg-white rounded-lg sm:rounded-xl p-1.5 sm:p-2 md:p-2.5 border border-gray-100 min-w-0">
-                        <p className="text-[7px] sm:text-[8px] font-black text-gray-400 uppercase tracking-wide sm:tracking-widest leading-tight">{language === 'বাংলা' ? 'সার্ভিস' : 'Service'}</p>
-                        <p className="text-[10px] sm:text-xs md:text-sm font-black text-gray-900 tabular-nums mt-0.5 leading-tight">{formatBDT(booking.serviceCharge || 0)}</p>
+                      <div className="bg-white rounded-xl p-3 border border-gray-100 min-w-0">
+                        <p className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest leading-tight">{language === 'বাংলা' ? 'সার্ভিস' : 'Service'}</p>
+                        <p className="text-sm font-black text-gray-900 tabular-nums mt-1 leading-tight">{formatBDT(booking.serviceCharge || 0)}</p>
                       </div>
-                      <div className="bg-white rounded-lg sm:rounded-xl p-1.5 sm:p-2 md:p-2.5 border border-gray-100 min-w-0">
-                        <p className="text-[7px] sm:text-[8px] font-black text-gray-400 uppercase tracking-wide sm:tracking-widest leading-tight">{language === 'বাংলা' ? 'ডিপোজিট (অগ্রিম)' : 'Deposit (Advance)'}</p>
-                        <p className="text-[10px] sm:text-xs md:text-sm font-black text-gray-900 tabular-nums mt-0.5 leading-tight">{formatBDT(booking.advancePayment || 0)}</p>
+                      <div className="bg-white rounded-xl p-3 border border-gray-100 min-w-0">
+                        <p className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest leading-tight">{language === 'বাংলা' ? 'ডিপোজিট (অগ্রিম)' : 'Deposit (Advance)'}</p>
+                        <p className="text-sm font-black text-gray-900 tabular-nums mt-1 leading-tight">{formatBDT(booking.advancePayment || 0)}</p>
                         {booking.paymentMethod ? (
-                          <span className="mt-1 inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[7px] sm:text-[8px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 max-w-full">
-                            <CreditCard size={8} strokeWidth={3} className="shrink-0"/> <span className="truncate">{booking.paymentMethod}</span>
+                          <span className="mt-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 max-w-full">
+                            <CreditCard size={10} strokeWidth={3} className="shrink-0"/> <span className="truncate">{booking.paymentMethod}</span>
                           </span>
                         ) : null}
                       </div>
-                      <div className="bg-gradient-to-br from-[#ba0036]/5 to-[#ff004c]/5 border border-[#ba0036]/10 rounded-lg sm:rounded-xl p-1.5 sm:p-2 md:p-2.5 min-w-0">
-                        <p className="text-[7px] sm:text-[8px] font-black text-[#ba0036] uppercase tracking-wide sm:tracking-widest leading-tight">{language === 'বাংলা' ? 'মোট মাসিক' : 'Total/mo'}</p>
-                        <p className="text-[10px] sm:text-xs md:text-sm font-black text-[#ba0036] tabular-nums mt-0.5 leading-tight">{formatBDT(monthlyTotal)}</p>
-                        <p className="text-[7px] sm:text-[8px] font-bold text-gray-500 mt-1 leading-tight">{language === 'বাংলা' ? 'ভাড়া + সার্ভিস' : 'Rent + Service'}</p>
+                      <div className="bg-gradient-to-br from-[#ba0036]/5 to-[#ff004c]/5 border border-[#ba0036]/10 rounded-xl p-3 min-w-0">
+                        <p className="text-[9px] sm:text-[10px] font-black text-[#ba0036] uppercase tracking-widest leading-tight">{language === 'বাংলা' ? 'মোট মাসিক' : 'Total/mo'}</p>
+                        <p className="text-sm font-black text-[#ba0036] tabular-nums mt-1 leading-tight">{formatBDT(monthlyTotal)}</p>
+                        <p className="text-[9px] sm:text-[10px] font-bold text-gray-500 mt-1 leading-tight">{language === 'বাংলা' ? 'ভাড়া + সার্ভিস' : 'Rent + Service'}</p>
                       </div>
                     </div>
 
