@@ -605,18 +605,6 @@ useEffect(() => {
               </nav>
             )}
 
-            {/* ── Landlord: the dashboard is home, so surface it as the primary
-                nav tab (mirrors "he sees only a Dashboard tab"). ── */}
-            {isLoggedIn && userRole === 'landlord' && (
-              <Link
-                to="/host-dashboard"
-                className="hidden lg:flex items-center gap-1.5 mr-1 font-bold text-gray-700 hover:text-[#ba0036] transition-colors"
-              >
-                <LayoutDashboard size={16} />
-                {langCode === 'bn' ? 'ড্যাশবোর্ড' : 'Dashboard'}
-              </Link>
-            )}
-
             {/* Desktop notification bell with unread badge + dropdown. */}
             {isAuthed && <NotificationBell isAuthed={isAuthed} />}
 

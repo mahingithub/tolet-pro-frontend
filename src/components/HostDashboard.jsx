@@ -3061,11 +3061,15 @@ const HostDashboard = () => {
               <span className="text-[8px] font-black uppercase tracking-wider bg-[#ba0036]/10 px-1.5 py-0.5 rounded-md">{language === 'বাংলা' ? 'ফ্রি' : 'Free'}</span>
             </button>
 
-            {/* Language switcher — English ⇄ বাংলা (persisted via LanguageContext). */}
-            <div className="relative hidden sm:block">
+            {/* Language switcher — English ⇄ বাংলা (persisted via LanguageContext).
+                Visible on mobile too: the global marketing navbar (which carries
+                the language pill elsewhere) is hidden on the dashboard, so this
+                is the landlord's only in-dashboard language toggle on phones. */}
+            <div className="relative">
               <button
                 onClick={() => setIsLangMenuOpen(v => !v)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/60 border border-white/80 shadow-sm hover:bg-white transition-all active:scale-95"
+                aria-label={language === 'বাংলা' ? 'ভাষা' : 'Language'}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl bg-white/60 border border-white/80 shadow-sm hover:bg-white transition-all active:scale-95"
               >
                 <Globe size={16} className="text-gray-500" />
                 <span className="text-[12px] font-black text-gray-700">{language === 'বাংলা' ? 'বাংলা' : 'English'}</span>
