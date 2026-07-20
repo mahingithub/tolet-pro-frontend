@@ -587,18 +587,31 @@ useEffect(() => {
             {/* Desktop notification bell with unread badge + dropdown. */}
             {isAuthed && <NotificationBell isAuthed={isAuthed} />}
 
-            {/* Post Property — ALWAYS visible so first-time visitors get a
-                clear listing CTA. Guests are sent to landlord signup; a
-                logged-in user goes straight to the listing form. Classic
-                red-outlined button that fills on hover, with a FREE tag. */}
-            <button
-              onClick={() => (isLoggedIn ? handleProtected('/list-property') : navigate('/login?mode=signup&role=landlord'))}
-              className="group flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[#ba0036] bg-white text-[#ba0036] hover:bg-[#ba0036] hover:text-white font-bold text-xs lg:text-sm shadow-sm hover:shadow transition-all active:scale-95 whitespace-nowrap"
-            >
-              <PlusCircle size={16} />
-              {t?.listProperty || 'Post Property'}
-              <span className="rounded-full bg-[#ba0036]/10 text-[#ba0036] group-hover:bg-white/25 group-hover:text-white px-1.5 py-0.5 text-[9px] font-extrabold leading-none tracking-wider transition-colors">FREE</span>
-            </button>
+            {/* Primary header CTA — role-aware.
+                • Logged-in TENANT → "Roommate Wallet" (→ /living). Tenants list
+                  nothing, so surfacing the shared-cost hub is far more useful
+                  to them than a "Post Property" button.
+                • Guest / LANDLORD → "Post Property" listing CTA (guests go to
+                  landlord signup; landlords go straight to the listing form). */}
+            {isLoggedIn && userRole === 'tenant' ? (
+              <button
+                onClick={() => navigate('/living')}
+                className="group flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[#ba0036] bg-white text-[#ba0036] hover:bg-[#ba0036] hover:text-white font-bold text-xs lg:text-sm shadow-sm hover:shadow transition-all active:scale-95 whitespace-nowrap"
+              >
+                <Wallet size={16} />
+                {t?.menuRoommateWallet || 'Roommate Wallet'}
+                <span className="rounded-full bg-[#ba0036]/10 text-[#ba0036] group-hover:bg-white/25 group-hover:text-white px-1.5 py-0.5 text-[9px] font-extrabold leading-none tracking-wider transition-colors">LIVING</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => (isLoggedIn ? handleProtected('/list-property') : navigate('/login?mode=signup&role=landlord'))}
+                className="group flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[#ba0036] bg-white text-[#ba0036] hover:bg-[#ba0036] hover:text-white font-bold text-xs lg:text-sm shadow-sm hover:shadow transition-all active:scale-95 whitespace-nowrap"
+              >
+                <PlusCircle size={16} />
+                {t?.listProperty || 'Post Property'}
+                <span className="rounded-full bg-[#ba0036]/10 text-[#ba0036] group-hover:bg-white/25 group-hover:text-white px-1.5 py-0.5 text-[9px] font-extrabold leading-none tracking-wider transition-colors">FREE</span>
+              </button>
+            )}
 
             <div className="relative" ref={langRef}>
               <div onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="flex items-center gap-2 cursor-pointer hover:text-[#ba0036] transition-colors">

@@ -218,6 +218,15 @@ const BUDGET_OPTIONS = [
   { id: 'above_50k', en: 'Above ৳50k',  bn: '৳৫০k এর উপরে' },
 ];
 
+// Category → PropertyListing `intent`. Residential maps to residential rentals
+// (intent=rent), Commercial to commercial spaces (intent=commercial). Empty =
+// no intent param (keeps the user's persisted browse mode).
+const CATEGORY_OPTIONS = [
+  { id: '',            intent: '',           en: 'Category',    bn: 'ক্যাটাগরি' },
+  { id: 'residential', intent: 'rent',       en: 'Residential', bn: 'আবাসিক' },
+  { id: 'commercial',  intent: 'commercial', en: 'Commercial',  bn: 'বাণিজ্যিক' },
+];
+
 // Localised month labels for the rent-proof month strip.
 const RENT_MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const RENT_MONTHS_BN = ['জানু', 'ফেব', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগ', 'সেপ্ট', 'অক্টো', 'নভে', 'ডিসে'];
@@ -1689,7 +1698,7 @@ const handleWizardSubmit = async (payload) => {
               full pill on md+ so the small header never overflows. */}
           <Link
             to="/living"
-            className="group flex items-center gap-2 p-2 md:pr-3.5 bg-white/60 rounded-xl border border-white/80 shadow-sm hover:shadow-md hover:bg-white transition-all active:scale-95"
+            className="group hidden md:flex items-center gap-2 p-2 md:pr-3.5 bg-white/60 rounded-xl border border-white/80 shadow-sm hover:shadow-md hover:bg-white transition-all active:scale-95"
             title={language === 'বাংলা' ? 'রুমমেট ওয়ালেট' : 'Roommate Wallet'}
           >
             <span className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 group-hover:scale-105 transition-transform">
@@ -1701,9 +1710,10 @@ const handleWizardSubmit = async (payload) => {
             </span>
           </Link>
 
-          {/* Language toggle — English / বাংলা. Reuses the langRef + isLangOpen
-              plumbing already wired into the click-outside handler. */}
-          <div className="relative" ref={langRef}>
+          {/* Language toggle — English / বাংলা. Desktop-only: the mobile
+              header stays clean (logo + bell + avatar), matching the mockup.
+              Reuses the langRef + isLangOpen click-outside plumbing. */}
+          <div className="relative hidden md:block" ref={langRef}>
             <button
               onClick={() => setIsLangOpen((v) => !v)}
               className="flex items-center gap-1.5 p-2 md:pl-3 md:pr-2.5 bg-white/60 rounded-xl border border-white/80 shadow-sm hover:bg-white transition-all active:scale-95"
@@ -2000,24 +2010,26 @@ const handleWizardSubmit = async (payload) => {
                 <button
                   key={stat.id}
                   onClick={stat.onClick}
-                  className="relative text-left bg-white/90 backdrop-blur-sm p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] border border-white shadow-[0_4px_20px_rgba(15,23,42,0.04)] flex flex-col gap-2 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)] transition-all duration-300 overflow-hidden"
+                  className="relative text-left bg-white/90 backdrop-blur-sm p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] border border-white shadow-[0_4px_20px_rgba(15,23,42,0.04)] flex items-center justify-between gap-2 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)] transition-all duration-300 overflow-hidden"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className={`w-10 h-10 md:w-11 md:h-11 rounded-2xl ${stat.iconBg} ${stat.iconColor} flex items-center justify-center shadow-sm`}>
-                      <stat.icon size={18} className="md:w-[20px] md:h-[20px]" strokeWidth={2.4} />
+                  {stat.badge ? (
+                    <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 bg-[#ba0036] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10">
+                      <span className="w-1 h-1 bg-white rounded-full animate-pulse" />{stat.badge}
+                    </span>
+                  ) : null}
+                  {/* Left: icon + label */}
+                  <div className="min-w-0 flex-1">
+                    <div className={`w-9 h-9 md:w-11 md:h-11 rounded-xl md:rounded-2xl ${stat.iconBg} ${stat.iconColor} flex items-center justify-center shadow-sm mb-2.5 md:mb-3`}>
+                      <stat.icon size={17} className="md:w-[20px] md:h-[20px]" strokeWidth={2.4} />
                     </div>
-                    {stat.badge ? (
-                      <span className="inline-flex items-center gap-1 bg-[#ba0036] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm">
-                        <span className="w-1 h-1 bg-white rounded-full animate-pulse" />{stat.badge}
-                      </span>
-                    ) : null}
+                    <p className="text-[11px] md:text-sm font-black text-gray-800 leading-tight">{stat.label}</p>
+                    <p className="hidden md:block text-[11px] font-bold text-gray-400 leading-tight mt-0.5 truncate">{stat.sub}</p>
                   </div>
-                  <h3 className="text-2xl md:text-[2rem] font-black text-gray-900 leading-none tabular-nums tracking-tight mt-1">{stat.value}</h3>
-                  <div>
-                    <p className="text-[12px] md:text-sm font-black text-gray-800 leading-tight">{stat.label}</p>
-                    <p className="text-[10px] md:text-[11px] font-bold text-gray-400 leading-tight mt-0.5 truncate">{stat.sub}</p>
+                  {/* Right: number + accent bar */}
+                  <div className="shrink-0 flex flex-col items-end">
+                    <h3 className="text-2xl md:text-[2.25rem] font-black text-gray-900 leading-none tabular-nums tracking-tight">{stat.value}</h3>
+                    <div className={`h-1 rounded-full ${stat.bar} w-7 md:w-9 mt-2`} />
                   </div>
-                  <div className={`h-1 rounded-full ${stat.bar} w-8 md:w-10 mt-0.5`} />
                 </button>
               ))}
 
@@ -2026,31 +2038,33 @@ const handleWizardSubmit = async (payload) => {
                   reads "All clear" when nothing is owed. */}
               <button
                 onClick={() => setActiveTab('payments')}
-                className="relative text-left p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] border border-white/10 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.4)] flex flex-col gap-2 hover:-translate-y-0.5 transition-all duration-300 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-[#3a0011]"
+                className="relative text-left p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] border border-white/10 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.4)] flex items-center justify-between gap-2 hover:-translate-y-0.5 transition-all duration-300 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-[#3a0011]"
               >
                 <div className="absolute -bottom-10 -right-8 w-32 h-32 rounded-full blur-3xl pointer-events-none bg-amber-500/10" />
-                <div className="relative flex items-start justify-between">
-                  <div className={`w-10 h-10 md:w-11 md:h-11 rounded-2xl flex items-center justify-center shadow-sm ${totalDueAmount > 0 ? 'bg-amber-400/15 text-amber-300' : 'bg-emerald-400/15 text-emerald-300'}`}>
-                    <Wallet size={18} className="md:w-[20px] md:h-[20px]" strokeWidth={2.4} />
+                {/* Left: icon + label */}
+                <div className="relative min-w-0 flex-1">
+                  <div className={`w-9 h-9 md:w-11 md:h-11 rounded-xl md:rounded-2xl flex items-center justify-center shadow-sm mb-2.5 md:mb-3 ${totalDueAmount > 0 ? 'bg-amber-400/15 text-amber-300' : 'bg-emerald-400/15 text-emerald-300'}`}>
+                    <Wallet size={17} className="md:w-[20px] md:h-[20px]" strokeWidth={2.4} />
                   </div>
+                  <p className="text-[11px] md:text-sm font-black text-white leading-tight">{language === 'বাংলা' ? 'বকেয়া' : 'Due Amount'}</p>
+                  <p className="hidden md:block text-[11px] font-bold text-white/50 leading-tight mt-0.5 truncate">{language === 'বাংলা' ? 'মোট বকেয়া পরিমাণ' : 'Total amount due'}</p>
                 </div>
-                <h3 className={`relative text-xl md:text-[1.65rem] font-black leading-none tabular-nums tracking-tight mt-1 ${totalDueAmount > 0 ? 'text-white' : 'text-emerald-300'}`}>
-                  {totalDueAmount > 0
-                    ? `৳${totalDueAmount.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}`
-                    : (language === 'বাংলা' ? 'ক্লিয়ার' : 'All clear')}
-                </h3>
-                <div className="relative">
-                  <p className="text-[12px] md:text-sm font-black text-white leading-tight">{language === 'বাংলা' ? 'বকেয়া' : 'Due Amount'}</p>
-                  <p className="text-[10px] md:text-[11px] font-bold text-white/50 leading-tight mt-0.5 truncate">{language === 'বাংলা' ? 'মোট বকেয়া পরিমাণ' : 'Total amount due'}</p>
+                {/* Right: amount + accent bar */}
+                <div className="relative shrink-0 flex flex-col items-end">
+                  <h3 className={`text-lg md:text-[1.6rem] font-black leading-none tabular-nums tracking-tight ${totalDueAmount > 0 ? 'text-white' : 'text-emerald-300'}`}>
+                    {totalDueAmount > 0
+                      ? `৳${totalDueAmount.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}`
+                      : (language === 'বাংলা' ? 'ক্লিয়ার' : 'All clear')}
+                  </h3>
+                  <div className={`h-1 rounded-full w-7 md:w-9 mt-2 ${totalDueAmount > 0 ? 'bg-amber-400' : 'bg-emerald-400'}`} />
                 </div>
-                <div className={`relative h-1 rounded-full w-8 md:w-10 mt-0.5 ${totalDueAmount > 0 ? 'bg-amber-400' : 'bg-emerald-400'}`} />
               </button>
             </div>
 
             {/* ── NAV CARDS — Messages · Services · Smart Alerts ──────────
                 Wider horizontal cards (icon + title + subtitle + chevron).
                 Stack to full-width rows on phones for big tap targets. */}
-            <div className="mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+            <div className="mb-4 md:mb-6 grid grid-cols-3 gap-2.5 md:gap-4">
               {[
                 {
                   label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',
@@ -2076,7 +2090,7 @@ const handleWizardSubmit = async (payload) => {
                   key={label}
                   type="button"
                   onClick={onClick}
-                  className="group flex items-center gap-3 p-4 rounded-2xl bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 text-left"
+                  className="group flex flex-col items-center text-center gap-2 p-3 md:flex-row md:text-left md:items-center md:gap-3 md:p-4 rounded-2xl bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300"
                 >
                   <span className={`relative w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 ${iconBg} ${iconColor} group-hover:scale-105 transition-transform`}>
                     <Icon size={19} strokeWidth={2.4} />
@@ -2084,11 +2098,11 @@ const handleWizardSubmit = async (payload) => {
                       <span className="absolute -top-1.5 -right-1.5 bg-[#ba0036] text-white text-[9px] font-black min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center shadow-sm border border-white">{badge}</span>
                     ) : null}
                   </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-black text-gray-900 leading-tight truncate">{label}</span>
-                    <span className="block text-[11px] font-bold text-gray-400 leading-tight mt-0.5 truncate">{sub}</span>
+                  <span className="min-w-0 w-full md:flex-1">
+                    <span className="block text-[11px] md:text-sm font-black text-gray-900 leading-tight md:truncate">{label}</span>
+                    <span className="hidden md:block text-[11px] font-bold text-gray-400 leading-tight mt-0.5 truncate">{sub}</span>
                   </span>
-                  <ChevronRight size={16} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all shrink-0" />
+                  <ChevronRight size={16} className="hidden md:block text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all shrink-0" />
                 </button>
               ))}
             </div>
@@ -4130,18 +4144,18 @@ const QuickSearchCard = ({ language }) => {
   const bn = language === 'বাংলা';
   const navigate = useNavigate();
   const [q, setQ] = useState('');
-  const [area, setArea] = useState('');
+  const [category, setCategory] = useState('');
   const [budget, setBudget] = useState('');
 
   const runSearch = () => {
     const params = new URLSearchParams();
     if (budget) params.set('budget', budget);
-    let slug = 'all';
+    const cat = CATEGORY_OPTIONS.find((c) => c.id === category);
+    if (cat?.intent) params.set('intent', cat.intent);
     const text = q.trim();
-    if (text) { params.set('q', text); slug = 'all'; }
-    else if (area) { slug = area; }
+    if (text) params.set('q', text);
     const qs = params.toString();
-    navigate(`/properties/${slug}${qs ? `?${qs}` : ''}`);
+    navigate(`/properties/all${qs ? `?${qs}` : ''}`);
   };
 
   return (
@@ -4163,16 +4177,16 @@ const QuickSearchCard = ({ language }) => {
           />
         </div>
         <div className="grid grid-cols-2 md:flex gap-2.5 md:gap-3">
-          {/* Area select */}
+          {/* Category select — Residential / Commercial. Maps to the listing
+              `intent` param (residential→rent, commercial→commercial). */}
           <div className="relative">
-            <MapPin size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
+            <Building2 size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
             <select
-              value={area}
-              onChange={(e) => setArea(e.target.value)}
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
               className="appearance-none w-full md:w-auto bg-gray-50 pl-9 pr-8 py-3 rounded-2xl text-[13px] font-black text-gray-700 border border-gray-100 focus:bg-white focus:border-[#ba0036] outline-none transition-all cursor-pointer"
             >
-              <option value="">{bn ? 'এলাকা বাছুন' : 'Select Area'}</option>
-              {QUICK_SEARCH_AREAS.map((a) => <option key={a.slug} value={a.slug}>{bn ? a.bn : a.en}</option>)}
+              {CATEGORY_OPTIONS.map((c) => <option key={c.id || 'any'} value={c.id}>{bn ? c.bn : c.en}</option>)}
             </select>
             <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
