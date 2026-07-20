@@ -610,3 +610,18 @@ html.reduce-motion .tp-home-spark { display: none !important; }
 html.reduce-motion .tp-home-bar-fill { left: 0 !important; width: 100% !important; }
 /* windows rest as simple crimson openings (logo-faithful) when motion is off */
 html.reduce-motion .tp-home-win { fill: rgba(255,211,122,0) !important; }
+
+/* ─── Scrollbar utilities ──────────────────────────────────────────────────
+   `no-scrollbar` fully hides the scrollbar — used on horizontal chip / toolbar
+   rows (e.g. the lease card's location + terms pills and the filter pills) that
+   scroll sideways on small screens without showing an ugly bar. `custom-scrollbar`
+   keeps a slim, unobtrusive thumb for tall scroll panels. Both class names are
+   already referenced across the app; defining them here makes that intent real. */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+.custom-scrollbar { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }

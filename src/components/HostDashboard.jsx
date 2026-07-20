@@ -5003,11 +5003,16 @@ const HostDashboard = () => {
             return (
               <div id={`booking-${booking.id}`} key={booking.id} className={`bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
 
-                {/* Compact row — always visible. Click-to-toggle suppressed in forceOpen mode. */}
-                <button
-                  type="button"
+                {/* Compact row — always visible. Click-to-toggle suppressed in
+                    forceOpen mode. Rendered as a div (not a <button>) so the 3-dot
+                    actions menu can live at the header's top-right without nesting
+                    a button inside a button. */}
+                <div
+                  role={forceOpen ? undefined : 'button'}
+                  tabIndex={forceOpen ? undefined : 0}
                   onClick={forceOpen ? undefined : () => setExpandedBookingId(isExpanded ? null : booking.id)}
-                  className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-3 text-left transition-colors ${forceOpen ? 'cursor-default' : 'hover:bg-gray-50/50'}`}
+                  onKeyDown={forceOpen ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedBookingId(isExpanded ? null : booking.id); } }}
+                  className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-3 text-left transition-colors ${forceOpen ? 'cursor-default' : 'cursor-pointer hover:bg-gray-50/50'}`}
                 >
                   <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-black text-[11px] sm:text-xs shrink-0 ${stageAvatar} overflow-hidden`}>
                     {(!hostelBooking && booking.tenantAvatar) ? (
@@ -5040,46 +5045,76 @@ const HostDashboard = () => {
                       )}
                     </p>
                   </div>
-                  <div className="hidden sm:flex flex-col items-end gap-0.5 shrink-0 mr-1">
+                  {/* Progress mini-bar — desktop, COLLAPSED only. Hidden once
+                      expanded (the body already shows the full Lease Progress bar),
+                      freeing the top-right corner for the 3-dot menu. */}
+                  <div className={`flex-col items-end gap-0.5 shrink-0 mr-1 ${isExpanded ? 'hidden' : 'hidden sm:flex'}`}>
                     <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest tabular-nums">{progress}%</span>
                     <div className="w-12 h-1 bg-gray-100 rounded-full overflow-hidden">
                       <div className={`h-full rounded-full ${stage === 'done' ? 'bg-gray-400' : stage === 'active' ? 'bg-green-500' : stage === 'notice' ? 'bg-amber-500' : 'bg-blue-500'}`} style={{ width: `${progress}%` }}/>
                     </div>
                   </div>
+                  {/* 3-dot actions menu — top-right of the card, next to the profile
+                      photo/name. Shown when the lease is expanded. stopPropagation
+                      keeps opening it from toggling the row; it opens downward into
+                      the (tall) body so the card's overflow never clips it. */}
+                  {isExpanded && (
+                    <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveDropdownId(activeDropdownId === booking.id ? null : booking.id)}
+                        className="p-1.5 rounded-lg bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"
+                        title={language === 'বাংলা' ? 'আরও অ্যাকশন' : 'More actions'}
+                      >
+                        <MoreVertical size={16}/>
+                      </button>
+                      {activeDropdownId === booking.id && (
+                        <div className="absolute right-0 top-full mt-2 w-52 bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[50] animate-in fade-in zoom-in-95 origin-top-right border border-gray-100">
+                          <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
+                          <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
+                          <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
+                          <div className="h-px w-full bg-gray-100 my-1"></div>
+                          <button onClick={() => { setActiveDropdownId(null); setConfirmDeleteBookingId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {!forceOpen && (
                     <div className="shrink-0 p-1.5 rounded-lg bg-gray-50 text-gray-400">
                       {isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
                     </div>
                   )}
-                </button>
+                </div>
 
                 {/* Expanded body — full agreement details */}
                 {isExpanded && (
                   <div className="border-t border-gray-100 bg-gray-50/40 px-3 sm:px-4 py-4 animate-in slide-in-from-top-2 fade-in duration-300">
 
-                    {/* Tenant count chip */}
-                    <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-                      <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                        {booking.location && (
-                          <div className="px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[10px] font-bold text-gray-600 inline-flex items-center gap-1.5 max-w-[220px]">
-                            <MapPin size={11} className="text-[#ba0036] shrink-0"/> <span className="truncate">{booking.location}</span>
-                          </div>
-                        )}
-                      </div>
+                    {/* Location + commercial terms — ONE horizontal row on every
+                        device. Pills never wrap or change position: on a narrow
+                        phone (iPhone 14 / Pixel 7 / Galaxy) the text just shrinks,
+                        and the row scrolls sideways only if the license number is
+                        too long to fit. Same layout & positions across all sizes. */}
+                    <div className="flex items-center gap-1.5 sm:gap-2 mb-3 overflow-x-auto no-scrollbar">
+                      {booking.location && (
+                        <div className="shrink-0 px-2 sm:px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[9px] sm:text-[10px] font-bold text-gray-600 inline-flex items-center gap-1 sm:gap-1.5 whitespace-nowrap">
+                          <MapPin size={11} className="text-[#ba0036] shrink-0"/> {booking.location}
+                        </div>
+                      )}
                       {booking.dealType === 'commercial' ? (
-                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                        <>
                           {booking.commercialTerms?.businessName && (
-                            <span className="px-2.5 py-1 bg-violet-50 border border-violet-100 rounded-lg text-[10px] font-black text-violet-700 inline-flex items-center gap-1.5 shrink-0">🏢 {booking.commercialTerms.businessName}</span>
+                            <span className="shrink-0 px-2 sm:px-2.5 py-1 bg-violet-50 border border-violet-100 rounded-lg text-[9px] sm:text-[10px] font-black text-violet-700 inline-flex items-center gap-1 sm:gap-1.5 whitespace-nowrap">🏢 {booking.commercialTerms.businessName}</span>
                           )}
                           {Number(booking.commercialTerms?.leaseTermMonths) > 0 && (
-                            <span className="px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[10px] font-black text-gray-700 inline-flex items-center gap-1.5 shrink-0">{language === 'বাংলা' ? 'মেয়াদ' : 'Term'}: {booking.commercialTerms.leaseTermMonths}{language === 'বাংলা' ? ' মাস' : 'mo'}</span>
+                            <span className="shrink-0 px-2 sm:px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[9px] sm:text-[10px] font-black text-gray-700 inline-flex items-center gap-1 sm:gap-1.5 whitespace-nowrap">{language === 'বাংলা' ? 'মেয়াদ' : 'Term'}: {booking.commercialTerms.leaseTermMonths}{language === 'বাংলা' ? ' মাস' : 'mo'}</span>
                           )}
                           {booking.commercialTerms?.licenseNumber && (
-                            <span className="px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[10px] font-bold text-gray-600 inline-flex items-center gap-1.5 shrink-0">{language === 'বাংলা' ? 'লাইসেন্স' : 'License'}: {booking.commercialTerms.licenseNumber}</span>
+                            <span className="shrink-0 px-2 sm:px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[9px] sm:text-[10px] font-bold text-gray-600 inline-flex items-center gap-1 sm:gap-1.5 whitespace-nowrap">{language === 'বাংলা' ? 'লাইসেন্স' : 'License'}: {booking.commercialTerms.licenseNumber}</span>
                           )}
-                        </div>
+                        </>
                       ) : (
-                        <div className="px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[10px] font-black text-gray-700 inline-flex items-center gap-1.5 shrink-0">
+                        <div className="shrink-0 px-2 sm:px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-[9px] sm:text-[10px] font-black text-gray-700 inline-flex items-center gap-1 sm:gap-1.5 whitespace-nowrap">
                           <User size={11}/> {tenantsLabel}
                         </div>
                       )}
@@ -5180,59 +5215,50 @@ const HostDashboard = () => {
                       </div>
                     )}
 
-                    {/* Auto-reminder + actions row */}
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-1.5">
+                    {/* Auto-reminder + actions row — stays on ONE line on every
+                        device. Never wraps (that's what pushed the ⋮ menu onto its
+                        own line before); on phones the labels + padding shrink so
+                        the whole row keeps its position instead of reflowing. */}
+                    <div className="mt-3 flex flex-nowrap items-center justify-between gap-1 sm:gap-1.5">
                       <button
                         onClick={() => toggleAutoReminder(booking.id)}
-                        className={`px-2.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1 ${booking.autoReminder ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+                        className={`shrink-0 px-1.5 sm:px-2.5 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest transition-all flex items-center gap-1 ${booking.autoReminder ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
                         title={booking.autoReminder ? `Auto-remind ${booking.reminderLeadDays}d before due` : 'Auto-reminder off'}
                       >
                         {booking.autoReminder ? <BellRing size={12}/> : <BellOff size={12}/>}
                         <span className="hidden sm:inline">{language === 'বাংলা' ? 'অটো রিমাইন্ডার' : 'Auto Reminder'}</span> · {booking.reminderLeadDays}d
                       </button>
 
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                      <div className="flex flex-nowrap items-center gap-1 sm:gap-1.5">
                         {/* Profile — opens the tenant's trust card (/tenant/:id). */}
                         <button
                           onClick={() => openTenantProfile(resolveTenantUserId(booking), { name: booking.tenant, avatar: booking.tenantAvatar })}
-                          className="px-2.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1"
+                          className="shrink-0 px-1.5 sm:px-2.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest active:scale-95 flex items-center gap-1"
                           title={language === 'বাংলা' ? 'টেন্যান্ট প্রোফাইল' : 'Tenant profile'}
                         >
-                          <UserCircle size={12}/> {language === 'বাংলা' ? 'প্রোফাইল' : 'Profile'}
+                          <UserCircle size={12} className="shrink-0"/> {language === 'বাংলা' ? 'প্রোফাইল' : 'Profile'}
                         </button>
                         {/* Message — single button. Routes to /messages so every conversation
                             lives in one place; ChatSystem hydrates the right thread from
                             location.state. */}
                         <button
                           onClick={() => openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-bookings', peerUserId: resolveTenantUserId(booking), peerName: booking.tenant, peerAvatar: booking.tenantAvatar, tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property })}
-                          className="px-3 py-2 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-md flex items-center gap-1"
+                          className="shrink-0 px-2 sm:px-3 py-2 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest active:scale-95 shadow-md flex items-center gap-1"
                         >
-                          <MessageCircle size={12}/> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
+                          <MessageCircle size={12} className="shrink-0"/> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
                         </button>
                         {/* Invoice — jumps to Rent Collection focused on this tenant. */}
                         <button
                           onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); }}
-                          className="px-2.5 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1"
+                          className="shrink-0 px-1.5 sm:px-2.5 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest active:scale-95 flex items-center gap-1"
                           title={language === 'বাংলা' ? 'রেন্ট কালেকশনে দেখুন' : 'Open in Rent Collection'}
                         >
-                          <Wallet size={12}/> {language === 'বাংলা' ? 'ইনভয়েস' : 'Invoice'}
+                          <Wallet size={12} className="shrink-0"/> {language === 'বাংলা' ? 'ইনভয়েস' : 'Invoice'}
                         </button>
                         {/* Docs — agreement document vault */}
-                        <button onClick={() => openModal('download_user_document')} className="px-2.5 py-2 bg-gray-50 text-gray-700 hover:bg-gray-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1">
-                          <Folder size={12}/> {language === 'বাংলা' ? 'ডকস' : 'Docs'}
+                        <button onClick={() => openModal('download_user_document')} className="shrink-0 px-1.5 sm:px-2.5 py-2 bg-gray-50 text-gray-700 hover:bg-gray-100 transition-all rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest active:scale-95 flex items-center gap-1">
+                          <Folder size={12} className="shrink-0"/> {language === 'বাংলা' ? 'ডকস' : 'Docs'}
                         </button>
-                        <div className="relative">
-                          <button onClick={() => setActiveDropdownId(activeDropdownId === booking.id ? null : booking.id)} className="p-2 rounded-xl bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"><MoreVertical size={13}/></button>
-                          {activeDropdownId === booking.id && (
-                            <div className="absolute right-0 bottom-full mb-2 w-52 bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[50] animate-in fade-in zoom-in-95 origin-bottom-right border border-gray-100">
-                              <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
-                              <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
-                              <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
-                              <div className="h-px w-full bg-gray-100 my-1"></div>
-                              <button onClick={() => { setActiveDropdownId(null); setConfirmDeleteBookingId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
-                            </div>
-                          )}
-                        </div>
                       </div>
                     </div>
                   </div>
