@@ -5086,7 +5086,7 @@ const HostDashboard = () => {
                     </div>
 
                     {/* Financial breakdown — Monthly Rent / Service / Deposit / Total */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                       <div className="bg-white rounded-xl p-2.5 border border-gray-100 flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ভাড়া / মাস' : 'Rent / mo'}</p>
@@ -5099,7 +5099,7 @@ const HostDashboard = () => {
                           <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'সার্ভিস' : 'Service'}</p>
                           <p className="text-xs sm:text-sm font-black text-gray-900 tabular-nums mt-0.5">{formatBDT(booking.serviceCharge || 0)}</p>
                         </div>
-                        <span className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><Settings size={13} className="text-[#ba0036]"/></span>
+                        <span className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><Settings size={13} className="text-blue-500"/></span>
                       </div>
                       <div className="bg-white rounded-xl p-2.5 border border-gray-100 flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -5111,7 +5111,7 @@ const HostDashboard = () => {
                             </span>
                           ) : null}
                         </div>
-                        <span className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center shrink-0"><CreditCard size={13} className="text-[#ba0036]"/></span>
+                        <span className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0"><CreditCard size={13} className="text-emerald-600"/></span>
                       </div>
                       <div className="bg-gradient-to-br from-[#ba0036]/5 to-[#ff004c]/5 border border-[#ba0036]/10 rounded-xl p-2.5 flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -5134,7 +5134,7 @@ const HostDashboard = () => {
                         <p className="text-[10px] sm:text-xs font-black text-gray-900 mt-0.5">{formatDate(booking.leaseStart, language)}</p>
                       </div>
                       <div className="rounded-xl p-2 sm:p-2.5 border border-gray-100 bg-white min-w-0">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><Clock size={9} className="shrink-0 text-emerald-500"/> <span className="truncate">{language === 'বাংলা' ? 'পরবর্তী পেমেন্ট' : 'Next Payment'}</span></p>
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><Clock size={9} className="shrink-0 text-blue-500"/> <span className="truncate">{language === 'বাংলা' ? 'পরবর্তী পেমেন্ট' : 'Next Payment'}</span></p>
                         <p className="text-[10px] sm:text-xs font-black text-gray-900 mt-0.5">
                           {next ? formatDate(next.due.toISOString(), language) : (language === 'বাংলা' ? 'বকেয়া নেই' : 'No upcoming')}
                         </p>
@@ -5251,12 +5251,13 @@ const HostDashboard = () => {
           return (
           <div className="w-full animate-in fade-in zoom-in-95 duration-500">
 
-            {/* Single centred column — the host asked for the mobile Booking
-                layout on desktop too, so the sidebar split is gone and every
-                block stacks in one readable, centred column at every width. */}
+            {/* Single centred column — mirrors the mobile Booking layout on
+                every width (per the reference design). No sidebar split; the
+                Financial Overview, toolbar, list and footer stack in one
+                readable, centred column that scales cleanly from phone to desktop. */}
             <div className="max-w-3xl mx-auto w-full flex flex-col gap-4">
 
-                {/* Financial Overview hero card (mirrors the mobile design). */}
+                {/* Financial Overview hero card (identical structure on mobile + desktop). */}
                 <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-[2rem] p-5 sm:p-7 text-white shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-10 translate-x-10"></div>
                   <div className="flex items-start justify-between mb-1 relative z-10">
@@ -5274,20 +5275,22 @@ const HostDashboard = () => {
                   <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest mb-5 relative z-10">
                     {language === 'বাংলা' ? 'লিজ পোর্টফোলিও সারাংশ' : 'Lease Portfolio Snapshot'}
                   </p>
-                  {/* Top row — total monthly revenue (left) + security deposits (right box) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 relative z-10">
-                    <div>
-                      <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'মোট মাসিক আয়' : 'Total Monthly Revenue'}</p>
-                      <p className="text-3xl sm:text-4xl font-black text-white tracking-tight tabular-nums">{formatBDT(leaseSummary.totalMonthlyRevenue)}</p>
-                      <p className="text-[9px] font-bold text-white/50 mt-1">{language === 'বাংলা' ? 'অ্যাক্টিভ + নোটিশ লিজ থেকে (ভাড়া + সার্ভিস)' : 'from active + notice leases (rent + service)'}</p>
+                  {/* Top row — total monthly revenue (left) + security deposits
+                      (right box), SIDE-BY-SIDE on every width so mobile matches
+                      the reference image. Numbers scale down on phones to fit. */}
+                  <div className="grid grid-cols-2 gap-2.5 sm:gap-4 relative z-10">
+                    <div className="min-w-0">
+                      <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1 leading-tight">{language === 'বাংলা' ? 'মোট মাসিক আয়' : 'Total Monthly Revenue'}</p>
+                      <p className="text-2xl sm:text-4xl font-black text-white tracking-tight tabular-nums">{formatBDT(leaseSummary.totalMonthlyRevenue)}</p>
+                      <p className="text-[9px] font-bold text-white/50 mt-1 leading-tight">{language === 'বাংলা' ? 'অ্যাক্টিভ + নোটিশ লিজ থেকে (ভাড়া + সার্ভিস)' : 'from active + notice leases (rent + service)'}</p>
                     </div>
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-3 sm:p-4 flex flex-col justify-center">
-                      <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'মোট সিকিউরিটি ডিপোজিট' : 'Total Security Deposits'}</p>
-                      <p className="text-xl sm:text-2xl font-black text-white tabular-nums">{formatBDT(leaseSummary.totalSecurityDeposits)}</p>
-                      <p className="text-[9px] font-bold text-white/50 mt-1">{language === 'বাংলা' ? 'লিজ শেষে রিটার্নযোগ্য' : 'returnable at lease end'}</p>
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-2.5 sm:p-4 flex flex-col justify-center min-w-0">
+                      <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1 leading-tight">{language === 'বাংলা' ? 'মোট সিকিউরিটি ডিপোজিট' : 'Total Security Deposits'}</p>
+                      <p className="text-lg sm:text-2xl font-black text-white tabular-nums">{formatBDT(leaseSummary.totalSecurityDeposits)}</p>
+                      <p className="text-[9px] font-bold text-white/50 mt-1 leading-tight">{language === 'বাংলা' ? 'লিজ শেষে রিটার্নযোগ্য' : 'returnable at lease end'}</p>
                     </div>
                   </div>
-                  {/* Stage counters — 2×2 grid, each box filters the list below */}
+                  {/* Stage counters — 2×2 grid on all widths, each box filters the list */}
                   <div className="grid grid-cols-2 gap-2.5 sm:gap-3 mt-4 relative z-10">
                     {[
                       { stage: 'active', count: leaseSummary.activeCount, color: 'text-green-400' },
@@ -5308,7 +5311,7 @@ const HostDashboard = () => {
                   </div>
                 </div>
 
-              {/* ── Toolbar (two rows, mirrors the mobile design) ──
+              {/* ── Toolbar (two rows, mirrors the reference image) ──
                   Row 1: Leases + live count · New Lease (+) · stage pills.
                   Row 2: search tenants · filter-reset button. Sticky so it
                   pins to the top of the list while the host scrolls. */}
@@ -5410,7 +5413,7 @@ const HostDashboard = () => {
                   );
                 })()}
 
-              {/* Footer — mirrors the mobile "X of Y tenants" line. */}
+              {/* Footer — mirrors the reference "X of Y tenants" line. */}
               {bookings.length > 0 && (
                 <p className="text-center text-[11px] font-bold text-gray-400 pt-1 pb-2">
                   {filtered.length} {language === 'বাংলা' ? '/' : 'of'} {bookings.length} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}
