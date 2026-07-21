@@ -103,7 +103,10 @@ const taka = (n) => `৳${(Number(n) || 0).toLocaleString('en-IN')}`;
 const isMongoId = (v) => /^[0-9a-fA-F]{24}$/.test(String(v || ''));
 
 function spaceLabel(m, isBn) {
-  const parts = [m.floor, m.roomLabel, m.seatLabel].filter(Boolean);
+  // Floor 0 means the ground floor — show it as such instead of a bare "0"
+  // (which otherwise reads like missing data on the booking).
+  const floorLabel = (m.floor === 0 || m.floor === '0') ? (isBn ? 'নিচতলা' : 'Ground Floor') : m.floor;
+  const parts = [floorLabel, m.roomLabel, m.seatLabel].filter(Boolean);
   if (parts.length) return parts.join(' • ');
   if (m.rentType === 'flat') return isBn ? 'পুরো ফ্ল্যাট' : 'Whole flat';
   if (m.rentType === 'room') return isBn ? 'রুম' : 'Room';
