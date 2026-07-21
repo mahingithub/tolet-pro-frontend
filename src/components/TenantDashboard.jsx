@@ -3175,7 +3175,9 @@ const handleWizardSubmit = async (payload) => {
                 <h3 className="text-sm font-black text-gray-800">{language === 'বাংলা' ? 'আপনার বুকিং / লিজ' : 'Your Bookings'}</h3>
                 <span className="text-[10px] font-black text-gray-400 tabular-nums">{activeLeases.length}</span>
               </div>
-              <div className="grid grid-cols-1 gap-3">
+              {/* One box per booking. A single booking fills the column; 2+
+                  tile into a 2-up grid so they read as distinct boxes. */}
+              <div className={`grid gap-3 ${activeLeases.length > 1 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
                 {activeLeases.map((b) => {
                   const fresh = isFreshBooking(b);
                   return (
@@ -3242,37 +3244,53 @@ const handleWizardSubmit = async (payload) => {
           // ── Payment Summary — compact purple KPI card (Paid / Outstanding /
           //    Next Due). Replaces the old full-width blue banner and sits
           //    beside the booking card so the row reads as a balanced pair. ──
-          const summaryCard = (
+          const summaryKpis = [
+            {
+              label: bn ? `${payYear} সালে পরিশোধ` : `Paid in ${payYear}`,
+              value: `৳${paidThisYear.toLocaleString(bn ? 'bn-BD' : 'en-IN')}`,
+              sub: `${receiptsThisYear} ${bn ? 'রিসিট' : 'receipts'} • ${unreadReceiptsCount} ${bn ? 'নতুন' : 'new'}`,
+              Icon: Wallet,
+              valueClass: '',
+            },
+            {
+              label: bn ? 'বাকি' : 'Outstanding',
+              value: `৳${outstanding.toLocaleString(bn ? 'bn-BD' : 'en-IN')}`,
+              sub: partialCount > 0 ? `${partialCount} ${bn ? 'মাসে আংশিক' : 'months partial'}` : (bn ? 'সব পরিশোধিত' : 'Fully up to date'),
+              Icon: FileText,
+              valueClass: outstanding > 0 ? 'text-rose-200' : '',
+            },
+            {
+              label: bn ? 'পরবর্তী বকেয়া' : 'Next Due',
+              value: nextDue ? (nextDue.monthLabel || nextDue.monthKey) : (bn ? 'কিছু বাকি নেই' : 'Nothing due'),
+              sub: nextDue ? `৳${(nextDue.balance || 0).toLocaleString(bn ? 'bn-BD' : 'en-IN')}` : (bn ? 'আপনি আপ-টু-ডেট!' : "You're all set!"),
+              Icon: Calendar,
+              valueClass: '',
+              small: true,
+            },
+          ];
+
+          // Payment Summary card. `full` lays the three KPIs out horizontally
+          // (used when there are no bookings and the card spans the whole
+          // width, so it never looks sparse); otherwise they stack vertically
+          // to sit in the narrow column beside the booking(s).
+          const renderSummaryCard = (full) => (
             <div className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-violet-600 via-indigo-600 to-violet-700 text-white shadow-[0_20px_45px_-20px_rgba(79,70,229,0.6)] p-5 md:p-6 h-full flex flex-col">
               <div className="absolute -top-12 -right-10 w-44 h-44 rounded-full bg-white/10 blur-3xl pointer-events-none" />
               <h3 className="relative text-base md:text-lg font-black mb-4">{bn ? 'পেমেন্ট সামারি' : 'Payment Summary'}</h3>
-              <div className="relative space-y-3.5 flex-1">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.16em] text-white/60">{bn ? `${payYear} সালে পরিশোধ` : `Paid in ${payYear}`}</p>
-                    <p className="text-xl md:text-2xl font-black tabular-nums leading-tight mt-0.5">৳{paidThisYear.toLocaleString(bn ? 'bn-BD' : 'en-IN')}</p>
-                    <p className="text-[10px] font-bold text-white/60 mt-0.5">{receiptsThisYear} {bn ? 'রিসিট' : 'receipts'} • {unreadReceiptsCount} {bn ? 'নতুন' : 'new'}</p>
-                  </div>
-                  <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0"><Wallet size={16} /></div>
-                </div>
-                <div className="h-px bg-white/15" />
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.16em] text-white/60">{bn ? 'বাকি' : 'Outstanding'}</p>
-                    <p className={`text-xl md:text-2xl font-black tabular-nums leading-tight mt-0.5 ${outstanding > 0 ? 'text-rose-200' : ''}`}>৳{outstanding.toLocaleString(bn ? 'bn-BD' : 'en-IN')}</p>
-                    <p className="text-[10px] font-bold text-white/60 mt-0.5">{partialCount > 0 ? `${partialCount} ${bn ? 'মাসে আংশিক' : 'months partial'}` : (bn ? 'সব পরিশোধিত' : 'Fully up to date')}</p>
-                  </div>
-                  <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0"><FileText size={16} /></div>
-                </div>
-                <div className="h-px bg-white/15" />
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.16em] text-white/60">{bn ? 'পরবর্তী বকেয়া' : 'Next Due'}</p>
-                    <p className="text-base md:text-lg font-black leading-tight mt-0.5 truncate">{nextDue ? (nextDue.monthLabel || nextDue.monthKey) : (bn ? 'কিছু বাকি নেই' : 'Nothing due')}</p>
-                    <p className="text-[10px] font-bold text-white/60 mt-0.5">{nextDue ? `৳${(nextDue.balance || 0).toLocaleString(bn ? 'bn-BD' : 'en-IN')}` : (bn ? 'আপনি আপ-টু-ডেট!' : "You're all set!")}</p>
-                  </div>
-                  <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0"><Calendar size={16} /></div>
-                </div>
+              <div className={`relative flex-1 ${full ? 'grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-6' : 'space-y-3.5'}`}>
+                {summaryKpis.map((k, i) => (
+                  <React.Fragment key={k.label}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.16em] text-white/60">{k.label}</p>
+                        <p className={`font-black tabular-nums leading-tight mt-0.5 ${k.small ? 'text-base md:text-lg truncate' : 'text-xl md:text-2xl'} ${k.valueClass}`}>{k.value}</p>
+                        <p className="text-[10px] font-bold text-white/60 mt-0.5">{k.sub}</p>
+                      </div>
+                      {!full && <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0"><k.Icon size={16} /></div>}
+                    </div>
+                    {!full && i < summaryKpis.length - 1 && <div className="h-px bg-white/15" />}
+                  </React.Fragment>
+                ))}
               </div>
               {nextDue && (
                 <button
@@ -3288,9 +3306,11 @@ const handleWizardSubmit = async (payload) => {
           // ── Row 2 — booking card (left, wider) + Payment Summary (right).
           //    With no active lease the summary spans the full width. ────────
           const bookingSummaryRow = (
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-5 items-stretch">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-5 items-start">
               {leaseBanner && <div className="lg:col-span-3">{leaseBanner}</div>}
-              <div className={leaseBanner ? 'lg:col-span-2' : 'lg:col-span-5'}>{summaryCard}</div>
+              {/* No bookings → the summary spans the whole width and lays its
+                  KPIs out horizontally so it never looks empty. */}
+              <div className={leaseBanner ? 'lg:col-span-2' : 'lg:col-span-5'}>{renderSummaryCard(!leaseBanner)}</div>
             </div>
           );
 
