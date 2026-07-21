@@ -2623,6 +2623,11 @@ const HostDashboard = () => {
     updateInquiryStatus(inquiry.id, 'accepted').catch(err => {
       console.warn('[host] inquiry accept sync failed:', err.message || err);
     });
+    // Follow the card: the inquiry just left "Pending", so switch the host to the
+    // "Accepted" tab (and open the card there) instead of leaving them staring at
+    // the now-empty Pending list.
+    setInquiryTab('accepted');
+    setExpandedHostInquiryId(inquiry.id);
     showToast(language === 'বাংলা' ? 'ইনকোয়ারি একসেপ্ট করা হয়েছে।' : 'Inquiry accepted.');
   };
 
