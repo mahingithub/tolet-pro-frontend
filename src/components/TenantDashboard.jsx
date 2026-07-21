@@ -13,6 +13,8 @@ import { buildTenantAlerts } from '../utils/rentAlerts';
 import SmartAlertsPage from './Smartalertspage';
 import SmartAlertsPopup from './SmartAlertsPopup';
 import LandlordHomeChoiceModal from './shared/LandlordHomeChoiceModal';
+import LocationSearchModal from './shared/LocationSearchModal';
+import { toSlug } from '../data/searchData';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useDeepLinkHighlight from '../hooks/useDeepLinkHighlight';
 import {
@@ -209,18 +211,6 @@ const QUICK_SEARCH_AREAS = [
   { slug: 'mirpur',      en: 'Mirpur',      bn: 'মিরপুর' },
   { slug: 'mohammadpur', en: 'Mohammadpur', bn: 'মোহাম্মদপুর' },
   { slug: 'uttara',      en: 'Uttara',      bn: 'উত্তরা' },
-];
-
-// Property-type keyword suggestions for the Quick Search autocomplete.
-// Selecting one runs a free-text search (?q=…) — the same URL contract the
-// Search button and the home hero already use.
-const QUICK_SEARCH_TYPES = [
-  { q: 'Family',   en: 'Family Flat',     bn: 'ফ্যামিলি ফ্ল্যাট' },
-  { q: 'Bachelor', en: 'Bachelor',        bn: 'ব্যাচেলর' },
-  { q: 'Sublet',   en: 'Sublet / Room',   bn: 'সাবলেট / রুম' },
-  { q: 'Hostel',   en: 'Hostel',          bn: 'হোস্টেল' },
-  { q: 'Office',   en: 'Office Space',     bn: 'অফিস স্পেস' },
-  { q: 'Shop',     en: 'Shop / Showroom',  bn: 'দোকান / শোরুম' },
 ];
 
 const BUDGET_OPTIONS = [
@@ -572,6 +562,10 @@ const TenantDashboard = () => {
   // wrap with onSubmitted later if you want to optimistically prepend a
   // new entry to the local inquiries list.
   const [inquiryProp, setInquiryProp] = useState(null);
+  // My Inquiries → which card is expanded. Cards are compact by default so the
+  // tenant sees several per screen; tapping one reveals its full status
+  // timeline + actions.
+  const [expandedInquiryId, setExpandedInquiryId] = useState(null);
 
   // 🟢 NEW: Real "My Inquiries" list, hydrated from GET /api/inquiries/mine.
   // Previously this tab rendered three hard-coded sample rows that had
@@ -2862,6 +2856,8 @@ const handleWizardSubmit = async (payload) => {
             propertyId:    inq.propertyId,
             landlordId:    inq.propertyOwnerId || inq.landlordId || inq.ownerUserId || inq.receiverId,
             landlordPhone: inq.landlordPhone || inq.ownerPhone || '',
+            landlordName:  inq.landlordName || inq.ownerName || '',
+            landlordAvatar: inq.landlordAvatar || inq.ownerAvatar || '',
             title:         inq.propTitle || 'Property',
             location:      inq.propLocation || '',
             price:         (inq.propPrice ?? '') === '' ? '' : Number(inq.propPrice).toLocaleString('en-IN'),
@@ -2894,162 +2890,151 @@ const handleWizardSubmit = async (payload) => {
           }
           return (
             <div className="animate-in fade-in duration-500 space-y-4 md:space-y-5">
-              {/* Counts strip */}
-              <div className="grid grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 mb-2">
+              {/* Counts strip — compact tiles */}
+              <div className="grid grid-cols-3 md:grid-cols-4 gap-2 md:gap-4 mb-1">
                 {[
                   { en: 'Total',     bn: 'মোট',       count: sampleApps.length,                                 cls: 'bg-gray-50 text-gray-700 border-gray-100' },
                   { en: 'In review', bn: 'রিভিউ',    count: sampleApps.filter((a) => a.outcome === 'pending').length, cls: 'bg-amber-50 text-amber-700 border-amber-100' },
                   { en: 'Approved',  bn: 'অ্যাপ্রুভড', count: sampleApps.filter((a) => a.outcome === 'approved').length, cls: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
                   { en: 'Declined',  bn: 'বাতিল',    count: sampleApps.filter((a) => a.outcome === 'declined').length, cls: 'hidden md:flex bg-red-50 text-red-700 border-red-100' },
                 ].map((s, i) => (
-                  <div key={i} className={`p-4 rounded-2xl border flex flex-col gap-1 ${s.cls}`}>
-                    <span className="text-[10px] font-black uppercase tracking-widest opacity-80">{language === 'বাংলা' ? s.bn : s.en}</span>
-                    <span className="text-2xl md:text-3xl font-black tabular-nums">{s.count}</span>
+                  <div key={i} className={`px-3 py-2.5 md:p-4 rounded-xl md:rounded-2xl border flex flex-col gap-0.5 ${s.cls}`}>
+                    <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest opacity-80">{language === 'বাংলা' ? s.bn : s.en}</span>
+                    <span className="text-lg md:text-3xl font-black tabular-nums leading-none">{s.count}</span>
                   </div>
                 ))}
               </div>
 
-              {/* Application cards */}
-              {sampleApps.map((app) => (
-                <div id={`application-${app.id}`} key={app.id} className="bg-white/80 backdrop-blur-xl rounded-[1.5rem] md:rounded-[2rem] border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all overflow-hidden">
-                  <div className="flex flex-col md:flex-row gap-0 md:gap-6">
-                    {/* Image */}
-                    <div className="w-full md:w-48 h-40 md:h-auto bg-gray-100 shrink-0 relative">
-                      {app.img ? (
-                        <div
-                          className="absolute inset-0 bg-cover bg-center"
-                          style={{ backgroundImage: `url(${app.img})` }}
-                        />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-gray-300">
-                          <Building2 size={40} strokeWidth={1.5} />
-                        </div>
-                      )}
-                      {app.price ? (
-                        <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm px-2.5 py-1 rounded-lg text-[11px] font-black text-gray-900">
-                          ৳ {app.price}
-                        </div>
-                      ) : null}
-                    </div>
+              {/* Inquiry cards — compact by default (thumbnail · property ·
+                  landlord · status). Tap a card to reveal its full status
+                  timeline + your message + actions, so several inquiries fit on
+                  one mobile screen without endless scrolling. */}
+              {sampleApps.map((app) => {
+                const isOpen = expandedInquiryId === app.id;
+                const lordName = app.landlordName || (language === 'বাংলা' ? 'বাড়িওয়ালা' : 'Landlord');
+                const lordInit = (lordName.trim().split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('') || 'L').toUpperCase();
+                const outCls = app.outcome === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                  : app.outcome === 'declined' ? 'bg-red-50 text-red-700 border-red-100'
+                  : 'bg-amber-50 text-amber-700 border-amber-100';
+                const outLabel = app.outcome === 'approved' ? (language === 'বাংলা' ? 'অ্যাপ্রুভড' : 'Approved')
+                  : app.outcome === 'declined' ? (language === 'বাংলা' ? 'বাতিল' : 'Declined')
+                  : (language === 'বাংলা' ? 'রিভিউ' : 'In review');
+                const OutIcon = app.outcome === 'approved' ? ThumbsUp : app.outcome === 'declined' ? ThumbsDown : Hourglass;
+                return (
+                  <div id={`application-${app.id}`} key={app.id} className={`bg-white rounded-2xl border overflow-hidden transition-all ${isOpen ? 'border-[#ba0036]/20 shadow-[0_8px_28px_rgba(0,0,0,0.07)]' : 'border-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.05)]'}`}>
 
-                    {/* Content */}
-                    <div className="flex-1 p-5 md:p-6 flex flex-col">
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-                        <div className="min-w-0">
-                          <h4 className="text-base md:text-lg font-black text-gray-900 truncate">{app.title}</h4>
-                          <p className="text-xs font-bold text-gray-500 flex items-center gap-1.5 mt-1">
-                            {app.location ? (
-                              <>
-                                <MapPin size={12} className="text-gray-400" /> {app.location}
-                                <span className="text-gray-300">·</span>
-                              </>
-                            ) : null}
+                    {/* Compact header — always visible, tap to expand */}
+                    <button
+                      type="button"
+                      onClick={() => setExpandedInquiryId(isOpen ? null : app.id)}
+                      className="w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 text-left"
+                    >
+                      {/* Property thumbnail */}
+                      <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-gray-100 shrink-0 overflow-hidden relative">
+                        {app.img ? (
+                          <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${app.img})` }} />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-gray-300"><Building2 size={20} strokeWidth={1.5} /></div>
+                        )}
+                      </div>
+
+                      {/* Property + price + landlord */}
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-[13px] md:text-sm font-black text-gray-900 truncate leading-tight">{app.title}</h4>
+                        <p className="text-[10px] md:text-[11px] font-bold text-gray-500 truncate flex items-center gap-1 mt-0.5">
+                          {app.location ? (<><MapPin size={10} className="text-gray-400 shrink-0" /> <span className="truncate">{app.location}</span></>) : null}
+                          {app.price ? (<><span className="text-gray-300">·</span> <span className="tabular-nums shrink-0">৳{app.price}</span></>) : null}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          {app.landlordAvatar ? (
+                            <img src={app.landlordAvatar} alt={lordName} className="w-4 h-4 md:w-5 md:h-5 rounded-full object-cover shrink-0" />
+                          ) : (
+                            <span className="w-4 h-4 md:w-5 md:h-5 rounded-full bg-[#ba0036]/10 text-[#ba0036] text-[7px] md:text-[8px] font-black flex items-center justify-center shrink-0">{lordInit}</span>
+                          )}
+                          <span className="text-[10px] md:text-[11px] font-bold text-gray-600 truncate">{lordName}</span>
+                        </div>
+                      </div>
+
+                      {/* Status pill + chevron */}
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-wider border ${outCls}`}>
+                          <OutIcon size={10} /> {outLabel}
+                        </span>
+                        <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                      </div>
+                    </button>
+
+                    {/* Expanded body — full status + message + actions */}
+                    {isOpen && (
+                      <div className="border-t border-gray-100 p-3 md:p-4 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[10px] font-bold text-gray-400 flex items-center gap-1.5">
                             <Clock size={11} className="text-gray-400" /> {language === 'বাংলা' ? 'পাঠানো:' : 'Sent:'} {app.sentAt}
                           </p>
-                        </div>
-                        {/* Outcome pill + withdraw */}
-                        <div className="flex items-center gap-2 self-start md:self-auto">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                            app.outcome === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                            : app.outcome === 'declined' ? 'bg-red-50 text-red-700 border-red-100'
-                            : 'bg-amber-50 text-amber-700 border-amber-100'
-                          }`}>
-                            {app.outcome === 'approved' ? <ThumbsUp size={11} /> : app.outcome === 'declined' ? <ThumbsDown size={11} /> : <Hourglass size={11} />}
-                            {app.outcome === 'approved'
-                              ? (language === 'বাংলা' ? 'অ্যাপ্রুভড' : 'Approved')
-                              : app.outcome === 'declined'
-                                ? (language === 'বাংলা' ? 'বাতিল' : 'Declined')
-                                : (language === 'বাংলা' ? 'রিভিউ চলছে' : 'In review')}
-                          </span>
                           <button
                             onClick={() => handleDeleteInquiry(app)}
                             disabled={deletingInquiryId === app.id}
-                            title={language === 'বাংলা' ? 'ইনকোয়ারি মুছুন' : 'Withdraw inquiry'}
-                            aria-label={language === 'বাংলা' ? 'ইনকোয়ারি মুছুন' : 'Withdraw inquiry'}
-                            className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 active:scale-90 transition-all disabled:opacity-50"
+                            className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black text-gray-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 active:scale-95 transition-all disabled:opacity-50"
                           >
-                            {deletingInquiryId === app.id ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            {deletingInquiryId === app.id ? <RefreshCw size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                            {language === 'বাংলা' ? 'মুছুন' : 'Withdraw'}
                           </button>
                         </div>
-                      </div>
 
-                      <div className="mb-4">
-                        <InquiryStatusTimeline 
-                          inquiry={myInquiries.find(i => String(i.id || i._id) === String(app.id))}
+                        <InquiryStatusTimeline
+                          inquiry={myInquiries.find((i) => String(i.id || i._id) === String(app.id))}
                           onCancelVisit={() => handleDeleteInquiry(app)}
                         />
-                      </div>
 
-                      {/* Your sent message. There is no separate landlord-reply
-                          field on an inquiry — the landlord's response shows as
-                          the status pill above and in the live chat thread. */}
-                      {app.msg ? (
-                        <div className="mb-4 px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-100">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-0.5">
-                            {language === 'বাংলা' ? 'আপনার মেসেজ' : 'Your message'}
-                          </p>
-                          <p className="text-[12px] font-semibold text-gray-600 line-clamp-2">{app.msg}</p>
-                        </div>
-                      ) : null}
+                        {app.msg ? (
+                          <div className="px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-100">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-0.5">{language === 'বাংলা' ? 'আপনার মেসেজ' : 'Your message'}</p>
+                            <p className="text-[12px] font-semibold text-gray-600 line-clamp-2">{app.msg}</p>
+                          </div>
+                        ) : null}
 
-                      {/* Actions */}
-                      <div className="mt-auto pt-4 border-t border-gray-100 space-y-2">
-                        {/* Secondary: call landlord + share property */}
-                        <div className="flex gap-2">
-                          {app.landlordPhone ? (
-                            <a
-                              href={`tel:${app.landlordPhone}`}
-                              className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 py-2.5 rounded-xl text-xs font-black active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                        {/* Actions */}
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            {app.landlordPhone ? (
+                              <a href={`tel:${app.landlordPhone}`} className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 py-2.5 rounded-xl text-[11px] font-black active:scale-95 transition-all flex items-center justify-center gap-1.5">
+                                <Phone size={13} /> {language === 'বাংলা' ? 'কল' : 'Call'}
+                              </a>
+                            ) : null}
+                            <button onClick={() => handleShareProperty(app)} className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 py-2.5 rounded-xl text-[11px] font-bold active:scale-95 transition-all flex items-center justify-center gap-1.5">
+                              <Share2 size={13} /> {language === 'বাংলা' ? 'শেয়ার' : 'Share'}
+                            </button>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                const pid = app.propertyId;
+                                if (!pid) { toast.error(language === 'বাংলা' ? 'এই ইনকোয়ারির প্রপার্টি আইডি পাওয়া যায়নি' : 'Property ID not found for this inquiry'); return; }
+                                navigate(`/property/${pid}`);
+                              }}
+                              className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 py-2.5 rounded-xl text-[11px] font-bold transition-all border border-gray-200 active:scale-95"
                             >
-                              <Phone size={13} /> {language === 'বাংলা' ? 'কল' : 'Call'}
-                            </a>
-                          ) : null}
-                          <button
-                            onClick={() => handleShareProperty(app)}
-                            className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 py-2.5 rounded-xl text-xs font-bold active:scale-95 transition-all flex items-center justify-center gap-1.5"
-                          >
-                            <Share2 size={13} /> {language === 'বাংলা' ? 'শেয়ার' : 'Share'}
-                          </button>
-                        </div>
-                        {/* Primary: property / re-inquire / chat */}
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              const pid = app.propertyId;
-                              if (!pid) {
-                                toast.error(language === 'বাংলা' ? 'এই ইনকোয়ারির প্রপার্টি আইডি পাওয়া যায়নি' : 'Property ID not found for this inquiry');
-                                return;
-                              }
-                              navigate(`/property/${pid}`);
-                            }}
-                            className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 py-2.5 rounded-xl text-xs font-bold transition-all border border-gray-200 active:scale-95"
-                          >
-                            {language === 'বাংলা' ? 'প্রপার্টি' : 'Property'}
-                          </button>
-                          <button
-                            onClick={() => openInquiry(app)}
-                            className="flex-1 bg-white text-[#ba0036] border border-[#ba0036]/20 hover:bg-[#ba0036] hover:text-white hover:border-[#ba0036] py-2.5 rounded-xl text-xs font-black active:scale-95 transition-all flex items-center justify-center gap-1.5"
-                          >
-                            <MessageCircle size={13} /> {language === 'বাংলা' ? 'আবার ইনকোয়ারি' : 'Re-inquire'}
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (!app.landlordId) {
-                                toast.error("Unable to open chat. Landlord info missing.");
-                                return;
-                              }
-                              navigate('/messages', { state: { peerUserId: app.landlordId, propertyId: app.propertyId } });
-                            }}
-                            className="flex-1 bg-gradient-to-r from-[#ba0036] to-[#d11147] text-white py-2.5 rounded-xl text-xs font-black shadow-[0_6px_18px_rgba(186,0,54,0.25)] hover:shadow-[0_10px_24px_rgba(186,0,54,0.4)] active:scale-95 transition-all flex items-center justify-center gap-1.5"
-                          >
-                            <MessageSquare size={13} /> {language === 'বাংলা' ? 'চ্যাট' : 'Chat'}
-                          </button>
+                              {language === 'বাংলা' ? 'প্রপার্টি' : 'Property'}
+                            </button>
+                            <button onClick={() => openInquiry(app)} className="flex-1 bg-white text-[#ba0036] border border-[#ba0036]/20 hover:bg-[#ba0036] hover:text-white hover:border-[#ba0036] py-2.5 rounded-xl text-[11px] font-black active:scale-95 transition-all flex items-center justify-center gap-1.5">
+                              <MessageCircle size={13} /> {language === 'বাংলা' ? 'রি-ইনকোয়ারি' : 'Re-inquire'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (!app.landlordId) { toast.error('Unable to open chat. Landlord info missing.'); return; }
+                                navigate('/messages', { state: { peerUserId: app.landlordId, propertyId: app.propertyId } });
+                              }}
+                              className="flex-1 bg-gradient-to-r from-[#ba0036] to-[#d11147] text-white py-2.5 rounded-xl text-[11px] font-black shadow-[0_6px_18px_rgba(186,0,54,0.25)] active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                            >
+                              <MessageSquare size={13} /> {language === 'বাংলা' ? 'চ্যাট' : 'Chat'}
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {/* Live data — refreshes automatically every 30 seconds. */}
             </div>
@@ -4271,56 +4256,31 @@ const QuickSearchCard = ({ language }) => {
   const [q, setQ] = useState('');
   const [category, setCategory] = useState('');
   const [budget, setBudget] = useState('');
-  // Autocomplete recommendations — dropdown open state + click-outside ref.
-  const [open, setOpen] = useState(false);
-  const searchBoxRef = useRef(null);
+  // The location field opens the SAME search modal the home hero uses, so its
+  // recommendations (popular areas + the live Bangladesh location index) are
+  // identical here on the tenant dashboard.
+  const [locOpen, setLocOpen] = useState(false);
 
+  // Navigate to the listing page for `value`, carrying the selected budget /
+  // category. Uses the shared `toSlug` contract (toSlug('') → 'all'), so the
+  // results behave exactly like the hero + popular-area chips.
   const runSearch = (overrideText) => {
-    setOpen(false);
-    const params = new URLSearchParams();
-    if (budget) params.set('budget', budget);
-    const cat = CATEGORY_OPTIONS.find((c) => c.id === category);
-    if (cat?.intent) params.set('intent', cat.intent);
-    const text = (overrideText ?? q).trim();
-    if (text) params.set('q', text);
-    const qs = params.toString();
-    navigate(`/properties/all${qs ? `?${qs}` : ''}`);
-  };
-
-  // Area suggestion → deep-link straight to that area's listing (slug),
-  // carrying the selected budget / category exactly like the Search button.
-  const goToArea = (area) => {
-    setOpen(false);
+    const value = (overrideText ?? q).trim();
     const params = new URLSearchParams();
     if (budget) params.set('budget', budget);
     const cat = CATEGORY_OPTIONS.find((c) => c.id === category);
     if (cat?.intent) params.set('intent', cat.intent);
     const qs = params.toString();
-    navigate(`/properties/${area.slug}${qs ? `?${qs}` : ''}`);
+    navigate(`/properties/${toSlug(value)}${qs ? `?${qs}` : ''}`);
   };
 
-  // Recommendation lists filtered by what the tenant typed. An empty query
-  // surfaces every popular area + property type, so simply focusing the box
-  // shows helpful suggestions too.
-  const rawQ = q.trim();
-  const query = rawQ.toLowerCase();
-  const areaMatches = QUICK_SEARCH_AREAS.filter(
-    (a) => !query || a.en.toLowerCase().includes(query) || a.bn.includes(rawQ) || a.slug.includes(query),
-  );
-  const typeMatches = QUICK_SEARCH_TYPES.filter(
-    (tp) => !query || tp.en.toLowerCase().includes(query) || tp.bn.includes(rawQ) || tp.q.toLowerCase().includes(query),
-  );
-  const hasSuggestions = areaMatches.length > 0 || typeMatches.length > 0;
-
-  // Close the dropdown on any click outside the search box (same pattern the
-  // dashboards use for the notification / language menus).
-  useEffect(() => {
-    const onDown = (e) => {
-      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, []);
+  // A location picked from the hero search modal fills the box and searches it.
+  const onLocationSelect = (loc) => {
+    const value = (loc || '').trim();
+    setQ(value);
+    setLocOpen(false);
+    if (value) runSearch(value);
+  };
 
   return (
     <div className="mb-5 md:mb-7 rounded-[1.5rem] md:rounded-[2rem] border border-white bg-white/95 backdrop-blur-sm shadow-[0_4px_20px_rgba(15,23,42,0.04)] p-5 md:p-7">
@@ -4331,86 +4291,19 @@ const QuickSearchCard = ({ language }) => {
 
       {/* Search row — stacks on mobile, single row on desktop */}
       <form onSubmit={(e) => { e.preventDefault(); runSearch(); }} className="flex flex-col md:flex-row gap-2.5 md:gap-3">
-        <div ref={searchBoxRef} className="relative flex-1">
-          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
-          <input
-            value={q}
-            onChange={(e) => { setQ(e.target.value); setOpen(true); }}
-            onFocus={() => setOpen(true)}
-            autoComplete="off"
-            placeholder={bn ? 'লোকেশন, এলাকা বা প্রপার্টির নাম...' : 'Search by location, area or property name...'}
-            className="w-full bg-gray-50 pl-11 pr-4 py-3 rounded-2xl text-[13px] font-bold text-gray-700 placeholder:text-gray-400 border border-gray-100 focus:bg-white focus:border-[#ba0036] focus:ring-4 focus:ring-[#ba0036]/10 outline-none transition-all"
-          />
-
-          {/* 🔎 Search recommendations — matching areas (deep-link to the area
-              slug) + property-type keywords (free-text search), plus a
-              "Search for …" row while typing. Opens on focus, closes on an
-              outside click or after a pick. */}
-          {open && (
-            <div className="absolute left-0 right-0 top-full mt-2 z-40 bg-white border border-gray-100 rounded-2xl shadow-[0_20px_45px_rgba(15,23,42,0.14)] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-              <div className="max-h-[320px] overflow-y-auto p-1.5">
-                {/* Free-text row — only while there is a query. */}
-                {rawQ && (
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => runSearch()}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-left transition-colors"
-                  >
-                    <span className="w-8 h-8 rounded-lg bg-[#ba0036]/10 text-[#ba0036] flex items-center justify-center shrink-0"><Search size={15} /></span>
-                    <span className="text-[13px] font-bold text-gray-700 truncate">{bn ? `"${rawQ}" দিয়ে খুঁজুন` : `Search for "${rawQ}"`}</span>
-                  </button>
-                )}
-
-                {/* Area suggestions */}
-                {areaMatches.length > 0 && (
-                  <>
-                    <p className="px-3 pt-2 pb-1 text-[9px] font-black text-gray-400 uppercase tracking-widest">{bn ? 'এলাকা' : 'Areas'}</p>
-                    {areaMatches.map((a) => (
-                      <button
-                        key={a.slug}
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => goToArea(a)}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-left transition-colors group"
-                      >
-                        <span className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 group-hover:bg-[#ba0036]/10 group-hover:text-[#ba0036] flex items-center justify-center shrink-0 transition-colors"><MapPin size={15} /></span>
-                        <span className="text-[13px] font-bold text-gray-700 group-hover:text-[#ba0036] transition-colors">{bn ? a.bn : a.en}</span>
-                        <ArrowRight size={13} className="ml-auto text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all" />
-                      </button>
-                    ))}
-                  </>
-                )}
-
-                {/* Property-type suggestions */}
-                {typeMatches.length > 0 && (
-                  <>
-                    <p className="px-3 pt-2 pb-1 text-[9px] font-black text-gray-400 uppercase tracking-widest">{bn ? 'প্রপার্টির ধরন' : 'Property Types'}</p>
-                    {typeMatches.map((tp) => (
-                      <button
-                        key={tp.q}
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => runSearch(tp.q)}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-left transition-colors group"
-                      >
-                        <span className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 group-hover:bg-[#ba0036]/10 group-hover:text-[#ba0036] flex items-center justify-center shrink-0 transition-colors"><Home size={15} /></span>
-                        <span className="text-[13px] font-bold text-gray-700 group-hover:text-[#ba0036] transition-colors">{bn ? tp.bn : tp.en}</span>
-                      </button>
-                    ))}
-                  </>
-                )}
-
-                {/* No matches (query typed but nothing matched) */}
-                {!hasSuggestions && rawQ && (
-                  <div className="px-3 py-3 text-center">
-                    <p className="text-[12px] font-bold text-gray-400">{bn ? 'কোনো এলাকা/ধরন মেলেনি — এন্টার চেপে খুঁজুন' : 'No matching areas or types — press Enter to search'}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Location field — tapping it opens the shared hero search modal
+            (LocationSearchModal) with its popular-area + live Bangladesh
+            location recommendations, exactly like the home hero. */}
+        <button
+          type="button"
+          onClick={() => setLocOpen(true)}
+          className="flex-1 flex items-center gap-3 bg-gray-50 px-4 py-3 rounded-2xl border border-gray-100 hover:border-[#ba0036]/40 hover:bg-white text-left transition-all"
+        >
+          <Search size={16} className="text-gray-400 shrink-0" />
+          <span className={`text-[13px] font-bold truncate ${q ? 'text-gray-800' : 'text-gray-400'}`}>
+            {q || (bn ? 'লোকেশন, এলাকা বা প্রপার্টির নাম...' : 'Search by location, area or property name...')}
+          </span>
+        </button>
         <div className="grid grid-cols-2 md:flex gap-2.5 md:gap-3">
           {/* Category select — Residential / Commercial. Maps to the listing
               `intent` param (residential→rent, commercial→commercial). */}
@@ -4462,6 +4355,15 @@ const QuickSearchCard = ({ language }) => {
 
       {/* Geolocation "homes near you" hint (unchanged behaviour) */}
       <NearbyAreaSuggestion language={language} />
+
+      {/* Same location search + recommendations surface the home hero uses. */}
+      <LocationSearchModal
+        isOpen={locOpen}
+        onClose={() => setLocOpen(false)}
+        onSelect={onLocationSelect}
+        initialValue={q}
+        language={language}
+      />
     </div>
   );
 };

@@ -140,6 +140,10 @@ const toInquiryRow = (raw = {}) => {
     inquirerUserId: raw.inquirerUserId || raw.userId || raw.tenantId || null,
     user,
     init:           raw.init || _inqInitials(user),
+    // Tenant's profile photo (https/Cloudinary). The backend returns it via
+    // listHostInquiries; carry it through so the card shows the real picture
+    // instead of only the initials fallback.
+    userAvatar:     raw.userAvatar || raw.avatar || '',
     timeAgo:        raw.timeAgo || _inqTimeAgo(raw.createdAt || raw.created_at || raw.date),
     phone:          raw.phone || raw.inquirerPhone || raw.userPhone || '',
     propTitle:      raw.propTitle || raw.propertyTitle || raw.property || '',
