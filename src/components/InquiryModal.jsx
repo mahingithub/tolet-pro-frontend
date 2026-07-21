@@ -22,11 +22,12 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
 	X, MessageCircle, MapPin, Clock, Send, CheckCircle2, Sparkles,
-	Phone, Wand2, BadgePercent, Wrench, CalendarClock, KeyRound,
+	Phone, Wand2, BadgePercent, Wrench, CalendarClock, KeyRound, ArrowLeftRight,
 } from 'lucide-react';
 import { createInquiry as createInquiryApi } from '../services/inquiryService.js';
 import { getCurrentUser, getCurrentToken } from '../services/authService.js';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 // Loose, friendly Bangladesh phone validation. We accept any 10+ digit run,
@@ -136,12 +137,20 @@ const useAiSuggestions = (property, t, isBn = false) => {
 const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 	const { t, language } = useLanguage();
 	const isBn = language === 'বাংলা';
+	// Sending an inquiry is a TENANT action. When the user is currently acting
+	// as a landlord we swap the form for a polite notice (see render below) and
+	// offer a one-tap switch back to tenant mode. `activeRole` mirrors the
+	// backend's user.role and is flipped by the Navbar mode pill.
+	const { activeRole, roles, addRole, setActiveRole } = useAuth();
+	const isLandlordMode = activeRole === 'landlord';
 	const [step, setStep] = useState('form');           // 'form' | 'success'
 	const [phone, setPhone] = useState('');
 	const [message, setMessage] = useState('');
 	const [selectedIds, setSelectedIds] = useState([]); // ordered chip ids
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [submitError, setSubmitError] = useState('');
+	const [isSwitching, setIsSwitching] = useState(false); // landlord → tenant switch
+	const [switchError, setSwitchError] = useState('');
 
 	// Cache property/landlord during exit animation so the modal doesn't blank
 	// out when the parent unsets them.
@@ -169,6 +178,8 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 				setSelectedIds([]);
 				setIsSubmitting(false);
 				setSubmitError('');
+				setIsSwitching(false);
+				setSwitchError('');
 			}, 400);
 			return () => clearTimeout(timer);
 		}
@@ -216,8 +227,32 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 	const messageOk = message.trim().length > 0;
 	const canSubmit = phoneOk && messageOk && !isSubmitting;
 
+	// Switch the user from landlord mode into tenant mode *in place* — no
+	// navigation, so they stay on this property and can immediately send the
+	// inquiry. `activeRole` flips to 'tenant', which drops `isLandlordMode` and
+	// reveals the form (see the AnimatePresence block below). If the user has
+	// never held the tenant role we grant it first (mirrors the Navbar pill).
+	const handleSwitchToTenant = async () => {
+		if (isSwitching) return;
+		setSwitchError('');
+		setIsSwitching(true);
+		try {
+			if (!(Array.isArray(roles) && roles.includes('tenant'))) {
+				await addRole?.('tenant');
+			}
+			await setActiveRole?.('tenant');
+		} catch (err) {
+			setSwitchError(err?.message || t.inquiryFailError);
+		} finally {
+			setIsSwitching(false);
+		}
+	};
+
 	const handleSubmit = async () => {
 		if (!canSubmit) return;
+		// Safety net: the form isn't rendered in landlord mode, but never let a
+		// landlord-mode submission slip through even if state races.
+		if (isLandlordMode) return;
 
 		const propertyId = displayProperty?.id || displayProperty?._id;
 		if (!propertyId) {
@@ -281,7 +316,81 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 						</button>
 
 						<AnimatePresence mode="wait">
-							{step === 'form' && (
+							{/* ── Landlord notice ── Inquiries are a tenant-only action.
+							    While the user is in landlord mode we show this polite
+							    screen instead of the form, with a one-tap switch to
+							    tenant mode. ── */}
+							{isLandlordMode && (
+								<motion.div
+									key="landlord"
+									initial={{ opacity: 0, x: -20 }}
+									animate={{ opacity: 1, x: 0 }}
+									exit={{ opacity: 0, x: -20 }}
+									transition={{ duration: 0.2 }}
+									className="p-8 pt-12 pb-10 text-center overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+								>
+									<motion.div
+										className="w-20 h-20 mx-auto mb-6 bg-red-50 rounded-3xl flex items-center justify-center"
+										initial={{ scale: 0, rotate: -20 }}
+										animate={{ scale: 1, rotate: 0 }}
+										transition={{ type: 'spring', damping: 15, stiffness: 200, delay: 0.1 }}
+									>
+										<KeyRound size={38} className="text-[#ba0036]" />
+									</motion.div>
+
+									<motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+										<h3 className="text-2xl font-black text-gray-900 tracking-tight">
+											{t.inquiryLandlordTitle}
+										</h3>
+										<p className="text-gray-500 font-bold text-sm mt-3 leading-relaxed">
+											{t.inquiryLandlordDesc}
+										</p>
+									</motion.div>
+
+									{switchError ? (
+										<div
+											className="mt-5 text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2"
+											role="alert"
+										>
+											{switchError}
+										</div>
+									) : null}
+
+									<motion.div
+										className="flex flex-col gap-2 mt-7"
+										initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+									>
+										<button
+											onClick={handleSwitchToTenant}
+											disabled={isSwitching}
+											className="w-full bg-[#ba0036] disabled:bg-gray-200 disabled:text-gray-400 text-white py-3.5 rounded-2xl font-black shadow-[0_10px_20px_rgba(186,0,54,0.25)] hover:bg-[#90002a] active:scale-95 disabled:shadow-none disabled:active:scale-100 transition-all flex items-center justify-center gap-2"
+										>
+											{isSwitching ? (
+												<>
+													<motion.div
+														animate={{ rotate: 360 }}
+														transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+														className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+													/>
+													{t.inquiryLandlordSwitching}
+												</>
+											) : (
+												<>
+													<ArrowLeftRight size={16} /> {t.inquiryLandlordSwitchBtn}
+												</>
+											)}
+										</button>
+										<button
+											onClick={onClose}
+											className="w-full py-3 rounded-2xl font-black text-sm text-gray-500 hover:text-gray-700 transition-colors"
+										>
+											{t.inquiryLandlordClose}
+										</button>
+									</motion.div>
+								</motion.div>
+							)}
+
+							{step === 'form' && !isLandlordMode && (
 								<motion.div
 									key="form"
 									initial={{ opacity: 0, x: -20 }}

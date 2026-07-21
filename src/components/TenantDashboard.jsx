@@ -2048,6 +2048,8 @@ const handleWizardSubmit = async (payload) => {
                   label: language === 'বাংলা' ? 'ইনকোয়ারি' : 'Inquiries',
                   sub: language === 'বাংলা' ? 'যেসব প্রপার্টিতে যোগাযোগ' : 'Properties you inquired',
                   value: myInquiries.length, onClick: () => setActiveTab('applications'),
+                  // Turn the box red when the landlord has responded to an inquiry the tenant hasn't opened.
+                  unread: (myInquiries || []).some((inq) => isInquiryUnread(inq, 'tenant', inqSeen)),
                 },
                 {
                   id: 'payments', icon: DollarSign, iconBg: 'bg-violet-100', iconColor: 'text-violet-600', bar: 'bg-violet-500',
@@ -2060,25 +2062,30 @@ const handleWizardSubmit = async (payload) => {
                 <button
                   key={stat.id}
                   onClick={stat.onClick}
-                  className="relative text-left bg-white/90 backdrop-blur-sm p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] border border-white shadow-[0_4px_20px_rgba(15,23,42,0.04)] flex items-center justify-between gap-2 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)] transition-all duration-300 overflow-hidden"
+                  className={`relative text-left backdrop-blur-sm p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] shadow-[0_4px_20px_rgba(15,23,42,0.04)] flex items-center justify-between gap-2 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)] transition-all duration-300 overflow-hidden ${stat.unread ? 'bg-gradient-to-br from-red-50 to-rose-50 border border-[#ba0036]/30 ring-2 ring-[#ba0036]/40' : 'bg-white/90 border border-white'}`}
                 >
                   {stat.badge ? (
                     <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 bg-[#ba0036] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10">
                       <span className="w-1 h-1 bg-white rounded-full animate-pulse" />{stat.badge}
                     </span>
+                  ) : stat.unread ? (
+                    <span className="absolute top-2.5 right-2.5 z-10 flex h-2.5 w-2.5" title={language === 'বাংলা' ? 'নতুন আপডেট' : 'New update'}>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ba0036] opacity-60" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#ba0036]" />
+                    </span>
                   ) : null}
                   {/* Left: icon + label */}
                   <div className="min-w-0 flex-1">
-                    <div className={`w-9 h-9 md:w-11 md:h-11 rounded-xl md:rounded-2xl ${stat.iconBg} ${stat.iconColor} flex items-center justify-center shadow-sm mb-2.5 md:mb-3`}>
+                    <div className={`w-9 h-9 md:w-11 md:h-11 rounded-xl md:rounded-2xl flex items-center justify-center shadow-sm mb-2.5 md:mb-3 ${stat.unread ? 'bg-[#ba0036]/10 text-[#ba0036]' : `${stat.iconBg} ${stat.iconColor}`}`}>
                       <stat.icon size={17} className="md:w-[20px] md:h-[20px]" strokeWidth={2.4} />
                     </div>
-                    <p className="text-[11px] md:text-sm font-black text-gray-800 leading-tight">{stat.label}</p>
+                    <p className={`text-[11px] md:text-sm font-black leading-tight ${stat.unread ? 'text-[#ba0036]' : 'text-gray-800'}`}>{stat.label}</p>
                     <p className="hidden md:block text-[11px] font-bold text-gray-400 leading-tight mt-0.5 truncate">{stat.sub}</p>
                   </div>
                   {/* Right: number + accent bar */}
                   <div className="shrink-0 flex flex-col items-end">
-                    <h3 className="text-2xl md:text-[2.25rem] font-black text-gray-900 leading-none tabular-nums tracking-tight">{stat.value}</h3>
-                    <div className={`h-1 rounded-full ${stat.bar} w-7 md:w-9 mt-2`} />
+                    <h3 className={`text-2xl md:text-[2.25rem] font-black leading-none tabular-nums tracking-tight ${stat.unread ? 'text-[#ba0036]' : 'text-gray-900'}`}>{stat.value}</h3>
+                    <div className={`h-1 rounded-full w-7 md:w-9 mt-2 ${stat.unread ? 'bg-[#ba0036]' : stat.bar}`} />
                   </div>
                 </button>
               ))}

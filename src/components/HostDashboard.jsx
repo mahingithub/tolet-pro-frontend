@@ -3480,7 +3480,9 @@ const HostDashboard = () => {
                   icon: MessageSquare, bg: 'bg-gradient-to-br from-violet-50 to-purple-100/60', iconColor: 'text-violet-600',
                   label: language === 'বাংলা' ? 'যোগাযোগ' : 'INQUIRIES',
                   value: inquiries.length, shadow: 'shadow-[0_4px_20px_rgba(124,58,237,0.08)]',
-                  indicator: 'bg-violet-500'
+                  indicator: 'bg-violet-500',
+                  // Turn the box red the moment a new inquiry / reply the host hasn't opened arrives.
+                  unread: inquiries.some((inq) => isInquiryUnread(inq, 'host', inqSeen)),
                 },
               ].map((stat, i) => {
                 // KPI boxes are one-tap deep links: Properties → all listings,
@@ -3491,20 +3493,27 @@ const HostDashboard = () => {
                     ? () => { setPropertyFilter('active'); setActiveTab('properties'); }
                     : () => setActiveTab('inquiries');
                 return (
-                <div key={i} onClick={onCardClick} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(); } }} className={`bg-white p-3 md:px-7 md:py-6 rounded-2xl md:rounded-[1.5rem] ${stat.shadow} border border-white/80 flex flex-col items-center justify-center md:flex-row md:items-center md:justify-between md:gap-3 group hover:scale-[1.02] hover:shadow-[0_12px_35px_rgba(0,0,0,0.10)] active:scale-95 transition-all duration-300 cursor-pointer relative overflow-hidden`}>
-                  <div className={`absolute top-0 right-0 w-16 h-16 md:w-24 md:h-24 rounded-full -translate-y-1/2 translate-x-1/2 ${stat.bg} blur-2xl opacity-60 pointer-events-none`}></div>
+                <div key={i} onClick={onCardClick} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(); } }} className={`p-3 md:px-7 md:py-6 rounded-2xl md:rounded-[1.5rem] ${stat.shadow} flex flex-col items-center justify-center md:flex-row md:items-center md:justify-between md:gap-3 group hover:scale-[1.02] hover:shadow-[0_12px_35px_rgba(0,0,0,0.10)] active:scale-95 transition-all duration-300 cursor-pointer relative overflow-hidden ${stat.unread ? 'bg-gradient-to-br from-red-50 to-rose-50 border border-[#ba0036]/30 ring-2 ring-[#ba0036]/40' : 'bg-white border border-white/80'}`}>
+                  {/* New-inquiry pulse dot — makes the red box unmistakable. */}
+                  {stat.unread && (
+                    <span className="absolute top-2 right-2 z-10 flex h-2.5 w-2.5" title={language === 'বাংলা' ? 'নতুন যোগাযোগ' : 'New inquiry'}>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ba0036] opacity-60" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#ba0036]" />
+                    </span>
+                  )}
+                  <div className={`absolute top-0 right-0 w-16 h-16 md:w-24 md:h-24 rounded-full -translate-y-1/2 translate-x-1/2 ${stat.unread ? 'bg-rose-200' : stat.bg} blur-2xl opacity-60 pointer-events-none`}></div>
                   {/* Left cluster — icon + label. On desktop this sits on the left
                       of the horizontal card; on mobile it stays centered on top. */}
                   <div className="flex flex-col items-center md:items-start shrink-0">
-                    <div className={`w-8 h-8 md:w-11 md:h-11 rounded-xl ${stat.bg} flex items-center justify-center ${stat.iconColor} mb-2 shrink-0`}>
+                    <div className={`w-8 h-8 md:w-11 md:h-11 rounded-xl flex items-center justify-center mb-2 shrink-0 ${stat.unread ? 'bg-[#ba0036]/10 text-[#ba0036]' : `${stat.bg} ${stat.iconColor}`}`}>
                       <stat.icon size={15} className="md:w-5 md:h-5" />
                     </div>
-                    <p className="text-[7px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest text-center md:text-left leading-tight">{stat.label}</p>
+                    <p className={`text-[7px] md:text-[10px] font-black uppercase tracking-widest text-center md:text-left leading-tight ${stat.unread ? 'text-[#ba0036]' : 'text-gray-400'}`}>{stat.label}</p>
                   </div>
                   {/* Right cluster — big value + accent bar, right-aligned on desktop. */}
                   <div className="flex flex-col items-center md:items-end mt-0.5 md:mt-0">
-                    <h3 className="text-2xl md:text-5xl font-black text-gray-900 leading-none">{stat.value}</h3>
-                    <div className={`w-6 h-1 rounded-full mt-2 md:mt-3 ${stat.indicator} opacity-40`}></div>
+                    <h3 className={`text-2xl md:text-5xl font-black leading-none ${stat.unread ? 'text-[#ba0036]' : 'text-gray-900'}`}>{stat.value}</h3>
+                    <div className={`w-6 h-1 rounded-full mt-2 md:mt-3 ${stat.unread ? 'bg-[#ba0036] opacity-70' : `${stat.indicator} opacity-40`}`}></div>
                   </div>
                 </div>
                 );

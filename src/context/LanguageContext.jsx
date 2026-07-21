@@ -326,6 +326,13 @@ const translations = {
     // Inquiry Modal
     inquiryModalTitle: "Send Inquiry",
     inquiryModalTo: "to ",
+    // Landlord-mode notice — shown instead of the inquiry form when the
+    // user is acting as a landlord (inquiries are a tenant-only action).
+    inquiryLandlordTitle: "You're in Landlord mode",
+    inquiryLandlordDesc: "Inquiries are sent by tenants looking to rent a place. While you're in Landlord mode, sending one isn't available. To reach out about this property, please switch to Tenant mode — or, as a landlord, you can list your own property for rent instead.",
+    inquiryLandlordSwitchBtn: "Switch to Tenant mode",
+    inquiryLandlordSwitching: "Switching...",
+    inquiryLandlordClose: "Not now",
     perMonthShort: "/mo",
     yourPhoneNum: "Your Phone Number",
     phoneShortError: "Looks short — please enter a full mobile number.",
@@ -1036,6 +1043,12 @@ const translations = {
     // Inquiry Modal
     inquiryModalTitle: "ইনকোয়ারি পাঠান",
     inquiryModalTo: "প্রতি ",
+    // Landlord-mode notice (tenant-only action)
+    inquiryLandlordTitle: "আপনি এখন ল্যান্ডলর্ড মোডে আছেন",
+    inquiryLandlordDesc: "ইনকোয়ারি পাঠান মূলত ভাড়া খুঁজছেন এমন ভাড়াটিয়ারা। ল্যান্ডলর্ড মোডে থাকা অবস্থায় ইনকোয়ারি পাঠানো যাবে না। এই প্রপার্টি সম্পর্কে জানতে অনুগ্রহ করে ভাড়াটিয়া মোডে যান — অথবা ল্যান্ডলর্ড হিসেবে আপনি নিজের প্রপার্টি ভাড়ার জন্য পোস্ট করতে পারেন।",
+    inquiryLandlordSwitchBtn: "ভাড়াটিয়া মোডে যান",
+    inquiryLandlordSwitching: "পরিবর্তন হচ্ছে...",
+    inquiryLandlordClose: "এখন নয়",
     perMonthShort: "/মাস",
     yourPhoneNum: "আপনার মোবাইল নম্বর",
     phoneShortError: "নম্বরটি ছোট মনে হচ্ছে — অনুগ্রহ করে সম্পূর্ণ নম্বর দিন।",
