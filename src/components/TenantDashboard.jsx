@@ -197,11 +197,12 @@ const findClosestArea = (lat, lng) => {
 };
 
 // ╔════════════════════════════════════════════════════════════════════════╗
-// ║  QUICK_SEARCH_AREAS + BUDGET_OPTIONS — power the overview Quick Search. ║
-// ║  Each area's slug maps 1:1 to the listing route (`/properties/<slug>`)  ║
-// ║  and the budget ids match the buckets PropertyListing already parses    ║
-// ║  (under_10k / 10k_20k / 20k_50k / above_50k). Kept in sync with the     ║
-// ║  home hero so a deep link behaves identically from either surface.      ║
+// ║  QUICK_SEARCH_AREAS — power the overview Quick Search popular-area chips.║
+// ║  Each area's slug maps 1:1 to the listing route (`/properties/<slug>`),  ║
+// ║  kept in sync with the home hero so a deep link behaves identically     ║
+// ║  from either surface. (Budget was removed from Quick Search — the tenant ║
+// ║  now searches by category + type only, then refines budget on the       ║
+// ║  listing page filters.)                                                  ║
 // ╚════════════════════════════════════════════════════════════════════════╝
 const QUICK_SEARCH_AREAS = [
   { slug: 'dhanmondi',   en: 'Dhanmondi',   bn: 'ধানমন্ডি' },
@@ -211,14 +212,6 @@ const QUICK_SEARCH_AREAS = [
   { slug: 'mirpur',      en: 'Mirpur',      bn: 'মিরপুর' },
   { slug: 'mohammadpur', en: 'Mohammadpur', bn: 'মোহাম্মদপুর' },
   { slug: 'uttara',      en: 'Uttara',      bn: 'উত্তরা' },
-];
-
-const BUDGET_OPTIONS = [
-  { id: '',          en: 'Any budget',  bn: 'যেকোনো বাজেট' },
-  { id: 'under_10k', en: 'Under ৳10k',  bn: '৳১০k এর নিচে' },
-  { id: '10k_20k',   en: '৳10k – ৳20k', bn: '৳১০k – ৳২০k' },
-  { id: '20k_50k',   en: '৳20k – ৳50k', bn: '৳২০k – ৳৫০k' },
-  { id: 'above_50k', en: 'Above ৳50k',  bn: '৳৫০k এর উপরে' },
 ];
 
 // Category → the listing `purpose` (rent / commercial). We always send one so
@@ -4277,7 +4270,6 @@ const QuickSearchCard = ({ language }) => {
   const [q, setQ] = useState('');
   const [category, setCategory] = useState('residential'); // 'residential' | 'commercial'
   const [propType, setPropType] = useState('any');         // type id within the chosen category
-  const [budget, setBudget] = useState('');
   // The location field opens the SAME search modal the home hero uses, so its
   // recommendations (popular areas + the live Bangladesh location index) are
   // identical here on the tenant dashboard.
@@ -4303,12 +4295,11 @@ const QuickSearchCard = ({ language }) => {
       location: value,
       purpose: cat.purpose,   // 'rent' | 'commercial'
       categoryId: propType,   // rentalCategory (residential) or prop.type (commercial); 'any…' = no filter
-      budgetId: budget || 'any',
     }));
   };
 
   // Picking a location only fills the box — it no longer jumps straight to the
-  // results. The tenant chooses category / type / budget first, THEN taps Search
+  // results. The tenant chooses category + type first, THEN taps Search
   // (fixes "it searches before I've picked a category").
   const onLocationSelect = (loc) => {
     setQ((loc || '').trim());
@@ -4362,19 +4353,6 @@ const QuickSearchCard = ({ language }) => {
               className="appearance-none w-full md:w-auto bg-gray-50 pl-9 pr-8 py-3 rounded-2xl text-[13px] font-black text-gray-700 border border-gray-100 focus:bg-white focus:border-[#ba0036] outline-none transition-all cursor-pointer"
             >
               {typeOptions.map((tp) => <option key={tp.id} value={tp.id}>{bn ? tp.bn : tp.en}</option>)}
-            </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
-          {/* Budget — full-width on its own row on mobile, inline on desktop. */}
-          <div className="relative col-span-2 md:col-span-1">
-            <Wallet size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
-            <select
-              value={budget}
-              onChange={(e) => setBudget(e.target.value)}
-              aria-label={bn ? 'বাজেট' : 'Budget'}
-              className="appearance-none w-full md:w-auto bg-gray-50 pl-9 pr-8 py-3 rounded-2xl text-[13px] font-black text-gray-700 border border-gray-100 focus:bg-white focus:border-[#ba0036] outline-none transition-all cursor-pointer"
-            >
-              {BUDGET_OPTIONS.map((b) => <option key={b.id || 'any'} value={b.id}>{bn ? b.bn : b.en}</option>)}
             </select>
             <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
