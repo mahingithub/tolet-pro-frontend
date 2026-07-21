@@ -2980,17 +2980,20 @@ const HostDashboard = () => {
           <button
             type="button"
             onClick={() => setShowHomeChoice(true)}
-            className="flex items-center gap-3 z-10 group"
+            className="flex items-center gap-3 z-10 group shrink-0"
             aria-label={language === 'বাংলা' ? 'নেভিগেশন মেনু' : 'Navigation menu'}
           >
             <div className="bg-gradient-to-br from-[#ba0036] to-[#ff004c] p-2.5 rounded-xl shadow-[0_4px_15px_rgba(186,0,54,0.3)] group-hover:scale-105 transition-transform">
               <Building2 className="text-white w-4 h-4 md:w-[18px] md:h-[18px]" />
             </div>
-            <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tighter hidden sm:block">
+            {/* whitespace-nowrap keeps "TO-LET PRO" on ONE line — it was
+                wrapping to two lines when the header got tight on iPad. */}
+            <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tighter hidden sm:block whitespace-nowrap">
               TO-LET <span className="text-[#ba0036]">PRO</span>
             </h1>
-            {/* Beta badge (Phase 7) — signals the app is in beta testing. */}
-            <span className="ml-1 px-1.5 py-0.5 text-[9px] md:text-[10px] font-black uppercase tracking-wider text-[#ba0036] bg-red-50 border border-[#ba0036]/30 rounded-md leading-none self-center hidden sm:block">
+            {/* Beta badge (Phase 7) — signals the app is in beta testing.
+                Hidden until lg so it doesn't crowd the header on iPad / tablet. */}
+            <span className="ml-1 px-1.5 py-0.5 text-[9px] md:text-[10px] font-black uppercase tracking-wider text-[#ba0036] bg-red-50 border border-[#ba0036]/30 rounded-md leading-none self-center hidden lg:block">
               Beta
             </span>
           </button>
@@ -3059,7 +3062,7 @@ const HostDashboard = () => {
             >
               <PlusCircle size={16} strokeWidth={2.5} />
               <span className="text-[12px] font-black">{language === 'বাংলা' ? 'বাড়ি দিন' : 'List Property'}</span>
-              <span className="text-[8px] font-black uppercase tracking-wider bg-[#ba0036]/10 px-1.5 py-0.5 rounded-md">{language === 'বাংলা' ? 'ফ্রি' : 'Free'}</span>
+              <span className="hidden lg:inline text-[8px] font-black uppercase tracking-wider bg-[#ba0036]/10 px-1.5 py-0.5 rounded-md">{language === 'বাংলা' ? 'ফ্রি' : 'Free'}</span>
             </button>
 
             {/* Language switcher — English ⇄ বাংলা (persisted via LanguageContext).
@@ -3070,13 +3073,13 @@ const HostDashboard = () => {
               <button
                 onClick={() => setIsLangMenuOpen(v => !v)}
                 aria-label={language === 'বাংলা' ? 'ভাষা' : 'Language'}
-                className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl bg-white/60 border border-white/80 shadow-sm hover:bg-white transition-all active:scale-95"
+                className="flex items-center gap-1.5 p-2 lg:px-3 lg:py-2 rounded-xl bg-white/60 border border-white/80 shadow-sm hover:bg-white transition-all active:scale-95"
               >
                 <Globe size={16} className="text-gray-500" />
-                {/* On mobile it's just the globe logo (like the bell beside it);
-                    the label + chevron only appear from sm up. */}
-                <span className="hidden sm:block text-[12px] font-black text-gray-700">{language === 'বাংলা' ? 'বাংলা' : 'English'}</span>
-                <ChevronDown size={14} className={`hidden sm:block text-gray-400 transition-transform duration-200 ${isLangMenuOpen ? 'rotate-180' : ''}`} />
+                {/* Globe-only through tablet (like the bell beside it); the label
+                    + chevron appear from lg up so iPad's header stays uncluttered. */}
+                <span className="hidden lg:block text-[12px] font-black text-gray-700">{language === 'বাংলা' ? 'বাংলা' : 'English'}</span>
+                <ChevronDown size={14} className={`hidden lg:block text-gray-400 transition-transform duration-200 ${isLangMenuOpen ? 'rotate-180' : ''}`} />
               </button>
               {isLangMenuOpen && (
                 <>
@@ -5911,53 +5914,8 @@ const HostDashboard = () => {
               {/* ── LEFT RAIL — full Shared Ledger ALWAYS visible (mobile + desktop) ── */}
               <aside className="xl:col-span-4 w-full flex flex-col gap-3 xl:gap-5 xl:h-full xl:overflow-y-auto custom-scrollbar xl:pt-1 xl:pb-4 xl:pr-1">
 
-                {/* Mobile / iPad rent summary — replaces the tall dark hero on
-                    small screens so the key numbers read top-to-bottom instead
-                    of forcing a sideways scroll. Renter + collection counts sit
-                    prominently up top; outstanding vs cleared money is listed
-                    neatly underneath. Desktop keeps the full dark hero (below). */}
-                <div className="xl:hidden bg-white rounded-2xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-gray-100 shrink-0">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{monthFullLabel(sm.key, language)}</p>
-                    <span className="text-[10px] font-black text-emerald-600 tabular-nums">{collectedPct}% {language === 'বাংলা' ? 'আদায়' : 'collected'}</span>
-                  </div>
-                  {/* Prominent counts — Renters + Collections */}
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div className="rounded-xl bg-gray-900 p-3 text-white">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-white/60 flex items-center gap-1"><Users size={11} /> {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'Renters'}</p>
-                      <p className="text-2xl font-black tabular-nums leading-none mt-1.5">{rentRows.length}</p>
-                    </div>
-                    <div className="rounded-xl bg-emerald-600 p-3 text-white">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-white/70 flex items-center gap-1"><CheckCircle2 size={11} /> {language === 'বাংলা' ? 'কালেকশন' : 'Collections'}</p>
-                      <p className="text-2xl font-black tabular-nums leading-none mt-1.5">{sm.paidCount}<span className="text-sm font-black text-white/60">/{sm.totalDueCount}</span></p>
-                    </div>
-                  </div>
-                  {/* Collection-rate bar */}
-                  <div className="mt-3 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-700" style={{ width: `${collectedPct}%` }} />
-                  </div>
-                  {/* Outstanding + Cleared — listed neatly underneath */}
-                  <div className="mt-3 space-y-2">
-                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-rose-50 border border-rose-100">
-                      <span className="flex items-center gap-1.5 text-[11px] font-black text-rose-700"><AlertCircle size={13} /> {language === 'বাংলা' ? 'বকেয়া' : 'Outstanding'}</span>
-                      <span className="text-right leading-tight">
-                        <span className="block text-sm font-black text-rose-700 tabular-nums">{formatBDT(sm.outstandingTotal)}</span>
-                        <span className="block text-[9px] font-bold text-rose-600/70 tabular-nums">{sm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'overdue'}</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-100">
-                      <span className="flex items-center gap-1.5 text-[11px] font-black text-emerald-700"><CheckCircle2 size={13} /> {language === 'বাংলা' ? 'ক্লিয়ার্ড' : 'Cleared'}</span>
-                      <span className="text-right leading-tight">
-                        <span className="block text-sm font-black text-emerald-700 tabular-nums">{formatBDT(sm.collectedTotal)}</span>
-                        <span className="block text-[9px] font-bold text-emerald-600/70 tabular-nums">{sm.paidCount} {language === 'বাংলা' ? 'পরিশোধিত' : 'paid'}</span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Shared Ledger hero — full KPI card, DESKTOP ONLY (xl+). The
-                    mobile / iPad summary above covers small screens. */}
-                <div className="hidden xl:block bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl xl:rounded-[2rem] p-5 xl:p-7 text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] xl:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
+                {/* Shared Ledger hero — full KPI card, always visible. */}
+                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl xl:rounded-[2rem] p-5 xl:p-7 text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] xl:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-10 translate-x-10"></div>
                   <div className="flex items-start justify-between mb-1 relative z-10">
                     <h3 className="text-lg xl:text-2xl font-black">{language === 'বাংলা' ? 'শেয়ার্ড লেজার' : 'Shared Ledger'}</h3>
@@ -6055,25 +6013,28 @@ const HostDashboard = () => {
               {/* ── RIGHT MAIN — main IS the scroll container; sticky toolbar pins inside it ── */}
               <main className="xl:col-span-8 w-full xl:h-full xl:overflow-y-auto custom-scrollbar pb-24 xl:pr-3 min-w-0">
 
-                {/* Sticky toolbar — ONE row. Title is a tiny chip in the corner;
-                    search + year stepper + filter pills + Export share the
-                    same sticky line. */}
+                {/* Sticky toolbar — two rows. Row 1 = controls (title chip, year
+                    stepper, search, export); Row 2 = the filter pills, which wrap
+                    instead of scrolling sideways on mobile / iPad. */}
                 <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:-mx-4 xl:mx-0 px-3 sm:px-4 xl:px-0 pt-2 pb-3 mb-2 xl:pt-1">
-                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap xl:flex-nowrap">
+                  {/* Row 1 — controls: title chip, year stepper, search, export.
+                      Filter pills live on their own wrapping row (Row 2) below so
+                      nothing needs horizontal scrolling on mobile / iPad. */}
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     {/* Title corner chip — small, gray, with live count. */}
                     <span className="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/70 text-[9px] xl:text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
                       <Wallet size={11} className="text-emerald-600"/>
                       <span className="hidden sm:inline">{language === 'বাংলা' ? 'রেন্ট' : 'Rent'}</span>
                       <span className="text-gray-400 tabular-nums">{filteredBookings.length}</span>
                     </span>
-                    {/* Year stepper — pin to corner of toolbar. */}
+                    {/* Year stepper. */}
                     <div className="shrink-0 flex items-center gap-1 bg-white rounded-xl px-1 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
                       <button onClick={() => setLedgerYear(y => y - 1)} className="p-1 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-gray-700 transition-colors"><ChevronLeft size={12}/></button>
                       <span className="text-[11px] font-black text-gray-900 tabular-nums w-10 text-center">{ledgerYear}</span>
                       <button onClick={() => setLedgerYear(y => y + 1)} className="p-1 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-gray-700 transition-colors"><ChevronRight size={12}/></button>
                     </div>
-                    {/* Search input. */}
-                    <div className="relative flex-1 min-w-[120px] xl:max-w-[220px] order-3 sm:order-none basis-full sm:basis-auto">
+                    {/* Search input — grows to fill the rest of the row. */}
+                    <div className="relative flex-1 min-w-0 xl:max-w-[220px]">
                       <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                       <input
                         type="search"
@@ -6083,34 +6044,36 @@ const HostDashboard = () => {
                         className="w-full pl-7 pr-2 py-2 rounded-xl bg-white text-[11px] font-bold text-gray-900 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-transparent focus:border-gray-200 focus:outline-none placeholder:text-gray-400"
                       />
                     </div>
-                    {/* Priority pills — horizontal scroll on narrow viewports. */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 xl:flex-none order-2 sm:order-none min-w-0">
-                      {[
-                        { k: 'all',      label: language === 'বাংলা' ? 'সকল' : 'All',        cls: 'bg-gray-900 text-white' },
-                        { k: 'overdue',  label: language === 'বাংলা' ? 'বকেয়া' : 'Overdue',  cls: 'bg-rose-600 text-white' },
-                        { k: 'partial',  label: language === 'বাংলা' ? 'আংশিক' : 'Partial',  cls: 'bg-amber-500 text-white' },
-                        { k: 'upcoming', label: language === 'বাংলা' ? 'আসন্ন' : 'Upcoming', cls: 'bg-orange-500 text-white' },
-                        { k: 'cleared',  label: language === 'বাংলা' ? 'ক্লিয়ার্ড' : 'Cleared', cls: 'bg-emerald-600 text-white' },
-                      ].map(pill => (
-                        <button
-                          key={pill.k}
-                          onClick={() => setRentPriorityFilter(pill.k)}
-                          className={`shrink-0 px-2.5 sm:px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap inline-flex items-center gap-1 ${rentPriorityFilter === pill.k ? `${pill.cls} shadow-[0_2px_8px_rgba(0,0,0,0.15)]` : 'bg-white text-gray-500 hover:text-gray-900 shadow-[0_2px_6px_rgba(0,0,0,0.03)]'}`}
-                        >
-                          {pill.label}
-                          {pill.k !== 'all' && counts[pill.k] > 0 && <span className={`tabular-nums ${rentPriorityFilter === pill.k ? 'opacity-90' : 'opacity-60'}`}>·{counts[pill.k]}</span>}
-                        </button>
-                      ))}
-                    </div>
-                    {/* Export action — corner-pinned. Exports the current year's
-                        filtered rent ledger to a CSV (one row per tenant). */}
+                    {/* Export action. */}
                     <button
                       onClick={() => exportRentCsv(filteredBookings, ledgerYear)}
-                      className="shrink-0 px-3 py-2 bg-white text-gray-700 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all flex items-center gap-1.5 active:scale-95 order-1 sm:order-none ml-auto sm:ml-0"
+                      className="shrink-0 px-3 py-2 bg-white text-gray-700 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all flex items-center gap-1.5 active:scale-95"
                       title={language === 'বাংলা' ? `${ledgerYear} সালের রেন্ট CSV` : `Export ${ledgerYear} rent as CSV`}
                     >
                       <FileSpreadsheet size={12}/> <span className="hidden sm:inline">{language === 'বাংলা' ? 'এক্সপোর্ট' : 'Export'}</span>
                     </button>
+                  </div>
+                  {/* Row 2 — priority filter pills on their own row. They WRAP
+                      onto a second line on small screens so every filter
+                      (Overdue / Partial / Upcoming / Cleared) is visible without
+                      any sideways scrolling. */}
+                  <div className="flex items-center flex-wrap gap-1.5 mt-2">
+                    {[
+                      { k: 'all',      label: language === 'বাংলা' ? 'সকল' : 'All',        cls: 'bg-gray-900 text-white' },
+                      { k: 'overdue',  label: language === 'বাংলা' ? 'বকেয়া' : 'Overdue',  cls: 'bg-rose-600 text-white' },
+                      { k: 'partial',  label: language === 'বাংলা' ? 'আংশিক' : 'Partial',  cls: 'bg-amber-500 text-white' },
+                      { k: 'upcoming', label: language === 'বাংলা' ? 'আসন্ন' : 'Upcoming', cls: 'bg-orange-500 text-white' },
+                      { k: 'cleared',  label: language === 'বাংলা' ? 'ক্লিয়ার্ড' : 'Cleared', cls: 'bg-emerald-600 text-white' },
+                    ].map(pill => (
+                      <button
+                        key={pill.k}
+                        onClick={() => setRentPriorityFilter(pill.k)}
+                        className={`shrink-0 px-2.5 sm:px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap inline-flex items-center gap-1 ${rentPriorityFilter === pill.k ? `${pill.cls} shadow-[0_2px_8px_rgba(0,0,0,0.15)]` : 'bg-white text-gray-500 hover:text-gray-900 shadow-[0_2px_6px_rgba(0,0,0,0.03)]'}`}
+                      >
+                        {pill.label}
+                        {pill.k !== 'all' && counts[pill.k] > 0 && <span className={`tabular-nums ${rentPriorityFilter === pill.k ? 'opacity-90' : 'opacity-60'}`}>·{counts[pill.k]}</span>}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
