@@ -33,6 +33,11 @@ const LandlordHomeChoiceModal = ({
   onGoDashboard,
   onDashboardPage = false,
   isBn = false,
+  // Description under the "Dashboard" option. Defaults to landlord copy; the
+  // tenant dashboard passes its own (rent / bookings) so the same popup serves
+  // both roles.
+  dashboardDescEn = 'Manage your properties & tenants',
+  dashboardDescBn = 'আপনার প্রপার্টি ও ভাড়াটিয়া পরিচালনা করুন',
 }) => {
   if (!open) return null;
   const L = (en, bn) => (isBn ? bn : en);
@@ -98,7 +103,7 @@ const LandlordHomeChoiceModal = ({
                   ? L('Stay on Dashboard', 'ড্যাশবোর্ডে থাকুন')
                   : L('Go to Dashboard', 'ড্যাশবোর্ডে যান')}
               </p>
-              <p className="text-xs text-gray-500">{L('Manage your properties & tenants', 'আপনার প্রপার্টি ও ভাড়াটিয়া পরিচালনা করুন')}</p>
+              <p className="text-xs text-gray-500">{L(dashboardDescEn, dashboardDescBn)}</p>
             </div>
             <ArrowRight size={18} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all shrink-0" />
           </button>

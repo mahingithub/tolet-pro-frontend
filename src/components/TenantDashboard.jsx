@@ -12,6 +12,7 @@ import { propertyService } from '../services/Propertyservice.js';
 import { buildTenantAlerts } from '../utils/rentAlerts';
 import SmartAlertsPage from './Smartalertspage';
 import SmartAlertsPopup from './SmartAlertsPopup';
+import LandlordHomeChoiceModal from './shared/LandlordHomeChoiceModal';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useDeepLinkHighlight from '../hooks/useDeepLinkHighlight';
 import {
@@ -208,6 +209,18 @@ const QUICK_SEARCH_AREAS = [
   { slug: 'mirpur',      en: 'Mirpur',      bn: 'মিরপুর' },
   { slug: 'mohammadpur', en: 'Mohammadpur', bn: 'মোহাম্মদপুর' },
   { slug: 'uttara',      en: 'Uttara',      bn: 'উত্তরা' },
+];
+
+// Property-type keyword suggestions for the Quick Search autocomplete.
+// Selecting one runs a free-text search (?q=…) — the same URL contract the
+// Search button and the home hero already use.
+const QUICK_SEARCH_TYPES = [
+  { q: 'Family',   en: 'Family Flat',     bn: 'ফ্যামিলি ফ্ল্যাট' },
+  { q: 'Bachelor', en: 'Bachelor',        bn: 'ব্যাচেলর' },
+  { q: 'Sublet',   en: 'Sublet / Room',   bn: 'সাবলেট / রুম' },
+  { q: 'Hostel',   en: 'Hostel',          bn: 'হোস্টেল' },
+  { q: 'Office',   en: 'Office Space',     bn: 'অফিস স্পেস' },
+  { q: 'Shop',     en: 'Shop / Showroom',  bn: 'দোকান / শোরুম' },
 ];
 
 const BUDGET_OPTIONS = [
@@ -520,6 +533,10 @@ const TenantDashboard = () => {
   const initialTab = new URLSearchParams(location.search).get('tab') || (location.state && location.state.activeTab) || 'overview';
   const [activeTab, setActiveTab] = useState(initialTab);
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
+  // Logo → "where to?" popup. Like the landlord, a connected tenant's home base
+  // is their dashboard, so tapping the TO-LET PRO logo asks whether to visit the
+  // public homepage or stay here — instead of silently leaving.
+  const [showHomeChoice, setShowHomeChoice] = useState(false);
   // "Add landlord" — tenant self-joins a booking/seat with an invite code.
   const [addLandlordOpen, setAddLandlordOpen] = useState(false);
   const [inviteCodeInput, setInviteCodeInput] = useState('');
@@ -1673,19 +1690,39 @@ const handleWizardSubmit = async (payload) => {
         </div>
       </div>
 
+      {/* 🏠 LOGO "WHERE TO?" POPUP — like the landlord, a connected tenant's
+          home base is the dashboard, so tapping the logo asks where to go
+          instead of silently leaving for the public site. "Go to main Home"
+          works because the boot-redirect only fires once per app open. */}
+      <LandlordHomeChoiceModal
+        open={showHomeChoice}
+        onClose={() => setShowHomeChoice(false)}
+        onGoHome={() => { setShowHomeChoice(false); navigate('/'); }}
+        onGoDashboard={() => setShowHomeChoice(false)}
+        onDashboardPage
+        isBn={language === 'বাংলা'}
+        dashboardDescEn="See your rent, bookings & receipts"
+        dashboardDescBn="আপনার ভাড়া, বুকিং ও রসিদ দেখুন"
+      />
+
       {/* --- TOP HEADER — floating glass card identical to HostDashboard --- */}
       <div className="w-full max-w-[1600px] mx-auto z-40 relative">
         <header className="mx-4 md:mx-8 mt-4 bg-white/60 backdrop-blur-3xl border border-white/80 rounded-[2rem] px-4 md:px-8 py-3.5 flex items-center justify-between shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
         {/* 🟢 GLOBAL LOGO — exact same block used in Navbar.jsx so the dashboard
             visually matches every other page. */}
-        <Link to="/" className="flex items-center gap-2 md:gap-2.5 cursor-pointer group shrink-0 z-10">
+        <button
+          type="button"
+          onClick={() => setShowHomeChoice(true)}
+          aria-label={language === 'বাংলা' ? 'নেভিগেশন মেনু' : 'Navigation menu'}
+          className="flex items-center gap-2 md:gap-2.5 cursor-pointer group shrink-0 z-10"
+        >
           <div className="bg-[#ba0036] p-1.5 md:p-2 rounded-xl shadow-[0_4px_15px_rgba(186,0,54,0.3)] group-hover:scale-105 transition-transform duration-300">
             <Building2 className="text-white w-4 h-4 md:w-[18px] md:h-[18px]" />
           </div>
           <h1 className="font-black text-base md:text-lg lg:text-xl tracking-tighter">
             <span className="text-gray-900">TO-LET</span> <span className="text-[#ba0036]">PRO</span>
           </h1>
-        </Link>
+        </button>
 
         {/* Header trimmed to match the public homepage navbar: logo +
             notification bell + tenant portal chip. The search bar and the
@@ -3119,7 +3156,9 @@ const handleWizardSubmit = async (payload) => {
                   <p className="text-[10px] font-bold text-gray-400 leading-tight">{language === 'বাংলা' ? 'এই মাসের ভাড়া ও পেমেন্ট তথ্য' : "This month's rent & payment details"}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Single column — each card now lives in a half-width outer
+                  column (paired with "Your Bookings"), so it stacks its cards. */}
+              <div className="grid grid-cols-1 gap-4">
                 {activeLeases.map((b) => (
                   <div key={b.id || b._id} id={`payment-${b.id || b._id}`}>
                     <TenantRentPay booking={b} submissions={rentSubmissions} onSubmitted={refreshRentData} />
@@ -3136,7 +3175,7 @@ const handleWizardSubmit = async (payload) => {
                 <h3 className="text-sm font-black text-gray-800">{language === 'বাংলা' ? 'আপনার বুকিং / লিজ' : 'Your Bookings'}</h3>
                 <span className="text-[10px] font-black text-gray-400 tabular-nums">{activeLeases.length}</span>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 {activeLeases.map((b) => {
                   const fresh = isFreshBooking(b);
                   return (
@@ -3180,10 +3219,98 @@ const handleWizardSubmit = async (payload) => {
             </div>
           ) : null;
 
+          const bn = language === 'বাংলা';
+          const receiptsThisYear = paymentReceipts.filter((r) => r.monthKey?.startsWith(`${payYear}-`)).length;
+
+          // ── Page hero header — big title + subtitle + a receipt glyph. ──
+          const paymentsHeader = (
+            <div className="relative overflow-hidden rounded-[1.75rem] bg-white border border-gray-100 shadow-[0_4px_20px_rgba(15,23,42,0.04)] px-5 py-5 md:px-7 md:py-6">
+              <div className="absolute -top-10 -right-8 w-40 h-40 rounded-full bg-indigo-100/50 blur-3xl pointer-events-none" />
+              <div className="relative flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">{bn ? 'পেমেন্ট ও রিসিট' : 'Payments & Receipts'}</h2>
+                  <p className="text-[12px] md:text-sm font-bold text-gray-400 mt-1">{bn ? 'আপনার সব পেমেন্ট ও রিসিট এক জায়গায়' : 'All your payments and receipts in one place'}</p>
+                </div>
+                <div className="relative shrink-0 hidden sm:flex items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100">
+                  <Receipt size={30} className="text-indigo-500" />
+                  <span className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg ring-4 ring-white"><CheckCircle2 size={15} /></span>
+                </div>
+              </div>
+            </div>
+          );
+
+          // ── Payment Summary — compact purple KPI card (Paid / Outstanding /
+          //    Next Due). Replaces the old full-width blue banner and sits
+          //    beside the booking card so the row reads as a balanced pair. ──
+          const summaryCard = (
+            <div className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-violet-600 via-indigo-600 to-violet-700 text-white shadow-[0_20px_45px_-20px_rgba(79,70,229,0.6)] p-5 md:p-6 h-full flex flex-col">
+              <div className="absolute -top-12 -right-10 w-44 h-44 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+              <h3 className="relative text-base md:text-lg font-black mb-4">{bn ? 'পেমেন্ট সামারি' : 'Payment Summary'}</h3>
+              <div className="relative space-y-3.5 flex-1">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.16em] text-white/60">{bn ? `${payYear} সালে পরিশোধ` : `Paid in ${payYear}`}</p>
+                    <p className="text-xl md:text-2xl font-black tabular-nums leading-tight mt-0.5">৳{paidThisYear.toLocaleString(bn ? 'bn-BD' : 'en-IN')}</p>
+                    <p className="text-[10px] font-bold text-white/60 mt-0.5">{receiptsThisYear} {bn ? 'রিসিট' : 'receipts'} • {unreadReceiptsCount} {bn ? 'নতুন' : 'new'}</p>
+                  </div>
+                  <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0"><Wallet size={16} /></div>
+                </div>
+                <div className="h-px bg-white/15" />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.16em] text-white/60">{bn ? 'বাকি' : 'Outstanding'}</p>
+                    <p className={`text-xl md:text-2xl font-black tabular-nums leading-tight mt-0.5 ${outstanding > 0 ? 'text-rose-200' : ''}`}>৳{outstanding.toLocaleString(bn ? 'bn-BD' : 'en-IN')}</p>
+                    <p className="text-[10px] font-bold text-white/60 mt-0.5">{partialCount > 0 ? `${partialCount} ${bn ? 'মাসে আংশিক' : 'months partial'}` : (bn ? 'সব পরিশোধিত' : 'Fully up to date')}</p>
+                  </div>
+                  <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0"><FileText size={16} /></div>
+                </div>
+                <div className="h-px bg-white/15" />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.16em] text-white/60">{bn ? 'পরবর্তী বকেয়া' : 'Next Due'}</p>
+                    <p className="text-base md:text-lg font-black leading-tight mt-0.5 truncate">{nextDue ? (nextDue.monthLabel || nextDue.monthKey) : (bn ? 'কিছু বাকি নেই' : 'Nothing due')}</p>
+                    <p className="text-[10px] font-bold text-white/60 mt-0.5">{nextDue ? `৳${(nextDue.balance || 0).toLocaleString(bn ? 'bn-BD' : 'en-IN')}` : (bn ? 'আপনি আপ-টু-ডেট!' : "You're all set!")}</p>
+                  </div>
+                  <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0"><Calendar size={16} /></div>
+                </div>
+              </div>
+              {nextDue && (
+                <button
+                  onClick={() => { setActiveReceipt(nextDue); markReceiptRead(nextDue.id); }}
+                  className="relative mt-4 w-full inline-flex items-center justify-center gap-1.5 bg-white text-indigo-700 py-2.5 rounded-xl text-[11px] font-black active:scale-95 transition-all shadow-md hover:shadow-lg"
+                >
+                  {bn ? 'রিসিট দেখুন' : 'Open receipt'} <ArrowRight size={12} />
+                </button>
+              )}
+            </div>
+          );
+
+          // ── Row 2 — booking card (left, wider) + Payment Summary (right).
+          //    With no active lease the summary spans the full width. ────────
+          const bookingSummaryRow = (
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-5 items-stretch">
+              {leaseBanner && <div className="lg:col-span-3">{leaseBanner}</div>}
+              <div className={leaseBanner ? 'lg:col-span-2' : 'lg:col-span-5'}>{summaryCard}</div>
+            </div>
+          );
+
+          // ── Trust footer — reassures the tenant their data is safe. ──────
+          const securityFooter = (
+            <div className="relative overflow-hidden rounded-[1.5rem] bg-gradient-to-r from-indigo-50 to-violet-50 border border-indigo-100/70 px-5 py-4 flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-white shadow-sm flex items-center justify-center shrink-0"><ShieldCheck size={20} className="text-indigo-600" /></div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-black text-gray-900 flex items-center gap-1.5">{bn ? 'আপনার সব পেমেন্ট সুরক্ষিত' : 'All your payments are secure'} <CheckCircle2 size={14} className="text-emerald-500" /></p>
+                <p className="text-[11px] font-bold text-gray-500 mt-0.5">{bn ? 'আপনার লেনদেন এনক্রিপ্টেড ও রিসিট নিরাপদে সংরক্ষিত।' : 'Your transactions are encrypted and receipts are stored safely.'}</p>
+              </div>
+              <Lock size={18} className="text-indigo-300 shrink-0 hidden sm:block" />
+            </div>
+          );
+
           // empty state — no receipts at all (still show any booking banner)
           if (paymentReceipts.length === 0) {
             return (
               <div className="animate-in fade-in duration-500 space-y-5">
+                {paymentsHeader}
                 {rentPaySection}
                 {leaseBanner}
                 <div className="text-center py-24 bg-white/40 backdrop-blur-md rounded-[3rem] border border-white shadow-sm flex flex-col items-center">
@@ -3199,6 +3326,7 @@ const handleWizardSubmit = async (payload) => {
                       : 'When your landlord updates a rent payment, the receipt will appear here automatically.'}
                   </p>
                 </div>
+                {securityFooter}
               </div>
             );
           }
@@ -3206,68 +3334,18 @@ const handleWizardSubmit = async (payload) => {
           return (
             <div className="animate-in fade-in duration-500 space-y-5">
 
-              {/* ─── PAY YOUR RENT (V1 manual rent) ──────────────────── */}
+              {/* ─── PAGE HEADER — title + subtitle + receipt glyph ─── */}
+              {paymentsHeader}
+
+              {/* ─── ROW 1: Pay Your Rent / payment status (full width) ─── */}
               {rentPaySection}
 
-              {/* ─── YOUR BOOKINGS (host-created leases) ─────────────── */}
-              {leaseBanner}
+              {/* ─── ROW 2: Your Booking (left) + Payment Summary (right) ─── */}
+              {bookingSummaryRow}
 
-              {/* ─── HERO SUMMARY ───────────────────────────────────────
-                  Mobile-first: the two key numbers (paid / outstanding) sit
-                  side-by-side, and "next due" spans full width below with its
-                  CTA inline. On md+ it opens back up into three columns. */}
-              <div className="relative overflow-hidden rounded-[1.75rem] md:rounded-[2rem] border border-white/80 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white shadow-[0_20px_50px_-20px_rgba(59,7,100,0.55)] p-5 md:p-7">
-                <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-20 -left-10 w-56 h-56 rounded-full bg-cyan-300/10 blur-3xl pointer-events-none" />
-                <div className="relative grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-4 md:gap-5">
-                  <div>
-                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.16em] opacity-70">
-                      {language === 'বাংলা' ? `${payYear} সালে পরিশোধ` : `Paid in ${payYear}`}
-                    </p>
-                    <p className="mt-1 text-2xl md:text-4xl font-black leading-none tabular-nums tracking-tight">
-                      ৳{paidThisYear.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}
-                    </p>
-                    <p className="mt-1.5 text-[10px] md:text-[11px] font-bold opacity-80">
-                      {paymentReceipts.filter((r) => r.monthKey?.startsWith(`${payYear}-`)).length}{' '}
-                      {language === 'বাংলা' ? 'রিসিট' : 'receipts'} · {unreadReceiptsCount}{' '}
-                      {language === 'বাংলা' ? 'নতুন' : 'new'}
-                    </p>
-                  </div>
-                  <div className="md:border-l md:border-white/20 md:pl-5">
-                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.16em] opacity-70">
-                      {language === 'বাংলা' ? 'বাকি' : 'Outstanding'}
-                    </p>
-                    <p className={`mt-1 text-2xl md:text-4xl font-black leading-none tabular-nums tracking-tight ${outstanding > 0 ? 'text-rose-200' : 'text-emerald-200'}`}>
-                      ৳{outstanding.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}
-                    </p>
-                    <p className="mt-1.5 text-[10px] md:text-[11px] font-bold opacity-80">
-                      {partialCount > 0
-                        ? `${partialCount} ${language === 'বাংলা' ? 'মাসে আংশিক' : 'months partial'}`
-                        : (language === 'বাংলা' ? 'সব পরিশোধিত' : 'Fully up to date')}
-                    </p>
-                  </div>
-                  <div className="col-span-2 md:col-span-1 flex items-center justify-between gap-3 border-t border-white/15 pt-4 mt-1 md:border-t-0 md:pt-0 md:mt-0 md:border-l md:border-white/20 md:pl-5 md:flex-col md:items-start md:justify-between">
-                    <div className="min-w-0">
-                      <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.16em] opacity-70">
-                        {language === 'বাংলা' ? 'পরবর্তী বকেয়া' : 'Next due'}
-                      </p>
-                      <p className="mt-1 text-sm md:text-lg font-black leading-tight truncate">
-                        {nextDue
-                          ? `${nextDue.monthLabel || nextDue.monthKey} · ৳${(nextDue.balance || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}`
-                          : (language === 'বাংলা' ? 'কিছু বাকি নেই' : 'Nothing due')}
-                      </p>
-                    </div>
-                    {nextDue && (
-                      <button
-                        onClick={() => { setActiveReceipt(nextDue); markReceiptRead(nextDue.id); }}
-                        className="shrink-0 md:mt-3 inline-flex items-center gap-1.5 bg-white text-indigo-700 px-3.5 py-2 rounded-xl text-[11px] font-black active:scale-95 transition-all shadow-md hover:shadow-lg"
-                      >
-                        {language === 'বাংলা' ? 'রিসিট' : 'Open'} <ArrowRight size={12} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
+              {/* ─── PAYMENT HISTORY CARD — the month navigator + search now
+                  live in one clean white card (was scattered on the page). ─── */}
+              <div className="bg-white rounded-[1.75rem] border border-gray-100 shadow-[0_4px_20px_rgba(15,23,42,0.04)] p-4 md:p-6 space-y-4">
 
               {/* ─── PAYMENT HISTORY HEADER ─────────────────────────── */}
               <div className="flex items-center gap-2.5 px-1 pt-1">
@@ -3404,6 +3482,8 @@ const handleWizardSubmit = async (payload) => {
                 )}
               </div>
 
+              </div>{/* ── end Payment History card ── */}
+
               {/* ─── FILTERED RECEIPT GRID ─────────────────────────── */}
               {filtered.length === 0 ? (
                 <div className="text-center py-16 bg-white/60 backdrop-blur-md rounded-[2rem] border border-gray-100">
@@ -3514,6 +3594,9 @@ const handleWizardSubmit = async (payload) => {
                   })}
                 </div>
               )}
+
+              {/* ─── SECURITY / TRUST FOOTER ─── */}
+              {securityFooter}
             </div>
           );
         })()}
@@ -4167,17 +4250,56 @@ const QuickSearchCard = ({ language }) => {
   const [q, setQ] = useState('');
   const [category, setCategory] = useState('');
   const [budget, setBudget] = useState('');
+  // Autocomplete recommendations — dropdown open state + click-outside ref.
+  const [open, setOpen] = useState(false);
+  const searchBoxRef = useRef(null);
 
-  const runSearch = () => {
+  const runSearch = (overrideText) => {
+    setOpen(false);
     const params = new URLSearchParams();
     if (budget) params.set('budget', budget);
     const cat = CATEGORY_OPTIONS.find((c) => c.id === category);
     if (cat?.intent) params.set('intent', cat.intent);
-    const text = q.trim();
+    const text = (overrideText ?? q).trim();
     if (text) params.set('q', text);
     const qs = params.toString();
     navigate(`/properties/all${qs ? `?${qs}` : ''}`);
   };
+
+  // Area suggestion → deep-link straight to that area's listing (slug),
+  // carrying the selected budget / category exactly like the Search button.
+  const goToArea = (area) => {
+    setOpen(false);
+    const params = new URLSearchParams();
+    if (budget) params.set('budget', budget);
+    const cat = CATEGORY_OPTIONS.find((c) => c.id === category);
+    if (cat?.intent) params.set('intent', cat.intent);
+    const qs = params.toString();
+    navigate(`/properties/${area.slug}${qs ? `?${qs}` : ''}`);
+  };
+
+  // Recommendation lists filtered by what the tenant typed. An empty query
+  // surfaces every popular area + property type, so simply focusing the box
+  // shows helpful suggestions too.
+  const rawQ = q.trim();
+  const query = rawQ.toLowerCase();
+  const areaMatches = QUICK_SEARCH_AREAS.filter(
+    (a) => !query || a.en.toLowerCase().includes(query) || a.bn.includes(rawQ) || a.slug.includes(query),
+  );
+  const typeMatches = QUICK_SEARCH_TYPES.filter(
+    (tp) => !query || tp.en.toLowerCase().includes(query) || tp.bn.includes(rawQ) || tp.q.toLowerCase().includes(query),
+  );
+  const hasSuggestions = areaMatches.length > 0 || typeMatches.length > 0;
+
+  // Close the dropdown on any click outside the search box (same pattern the
+  // dashboards use for the notification / language menus).
+  useEffect(() => {
+    const onDown = (e) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, []);
 
   return (
     <div className="mb-5 md:mb-7 rounded-[1.5rem] md:rounded-[2rem] border border-white bg-white/95 backdrop-blur-sm shadow-[0_4px_20px_rgba(15,23,42,0.04)] p-5 md:p-7">
@@ -4188,14 +4310,85 @@ const QuickSearchCard = ({ language }) => {
 
       {/* Search row — stacks on mobile, single row on desktop */}
       <form onSubmit={(e) => { e.preventDefault(); runSearch(); }} className="flex flex-col md:flex-row gap-2.5 md:gap-3">
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+        <div ref={searchBoxRef} className="relative flex-1">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
           <input
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+            onFocus={() => setOpen(true)}
+            autoComplete="off"
             placeholder={bn ? 'লোকেশন, এলাকা বা প্রপার্টির নাম...' : 'Search by location, area or property name...'}
             className="w-full bg-gray-50 pl-11 pr-4 py-3 rounded-2xl text-[13px] font-bold text-gray-700 placeholder:text-gray-400 border border-gray-100 focus:bg-white focus:border-[#ba0036] focus:ring-4 focus:ring-[#ba0036]/10 outline-none transition-all"
           />
+
+          {/* 🔎 Search recommendations — matching areas (deep-link to the area
+              slug) + property-type keywords (free-text search), plus a
+              "Search for …" row while typing. Opens on focus, closes on an
+              outside click or after a pick. */}
+          {open && (
+            <div className="absolute left-0 right-0 top-full mt-2 z-40 bg-white border border-gray-100 rounded-2xl shadow-[0_20px_45px_rgba(15,23,42,0.14)] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="max-h-[320px] overflow-y-auto p-1.5">
+                {/* Free-text row — only while there is a query. */}
+                {rawQ && (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => runSearch()}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-left transition-colors"
+                  >
+                    <span className="w-8 h-8 rounded-lg bg-[#ba0036]/10 text-[#ba0036] flex items-center justify-center shrink-0"><Search size={15} /></span>
+                    <span className="text-[13px] font-bold text-gray-700 truncate">{bn ? `"${rawQ}" দিয়ে খুঁজুন` : `Search for "${rawQ}"`}</span>
+                  </button>
+                )}
+
+                {/* Area suggestions */}
+                {areaMatches.length > 0 && (
+                  <>
+                    <p className="px-3 pt-2 pb-1 text-[9px] font-black text-gray-400 uppercase tracking-widest">{bn ? 'এলাকা' : 'Areas'}</p>
+                    {areaMatches.map((a) => (
+                      <button
+                        key={a.slug}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => goToArea(a)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-left transition-colors group"
+                      >
+                        <span className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 group-hover:bg-[#ba0036]/10 group-hover:text-[#ba0036] flex items-center justify-center shrink-0 transition-colors"><MapPin size={15} /></span>
+                        <span className="text-[13px] font-bold text-gray-700 group-hover:text-[#ba0036] transition-colors">{bn ? a.bn : a.en}</span>
+                        <ArrowRight size={13} className="ml-auto text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all" />
+                      </button>
+                    ))}
+                  </>
+                )}
+
+                {/* Property-type suggestions */}
+                {typeMatches.length > 0 && (
+                  <>
+                    <p className="px-3 pt-2 pb-1 text-[9px] font-black text-gray-400 uppercase tracking-widest">{bn ? 'প্রপার্টির ধরন' : 'Property Types'}</p>
+                    {typeMatches.map((tp) => (
+                      <button
+                        key={tp.q}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => runSearch(tp.q)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-left transition-colors group"
+                      >
+                        <span className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 group-hover:bg-[#ba0036]/10 group-hover:text-[#ba0036] flex items-center justify-center shrink-0 transition-colors"><Home size={15} /></span>
+                        <span className="text-[13px] font-bold text-gray-700 group-hover:text-[#ba0036] transition-colors">{bn ? tp.bn : tp.en}</span>
+                      </button>
+                    ))}
+                  </>
+                )}
+
+                {/* No matches (query typed but nothing matched) */}
+                {!hasSuggestions && rawQ && (
+                  <div className="px-3 py-3 text-center">
+                    <p className="text-[12px] font-bold text-gray-400">{bn ? 'কোনো এলাকা/ধরন মেলেনি — এন্টার চেপে খুঁজুন' : 'No matching areas or types — press Enter to search'}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-2 md:flex gap-2.5 md:gap-3">
           {/* Category select — Residential / Commercial. Maps to the listing

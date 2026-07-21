@@ -6,6 +6,7 @@ import { SettingsProvider } from "./context/SettingsContext.jsx";
 import { NotificationProvider } from "./context/NotificationContext.jsx";
 import callProvider from "./services/callProvider";
 import { getCurrentToken } from "./services/authService";
+import { listTenantBookings } from "./services/bookingService";
 import fcmService from "./services/fcmService";
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -128,6 +129,42 @@ const AppLayout = () => {
 		if (isLandlord && location.pathname === '/') {
 			navigate('/host-dashboard', { replace: true });
 		}
+	}, [isAuthenticated, activeRole, location.pathname, navigate]);
+
+	// ── Tenant: "the dashboard is home ONCE there's a booking" ─────────────
+	// A tenant only gets the app to open on their Tenant Dashboard after they
+	// are connected to a booking (a landlord added them to a lease). Until
+	// then, opening the app keeps the normal public homepage — unchanged.
+	//
+	// Mirrors the landlord guard (fires at most once per app load) but needs an
+	// async lookup — listTenantBookings() — to know whether a booking exists.
+	// We only redirect if the tenant is STILL on "/" when it resolves, so we
+	// never yank them off a page they navigated to while the lookup was in
+	// flight. A failed lookup just leaves them on the homepage (safe default).
+	const tenantBootHandled = useRef(false);
+	useEffect(() => {
+		if (tenantBootHandled.current) return;
+		// Wait until BOTH auth and the role are resolved so we don't trip the
+		// one-shot guard before we can tell this is a tenant.
+		if (!isAuthenticated || !activeRole) return;
+		tenantBootHandled.current = true;
+		if (activeRole !== 'tenant' || location.pathname !== '/') return;
+		let cancelled = false;
+		(async () => {
+			try {
+				const bookings = await listTenantBookings();
+				if (cancelled) return;
+				const connected = Array.isArray(bookings) && bookings.length > 0;
+				// Redirect only if connected to a booking AND the tenant hasn't
+				// navigated away from "/" while the lookup was in flight.
+				if (connected && window.location.pathname === '/') {
+					navigate('/tenant-dashboard?tab=overview', { replace: true });
+				}
+			} catch {
+				/* network/auth hiccup — keep them on the public homepage */
+			}
+		})();
+		return () => { cancelled = true; };
 	}, [isAuthenticated, activeRole, location.pathname, navigate]);
 
 	// Hide the marketing Navbar on dashboards, auth, admin, and the privacy center
