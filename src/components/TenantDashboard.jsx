@@ -3226,12 +3226,12 @@ const handleWizardSubmit = async (payload) => {
 
           // ── Page hero header — big title + subtitle + a receipt glyph. ──
           const paymentsHeader = (
-            <div className="relative overflow-hidden rounded-[1.75rem] bg-white border border-gray-100 shadow-[0_4px_20px_rgba(15,23,42,0.04)] px-5 py-5 md:px-7 md:py-6">
+            <div className="relative overflow-hidden rounded-2xl md:rounded-[1.75rem] bg-white border border-gray-100 shadow-[0_4px_20px_rgba(15,23,42,0.04)] px-4 py-3.5 md:px-7 md:py-6">
               <div className="absolute -top-10 -right-8 w-40 h-40 rounded-full bg-indigo-100/50 blur-3xl pointer-events-none" />
               <div className="relative flex items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">{bn ? 'পেমেন্ট ও রিসিট' : 'Payments & Receipts'}</h2>
-                  <p className="text-[12px] md:text-sm font-bold text-gray-400 mt-1">{bn ? 'আপনার সব পেমেন্ট ও রিসিট এক জায়গায়' : 'All your payments and receipts in one place'}</p>
+                  <h2 className="text-lg md:text-3xl font-black text-gray-900 tracking-tight">{bn ? 'পেমেন্ট ও রিসিট' : 'Payments & Receipts'}</h2>
+                  <p className="text-[11px] md:text-sm font-bold text-gray-400 mt-0.5 md:mt-1">{bn ? 'আপনার সব পেমেন্ট ও রিসিট এক জায়গায়' : 'All your payments and receipts in one place'}</p>
                 </div>
                 <div className="relative shrink-0 hidden sm:flex items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100">
                   <Receipt size={30} className="text-indigo-500" />
@@ -3329,7 +3329,7 @@ const handleWizardSubmit = async (payload) => {
           // empty state — no receipts at all (still show any booking banner)
           if (paymentReceipts.length === 0) {
             return (
-              <div className="animate-in fade-in duration-500 space-y-5">
+              <div className="animate-in fade-in duration-500 space-y-4 md:space-y-5">
                 {paymentsHeader}
                 {rentPaySection}
                 {leaseBanner}
@@ -3352,7 +3352,7 @@ const handleWizardSubmit = async (payload) => {
           }
 
           return (
-            <div className="animate-in fade-in duration-500 space-y-5">
+            <div className="animate-in fade-in duration-500 space-y-4 md:space-y-5">
 
               {/* ─── PAGE HEADER — title + subtitle + receipt glyph ─── */}
               {paymentsHeader}
@@ -3365,7 +3365,7 @@ const handleWizardSubmit = async (payload) => {
 
               {/* ─── PAYMENT HISTORY CARD — the month navigator + search now
                   live in one clean white card (was scattered on the page). ─── */}
-              <div className="bg-white rounded-[1.75rem] border border-gray-100 shadow-[0_4px_20px_rgba(15,23,42,0.04)] p-4 md:p-6 space-y-4">
+              <div className="bg-white rounded-2xl md:rounded-[1.75rem] border border-gray-100 shadow-[0_4px_20px_rgba(15,23,42,0.04)] p-3 md:p-6 space-y-3 md:space-y-4">
 
               {/* ─── PAYMENT HISTORY HEADER ─────────────────────────── */}
               <div className="flex items-center gap-2.5 px-1 pt-1">
@@ -3412,52 +3412,53 @@ const handleWizardSubmit = async (payload) => {
               {/* ─── MONTH STRIP (12 chips, scrollable on small screens) ─
                   Status per chip: full / partial / empty (no receipt).
                   Current month gets a subtle ring. Click → filter list. */}
-              <div className="-mx-4 px-4 md:mx-0 md:px-0 overflow-x-auto md:overflow-visible snap-x snap-mandatory scroll-px-4 [&::-webkit-scrollbar]:hidden">
-                <div className="grid grid-flow-col md:grid-flow-row auto-cols-[84px] md:auto-cols-auto md:grid-cols-6 lg:grid-cols-12 gap-2">
-                  {monthNames.map((label, i) => {
-                    const mm = String(i + 1).padStart(2, '0');
-                    const list = buckets[mm] || [];
-                    const paid = list.reduce((s, r) => s + (r.totalPaid || 0), 0);
-                    const due = list.reduce((s, r) => s + (r.balance || 0), 0);
-                    const hasAny = list.length > 0;
-                    const isFull = hasAny && due <= 0;
-                    const isPartial = hasAny && due > 0;
-                    const isActive = payMonth === mm;
-                    const isCurrent = `${payYear}-${mm}` === thisMonthKey;
-                    return (
-                      <button
-                        key={mm}
-                        onClick={() => setPayMonth(isActive ? null : mm)}
-                        className={`relative snap-start text-left p-3 rounded-2xl border transition-all duration-200 active:scale-95 ${
-                          isActive
-                            ? 'bg-gray-900 text-white border-gray-900 shadow-lg'
-                            : isFull
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-100 hover:border-emerald-300'
-                              : isPartial
-                                ? 'bg-amber-50 text-amber-800 border-amber-100 hover:border-amber-300'
-                                : 'bg-white text-gray-400 border-gray-100 hover:border-gray-300'
-                        } ${isCurrent && !isActive ? 'ring-2 ring-[#ba0036]/30' : ''}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black uppercase tracking-widest opacity-80">{label}</span>
-                          {isFull && <CheckCheck size={11} className={isActive ? 'text-emerald-300' : 'text-emerald-600'} />}
-                          {isPartial && <Hourglass size={11} className={isActive ? 'text-amber-300' : 'text-amber-600'} />}
+              {/* All 12 months tile as a grid — NO horizontal scroll on mobile
+                  (4 per row on phones → 6 on sm → all 12 in one row on lg). The
+                  compact chips let the tenant see the whole year at a glance. */}
+              <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-1.5 md:gap-2">
+                {monthNames.map((label, i) => {
+                  const mm = String(i + 1).padStart(2, '0');
+                  const list = buckets[mm] || [];
+                  const paid = list.reduce((s, r) => s + (r.totalPaid || 0), 0);
+                  const due = list.reduce((s, r) => s + (r.balance || 0), 0);
+                  const hasAny = list.length > 0;
+                  const isFull = hasAny && due <= 0;
+                  const isPartial = hasAny && due > 0;
+                  const isActive = payMonth === mm;
+                  const isCurrent = `${payYear}-${mm}` === thisMonthKey;
+                  return (
+                    <button
+                      key={mm}
+                      onClick={() => setPayMonth(isActive ? null : mm)}
+                      className={`relative text-left p-2 md:p-3 rounded-xl md:rounded-2xl border transition-all duration-200 active:scale-95 ${
+                        isActive
+                          ? 'bg-gray-900 text-white border-gray-900 shadow-lg'
+                          : isFull
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-100 hover:border-emerald-300'
+                            : isPartial
+                              ? 'bg-amber-50 text-amber-800 border-amber-100 hover:border-amber-300'
+                              : 'bg-white text-gray-400 border-gray-100 hover:border-gray-300'
+                      } ${isCurrent && !isActive ? 'ring-2 ring-[#ba0036]/30' : ''}`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[9px] md:text-[10px] font-black uppercase tracking-wide md:tracking-widest opacity-80">{label}</span>
+                        {isFull && <CheckCheck size={10} className={`shrink-0 ${isActive ? 'text-emerald-300' : 'text-emerald-600'}`} />}
+                        {isPartial && <Hourglass size={10} className={`shrink-0 ${isActive ? 'text-amber-300' : 'text-amber-600'}`} />}
+                      </div>
+                      <div className="mt-0.5 md:mt-1.5 text-[10px] md:text-[11px] font-black tabular-nums truncate">
+                        {hasAny ? `৳${paid.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}` : '—'}
+                      </div>
+                      {isPartial && (
+                        <div className={`hidden md:block text-[9px] font-bold mt-0.5 truncate ${isActive ? 'text-amber-200' : 'text-amber-700'}`}>
+                          {language === 'বাংলা' ? 'বাকি' : 'Due'} ৳{due.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}
                         </div>
-                        <div className="mt-1.5 text-[11px] font-black tabular-nums truncate">
-                          {hasAny ? `৳${paid.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}` : '—'}
-                        </div>
-                        {isPartial && (
-                          <div className={`text-[9px] font-bold mt-0.5 truncate ${isActive ? 'text-amber-200' : 'text-amber-700'}`}>
-                            {language === 'বাংলা' ? 'বাকি' : 'Due'} ৳{due.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}
-                          </div>
-                        )}
-                        {isCurrent && (
-                          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#ba0036] animate-pulse" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                      )}
+                      {isCurrent && (
+                        <span className="absolute top-1 right-1 md:top-1.5 md:right-1.5 w-1.5 h-1.5 rounded-full bg-[#ba0036] animate-pulse" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* ─── PROPERTY FILTER + SEARCH + MARK READ ─────────── */}
@@ -3518,7 +3519,7 @@ const handleWizardSubmit = async (payload) => {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
+                <div className="grid grid-cols-2 gap-3 md:gap-4 lg:gap-5">
                   {filtered.map(r => {
                     const isFull = r.status === 'full' || r.balance <= 0;
                     const { date: rDate, time: rTime } = fmtReceiptDateTime(r, language);
@@ -3527,7 +3528,7 @@ const handleWizardSubmit = async (payload) => {
                         id={`receipt-${r.id}`}
                         key={r.id}
                         onClick={() => { setActiveReceipt(r); markReceiptRead(r.id); }}
-                        className={`text-left bg-white/80 backdrop-blur-xl p-5 md:p-6 rounded-3xl md:rounded-[2rem] border shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.99] relative overflow-hidden ${
+                        className={`text-left bg-white/80 backdrop-blur-xl p-3 md:p-6 rounded-2xl md:rounded-[2rem] border shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.99] relative overflow-hidden ${
                           !r.read ? 'border-[#ba0036]/30 ring-2 ring-[#ba0036]/10' : 'border-gray-100'
                         }`}
                       >
@@ -3537,27 +3538,27 @@ const handleWizardSubmit = async (payload) => {
                         }`} />
 
                         {!r.read && (
-                          <span className="absolute top-4 right-4 inline-flex items-center gap-1 bg-[#ba0036] text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest shadow-md z-10">
-                            <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+                          <span className="absolute top-2.5 right-2.5 md:top-4 md:right-4 inline-flex items-center gap-1 bg-[#ba0036] text-white text-[8px] md:text-[9px] font-black px-1.5 md:px-2 py-0.5 rounded-full uppercase tracking-widest shadow-md z-10">
+                            <span className="w-1 h-1 md:w-1.5 md:h-1.5 bg-white rounded-full animate-pulse"></span>
                             {language === 'বাংলা' ? 'নতুন' : 'New'}
                           </span>
                         )}
 
                         {/* Header */}
-                        <div className="relative z-10 flex items-start gap-3 mb-4">
-                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-md ${
+                        <div className="relative z-10 flex items-start gap-2 md:gap-3 mb-2.5 md:mb-4">
+                          <div className={`w-9 h-9 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center shrink-0 shadow-md ${
                             isFull ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white' : 'bg-gradient-to-br from-amber-400 to-orange-500 text-white'
                           }`}>
-                            {isFull ? <CheckCheck size={22} strokeWidth={3} /> : <Hourglass size={22} strokeWidth={2.5} />}
+                            {isFull ? <CheckCheck className="w-4 h-4 md:w-[22px] md:h-[22px]" strokeWidth={3} /> : <Hourglass className="w-4 h-4 md:w-[22px] md:h-[22px]" strokeWidth={2.5} />}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-base font-black text-gray-900 leading-tight truncate">{r.propertyTitle}</p>
-                            <p className="text-[11px] font-bold text-gray-500 mt-0.5 flex items-center gap-1.5">
-                              <Calendar size={11} className="text-gray-400" />
-                              {r.monthLabel || r.monthKey}
+                            <p className="text-[13px] md:text-base font-black text-gray-900 leading-tight truncate">{r.propertyTitle}</p>
+                            <p className="text-[10px] md:text-[11px] font-bold text-gray-500 mt-0.5 flex items-center gap-1 md:gap-1.5">
+                              <Calendar size={10} className="text-gray-400 shrink-0" />
+                              <span className="truncate">{r.monthLabel || r.monthKey}</span>
                             </p>
                             {(rDate || rTime) && (
-                              <span className="inline-flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black tabular-nums">
+                              <span className="hidden md:inline-flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black tabular-nums">
                                 <Clock size={11} className="shrink-0" />
                                 {language === 'বাংলা' ? 'গৃহীত' : 'Received'}
                                 {rDate ? ` ${rDate}` : ''}{rTime ? ` • ${rTime}` : ''}
@@ -3566,17 +3567,17 @@ const handleWizardSubmit = async (payload) => {
                           </div>
                         </div>
 
-                        {/* Body — premium price block */}
-                        <div className={`relative z-10 rounded-2xl p-4 mb-3 border ${
+                        {/* Body — price block */}
+                        <div className={`relative z-10 rounded-xl md:rounded-2xl p-2.5 md:p-4 mb-2.5 md:mb-3 border ${
                           isFull
                             ? 'bg-gradient-to-br from-blue-50/80 to-indigo-50/60 border-blue-100/60'
                             : 'bg-gradient-to-br from-amber-50/80 to-orange-50/60 border-amber-100/60'
                         }`}>
-                          <div className="flex items-baseline justify-between mb-1.5">
-                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                          <div className="flex items-center justify-between gap-1 mb-1 md:mb-1.5">
+                            <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest">
                               {language === 'বাংলা' ? 'পেইড' : 'Paid'}
                             </span>
-                            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
+                            <span className={`text-[8px] md:text-[9px] font-black uppercase tracking-widest px-1.5 md:px-2 py-0.5 rounded-md shrink-0 ${
                               isFull ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
                             }`}>
                               {isFull
@@ -3584,29 +3585,29 @@ const handleWizardSubmit = async (payload) => {
                                 : (language === 'বাংলা' ? 'আংশিক' : 'PARTIAL')}
                             </span>
                           </div>
-                          <p className={`text-3xl md:text-[2rem] font-black flex items-center gap-2 leading-none tabular-nums tracking-tight ${
+                          <p className={`text-lg md:text-[2rem] font-black flex items-center gap-2 leading-none tabular-nums tracking-tight ${
                             isFull
                               ? 'bg-gradient-to-br from-blue-600 to-indigo-700 bg-clip-text text-transparent'
                               : 'bg-gradient-to-br from-amber-600 to-orange-600 bg-clip-text text-transparent'
                           }`}>
                             ৳ {(r.totalPaid || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}
-                            {isFull && <CheckCheck size={22} strokeWidth={3} className="text-blue-600 shrink-0" />}
+                            {isFull && <CheckCheck className="hidden md:block w-[22px] h-[22px] text-blue-600 shrink-0" strokeWidth={3} />}
                           </p>
-                          <div className="flex items-center justify-between mt-2.5 text-[11px] font-bold text-gray-500">
-                            <span>{language === 'বাংলা' ? 'মোট বকেয়া' : 'Total Due'}: ৳{(r.totalDue || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}</span>
-                            <span className={r.balance > 0 ? 'text-[#ba0036]' : 'text-green-600'}>
+                          <div className="flex flex-col gap-0.5 md:flex-row md:items-center md:justify-between mt-1.5 md:mt-2.5 text-[10px] md:text-[11px] font-bold text-gray-500">
+                            <span className="truncate">{language === 'বাংলা' ? 'মোট বকেয়া' : 'Total Due'}: ৳{(r.totalDue || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}</span>
+                            <span className={`shrink-0 ${r.balance > 0 ? 'text-[#ba0036]' : 'text-green-600'}`}>
                               {language === 'বাংলা' ? 'বাকি' : 'Balance'}: {r.balance > 0 ? `৳${r.balance.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}` : '✓'}
                             </span>
                           </div>
                         </div>
 
-                        <div className="relative z-10 flex items-center justify-between text-[11px] font-bold">
-                          <span className="text-gray-400 flex items-center gap-1.5">
-                            <CreditCard size={12} className="text-gray-400" />
-                            {language === 'বাংলা' ? 'রিসিট' : 'Receipt'} #{r.id?.slice(-6)}
+                        <div className="relative z-10 flex items-center justify-between gap-1 text-[10px] md:text-[11px] font-bold">
+                          <span className="text-gray-400 flex items-center gap-1 md:gap-1.5 min-w-0">
+                            <CreditCard size={11} className="text-gray-400 shrink-0" />
+                            <span className="truncate">#{r.id?.slice(-6)}</span>
                           </span>
-                          <span className="text-[#ba0036] flex items-center gap-1 group">
-                            {language === 'বাংলা' ? 'বিস্তারিত' : 'View'} <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
+                          <span className="text-[#ba0036] flex items-center gap-1 group shrink-0">
+                            {language === 'বাংলা' ? 'দেখুন' : 'View'} <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
                           </span>
                         </div>
                       </button>
