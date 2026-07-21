@@ -10,6 +10,7 @@ import TenantRentPay from './payments/TenantRentPay';
 import { listNotifications, getUnreadCount, markRead } from '../services/notificationService.js';
 import { propertyService } from '../services/Propertyservice.js';
 import { buildTenantAlerts } from '../utils/rentAlerts';
+import { loadSeenMap, isInquiryUnread, markInquirySeen } from '../utils/inquiryUnread';
 import SmartAlertsPage from './Smartalertspage';
 import SmartAlertsPopup from './SmartAlertsPopup';
 import LandlordHomeChoiceModal from './shared/LandlordHomeChoiceModal';
@@ -580,6 +581,10 @@ const TenantDashboard = () => {
   // tenant sees several per screen; tapping one reveals its full status
   // timeline + actions.
   const [expandedInquiryId, setExpandedInquiryId] = useState(null);
+  // "Unread until opened" — { [inquiryId]: seenSignature }. When the landlord
+  // acts (accept / reply / schedule), the inquiry stays highlighted until the
+  // tenant expands the card.
+  const [inqSeen, setInqSeen] = useState(() => loadSeenMap('tenant'));
 
   // 🟢 NEW: Real "My Inquiries" list, hydrated from GET /api/inquiries/mine.
   // Previously this tab rendered three hard-coded sample rows that had
@@ -2880,6 +2885,11 @@ const handleWizardSubmit = async (payload) => {
             outcome:       outcomeOf(inq.status),
             sentAt:        fmtDate(inq.createdAt),
             lastUpdate:    relTime(inq.updatedAt || inq.createdAt),
+            // Raw timestamps drive the "unread until opened" highlight: the card
+            // stays flagged while updatedAt (landlord activity) is newer than the
+            // signature the tenant last saw.
+            createdAt:     inq.createdAt,
+            updatedAt:     inq.updatedAt,
             img:           inq.propCover || '',
           }));
           if (sampleApps.length === 0) {
@@ -2925,6 +2935,13 @@ const handleWizardSubmit = async (payload) => {
                   one mobile screen without endless scrolling. */}
               {sampleApps.map((app) => {
                 const isOpen = expandedInquiryId === app.id;
+                // Highlight until opened — the landlord acted (accept / reply / visit) since the tenant last looked.
+                const unread = isInquiryUnread(app, 'tenant', inqSeen);
+                const openApp = () => {
+                  const opening = !isOpen;
+                  setExpandedInquiryId(isOpen ? null : app.id);
+                  if (opening) setInqSeen((prev) => markInquirySeen('tenant', app, prev));
+                };
                 const lordName = app.landlordName || (language === 'বাংলা' ? 'বাড়িওয়ালা' : 'Landlord');
                 const lordInit = (lordName.trim().split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('') || 'L').toUpperCase();
                 const outCls = app.outcome === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
@@ -2935,13 +2952,13 @@ const handleWizardSubmit = async (payload) => {
                   : (language === 'বাংলা' ? 'রিভিউ' : 'In review');
                 const OutIcon = app.outcome === 'approved' ? ThumbsUp : app.outcome === 'declined' ? ThumbsDown : Hourglass;
                 return (
-                  <div id={`application-${app.id}`} key={app.id} className={`bg-white rounded-2xl border overflow-hidden transition-all ${isOpen ? 'border-[#ba0036]/20 shadow-[0_8px_28px_rgba(0,0,0,0.07)]' : 'border-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.05)]'}`}>
+                  <div id={`application-${app.id}`} key={app.id} className={`bg-white rounded-2xl border overflow-hidden transition-all ${isOpen ? 'border-[#ba0036]/20 shadow-[0_8px_28px_rgba(0,0,0,0.07)]' : 'border-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.05)]'} ${unread ? 'ring-2 ring-[#ba0036]/40' : ''}`}>
 
                     {/* Compact header — always visible, tap to expand */}
                     <button
                       type="button"
-                      onClick={() => setExpandedInquiryId(isOpen ? null : app.id)}
-                      className="w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 text-left"
+                      onClick={openApp}
+                      className={`w-full flex items-center gap-2.5 md:gap-3 p-2.5 md:p-3 text-left ${unread ? 'bg-[#ba0036]/[0.035]' : ''}`}
                     >
                       {/* Property thumbnail */}
                       <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-gray-100 shrink-0 overflow-hidden relative">
@@ -2969,12 +2986,20 @@ const handleWizardSubmit = async (payload) => {
                         </div>
                       </div>
 
-                      {/* Status pill + chevron */}
+                      {/* Status pill + chevron (with unread dot) */}
                       <div className="flex flex-col items-end gap-1.5 shrink-0">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-wider border ${outCls}`}>
                           <OutIcon size={10} /> {outLabel}
                         </span>
-                        <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                        <div className="flex items-center gap-1.5">
+                          {unread && (
+                            <span className="flex h-2.5 w-2.5 relative" aria-label={language === 'বাংলা' ? 'নতুন / দেখা হয়নি' : 'Unread'} title={language === 'বাংলা' ? 'নতুন / দেখা হয়নি' : 'Unread'}>
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ba0036] opacity-60" />
+                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#ba0036]" />
+                            </span>
+                          )}
+                          <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                        </div>
                       </div>
                     </button>
 

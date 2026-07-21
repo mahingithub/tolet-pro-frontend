@@ -42,6 +42,7 @@ import SharedSettings from './shared/SharedSettings';
 import Smartalertspage from './Smartalertspage';
 import SmartAlertsPopup from './SmartAlertsPopup';
 import { buildRentAlerts, buildLeaseAlerts, buildInquiryAlerts } from '../utils/rentAlerts';
+import { loadSeenMap, isInquiryUnread, markInquirySeen } from '../utils/inquiryUnread';
 import Aiinsightspage from './Aiinsightspage';
 import { jsPDF } from 'jspdf';
 import useDeepLinkHighlight, { highlightNotifTarget } from '../hooks/useDeepLinkHighlight';
@@ -1062,6 +1063,9 @@ const HostDashboard = () => {
   const [replyingId, setReplyingId] = useState(null);
   // Host inquiries accordion: only one card's full body is open at a time (mobile-friendly, avoids long scroll with 10-15 inquiries)
   const [expandedHostInquiryId, setExpandedHostInquiryId] = useState(null);
+  // "Unread until opened" — { [inquiryId]: seenSignature }. A new inquiry or a
+  // fresh tenant reply keeps the card highlighted until the host expands it.
+  const [inqSeen, setInqSeen] = useState(() => loadSeenMap('host'));
 
   const sendInquiryReply = async (inquiry) => {
     const id = inquiry.id || inquiry._id;
@@ -4704,16 +4708,23 @@ const HostDashboard = () => {
                       // Conversation stays locked until the host Accepts. Pending inquiries
                       // are review-only: the host reads the request + profile, then decides.
                       const conversationLocked = inquiryTab === 'pending';
+                      // Highlight until opened — a new inquiry or a fresh tenant reply the host hasn't seen.
+                      const unread = isInquiryUnread(inquiry, 'host', inqSeen);
+                      const openInquiry = () => {
+                        const opening = !isExpanded;
+                        setExpandedHostInquiryId(isExpanded ? null : inquiry.id);
+                        if (opening) setInqSeen((prev) => markInquirySeen('host', inquiry, prev));
+                      };
                       return (
-                      <div id={`inquiry-${inquiry.id}`} key={inquiry.id} className="bg-white rounded-2xl md:rounded-[2rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_35px_rgba(0,0,0,0.06)] transition-all duration-300 border-none overflow-hidden">
+                      <div id={`inquiry-${inquiry.id}`} key={inquiry.id} className={`bg-white rounded-2xl md:rounded-[2rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_35px_rgba(0,0,0,0.06)] transition-all duration-300 border-none overflow-hidden ${unread ? 'ring-2 ring-[#ba0036]/40' : ''}`}>
 
                         {/* ===== Compact header (always visible) — tap to expand / collapse. Keeps the list short on mobile with 10-15 inquiries. ===== */}
                         <div
                           role="button"
                           tabIndex={0}
-                          onClick={() => setExpandedHostInquiryId(isExpanded ? null : inquiry.id)}
-                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedHostInquiryId(isExpanded ? null : inquiry.id); } }}
-                          className="flex items-center gap-3 p-3.5 md:p-5 cursor-pointer select-none"
+                          onClick={openInquiry}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openInquiry(); } }}
+                          className={`flex items-center gap-3 p-3.5 md:p-5 cursor-pointer select-none ${unread ? 'bg-[#ba0036]/[0.035]' : ''}`}
                         >
                           <div className="w-11 h-11 md:w-12 md:h-12 bg-red-50 rounded-xl flex items-center justify-center text-[#ba0036] font-black text-sm md:text-lg shadow-sm overflow-hidden shrink-0">
                             {inquiry.userAvatar ? (
@@ -4747,6 +4758,12 @@ const HostDashboard = () => {
                               {inquiry.timeAgo}
                             </p>
                           </div>
+                          {unread && (
+                            <span className="shrink-0 flex h-2.5 w-2.5 relative" aria-label={language === 'বাংলা' ? 'নতুন / দেখা হয়নি' : 'Unread'} title={language === 'বাংলা' ? 'নতুন / দেখা হয়নি' : 'Unread'}>
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ba0036] opacity-60" />
+                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#ba0036]" />
+                            </span>
+                          )}
                           <div className="shrink-0 p-1.5 rounded-lg bg-gray-50 text-gray-400">
                             <ChevronDown size={16} className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
                           </div>

@@ -750,6 +750,64 @@ const ChatSystem = () => {
       setChats(prev => prev.map(c => c.id === conversationId ? { ...c, pinnedMessageIds: pinnedMessageIds || [] } : c));
     };
 
+    // Real-time incoming message (Messenger / WhatsApp feel). The backend emits
+    // RECEIVE_MESSAGE to the recipient the instant a message is saved. Without
+    // this, a new message + its unread badge only appeared on the next 15s
+    // conversation poll. We cache the message (so an open thread updates live
+    // and the sidebar re-sorts this thread to the top — visibleChats orders by
+    // the latest cached message) and bump the conversation's unread badge unless
+    // that chat is already open.
+    const onReceiveMessage = (payload) => {
+      const m = payload && payload.message;
+      const convoId = payload && payload.conversationId;
+      if (!m || !convoId) return;
+      const myId = String(getCurrentUser()?.id || getCurrentUser()?._id || '');
+      const fromMe = String(m.senderId) === myId;
+      const isActive = convoId === activeChatId;
+
+      setMessages(prev => {
+        const existing = prev[convoId] || [];
+        // Dedup against the 5s delta poll, which may also deliver this message.
+        if (existing.some(x => String(x.id) === String(m.id || m._id))) return prev;
+        const mapped = {
+          id: m.id || m._id,
+          sender: fromMe ? 'me' : 'them',
+          text: m.text,
+          type: m.type || 'text',
+          mediaUrl: m.mediaUrl || null,
+          mediaMeta: m.mediaMeta || null,
+          replyTo: m.replyTo || null,
+          isDeleted: !!m.isDeleted,
+          reactions: m.reactions || {},
+          iso: m.createdAt,
+          status: 'delivered',
+          senderId: m.senderId,
+        };
+        if (mapped.iso) latestMessageIso.current[convoId] = mapped.iso;
+        return { ...prev, [convoId]: [...existing, mapped] };
+      });
+
+      setChats(prev => {
+        const idx = prev.findIndex(c => c.id === convoId);
+        if (idx === -1) {
+          // First message of a thread we don't have locally yet → pull the list.
+          chatService.listConversations().then(mergeBackendConversations).catch(() => {});
+          return prev;
+        }
+        const row = prev[idx];
+        const preview = m.text || (m.type && m.type !== 'text' ? `[${m.type}]` : row.lastMsg);
+        const next = [...prev];
+        next[idx] = {
+          ...row,
+          lastMsg: preview,
+          time: m.createdAt ? new Date(m.createdAt).toISOString() : row.time,
+          // An open chat (or our own echo) is already "read" — never bump it.
+          unread: (isActive || fromMe) ? 0 : (Number(row.unread) || 0) + 1,
+        };
+        return next;
+      });
+    };
+
     socket.on('MESSAGE_DELIVERED', onDelivered);
     socket.on('MESSAGE_SEEN', onSeen);
     socket.on('MESSAGE_DELETED', onMessageDeleted);
@@ -761,6 +819,7 @@ const ChatSystem = () => {
     socket.on('CONVERSATION_BLOCKED', onConversationBlocked);
     socket.on('CONVERSATION_UNBLOCKED', onConversationUnblocked);
     socket.on('CONVERSATION_PINS', onConversationPins);
+    socket.on('RECEIVE_MESSAGE', onReceiveMessage);
 
     return () => {
       socket.off('MESSAGE_DELIVERED', onDelivered);
@@ -774,6 +833,7 @@ const ChatSystem = () => {
       socket.off('CONVERSATION_BLOCKED', onConversationBlocked);
       socket.off('CONVERSATION_UNBLOCKED', onConversationUnblocked);
       socket.off('CONVERSATION_PINS', onConversationPins);
+      socket.off('RECEIVE_MESSAGE', onReceiveMessage);
     };
   }, [activeChatId, chats]);
 
