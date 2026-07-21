@@ -5405,8 +5405,11 @@ const HostDashboard = () => {
                         className="w-full pl-7 pr-2 py-2 rounded-xl bg-white text-[11px] font-bold text-gray-900 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-transparent focus:border-gray-200 focus:outline-none placeholder:text-gray-400"
                       />
                     </div>
-                    {/* Filter pills — horizontal scroll on narrow viewports. */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 xl:flex-none order-2 sm:order-none min-w-0">
+                    {/* Filter pills — horizontal scroll on narrow viewports.
+                        No flex-1 so the pills stay content-width and the New
+                        Lease (+) button sits right next to the "Done" pill
+                        instead of being pushed to the far edge. */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar xl:flex-none order-1 sm:order-none min-w-0">
                       {['all', 'draft', 'active', 'notice', 'done'].map(f => (
                         <button
                           key={f}
@@ -5417,10 +5420,12 @@ const HostDashboard = () => {
                         </button>
                       ))}
                     </div>
-                    {/* New Lease action — corner-pinned. */}
+                    {/* New Lease action (add booking) — sits right next to the
+                        "Done" filter pill on mobile (order-2, after the pills),
+                        then reverts to its corner-pinned spot from sm up. */}
                     <button
                       onClick={() => isPremium ? openBlankLease() : setActiveModal('premium_gate')}
-                      className="shrink-0 bg-[#ba0036] hover:bg-[#90002a] text-white px-3 py-2 rounded-xl font-black text-[10px] shadow-[0_4px_12px_rgba(186,0,54,0.25)] transition-all flex items-center gap-1.5 active:scale-95 order-1 sm:order-none ml-auto sm:ml-0"
+                      className="shrink-0 bg-[#ba0036] hover:bg-[#90002a] text-white px-3 py-2 rounded-xl font-black text-[10px] shadow-[0_4px_12px_rgba(186,0,54,0.25)] transition-all flex items-center gap-1.5 active:scale-95 order-2 sm:order-none sm:ml-auto"
                     >
                       {isPremium ? <Plus size={13}/> : <Crown size={13}/>}
                       <span className="hidden sm:inline">{language === 'বাংলা' ? 'নতুন লিজ' : 'New Lease'}</span>
@@ -5641,8 +5646,8 @@ const HostDashboard = () => {
                       {/* Residential / Commercial property badge */}
                       <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 inline-flex items-center gap-0.5 ${booking.dealType === 'commercial' ? 'bg-violet-50 text-violet-700 border-violet-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
                         {booking.dealType === 'commercial'
-                          ? (<>🏢<span className="hidden sm:inline"> {language === 'বাংলা' ? 'কমার্শিয়াল' : 'Commercial'}</span></>)
-                          : (<>🏠<span className="hidden sm:inline"> {language === 'বাংলা' ? 'আবাসিক' : 'Residential'}</span></>)}
+                          ? (<>🏢<span> {language === 'বাংলা' ? 'কমার্শিয়াল' : 'Commercial'}</span></>)
+                          : (<>🏠<span> {language === 'বাংলা' ? 'আবাসিক' : 'Residential'}</span></>)}
                       </span>
                       <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 inline-flex items-center gap-0.5 ${theme.cls}`}>
                         {theme.icon} <span className="hidden sm:inline">{theme.label}</span>
@@ -5906,8 +5911,53 @@ const HostDashboard = () => {
               {/* ── LEFT RAIL — full Shared Ledger ALWAYS visible (mobile + desktop) ── */}
               <aside className="xl:col-span-4 w-full flex flex-col gap-3 xl:gap-5 xl:h-full xl:overflow-y-auto custom-scrollbar xl:pt-1 xl:pb-4 xl:pr-1">
 
-                {/* Shared Ledger hero — full KPI card, always visible. */}
-                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl xl:rounded-[2rem] p-5 xl:p-7 text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] xl:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
+                {/* Mobile / iPad rent summary — replaces the tall dark hero on
+                    small screens so the key numbers read top-to-bottom instead
+                    of forcing a sideways scroll. Renter + collection counts sit
+                    prominently up top; outstanding vs cleared money is listed
+                    neatly underneath. Desktop keeps the full dark hero (below). */}
+                <div className="xl:hidden bg-white rounded-2xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-gray-100 shrink-0">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{monthFullLabel(sm.key, language)}</p>
+                    <span className="text-[10px] font-black text-emerald-600 tabular-nums">{collectedPct}% {language === 'বাংলা' ? 'আদায়' : 'collected'}</span>
+                  </div>
+                  {/* Prominent counts — Renters + Collections */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="rounded-xl bg-gray-900 p-3 text-white">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-white/60 flex items-center gap-1"><Users size={11} /> {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'Renters'}</p>
+                      <p className="text-2xl font-black tabular-nums leading-none mt-1.5">{rentRows.length}</p>
+                    </div>
+                    <div className="rounded-xl bg-emerald-600 p-3 text-white">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-white/70 flex items-center gap-1"><CheckCircle2 size={11} /> {language === 'বাংলা' ? 'কালেকশন' : 'Collections'}</p>
+                      <p className="text-2xl font-black tabular-nums leading-none mt-1.5">{sm.paidCount}<span className="text-sm font-black text-white/60">/{sm.totalDueCount}</span></p>
+                    </div>
+                  </div>
+                  {/* Collection-rate bar */}
+                  <div className="mt-3 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-700" style={{ width: `${collectedPct}%` }} />
+                  </div>
+                  {/* Outstanding + Cleared — listed neatly underneath */}
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-rose-50 border border-rose-100">
+                      <span className="flex items-center gap-1.5 text-[11px] font-black text-rose-700"><AlertCircle size={13} /> {language === 'বাংলা' ? 'বকেয়া' : 'Outstanding'}</span>
+                      <span className="text-right leading-tight">
+                        <span className="block text-sm font-black text-rose-700 tabular-nums">{formatBDT(sm.outstandingTotal)}</span>
+                        <span className="block text-[9px] font-bold text-rose-600/70 tabular-nums">{sm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'overdue'}</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-100">
+                      <span className="flex items-center gap-1.5 text-[11px] font-black text-emerald-700"><CheckCircle2 size={13} /> {language === 'বাংলা' ? 'ক্লিয়ার্ড' : 'Cleared'}</span>
+                      <span className="text-right leading-tight">
+                        <span className="block text-sm font-black text-emerald-700 tabular-nums">{formatBDT(sm.collectedTotal)}</span>
+                        <span className="block text-[9px] font-bold text-emerald-600/70 tabular-nums">{sm.paidCount} {language === 'বাংলা' ? 'পরিশোধিত' : 'paid'}</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Shared Ledger hero — full KPI card, DESKTOP ONLY (xl+). The
+                    mobile / iPad summary above covers small screens. */}
+                <div className="hidden xl:block bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl xl:rounded-[2rem] p-5 xl:p-7 text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] xl:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-10 translate-x-10"></div>
                   <div className="flex items-start justify-between mb-1 relative z-10">
                     <h3 className="text-lg xl:text-2xl font-black">{language === 'বাংলা' ? 'শেয়ার্ড লেজার' : 'Shared Ledger'}</h3>
@@ -5986,7 +6036,10 @@ const HostDashboard = () => {
                   </div>
                 )}
 
-                <div className="bg-white rounded-2xl xl:rounded-[2rem] p-4 xl:p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none shrink-0">
+                {/* Legend — desktop only. Hidden on mobile + iPad (below xl,
+                    where the rail stacks on top of the list); shown only in the
+                    xl sidebar layout so it doesn't crowd the smaller screens. */}
+                <div className="hidden xl:block bg-white rounded-2xl xl:rounded-[2rem] p-4 xl:p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none shrink-0">
                   <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">{language === 'বাংলা' ? 'লেজেন্ড' : 'Legend'}</h4>
                   <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-[10px] font-bold text-gray-600">
                     <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-blue-500 inline-block"></span>{language === 'বাংলা' ? 'পেইড' : 'Paid'}</span>
