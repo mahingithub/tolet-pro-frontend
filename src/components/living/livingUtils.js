@@ -11,12 +11,12 @@
 // ── formatting ─────────────────────────────────────────────────────────────
 const localeFor = (lang) => (lang === 'বাংলা' ? 'bn-BD' : 'en-BD');
 
-export const num = (n, lang) => (Number(n) || 0).toLocaleString(localeFor(lang));
+export const num = (n, lang) => (Number(n) || 0).toLocaleString(localeFor(lang), { maximumFractionDigits: 2 });
 
-export const taka = (n, lang) => `৳${num(Math.round(Number(n) || 0), lang)}`;
+export const taka = (n, lang) => `৳${num(Number(n) || 0, lang)}`;
 
 export const takaSigned = (n, lang) => {
-  const v = Math.round(Number(n) || 0);
+  const v = Number(n) || 0;
   const sign = v > 0 ? '+' : v < 0 ? '−' : '';
   return `${sign}৳${num(Math.abs(v), lang)}`;
 };

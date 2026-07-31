@@ -205,12 +205,12 @@ const useLivingStore = create(
           const existing = s.meals.find((m) => m.date.slice(0, 10) === dayKey && m.roommateId === roommateId);
           const v = Math.max(0, value);
           if (existing) {
-            return { meals: s.meals.map((m) => (m.id === existing.id ? { ...m, [meal]: v } : m)) };
+            return { meals: s.meals.map((m) => (m.id === existing.id ? { ...m, [meal]: v, editedBy: get().myId || 'me', editedAt: new Date().toISOString() } : m)) };
           }
           return {
             meals: [
               ...s.meals,
-              { id: uid(), date: new Date(dayKey + 'T12:00:00').toISOString(), roommateId, breakfast: 0, lunch: 0, dinner: 0, [meal]: v },
+              { id: uid(), date: new Date(dayKey + 'T12:00:00').toISOString(), roommateId, breakfast: 0, lunch: 0, dinner: 0, [meal]: v, createdBy: get().myId || 'me' },
             ],
           };
         });
@@ -302,7 +302,7 @@ const useLivingStore = create(
       addDeposit: (d) => {
         if (get().connected) { runRemote(get, livingService.addDeposit(d)); return; }
         const who = get().roommates.find((r) => r.id === d.roommateId);
-        set((s) => ({ deposits: [{ id: uid(), createdBy: 'me', date: new Date().toISOString(), ...d }, ...s.deposits] }));
+        set((s) => ({ deposits: [{ id: uid(), createdBy: get().myId || 'me', date: new Date().toISOString(), ...d }, ...s.deposits] }));
         get().pushActivity('meal', 'Deposit added', `${who?.name || 'Someone'} deposited ৳${Number(d.amount).toLocaleString('en-BD')}`);
       },
       deleteDeposit: (id) => {

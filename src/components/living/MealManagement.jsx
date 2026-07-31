@@ -25,6 +25,52 @@ const dayISO = (offset) => {
   return d.toISOString();
 };
 
+const MonthlyHistorySheet = ({ open, onClose, roommate, meals, language }) => {
+  const isBn = language === 'বাংলা';
+  const myMeals = useMemo(() => {
+    if (!roommate) return [];
+    return [...meals]
+      .filter((m) => m.roommateId === roommate.id && (m.breakfast > 0 || m.lunch > 0 || m.dinner > 0))
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [meals, roommate]);
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={isBn ? 'মিলের হিস্ট্রি' : 'Meal History'}
+      subtitle={roommate ? roommate.name : ''}
+    >
+      <div className="py-2 space-y-2">
+        {myMeals.length === 0 ? (
+          <EmptyState title={isBn ? 'কোনো মিল নেই' : 'No meals'} />
+        ) : (
+          myMeals.map((m) => {
+            const d = new Date(m.date);
+            const day = d.toLocaleDateString(isBn ? 'bn-BD' : 'en-GB', { day: 'numeric', month: 'short', weekday: 'short' });
+            const total = (m.breakfast || 0) + (m.lunch || 0) + (m.dinner || 0);
+            return (
+              <div key={m.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                <div>
+                  <p className="text-[13px] font-black text-gray-800">{day}</p>
+                  <p className="text-[10.5px] font-bold text-gray-500 mt-1 flex gap-2">
+                    <span>{isBn ? 'সকাল' : 'B'}: {num(m.breakfast || 0, language)}</span>
+                    <span>{isBn ? 'দুপুর' : 'L'}: {num(m.lunch || 0, language)}</span>
+                    <span>{isBn ? 'রাত' : 'D'}: {num(m.dinner || 0, language)}</span>
+                  </p>
+                </div>
+                <div className="text-[14px] font-black text-[#ba0036] bg-[#ba0036]/10 px-3 py-1 rounded-xl">
+                  {num(total, language)}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </Sheet>
+  );
+};
+
 // ── Deposit (জমা) sheet ─────────────────────────────────────────────────────
 const DepositSheet = ({ open, onClose, roommates, onSave }) => {
   const { language } = useLanguage();
@@ -224,6 +270,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
   const [depositOpen, setDepositOpen] = useState(false);
   const [bazarOpen, setBazarOpen] = useState(false);
   const [rateOpen, setRateOpen] = useState(false);
+  const [historyOpenFor, setHistoryOpenFor] = useState(null); // roommate ID
   const [pendingDelete, setPendingDelete] = useState(null); // { kind, id }
 
   useEffect(() => {
@@ -360,7 +407,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
         </div>
         <div className="divide-y divide-gray-50">
           {summary.perMember.map((p) => (
-            <div key={p.id} className="grid grid-cols-[1.5fr_0.7fr_1fr_1.05fr] gap-2 items-center py-2.5">
+            <button key={p.id} onClick={() => setHistoryOpenFor(p.id)} className="w-full grid grid-cols-[1.5fr_0.7fr_1fr_1.05fr] gap-2 items-center py-2.5 active:bg-gray-50 transition text-left">
               <div className="flex items-center gap-2 min-w-0">
                 <Avatar roommate={p} size={28} />
                 <span className="text-[12.5px] font-bold text-gray-800 truncate">{p.isMe ? (isBn ? 'আপনি' : 'You') : p.name}</span>
@@ -368,7 +415,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
               <span className="text-right text-[12.5px] font-black text-gray-900 tabular-nums">{num(p.meals, language)}</span>
               <span className="text-right text-[12.5px] font-bold text-gray-600 tabular-nums">{taka(p.deposit, language)}</span>
               <span className={cx('text-right text-[12.5px] font-black tabular-nums', p.balance >= 0 ? 'text-emerald-600' : 'text-red-600')}>{takaSigned(p.balance, language)}</span>
-            </div>
+            </button>
           ))}
         </div>
       </Card>
@@ -397,10 +444,18 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
             const total = (m.breakfast || 0) + (m.lunch || 0) + (m.dinner || 0);
             return (
               <div key={r.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
-                <div className="flex items-center gap-2 mb-2.5">
+                <div className="flex items-start gap-2 mb-2.5">
                   <Avatar roommate={r} size={28} />
-                  <span className="text-[13px] font-black text-gray-800 flex-1">{r.isMe ? (isBn ? 'আপনি' : 'You') : r.name}</span>
-                  <span className="text-[11px] font-black text-gray-400">{num(total, language)} {isBn ? 'মিল' : 'meals'}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[13px] font-black text-gray-800 flex-1">{r.isMe ? (isBn ? 'আপনি' : 'You') : r.name}</span>
+                    {(m.editedBy || m.createdBy) && (
+                      <p className="text-[9px] font-bold text-gray-400 truncate mt-0.5">
+                        {m.editedBy ? (isBn ? 'এডিট করেছেন ' : 'Edited by ') : (isBn ? 'যুক্ত করেছেন ' : 'Added by ')}
+                        {roommateById(roommates, m.editedBy || m.createdBy).name}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-[11px] font-black text-gray-400 mt-1">{num(total, language)} {isBn ? 'মিল' : 'meals'}</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {MEALS.map((meal) => {
@@ -438,6 +493,11 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                   <div className="flex-1 min-w-0">
                     <p className="text-[12.5px] font-bold text-gray-800 truncate">{who.isMe ? (isBn ? 'আপনি' : 'You') : who.name}</p>
                     <p className="text-[11px] font-medium text-gray-400 truncate">{d.note || (isBn ? 'জমা' : 'Deposit')} · {dateLabel(d.date, language)}</p>
+                    {d.createdBy && d.createdBy !== d.roommateId && (
+                      <p className="text-[9px] font-bold text-gray-400 truncate mt-0.5">
+                        {isBn ? 'যুক্ত করেছেন ' : 'Added by '}{roommateById(roommates, d.createdBy).name}
+                      </p>
+                    )}
                   </div>
                   <span className="text-[13px] font-black text-emerald-600 shrink-0">+{taka(d.amount, language)}</span>
                   <button onClick={() => setPendingDelete({ kind: 'deposit', id: d.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
@@ -482,6 +542,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       <DepositSheet open={depositOpen} onClose={() => setDepositOpen(false)} roommates={roommates} onSave={addDeposit} />
       <GrocerySheet open={bazarOpen} onClose={() => setBazarOpen(false)} roommates={roommates} onSave={addGrocery} />
       <RateSheet open={rateOpen} onClose={() => setRateOpen(false)} autoRate={summary.autoRate} current={mealRateSetting} onSave={setMealRate} language={language} />
+      <MonthlyHistorySheet open={!!historyOpenFor} onClose={() => setHistoryOpenFor(null)} roommate={historyOpenFor ? roommateById(roommates, historyOpenFor) : null} meals={meals} language={language} />
       <ConfirmDialog
         open={!!pendingDelete}
         onClose={() => setPendingDelete(null)}
