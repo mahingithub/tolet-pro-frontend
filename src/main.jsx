@@ -3,6 +3,10 @@ import ReactDOM from 'react-dom/client'
 import * as Sentry from '@sentry/react'
 import App from './App.jsx'
 import './index.css'
+import { setupFetchInterceptor } from './utils/fetchInterceptor.js'
+
+// Setup global fetch interceptor for auto token refresh
+setupFetchInterceptor()
 
 // ─── Sentry: frontend error tracking (Phase 7) ─────────────────────────────
 // DSN comes from VITE_SENTRY_DSN (set it on Vercel). If unset, Sentry stays
