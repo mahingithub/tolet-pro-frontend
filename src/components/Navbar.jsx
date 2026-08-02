@@ -7,7 +7,7 @@ import {
   Bell, Sparkles, PlusCircle, BarChart2, Wallet,
   UserCircle, MapPin, SlidersHorizontal,
   FileText, Phone, BookOpen, PenLine, HelpCircle,
-  Settings as SettingsIcon, LifeBuoy
+  Settings as SettingsIcon, LifeBuoy, Briefcase
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -219,6 +219,11 @@ const Navbar = () => {
   const [isMobileMenuOpen,  setIsMobileMenuOpen]  = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [expandedDiv,       setExpandedDiv]       = useState(null);
+
+  // "What are you looking for?" popup state — shown after clicking a district
+  const [showTypeChoice,    setShowTypeChoice]    = useState(false);
+  const [pendingDistrictSlug, setPendingDistrictSlug] = useState('');  // e.g. 'faridpur'
+  const [pendingDistrictName, setPendingDistrictName] = useState(''); // display name
 
   const [isScrolled,    setIsScrolled]    = useState(false);
   const [navLoc,        setNavLoc]        = useState('');
@@ -680,7 +685,7 @@ useEffect(() => {
                     <div className="absolute top-full right-0 mt-3 w-64 bg-white/95 backdrop-blur-3xl border border-white shadow-[0_30px_60px_rgba(0,0,0,0.12)] rounded-[2rem] p-2 z-[70] overflow-hidden">
                       <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 rounded-t-[1.5rem] mb-2">
                         <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${userRole === 'landlord' ? 'text-[#ba0036]' : 'text-blue-500'}`}>
-                          {userRole === 'landlord' ? 'Host Portal' : 'Tenant Portal'}
+                          {userRole === 'landlord' ? (t?.menuHostPortal || 'Host Portal') : (t?.menuTenantPortal || 'Tenant Portal')}
                         </p>
                         <p className="text-sm font-bold text-gray-900">{userName}</p>
                         <p className="text-xs text-gray-400">{userEmail}</p>
@@ -688,19 +693,19 @@ useEffect(() => {
 
                       {userRole === 'landlord' ? (
                         <>
-                          <Link to="/host-dashboard" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-red-50 hover:text-[#ba0036] rounded-xl transition-colors"><LayoutDashboard size={17} /> Host Dashboard</Link>
-                          <button onClick={() => handleProtected('/list-property')} className="w-full flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-red-50 hover:text-[#ba0036] rounded-xl transition-colors text-left"><PlusCircle size={17} /> Add Property</button>
+                          <Link to="/host-dashboard" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-red-50 hover:text-[#ba0036] rounded-xl transition-colors"><LayoutDashboard size={17} /> {t?.menuHostDashboard || 'Host Dashboard'}</Link>
+                          <button onClick={() => handleProtected('/list-property')} className="w-full flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-red-50 hover:text-[#ba0036] rounded-xl transition-colors text-left"><PlusCircle size={17} /> {t?.menuAddProperty || 'Add Property'}</button>
                         </>
                       ) : (
                         <>
-                          <Link to="/tenant-dashboard" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><LayoutDashboard size={17} /> Tenant Dashboard</Link>
+                          <Link to="/tenant-dashboard" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><LayoutDashboard size={17} /> {t?.menuTenantDashboard || 'Tenant Dashboard'}</Link>
                           <Link to="/living" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-[#ba0036]/5 hover:text-[#ba0036] rounded-xl transition-colors"><Wallet size={17} /> {t?.menuRoommateWallet || 'Roommate Wallet'}</Link>
-                          <Link to="/tenant-dashboard?tab=saved" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><Heart size={17} /> Saved Properties</Link>
-                          <Link to="/tenant-dashboard?tab=applications" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><MessageSquare size={17} /> My Inquiries</Link>
+                          <Link to="/tenant-dashboard?tab=saved" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><Heart size={17} /> {t?.menuSavedProperties || 'Saved Properties'}</Link>
+                          <Link to="/tenant-dashboard?tab=applications" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><MessageSquare size={17} /> {t?.menuMyInquiries || 'My Inquiries'}</Link>
                         </>
                       )}
 
-                      <Link to="/smart-alerts" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-amber-50 hover:text-amber-600 rounded-xl transition-colors"><Bell size={17} /> Smart Alerts</Link>
+                      <Link to="/smart-alerts" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-amber-50 hover:text-amber-600 rounded-xl transition-colors"><Bell size={17} /> {t?.menuMyAlerts || 'Smart Alerts'}</Link>
 
                       <Link to={userRole === 'landlord' ? '/host-dashboard?tab=settings' : '/tenant-dashboard?tab=settings'} onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors"><SettingsIcon size={17} /> {t?.menuSettings || 'Settings'}</Link>
 
@@ -709,7 +714,7 @@ useEffect(() => {
 
                       <button onClick={handleLogout}
                         className="w-full flex items-center gap-3 px-5 py-3 text-sm font-black text-red-500 hover:bg-red-50 rounded-xl transition-colors text-left mt-1 border-t border-gray-50">
-                        <LogOut size={17} /> Log Out
+                        <LogOut size={17} /> {t?.menuLogOut || 'Log Out'}
                       </button>
 
                       {(hasBothRoles || !ownsLandlord) && (
@@ -721,7 +726,7 @@ useEffect(() => {
                                reloads and is mirrored across tabs. */
                             <button onClick={handleSwitchRole}
                               className="w-full flex items-center justify-center gap-2 text-[10px] font-black text-white uppercase tracking-widest py-1 hover:scale-105 transition-transform">
-                              <RefreshCw size={13} /> Switch to {userRole === 'tenant' ? 'Host' : 'Tenant'}
+                              <RefreshCw size={13} /> {userRole === 'tenant' ? (t?.menuSwitchToHost || 'Switch to Host') : (t?.menuSwitchToTenant || 'Switch to Tenant')}
                             </button>
                           ) : (
                             /* Tenant who hasn't become a host yet — invite them
@@ -816,7 +821,11 @@ useEffect(() => {
                     {division.districts.map((district, idx) => {
                       const param = locationData['en'].find(d => d.id === division.id).districts[idx].toLowerCase().replace(/\s+/g, '-');
                       return (
-                        <div key={idx} onClick={() => navigate(`/properties/${param}`)}
+                        <div key={idx} onClick={() => {
+                          setPendingDistrictSlug(param);
+                          setPendingDistrictName(district);
+                          setShowTypeChoice(true);
+                        }}
                           className="h-9 w-[120px] flex items-center justify-center bg-gray-50 border border-gray-100 rounded-lg hover:bg-red-50 hover:border-red-200 hover:text-[#ba0036] transition-all cursor-pointer px-2 group/d">
                           <span className="text-[11px] font-bold text-gray-700 group-hover/d:text-[#ba0036] truncate text-center w-full">{district}</span>
                         </div>
@@ -1258,6 +1267,90 @@ useEffect(() => {
                   {language === 'বাংলা' ? 'পরে করব' : 'Maybe Later'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* "WHAT ARE YOU LOOKING FOR?" POPUP — shown after picking a district
+          from the division hover bar. Two big cards: Residential / Commercial. */}
+      {showTypeChoice && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 font-sans">
+          <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-md" onClick={() => setShowTypeChoice(false)} />
+          <div className="bg-white/95 backdrop-blur-3xl border border-white shadow-[0_40px_80px_rgba(0,0,0,0.18)] rounded-[2.5rem] p-0 max-w-[420px] w-full relative overflow-hidden animate-[slideUp_0.25s_ease-out]">
+            {/* Decorative blurs */}
+            <div className="absolute -top-12 -right-12 w-44 h-44 bg-[#ba0036]/8 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-10 -left-10 w-36 h-36 bg-blue-500/6 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Close button */}
+            <button
+              onClick={() => setShowTypeChoice(false)}
+              className="absolute top-5 right-5 z-10 text-gray-400 hover:text-red-500 bg-gray-50 hover:bg-red-50 border border-gray-100 rounded-full p-2 transition-all shadow-sm"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Header */}
+            <div className="px-8 pt-8 pb-5">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin size={14} className="text-[#ba0036]" />
+                <span className="text-xs font-black text-[#ba0036] uppercase tracking-widest">{pendingDistrictName}</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight leading-tight">
+                {langCode === 'bn' ? 'আপনি কী খুঁজছেন?' : 'What are you looking for?'}
+              </h3>
+              <p className="text-sm text-gray-500 mt-1.5 font-medium">
+                {langCode === 'bn' ? 'আপনার প্রয়োজন অনুসারে বেছে নিন' : 'Choose the type that fits your needs'}
+              </p>
+            </div>
+
+            {/* Two option cards */}
+            <div className="px-8 pb-8 flex flex-col gap-3">
+              {/* Residential */}
+              <button
+                onClick={() => {
+                  setShowTypeChoice(false);
+                  navigate(`/properties/${pendingDistrictSlug}?category=family`);
+                }}
+                className="group relative w-full flex items-center gap-4 p-5 rounded-2xl border-2 border-gray-100 bg-gradient-to-br from-white to-gray-50/80 hover:border-[#ba0036]/40 hover:shadow-[0_8px_30px_rgba(186,0,54,0.12)] transition-all duration-200 active:scale-[0.98] text-left overflow-hidden"
+              >
+                <div className="absolute -top-6 -right-6 w-20 h-20 bg-[#ba0036]/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                <div className="w-14 h-14 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center shrink-0 group-hover:bg-[#ba0036] group-hover:border-[#ba0036] transition-all duration-200 shadow-sm">
+                  <Home size={24} className="text-[#ba0036] group-hover:text-white transition-colors duration-200" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-base font-black text-gray-900 group-hover:text-[#ba0036] transition-colors">
+                    {langCode === 'bn' ? 'আবাসিক' : 'Residential'}
+                  </p>
+                  <p className="text-xs font-medium text-gray-400 mt-0.5">
+                    {langCode === 'bn' ? 'ফ্যামিলি অ্যাপার্টমেন্ট, ব্যাচেলর ফ্ল্যাট, সাবলেট' : 'Family, Bachelor, Sublet & more'}
+                  </p>
+                </div>
+                <ChevronRight size={18} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-1 transition-all shrink-0" />
+              </button>
+
+              {/* Commercial */}
+              <button
+                onClick={() => {
+                  setShowTypeChoice(false);
+                  navigate(`/properties/${pendingDistrictSlug}?category=commercial`);
+                }}
+                className="group relative w-full flex items-center gap-4 p-5 rounded-2xl border-2 border-gray-100 bg-gradient-to-br from-white to-gray-50/80 hover:border-blue-400/40 hover:shadow-[0_8px_30px_rgba(59,130,246,0.12)] transition-all duration-200 active:scale-[0.98] text-left overflow-hidden"
+              >
+                <div className="absolute -top-6 -right-6 w-20 h-20 bg-blue-500/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 group-hover:bg-blue-500 group-hover:border-blue-500 transition-all duration-200 shadow-sm">
+                  <Briefcase size={24} className="text-blue-500 group-hover:text-white transition-colors duration-200" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-base font-black text-gray-900 group-hover:text-blue-600 transition-colors">
+                    {langCode === 'bn' ? 'বাণিজ্যিক' : 'Commercial'}
+                  </p>
+                  <p className="text-xs font-medium text-gray-400 mt-0.5">
+                    {langCode === 'bn' ? 'অফিস স্পেস, দোকান, শোরুম' : 'Office, Shop, Showroom & more'}
+                  </p>
+                </div>
+                <ChevronRight size={18} className="text-gray-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all shrink-0" />
+              </button>
             </div>
           </div>
         </div>

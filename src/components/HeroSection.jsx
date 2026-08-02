@@ -927,7 +927,7 @@ const HeroSection = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => navigate('/download')}
+                  onClick={() => window.open('https://play.google.com/store/apps/details?id=com.tolet.pro', '_blank')}
                   className="bg-[#ba0036] hover:bg-[#d4004a] text-white px-7 py-3.5 rounded-full font-black text-xs uppercase tracking-widest shadow-[0_8px_24px_rgba(186,0,54,0.45)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
                 >
                   <Zap size={13} /> {t?.getApp || 'Get the App'}

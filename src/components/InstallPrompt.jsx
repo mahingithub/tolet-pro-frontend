@@ -20,7 +20,7 @@
 
 import React, { useState, useEffect } from 'react';
 
-const VISIT_THRESHOLD = 3;          // show after this many visits
+const VISIT_THRESHOLD = 1;          // show after this many visits
 const DISMISS_KEY = 'pwa:dismissed'; // remembers the user said "not now"
 const VISITS_KEY = 'pwa:visits';
 
