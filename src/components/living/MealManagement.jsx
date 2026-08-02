@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   UtensilsCrossed, ShoppingBasket, Trash2, ChevronLeft, ChevronRight, Coffee, Sun, Moon, Check, ChefHat,
-  Scale, PiggyBank, Gauge, HandCoins, Wallet, Info, Pencil,
+  Scale, PiggyBank, Gauge, HandCoins, Wallet, Info, Pencil, CalendarRange,
 } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
@@ -268,6 +268,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
 
   const [monthOffset, setMonthOffset] = useState(0); // 0 = this month, −1 = last month…
   const [selectedWeek, setSelectedWeek] = useState(null); // null = whole month, or week index
+  const [weeklyOpen, setWeeklyOpen] = useState(false); // weekly-breakdown side popup
   const [dayOffset, setDayOffset] = useState(0);
   const [depositOpen, setDepositOpen] = useState(false);
   const [bazarOpen, setBazarOpen] = useState(false);
@@ -344,7 +345,35 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
         </button>
       </div>
 
+      {/* quick section nav — jump to any section in one tap instead of long scrolling */}
+      <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-0.5" style={{ scrollbarWidth: 'none' }}>
+        {[
+          { id: 'mm-summary', label: isBn ? 'সারাংশ' : 'Summary' },
+          { id: 'weekly', label: isBn ? 'সাপ্তাহিক' : 'Weekly' },
+          { id: 'mm-accounts', label: isBn ? 'সবার হিসাব' : 'Accounts' },
+          { id: 'mm-log', label: isBn ? 'মিল লগ' : 'Log meals' },
+          { id: 'mm-deposits', label: isBn ? 'জমা' : 'Deposits' },
+          { id: 'mm-bazar', label: isBn ? 'বাজার' : 'Bazar' },
+        ].map((s) => (
+          <button
+            key={s.id}
+            onClick={() =>
+              s.id === 'weekly'
+                ? setWeeklyOpen(true)
+                : document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
+            className="shrink-0 px-3.5 py-1.5 rounded-full bg-white border border-gray-100 text-[11px] font-black text-gray-600 shadow-sm hover:border-[#ba0036]/30 hover:text-[#ba0036] active:scale-95 transition"
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* two columns on tablet/desktop → half the scroll; phones keep a single column */}
+      <div className="md:grid md:grid-cols-2 md:gap-4 md:items-start space-y-4 md:space-y-0">
+      <div className="space-y-4 min-w-0">
       {/* mess summary */}
+      <div id="mm-summary" className="scroll-mt-24">
       <Card className="p-5">
         <div className="text-center">
           <span className="flex items-center justify-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-gray-400">
@@ -394,64 +423,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
           </div>
         )}
       </Card>
-      <Card className="p-4">
-        <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-2 flex items-center gap-1.5">
-          <Scale size={15} className="text-gray-400" /> {isBn ? 'সাপ্তাহিক খরচ' : 'Weekly breakdown'}
-          <span className="text-[9.5px] font-bold text-gray-400 normal-case tracking-normal ml-auto">
-            {isBn ? `${num(weeks.length, language)} সপ্তাহ` : `${weeks.length} weeks`}
-          </span>
-        </h3>
-        <div className="grid grid-cols-[1.2fr_0.7fr_1fr_1fr] gap-2 px-1 pb-2 text-[10px] font-black uppercase tracking-wider text-gray-400">
-          <span>{isBn ? 'সপ্তাহ' : 'Week'}</span>
-          <span className="text-right">{isBn ? 'মিল' : 'Meals'}</span>
-          <span className="text-right">{isBn ? 'বাজার' : 'Bazar'}</span>
-          <span className="text-right">{isBn ? 'জমা' : 'Deposit'}</span>
-        </div>
-        <div className="divide-y divide-gray-50">
-          {weeks.map((w) => (
-            <button
-              key={w.index}
-              onClick={() => setSelectedWeek((s) => (s === w.index ? null : w.index))}
-              className={cx(
-                'w-full grid grid-cols-[1.2fr_0.7fr_1fr_1fr] gap-2 items-center py-2.5 px-1 rounded-xl transition text-left',
-                selectedWeek === w.index ? 'bg-[#ba0036]/5' : 'active:bg-gray-50'
-              )}
-            >
-              <div>
-                <p className={cx('text-[12.5px] font-black', selectedWeek === w.index ? 'text-[#ba0036]' : 'text-gray-800')}>
-                  {isBn ? `সপ্তাহ ${num(w.index, language)}` : `Week ${w.index}`}
-                </p>
-                <p className="text-[9.5px] font-bold text-gray-400">{weekRangeLabel(w)}</p>
-              </div>
-              <span className="text-right text-[12.5px] font-black text-gray-900 tabular-nums">{num(w.meals, language)}</span>
-              <span className="text-right text-[12.5px] font-bold text-gray-600 tabular-nums">{taka(w.bazar, language)}</span>
-              <span className="text-right text-[12.5px] font-bold text-emerald-600 tabular-nums">{taka(w.deposit, language)}</span>
-            </button>
-          ))}
-        </div>
-        {selectedWeek && (() => {
-          const w = weeks.find((x) => x.index === selectedWeek);
-          if (!w) return null;
-          return (
-            <div className="mt-2 rounded-2xl bg-[#ba0036]/5 border border-[#ba0036]/10 p-3">
-              <p className="text-[11px] font-black text-[#ba0036] uppercase tracking-wider mb-2">
-                {isBn ? `সপ্তাহ ${num(w.index, language)} · ${weekRangeLabel(w)}` : `Week ${w.index} · ${weekRangeLabel(w)}`}
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                <MiniStat icon={ShoppingBasket} label={isBn ? 'বাজার খরচ' : 'Bazar spent'} value={taka(w.bazar, language)} />
-                <MiniStat icon={UtensilsCrossed} label={isBn ? 'মিল খরচ' : 'Meal cost'} value={taka(w.mealCost, language)} sub={isBn ? 'মাসের রেটে' : 'at month rate'} />
-                <MiniStat icon={HandCoins} label={isBn ? 'জমা' : 'Deposit'} value={taka(w.deposit, language)} valueClass="text-emerald-600" />
-              </div>
-            </div>
-          );
-        })()}
-        <p className="text-[10px] font-semibold text-gray-400 mt-2.5 leading-relaxed flex items-start gap-1.5">
-          <Info size={12} className="shrink-0 mt-0.5" />
-          {isBn
-            ? 'সপ্তাহগুলো মাসের ভেতরে ভাগ করা (১–৭, ৮–১৪…) — তাই সব সপ্তাহ যোগ করলে মাসের মোট হিসাব মিলে যায়।'
-            : 'Weeks are fixed inside the month (1–7, 8–14…) — so the weeks always add up exactly to the monthly total.'}
-        </p>
-      </Card>
+      </div>
 
       {/* quick actions */}
       <div className="grid grid-cols-2 gap-3">
@@ -505,8 +477,11 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
           )}
         </Card>
       )}
+      </div>
 
+      <div className="space-y-4 min-w-0">
       {/* everyone's account (manager table) */}
+      <div id="mm-accounts" className="scroll-mt-24">
       <Card className="p-4">
         <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-2 flex items-center gap-1.5">
           <UtensilsCrossed size={15} className="text-gray-400" /> {isBn ? 'সবার হিসাব' : "Everyone's account"}
@@ -543,8 +518,10 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
             : "Balance includes each member's carry-over from previous months — money never disappears when the month changes."}
         </p>
       </Card>
+      </div>
 
       {/* daily meal editor */}
+      <div id="mm-log" className="scroll-mt-24">
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[14px] font-black text-gray-900 tracking-tight flex items-center gap-1.5">
@@ -599,8 +576,10 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
           })}
         </div>
       </Card>
+      </div>
 
       {/* deposits list */}
+      <div id="mm-deposits" className="scroll-mt-24">
       <Card className="p-4">
         <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-1 flex items-center gap-1.5">
           <PiggyBank size={15} className="text-emerald-600" /> {isBn ? 'জমার হিস্ট্রি' : 'Deposits'}
@@ -634,8 +613,10 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
           </div>
         )}
       </Card>
+      </div>
 
       {/* bazar list */}
+      <div id="mm-bazar" className="scroll-mt-24">
       <Card className="p-4">
         <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-1 flex items-center gap-1.5">
           <ShoppingBasket size={15} className="text-amber-600" /> {isBn ? 'বাজারের হিস্ট্রি' : 'Bazar'}
@@ -664,6 +645,89 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
           </div>
         )}
       </Card>
+      </div>
+      </div>
+      </div>
+
+      {/* floating side tab (chat-bot style launcher) → weekly breakdown popup */}
+      {!weeklyOpen && (
+        <button
+          onClick={() => setWeeklyOpen(true)}
+          className="fixed right-0 top-1/2 -translate-y-1/2 z-[60] rounded-l-2xl overflow-hidden bg-white border border-r-0 border-gray-100 shadow-[0_12px_32px_-8px_rgba(15,23,42,0.4)] active:scale-95 transition"
+          aria-label={isBn ? 'সাপ্তাহিক খরচ দেখুন' : 'Open weekly breakdown'}
+        >
+          <span className="flex flex-col items-center gap-1 bg-gradient-to-b from-[#ba0036] to-[#d4004a] text-white px-2.5 py-3">
+            <CalendarRange size={17} />
+            <span className="text-[9px] font-black uppercase tracking-wide leading-none">
+              {isBn ? `${num(weeks.length, language)} সপ্তাহ` : `${weeks.length} Weeks`}
+            </span>
+          </span>
+          <span className="block px-2 py-2 text-center text-[10.5px] font-black text-[#ba0036]">
+            {taka(summary.totalMealCost, language)}
+          </span>
+        </button>
+      )}
+
+      {/* weekly breakdown popup — the month split into fixed weeks (1–7, 8–14…) */}
+      <Sheet
+        open={weeklyOpen}
+        onClose={() => setWeeklyOpen(false)}
+        title={isBn ? 'সাপ্তাহিক খরচ' : 'Weekly breakdown'}
+        subtitle={`${periodLabel} · ${isBn ? `${num(weeks.length, language)} সপ্তাহ` : `${weeks.length} weeks`}`}
+      >
+        <div className="py-2">
+          <div className="grid grid-cols-[1.2fr_0.7fr_1fr_1fr] gap-2 px-1 pb-2 text-[10px] font-black uppercase tracking-wider text-gray-400">
+            <span>{isBn ? 'সপ্তাহ' : 'Week'}</span>
+            <span className="text-right">{isBn ? 'মিল' : 'Meals'}</span>
+            <span className="text-right">{isBn ? 'বাজার' : 'Bazar'}</span>
+            <span className="text-right">{isBn ? 'জমা' : 'Deposit'}</span>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {weeks.map((w) => (
+              <button
+                key={w.index}
+                onClick={() => setSelectedWeek((s) => (s === w.index ? null : w.index))}
+                className={cx(
+                  'w-full grid grid-cols-[1.2fr_0.7fr_1fr_1fr] gap-2 items-center py-2.5 px-1 rounded-xl transition text-left',
+                  selectedWeek === w.index ? 'bg-[#ba0036]/5' : 'active:bg-gray-50'
+                )}
+              >
+                <div>
+                  <p className={cx('text-[12.5px] font-black', selectedWeek === w.index ? 'text-[#ba0036]' : 'text-gray-800')}>
+                    {isBn ? `সপ্তাহ ${num(w.index, language)}` : `Week ${w.index}`}
+                  </p>
+                  <p className="text-[9.5px] font-bold text-gray-400">{weekRangeLabel(w)}</p>
+                </div>
+                <span className="text-right text-[12.5px] font-black text-gray-900 tabular-nums">{num(w.meals, language)}</span>
+                <span className="text-right text-[12.5px] font-bold text-gray-600 tabular-nums">{taka(w.bazar, language)}</span>
+                <span className="text-right text-[12.5px] font-bold text-emerald-600 tabular-nums">{taka(w.deposit, language)}</span>
+              </button>
+            ))}
+          </div>
+          {selectedWeek && (() => {
+            const w = weeks.find((x) => x.index === selectedWeek);
+            if (!w) return null;
+            return (
+              <div className="mt-2 rounded-2xl bg-[#ba0036]/5 border border-[#ba0036]/10 p-3">
+                <p className="text-[11px] font-black text-[#ba0036] uppercase tracking-wider mb-2">
+                  {isBn ? `সপ্তাহ ${num(w.index, language)} · ${weekRangeLabel(w)}` : `Week ${w.index} · ${weekRangeLabel(w)}`}
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  <MiniStat icon={ShoppingBasket} label={isBn ? 'বাজার খরচ' : 'Bazar spent'} value={taka(w.bazar, language)} />
+                  <MiniStat icon={UtensilsCrossed} label={isBn ? 'মিল খরচ' : 'Meal cost'} value={taka(w.mealCost, language)} sub={isBn ? 'মাসের রেটে' : 'at month rate'} />
+                  <MiniStat icon={HandCoins} label={isBn ? 'জমা' : 'Deposit'} value={taka(w.deposit, language)} valueClass="text-emerald-600" />
+                </div>
+              </div>
+            );
+          })()}
+          <p className="text-[10px] font-semibold text-gray-400 mt-2.5 leading-relaxed flex items-start gap-1.5">
+            <Info size={12} className="shrink-0 mt-0.5" />
+            {isBn
+              ? 'সপ্তাহগুলো মাসের ভেতরে ভাগ করা (১–৭, ৮–১৪…) — তাই সব সপ্তাহ যোগ করলে মাসের মোট হিসাব মিলে যায়।'
+              : 'Weeks are fixed inside the month (1–7, 8–14…) — so the weeks always add up exactly to the monthly total.'}
+          </p>
+        </div>
+      </Sheet>
 
       <DepositSheet open={depositOpen} onClose={() => setDepositOpen(false)} roommates={roommates} onSave={addDeposit} />
       <GrocerySheet open={bazarOpen} onClose={() => setBazarOpen(false)} roommates={roommates} onSave={addGrocery} />
