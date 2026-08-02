@@ -43,8 +43,7 @@ const SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 // language choice or re-trigger the PWA install banner.
 const DEVICE_KEEP_KEYS = new Set([
   'tolet_lang',           // LanguageContext — chosen language
-  'pwa:visits',           // InstallPrompt — visit counter
-  'pwa:dismissed',        // InstallPrompt — "not now" memory
+  'toletpro_app_banner_dismissed', // AppDownloadBanner — "don't show again"
   'welcome:login:hidden', // WelcomeRobotOverlay — "never show the login welcome again"
 ]);
 

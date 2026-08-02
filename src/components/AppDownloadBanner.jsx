@@ -1,95 +1,91 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, Smartphone, Star, Apple, Monitor, Share, PlusSquare } from 'lucide-react';
+import { X, Download, Star, Share, PlusSquare, Info } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import {
+  useAppInstall,
+  isAppAlreadyInstalled,
+  safeStorageGet,
+  safeStorageSet,
+  INSTALL_GUIDE_EVENT,
+} from '../hooks/useAppInstall';
 
 const STORAGE_KEY = 'toletpro_app_banner_dismissed';
 
 /**
  * Persistent App Download Banner.
  *
- * ─ Android: Shows Play Store link.
- * ─ Apple/Desktop: Shows Native App download link.
+ * ─ Android: Play Store link only (no PWA flow).
+ * ─ iPhone/iPad: App Store when available, otherwise the iOS
+ *   Add-to-Home-Screen guide (iPadOS-as-Macintosh handled).
+ * ─ Mac: native app when available, else PWA prompt / Safari Add-to-Dock guide.
+ * ─ Windows/desktop: PWA prompt when supported, else an honest fallback.
  *
- * Once the user taps ✕ or downloads, the banner stays hidden permanently via localStorage.
- * The component renders nothing when:
- *   • the banner was previously dismissed, OR
- *   • the page is loaded inside the native Android WebView (user agent check).
+ * Hidden when already installed (native app or standalone PWA), after a
+ * successful install (`appinstalled`), or permanently after the user taps ✕
+ * ("don't show again"). Cancelling an install does NOT dismiss permanently.
  */
 const AppDownloadBanner = () => {
   const { t } = useLanguage();
-  const [dismissed, setDismissed] = useState(true);  // default hidden until we check
-  const [platform, setPlatform] = useState('android'); // 'android' | 'apple' | 'desktop'
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showAppleGuide, setShowAppleGuide] = useState(false);
-  const [appleDeviceType, setAppleDeviceType] = useState('ios'); // 'ios' | 'mac'
+  const { platform, triggerDownload, installed } = useAppInstall();
+  const [dismissed, setDismissed] = useState(true); // default hidden until we check
+  const [guide, setGuide] = useState(null); // null | 'ios' | 'mac' | 'unsupported'
 
   useEffect(() => {
-    // Already dismissed?
-    if (localStorage.getItem(STORAGE_KEY) === '1') return;
-
-    // Running inside the native Android wrapper? Don't show.
-    const ua = navigator.userAgent || '';
-    if (/ToLetProApp/i.test(ua)) return;
-    
-    // Already installed as standalone?
-    if (window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true) return;
-
-    // Detect platform
-    if (/android/i.test(ua)) {
-      setPlatform('android');
-    } else if (/iphone|ipad|ipod|macintosh/i.test(ua)) {
-      setPlatform('apple');
-    } else {
-      setPlatform('desktop');
-    }
-
-    const onBeforeInstall = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', onBeforeInstall);
-
+    // Previously dismissed, or already running as the app? Stay hidden.
+    if (safeStorageGet(STORAGE_KEY) === '1') return;
+    if (isAppAlreadyInstalled()) return;
     setDismissed(false);
-    
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstall);
-    };
   }, []);
 
-  if (dismissed && !showAppleGuide) return null;
+  // Other components (HeroSection) can open the guide modal via this event
+  // instead of duplicating the modal UI.
+  useEffect(() => {
+    const onRequest = (e) => setGuide(e.detail);
+    window.addEventListener(INSTALL_GUIDE_EVENT, onRequest);
+    return () => window.removeEventListener(INSTALL_GUIDE_EVENT, onRequest);
+  }, []);
 
+  // Successful install (via our prompt or the browser menu) → hide for good.
+  useEffect(() => {
+    if (installed) {
+      safeStorageSet(STORAGE_KEY, '1');
+      setDismissed(true);
+      setGuide(null);
+    }
+  }, [installed]);
+
+  if (dismissed && !guide) return null;
+
+  // Intentional "don't show again" — the only path that persists dismissal.
   const handleDismiss = () => {
-    localStorage.setItem(STORAGE_KEY, '1');
+    safeStorageSet(STORAGE_KEY, '1');
     setDismissed(true);
-    setShowAppleGuide(false);
+    setGuide(null);
   };
 
   const handleDownload = async () => {
-    if (platform === 'android') {
-      window.open('https://play.google.com/store/apps/details?id=com.tolet.pro', '_blank');
-      handleDismiss();
-    } else {
-      // Trigger PWA Install
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        try { await deferredPrompt.userChoice; } catch {/* ignore */}
-        setDeferredPrompt(null);
-        handleDismiss();
-      } else {
-        // Fallback instructions for Safari (iOS / Mac)
-        const ua = navigator.userAgent || '';
-        const isChrome = /chrome|crios/i.test(ua);
-        
-        if (/iphone|ipad|ipod/i.test(ua)) {
-          setAppleDeviceType('ios');
-          setShowAppleGuide(true);
-        } else if (/macintosh/i.test(ua) && !isChrome) {
-          setAppleDeviceType('mac');
-          setShowAppleGuide(true);
-        } else {
-          alert("To install: Look for the 'Install App' icon in your browser's address bar (near the bookmark star).");
-        }
-      }
+    const result = await triggerDownload();
+    switch (result) {
+      case 'store':
+        // Store page opened — hide for this session only; if the user comes
+        // back without installing, the banner returns.
+        setDismissed(true);
+        break;
+      case 'prompted-accepted':
+        // `appinstalled` will fire and persist the dismissal; hide right away.
+        setDismissed(true);
+        break;
+      case 'prompted-cancelled':
+        // User changed their mind — keep the banner, don't dismiss.
+        break;
+      case 'guide-ios':
+        setGuide('ios');
+        break;
+      case 'guide-mac':
+        setGuide('mac');
+        break;
+      default:
+        setGuide('unsupported');
     }
   };
 
@@ -97,26 +93,26 @@ const AppDownloadBanner = () => {
 
   return (
     <>
-      {/* ─── VISUAL GUIDE MODAL (FOR APPLE DEVICES) ─── */}
-      {showAppleGuide && (
+      {/* ─── VISUAL GUIDE MODAL (APPLE GUIDES + UNSUPPORTED FALLBACK) ─── */}
+      {guide && (
         <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-300">
           <div className="w-full max-w-[340px] rounded-[32px] p-6 shadow-[0_24px_48px_rgba(0,0,0,0.25)] border border-white/20 bg-white/80 dark:bg-[#151520]/80 backdrop-blur-3xl relative animate-in slide-in-from-bottom-8 md:slide-in-from-bottom-0 md:zoom-in-95 overflow-hidden">
             {/* Subtle background glow */}
             <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#ba0036]/20 blur-[64px] rounded-full pointer-events-none" />
-            
-            <button onClick={() => setShowAppleGuide(false)} className="absolute top-4 right-4 p-2 bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 rounded-full transition-colors z-10">
+
+            <button onClick={() => setGuide(null)} className="absolute top-4 right-4 p-2 bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 rounded-full transition-colors z-10">
               <X size={16} className="text-slate-700 dark:text-slate-300" />
             </button>
-            
+
             <div className="w-16 h-16 bg-gradient-to-br from-[#ba0036] to-[#ff4d7d] rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-[0_8px_16px_rgba(186,0,54,0.3)] relative z-10">
               <img src="/icons/icon-192.png" alt="TO-LET PRO" className="w-10 h-10 object-contain drop-shadow-md rounded-lg" />
             </div>
-            
+
             <h3 className="text-[22px] font-black text-center text-slate-900 dark:text-white mb-2 leading-tight">
               {t('bannerInstallTitle')}
             </h3>
-            
-            {appleDeviceType === 'ios' ? (
+
+            {guide === 'ios' && (
               <div className="space-y-4 mt-6 relative z-10">
                 <p className="text-[13px] text-slate-600 dark:text-slate-400 text-center font-semibold mb-2">
                   {t('bannerIosSub')}
@@ -141,7 +137,9 @@ const AppDownloadBanner = () => {
                   </div>
                 </div>
               </div>
-            ) : (
+            )}
+
+            {guide === 'mac' && (
               <div className="space-y-4 mt-6 relative z-10">
                 <p className="text-[13px] text-slate-600 dark:text-slate-400 text-center font-semibold mb-2">
                   {t('bannerMacSub')}
@@ -157,8 +155,24 @@ const AppDownloadBanner = () => {
                 </div>
               </div>
             )}
-            
-            <button onClick={handleDismiss} className="w-full mt-5 py-3.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-[18px] font-black text-sm tracking-wide transition-all active:scale-[0.98] relative z-10 shadow-md">
+
+            {guide === 'unsupported' && (
+              <div className="space-y-4 mt-6 relative z-10">
+                <div className="flex items-start gap-4 bg-white/60 dark:bg-black/40 backdrop-blur-md p-4 rounded-2xl border border-white/40 dark:border-white/10 shadow-sm">
+                  <div className="w-10 h-10 bg-amber-500/10 dark:bg-amber-500/20 rounded-xl flex items-center justify-center shrink-0 text-amber-600 dark:text-amber-400">
+                    <Info size={20} strokeWidth={2.5} />
+                  </div>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                    {t('bannerUnsupportedMsg')}
+                  </p>
+                </div>
+                <p className="text-[13px] text-slate-600 dark:text-slate-400 text-center font-semibold">
+                  {t('bannerUnsupportedHint')}
+                </p>
+              </div>
+            )}
+
+            <button onClick={() => setGuide(null)} className="w-full mt-5 py-3.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-[18px] font-black text-sm tracking-wide transition-all active:scale-[0.98] relative z-10 shadow-md">
               {t('bannerGotItBtn')}
             </button>
           </div>

@@ -10,6 +10,7 @@ import usePropertyStore from '../store/usePropertyStore';
 import { SALE_INTENT_ENABLED } from '../constants/listingIntents';
 import { DIVISIONS, POPULAR_AREAS, POPULAR_AREA_IMAGES, POPULAR_AREA_IMAGES_DESKTOP, POPULAR_AREA_TAGLINES, POPULAR_AREA_SUBZONES, buildSearchUrl } from '../data/searchData';
 import LocationSearchModal from './shared/LocationSearchModal';
+import { useAppInstall, requestInstallGuide } from '../hooks/useAppInstall';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTEXT DATA
@@ -451,6 +452,17 @@ const HeroSection = () => {
   const language     = langContext.language || 'English';
   const langKey      = language === 'বাংলা' ? 'bn' : 'en';
   const navigate     = useNavigate();
+
+  // Shared smart download logic (same as AppDownloadBanner): Android → Play
+  // Store, Apple → App Store or PWA guide, desktop → PWA prompt/fallback.
+  // Guide results open AppDownloadBanner's modal via requestInstallGuide.
+  const { triggerDownload } = useAppInstall();
+  const handleGetApp = async () => {
+    const result = await triggerDownload();
+    if (result === 'guide-ios' || result === 'guide-mac' || result === 'unsupported') {
+      requestInstallGuide(result);
+    }
+  };
 
   const HERO_YOUTUBE_ID = 'PpeE86P9TnA';
 
@@ -927,7 +939,7 @@ const HeroSection = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => window.open('https://play.google.com/store/apps/details?id=com.tolet.pro', '_blank')}
+                  onClick={handleGetApp}
                   className="bg-[#ba0036] hover:bg-[#d4004a] text-white px-7 py-3.5 rounded-full font-black text-xs uppercase tracking-widest shadow-[0_8px_24px_rgba(186,0,54,0.45)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
                 >
                   <Zap size={13} /> {t?.getApp || 'Get the App'}
