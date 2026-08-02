@@ -291,7 +291,6 @@ const AppLayout = () => {
 			<GlobalToaster />
 			{!shouldHideAIAssistant && <GlobalAIAssistant />}
 			<MobileBottomNav hideOnRoutes={['/login', '/list-property', '/properties/']} />
-			<InstallPrompt />
 			<FeedbackButton />
 		</div>
 	);
