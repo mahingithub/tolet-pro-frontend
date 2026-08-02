@@ -58,6 +58,30 @@ if (typeof window !== 'undefined') {
   });
 }
 
+/**
+ * Event-driven grace period for the install prompt. Resolves IMMEDIATELY when
+ * `beforeinstallprompt` has already been captured or the moment it arrives —
+ * the timeout is only an upper bound for the "event never comes" case, so a
+ * click can never be delayed longer than the event actually takes.
+ * @returns {Promise<Event|null>}
+ */
+function waitForInstallPrompt(maxWaitMs = 400) {
+  if (capturedPrompt) return Promise.resolve(capturedPrompt);
+  return new Promise((resolve) => {
+    let timer = null;
+    const onPrompt = (e) => {
+      clearTimeout(timer);
+      promptSubscribers.delete(onPrompt);
+      resolve(e); // event-driven: fires the instant the browser delivers it
+    };
+    promptSubscribers.add(onPrompt);
+    timer = setTimeout(() => {
+      promptSubscribers.delete(onPrompt);
+      resolve(null);
+    }, maxWaitMs);
+  });
+}
+
 // ── Platform detection ─────────────────────────────────────────────────────
 /** @returns {'android'|'ios'|'ipad'|'mac'|'desktop'} */
 export function detectPlatform() {
@@ -71,6 +95,19 @@ export function detectPlatform() {
     return (navigator.maxTouchPoints || 0) > 1 ? 'ipad' : 'mac';
   }
   return 'desktop';
+}
+
+/**
+ * Chromium-based browser (Chrome, Edge, Brave, Opera…)? These DO support PWA
+ * install, so a missing `beforeinstallprompt` there means "already installed
+ * or not offered right now" — never "unsupported".
+ */
+export function isChromiumBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  // CriOS/EdgiOS are iOS shells over WebKit — not real Chromium.
+  if (/crios|edgios|fxios/i.test(ua)) return false;
+  return /chrome|chromium|edg\/|opr\//i.test(ua);
 }
 
 /** True inside the native app (Android WebView wrapper or Capacitor shell). */
@@ -97,9 +134,12 @@ export function isAppAlreadyInstalled() {
 // the modal UI.
 export const INSTALL_GUIDE_EVENT = 'toletpro:show-install-guide';
 
-/** @param {'guide-ios'|'guide-mac'|'unsupported'} result */
+/** @param {'guide-ios'|'guide-mac'|'chromium-menu'|'unsupported'} result */
 export function requestInstallGuide(result) {
-  const guide = result === 'guide-ios' ? 'ios' : result === 'guide-mac' ? 'mac' : 'unsupported';
+  const guide =
+    result === 'guide-ios' ? 'ios' :
+    result === 'guide-mac' ? 'mac' :
+    result === 'chromium-menu' ? 'chromium' : 'unsupported';
   window.dispatchEvent(new CustomEvent(INSTALL_GUIDE_EVENT, { detail: guide }));
 }
 
@@ -109,7 +149,7 @@ export function requestInstallGuide(result) {
  *   platform: 'android'|'ios'|'ipad'|'mac'|'desktop',
  *   canPromptInstall: boolean,
  *   installed: boolean,
- *   triggerDownload: () => Promise<'store'|'prompted-accepted'|'prompted-cancelled'|'guide-ios'|'guide-mac'|'unsupported'>,
+ *   triggerDownload: () => Promise<'store'|'prompted-accepted'|'prompted-cancelled'|'guide-ios'|'guide-mac'|'chromium-menu'|'unsupported'>,
  * }}
  *
  * `triggerDownload()` performs the store redirect / install prompt itself and
@@ -153,11 +193,14 @@ export function useAppInstall() {
       return 'store';
     }
 
-    // Real PWA install prompt (Chrome/Edge on desktop or Mac).
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
+    // Real PWA install prompt (Chrome/Edge on desktop or Mac). If the event
+    // hasn't arrived yet, wait for it event-driven with a short upper bound —
+    // resolves the instant the browser delivers it, never a fixed delay.
+    const prompt = deferredPrompt || await waitForInstallPrompt();
+    if (prompt) {
+      prompt.prompt();
       let outcome = 'dismissed';
-      try { outcome = (await deferredPrompt.userChoice)?.outcome; } catch { /* ignore */ }
+      try { outcome = (await prompt.userChoice)?.outcome; } catch { /* ignore */ }
       capturedPrompt = null;
       setDeferredPrompt(null);
       return outcome === 'accepted' ? 'prompted-accepted' : 'prompted-cancelled';
@@ -169,10 +212,16 @@ export function useAppInstall() {
     if (platform === 'mac') {
       const ua = navigator.userAgent || '';
       const isSafari = /safari/i.test(ua) && !/chrome|crios|edg|firefox|fxios/i.test(ua);
-      return isSafari ? 'guide-mac' : 'unsupported';
+      if (isSafari) return 'guide-mac';
     }
 
-    // Desktop browser with no install support (e.g. Firefox) — be honest.
+    // Chromium without a prompt ≠ unsupported: Chrome suppresses the event
+    // when it considers the app already installed (e.g. added via Safari on
+    // this Mac) or chooses not to offer it. Point to the Dock/menu instead of
+    // claiming — falsely — that the browser can't install.
+    if (isChromiumBrowser()) return 'chromium-menu';
+
+    // Genuinely non-installing browser (e.g. Firefox) — be honest.
     return 'unsupported';
   }, [platform, deferredPrompt]);
 
