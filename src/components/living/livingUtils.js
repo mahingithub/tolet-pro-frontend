@@ -480,11 +480,60 @@ export const inDateRange = (d, range) => {
 };
 
 /**
+ * Carry-forward: each member's leftover balance from every month BEFORE the
+ * given range — Σ(deposit − meals × that month's rate), computed month by
+ * month so each past month uses its own rate. Money deposited in July that
+ * wasn't eaten stays with the member into August; unpaid meal cost follows
+ * them too. Nothing resets at the month boundary.
+ */
+function messCarryForward(state, range) {
+  const { meals = [], groceries = [], deposits = [], roommates = [] } = state;
+  const startT = range.start.getTime();
+  const before = (d) => new Date(d).getTime() < startT;
+
+  // Bucket all prior activity by calendar month.
+  const months = {};
+  const bucketOf = (d) => (months[monthKey(d)] ||= { bazar: 0, mealsBy: {}, depositBy: {} });
+  meals.forEach((m) => {
+    if (!before(m.date)) return;
+    const b = bucketOf(m.date);
+    b.mealsBy[m.roommateId] = (b.mealsBy[m.roommateId] || 0) + (Number(m.breakfast) || 0) + (Number(m.lunch) || 0) + (Number(m.dinner) || 0);
+  });
+  groceries.forEach((g) => {
+    if (before(g.date)) bucketOf(g.date).bazar += Number(g.amount) || 0;
+  });
+  deposits.forEach((d) => {
+    if (!before(d.date)) return;
+    const b = bucketOf(d.date);
+    b.depositBy[d.roommateId] = (b.depositBy[d.roommateId] || 0) + (Number(d.amount) || 0);
+  });
+
+  const manualRate = Number(state.mealRate) || 0;
+  const carry = {};
+  roommates.forEach((r) => (carry[r.id] = 0));
+  let totalOpening = 0;
+  Object.values(months).forEach((b) => {
+    const totalMeals = Object.values(b.mealsBy).reduce((s, v) => s + v, 0);
+    const rate = manualRate > 0 ? manualRate : totalMeals > 0 ? b.bazar / totalMeals : 0;
+    const ids = new Set([...Object.keys(b.mealsBy), ...Object.keys(b.depositBy)]);
+    ids.forEach((id) => {
+      if (!(id in carry)) carry[id] = 0;
+      carry[id] += (b.depositBy[id] || 0) - (b.mealsBy[id] || 0) * rate;
+    });
+    totalOpening += Object.values(b.depositBy).reduce((s, v) => s + v, 0) - b.bazar;
+  });
+  return { carry, totalOpening };
+}
+
+/**
  * The heart of the mess/meal manager. For the selected month, computes:
  *   • totals — deposit (জমা), meals, meal cost (bazar), meal rate, mess balance
  *   • per member — meals, deposit, meal cost (meals × rate), balance (deposit − cost)
  * Meal rate = total bazar cost ÷ total meals. A member's balance is what the
  * mess owes them (+) or what they still need to deposit (−).
+ * Balances CARRY FORWARD: opening = leftover from all previous months, and
+ * balance = opening + deposit − meal cost, so money never disappears at the
+ * turn of the month.
  */
 export function messSummary(state, monthOffset = 0) {
   const range = monthRange(monthOffset);
@@ -492,7 +541,7 @@ export function messSummary(state, monthOffset = 0) {
 
   const perMember = roommates.map((r) => ({
     id: r.id, name: r.name, color: r.color, isMe: r.isMe,
-    meals: 0, deposit: 0, mealCost: 0, balance: 0,
+    meals: 0, deposit: 0, mealCost: 0, opening: 0, balance: 0,
   }));
   const byId = Object.fromEntries(perMember.map((p) => [p.id, p]));
 
@@ -519,9 +568,13 @@ export function messSummary(state, monthOffset = 0) {
   const rateMode = manualRate > 0 ? 'manual' : 'auto';
   const mealRate = manualRate > 0 ? manualRate : autoRate;
 
+  // Previous months' leftovers roll into this month.
+  const { carry, totalOpening } = messCarryForward(state, range);
+
   perMember.forEach((p) => {
     p.mealCost = p.meals * mealRate;
-    p.balance = p.deposit - p.mealCost;
+    p.opening = carry[p.id] || 0;
+    p.balance = p.opening + p.deposit - p.mealCost;
   });
 
   return {
@@ -533,7 +586,8 @@ export function messSummary(state, monthOffset = 0) {
     mealRate,
     autoRate,
     rateMode,
-    messBalance: totalDeposit - totalMealCost,
+    totalOpening,
+    messBalance: totalOpening + totalDeposit - totalMealCost,
     perMember,
   };
 }

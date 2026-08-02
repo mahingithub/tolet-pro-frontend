@@ -353,11 +353,20 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
             {takaSigned(summary.messBalance, language)}
           </p>
           <p className="text-[11px] font-semibold text-gray-400 mt-1.5">
-            {isBn ? 'মোট জমা − মোট মিল খরচ' : 'Total deposit − total meal cost'}
+            {isBn ? 'আগের ব্যালেন্স + জমা − মিল খরচ' : 'Previous balance + deposits − meal cost'}
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2.5 mt-4">
-          <MiniStat icon={HandCoins} label={isBn ? 'মোট জমা' : 'Total deposit'} value={taka(summary.totalDeposit, language)} valueClass="text-emerald-600" />
+          {summary.totalOpening !== 0 && (
+            <MiniStat
+              icon={Wallet}
+              label={isBn ? 'আগের মাস থেকে' : 'Carried over'}
+              value={takaSigned(summary.totalOpening, language)}
+              valueClass={summary.totalOpening >= 0 ? 'text-emerald-600' : 'text-red-600'}
+              sub={isBn ? 'আগের মাসগুলোর অবশিষ্ট' : 'Leftover from past months'}
+            />
+          )}
+          <MiniStat icon={HandCoins} label={isBn ? 'মোট জমা' : 'Total deposit'} value={taka(summary.totalDeposit, language)} valueClass="text-emerald-600" sub={isBn ? 'এ মাসে' : 'This month'} />
           <MiniStat icon={ShoppingBasket} label={isBn ? 'মোট মিল খরচ' : 'Meal cost'} value={taka(summary.totalMealCost, language)} />
           <MiniStat icon={UtensilsCrossed} label={isBn ? 'মোট মিল' : 'Total meals'} value={num(summary.totalMeals, language)} />
           <button onClick={() => setRateOpen(true)} className="rounded-2xl bg-gray-50 border border-gray-100 p-3 text-left active:scale-95 transition">
@@ -474,9 +483,17 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
           <p className="text-[10.5px] font-semibold text-gray-400 mt-2.5 leading-relaxed flex items-start gap-1.5">
             <Info size={13} className="shrink-0 mt-0.5" />
             {isBn
-              ? `ব্যালেন্স = জমা − (মিল × রেট)। + মানে আপনি ফেরত পাবেন, − মানে আরও জমা দিতে হবে।`
-              : `Balance = deposit − (meals × rate). + means you get money back, − means you owe more.`}
+              ? `ব্যালেন্স = আগের ব্যালেন্স + জমা − (মিল × রেট)। + মানে আপনি ফেরত পাবেন, − মানে আরও জমা দিতে হবে।`
+              : `Balance = previous balance + deposit − (meals × rate). + means you get money back, − means you owe more.`}
           </p>
+          {mine.opening !== 0 && (
+            <p className={cx('text-[10.5px] font-black mt-1.5 flex items-center gap-1.5', mine.opening >= 0 ? 'text-emerald-600' : 'text-red-600')}>
+              <Wallet size={12} className="shrink-0" />
+              {isBn
+                ? `আগের মাস থেকে এসেছে: ${takaSigned(mine.opening, language)}`
+                : `Carried over from previous months: ${takaSigned(mine.opening, language)}`}
+            </p>
+          )}
         </Card>
       )}
 
@@ -504,6 +521,12 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
             </button>
           ))}
         </div>
+        <p className="text-[10px] font-semibold text-gray-400 mt-2 leading-relaxed flex items-start gap-1.5">
+          <Info size={12} className="shrink-0 mt-0.5" />
+          {isBn
+            ? 'ব্যালেন্সে আগের মাসের পাওনা/দেনা যোগ করা আছে — মাস বদলালেও টাকা হারায় না।'
+            : "Balance includes each member's carry-over from previous months — money never disappears when the month changes."}
+        </p>
       </Card>
 
       {/* daily meal editor */}
