@@ -200,6 +200,7 @@ const AppLayout = () => {
 	return (
 		<div className="min-h-screen bg-white">
 			<GlobalCallSocket />
+			<InstallPrompt />
 			{!shouldHideNavbar && (
 				<div className={isPropertyListingRoute ? "hidden lg:block" : ""}>
 					<Navbar />
@@ -291,7 +292,6 @@ const AppLayout = () => {
 			<GlobalToaster />
 			{!shouldHideAIAssistant && <GlobalAIAssistant />}
 			<MobileBottomNav hideOnRoutes={['/login', '/list-property', '/properties/']} />
-			<InstallPrompt />
 			<FeedbackButton />
 		</div>
 	);
