@@ -17,6 +17,7 @@ const STORAGE_KEY = 'toletpro_app_banner_dismissed';
 const AppDownloadBanner = () => {
   const [dismissed, setDismissed] = useState(true);  // default hidden until we check
   const [platform, setPlatform] = useState('android'); // 'android' | 'apple' | 'desktop'
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   useEffect(() => {
     // Already dismissed?
@@ -25,17 +26,30 @@ const AppDownloadBanner = () => {
     // Running inside the native Android wrapper? Don't show.
     const ua = navigator.userAgent || '';
     if (/ToLetProApp/i.test(ua)) return;
+    
+    // Already installed as standalone?
+    if (window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true) return;
 
     // Detect platform
-    if (/iphone|ipad|ipod|macintosh/i.test(ua)) {
-      setPlatform('apple');
-    } else if (!/android/i.test(ua) && /windows|linux/i.test(ua)) {
-      setPlatform('desktop');
-    } else {
+    if (/android/i.test(ua)) {
       setPlatform('android');
+    } else if (/iphone|ipad|ipod|macintosh/i.test(ua)) {
+      setPlatform('apple');
+    } else {
+      setPlatform('desktop');
     }
 
+    const onBeforeInstall = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', onBeforeInstall);
+
     setDismissed(false);
+    
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstall);
+    };
   }, []);
 
   if (dismissed) return null;
@@ -45,15 +59,29 @@ const AppDownloadBanner = () => {
     setDismissed(true);
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (platform === 'android') {
       window.open('https://play.google.com/store/apps/details?id=com.tolet.pro', '_blank');
+      handleDismiss();
     } else {
-      // Placeholder for Native App download logic (e.g. PWA install or direct IPA/DMG download)
-      // window.location.href = '/download-native-app';
-      alert('Native app download triggered. Replace this with actual download link/logic.');
+      // Trigger PWA Install
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        try { await deferredPrompt.userChoice; } catch {/* ignore */}
+        setDeferredPrompt(null);
+        handleDismiss();
+      } else {
+        // Fallback instructions for Safari (iOS / Mac)
+        const ua = navigator.userAgent || '';
+        if (/iphone|ipad|ipod/i.test(ua)) {
+          alert("To install: Tap the Share button (square with arrow) at the bottom, then 'Add to Home Screen'.");
+        } else if (/macintosh/i.test(ua)) {
+          alert("To install on Mac: Click 'File' in the Safari menu bar, then select 'Add to Dock'.");
+        } else {
+          alert("To install: Look for the install icon in your browser's address bar.");
+        }
+      }
     }
-    handleDismiss(); // Hide after downloading as requested
   };
 
   const isNative = platform !== 'android';

@@ -38,8 +38,6 @@ import HowItWorks from "./components/HowItWorks";
 // --- Mobile Shell ---
 import MobileBottomNav from "./components/mobile/MobileBottomNav";
 
-// --- PWA install banner (Phase Call-5) ---
-import InstallPrompt from "./components/InstallPrompt";
 import AppDownloadBanner from "./components/AppDownloadBanner";
 
 // --- Legal pages (Phase 7) ---
