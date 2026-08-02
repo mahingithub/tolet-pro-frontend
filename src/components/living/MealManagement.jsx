@@ -6,7 +6,7 @@ import {
 
 import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
-import { messSummary, taka, takaSigned, num, dateLabel, roommateById } from './livingUtils';
+import { messSummary, messWeeklyBreakdown, inDateRange, monthLabel, taka, takaSigned, num, dateLabel, roommateById } from './livingUtils';
 import {
   Card, SectionHeader, IconBadge, Avatar, Stepper, PrimaryButton, Field, MoneyInput, TextInput,
   SegmentedControl, EmptyState, Sheet, ConfirmDialog, cx,
@@ -265,7 +265,8 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
   const deleteDeposit = useLivingStore((s) => s.deleteDeposit);
   const state = useLivingStore();
 
-  const [period, setPeriod] = useState('month');
+  const [monthOffset, setMonthOffset] = useState(0); // 0 = this month, −1 = last month…
+  const [selectedWeek, setSelectedWeek] = useState(null); // null = whole month, or week index
   const [dayOffset, setDayOffset] = useState(0);
   const [depositOpen, setDepositOpen] = useState(false);
   const [bazarOpen, setBazarOpen] = useState(false);
@@ -287,13 +288,23 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
     return m || { breakfast: 0, lunch: 0, dinner: 0 };
   };
 
-  const summary = useMemo(() => messSummary(state, period), [state, period]);
+  const summary = useMemo(() => messSummary(state, monthOffset), [state, monthOffset]);
+  const weeks = useMemo(() => messWeeklyBreakdown(state, monthOffset, summary.mealRate), [state, monthOffset, summary.mealRate]);
   const mine = summary.perMember.find((p) => p.id === me) || summary.perMember.find((p) => p.isMe) || summary.perMember[0];
 
-  const recentDeposits = useMemo(() => [...(deposits || [])].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6), [deposits]);
-  const recentBazar = useMemo(() => [...(groceries || [])].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6), [groceries]);
+  // Deposit/bazar history scoped to the selected month (newest first).
+  const monthDeposits = useMemo(
+    () => [...(deposits || [])].filter((d) => inDateRange(d.date, summary.range)).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8),
+    [deposits, summary.range]
+  );
+  const monthBazar = useMemo(
+    () => [...(groceries || [])].filter((g) => inDateRange(g.date, summary.range)).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8),
+    [groceries, summary.range]
+  );
 
-  const periodLabel = period === 'week' ? (isBn ? 'গত ৭ দিন' : 'Last 7 days') : (isBn ? 'এ মাস' : 'This month');
+  const periodLabel = monthLabel(summary.range.start, language);
+  const weekRangeLabel = (w) =>
+    `${num(w.start.getDate(), language)}–${num(w.end.getDate(), language)} ${w.start.toLocaleDateString(isBn ? 'bn-BD' : 'en-GB', { month: 'short' })}`;
 
   return (
     <div className="space-y-4">
@@ -307,15 +318,30 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
         }
       />
 
-      {/* week / month toggle */}
-      <SegmentedControl
-        value={period}
-        onChange={setPeriod}
-        options={[
-          { value: 'week', label: isBn ? 'সাপ্তাহিক' : 'Weekly' },
-          { value: 'month', label: isBn ? 'মাসিক' : 'Monthly' },
-        ]}
-      />
+      {/* month filter — every total below is scoped to this calendar month */}
+      <div className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 px-2 py-2 shadow-[0_8px_22px_-16px_rgba(15,23,42,0.3)]">
+        <button
+          onClick={() => { setMonthOffset((o) => o - 1); setSelectedWeek(null); }}
+          className="p-2 rounded-xl bg-gray-50 border border-gray-100 text-gray-500 active:scale-90 transition"
+          aria-label={isBn ? 'আগের মাস' : 'Previous month'}
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <div className="text-center">
+          <p className="text-[13.5px] font-black text-gray-900 tracking-tight">{periodLabel}</p>
+          <p className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">
+            {monthOffset === 0 ? (isBn ? 'চলতি মাস' : 'Current month') : (isBn ? 'মাসিক হিসাব' : 'Monthly view')}
+          </p>
+        </div>
+        <button
+          onClick={() => { setMonthOffset((o) => Math.min(0, o + 1)); setSelectedWeek(null); }}
+          disabled={monthOffset === 0}
+          className="p-2 rounded-xl bg-gray-50 border border-gray-100 text-gray-500 active:scale-90 transition disabled:opacity-40"
+          aria-label={isBn ? 'পরের মাস' : 'Next month'}
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
 
       {/* mess summary */}
       <Card className="p-5">
@@ -347,6 +373,66 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
             </span>
           </button>
         </div>
+      </Card>
+
+      {/* weekly breakdown — the month split into fixed weeks (1–7, 8–14, 15–21, 22–28, 29–end) */}
+      <Card className="p-4">
+        <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-2 flex items-center gap-1.5">
+          <Scale size={15} className="text-gray-400" /> {isBn ? 'সাপ্তাহিক খরচ' : 'Weekly breakdown'}
+          <span className="text-[9.5px] font-bold text-gray-400 normal-case tracking-normal ml-auto">
+            {isBn ? `${num(weeks.length, language)} সপ্তাহ` : `${weeks.length} weeks`}
+          </span>
+        </h3>
+        <div className="grid grid-cols-[1.2fr_0.7fr_1fr_1fr] gap-2 px-1 pb-2 text-[10px] font-black uppercase tracking-wider text-gray-400">
+          <span>{isBn ? 'সপ্তাহ' : 'Week'}</span>
+          <span className="text-right">{isBn ? 'মিল' : 'Meals'}</span>
+          <span className="text-right">{isBn ? 'বাজার' : 'Bazar'}</span>
+          <span className="text-right">{isBn ? 'জমা' : 'Deposit'}</span>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {weeks.map((w) => (
+            <button
+              key={w.index}
+              onClick={() => setSelectedWeek((s) => (s === w.index ? null : w.index))}
+              className={cx(
+                'w-full grid grid-cols-[1.2fr_0.7fr_1fr_1fr] gap-2 items-center py-2.5 px-1 rounded-xl transition text-left',
+                selectedWeek === w.index ? 'bg-[#ba0036]/5' : 'active:bg-gray-50'
+              )}
+            >
+              <div>
+                <p className={cx('text-[12.5px] font-black', selectedWeek === w.index ? 'text-[#ba0036]' : 'text-gray-800')}>
+                  {isBn ? `সপ্তাহ ${num(w.index, language)}` : `Week ${w.index}`}
+                </p>
+                <p className="text-[9.5px] font-bold text-gray-400">{weekRangeLabel(w)}</p>
+              </div>
+              <span className="text-right text-[12.5px] font-black text-gray-900 tabular-nums">{num(w.meals, language)}</span>
+              <span className="text-right text-[12.5px] font-bold text-gray-600 tabular-nums">{taka(w.bazar, language)}</span>
+              <span className="text-right text-[12.5px] font-bold text-emerald-600 tabular-nums">{taka(w.deposit, language)}</span>
+            </button>
+          ))}
+        </div>
+        {selectedWeek && (() => {
+          const w = weeks.find((x) => x.index === selectedWeek);
+          if (!w) return null;
+          return (
+            <div className="mt-2 rounded-2xl bg-[#ba0036]/5 border border-[#ba0036]/10 p-3">
+              <p className="text-[11px] font-black text-[#ba0036] uppercase tracking-wider mb-2">
+                {isBn ? `সপ্তাহ ${num(w.index, language)} · ${weekRangeLabel(w)}` : `Week ${w.index} · ${weekRangeLabel(w)}`}
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <MiniStat icon={ShoppingBasket} label={isBn ? 'বাজার খরচ' : 'Bazar spent'} value={taka(w.bazar, language)} />
+                <MiniStat icon={UtensilsCrossed} label={isBn ? 'মিল খরচ' : 'Meal cost'} value={taka(w.mealCost, language)} sub={isBn ? 'মাসের রেটে' : 'at month rate'} />
+                <MiniStat icon={HandCoins} label={isBn ? 'জমা' : 'Deposit'} value={taka(w.deposit, language)} valueClass="text-emerald-600" />
+              </div>
+            </div>
+          );
+        })()}
+        <p className="text-[10px] font-semibold text-gray-400 mt-2.5 leading-relaxed flex items-start gap-1.5">
+          <Info size={12} className="shrink-0 mt-0.5" />
+          {isBn
+            ? 'সপ্তাহগুলো মাসের ভেতরে ভাগ করা (১–৭, ৮–১৪…) — তাই সব সপ্তাহ যোগ করলে মাসের মোট হিসাব মিলে যায়।'
+            : 'Weeks are fixed inside the month (1–7, 8–14…) — so the weeks always add up exactly to the monthly total.'}
+        </p>
       </Card>
 
       {/* quick actions */}
@@ -480,12 +566,13 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       <Card className="p-4">
         <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-1 flex items-center gap-1.5">
           <PiggyBank size={15} className="text-emerald-600" /> {isBn ? 'জমার হিস্ট্রি' : 'Deposits'}
+          <span className="text-[9.5px] font-bold text-gray-400 ml-auto">{periodLabel}</span>
         </h3>
-        {recentDeposits.length === 0 ? (
+        {monthDeposits.length === 0 ? (
           <EmptyState icon={HandCoins} title={isBn ? 'কোনো জমা নেই' : 'No deposits yet'} subtitle={isBn ? 'মেস ফান্ডে টাকা জমা দিন' : 'Add money to the meal fund'} />
         ) : (
           <div className="divide-y divide-gray-50">
-            {recentDeposits.map((d) => {
+            {monthDeposits.map((d) => {
               const who = roommateById(roommates, d.roommateId);
               return (
                 <div key={d.id} className="flex items-center gap-3 py-2.5">
@@ -514,12 +601,13 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       <Card className="p-4">
         <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-1 flex items-center gap-1.5">
           <ShoppingBasket size={15} className="text-amber-600" /> {isBn ? 'বাজারের হিস্ট্রি' : 'Bazar'}
+          <span className="text-[9.5px] font-bold text-gray-400 ml-auto">{periodLabel}</span>
         </h3>
-        {recentBazar.length === 0 ? (
+        {monthBazar.length === 0 ? (
           <EmptyState icon={ShoppingBasket} title={isBn ? 'কোনো বাজার নেই' : 'No bazar yet'} subtitle={isBn ? 'মিলের বাজার যোগ করুন' : 'Add the meal groceries'} />
         ) : (
           <div className="divide-y divide-gray-50">
-            {recentBazar.map((g) => {
+            {monthBazar.map((g) => {
               const payer = roommateById(roommates, g.paidBy);
               return (
                 <div key={g.id} className="flex items-center gap-3 py-2.5">

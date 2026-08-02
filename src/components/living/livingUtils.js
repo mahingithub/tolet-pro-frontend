@@ -444,34 +444,50 @@ export function buildReminders(state, meId = 'me') {
 }
 
 // ── mess / meal manager (Bangladeshi mess accounting) ──────────────────────────
-// Period range: 'week' = rolling last 7 days, 'month' = current calendar month.
-export function periodRange(period = 'month') {
+// The mess runs on CALENDAR MONTHS (the way rent + bazar actually work), never
+// on a rolling 7-day window: a rolling week straddles two months and breaks
+// the monthly totals. `monthOffset` selects the month (0 = current, −1 = last…).
+export function monthRange(monthOffset = 0) {
   const now = new Date();
-  if (period === 'week') {
-    const start = new Date();
-    start.setDate(start.getDate() - 6);
-    start.setHours(0, 0, 0, 0);
-    return { start, end: now };
-  }
-  const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const start = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1, 0, 0, 0, 0);
+  const end = new Date(now.getFullYear(), now.getMonth() + monthOffset + 1, 0, 23, 59, 59, 999);
   return { start, end };
 }
 
-const inRange = (d, range) => {
+/**
+ * Fixed week segments WITHIN a month: days 1–7, 8–14, 15–21, 22–28, 29–end.
+ * A 28-day February yields exactly 4 weeks; 30/31-day months get a short
+ * 5th week (2–3 days) — every day belongs to exactly one week, no spillover.
+ */
+export function monthWeeks(monthOffset = 0) {
+  const { start, end } = monthRange(monthOffset);
+  const daysInMonth = end.getDate();
+  const weeks = [];
+  for (let day = 1; day <= daysInMonth; day += 7) {
+    const lastDay = Math.min(day + 6, daysInMonth);
+    weeks.push({
+      index: weeks.length + 1,
+      start: new Date(start.getFullYear(), start.getMonth(), day, 0, 0, 0, 0),
+      end: new Date(start.getFullYear(), start.getMonth(), lastDay, 23, 59, 59, 999),
+    });
+  }
+  return weeks;
+}
+
+export const inDateRange = (d, range) => {
   const t = new Date(d).getTime();
   return t >= range.start.getTime() && t <= range.end.getTime();
 };
 
 /**
- * The heart of the mess/meal manager. For a period, computes:
+ * The heart of the mess/meal manager. For the selected month, computes:
  *   • totals — deposit (জমা), meals, meal cost (bazar), meal rate, mess balance
  *   • per member — meals, deposit, meal cost (meals × rate), balance (deposit − cost)
  * Meal rate = total bazar cost ÷ total meals. A member's balance is what the
  * mess owes them (+) or what they still need to deposit (−).
  */
-export function messSummary(state, period = 'month') {
-  const range = periodRange(period);
+export function messSummary(state, monthOffset = 0) {
+  const range = monthRange(monthOffset);
   const { meals = [], groceries = [], deposits = [], roommates = [] } = state;
 
   const perMember = roommates.map((r) => ({
@@ -481,19 +497,19 @@ export function messSummary(state, period = 'month') {
   const byId = Object.fromEntries(perMember.map((p) => [p.id, p]));
 
   meals.forEach((m) => {
-    if (!inRange(m.date, range)) return;
+    if (!inDateRange(m.date, range)) return;
     const p = byId[m.roommateId];
     if (!p) return;
     p.meals += (Number(m.breakfast) || 0) + (Number(m.lunch) || 0) + (Number(m.dinner) || 0);
   });
   deposits.forEach((d) => {
-    if (!inRange(d.date, range)) return;
+    if (!inDateRange(d.date, range)) return;
     const p = byId[d.roommateId];
     if (!p) return;
     p.deposit += Number(d.amount) || 0;
   });
 
-  const totalMealCost = groceries.filter((g) => inRange(g.date, range)).reduce((s, g) => s + (Number(g.amount) || 0), 0);
+  const totalMealCost = groceries.filter((g) => inDateRange(g.date, range)).reduce((s, g) => s + (Number(g.amount) || 0), 0);
   const totalMeals = perMember.reduce((s, p) => s + p.meals, 0);
   const totalDeposit = perMember.reduce((s, p) => s + p.deposit, 0);
 
@@ -509,7 +525,7 @@ export function messSummary(state, period = 'month') {
   });
 
   return {
-    period,
+    monthOffset,
     range,
     totalDeposit,
     totalMeals,
@@ -520,4 +536,29 @@ export function messSummary(state, period = 'month') {
     messBalance: totalDeposit - totalMealCost,
     perMember,
   };
+}
+
+/**
+ * Week-by-week breakdown of the selected month: for each fixed week segment,
+ * the meals eaten, bazar spent, deposits made, and meal cost (meals × the
+ * MONTH's rate — the rate is a monthly figure, so weekly costs always sum
+ * back to the monthly total).
+ */
+export function messWeeklyBreakdown(state, monthOffset = 0, mealRate = 0) {
+  const { meals = [], groceries = [], deposits = [] } = state;
+  return monthWeeks(monthOffset).map((w) => {
+    const row = { ...w, meals: 0, bazar: 0, deposit: 0, mealCost: 0 };
+    meals.forEach((m) => {
+      if (!inDateRange(m.date, row)) return;
+      row.meals += (Number(m.breakfast) || 0) + (Number(m.lunch) || 0) + (Number(m.dinner) || 0);
+    });
+    groceries.forEach((g) => {
+      if (inDateRange(g.date, row)) row.bazar += Number(g.amount) || 0;
+    });
+    deposits.forEach((d) => {
+      if (inDateRange(d.date, row)) row.deposit += Number(d.amount) || 0;
+    });
+    row.mealCost = row.meals * mealRate;
+    return row;
+  });
 }

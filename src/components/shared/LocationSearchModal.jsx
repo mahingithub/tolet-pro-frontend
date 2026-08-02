@@ -31,6 +31,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, MapPin, X, TrendingUp, Building2, ArrowLeft } from 'lucide-react';
 import { POPULAR_AREAS } from '../../data/searchData';
 import { searchBdLocations } from '../../data/bdLocations';
@@ -201,7 +202,7 @@ const LocationSearchModal = ({
 
   const hasQuery = query.trim().length > 0;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100000] font-sans flex md:items-center md:justify-center md:p-4">
       {/* Backdrop — full-screen white on mobile (panel covers it), dimmed on desktop */}
       <div
@@ -352,7 +353,8 @@ const LocationSearchModal = ({
           }
         `}</style>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
