@@ -294,50 +294,53 @@ const AppDownloadBanner = () => {
             <div className="absolute -top-10 right-1/4 w-48 h-32 bg-blue-600/10 blur-[56px] rounded-full pointer-events-none" />
             <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent pointer-events-none" />
 
-            <div className="relative w-full max-w-[1400px] mx-auto px-4 lg:px-6 flex items-center justify-center gap-5 h-[44px]">
+            <div className="relative w-full max-w-[1400px] mx-auto px-4 lg:px-6 flex items-center justify-between gap-4 h-[44px]">
               {/* Left: icon + text */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 <div className="w-7 h-7 rounded-lg shrink-0 p-1 flex items-center justify-center
                                 bg-gradient-to-br from-[#ba0036] to-[#ff4d7d]
                                 shadow-[0_4px_10px_-1px_rgba(186,0,54,0.5),0_1px_0_rgba(255,255,255,0.3)_inset]
                                 transition-transform duration-300 hover:scale-110 hover:-translate-y-px">
                   <img src="/icons/icon-192.png" alt="TO-LET PRO Logo" className="w-full h-full object-contain rounded-md" />
                 </div>
-                <p className="text-xs font-bold text-slate-300">
+                <p className="text-xs font-bold text-slate-300 truncate">
                   <span className="font-black text-white tracking-tight">TO-LET PRO</span>
                   <span className="mx-2 inline-block w-1 h-1 rounded-full bg-slate-600 align-middle" />
                   {isNative ? t.bannerDesktopNativeTxt : t.bannerDesktopStoreTxt}
                 </p>
-                <div className="flex items-center gap-0.5">
+                <div className="hidden lg:flex items-center gap-0.5 shrink-0">
                   {[...Array(5)].map((_, i) => (
                     <Star key={i} size={10} className="text-amber-400 fill-amber-400" />
                   ))}
                 </div>
               </div>
 
-              {/* CTA with hover sheen */}
-              <button
-                onClick={handleDownload}
-                className="group shrink-0 relative overflow-hidden px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-white
-                           bg-gradient-to-r from-[#ba0036] to-[#d4004a]
-                           shadow-[0_6px_16px_-2px_rgba(186,0,54,0.5),0_1px_0_rgba(255,255,255,0.25)_inset]
-                           hover:shadow-[0_8px_24px_-2px_rgba(186,0,54,0.65)] hover:scale-[1.04] active:scale-95
-                           transition-all duration-300 flex items-center gap-1.5
-                           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-              >
-                {/* Sheen sweep — hover only, motion-safe */}
-                <span className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 motion-safe:group-hover:animate-[banner-sheen_1.6s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full" aria-hidden="true" />
-                <Download size={11} /> {isNative ? t.bannerBtnInstall : t.bannerBtnDownload}
-              </button>
+              {/* Right: CTA + close */}
+              <div className="flex items-center gap-2 shrink-0">
+                {/* CTA with hover sheen */}
+                <button
+                  onClick={handleDownload}
+                  className="group shrink-0 relative overflow-hidden px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-white
+                             bg-gradient-to-r from-[#ba0036] to-[#d4004a]
+                             shadow-[0_6px_16px_-2px_rgba(186,0,54,0.5),0_1px_0_rgba(255,255,255,0.25)_inset]
+                             hover:shadow-[0_8px_24px_-2px_rgba(186,0,54,0.65)] hover:scale-[1.04] active:scale-95
+                             transition-all duration-300 flex items-center gap-1.5
+                             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                >
+                  {/* Sheen sweep — hover only, motion-safe */}
+                  <span className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 motion-safe:group-hover:animate-[banner-sheen_1.6s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full" aria-hidden="true" />
+                  <Download size={11} /> {isNative ? t.bannerBtnInstall : t.bannerBtnDownload}
+                </button>
 
-              {/* Close */}
-              <button
-                onClick={handleDismiss}
-                className="shrink-0 p-1.5 rounded-full text-slate-500 hover:text-white hover:bg-white/10 transition-colors ml-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                aria-label="Dismiss banner"
-              >
-                <X size={15} strokeWidth={2.5} />
-              </button>
+                {/* Close */}
+                <button
+                  onClick={handleDismiss}
+                  className="shrink-0 p-1.5 rounded-full text-slate-500 hover:text-white hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  aria-label="Dismiss banner"
+                >
+                  <X size={15} strokeWidth={2.5} />
+                </button>
+              </div>
             </div>
           </div>
 
