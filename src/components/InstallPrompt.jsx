@@ -93,6 +93,8 @@ export default function InstallPrompt() {
 
   if (!visible) return null;
 
+  const showIosHint = iosHint && !deferredPrompt;
+
   return (
     <div
       style={{
@@ -139,7 +141,7 @@ export default function InstallPrompt() {
             <div style={{ fontWeight: 800, fontSize: '14px', color: '#1f2937' }}>
               Install TO-LET PRO
             </div>
-            {iosHint ? (
+            {showIosHint ? (
               <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 500, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
                 Tap <Share size={14} style={{ color: '#007AFF' }} /> <b>Share</b> then <PlusSquare size={14} style={{ color: '#007AFF' }} /> <b>Add to Home Screen</b>
               </div>
@@ -151,7 +153,7 @@ export default function InstallPrompt() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {!iosHint && (
+            {!showIosHint && (
               <button
                 onClick={install}
                 style={{
