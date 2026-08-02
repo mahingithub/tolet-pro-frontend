@@ -173,7 +173,7 @@ const LeaveHouseholdSheet = ({ open, onClose, isBn, onConfirm }) => {
       toast.success(isBn ? 'হাউসহোল্ড ছেড়ে দিয়েছেন' : 'Left the household');
       onClose();
     } catch (e) {
-      const wrong = e?.code === 'invalid_password' || e?.status === 401;
+      const wrong = e?.code === 'invalid_password' || e?.status === 403 || e?.status === 401;
       toast.error(wrong ? (isBn ? 'পাসওয়ার্ড ভুল হয়েছে।' : 'Incorrect password.') : (e?.message || (isBn ? 'ব্যর্থ হয়েছে' : 'Something went wrong')));
       setBusy(false);
     }
