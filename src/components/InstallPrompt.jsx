@@ -19,9 +19,8 @@
 //     number and clear 'pwa:dismissed' in DevTools.
 
 import React, { useState, useEffect } from 'react';
-import { Share, PlusSquare } from 'lucide-react';
 
-const VISIT_THRESHOLD = 1;          // show after this many visits
+const VISIT_THRESHOLD = 3;          // show after this many visits
 const DISMISS_KEY = 'pwa:dismissed'; // remembers the user said "not now"
 const VISITS_KEY = 'pwa:visits';
 
@@ -93,23 +92,25 @@ export default function InstallPrompt() {
 
   if (!visible) return null;
 
-  const showIosHint = iosHint && !deferredPrompt;
-
   return (
     <div
       style={{
-        position: 'relative',
-        width: '100%',
+        position: 'fixed',
+        left: '50%',
+        bottom: '20px',
+        transform: 'translateX(-50%)',
         zIndex: 1000,
-        background: '#fff',
-        borderBottom: '1px solid #f0f0f0',
+        width: 'calc(100% - 32px)',
+        maxWidth: '420px',
       }}
     >
       <div
         style={{
-          maxWidth: '1400px',
-          margin: '0 auto',
-          padding: '12px 16px',
+          background: '#fff',
+          borderRadius: '20px',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.18)',
+          border: '1px solid #f0f0f0',
+          padding: '16px',
           display: 'flex',
           alignItems: 'center',
           gap: '14px',
@@ -136,24 +137,22 @@ export default function InstallPrompt() {
         </div>
 
         {/* Text + actions */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: '14px', color: '#1f2937' }}>
-              Install TO-LET PRO
-            </div>
-            {showIosHint ? (
-              <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 500, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-                Tap <Share size={14} style={{ color: '#007AFF' }} /> <b>Share</b> then <PlusSquare size={14} style={{ color: '#007AFF' }} /> <b>Add to Home Screen</b>
-              </div>
-            ) : (
-              <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 500, marginTop: '2px' }}>
-                Add to your home screen for quick access.
-              </div>
-            )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 800, fontSize: '14px', color: '#1f2937' }}>
+            Install TO-LET PRO
           </div>
+          {iosHint ? (
+            <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 500, marginTop: '2px', lineHeight: 1.4 }}>
+              Tap the Share button, then “Add to Home Screen”.
+            </div>
+          ) : (
+            <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 500, marginTop: '2px' }}>
+              Add to your home screen for quick access.
+            </div>
+          )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {!showIosHint && (
+          {!iosHint && (
+            <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
               <button
                 onClick={install}
                 style={{
@@ -164,23 +163,33 @@ export default function InstallPrompt() {
               >
                 Install
               </button>
-            )}
-
-            {/* Close X */}
-            <button
-              onClick={dismiss}
-              aria-label="Dismiss"
-              style={{
-                background: '#f3f4f6', border: 'none', borderRadius: '50%',
-                width: '28px', height: '28px', cursor: 'pointer', flexShrink: 0,
-                color: '#6b7280', fontSize: '16px', lineHeight: 1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              ×
-            </button>
-          </div>
+              <button
+                onClick={dismiss}
+                style={{
+                  background: 'transparent', color: '#6b7280', border: 'none',
+                  borderRadius: '10px', padding: '8px 12px',
+                  fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                Not now
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Close X (mainly for the iOS hint, which has no buttons) */}
+        <button
+          onClick={dismiss}
+          aria-label="Dismiss"
+          style={{
+            background: '#f3f4f6', border: 'none', borderRadius: '50%',
+            width: '28px', height: '28px', cursor: 'pointer', flexShrink: 0,
+            color: '#6b7280', fontSize: '16px', lineHeight: 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          ×
+        </button>
       </div>
     </div>
   );

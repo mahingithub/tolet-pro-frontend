@@ -40,6 +40,7 @@ import MobileBottomNav from "./components/mobile/MobileBottomNav";
 
 // --- PWA install banner (Phase Call-5) ---
 import InstallPrompt from "./components/InstallPrompt";
+import AppDownloadBanner from "./components/AppDownloadBanner";
 
 // --- Legal pages (Phase 7) ---
 import PrivacyPolicy from "./components/legal/PrivacyPolicy";
@@ -200,7 +201,7 @@ const AppLayout = () => {
 	return (
 		<div className="min-h-screen bg-white">
 			<GlobalCallSocket />
-			<InstallPrompt />
+			<AppDownloadBanner />
 			{!shouldHideNavbar && (
 				<div className={isPropertyListingRoute ? "hidden lg:block" : ""}>
 					<Navbar />
@@ -292,6 +293,7 @@ const AppLayout = () => {
 			<GlobalToaster />
 			{!shouldHideAIAssistant && <GlobalAIAssistant />}
 			<MobileBottomNav hideOnRoutes={['/login', '/list-property', '/properties/']} />
+			<InstallPrompt />
 			<FeedbackButton />
 		</div>
 	);
