@@ -109,25 +109,25 @@ const AppDownloadBanner = () => {
             </div>
 
             <h3 className="text-[22px] font-black text-center text-slate-900 dark:text-white mb-2 leading-tight">
-              {t('bannerInstallTitle')}
+              {t.bannerInstallTitle}
             </h3>
 
             {guide === 'ios' && (
               <div className="space-y-4 mt-6 relative z-10">
                 <p className="text-[13px] text-slate-600 dark:text-slate-400 text-center font-semibold mb-2">
-                  {t('bannerIosSub')}
+                  {t.bannerIosSub}
                 </p>
                 <div className="flex items-center gap-4 bg-white/60 dark:bg-black/40 backdrop-blur-md p-4 rounded-2xl border border-white/40 dark:border-white/10 shadow-sm">
                   <div className="w-10 h-10 bg-blue-500/10 dark:bg-blue-500/20 rounded-xl flex items-center justify-center shrink-0 text-blue-600 dark:text-blue-400">
                     <Share size={20} strokeWidth={2.5} />
                   </div>
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{t('bannerIosStep1')} <span className="text-blue-600 dark:text-blue-400">{t('bannerIosStep1b')}</span> {t('bannerIosStep1c')}</p>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{t.bannerIosStep1} <span className="text-blue-600 dark:text-blue-400">{t.bannerIosStep1b}</span> {t.bannerIosStep1c}</p>
                 </div>
                 <div className="flex items-center gap-4 bg-white/60 dark:bg-black/40 backdrop-blur-md p-4 rounded-2xl border border-white/40 dark:border-white/10 shadow-sm">
                   <div className="w-10 h-10 bg-slate-100 dark:bg-white/10 rounded-xl flex items-center justify-center shrink-0 text-slate-700 dark:text-slate-300">
                     <PlusSquare size={20} strokeWidth={2.5} />
                   </div>
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{t('bannerIosStep2')} <span className="text-slate-900 dark:text-white">{t('bannerIosStep2b')}</span> {t('bannerIosStep2c')}</p>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{t.bannerIosStep2} <span className="text-slate-900 dark:text-white">{t.bannerIosStep2b}</span> {t.bannerIosStep2c}</p>
                 </div>
                 {/* Visual downward arrow hinting at the bottom menu */}
                 <div className="flex justify-center pt-3 pb-1">
@@ -142,15 +142,15 @@ const AppDownloadBanner = () => {
             {guide === 'mac' && (
               <div className="space-y-4 mt-6 relative z-10">
                 <p className="text-[13px] text-slate-600 dark:text-slate-400 text-center font-semibold mb-2">
-                  {t('bannerMacSub')}
+                  {t.bannerMacSub}
                 </p>
                 <div className="bg-white/60 dark:bg-black/40 backdrop-blur-md p-5 rounded-2xl border border-white/40 dark:border-white/10 text-center space-y-4 shadow-sm">
                   <p className="text-[15px] font-bold text-slate-800 dark:text-slate-200">
-                    {t('bannerMacStep1')} <span className="bg-white dark:bg-slate-800 px-2.5 py-1 rounded-md shadow-sm border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm">{t('bannerMacStep1b')}</span> {t('bannerMacStep1c')}
+                    {t.bannerMacStep1} <span className="bg-white dark:bg-slate-800 px-2.5 py-1 rounded-md shadow-sm border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm">{t.bannerMacStep1b}</span> {t.bannerMacStep1c}
                   </p>
                   <div className="text-slate-400">↓</div>
                   <p className="text-[15px] font-bold text-slate-800 dark:text-slate-200">
-                    {t('bannerMacStep2')} <span className="bg-white dark:bg-slate-800 px-2.5 py-1 rounded-md shadow-sm border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm">{t('bannerMacStep2b')}</span> {t('bannerMacStep2c')}
+                    {t.bannerMacStep2} <span className="bg-white dark:bg-slate-800 px-2.5 py-1 rounded-md shadow-sm border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm">{t.bannerMacStep2b}</span> {t.bannerMacStep2c}
                   </p>
                 </div>
               </div>
@@ -163,17 +163,17 @@ const AppDownloadBanner = () => {
                     <Info size={20} strokeWidth={2.5} />
                   </div>
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                    {t('bannerUnsupportedMsg')}
+                    {t.bannerUnsupportedMsg}
                   </p>
                 </div>
                 <p className="text-[13px] text-slate-600 dark:text-slate-400 text-center font-semibold">
-                  {t('bannerUnsupportedHint')}
+                  {t.bannerUnsupportedHint}
                 </p>
               </div>
             )}
 
             <button onClick={() => setGuide(null)} className="w-full mt-5 py-3.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-[18px] font-black text-sm tracking-wide transition-all active:scale-[0.98] relative z-10 shadow-md">
-              {t('bannerGotItBtn')}
+              {t.bannerGotItBtn}
             </button>
           </div>
         </div>
@@ -194,13 +194,13 @@ const AppDownloadBanner = () => {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <p className="text-[13px] font-black leading-tight truncate">TO-LET PRO</p>
-                  <span className="text-[8px] font-black uppercase tracking-widest text-[#ff4d7d] bg-[#ff4d7d]/15 px-1.5 py-0.5 rounded-full leading-none">{t('bannerMobileFree')}</span>
+                  <span className="text-[8px] font-black uppercase tracking-widest text-[#ff4d7d] bg-[#ff4d7d]/15 px-1.5 py-0.5 rounded-full leading-none">{t.bannerMobileFree}</span>
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
                   {[...Array(5)].map((_, i) => (
                     <Star key={i} size={9} className="text-amber-400 fill-amber-400" />
                   ))}
-                  <span className="text-[10px] text-slate-400 font-semibold ml-0.5">{isNative ? t('bannerNativeApp') : t('bannerPlayStore')}</span>
+                  <span className="text-[10px] text-slate-400 font-semibold ml-0.5">{isNative ? t.bannerNativeApp : t.bannerPlayStore}</span>
                 </div>
               </div>
 
@@ -209,7 +209,7 @@ const AppDownloadBanner = () => {
                 onClick={handleDownload}
                 className="shrink-0 bg-[#ba0036] hover:bg-[#d4004a] text-white px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-wider shadow-[0_4px_14px_rgba(186,0,54,0.4)] active:scale-95 transition-all flex items-center gap-1.5"
               >
-                <Download size={12} /> {isNative ? t('bannerBtnInstall') : t('bannerBtnDownload')}
+                <Download size={12} /> {isNative ? t.bannerBtnInstall : t.bannerBtnDownload}
               </button>
 
               {/* Close */}
@@ -232,7 +232,7 @@ const AppDownloadBanner = () => {
                   <img src="/icons/icon-192.png" alt="TO-LET PRO Logo" className="w-full h-full object-contain rounded-md" />
                 </div>
                 <p className="text-xs font-bold text-slate-300">
-                  <span className="font-black text-white">TO-LET PRO</span> {isNative ? t('bannerDesktopNativeTxt') : t('bannerDesktopStoreTxt')}
+                  <span className="font-black text-white">TO-LET PRO</span> {isNative ? t.bannerDesktopNativeTxt : t.bannerDesktopStoreTxt}
                 </p>
                 <div className="flex items-center gap-0.5">
                   {[...Array(5)].map((_, i) => (
@@ -246,7 +246,7 @@ const AppDownloadBanner = () => {
                 onClick={handleDownload}
                 className="shrink-0 bg-[#ba0036] hover:bg-[#d4004a] text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-[0_4px_14px_rgba(186,0,54,0.35)] hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5"
               >
-                <Download size={11} /> {isNative ? t('bannerBtnInstall') : t('bannerBtnDownload')}
+                <Download size={11} /> {isNative ? t.bannerBtnInstall : t.bannerBtnDownload}
               </button>
 
               {/* Close */}
