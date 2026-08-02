@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download, Smartphone, Star, Apple, Monitor, Share, PlusSquare } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 const STORAGE_KEY = 'toletpro_app_banner_dismissed';
 
@@ -15,6 +16,7 @@ const STORAGE_KEY = 'toletpro_app_banner_dismissed';
  *   • the page is loaded inside the native Android WebView (user agent check).
  */
 const AppDownloadBanner = () => {
+  const { t } = useLanguage();
   const [dismissed, setDismissed] = useState(true);  // default hidden until we check
   const [platform, setPlatform] = useState('android'); // 'android' | 'apple' | 'desktop'
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -76,80 +78,88 @@ const AppDownloadBanner = () => {
       } else {
         // Fallback instructions for Safari (iOS / Mac)
         const ua = navigator.userAgent || '';
+        const isChrome = /chrome|crios/i.test(ua);
+        
         if (/iphone|ipad|ipod/i.test(ua)) {
           setAppleDeviceType('ios');
           setShowAppleGuide(true);
-        } else if (/macintosh/i.test(ua)) {
+        } else if (/macintosh/i.test(ua) && !isChrome) {
           setAppleDeviceType('mac');
           setShowAppleGuide(true);
         } else {
-          alert("To install: Look for the install icon in your browser's address bar.");
+          alert("To install: Look for the 'Install App' icon in your browser's address bar (near the bookmark star).");
         }
       }
     }
   };
 
   const isNative = platform !== 'android';
-  const label = isNative ? 'Native App' : 'Play Store';
 
   return (
     <>
       {/* ─── VISUAL GUIDE MODAL (FOR APPLE DEVICES) ─── */}
       {showAppleGuide && (
-        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl relative animate-in slide-in-from-bottom-10 md:slide-in-from-bottom-0 md:zoom-in-95">
-            <button onClick={() => setShowAppleGuide(false)} className="absolute top-4 right-4 p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
-              <X size={18} className="text-gray-600" />
+        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="w-full max-w-[340px] rounded-[32px] p-6 shadow-[0_24px_48px_rgba(0,0,0,0.25)] border border-white/20 bg-white/80 dark:bg-[#151520]/80 backdrop-blur-3xl relative animate-in slide-in-from-bottom-8 md:slide-in-from-bottom-0 md:zoom-in-95 overflow-hidden">
+            {/* Subtle background glow */}
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#ba0036]/20 blur-[64px] rounded-full pointer-events-none" />
+            
+            <button onClick={() => setShowAppleGuide(false)} className="absolute top-4 right-4 p-2 bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 rounded-full transition-colors z-10">
+              <X size={16} className="text-slate-700 dark:text-slate-300" />
             </button>
             
-            <div className="w-16 h-16 bg-[#ba0036]/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Apple size={32} className="text-[#ba0036]" />
+            <div className="w-16 h-16 bg-gradient-to-br from-[#ba0036] to-[#ff4d7d] rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-[0_8px_16px_rgba(186,0,54,0.3)] relative z-10">
+              <img src="/icons/icon-192.png" alt="TO-LET PRO" className="w-10 h-10 object-contain drop-shadow-md rounded-lg" />
             </div>
             
-            <h3 className="text-xl font-black text-center text-gray-900 mb-2">
-              Install TO-LET PRO
+            <h3 className="text-[22px] font-black text-center text-slate-900 dark:text-white mb-2 leading-tight">
+              {t('bannerInstallTitle')}
             </h3>
             
             {appleDeviceType === 'ios' ? (
-              <div className="space-y-4 mt-6">
-                <p className="text-sm text-gray-600 text-center font-medium">
-                  Follow these 2 simple steps to install the app on your iPhone/iPad:
+              <div className="space-y-4 mt-6 relative z-10">
+                <p className="text-[13px] text-slate-600 dark:text-slate-400 text-center font-semibold mb-2">
+                  {t('bannerIosSub')}
                 </p>
-                <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                  <div className="w-10 h-10 bg-white shadow-sm rounded-xl flex items-center justify-center shrink-0 text-blue-500">
-                    <Share size={20} />
+                <div className="flex items-center gap-4 bg-white/60 dark:bg-black/40 backdrop-blur-md p-4 rounded-2xl border border-white/40 dark:border-white/10 shadow-sm">
+                  <div className="w-10 h-10 bg-blue-500/10 dark:bg-blue-500/20 rounded-xl flex items-center justify-center shrink-0 text-blue-600 dark:text-blue-400">
+                    <Share size={20} strokeWidth={2.5} />
                   </div>
-                  <p className="text-sm font-bold text-gray-800">1. Tap the <span className="text-blue-500">Share</span> button at the bottom of Safari.</p>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{t('bannerIosStep1')} <span className="text-blue-600 dark:text-blue-400">{t('bannerIosStep1b')}</span> {t('bannerIosStep1c')}</p>
                 </div>
-                <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                  <div className="w-10 h-10 bg-white shadow-sm rounded-xl flex items-center justify-center shrink-0 text-gray-700">
-                    <PlusSquare size={20} />
+                <div className="flex items-center gap-4 bg-white/60 dark:bg-black/40 backdrop-blur-md p-4 rounded-2xl border border-white/40 dark:border-white/10 shadow-sm">
+                  <div className="w-10 h-10 bg-slate-100 dark:bg-white/10 rounded-xl flex items-center justify-center shrink-0 text-slate-700 dark:text-slate-300">
+                    <PlusSquare size={20} strokeWidth={2.5} />
                   </div>
-                  <p className="text-sm font-bold text-gray-800">2. Scroll down and tap <span className="text-gray-900">Add to Home Screen</span>.</p>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{t('bannerIosStep2')} <span className="text-slate-900 dark:text-white">{t('bannerIosStep2b')}</span> {t('bannerIosStep2c')}</p>
                 </div>
                 {/* Visual downward arrow hinting at the bottom menu */}
-                <div className="flex justify-center pt-2">
-                  <div className="animate-bounce">
-                    <div className="w-1 h-8 bg-gradient-to-b from-transparent to-blue-500 mx-auto rounded-full" />
-                    <div className="w-3 h-3 border-b-2 border-r-2 border-blue-500 rotate-45 mx-auto -mt-2" />
+                <div className="flex justify-center pt-3 pb-1">
+                  <div className="animate-bounce flex flex-col items-center">
+                    <div className="w-[3px] h-8 bg-gradient-to-b from-blue-500/0 to-blue-500 mx-auto rounded-full" />
+                    <div className="w-3 h-3 border-b-[3px] border-r-[3px] border-blue-500 rotate-45 mx-auto -mt-2 rounded-sm" />
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="space-y-4 mt-6">
-                <p className="text-sm text-gray-600 text-center font-medium">
-                  Install the Native App on your MacBook in one click:
+              <div className="space-y-4 mt-6 relative z-10">
+                <p className="text-[13px] text-slate-600 dark:text-slate-400 text-center font-semibold mb-2">
+                  {t('bannerMacSub')}
                 </p>
-                <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100 text-center space-y-3">
-                  <p className="text-sm font-bold text-gray-800">Click <span className="bg-white px-2 py-1 rounded shadow-sm border border-gray-200">File</span> in the top Safari menu bar.</p>
-                  <p className="text-sm text-gray-400 font-black">↓</p>
-                  <p className="text-sm font-bold text-gray-800">Select <span className="bg-white px-2 py-1 rounded shadow-sm border border-gray-200">Add to Dock...</span></p>
+                <div className="bg-white/60 dark:bg-black/40 backdrop-blur-md p-5 rounded-2xl border border-white/40 dark:border-white/10 text-center space-y-4 shadow-sm">
+                  <p className="text-[15px] font-bold text-slate-800 dark:text-slate-200">
+                    {t('bannerMacStep1')} <span className="bg-white dark:bg-slate-800 px-2.5 py-1 rounded-md shadow-sm border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm">{t('bannerMacStep1b')}</span> {t('bannerMacStep1c')}
+                  </p>
+                  <div className="text-slate-400">↓</div>
+                  <p className="text-[15px] font-bold text-slate-800 dark:text-slate-200">
+                    {t('bannerMacStep2')} <span className="bg-white dark:bg-slate-800 px-2.5 py-1 rounded-md shadow-sm border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm">{t('bannerMacStep2b')}</span> {t('bannerMacStep2c')}
+                  </p>
                 </div>
               </div>
             )}
             
-            <button onClick={handleDismiss} className="w-full mt-6 py-3 font-bold text-gray-500 hover:text-gray-800 transition-colors">
-              Got it, thanks!
+            <button onClick={handleDismiss} className="w-full mt-5 py-3.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-[18px] font-black text-sm tracking-wide transition-all active:scale-[0.98] relative z-10 shadow-md">
+              {t('bannerGotItBtn')}
             </button>
           </div>
         </div>
@@ -162,21 +172,21 @@ const AppDownloadBanner = () => {
           <div className="md:hidden w-full bg-gradient-to-r from-[#0d0d14] via-[#1a0a14] to-[#0d0d20] text-white relative z-[61]">
             <div className="flex items-center gap-2.5 px-3 py-2">
               {/* App icon */}
-              <div className="w-10 h-10 rounded-xl bg-[#ba0036] flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(186,0,54,0.4)]">
-                {platform === 'apple' ? <Apple size={18} className="text-white" /> : <Smartphone size={18} className="text-white" />}
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#ba0036] to-[#ff4d7d] flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(186,0,54,0.4)] p-1.5">
+                <img src="/icons/icon-192.png" alt="TO-LET PRO Logo" className="w-full h-full object-contain rounded-lg" />
               </div>
 
               {/* Text */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <p className="text-[13px] font-black leading-tight truncate">TO-LET PRO</p>
-                  <span className="text-[8px] font-black uppercase tracking-widest text-[#ff4d7d] bg-[#ff4d7d]/15 px-1.5 py-0.5 rounded-full leading-none">Free</span>
+                  <span className="text-[8px] font-black uppercase tracking-widest text-[#ff4d7d] bg-[#ff4d7d]/15 px-1.5 py-0.5 rounded-full leading-none">{t('bannerMobileFree')}</span>
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
                   {[...Array(5)].map((_, i) => (
                     <Star key={i} size={9} className="text-amber-400 fill-amber-400" />
                   ))}
-                  <span className="text-[10px] text-slate-400 font-semibold ml-0.5">{label}</span>
+                  <span className="text-[10px] text-slate-400 font-semibold ml-0.5">{isNative ? t('bannerNativeApp') : t('bannerPlayStore')}</span>
                 </div>
               </div>
 
@@ -185,7 +195,7 @@ const AppDownloadBanner = () => {
                 onClick={handleDownload}
                 className="shrink-0 bg-[#ba0036] hover:bg-[#d4004a] text-white px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-wider shadow-[0_4px_14px_rgba(186,0,54,0.4)] active:scale-95 transition-all flex items-center gap-1.5"
               >
-                <Download size={12} /> {isNative ? 'Install' : 'ডাউনলোড'}
+                <Download size={12} /> {isNative ? t('bannerBtnInstall') : t('bannerBtnDownload')}
               </button>
 
               {/* Close */}
@@ -204,11 +214,11 @@ const AppDownloadBanner = () => {
             <div className="w-full max-w-[1400px] mx-auto px-4 lg:px-6 flex items-center justify-center gap-4 h-[38px]">
               {/* Left: icon + text */}
               <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-lg bg-[#ba0036] flex items-center justify-center shrink-0 shadow-sm">
-                  {platform === 'desktop' ? <Monitor size={13} className="text-white" /> : platform === 'apple' ? <Apple size={13} className="text-white" /> : <Smartphone size={13} className="text-white" />}
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[#ba0036] to-[#ff4d7d] flex items-center justify-center shrink-0 shadow-sm p-1">
+                  <img src="/icons/icon-192.png" alt="TO-LET PRO Logo" className="w-full h-full object-contain rounded-md" />
                 </div>
                 <p className="text-xs font-bold text-slate-300">
-                  <span className="font-black text-white">TO-LET PRO</span> {isNative ? 'Native App ডাউনলোড করুন — দ্রুত এবং নিরাপদ!' : 'অ্যাপ ডাউনলোড করুন — ১০× দ্রুত বাসা খুঁজুন!'}
+                  <span className="font-black text-white">TO-LET PRO</span> {isNative ? t('bannerDesktopNativeTxt') : t('bannerDesktopStoreTxt')}
                 </p>
                 <div className="flex items-center gap-0.5">
                   {[...Array(5)].map((_, i) => (
@@ -222,7 +232,7 @@ const AppDownloadBanner = () => {
                 onClick={handleDownload}
                 className="shrink-0 bg-[#ba0036] hover:bg-[#d4004a] text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-[0_4px_14px_rgba(186,0,54,0.35)] hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5"
               >
-                <Download size={11} /> {isNative ? 'Install App' : 'Download App'}
+                <Download size={11} /> {isNative ? t('bannerBtnInstall') : t('bannerBtnDownload')}
               </button>
 
               {/* Close */}
