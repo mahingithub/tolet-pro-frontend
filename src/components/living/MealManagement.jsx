@@ -25,21 +25,22 @@ const dayISO = (offset) => {
   return d.toISOString();
 };
 
-const MonthlyHistorySheet = ({ open, onClose, roommate, meals, language }) => {
+const MonthlyHistorySheet = ({ open, onClose, roommate, meals, range, monthName, language }) => {
   const isBn = language === 'বাংলা';
   const myMeals = useMemo(() => {
     if (!roommate) return [];
     return [...meals]
       .filter((m) => m.roommateId === roommate.id && (m.breakfast > 0 || m.lunch > 0 || m.dinner > 0))
+      .filter((m) => !range || inDateRange(m.date, range))
       .sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [meals, roommate]);
+  }, [meals, roommate, range]);
 
   return (
     <Sheet
       open={open}
       onClose={onClose}
       title={isBn ? 'মিলের হিস্ট্রি' : 'Meal History'}
-      subtitle={roommate ? roommate.name : ''}
+      subtitle={roommate ? `${roommate.name}${monthName ? ` · ${monthName}` : ''}` : ''}
     >
       <div className="py-2 space-y-2">
         {myMeals.length === 0 ? (
@@ -382,9 +383,17 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
             </span>
           </button>
         </div>
+        {summary.rateMode === 'manual' && summary.totalMeals > 0 && summary.totalMealCost === 0 && (
+          <div className="flex items-start gap-2 rounded-2xl bg-amber-50 border border-amber-100 p-3 mt-2.5">
+            <Info size={14} className="text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-[10.5px] font-semibold text-amber-700 leading-relaxed">
+              {isBn
+                ? `নির্দিষ্ট রেট (${taka(summary.mealRate, language)}) চালু — তাই এ মাসে বাজার না হলেও প্রতি মিলে চার্জ হচ্ছে। বাজার ÷ মিল হিসাব চাইলে রেট "অটো" করুন।`
+                : `Fixed rate (${taka(summary.mealRate, language)}) is on — so meals are charged even though no bazar has happened this month. Switch the rate to "Auto" if cost should follow bazar ÷ meals.`}
+            </p>
+          </div>
+        )}
       </Card>
-
-      {/* weekly breakdown — the month split into fixed weeks (1–7, 8–14, 15–21, 22–28, 29–end) */}
       <Card className="p-4">
         <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-2 flex items-center gap-1.5">
           <Scale size={15} className="text-gray-400" /> {isBn ? 'সাপ্তাহিক খরচ' : 'Weekly breakdown'}
@@ -513,7 +522,13 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
             <button key={p.id} onClick={() => setHistoryOpenFor(p.id)} className="w-full grid grid-cols-[1.5fr_0.7fr_1fr_1.05fr] gap-2 items-center py-2.5 active:bg-gray-50 transition text-left">
               <div className="flex items-center gap-2 min-w-0">
                 <Avatar roommate={p} size={28} />
-                <span className="text-[12.5px] font-bold text-gray-800 truncate">{p.isMe ? (isBn ? 'আপনি' : 'You') : p.name}</span>
+                <div className="min-w-0">
+                  <span className="text-[12.5px] font-bold text-gray-800 truncate block">{p.isMe ? (isBn ? 'আপনি' : 'You') : p.name}</span>
+                  {/* the "why" behind the balance: carry-over and this month's charge */}
+                  <span className="text-[9px] font-bold text-gray-400 truncate block">
+                    {isBn ? 'আগের' : 'Prev'} {takaSigned(p.opening, language)} · {isBn ? 'খরচ' : 'Cost'} −{taka(p.mealCost, language)}
+                  </span>
+                </div>
               </div>
               <span className="text-right text-[12.5px] font-black text-gray-900 tabular-nums">{num(p.meals, language)}</span>
               <span className="text-right text-[12.5px] font-bold text-gray-600 tabular-nums">{taka(p.deposit, language)}</span>
@@ -653,7 +668,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       <DepositSheet open={depositOpen} onClose={() => setDepositOpen(false)} roommates={roommates} onSave={addDeposit} />
       <GrocerySheet open={bazarOpen} onClose={() => setBazarOpen(false)} roommates={roommates} onSave={addGrocery} />
       <RateSheet open={rateOpen} onClose={() => setRateOpen(false)} autoRate={summary.autoRate} current={mealRateSetting} onSave={setMealRate} language={language} />
-      <MonthlyHistorySheet open={!!historyOpenFor} onClose={() => setHistoryOpenFor(null)} roommate={historyOpenFor ? roommateById(roommates, historyOpenFor) : null} meals={meals} language={language} />
+      <MonthlyHistorySheet open={!!historyOpenFor} onClose={() => setHistoryOpenFor(null)} roommate={historyOpenFor ? roommateById(roommates, historyOpenFor) : null} meals={meals} range={summary.range} monthName={periodLabel} language={language} />
       <ConfirmDialog
         open={!!pendingDelete}
         onClose={() => setPendingDelete(null)}
