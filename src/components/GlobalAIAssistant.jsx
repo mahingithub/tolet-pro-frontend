@@ -9,6 +9,7 @@ import {
 import VideoModal from './shared/VideoModal';
 
 import { useAuth } from '../context/AuthContext.jsx';
+import { useLanguage } from '../context/LanguageContext';
 import {
   openTicket as svcOpenTicket,
   listMyTickets,
@@ -48,6 +49,10 @@ const GlobalAIAssistant = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated } = useAuth();
+  // Current UI language mode — sent with every AI question so the bot names
+  // the buttons the user actually sees ('যোগাযোগ করুন' vs 'Inquire').
+  const { language } = useLanguage() || {};
+  const uiLang = language === 'বাংলা' ? 'bn' : 'en';
 
   const messagesEndRef = useRef(null);
   const chatWindowRef = useRef(null);
@@ -257,7 +262,7 @@ const GlobalAIAssistant = () => {
       const response = await fetch(`${API}/ai-chat/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeader() },
-        body: JSON.stringify({ text, history: historyPayload })
+        body: JSON.stringify({ text, history: historyPayload, language: uiLang })
       });
 
       if (response.status === 401) {
@@ -284,6 +289,9 @@ const GlobalAIAssistant = () => {
           sender: 'ai',
           text: data.text || '',
           properties: Array.isArray(data.properties) && data.properties.length ? data.properties : undefined,
+          // Direct in-app navigation buttons the AI attached (e.g. "Add
+          // Property" under a how-to answer). [{ label, route }]
+          actions: Array.isArray(data.actions) && data.actions.length ? data.actions : undefined,
           // The AI can attach ONE admin-published walkthrough video when the
           // question matches a guide (e.g. "how do I rent a house?"). It renders
           // as a "Watch" button under the reply that opens the video modal.
@@ -618,6 +626,22 @@ const GlobalAIAssistant = () => {
                         >
                           <Sparkles size={12} /> {msg.action.label} <ExternalLink size={12} />
                         </button>
+                      )}
+                      {Array.isArray(msg.actions) && msg.actions.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {msg.actions.map((a, i) => (
+                            <button
+                              key={`${a.route}-${i}`}
+                              onClick={() => {
+                                navigate(a.route);
+                                setIsOpen(false);
+                              }}
+                              className="flex items-center gap-2 bg-gray-900 text-white hover:bg-gray-800 px-4 py-2 rounded-xl text-xs font-black transition-colors shadow-sm"
+                            >
+                              <Sparkles size={12} /> {a.label} <ExternalLink size={12} />
+                            </button>
+                          ))}
+                        </div>
                       )}
                       {msg.videoAction && (
                         <button

@@ -191,7 +191,11 @@ const AppLayout = () => {
 	const shouldShowAIAssistant =
 		location.pathname === "/" ||
 		location.pathname.startsWith("/properties/") ||
-		location.pathname.startsWith("/property/");
+		location.pathname.startsWith("/property/") ||
+		// Dashboards too — landlords/tenants need the helpdesk + AI guides
+		// exactly where they manage their listings and rentals.
+		location.pathname.startsWith("/tenant-dashboard") ||
+		location.pathname.startsWith("/host-dashboard");
 
 	const shouldHideAIAssistant = !shouldShowAIAssistant;
 
