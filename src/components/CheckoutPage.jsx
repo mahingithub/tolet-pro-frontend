@@ -23,7 +23,7 @@ const PAYMENT_METHODS = [
     descriptionBn: 'মোবাইল ওয়ালেট',
     logoPath: '/payment svg/bkash.svg',
     icon: (
-      <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-[#e2136e] to-[#c01159] rounded-2xl flex items-center justify-center shadow-lg">
+      <div className="w-16 h-16 md:w-20 md:h-20 bg-transparent rounded-2xl flex items-center justify-center">
         <img 
           src="/payment svg/bkash.svg" 
           alt="bKash" 
@@ -52,7 +52,7 @@ const PAYMENT_METHODS = [
     descriptionBn: 'মোবাইল ওয়ালেট',
     logoPath: '/payment svg/nagad.png',
     icon: (
-      <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-[#f7941d] to-[#e67e0a] rounded-2xl flex items-center justify-center shadow-lg">
+      <div className="w-16 h-16 md:w-20 md:h-20 bg-transparent rounded-2xl flex items-center justify-center">
         <img 
           src="/payment svg/nagad.png" 
           alt="Nagad" 
@@ -271,7 +271,7 @@ const CheckoutPage = () => {
                       }`}
                     >
                       {isSelected && (
-                        <div className={`absolute -top-3 -right-3 w-8 h-8 rounded-full ${method.bgColor} flex items-center justify-center shadow-lg`}>
+                        <div className={`absolute -top-3 -right-3 w-8 h-8 rounded-full ${method.bgColor} flex items-center justify-center shadow-md`}>
                           <Check size={16} className="text-white" strokeWidth={3} />
                         </div>
                       )}

@@ -175,6 +175,8 @@ const AppLayout = () => {
 		"/living",
 		"/login",
 		"/account",
+		"/subscription",
+		"/checkout",
 		// Property detail pages have their own dedicated sticky header
 		// (Back / breadcrumb / save+share), so the marketing navbar is
 		// redundant here and caused a "floating" second bar on scroll.
