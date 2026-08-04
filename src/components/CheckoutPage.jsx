@@ -4,7 +4,7 @@ import useGoBack from '../hooks/useGoBack';
 import { useLanguage } from '../context/LanguageContext';
 import { subscriptionService, PLANS } from '../services/subscriptionService';
 import { ArrowLeft, ShieldCheck, Check, Info, Lock } from 'lucide-react';
-import { BkashGateway, NagadGateway, CardGateway } from './payment/MerchantGateways';
+import { BkashGateway, NagadGateway } from './payment/MerchantGateways';
 
 const PAYMENT_METHODS = [
   { 
@@ -14,7 +14,17 @@ const PAYMENT_METHODS = [
     color: 'bg-[#e2136e]',
     borderColor: 'border-[#e2136e]',
     bgTint: 'bg-[#e2136e]/5',
-    logo: 'bKash'
+    logo: (
+      <div className="w-16 h-10 sm:w-20 sm:h-12 bg-[#e2136e] rounded-xl flex items-center justify-center shadow-sm transition-transform">
+        <img 
+          src="https://scripts.pay.bka.sh/logo/bkash_logo.svg" 
+          alt="bKash" 
+          className="w-[70%] sm:w-[75%] h-auto object-contain brightness-0 invert" 
+          onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} 
+        />
+        <span className="hidden text-white font-black text-sm sm:text-lg tracking-tight">bKash</span>
+      </div>
+    )
   },
   { 
     id: 'nagad',  
@@ -23,25 +33,11 @@ const PAYMENT_METHODS = [
     color: 'bg-[#f7941d]',
     borderColor: 'border-[#f7941d]',
     bgTint: 'bg-[#f7941d]/5',
-    logo: 'Nagad'
-  },
-  { 
-    id: 'rocket', 
-    label: 'Rocket', 
-    labelBn: 'রকেট',
-    color: 'bg-[#8c1586]',
-    borderColor: 'border-[#8c1586]',
-    bgTint: 'bg-[#8c1586]/5',
-    logo: 'Rocket'
-  },
-  { 
-    id: 'card',   
-    label: 'Card / Online', 
-    labelBn: 'কার্ড / অনলাইন',
-    color: 'bg-blue-600',
-    borderColor: 'border-blue-600',
-    bgTint: 'bg-blue-600/5',
-    logo: 'Cards'
+    logo: (
+      <div className="w-16 h-10 sm:w-20 sm:h-12 bg-[#f7941d] rounded-xl flex items-center justify-center shadow-sm transition-transform">
+        <span className="text-white font-black text-base sm:text-xl tracking-widest">নগদ</span>
+      </div>
+    )
   }
 ];
 
@@ -234,12 +230,6 @@ const CheckoutPage = () => {
       )}
       {activeGateway === 'nagad' && (
         <NagadGateway amount={plan.price} onPay={handlePaySuccess} onClose={() => setActiveGateway(null)} />
-      )}
-      {activeGateway === 'rocket' && (
-        <BkashGateway amount={plan.price} onPay={handlePaySuccess} onClose={() => setActiveGateway(null)} />
-      )}
-      {activeGateway === 'card' && (
-        <CardGateway amount={plan.price} onPay={handlePaySuccess} onClose={() => setActiveGateway(null)} />
       )}
     </div>
   );
