@@ -174,10 +174,10 @@ export const subscriptionService = {
     return lang === 'বাংলা' ? entry.bn : entry.en;
   },
 
-  async subscribe(planId) {
+  async subscribe(planId, paymentMethod = 'bKash') {
     const data = await call('/billing/checkout', {
       method: 'POST',
-      body: { planId, paymentMethod: 'bKash' }
+      body: { planId, paymentMethod }
     });
     return updateCache(data.subscription);
   },

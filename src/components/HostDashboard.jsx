@@ -3138,8 +3138,8 @@ const HostDashboard = () => {
               <div className="hidden md:block text-left ml-1">
                 <div className="flex items-center gap-1.5">
                   <p className="text-xs font-black text-gray-800 leading-none truncate max-w-[80px]">{userData.fullName.split(' ')[0]}</p>
-                  {subStatus.tier === 'pro' && <span className="bg-[#ba0036] text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center">Pro</span>}
-                  {subStatus.tier === 'plus' && <span className="bg-gray-900 text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center">Plus</span>}
+                  {subStatus.isPaid && subStatus.tier === 'pro' && <span className="bg-[#ba0036] text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center">Pro</span>}
+                  {subStatus.isPaid && subStatus.tier === 'plus' && <span className="bg-gray-900 text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center">Plus</span>}
                 </div>
                 <p className="text-[9px] font-bold text-[#ba0036] uppercase tracking-widest mt-1">{t?.hostPortal || (language === 'বাংলা' ? 'হোস্ট পোর্টাল' : 'Host Portal')}</p>
               </div>
@@ -3166,8 +3166,8 @@ const HostDashboard = () => {
             <div>
               <div className="flex items-center gap-1.5">
                 <p className="text-[13px] font-black text-gray-900 leading-tight group-hover:text-[#ba0036] transition-colors truncate max-w-[120px]">{userData.fullName}</p>
-                {subStatus.tier === 'pro' && <span className="bg-[#ba0036] text-white text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center">Pro</span>}
-                {subStatus.tier === 'plus' && <span className="bg-gray-900 text-white text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center">Plus</span>}
+                {subStatus.isPaid && subStatus.tier === 'pro' && <span className="bg-[#ba0036] text-white text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center">Pro</span>}
+                {subStatus.isPaid && subStatus.tier === 'plus' && <span className="bg-gray-900 text-white text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center">Plus</span>}
               </div>
               <p className="text-[9px] font-bold text-[#ba0036] uppercase tracking-widest mt-1">{t?.managingUrbanLiving || (language === 'বাংলা' ? 'ম্যানেজিং আরবান লিভিং' : 'MANAGING URBAN LIVING')}</p>
             </div>
