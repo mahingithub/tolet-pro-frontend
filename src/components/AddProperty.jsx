@@ -1412,6 +1412,7 @@ const AddProperty = () => {
   const coverInputRef = useRef(null);
   const roomInputRef  = useRef(null);
   const [selectedRoomType, setSelectedRoomType] = useState('bedroom');
+  const [toast, setToast] = useState(null);
 
   // Keep the active photo-category tab valid for the current property kind, so
   // a commercial upload is never tagged 'bedroom' (residential). Reseed to the
