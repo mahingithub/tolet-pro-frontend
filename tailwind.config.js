@@ -45,6 +45,20 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
+        display: ['Sora', 'sans-serif'],
+      },
+      keyframes: {
+        shimmer: {
+          '100%': { transform: 'translateX(100%)' },
+        },
+        'border-shimmer': {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+        }
+      },
+      animation: {
+        'shimmer': 'shimmer 2s infinite',
+        'border-shimmer': 'border-shimmer 3s ease infinite',
       }
     },
   },
