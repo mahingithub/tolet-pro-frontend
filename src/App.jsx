@@ -31,6 +31,7 @@ import LandlordProfile from "./components/LandlordProfile";
 import TenantProfile from "./components/TenantProfile";
 import PrivacyCenter from "./components/PrivacyCenter.jsx";
 import SubscriptionPage from "./components/SubscriptionPage";
+import CheckoutPage from "./components/CheckoutPage";
 import SupportPage from "./components/SupportPage";
 import ServicesPage from "./components/ServicesPage";
 import HowItWorks from "./components/HowItWorks";
@@ -279,6 +280,14 @@ const AppLayout = () => {
 					element={
 						<RequireAuth requireRole="landlord">
 							<SubscriptionPage />
+						</RequireAuth>
+					}
+				/>
+				<Route
+					path="/checkout/:planId"
+					element={
+						<RequireAuth>
+							<CheckoutPage />
 						</RequireAuth>
 					}
 				/>
