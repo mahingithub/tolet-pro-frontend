@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import useGoBack from '../hooks/useGoBack';
 import { useLanguage } from '../context/LanguageContext';
 import { subscriptionService, PLANS } from '../services/subscriptionService';
-import { ArrowLeft, ShieldCheck, Check, Info } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Check, Info, Lock } from 'lucide-react';
 import { BkashGateway, NagadGateway, CardGateway } from './payment/MerchantGateways';
 
 const PAYMENT_METHODS = [
@@ -12,17 +12,17 @@ const PAYMENT_METHODS = [
     label: 'bKash', 
     labelBn: 'বিকাশ',
     color: 'bg-[#e2136e]',
-    borderHover: 'hover:border-[#e2136e]',
-    textActive: 'text-[#e2136e]',
-    logo: 'bKash' // Handled via styling in the card for simplicity, or we could use SVG
+    borderColor: 'border-[#e2136e]',
+    bgTint: 'bg-[#e2136e]/5',
+    logo: 'bKash'
   },
   { 
     id: 'nagad',  
     label: 'Nagad',  
     labelBn: 'নগদ',
     color: 'bg-[#f7941d]',
-    borderHover: 'hover:border-[#f7941d]',
-    textActive: 'text-[#f7941d]',
+    borderColor: 'border-[#f7941d]',
+    bgTint: 'bg-[#f7941d]/5',
     logo: 'Nagad'
   },
   { 
@@ -30,17 +30,17 @@ const PAYMENT_METHODS = [
     label: 'Rocket', 
     labelBn: 'রকেট',
     color: 'bg-[#8c1586]',
-    borderHover: 'hover:border-[#8c1586]',
-    textActive: 'text-[#8c1586]',
+    borderColor: 'border-[#8c1586]',
+    bgTint: 'bg-[#8c1586]/5',
     logo: 'Rocket'
   },
   { 
     id: 'card',   
-    label: 'Card/Online Banking', 
-    labelBn: 'কার্ড/অনলাইন ব্যাংকিং',
+    label: 'Card / Online', 
+    labelBn: 'কার্ড / অনলাইন',
     color: 'bg-blue-600',
-    borderHover: 'hover:border-blue-600',
-    textActive: 'text-blue-600',
+    borderColor: 'border-blue-600',
+    bgTint: 'bg-blue-600/5',
     logo: 'Cards'
   }
 ];
@@ -88,23 +88,23 @@ const CheckoutPage = () => {
   };
 
   const isPro = plan.tier === 'pro';
-  const accentColor = isPro ? 'amber' : 'violet';
   
-  // Tailwind dynamic classes (must map explicitly to avoid purging)
+  // Theme variables
   const themeClasses = {
-    text: isPro ? 'text-amber-600 dark:text-amber-400' : 'text-violet-600 dark:text-violet-400',
-    bg: isPro ? 'bg-amber-600 hover:bg-amber-700' : 'bg-violet-600 hover:bg-violet-700',
-    bgLight: isPro ? 'bg-amber-50 dark:bg-amber-500/10' : 'bg-violet-50 dark:bg-violet-500/10',
-    border: isPro ? 'border-amber-200 dark:border-amber-500/30' : 'border-violet-200 dark:border-violet-500/30',
+    badgeText: isPro ? 'text-amber-700 dark:text-amber-400' : 'text-violet-700 dark:text-violet-400',
+    badgeBg: isPro ? 'bg-amber-100 dark:bg-amber-500/20' : 'bg-violet-100 dark:bg-violet-500/20',
+    buttonBg: isPro ? 'bg-amber-500 hover:bg-amber-600' : 'bg-violet-600 hover:bg-violet-700',
+    toggleBg: isPro ? 'bg-amber-500' : 'bg-violet-600',
+    shadow: isPro ? 'shadow-amber-500/30' : 'shadow-violet-600/30',
   };
 
-  return (
-    <div className="min-h-screen bg-[#F4F6FA] dark:bg-[#0A0A0F] font-sans relative overflow-hidden text-slate-900 dark:text-white pb-24 transition-colors duration-300">
-      
-      {/* Background decorations */}
-      <div className="fixed top-[-20%] left-[-10%] w-[50vw] h-[50vw] bg-violet-600/10 dark:bg-violet-600/15 rounded-full blur-[120px] pointer-events-none z-0" />
-      <div className="fixed bottom-[-20%] right-[-10%] w-[50vw] h-[50vw] bg-amber-500/10 dark:bg-amber-500/15 rounded-full blur-[120px] pointer-events-none z-0" />
+  const benefitText = isPro 
+    ? (isBn ? 'সীমাহীন বাড়ি, AI সহায়তা, সব ফিচার আনলক' : 'Unlimited listings, AI insights, all features unlocked')
+    : (isBn ? '৩টি বাড়ি লিস্ট করুন, ভাড়া ট্র্যাক করুন' : 'List up to 3 properties, track rent');
 
+  return (
+    <div className="min-h-screen bg-[#F4F6FA] dark:bg-[#0A0A0F] font-sans text-slate-900 dark:text-white pb-12 transition-colors duration-300 flex justify-center">
+      
       {/* Toast Notification */}
       <div className={`fixed top-8 left-1/2 -translate-x-1/2 z-[100] transition-all duration-500 ease-out ${toast ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-10 scale-95 pointer-events-none'}`}>
         <div className={`backdrop-blur-2xl px-6 py-4 rounded-2xl shadow-[0_20px_40px_rgba(0,0,0,0.15)] border flex items-center gap-3 ${toast?.type === 'error' ? 'bg-red-500/90 text-white border-red-400' : 'bg-slate-900/90 dark:bg-white/10 text-white border-white/20'}`}>
@@ -113,173 +113,137 @@ const CheckoutPage = () => {
         </div>
       </div>
 
-      <div className="relative z-10 max-w-5xl mx-auto px-4 md:px-8 pt-6 md:pt-12">
-        <button
-          type="button"
-          onClick={goBack}
-          className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors mb-8 group"
-        >
-          <div className="bg-white dark:bg-white/10 dark:border-white/10 p-2 rounded-full shadow-sm group-hover:shadow-md transition-all border border-slate-200">
-            <ArrowLeft size={16} />
-          </div>
-          {isBn ? 'ফিরে যান' : 'Go Back'}
-        </button>
-
-        <div className="flex flex-col lg:flex-row gap-8 items-stretch">
-          
-          {/* LEFT: Order Summary Panel */}
-          <div className="w-full lg:w-5/12 flex flex-col gap-5">
-            <div className={`bg-white dark:bg-[#13111C] rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-none p-6 md:p-8 border ${themeClasses.border} flex flex-col h-full relative overflow-hidden backdrop-blur-xl`}>
-              <div className={`absolute -right-10 -bottom-10 opacity-[0.03] dark:opacity-5 scale-150 rotate-12 ${themeClasses.text}`}>
-                <ShieldCheck size={300} />
-              </div>
-
-              <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-8">
-                {isBn ? 'অর্ডার সামারি' : 'Order Summary'}
-              </h2>
-              
-              <div className="flex-1">
-                <div className="flex justify-between items-start mb-8">
-                  <div>
-                    <h3 className="text-3xl font-display font-extrabold text-slate-900 dark:text-white mb-2">
-                      {isBn ? plan.name.bn : plan.name.en}
-                    </h3>
-                    <span className={`${themeClasses.bgLight} ${themeClasses.text} text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full inline-block`}>
-                      {isBn ? plan.intervalLabel.bn : plan.intervalLabel.en}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-4xl font-display font-extrabold text-slate-900 dark:text-white tracking-tighter">
-                      {plan.currency === 'BDT' ? '৳' : plan.currency}{plan.price.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-4 mt-8 bg-slate-50 dark:bg-white/5 p-6 rounded-2xl border border-slate-100 dark:border-white/10">
-                  <div className="flex justify-between text-sm font-bold border-b border-slate-200 dark:border-white/10 pb-4">
-                    <span className="text-slate-500 dark:text-slate-400">{isBn ? 'সাবটোটাল' : 'Subtotal'}</span>
-                    <span className="text-slate-900 dark:text-white">৳{plan.price.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-bold border-b border-slate-200 dark:border-white/10 pb-4">
-                    <span className="text-slate-500 dark:text-slate-400">{isBn ? 'ভ্যাট / ট্যাক্স' : 'VAT / Tax'}</span>
-                    <span className="text-slate-900 dark:text-white">৳0</span>
-                  </div>
-                  <div className="flex justify-between text-xl font-display font-extrabold pt-2">
-                    <span className="text-slate-900 dark:text-white">{isBn ? 'সর্বমোট' : 'Total'}</span>
-                    <span className={themeClasses.text}>৳{plan.price.toLocaleString('en-IN')}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-4 bg-blue-50/50 dark:bg-blue-500/10 rounded-2xl border border-blue-100/50 dark:border-blue-500/20 mt-8 relative z-10">
-                <Info size={20} className="text-blue-500 shrink-0 mt-0.5" />
-                <p className="text-xs font-medium text-blue-800/80 dark:text-blue-300 leading-relaxed">
-                  {isBn 
-                    ? 'আপনার সাবস্ক্রিপশন পরবর্তী চক্রে স্বয়ংক্রিয়ভাবে পুনর্নবীকরণ হবে (যদি অটো-রিনিউ চালু থাকে)। আপনি যেকোনো সময় সেটিংসে গিয়ে এটি বন্ধ করতে পারেন।'
-                    : 'Your subscription will auto-renew at the next cycle if auto-renewal is enabled. You can manage or cancel this anytime in settings.'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* RIGHT: Payment Methods */}
-          <div className="w-full lg:w-7/12">
-            <div className="bg-white dark:bg-white/5 rounded-3xl shadow-2xl shadow-slate-200/50 dark:shadow-none p-6 md:p-8 border border-slate-200 dark:border-white/10 h-full backdrop-blur-xl flex flex-col">
-              
-              <h2 className="text-2xl font-display font-extrabold text-slate-900 dark:text-white tracking-tight mb-8">
-                {isBn ? 'পেমেন্ট মেথড নির্বাচন করুন' : 'Select Payment Method'}
-              </h2>
-
-              <div className="flex-1 space-y-4">
-                {PAYMENT_METHODS.map(method => {
-                  const isSelected = selectedMethod === method.id;
-                  return (
-                    <div 
-                      key={method.id}
-                      onClick={() => setSelectedMethod(method.id)}
-                      className={`bg-white dark:bg-white/5 border-2 rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer ${isSelected ? 'border-slate-800 dark:border-white shadow-md' : 'border-slate-100 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/30'}`}
-                    >
-                      <div className="p-5 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'border-slate-800 dark:border-white' : 'border-slate-300 dark:border-slate-600'}`}>
-                            <div className={`w-2.5 h-2.5 rounded-full bg-slate-800 dark:bg-white transition-transform duration-300 ${isSelected ? 'scale-100' : 'scale-0'}`} />
-                          </div>
-                          <div>
-                            <h4 className={`text-lg font-bold ${isSelected ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>{method.label}</h4>
-                          </div>
-                        </div>
-                        <div className={`font-black text-xl italic tracking-tighter ${method.textActive}`}>
-                          {method.logo}
-                        </div>
-                      </div>
-                      
-                      {/* Auto Renewal Toggle */}
-                      {isSelected && (
-                        <div className="bg-slate-50 dark:bg-white/5 px-5 py-3 border-t border-slate-100 dark:border-white/10 flex items-center justify-between animate-tp-fade-in">
-                          <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{isBn ? 'অটো রিনিউয়াল' : 'Auto Renewal'}</span>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); setAutoRenew(!autoRenew); }}
-                            className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 flex ${autoRenew ? method.color : 'bg-slate-300 dark:bg-slate-700'}`}
-                          >
-                            <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300 ${autoRenew ? 'translate-x-6' : 'translate-x-0'}`} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div className="mt-8 pt-6 border-t border-slate-100 dark:border-white/10">
-                <button
-                  onClick={() => setActiveGateway(selectedMethod)}
-                  className={`w-full py-5 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all text-white shadow-xl hover:-translate-y-1 hover:shadow-2xl ${themeClasses.bg} ${isPro ? 'shadow-amber-500/30 hover:shadow-amber-500/40' : 'shadow-violet-500/30 hover:shadow-violet-500/40'}`}
-                >
-                  {isBn ? 'পেমেন্ট নিশ্চিত করুন' : 'Confirm & Pay'}
-                </button>
-                <div className="mt-5 flex items-center justify-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  <ShieldCheck size={14} className="text-emerald-500" />
-                  {isBn ? 'নিরাপদ পেমেন্ট গেটওয়ে' : 'Secure Encrypted Gateway'}
-                </div>
-              </div>
-
-            </div>
-          </div>
-
+      <div className="w-full max-w-[480px] px-4 pt-6 md:pt-10 flex flex-col relative z-10">
+        
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
+          <button
+            type="button"
+            onClick={goBack}
+            className="w-10 h-10 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 transition-colors"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="font-display font-bold text-xl">{isBn ? 'চেকআউট' : 'Checkout'}</h1>
         </div>
+
+        {/* SECTION: WHAT YOU'RE BUYING */}
+        <div className="bg-white dark:bg-[#13111C] rounded-[24px] p-6 shadow-sm border border-slate-200 dark:border-white/10 mb-6">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${themeClasses.badgeBg} ${themeClasses.badgeText} mb-2`}>
+                {isBn ? plan.name.bn : plan.name.en}
+              </span>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400 leading-tight">
+                {benefitText}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-baseline gap-1 mb-6">
+            <span className="text-4xl font-display font-extrabold tracking-tight">
+              {plan.currency === 'BDT' ? '৳' : plan.currency}{plan.price.toLocaleString('en-IN')}
+            </span>
+            <span className="text-slate-500 font-medium">
+              {isBn ? plan.intervalLabel.bn : plan.intervalLabel.en}
+            </span>
+          </div>
+
+          <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-white/10 text-sm font-medium">
+            <div className="flex justify-between text-slate-500 dark:text-slate-400">
+              <span>{isBn ? 'সাবটোটাল' : 'Subtotal'}</span>
+              <span>৳{plan.price.toLocaleString('en-IN')}</span>
+            </div>
+            <div className="flex justify-between text-slate-500 dark:text-slate-400">
+              <span>{isBn ? 'ভ্যাট / ট্যাক্স' : 'VAT / Tax'}</span>
+              <span>৳0</span>
+            </div>
+            <div className="flex justify-between font-bold text-slate-900 dark:text-white text-base pt-1">
+              <span>{isBn ? 'সর্বমোট' : 'Total'}</span>
+              <span>৳{plan.price.toLocaleString('en-IN')}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION: PAY WITH */}
+        <div className="mb-6">
+          <h2 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 px-1">
+            {isBn ? 'পেমেন্ট মাধ্যম' : 'Pay With'}
+          </h2>
+          <div className="space-y-3">
+            {PAYMENT_METHODS.map(method => {
+              const isSelected = selectedMethod === method.id;
+              return (
+                <div 
+                  key={method.id}
+                  onClick={() => setSelectedMethod(method.id)}
+                  className={`flex items-center justify-between p-4 rounded-2xl cursor-pointer transition-all duration-300 border-2 bg-white dark:bg-white/5 ${isSelected ? `${method.borderColor} ${method.bgTint} shadow-sm` : 'border-transparent hover:border-slate-200 dark:hover:border-white/10'}`}
+                >
+                  <div className="flex items-center gap-4">
+                    {/* Method Logo / Text */}
+                    <div className={`font-black text-lg italic tracking-tighter w-16 ${isSelected ? method.color.replace('bg-', 'text-') : 'text-slate-400 dark:text-slate-500'}`}>
+                      {method.logo}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-4">
+                    <span className="font-bold text-slate-900 dark:text-white">৳{plan.price}</span>
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? method.borderColor : 'border-slate-300 dark:border-slate-600'}`}>
+                      <div className={`w-3 h-3 rounded-full ${method.color} transition-transform duration-300 ${isSelected ? 'scale-100' : 'scale-0'}`} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* SECTION: AUTO RENEWAL */}
+        <div className="bg-white dark:bg-[#13111C] rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-white/10 flex items-center justify-between mb-8">
+          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+            {isBn ? 'প্রতি মাসে স্বয়ংক্রিয়ভাবে নবায়ন হবে' : 'Auto-renew every cycle'}
+          </span>
+          <button 
+            onClick={() => setAutoRenew(!autoRenew)}
+            className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 flex ${autoRenew ? themeClasses.toggleBg : 'bg-slate-300 dark:bg-slate-700'}`}
+          >
+            <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300 ${autoRenew ? 'translate-x-6' : 'translate-x-0'}`} />
+          </button>
+        </div>
+
+        {/* SECTION: ACTION BUTTON */}
+        <div className="mt-auto pb-6">
+          <button
+            onClick={() => setActiveGateway(selectedMethod)}
+            className={`w-full py-4 rounded-xl font-bold text-base text-white transition-all shadow-lg hover:-translate-y-0.5 hover:shadow-xl ${themeClasses.buttonBg} ${themeClasses.shadow} flex items-center justify-center gap-2`}
+          >
+            {isBn ? 'এখনই পেমেন্ট করুন' : 'Pay Now'} &rarr;
+          </button>
+          
+          <div className="mt-4 flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-400 dark:text-slate-500">
+            <Lock size={14} className="text-emerald-500" />
+            {isBn ? 'নিরাপদ এনক্রিপ্টেড পেমেন্ট' : 'Secure Encrypted Payment'}
+          </div>
+        </div>
+
       </div>
 
       {/* Render Active Gateway Overlay */}
       {activeGateway === 'bkash' && (
-        <BkashGateway 
-          amount={plan.price} 
-          onPay={handlePaySuccess} 
-          onClose={() => setActiveGateway(null)} 
-        />
+        <BkashGateway amount={plan.price} onPay={handlePaySuccess} onClose={() => setActiveGateway(null)} />
       )}
       {activeGateway === 'nagad' && (
-        <NagadGateway 
-          amount={plan.price} 
-          onPay={handlePaySuccess} 
-          onClose={() => setActiveGateway(null)} 
-        />
+        <NagadGateway amount={plan.price} onPay={handlePaySuccess} onClose={() => setActiveGateway(null)} />
       )}
       {activeGateway === 'rocket' && (
-        <BkashGateway 
-          amount={plan.price} 
-          onPay={handlePaySuccess} 
-          onClose={() => setActiveGateway(null)} 
-        />
+        <BkashGateway amount={plan.price} onPay={handlePaySuccess} onClose={() => setActiveGateway(null)} />
       )}
       {activeGateway === 'card' && (
-        <CardGateway 
-          amount={plan.price} 
-          onPay={handlePaySuccess} 
-          onClose={() => setActiveGateway(null)} 
-        />
+        <CardGateway amount={plan.price} onPay={handlePaySuccess} onClose={() => setActiveGateway(null)} />
       )}
     </div>
   );
 };
 
 export default CheckoutPage;
+

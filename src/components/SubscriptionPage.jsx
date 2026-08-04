@@ -139,6 +139,9 @@ const SubscriptionPage = () => {
               <span className="inline-block px-3 py-1 bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-black uppercase tracking-widest rounded-full mb-4">
                 {isBn ? 'আজীবন ফ্রি' : 'FREE FOREVER'}
               </span>
+              <p className="text-sm text-slate-500 dark:text-slate-400 italic mb-3">
+                {isBn ? 'একটি বাড়ি আছে? বিনামূল্যে শুরু করুন' : 'Have one property? Start for free'}
+              </p>
               <div className="flex items-baseline gap-1">
                 <span className="text-4xl font-display font-extrabold text-slate-900 dark:text-white">৳0</span>
                 <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">/{billingCycle === 'year' ? 'yr' : 'mo'}</span>
@@ -175,6 +178,9 @@ const SubscriptionPage = () => {
               <span className="inline-block px-3 py-1 bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300 text-xs font-black uppercase tracking-widest rounded-full mb-4">
                 PLUS
               </span>
+              <p className="text-sm text-slate-500 dark:text-slate-400 italic mb-3">
+                {isBn ? '২-৩টি বাড়ি ম্যানেজ করেন? এই প্ল্যান আপনার জন্য' : 'Managing 2-3 properties? This is for you'}
+              </p>
               <div className="flex items-baseline gap-1 relative">
                 <span className="text-4xl font-display font-extrabold text-slate-900 dark:text-white transition-opacity duration-300">
                   ৳{billingCycle === 'year' ? '229' : '19'}
@@ -224,6 +230,9 @@ const SubscriptionPage = () => {
               <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-black uppercase tracking-widest rounded-full mb-4">
                 <Crown size={12} strokeWidth={3} /> PRO
               </span>
+              <p className="text-sm text-slate-500 dark:text-slate-400 italic mb-3">
+                {isBn ? 'একাধিক বাড়ি আছে? সব কিছু এক জায়গায় কন্ট্রোল করুন' : 'Multiple properties? Control everything in one place'}
+              </p>
               <div className="flex items-baseline gap-1">
                 <span className="text-4xl font-display font-extrabold text-slate-900 dark:text-white">
                   ৳{billingCycle === 'year' ? '599' : '49'}
