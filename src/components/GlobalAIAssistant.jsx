@@ -303,12 +303,17 @@ const GlobalAIAssistant = () => {
       }
     } catch (err) {
       console.error('AI Chat Error:', err);
-      setAiMessages((prev) => [...prev, { id: crypto.randomUUID(), sender: 'ai', text: "Sorry, I am having trouble connecting to my brain right now. Please try again or speak to a human teammate." }]);
-      setUnhelpfulStreak((s) => {
-        const next = s + 1;
-        if (next >= 2) setShowHandoffCta(true);
-        return next;
-      });
+      // Only real network failures land here now — Gemini quota/outages get a
+      // graceful 200 fallback from the server (polite note + video + buttons).
+      setAiMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        sender: 'ai',
+        text: uiLang === 'bn'
+          ? 'সার্ভারের সাথে সংযোগ করা যাচ্ছে না। 🙏 ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন, অথবা আমাদের সাপোর্ট টিমের সাথে কথা বলুন।'
+          : "We couldn't reach the server. 🙏 Please check your connection and try again, or talk to our support team.",
+      }]);
+      setShowHandoffCta(true);
+      setUnhelpfulStreak((s) => s + 1);
     } finally {
       setIsTyping(false);
     }
