@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom"
 import useGoBack from "../hooks/useGoBack";
 import useRequireAuth from "../hooks/useRequireAuth";
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
-import { Search, MapPin, BedDouble, Bath, Square, Heart, Star, X, ChevronRight, ShieldCheck, ChevronDown, ChevronUp, Filter, Ruler, Navigation, CheckCircle2, Flame, Building, Wifi, Map, List, LayoutGrid, Home, Users, User, BookOpen, Share2, MessageCircle, ArrowLeft, SlidersHorizontal, ArrowUpDown, Camera, Layers, Crosshair, Loader2 } from "lucide-react";
+import { Search, MapPin, BedDouble, Bath, Square, Heart, Star, X, ChevronRight, ShieldCheck, ChevronDown, ChevronUp, Filter, Ruler, Navigation, CheckCircle2, Flame, Building, Wifi, Map, List, LayoutGrid, Home, Users, User, BookOpen, Share2, MessageCircle, ArrowLeft, SlidersHorizontal, ArrowUpDown, Camera, Layers, Crosshair, Loader2, Crown, Sparkles, TrendingUp } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 // ─── SHARED INQUIRY MODAL (single source of truth for the inquiry flow) ───────
 import InquiryModal from "./InquiryModal";
@@ -385,8 +385,17 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 	const amenities = Array.isArray(property.amenities) ? property.amenities.filter(Boolean) : [];
 	const landlordName = String(property.landlordName || property.ownerName || "").trim();
 
+	const isPro = property.hostTier === 'pro';
+	const isPlus = property.hostTier === 'plus';
+	
+	const cardStyle = isPro 
+		? "border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.3)] bg-gradient-to-r from-amber-50/20 to-transparent" 
+		: isHighlighted 
+			? "border-brandRed shadow-[0_0_0_2px_rgba(186,0,54,0.3)] bg-white" 
+			: "border-gray-100 bg-white";
+
 	return (
-		<div onMouseEnter={() => onHover && onHover(property.id)} onMouseLeave={() => onHoverEnd && onHoverEnd()} className={`bg-white rounded-3xl border overflow-hidden flex flex-col md:flex-row hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 group ${isHighlighted ? "border-brandRed shadow-[0_0_0_2px_rgba(186,0,54,0.3)]" : "border-gray-100"} ${property.availabilityStatus === 'rented' ? 'opacity-60 grayscale-[50%]' : ''}`}>
+		<div onMouseEnter={() => onHover && onHover(property.id)} onMouseLeave={() => onHoverEnd && onHoverEnd()} className={`rounded-3xl border overflow-hidden flex flex-col md:flex-row hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] transition-all duration-500 group ${cardStyle} ${property.availabilityStatus === 'rented' ? 'opacity-60 grayscale-[50%]' : ''}`}>
 			<div className="w-full md:w-[280px] lg:w-[300px] h-[190px] md:h-auto p-2.5 shrink-0">
 				<div className="relative w-full h-full rounded-2xl overflow-hidden flex gap-1.5 bg-gray-100">
 					<div className="relative w-[75%] h-full overflow-hidden cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
@@ -415,6 +424,21 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 							{property.verified && (
 								<div className="bg-white/90 backdrop-blur-md px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm text-[10px] font-black text-brandRed">
 									<ShieldCheck size={12} /> {t.verified || "Verified"}
+								</div>
+							)}
+							{isPro && (
+								<>
+									<div className="bg-gradient-to-r from-amber-400 to-orange-500 text-white px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md text-[10px] font-black tracking-widest uppercase">
+										<Crown size={12} /> Pro
+									</div>
+									<div className="bg-white/90 backdrop-blur-md px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm text-[10px] font-black text-amber-600 uppercase tracking-widest">
+										<TrendingUp size={12} /> {isBn ? "শীর্ষ অবস্থান" : "Top Position"}
+									</div>
+								</>
+							)}
+							{isPlus && !isPro && (
+								<div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md text-[10px] font-black tracking-widest uppercase">
+									<Sparkles size={12} /> Plus
 								</div>
 							)}
 							<span className="bg-gray-900/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm">{propertyTypeLabel(property.type, isBn)}</span>

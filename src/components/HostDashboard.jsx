@@ -992,7 +992,7 @@ const HostDashboard = () => {
     return off;
   }, []);
   const lockedFeatureIds = useMemo(
-    () => (subStatus.isExpired ? subscriptionService.getLockedFeatures() : []),
+    () => subscriptionService.getLockedFeatures(),
     [subStatus],
   );
   const isFeatureLocked = (featureId) => lockedFeatureIds.includes(featureId);
@@ -1001,7 +1001,7 @@ const HostDashboard = () => {
   // Single source of truth for the booking-conversion gate + premium badges. If
   // subscriptionService later exposes a more specific flag (e.g. paid tier),
   // swap it in here and everything downstream follows.
-  const isPremium = !subStatus?.isExpired;
+  const isPremium = ['plus', 'pro'].includes(subStatus?.tier);
 
   // Active tab guarded by subscription. If the host lands on a locked tab
   // (e.g. via a stale link), we bounce them to /subscription with a `from`

@@ -134,10 +134,15 @@ const GlobalAIAssistant = () => {
 
   // We'll declare handleGuideClick lower down after aiMessages is defined.
 
-  // AI chat history (persisted in localStorage so it survives refreshes).
+  // AI chat history — SESSION-only persistence (sessionStorage): it survives
+  // refreshes and in-app navigation, but clears when the app/tab is closed so
+  // a returning user always starts a fresh conversation. (It used to live in
+  // localStorage, which resurfaced ten-day-old chats after re-login.)
   const [aiMessages, setAiMessages] = useState(() => {
     try {
-      const saved = localStorage.getItem('ai_chat_history');
+      // One-time cleanup of the old forever-persisted history.
+      localStorage.removeItem('ai_chat_history');
+      const saved = sessionStorage.getItem('ai_chat_history');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
@@ -183,9 +188,9 @@ const GlobalAIAssistant = () => {
   // ── persistence ─────────────────────────────────────────────────────────
   useEffect(() => {
     try {
-      localStorage.setItem('ai_chat_history', JSON.stringify(aiMessages));
+      sessionStorage.setItem('ai_chat_history', JSON.stringify(aiMessages));
     } catch (e) {
-      console.warn("Could not save chat history to localStorage", e);
+      console.warn("Could not save chat history to sessionStorage", e);
     }
   }, [aiMessages]);
 

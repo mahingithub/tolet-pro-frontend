@@ -20,6 +20,7 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
 import { propertyService } from '../services/Propertyservice';
+import { subscriptionService, TIER_LIMITS } from '../services/subscriptionService';
 import { GoogleMap, MarkerF, useJsApiLoader } from '@react-google-maps/api';
 
 // ─── GOOGLE MAPS CONFIG (shared with PropertyDetails) ────────────────────────
@@ -1400,7 +1401,8 @@ const AddProperty = () => {
     return INITIAL_FORM;
   });
   const [errors, setErrors] = useState({});
-  const [toast, setToast] = useState(null);
+  const subscriptionStatus = subscriptionService.getStatus();
+  const tierLimits = TIER_LIMITS[subscriptionStatus.tier] || TIER_LIMITS.free;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   // "I am interested in selling" Coming-Soon modal (opened from the intent step).
@@ -1546,7 +1548,16 @@ const AddProperty = () => {
   };
 
   const handleRoomPhotos = async (files) => {
-    const remaining = 20 - form.roomPhotos.length;
+    const remaining = tierLimits.maxPhotos - form.roomPhotos.length;
+    if (remaining <= 0) {
+      showToast(
+        isBn
+          ? `আপনি সর্বোচ্চ সংখ্যক (${tierLimits.maxPhotos}টি) ছবি আপলোড করেছেন।`
+          : `You have reached your tier's max limit of ${tierLimits.maxPhotos} photos.`,
+        'error'
+      );
+      return;
+    }
     const all   = Array.from(files).filter(f => f.type.startsWith('image/'));
     const tooBig = all.filter(f => f.size > MAX_IMAGE_BYTES);
     if (tooBig.length) {
@@ -1581,6 +1592,11 @@ const AddProperty = () => {
   const handleVideoUpload = (files) => {
     const all = Array.from(files);
     const vid = all.find(f => f.type.startsWith('video/'));
+    
+    if (vid && tierLimits.maxVideos === 0) {
+      setToast({ type: 'error', msg: isBn ? 'ভিডিও আপলোড করতে প্লাস বা প্রো প্ল্যানে আপগ্রেড করুন।' : 'Upgrade to Plus or Pro plan to upload videos.' });
+      return;
+    }
     if (!vid) {
       showToast(
         isBn
@@ -1666,6 +1682,19 @@ const AddProperty = () => {
 
     setIsSubmitting(true);
     try {
+      // Enforce tier property limits
+      const existingProperties = await propertyService.listMyProperties();
+      if (existingProperties.length >= tierLimits.maxProperties) {
+        setIsSubmitting(false);
+        showToast(
+          isBn
+            ? `আপনি সর্বোচ্চ সংখ্যক (${tierLimits.maxProperties}টি) প্রপার্টি যোগ করেছেন। আরও যোগ করতে প্লাস বা প্রো প্ল্যানে আপগ্রেড করুন।`
+            : `You have reached your limit of ${tierLimits.maxProperties} properties. Upgrade to Plus or Pro to add more.`,
+          'error'
+        );
+        return;
+      }
+
       // propertyService pulls the current host from auth state and stamps
       // the listing with their id/name.
       await propertyService.createProperty(form);

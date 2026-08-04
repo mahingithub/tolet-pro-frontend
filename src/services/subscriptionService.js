@@ -9,7 +9,7 @@ import { broadcast, subscribe as subscribeKey } from './_storage.js';
 const KEY_SUBSCRIPTION = 'subscription:update';
 const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
 
-let cachedStatus = { tier: 'guest', isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null };
+let cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null };
 
 export const PREMIUM_FEATURES = [
   'analytics',
@@ -19,6 +19,12 @@ export const PREMIUM_FEATURES = [
   'smartAlerts',
   'aiInsights',
 ];
+
+export const TIER_LIMITS = {
+  free: { maxProperties: 1, maxPhotos: 5, maxVideos: 0 },
+  plus: { maxProperties: 3, maxPhotos: 15, maxVideos: 1 },
+  pro: { maxProperties: Infinity, maxPhotos: Infinity, maxVideos: Infinity }
+};
 
 const FEATURE_LABELS = {
   analytics:   { en: 'Analytics',        bn: 'অ্যানালিটিক্স' },
@@ -31,25 +37,48 @@ const FEATURE_LABELS = {
 
 export const PLANS = [
   {
-    id: 'pro_monthly',
-    name: { en: 'Pro Monthly', bn: 'প্রো মাসিক' },
-    price: 999,
-    currency: 'BDT',
+    id: 'plus_monthly',
+    name: { en: 'Plus', bn: 'প্লাস' },
+    price: 19,
+    currency: '৳',
     interval: 'month',
     intervalLabel: { en: '/month', bn: '/মাসিক' },
     popular: false,
-    benefits: { en: ['All premium tabs', 'Cancel anytime', 'Email support'], bn: ['সব প্রিমিয়াম ট্যাব', 'যেকোনো সময় বাতিল', 'ইমেইল সাপোর্ট'] },
+    tier: 'plus',
+    benefits: { en: ['Up to 3 Active Listings', '1x Top Search Boost/mo', 'Rent & Bookings Management', 'Plus Badge'], bn: ['সর্বোচ্চ ৩টি অ্যাক্টিভ লিস্টিং', 'মাসে ১টি টপ সার্চ বুস্ট', 'ভাড়া ও বুকিং ম্যানেজমেন্ট', 'প্লাস ব্যাজ'] },
+  },
+  {
+    id: 'plus_yearly',
+    name: { en: 'Plus', bn: 'প্লাস' },
+    price: 229,
+    currency: '৳',
+    interval: 'year',
+    intervalLabel: { en: '/year', bn: '/বছর' },
+    popular: false,
+    tier: 'plus',
+    benefits: { en: ['Up to 3 Active Listings', '1x Top Search Boost/mo', 'Rent & Bookings Management', 'Plus Badge'], bn: ['সর্বোচ্চ ৩টি অ্যাক্টিভ লিস্টিং', 'মাসে ১টি টপ সার্চ বুস্ট', 'ভাড়া ও বুকিং ম্যানেজমেন্ট', 'প্লাস ব্যাজ'] },
+  },
+  {
+    id: 'pro_monthly',
+    name: { en: 'Pro', bn: 'প্রো' },
+    price: 49,
+    currency: '৳',
+    interval: 'month',
+    intervalLabel: { en: '/month', bn: '/মাসিক' },
+    popular: true,
+    tier: 'pro',
+    benefits: { en: ['Unlimited Listings', 'Super Boost & Top Position', 'Smart Alerts & AI Insights', 'Pro Badge & Gold Card'], bn: ['আনলিমিটেড লিস্টিং', 'সুপার বুস্ট ও টপ পজিশন', 'স্মার্ট অ্যালার্টস ও এআই ইনসাইটস', 'প্রো ব্যাজ ও গোল্ড কার্ড'] },
   },
   {
     id: 'pro_yearly',
-    name: { en: 'Pro Yearly', bn: 'প্রো বার্ষিক' },
-    price: 9999,
-    currency: 'BDT',
+    name: { en: 'Pro', bn: 'প্রো' },
+    price: 599,
+    currency: '৳',
     interval: 'year',
     intervalLabel: { en: '/year', bn: '/বছর' },
     popular: true,
-    savings: { en: 'Save ~17%', bn: '~১৭% সাশ্রয়' },
-    benefits: { en: ['All premium tabs', 'Priority support', '2 months free'], bn: ['সব প্রিমিয়াম ট্যাব', 'প্রায়োরিটি সাপোর্ট', '২ মাস ফ্রি'] },
+    tier: 'pro',
+    benefits: { en: ['Unlimited Listings', 'Super Boost & Top Position', 'Smart Alerts & AI Insights', 'Pro Badge & Gold Card'], bn: ['আনলিমিটেড লিস্টিং', 'সুপার বুস্ট ও টপ পজিশন', 'স্মার্ট অ্যালার্টস ও এআই ইনসাইটস', 'প্রো ব্যাজ ও গোল্ড কার্ড'] },
   },
 ];
 
@@ -82,14 +111,14 @@ async function call(path, { method = 'GET', body } = {}) {
 
 function updateCache(dbSub) {
   if (!dbSub) {
-    cachedStatus = { tier: 'guest', isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null };
+    cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null };
   } else if (dbSub.status === 'active' && dbSub.currentPeriodEnd) {
     const msLeft = new Date(dbSub.currentPeriodEnd).getTime() - Date.now();
     const daysRemaining = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
-    const planDef = PLANS.find(p => p.id === dbSub.planId) || { id: dbSub.planId, name: { en: 'Pro', bn: 'প্রো' } };
+    const planDef = PLANS.find(p => p.id === dbSub.planId) || { id: dbSub.planId, name: { en: 'Pro', bn: 'প্রো' }, tier: 'pro' };
     
     cachedStatus = {
-      tier: 'pro',
+      tier: planDef.tier || 'pro',
       plan: { id: planDef.id, name: planDef.name, interval: planDef.interval },
       isPaid: true,
       isTrial: false,
@@ -102,7 +131,7 @@ function updateCache(dbSub) {
     const msLeft = new Date(dbSub.trialEndsAt).getTime() - Date.now();
     const daysRemaining = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
     cachedStatus = {
-      tier: 'trial',
+      tier: 'pro', // Give full access during trial
       plan: null,
       isPaid: false,
       isTrial: true,
@@ -111,7 +140,7 @@ function updateCache(dbSub) {
       trialEndsAt: dbSub.trialEndsAt
     };
   } else {
-    cachedStatus = { tier: 'expired', isPaid: false, isTrial: false, isExpired: true, daysRemaining: 0, trialEndsAt: null, plan: null };
+    cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: true, daysRemaining: 0, trialEndsAt: null, plan: null };
   }
   broadcast(KEY_SUBSCRIPTION);
   return cachedStatus;
@@ -134,7 +163,9 @@ export const subscriptionService = {
   },
 
   getLockedFeatures() {
-    return cachedStatus.isExpired ? [...PREMIUM_FEATURES] : [];
+    if (cachedStatus.tier === 'pro') return [];
+    if (cachedStatus.tier === 'plus') return ['analytics', 'smartAlerts', 'aiInsights']; // Plus locks these
+    return [...PREMIUM_FEATURES]; // Free locks everything in PREMIUM_FEATURES
   },
 
   labelFor(featureId, lang = 'English') {
