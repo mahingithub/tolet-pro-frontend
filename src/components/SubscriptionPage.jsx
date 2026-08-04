@@ -3,10 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import useGoBack from '../hooks/useGoBack';
 import {
   Sparkles, Check, X, ArrowLeft, Crown, BellRing,
-  Calendar, Wallet, TrendingUp, Folder, ShieldCheck, Clock
+  Calendar, Wallet, TrendingUp, Folder, ShieldCheck, Clock, Video, PlayCircle
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { subscriptionService } from '../services/subscriptionService';
+import { getSectionGuides } from '../services/aiGuideService';
 
 // Full list of features for the comparison table
 const ALL_FEATURES = [
@@ -32,9 +33,19 @@ const SubscriptionPage = () => {
   const [status, setStatus] = useState(() => subscriptionService.getStatus());
   const [billingCycle, setBillingCycle] = useState('month');
   
+  // Video Guides State
+  const [guides, setGuides] = useState([]);
+  const [activeVideo, setActiveVideo] = useState(null);
+  
   useEffect(() => {
     subscriptionService.fetchStatus();
     const off = subscriptionService.onChange(() => setStatus(subscriptionService.getStatus()));
+    
+    // Fetch video guides for subscription page
+    getSectionGuides('subscription').then(data => {
+      setGuides(Array.isArray(data) ? data : []);
+    });
+
     return off;
   }, []);
 
@@ -47,6 +58,18 @@ const SubscriptionPage = () => {
   const isFree = currentPlanTier === 'free';
   const isPlus = currentPlanTier === 'plus';
   const isPro = currentPlanTier === 'pro';
+
+  // Helper to format youtube URL to embed
+  const getEmbedUrl = (url) => {
+    if (!url) return '';
+    if (url.includes('youtube.com/watch?v=')) {
+      return url.replace('watch?v=', 'embed/');
+    }
+    if (url.includes('youtu.be/')) {
+      return url.replace('youtu.be/', 'youtube.com/embed/');
+    }
+    return url;
+  };
 
   return (
     <div className="min-h-screen bg-[#F4F6FA] dark:bg-[#0A0A0F] text-[#0F172A] dark:text-[#F1F5F9] font-sans transition-colors duration-300 pb-24 overflow-x-hidden relative">
@@ -97,36 +120,57 @@ const SubscriptionPage = () => {
         </div>
 
         {/* SECTION 2: Header & Toggle */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-10">
           <h1 className="font-display text-4xl md:text-5xl font-extrabold tracking-tight mb-4">
-            {isBn ? 'আপনার ভাড়ার ব্যবসা বড় করুন' : 'Scale your rental business'}
+            {isBn ? 'আপনার বাড়ি ম্যানেজ করুন' : 'Manage your home'}
           </h1>
-          <p className="text-slate-600 dark:text-slate-400 text-lg max-w-2xl mx-auto mb-10">
-            {isBn ? 'আপনার প্রয়োজন অনুযায়ী একটি প্ল্যান বেছে নিন। ফ্রি প্ল্যানে আজীবন লিস্টিং করুন।' : 'Choose a plan that fits your needs. Start for free and upgrade when you are ready.'}
+          <p className="text-slate-600 dark:text-slate-400 text-base md:text-lg max-w-3xl mx-auto mb-6 leading-relaxed">
+            {isBn 
+              ? 'খাতা-কলমের হিসাব বাদ দিন! কে ভাড়া দিয়েছে, কে দেয়নি তার স্মার্ট রিমাইন্ডার এবং হিসাব রাখুন। ভেরিফাইড ভাড়াটিয়া খুঁজুন এবং খুব সহজেই সব ম্যানেজ করুন। প্রথম লগইন এর পর ২ মাস Plus সাবস্ক্রিপশন সম্পূর্ণ ফ্রি!' 
+              : 'Keep track of who paid rent with smart reminders. Find verified tenants and manage everything easily. Get 2 months of Plus subscription absolutely free after your first login!'}
           </p>
 
-          <div className="inline-flex items-center p-1.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full shadow-inner relative">
+          {/* Video Guides Row (if any uploaded by admin) */}
+          {(guides.length > 0) && (
+            <div className="flex flex-wrap justify-center gap-3 mb-10">
+              {guides.map(guide => (
+                <button 
+                  key={guide._id}
+                  onClick={() => setActiveVideo(guide.videoUrl)}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-bold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
+                >
+                  <PlayCircle size={18} />
+                  {guide.title || (isBn ? 'ভিডিও গাইড দেখুন' : 'Watch Guide')}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Fixed shift button alignment using direct active classes without absolute slider */}
+          <div className="inline-flex items-center p-1.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full shadow-inner">
             <button
               onClick={() => setBillingCycle('month')}
-              className={`relative z-10 px-8 py-3 rounded-full text-sm font-bold transition-all duration-300 ${billingCycle === 'month' ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+              className={`px-8 py-3 rounded-full text-sm font-bold transition-all duration-300 ${
+                billingCycle === 'month' 
+                  ? 'bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white shadow-sm' 
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
             >
               {isBn ? 'মাসিক' : 'MONTHLY'}
             </button>
             <button
               onClick={() => setBillingCycle('year')}
-              className={`relative z-10 px-8 py-3 rounded-full text-sm font-bold transition-all duration-300 flex items-center gap-2 ${billingCycle === 'year' ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+              className={`px-8 py-3 rounded-full text-sm font-bold transition-all duration-300 flex items-center gap-2 ${
+                billingCycle === 'year' 
+                  ? 'bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white shadow-sm' 
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
             >
               {isBn ? 'বার্ষিক' : 'YEARLY'}
               <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider">
                 SAVE 20%
               </span>
             </button>
-            
-            {/* Toggle Sliding Background */}
-            <div 
-              className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] bg-slate-100 dark:bg-white/10 rounded-full shadow-sm transition-transform duration-300 ease-out`}
-              style={{ transform: billingCycle === 'year' ? 'translateX(calc(100% + 4px))' : 'translateX(4px)' }}
-            />
           </div>
         </div>
 
@@ -181,11 +225,14 @@ const SubscriptionPage = () => {
               <p className="text-sm text-slate-500 dark:text-slate-400 italic mb-3">
                 {isBn ? '২-৩টি বাড়ি ম্যানেজ করেন? এই প্ল্যান আপনার জন্য' : 'Managing 2-3 properties? This is for you'}
               </p>
-              <div className="flex items-baseline gap-1 relative">
+              <div className="flex items-baseline gap-1 relative mb-2">
                 <span className="text-4xl font-display font-extrabold text-slate-900 dark:text-white transition-opacity duration-300">
                   ৳{billingCycle === 'year' ? '229' : '19'}
                 </span>
                 <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">/{billingCycle === 'year' ? 'yr' : 'mo'}</span>
+              </div>
+              <div className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 rounded w-max">
+                {isBn ? 'প্রথম ২ মাস সম্পূর্ণ ফ্রি!' : 'First 2 months Free!'}
               </div>
             </div>
             
@@ -307,6 +354,28 @@ const SubscriptionPage = () => {
         </div>
 
       </div>
+
+      {/* Video Modal Overlay */}
+      {activeVideo && (
+        <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#13111C] w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl border border-white/10 relative">
+            <button 
+              onClick={() => setActiveVideo(null)} 
+              className="absolute top-4 right-4 w-10 h-10 bg-black/50 hover:bg-black/80 text-white rounded-full flex items-center justify-center z-10 transition-colors backdrop-blur-md"
+            >
+              <X size={24} />
+            </button>
+            <div className="aspect-video w-full bg-black">
+              <iframe 
+                src={getEmbedUrl(activeVideo)} 
+                className="w-full h-full border-0" 
+                allow="autoplay; encrypted-media; picture-in-picture" 
+                allowFullScreen 
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
