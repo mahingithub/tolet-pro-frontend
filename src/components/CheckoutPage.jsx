@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import useGoBack from '../hooks/useGoBack';
 import { useLanguage } from '../context/LanguageContext';
 import { subscriptionService, PLANS } from '../services/subscriptionService';
-import { ArrowLeft, ShieldCheck, Check, Info, Lock, CreditCard, Zap, CheckCircle2, Shield } from 'lucide-react';
+import { getSectionGuides } from '../services/aiGuideService';
+import { ArrowLeft, ShieldCheck, Check, Info, Lock, CreditCard, Zap, CheckCircle2, Shield, X } from 'lucide-react';
 import { BkashGateway, NagadGateway } from './payment/MerchantGateways';
 
 const PAYMENT_METHODS = [
@@ -78,6 +79,9 @@ const CheckoutPage = () => {
   const [activeGateway, setActiveGateway] = useState(null);
   const [selectedMethod, setSelectedMethod] = useState(PAYMENT_METHODS[0].id);
   const [autoRenew, setAutoRenew] = useState(true);
+  
+  // Video Guide State
+  const [activeVideo, setActiveVideo] = useState(null);
 
   // Find the selected plan
   const plan = PLANS.find(p => p.id === planId);
@@ -86,6 +90,14 @@ const CheckoutPage = () => {
     if (!plan) {
       navigate('/subscription');
     }
+    
+    getSectionGuides('checkout').then(data => {
+      const fetchedGuides = Array.isArray(data) ? data : [];
+      if (fetchedGuides.length > 0 && !sessionStorage.getItem('checkout_video_played')) {
+        setActiveVideo(fetchedGuides[0].videoUrl);
+        sessionStorage.setItem('checkout_video_played', 'true');
+      }
+    });
   }, [plan, navigate]);
 
   if (!plan) return null;
@@ -93,6 +105,17 @@ const CheckoutPage = () => {
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
+  };
+  
+  const getEmbedUrl = (url) => {
+    if (!url) return '';
+    if (url.includes('youtube.com/watch?v=')) {
+      return url.replace('watch?v=', 'embed/');
+    }
+    if (url.includes('youtu.be/')) {
+      return url.replace('youtu.be/', 'youtube.com/embed/');
+    }
+    return url;
   };
 
   const handlePaySuccess = async () => {
@@ -384,6 +407,28 @@ const CheckoutPage = () => {
       )}
       {activeGateway === 'nagad' && (
         <NagadGateway amount={plan.price} onPay={handlePaySuccess} onClose={() => setActiveGateway(null)} />
+      )}
+      
+      {/* Video Modal Overlay */}
+      {activeVideo && (
+        <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#13111C] w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl border border-white/10 relative">
+            <button 
+              onClick={() => setActiveVideo(null)} 
+              className="absolute top-4 right-4 w-10 h-10 bg-black/50 hover:bg-black/80 text-white rounded-full flex items-center justify-center z-10 transition-colors backdrop-blur-md"
+            >
+              <X size={24} />
+            </button>
+            <div className="aspect-video w-full bg-black">
+              <iframe 
+                src={getEmbedUrl(activeVideo)} 
+                className="w-full h-full border-0" 
+                allow="autoplay; encrypted-media; picture-in-picture" 
+                allowFullScreen 
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -43,7 +43,12 @@ const SubscriptionPage = () => {
     
     // Fetch video guides for subscription page
     getSectionGuides('subscription').then(data => {
-      setGuides(Array.isArray(data) ? data : []);
+      const fetchedGuides = Array.isArray(data) ? data : [];
+      setGuides(fetchedGuides);
+      if (fetchedGuides.length > 0 && !sessionStorage.getItem('subscription_video_played')) {
+        setActiveVideo(fetchedGuides[0].videoUrl);
+        sessionStorage.setItem('subscription_video_played', 'true');
+      }
     });
 
     return off;
