@@ -199,6 +199,40 @@ const propertyTypeLabel = (type, isBn) => {
 		: (isBn ? 'প্রপার্টি' : 'Property');
 };
 
+// ─── AMENITY LABELS ───────────────────────────────────────────────────────────
+// Amenities are stored on the property as the human-readable English ids from
+// AddProperty (AMENITIES_RESIDENTIAL / _COMMERCIAL / _LAND — e.g. "Central AC",
+// "Parking"). This map provides the Bangla rendering; unknown ids fall back to
+// the raw (already readable) English string.
+const AMENITY_LABELS_BN = {
+	'Central AC': 'সেন্ট্রাল এসি',
+	'Parking': 'পার্কিং',
+	'High-Speed WiFi': 'হাই-স্পিড ওয়াইফাই',
+	'Generator Backup': 'জেনারেটর ব্যাকআপ',
+	'24/7 Security': '২৪/৭ নিরাপত্তা',
+	'CCTV': 'সিসিটিভি',
+	'Gym Access': 'জিম সুবিধা',
+	'Rooftop Lounge': 'রুফটপ লাউঞ্জ',
+	'Private Garden': 'প্রাইভেট গার্ডেন',
+	'Concierge': 'কনসিয়ার্জ সেবা',
+	'Home Theater': 'হোম থিয়েটার',
+	'Pool Access': 'সুইমিং পুল',
+	'Study Room': 'স্টাডি রুম',
+	'Shared Kitchen': 'শেয়ার্ড কিচেন',
+	'Intercom': 'ইন্টারকম',
+	'Balcony': 'বারান্দা',
+	'Elevator': 'লিফট',
+	'Fire Safety': 'অগ্নি নিরাপত্তা',
+	'Dedicated Washroom': 'নিজস্ব ওয়াশরুম',
+	'Fenced': 'সীমানা প্রাচীর',
+	'Main Road Access': 'প্রধান রাস্তার সাথে',
+	'Electricity': 'বিদ্যুৎ সংযোগ',
+	'Gas Line': 'গ্যাস লাইন',
+	'Water Supply': '২৪ ঘণ্টা পানি',
+	'Corner Plot': 'কর্নার প্লট',
+};
+const amenityLabel = (id, isBn) => (isBn && AMENITY_LABELS_BN[id]) || id;
+
 // ─── ROOM COLLAGE HELPER ──────────────────────────────────────────────────────
 // Dynamically builds the listing-card collage using the actual room photos uploaded by the user.
 // It extracts up to 3 unique room categories (e.g. workspace, meeting, cabin, bedroom).
@@ -344,6 +378,13 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 
 	const extraRoomCount = Math.max(0, totalRoomCategories - 1 - collageThumbs.length);
 
+	// Amenities + landlord identity come straight off the list payload —
+	// `amenities` is stored on the property document and `landlordName` is the
+	// backend's denormalised ownerName snapshot (kept there precisely so list
+	// cards never need a per-card landlord fetch).
+	const amenities = Array.isArray(property.amenities) ? property.amenities.filter(Boolean) : [];
+	const landlordName = String(property.landlordName || property.ownerName || "").trim();
+
 	return (
 		<div onMouseEnter={() => onHover && onHover(property.id)} onMouseLeave={() => onHoverEnd && onHoverEnd()} className={`bg-white rounded-3xl border overflow-hidden flex flex-col md:flex-row hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 group ${isHighlighted ? "border-brandRed shadow-[0_0_0_2px_rgba(186,0,54,0.3)]" : "border-gray-100"} ${property.availabilityStatus === 'rented' ? 'opacity-60 grayscale-[50%]' : ''}`}>
 			<div className="w-full md:w-[280px] lg:w-[300px] h-[190px] md:h-auto p-2.5 shrink-0">
@@ -463,6 +504,47 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 							{property.furnishing === "Furnished" ? t.furnished || "Furnished" : property.furnishing === "Semi-Furnished" ? t.semiFurnished || "Semi-Furnished" : t.unfurnished || "Unfurnished"}
 						</span>
 					</div>
+
+					{/* ── AMENITIES + LANDLORD STRIP ─────────────────────────────
+					    Fills the empty band between the specs box and the price
+					    footer: amenity chips on the left (max 4 + "+N"), a compact
+					    landlord identity block on the right. Both halves render
+					    only when the listing actually carries the data. */}
+					{(amenities.length > 0 || landlordName) && (
+						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-3">
+							{amenities.length > 0 && (
+								<div className="flex flex-wrap items-center gap-1.5 min-w-0">
+									{amenities.slice(0, 4).map((a) => (
+										<span key={a} className="flex items-center gap-1 bg-white border border-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded-lg">
+											<CheckCircle2 size={11} className="text-[#1ab64f] shrink-0" />
+											{amenityLabel(a, isBn)}
+										</span>
+									))}
+									{amenities.length > 4 && (
+										<span className="text-[10px] font-black text-brandRed px-1.5">
+											+{amenities.length - 4} {isBn ? "আরও" : "more"}
+										</span>
+									)}
+								</div>
+							)}
+							{landlordName && (
+								<div className="flex items-center gap-2 shrink-0 sm:pl-3 sm:border-l sm:border-gray-100">
+									<div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-black shrink-0">
+										{landlordName.charAt(0).toUpperCase()}
+									</div>
+									<div className="leading-tight">
+										<p className="text-[11px] font-black text-gray-900 flex items-center gap-1">
+											{landlordName}
+											{property.verified && <ShieldCheck size={12} className="text-[#1ab64f] shrink-0" />}
+										</p>
+										<p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+											{isBn ? "বাড়িওয়ালা" : "Landlord"}
+										</p>
+									</div>
+								</div>
+							)}
+						</div>
+					)}
 				</div>
 				<div className="flex flex-col sm:flex-row justify-between items-center gap-2.5 pt-3 mt-3 border-t border-gray-100">
 					<div className="w-full sm:w-auto flex flex-col cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
@@ -1322,9 +1404,12 @@ const PropertyListing = () => {
 			</motion.div>
 
 			{/* ═══════════════════════════════════════════════════════════════
-			    MOBILE: Daraz-style immersive header — replaces global Navbar
+			    MOBILE + TABLET: Daraz-style immersive header — replaces global
+			    Navbar (App.jsx hides the Navbar below lg on this route, so this
+			    header must stay visible through the whole <lg range or tablets
+			    end up with no search/filter controls at all).
 			    ─────────────────────────────────────────────────────────────── */}
-			<div className="md:hidden sticky top-0 z-40 bg-white shadow-sm">
+			<div className="lg:hidden sticky top-0 z-40 bg-white shadow-sm">
 				{/* Row 1: Back arrow · Search bar · Sort icon */}
 				<div className="flex items-center gap-2 px-3 pt-3 pb-2">
 					<button
@@ -1777,7 +1862,7 @@ const PropertyListing = () => {
 							</h1>
 						</div>
 						<div className="flex items-center gap-3">
-							<div className="hidden md:flex items-center bg-gray-100 rounded-xl p-1 gap-1">
+							<div className="hidden lg:flex items-center bg-gray-100 rounded-xl p-1 gap-1">
 								<button onClick={() => setViewMode("list")} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black transition-all ${!isMapMode ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
 									<List size={14} /> List
 								</button>
@@ -1785,7 +1870,7 @@ const PropertyListing = () => {
 									<Map size={14} /> Map View
 								</button>
 							</div>
-							<div className="hidden md:flex items-center gap-2">
+							<div className="hidden lg:flex items-center gap-2">
 								<span className="text-sm font-bold text-gray-500">{t.sortBy || "Sort by:"}</span>
 								<select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold text-gray-900 outline-none focus:border-brandRed cursor-pointer shadow-sm hover:shadow-md transition-shadow">
 									<option value="Newest Listings">{t.sortNewest || "Newest Listings"}</option>

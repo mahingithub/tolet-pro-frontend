@@ -14,7 +14,8 @@ import {
   ChevronDown, Globe, Star, Play, Layers, Eye,
   LayoutDashboard, Navigation, Map, Wand2, RefreshCw,
   ShoppingBag, Briefcase, Store,
-  User, GraduationCap, Leaf, Utensils, Coffee, Rocket
+  User, GraduationCap, Leaf, Utensils, Coffee, Rocket,
+  Flame, Droplets
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -578,6 +579,11 @@ const FURNISHING_OPTIONS = [
 ];
 
 const AMENITIES_RESIDENTIAL = [
+  // Bangladesh essentials first — these are the amenities tenants here
+  // actually filter on (gas line, lift, water supply) before anything fancy.
+  { id: 'Gas Line',         label: 'Gas Line',         labelBn: 'গ্যাস লাইন',           icon: Flame,      color: 'text-orange-500',  bg: 'bg-orange-50'  },
+  { id: 'Elevator',         label: 'Elevator / Lift',  labelBn: 'লিফট',                  icon: Layers,     color: 'text-purple-500',  bg: 'bg-purple-50'  },
+  { id: 'Water Supply',     label: 'Water Supply',     labelBn: '২৪ ঘণ্টা পানি',        icon: Droplets,   color: 'text-cyan-500',    bg: 'bg-cyan-50'    },
   { id: 'Central AC',       label: 'Central AC',       labelBn: 'সেন্ট্রাল এসি',       icon: Snowflake,  color: 'text-blue-500',    bg: 'bg-blue-50'    },
   { id: 'Parking',          label: 'Parking',          labelBn: 'পার্কিং',              icon: Car,        color: 'text-gray-600',    bg: 'bg-gray-100'   },
   { id: 'High-Speed WiFi',  label: 'High-Speed WiFi',  labelBn: 'হাই-স্পিড ওয়াইফাই',  icon: Wifi,       color: 'text-green-500',   bg: 'bg-green-50'   },
@@ -686,9 +692,9 @@ const INITIAL_FORM = {
   sqft: '',
   // User-approved Q5 — "on which floor is the house located". Stored as
   // an integer; 0 means ground floor. Backend `Property.floor` already
-  // accepts -5..200 so we keep this purely numeric.
-  floor: '',
-  age: '',
+  // accepts -5..200 so we keep this purely numeric. Defaults to '0'
+  // (ground floor) so hosts who skip the field get a sensible value.
+  floor: '0',
   furnishing: '',
   amenities: [],
   // Step 4 – Media (structured)
@@ -1741,7 +1747,7 @@ const AddProperty = () => {
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#eaeff5] font-sans relative overflow-x-hidden text-gray-900 selection:bg-[#ba0036] selection:text-white">
+    <div className="min-h-screen bg-[#eaeff5] font-sans relative text-gray-900 selection:bg-[#ba0036] selection:text-white">
 
       {/* Glowing Orbs */}
       <div className="fixed top-[-20%] left-[-10%] w-[50vw] h-[50vw] bg-gradient-to-br from-[#ba0036]/10 to-transparent rounded-full blur-[120px] pointer-events-none z-0" />
@@ -1764,8 +1770,12 @@ const AddProperty = () => {
         )}
       </AnimatePresence>
 
-      {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-2xl border-b border-gray-100 shadow-[0_2px_16px_rgba(0,0,0,0.04)]">
+      {/* Header — sticky (NOT fixed) so it participates in page flow: when the
+          global AppDownloadBanner is present it starts BELOW the banner instead
+          of being pinned underneath it at the viewport top, then pins itself
+          once the banner scrolls away. (The banner is in-flow with z-[61]; a
+          fixed z-40 header at top-0 was fully covered by it.) */}
+      <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-2xl border-b border-gray-100 shadow-[0_2px_16px_rgba(0,0,0,0.04)]">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-gradient-to-br from-[#ba0036] to-rose-500 rounded-xl flex items-center justify-center shadow-[0_4px_10px_rgba(186,0,54,0.25)]">
@@ -1788,8 +1798,9 @@ const AddProperty = () => {
         </div>
       </div>
 
-      {/* Step Indicators */}
-      <div className="max-w-2xl mx-auto px-4 pt-24">
+      {/* Step Indicators — header is sticky/in-flow now, so no fixed-header
+          padding compensation is needed here. */}
+      <div className="max-w-2xl mx-auto px-4 pt-8">
         <div className="flex items-center justify-between relative">
           <div className="absolute top-5 left-5 right-5 h-px bg-gray-200 z-0" />
           <div className="absolute top-5 left-5 h-px bg-gradient-to-r from-[#ba0036] to-rose-400 z-0 transition-all duration-500"
@@ -1926,6 +1937,50 @@ const AddProperty = () => {
                           ))}
                         </div>
                         {err('category') && <ErrMsg text={isBn ? 'ক্যাটাগরি বেছে নিন' : 'Please select a category'} />}
+                      </Field>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* ── HOSTEL SEAT TYPE (rent → hostel only) ──
+                    Most Bangladeshi hostels rent single-occupancy rooms, but
+                    the wizard had no way to say so — hosts had to hope tenants
+                    read "Seats per Room" in step 2. This makes it a first-class
+                    step-1 choice. Stored in specificDetails.seatType; picking
+                    "single" also pre-fills seatsPerRoom = 1 (the step-2 field
+                    stays editable for shared setups). */}
+                <AnimatePresence>
+                  {form.intent === 'rent' && form.type === 'hostel' && (
+                    <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                      <Field label={isBn ? 'সিটের ধরন' : 'Seat Type'}
+                        hint={isBn ? 'রুমগুলো কীভাবে ভাড়া দেওয়া হয়?' : 'How are the rooms rented out?'}>
+                        <div className="grid grid-cols-2 gap-3">
+                          {[
+                            { id: 'single', label: 'Single Seat', labelBn: 'সিঙ্গেল সিট', desc: '1 person per room', descBn: 'প্রতি রুমে ১ জন', icon: User },
+                            { id: 'shared', label: 'Shared Seat', labelBn: 'শেয়ার্ড সিট', desc: 'Multiple per room', descBn: 'প্রতি রুমে একাধিক জন', icon: Users },
+                          ].map(({ id, label, labelBn, desc, descBn, icon: Icon }) => {
+                            const active = (form.specificDetails || {}).seatType === id;
+                            return (
+                              <button key={id} type="button"
+                                onClick={() => {
+                                  setSpecific('seatType', id);
+                                  setSpecific('seatsPerRoom', id === 'single' ? 1 : ((form.specificDetails || {}).seatsPerRoom === 1 ? '' : (form.specificDetails || {}).seatsPerRoom));
+                                }}
+                                className={`flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all duration-200 active:scale-95 text-left
+                                  ${active
+                                    ? 'bg-[#ba0036] border-[#ba0036] text-white shadow-[0_8px_20px_rgba(186,0,54,0.25)]'
+                                    : 'bg-white border-gray-100 text-gray-500 hover:border-[#ba0036]/30'}`}>
+                                <Icon size={20} className={active ? 'text-white' : 'text-gray-400'} />
+                                <span className="flex flex-col">
+                                  <span className="text-xs font-black leading-tight">{isBn ? labelBn : label}</span>
+                                  <span className={`text-[10px] font-bold leading-tight ${active ? 'text-white/70' : 'text-gray-400'}`}>
+                                    {isBn ? descBn : desc}
+                                  </span>
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </Field>
                     </motion.div>
                   )}
@@ -2178,24 +2233,43 @@ const AddProperty = () => {
 
                 
                 {/* ── DYNAMIC GROUP-SPECIFIC DETAILS ── */}
+                {/* Balcony — residential only. Yes/No toggle; picking Yes
+                    reveals a counter for how many. Stored in the
+                    specificDetails Mixed bag (hasBalcony / balconyCount) so
+                    it reaches the backend without a schema change. */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
                   {group === 'residential' && (
                     <>
-                      <Field label={isBn ? 'বাড়ির বয়স' : 'Age of House'}>
-                        <div className="relative">
-                          <select className={inputCls} value={form.age || ''} onChange={e => set('age', e.target.value)}>
-                            <option value="">{isBn ? 'নির্বাচন করুন' : 'Select'}</option>
-                            <option value="নতুন">{isBn ? 'নতুন' : 'New'}</option>
-                            <option value="১-৫ বছর">{isBn ? '১-৫ বছর' : '1-5 years'}</option>
-                            <option value="৫-১০ বছর">{isBn ? '৫-১০ বছর' : '5-10 years'}</option>
-                            <option value="১০+ বছর">{isBn ? '১০+ বছর' : '10+ years'}</option>
-                          </select>
+                      <Field label={isBn ? 'বারান্দা আছে?' : 'Balcony?'}>
+                        <div className="grid grid-cols-2 gap-3">
+                          {[{ v: true, en: 'Yes', bn: 'হ্যাঁ' }, { v: false, en: 'No', bn: 'না' }].map(opt => (
+                            <button key={String(opt.v)} type="button"
+                              onClick={() => {
+                                setSpecific('hasBalcony', opt.v);
+                                setSpecific('balconyCount', opt.v ? ((form.specificDetails || {}).balconyCount || 1) : '');
+                              }}
+                              className={`py-3 px-2 rounded-2xl border-2 text-xs font-black transition-all active:scale-95 text-center
+                                ${(form.specificDetails || {}).hasBalcony === opt.v
+                                  ? 'bg-[#ba0036]/5 border-[#ba0036] text-[#ba0036] shadow-sm'
+                                  : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200'}`}>
+                              {isBn ? opt.bn : opt.en}
+                            </button>
+                          ))}
                         </div>
                       </Field>
+                      {(form.specificDetails || {}).hasBalcony === true && (
+                        <Field label={isBn ? 'কতটি বারান্দা?' : 'How many balconies?'}>
+                          <div className="flex items-center gap-3 mt-1">
+                            <Eye size={18} className="text-gray-300 shrink-0" />
+                            <CounterInput
+                              value={Number((form.specificDetails || {}).balconyCount) || 1}
+                              onChange={v => setSpecific('balconyCount', v)}
+                              min={1} max={8} />
+                          </div>
+                        </Field>
+                      )}
                     </>
                   )}
-
-
                 </div>
 
                 {/* Furnishing */}

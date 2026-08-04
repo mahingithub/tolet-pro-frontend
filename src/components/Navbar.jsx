@@ -685,7 +685,7 @@ useEffect(() => {
                     <div className="absolute top-full right-0 mt-3 w-64 bg-white/95 backdrop-blur-3xl border border-white shadow-[0_30px_60px_rgba(0,0,0,0.12)] rounded-[2rem] p-2 z-[70] overflow-hidden">
                       <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 rounded-t-[1.5rem] mb-2">
                         <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${userRole === 'landlord' ? 'text-[#ba0036]' : 'text-blue-500'}`}>
-                          {userRole === 'landlord' ? (t?.menuHostPortal || 'Host Portal') : (t?.menuTenantPortal || 'Tenant Portal')}
+                          {userRole === 'landlord' ? (t?.menuHostPortal || 'Landlord Portal') : (t?.menuTenantPortal || 'Tenant Portal')}
                         </p>
                         <p className="text-sm font-bold text-gray-900">{userName}</p>
                         <p className="text-xs text-gray-400">{userEmail}</p>
@@ -695,6 +695,9 @@ useEffect(() => {
                         <>
                           <Link to="/host-dashboard" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-red-50 hover:text-[#ba0036] rounded-xl transition-colors"><LayoutDashboard size={17} /> {t?.menuHostDashboard || 'Host Dashboard'}</Link>
                           <button onClick={() => handleProtected('/list-property')} className="w-full flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-red-50 hover:text-[#ba0036] rounded-xl transition-colors text-left"><PlusCircle size={17} /> {t?.menuAddProperty || 'Add Property'}</button>
+                          {/* Direct Messages shortcut — the chat previously
+                              required dashboard → messages, two hops on desktop. */}
+                          <Link to="/messages" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-red-50 hover:text-[#ba0036] rounded-xl transition-colors"><MessageSquare size={17} /> {t?.menuTenantMessages || 'Tenant Messages'}</Link>
                         </>
                       ) : (
                         <>

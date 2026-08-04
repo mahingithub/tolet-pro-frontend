@@ -36,6 +36,14 @@ const HUMAN_KEYWORDS = ['human', 'agent', 'support', 'complaint', 'real person',
 
 const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
 
+// /ai-chat/* routes are auth-gated (AI calls cost money). Same token the rest
+// of the app uses (see supportService.js) — without this header every ask
+// returned 401 and the user only ever saw the generic "brain" error.
+const authHeader = () => {
+  const t = window.localStorage.getItem('auth:token');
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
+
 const GlobalAIAssistant = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -248,9 +256,21 @@ const GlobalAIAssistant = () => {
         
       const response = await fetch(`${API}/ai-chat/ask`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({ text, history: historyPayload })
       });
+
+      if (response.status === 401) {
+        // Not signed in (or session expired) — say so instead of the generic
+        // "brain" error, and don't count it toward the human-handoff streak.
+        setAiMessages((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          sender: 'ai',
+          text: 'AI চ্যাট ব্যবহার করতে প্রথমে লগইন করুন। 🙏\n(Please sign in to use the AI chat.)',
+          action: { label: 'লগইন করুন / Sign in', route: '/login' },
+        }]);
+        return;
+      }
 
       if (!response.ok) {
         throw new Error('API Error');
@@ -348,7 +368,7 @@ const GlobalAIAssistant = () => {
     try {
       const fd = new FormData();
       fd.append('audio', blob, 'voice.webm');
-      const res = await fetch(`${API}/ai-chat/transcribe`, { method: 'POST', body: fd });
+      const res = await fetch(`${API}/ai-chat/transcribe`, { method: 'POST', headers: authHeader(), body: fd });
       if (res.ok) {
         const data = await res.json();
         const t = (data.text || '').trim();
