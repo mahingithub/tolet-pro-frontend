@@ -419,8 +419,8 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 
 	return (
 		<div onMouseEnter={() => onHover && onHover(property.id)} onMouseLeave={() => onHoverEnd && onHoverEnd()} className={`rounded-3xl border overflow-hidden flex flex-col md:flex-row hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] transition-all duration-500 group ${cardStyle} ${property.availabilityStatus === 'rented' ? 'opacity-60 grayscale-[50%]' : ''}`}>
-			<div className="w-full md:w-[280px] lg:w-[300px] h-[190px] md:h-auto p-2.5 shrink-0">
-				<div className="relative w-full h-full rounded-2xl overflow-hidden flex gap-1.5 bg-gray-100">
+			<div className="w-full md:w-[280px] lg:w-[300px] h-[190px] md:h-auto shrink-0">
+				<div className="relative w-full h-full overflow-hidden flex gap-1.5 bg-gray-100">
 					<div className="relative w-[75%] h-full overflow-hidden cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
 						{coverImg ? (
 							<img src={coverImg} alt={property.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out" loading="lazy" decoding="async" />
@@ -436,38 +436,38 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
                                 </div>
                             </div>
                         )}
-						<div className="absolute top-3 left-3 flex flex-col gap-2 items-start">
+						<div className="absolute top-2.5 left-2.5 right-10 flex flex-wrap gap-1.5 items-start">
                             {property.availabilityStatus === 'rented' && (
                                 <div className="absolute inset-0 z-10 bg-brandRed/80 backdrop-blur-[2px] flex items-center justify-center">
-                                    <div className="bg-white px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-xl text-sm font-black text-brandRed transform -rotate-12 border-2 border-brandRed/20">
+                                    <div className="bg-white px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xl text-xs font-black text-brandRed transform -rotate-12 border-2 border-brandRed/20">
                                         {t.rentedBadge || "ভাড়া হয়ে গেছে"}
                                     </div>
                                 </div>
                             )}
 							{property.verified && (
-								<div className="bg-white/90 backdrop-blur-md px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm text-[10px] font-black text-brandRed">
-									<ShieldCheck size={12} /> {t.verified || "Verified"}
+								<div className="bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg flex items-center gap-1 shadow-sm text-[9px] font-black text-brandRed">
+									<ShieldCheck size={10} /> {t.verified || "Verified"}
 								</div>
 							)}
 							{isPro && (
 								<>
-									<div className="bg-gradient-to-r from-amber-400 to-orange-500 text-white px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md text-[10px] font-black tracking-widest uppercase">
-										<Crown size={12} /> Pro
+									<div className="bg-gradient-to-r from-amber-400 to-orange-500 text-white px-2 py-1 rounded-lg flex items-center gap-1 shadow-md text-[9px] font-black tracking-widest uppercase">
+										<Crown size={10} /> Pro
 									</div>
-									<div className="bg-white/90 backdrop-blur-md px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm text-[10px] font-black text-amber-600 uppercase tracking-widest">
-										<TrendingUp size={12} /> {isBn ? "শীর্ষ অবস্থান" : "Top Position"}
+									<div className="bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg flex items-center gap-1 shadow-sm text-[9px] font-black text-amber-600 uppercase tracking-widest">
+										<TrendingUp size={10} /> {isBn ? "শীর্ষ অবস্থান" : "Top Position"}
 									</div>
 								</>
 							)}
 							{isPlus && !isPro && (
-								<div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md text-[10px] font-black tracking-widest uppercase">
-									<Sparkles size={12} /> Plus
+								<div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-2 py-1 rounded-lg flex items-center gap-1 shadow-md text-[9px] font-black tracking-widest uppercase">
+									<Sparkles size={10} /> Plus
 								</div>
 							)}
-							<span className="bg-gray-900/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm">{propertyTypeLabel(property.type, isBn)}</span>
-							<span className="bg-brandRed/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm">{catLabel}</span>
+							<span className="bg-gray-900/90 backdrop-blur-md text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-lg shadow-sm">{propertyTypeLabel(property.type, isBn)}</span>
+							<span className="bg-brandRed/90 backdrop-blur-md text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-lg shadow-sm">{catLabel}</span>
 							{property.intent && (
-								<span className={`backdrop-blur-md text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm ${
+								<span className={`backdrop-blur-md text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-lg shadow-sm ${
 									property.intent === 'sale' ? 'bg-blue-600/90 text-white' :
 									property.intent === 'commercial' ? 'bg-purple-600/90 text-white' :
 									'bg-green-600/90 text-white'
@@ -652,8 +652,8 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 
 const PropertyCardSkeleton = () => (
 	<div className="bg-white rounded-3xl border border-gray-100 overflow-hidden flex flex-col md:flex-row shadow-sm animate-pulse">
-		<div className="w-full md:w-[280px] lg:w-[300px] h-[190px] md:h-auto p-2.5 shrink-0">
-			<div className="relative w-full h-full rounded-2xl overflow-hidden flex gap-1.5 bg-gray-100">
+		<div className="w-full md:w-[280px] lg:w-[300px] h-[190px] md:h-auto shrink-0">
+			<div className="relative w-full h-full overflow-hidden flex gap-1.5 bg-gray-100">
 				<div className="w-[75%] h-full bg-gray-200" />
 				<div className="w-[25%] flex flex-col gap-1.5 h-full">
 					<div className="flex-1 bg-gray-200" />

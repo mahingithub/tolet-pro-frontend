@@ -733,9 +733,9 @@ const PropertyCard = ({ property, t, landlord }) => {
         className="bg-white rounded-[26px] overflow-hidden shadow-[0_10px_30px_-12px_rgba(15,23,42,0.18)] border border-gray-100 active:scale-[0.995] transition-transform cursor-pointer"
       >
         {/* IMAGE BLOCK — big image left, 3 thumbs right */}
-        <div className="relative grid grid-cols-[1.7fr_1fr] gap-1 p-1 bg-white">
+        <div className="relative grid grid-cols-[1.7fr_1fr] gap-1 bg-white">
           {/* Primary image */}
-          <div className="relative rounded-[20px] overflow-hidden bg-gray-100 aspect-[4/3.4]">
+          <div className="relative overflow-hidden bg-gray-100 aspect-[4/3.4]">
             <SafeImg
               src={primary}
               alt={property.title}
@@ -743,23 +743,23 @@ const PropertyCard = ({ property, t, landlord }) => {
             />
 
             {/* TOP-LEFT: vertical pill stack — VERIFIED + APARTMENT + FAMILY FLAT */}
-            <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5 z-10">
+            <div className="absolute top-2 left-2 right-10 flex flex-wrap items-start gap-1.5 z-10">
               {property.verified && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white text-[#ba0036] text-[10px] font-black uppercase tracking-wider shadow-md">
-                  <ShieldCheck size={11} strokeWidth={2.6} />
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white text-[#ba0036] text-[9px] font-black uppercase tracking-wider shadow-md">
+                  <ShieldCheck size={10} strokeWidth={2.6} />
                   {t.mobVerified}
                 </span>
               )}
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-900 text-white text-[10px] font-black uppercase tracking-wider shadow-md">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-900 text-white text-[9px] font-black uppercase tracking-wider shadow-md">
                 {typeLabel}
               </span>
               {catLabel && (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#ba0036] text-white text-[10px] font-black uppercase tracking-wider shadow-[0_6px_18px_-6px_rgba(186,0,54,0.55)]">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#ba0036] text-white text-[9px] font-black uppercase tracking-wider shadow-[0_6px_18px_-6px_rgba(186,0,54,0.55)]">
                   {catLabel}
                 </span>
               )}
               {intentLabel && (
-                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-white text-[10px] font-black uppercase tracking-wider shadow-md ${
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-white text-[9px] font-black uppercase tracking-wider shadow-md ${
                   intentKind === 'sale' ? 'bg-blue-600' :
                   intentKind === 'commercial' ? 'bg-purple-600' :
                   'bg-green-600'
@@ -795,7 +795,7 @@ const PropertyCard = ({ property, t, landlord }) => {
               // Convert shot string (fallback) to object just in case
               const s = typeof shot === 'string' ? { url: shot, room: null } : shot;
               return (
-                <div key={i} className="relative rounded-[16px] overflow-hidden bg-gray-100">
+                <div key={i} className="relative overflow-hidden bg-gray-100">
                   <SafeImg
                     src={s?.url}
                     alt={s?.url ? `${property.title} ${i + 2}` : ''}
