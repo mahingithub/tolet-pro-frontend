@@ -1,7 +1,24 @@
 import React from 'react';
-import { Facebook, Instagram, Send } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
-import { useLanguage } from '../context/LanguageContext'; 
+import { useLanguage } from '../context/LanguageContext';
+
+// lucide-react v1 removed its brand marks (Facebook / Instagram), so the two
+// social glyphs are inlined here rather than imported — importing them again
+// would break the build.
+const FacebookIcon = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5.02 3.66 9.18 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.52 1.49-3.91 3.77-3.91 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.78-1.63 1.57v1.89h2.78l-.45 2.91h-2.33V22c4.78-.76 8.44-4.92 8.44-9.94Z" />
+  </svg>
+);
+
+const InstagramIcon = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37Z" />
+    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+  </svg>
+);
 
 const Footer = () => {
   const { t } = useLanguage(); 
@@ -32,12 +49,24 @@ const Footer = () => {
               {t.footerDesc}
             </p>
             <div className="flex gap-4">
-              <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-brandRed hover:text-white transition-colors cursor-pointer">
-                <Facebook size={18} />
-              </div>
-              <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-brandRed hover:text-white transition-colors cursor-pointer">
-                <Instagram size={18} />
-              </div>
+              <a
+                href="https://facebook.com"
+                target="_blank"
+                rel="noreferrer noopener"
+                aria-label="Facebook"
+                className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-brandRed hover:text-white transition-colors cursor-pointer"
+              >
+                <FacebookIcon size={18} />
+              </a>
+              <a
+                href="https://instagram.com"
+                target="_blank"
+                rel="noreferrer noopener"
+                aria-label="Instagram"
+                className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-brandRed hover:text-white transition-colors cursor-pointer"
+              >
+                <InstagramIcon size={18} />
+              </a>
             </div>
           </div>
 
@@ -78,7 +107,7 @@ const Footer = () => {
                 placeholder={t.emailPlaceholder} 
                 className="w-full bg-white/5 border border-gray-800 rounded-full py-3 px-5 text-sm text-white focus:outline-none focus:border-brandRed transition-colors placeholder-gray-600"
               />
-              <button className="absolute right-1.5 top-1.5 w-9 h-9 bg-brandRed rounded-full flex items-center justify-center hover:bg-[#a0002e] transition-colors">
+              <button aria-label={t.newsletterDesc || 'Subscribe'} className="absolute right-1.5 top-1.5 w-9 h-9 bg-brandRed rounded-full flex items-center justify-center hover:bg-[#a0002e] transition-colors">
                 <Send size={14} className="ml-[-2px]" />
               </button>
             </div>

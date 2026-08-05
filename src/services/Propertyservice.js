@@ -329,6 +329,38 @@ const buildRoomPhotoRecords = async (form) => {
   })));
 };
 
+// Upload every walkthrough video and return the `videos[]` records the API
+// expects. Plans allow 0 / 1 / 5 videos per property (free / plus / pro); the
+// count is capped by the wizard and enforced server-side — this just hosts them.
+//
+// Accepts the wizard shape ({ file, preview, name }), an already-hosted record
+// ({ url }), a bare YouTube entry ({ youtubeId }), or the LEGACY single-video
+// `form.mainVideo` + `form.videoId` pair so older callers keep working.
+const buildVideoRecords = async (form) => {
+  const list = Array.isArray(form.videos) && form.videos.length
+    ? form.videos
+    : [
+        ...(form.mainVideo ? [form.mainVideo] : []),
+        ...(form.videoId ? [{ youtubeId: form.videoId }] : []),
+      ];
+
+  const rows = list
+    .map((v) => ({
+      // Prefer the original File (no base64 round-trip), then the local
+      // preview, then an already-hosted URL.
+      source:    v?.file || v?.preview || v?.url || '',
+      youtubeId: v?.youtubeId || '',
+      name:      v?.name || '',
+    }))
+    .filter((v) => v.source || v.youtubeId);
+
+  return Promise.all(rows.map(async (v) => ({
+    url:       v.source ? await uploadToCloudinary(v.source, 'video') : '',
+    youtubeId: v.youtubeId,
+    name:      v.name,
+  })));
+};
+
 
 // ─── PROPERTY SERVICE ─────────────────────────────────────────────────────────
 export const propertyService = {
@@ -534,13 +566,13 @@ export const propertyService = {
       // carries ONLY https URLs (never base64). This is the fix for the POST
       // 400s, and a big part of the listing 500 OOMs — the heavy bytes go to
       // Cloudinary instead of into the request body / MongoDB / the backend.
-      const [coverPhoto, roomPhotos, videoUrl] = await Promise.all([
+      const [coverPhoto, roomPhotos, videos] = await Promise.all([
         // Cover: prefer the original File, else the data: preview, else a url.
         uploadToCloudinary(form.coverPhoto?.file || form.coverPhoto?.preview || '', 'image'),
         buildRoomPhotoRecords(form),
-        // Video: upload the raw File directly (no base64 conversion). An
+        // Videos: upload each raw File directly (no base64 conversion). An
         // already-hosted https url (e.g. on edit) is passed through untouched.
-        uploadToCloudinary(form.mainVideo?.file || form.mainVideo?.preview || '', 'video'),
+        buildVideoRecords(form),
       ]);
 
 
@@ -571,8 +603,9 @@ export const propertyService = {
         // no longer send a separate base64 thumbnail.
         coverPhotoThumb: '',
         roomPhotos,
-        videoId:     form.videoId     || '',
-        videoUrl,
+        // Canonical multi-video field. The backend mirrors videos[0] onto the
+        // legacy videoId/videoUrl columns, so no separate send is needed.
+        videos,
         // Intent-specific details bag (rent/sale/commercial fields). AddProperty
         // bundles the dynamic Step-2 inputs into form.specificDetails; the
         // backend stores it as Mixed. (updateProperty already forwards it via its
@@ -658,9 +691,21 @@ export const propertyService = {
       if (Array.isArray(nextPatch.roomPhotos)) {
         nextPatch.roomPhotos = await buildRoomPhotoRecords({ roomPhotos: nextPatch.roomPhotos });
       }
-      // Guard: if a raw/base64 video sneaks into an edit, host it too.
-      if (Object.prototype.hasOwnProperty.call(nextPatch, 'videoUrl') && nextPatch.videoUrl) {
-        nextPatch.videoUrl = await uploadToCloudinary(nextPatch.videoUrl, 'video');
+      // Guard: if raw/base64 videos sneak into an edit, host them too. A legacy
+      // single-video patch (videoUrl / videoId) is folded into videos[] so the
+      // API only ever receives the canonical field.
+      const patchesVideos =
+        Array.isArray(nextPatch.videos) ||
+        Object.prototype.hasOwnProperty.call(nextPatch, 'videoUrl') ||
+        Object.prototype.hasOwnProperty.call(nextPatch, 'videoId');
+      if (patchesVideos) {
+        nextPatch.videos = await buildVideoRecords({
+          videos:    nextPatch.videos,
+          mainVideo: nextPatch.videoUrl ? { url: nextPatch.videoUrl } : null,
+          videoId:   nextPatch.videoId || '',
+        });
+        delete nextPatch.videoUrl;
+        delete nextPatch.videoId;
       }
       const res = await probeFetch('updateProperty', `${API}/properties/${id}`, {
         method:  'PATCH',
@@ -759,7 +804,21 @@ function _normaliseApiProperty(p) {
     lat:            p.gpsLat     ?? p.lat ?? null,
     lng:            p.gpsLng     ?? p.lng ?? null,
     floor:          p.floor      ?? 0,
+    // `mainVideo` stays for readers that predate multi-video (it is videos[0]).
     mainVideo:      p.videoUrl   || p.mainVideo || '',
+    // Canonical list. Older documents saved before videos[] existed only carry
+    // the legacy scalars, so synthesise a one-element list for them — they
+    // self-migrate server-side the next time the listing is saved.
+    videos: Array.isArray(p.videos) && p.videos.length
+      ? p.videos
+      : (p.videoUrl || p.mainVideo || p.videoId
+          ? [{ url: p.videoUrl || p.mainVideo || '', youtubeId: p.videoId || '' }]
+          : []),
+    // Plan signals: hostTier drives the Plus/Pro badge + Gold Card border,
+    // boosted/boostedUntil drive the dashboard's Boost button state.
+    hostTier:       p.hostTier || 'free',
+    boosted:        p.boosted ?? false,
+    boostedUntil:   p.boostedUntil ?? null,
   };
 }
 

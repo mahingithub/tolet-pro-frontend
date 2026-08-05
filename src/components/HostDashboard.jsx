@@ -20,6 +20,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { propertyService, subscribeUserProperties } from '../services/Propertyservice';
 import { getDynamicFields } from '../constants/propertyFields';
 import { subscriptionService } from '../services/subscriptionService';
+import boostService from '../services/boostService';
 import { listHostInquiries, updateInquiryStatus, deleteInquiry, replyToInquiry, respondVisit, proposeVisit } from "../services/inquiryService.js";
 import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi, cancelBooking as cancelBookingApi, updateBookingSettings as updateBookingSettingsApi, updateMemberLedger as updateMemberLedgerApi, undoMemberLedger as undoMemberLedgerApi } from "../services/bookingService.js";
 import { getRoomTypes, firstRoomTypeId, roomLabel } from '../constants/roomCategories';
@@ -1002,6 +1003,50 @@ const HostDashboard = () => {
   // subscriptionService later exposes a more specific flag (e.g. paid tier),
   // swap it in here and everything downstream follows.
   const isPremium = ['plus', 'pro'].includes(subStatus?.tier);
+
+  // ─── Search boost (Plus perk) ──────────────────────────────────────────
+  // Plus hosts get one credit a month to pin a listing to the top of search
+  // for 24h. Pro is deliberately excluded: Pro listings already outrank
+  // everything via the hostTier sort, so a Boost button there would be a
+  // no-op that implies otherwise. Free hosts have nothing to spend.
+  //
+  // The status endpoint is the source of truth for `canBoost` — it also does
+  // the lazy monthly refill, so this fetch is what tops a host up when the
+  // 1st-of-month cron was missed on a sleeping instance.
+  const [boostStatus, setBoostStatus] = useState(null);
+  const [boostingId, setBoostingId] = useState(null);
+  const showBoostButton = subStatus?.tier === 'plus';
+
+  useEffect(() => {
+    if (!showBoostButton) { setBoostStatus(null); return; }
+    let cancelled = false;
+    boostService.getStatus().then((s) => { if (!cancelled) setBoostStatus(s); });
+    return () => { cancelled = true; };
+  }, [showBoostButton]);
+
+  const handleBoost = async (prop) => {
+    if (boostingId) return; // a boost is already in flight
+    setBoostingId(prop.id);
+    try {
+      const res = await boostService.boost(prop.id);
+      setBoostStatus((s) => (s ? { ...s, creditsRemaining: res.creditsRemaining, canBoost: res.creditsRemaining > 0 } : s));
+      // Reflect the pin on the card straight away instead of waiting for a refetch.
+      setProperties((prev) => prev.map((p) => (
+        p.id === prop.id ? { ...p, boosted: true, boostedUntil: res.boostedUntil } : p
+      )));
+      showToast(
+        res.alreadyBoosted
+          ? (language === 'বাংলা' ? 'এই প্রপার্টি এখনো বুস্ট করা আছে।' : 'This property is already boosted.')
+          : (language === 'বাংলা'
+              ? 'বুস্ট হয়েছে! ২৪ ঘণ্টা সার্চের উপরে থাকবে।'
+              : 'Boosted! Top of search for 24 hours.'),
+      );
+    } catch (err) {
+      showToast(err.message || (language === 'বাংলা' ? 'বুস্ট করা যায়নি।' : 'Could not boost.'));
+    } finally {
+      setBoostingId(null);
+    }
+  };
 
   // Active tab guarded by subscription. If the host lands on a locked tab
   // (e.g. via a stale link), we bounce them to /subscription with a `from`
@@ -6549,6 +6594,40 @@ const HostDashboard = () => {
                              <button onClick={() => togglePropertyStatus(prop.id)} className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 md:py-3 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 ${prop.status === 'paused' ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-md shadow-orange-500/20' : 'bg-gray-50 hover:bg-gray-100 text-gray-700'}`}>
                                {prop.status === 'paused' ? <><PlayCircle size={12}/> {t?.resumeBtn || (language === 'বাংলা' ? 'চালু' : 'Resume')}</> : <><PauseCircle size={12}/> {t?.pauseBtn || (language === 'বাংলা' ? 'পজ' : 'Pause')}</>}
                              </button>
+                             {/* Boost — Plus only. Pro already ranks top, free has no credits. */}
+                             {showBoostButton && (() => {
+                               const isBoosted = prop.boostedUntil && new Date(prop.boostedUntil) > new Date();
+                               const credits = boostStatus?.creditsRemaining ?? 0;
+                               const busy = boostingId === prop.id;
+                               const disabled = busy || isBoosted || credits === 0;
+                               return (
+                                 <button
+                                   onClick={() => handleBoost(prop)}
+                                   disabled={disabled}
+                                   title={
+                                     isBoosted
+                                       ? (language === 'বাংলা' ? 'এই প্রপার্টি এখন বুস্ট করা আছে' : 'Already boosted')
+                                       : credits === 0
+                                         ? (language === 'বাংলা' ? 'এই মাসের বুস্ট শেষ — পরের মাসে আবার পাবেন' : 'No boosts left — resets next month')
+                                         : (language === 'বাংলা' ? '২৪ ঘণ্টা সার্চের উপরে রাখুন' : 'Pin to top of search for 24 hours')
+                                   }
+                                   className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 md:py-3 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-wider transition-all ${
+                                     isBoosted
+                                       ? 'bg-amber-100 text-amber-700 cursor-default'
+                                       : disabled
+                                         ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
+                                         : 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-md shadow-amber-500/25 hover:from-amber-600 hover:to-yellow-600 active:scale-95'
+                                   }`}
+                                 >
+                                   <Zap size={12} className={isBoosted ? 'fill-amber-700' : ''} />
+                                   {busy
+                                     ? (language === 'বাংলা' ? 'হচ্ছে…' : 'Boosting…')
+                                     : isBoosted
+                                       ? (language === 'বাংলা' ? 'বুস্টেড' : 'Boosted')
+                                       : `${language === 'বাংলা' ? 'বুস্ট' : 'Boost'} (${credits})`}
+                                 </button>
+                               );
+                             })()}
                              <button onClick={() => setActiveTab('inquiries')} className="w-full lg:flex-1 flex items-center justify-center gap-1.5 bg-[#ba0036] hover:bg-[#90002a] text-white py-2.5 md:py-3 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-wider transition-all relative shadow-[0_6px_15px_rgba(186,0,54,0.25)] active:scale-95">
                                {t?.inquiriesBtn || (language === 'বাংলা' ? 'যোগাযোগ' : 'Inquiries')}
                                {prop.inquiries > 0 && <span className="absolute -top-1.5 -right-1.5 bg-gray-900 text-white text-[8px] md:text-[9px] w-4 h-4 md:w-5 md:h-5 flex items-center justify-center rounded-full shadow-sm border-2 border-white">{prop.inquiries}</span>}

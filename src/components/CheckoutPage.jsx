@@ -6,6 +6,7 @@ import { subscriptionService, PLANS } from '../services/subscriptionService';
 import { getSectionGuides } from '../services/aiGuideService';
 import { ArrowLeft, ShieldCheck, Check, Info, Lock, CreditCard, Zap, CheckCircle2, Shield, X } from 'lucide-react';
 import { BkashGateway, NagadGateway } from './payment/MerchantGateways';
+import Footer from './Footer';
 
 const PAYMENT_METHODS = [
   { 
@@ -24,7 +25,7 @@ const PAYMENT_METHODS = [
     descriptionBn: 'মোবাইল ওয়ালেট',
     logoPath: '/payment svg/bkash.svg',
     icon: (
-      <div className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-2xl flex items-center justify-center border border-slate-200">
+      <div className="w-14 h-14 md:w-16 md:h-16 bg-white rounded-2xl flex items-center justify-center border border-slate-200">
         <img 
           src="/payment svg/bkash.svg" 
           alt="bKash" 
@@ -53,7 +54,7 @@ const PAYMENT_METHODS = [
     descriptionBn: 'মোবাইল ওয়ালেট',
     logoPath: '/payment svg/nagad.png',
     icon: (
-      <div className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-2xl flex items-center justify-center border border-slate-200">
+      <div className="w-14 h-14 md:w-16 md:h-16 bg-white rounded-2xl flex items-center justify-center border border-slate-200">
         <img 
           src="/payment svg/nagad.png" 
           alt="Nagad" 
@@ -149,7 +150,7 @@ const CheckoutPage = () => {
     : (isBn ? '৩টি বাড়ি লিস্ট করুন, ভাড়া ট্র্যাক করুন' : 'List up to 3 properties, track rent');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-[#0A0A0F] dark:via-[#13111C] dark:to-[#1A1625] transition-colors duration-300">
+    <div className="min-h-screen pb-[64px] md:pb-0 bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-[#0A0A0F] dark:via-[#13111C] dark:to-[#1A1625] transition-colors duration-300">
       
       {/* Toast Notification */}
       {toast && (
@@ -187,13 +188,13 @@ const CheckoutPage = () => {
       </div>
 
       {/* Main Content - Desktop: Side by Side, Mobile/Tablet: Responsive Grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-10 min-h-[calc(100vh-160px)]">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
           
           {/* LEFT COLUMN - Order Summary */}
-          <div className="space-y-6">
+          <div className="space-y-4 order-last md:order-first">
             {/* Plan Details Card */}
-            <div className="bg-white dark:bg-[#13111C] rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 dark:border-white/10">
+            <div className="bg-white dark:bg-[#13111C] rounded-3xl p-5 sm:p-6 shadow-xl border border-slate-200 dark:border-white/10">
               <div className="flex items-start justify-between mb-6">
                 <div>
                   <span className={`inline-block px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest ${themeClasses.badgeBg} ${themeClasses.badgeText} mb-3`}>
@@ -206,12 +207,12 @@ const CheckoutPage = () => {
               </div>
 
               {/* Price Display */}
-              <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-white/5 dark:to-white/10 rounded-2xl p-6 mb-6">
+              <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-white/5 dark:to-white/10 rounded-2xl p-4 sm:p-5 mb-5">
                 <div className="flex items-baseline gap-2 mb-2">
-                  <span className="text-5xl sm:text-6xl font-black text-slate-900 dark:text-white tracking-tight">
+                  <span className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
                     ৳{plan.price.toLocaleString('en-IN')}
                   </span>
-                  <span className="text-lg text-slate-500 dark:text-slate-400 font-semibold">
+                  <span className="text-base text-slate-500 dark:text-slate-400 font-semibold">
                     {isBn ? plan.intervalLabel.bn : plan.intervalLabel.en}
                   </span>
                 </div>
@@ -224,8 +225,8 @@ const CheckoutPage = () => {
               </div>
 
               {/* Price Breakdown */}
-              <div className="space-y-4 pb-6 border-b border-slate-200 dark:border-white/10">
-                <div className="flex justify-between text-base">
+              <div className="space-y-3 pb-5 border-b border-slate-200 dark:border-white/10">
+                <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-slate-600 dark:text-slate-400 font-medium">{isBn ? 'সাবটোটাল' : 'Subtotal'}</span>
                   <span className="text-slate-900 dark:text-white font-bold">৳{plan.price.toLocaleString('en-IN')}</span>
                 </div>
@@ -233,27 +234,27 @@ const CheckoutPage = () => {
                   <span className="text-slate-600 dark:text-slate-400 font-medium">{isBn ? 'ভ্যাট / ট্যাক্স' : 'VAT / Tax'}</span>
                   <span className="text-slate-900 dark:text-white font-bold">৳0</span>
                 </div>
-                <div className="flex justify-between text-base">
+                <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-slate-600 dark:text-slate-400 font-medium">{isBn ? 'প্রসেসিং ফি' : 'Processing Fee'}</span>
                   <span className="text-emerald-600 dark:text-emerald-400 font-bold">{isBn ? 'বিনামূল্যে' : 'Free'}</span>
                 </div>
               </div>
 
               {/* Total */}
-              <div className="flex justify-between items-center pt-6">
-                <span className="text-xl font-bold text-slate-900 dark:text-white">{isBn ? 'সর্বমোট' : 'Total Due'}</span>
-                <span className="text-3xl font-black text-slate-900 dark:text-white">৳{plan.price.toLocaleString('en-IN')}</span>
+              <div className="flex justify-between items-center pt-5">
+                <span className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">{isBn ? 'সর্বমোট' : 'Total Due'}</span>
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">৳{plan.price.toLocaleString('en-IN')}</span>
               </div>
             </div>
 
             {/* Features List */}
-            <div className="bg-white dark:bg-[#13111C] rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 dark:border-white/10">
+            <div className="bg-white dark:bg-[#13111C] rounded-3xl p-5 sm:p-6 shadow-xl border border-slate-200 dark:border-white/10">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                 <Zap size={20} className={themeClasses.accentColor} />
                 {isBn ? 'এই প্ল্যানে যা পাবেন' : "What's Included"}
               </h3>
               <ul className="space-y-3">
-                {['Unlimited property listings', 'AI-powered insights', 'Priority support', 'Advanced analytics', 'Custom branding'].map((feature, idx) => (
+                {((isBn ? plan.benefits?.bn : plan.benefits?.en) || []).map((feature, idx) => (
                   <li key={idx} className="flex items-start gap-3">
                     <div className={`w-5 h-5 rounded-full ${themeClasses.badgeBg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
                       <Check size={12} className={themeClasses.badgeText} strokeWidth={3} />
@@ -266,9 +267,9 @@ const CheckoutPage = () => {
           </div>
 
           {/* RIGHT COLUMN - Payment Methods */}
-          <div className="space-y-6">
+          <div className="space-y-4 order-first md:order-last">
             {/* Payment Selection Card */}
-            <div className="bg-white dark:bg-[#13111C] rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 dark:border-white/10">
+            <div className="bg-white dark:bg-[#13111C] rounded-3xl p-5 sm:p-6 shadow-xl border border-slate-200 dark:border-white/10">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
                   <CreditCard size={24} className="text-white" />
@@ -287,7 +288,7 @@ const CheckoutPage = () => {
                     <button
                       key={method.id}
                       onClick={() => setSelectedMethod(method.id)}
-                      className={`relative group p-6 rounded-2xl border-2 transition-all duration-300 ${
+                      className={`relative group p-4 sm:p-5 rounded-2xl border-2 transition-all duration-300 ${
                         isSelected
                           ? `${method.borderColor} ${method.bgTint} shadow-lg scale-105`
                           : `border-slate-200 dark:border-white/10 ${method.hoverBg} hover:border-slate-300 dark:hover:border-white/20`
@@ -430,6 +431,9 @@ const CheckoutPage = () => {
           </div>
         </div>
       )}
+      
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };

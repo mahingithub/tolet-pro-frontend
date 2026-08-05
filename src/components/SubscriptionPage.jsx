@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import useGoBack from '../hooks/useGoBack';
-import {
-  Sparkles, Check, X, ArrowLeft, Crown, BellRing,
-  Calendar, Wallet, TrendingUp, Folder, ShieldCheck, Clock, Video, PlayCircle
-} from 'lucide-react';
+import { Sparkles, Check, X, ArrowLeft, Crown, PlayCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { subscriptionService } from '../services/subscriptionService';
 import { getSectionGuides } from '../services/aiGuideService';
@@ -15,6 +12,7 @@ const ALL_FEATURES = [
   { id: 'photos', en: 'Photos per property', bn: 'প্রতি প্রপার্টিতে ছবি', free: '5', plus: '15', pro: '50' },
   { id: 'videos', en: 'Videos per property', bn: 'প্রতি প্রপার্টিতে ভিডিও', free: '✗', plus: '1', pro: '5' },
   { id: 'boost', en: 'Search Boost', bn: 'সার্চ বুস্ট', free: '✗', plus: '1× / month', pro: 'Super Boost + Top Position' },
+  { id: 'fbboost', en: 'Facebook Boost Post', bn: 'ফেসবুক বুস্ট পোস্ট', free: '✗', plus: 'Boost Post', pro: 'Super Boost Post' },
   { id: 'rent', en: 'Rent Collection', bn: 'ভাড়া কালেকশন', free: '✗', plus: '✓', pro: '✓' },
   { id: 'bookings', en: 'Bookings Pipeline', bn: 'বুকিং পাইপলাইন', free: '✗', plus: '✓', pro: '✓' },
   { id: 'alerts', en: 'Smart Alerts', bn: 'স্মার্ট অ্যালার্টস', free: '✗', plus: '✗', pro: '✓' },
@@ -58,11 +56,16 @@ const SubscriptionPage = () => {
     navigate(`/checkout/${planId}_${billingCycle === 'month' ? 'monthly' : 'yearly'}`);
   };
 
-  // Determine current active plan strictly for UI highlight
+  // Determine current active plan strictly for UI highlight.
+  //
+  // `isTrial` is tracked separately from the tier: a landlord on the 2-month
+  // launch trial has tier 'pro' but isPaid false, so without this they fell
+  // through to the "You're on the Free Plan" banner while actually holding Pro.
   const currentPlanTier = status.tier || 'free';
+  const isTrial = !!status.isTrial && status.daysRemaining > 0;
   const isFree = currentPlanTier === 'free';
-  const isPlus = currentPlanTier === 'plus';
-  const isPro = currentPlanTier === 'pro';
+  const isPlus = currentPlanTier === 'plus' && !isTrial;
+  const isPro = currentPlanTier === 'pro' && !isTrial;
 
   // Helper to format youtube URL to embed
   const getEmbedUrl = (url) => {
@@ -83,11 +86,11 @@ const SubscriptionPage = () => {
       <div className="fixed top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-violet-600/10 dark:bg-violet-600/20 rounded-full blur-[120px] pointer-events-none z-0 mix-blend-multiply dark:mix-blend-screen" />
       <div className="fixed bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-amber-500/10 dark:bg-amber-500/15 rounded-full blur-[120px] pointer-events-none z-0 mix-blend-multiply dark:mix-blend-screen" />
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-8 pt-6 md:pt-12">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-8 pt-4 md:pt-6">
         <button
           type="button"
           onClick={goBack}
-          className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors mb-8 group"
+          className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors mb-4 group"
         >
           <div className="bg-white dark:bg-white/10 dark:border-white/10 p-2 rounded-full shadow-sm group-hover:shadow-md transition-all border border-slate-200">
             <ArrowLeft size={16} />
@@ -96,8 +99,18 @@ const SubscriptionPage = () => {
         </button>
 
         {/* SECTION 1: Hero Status Banner */}
-        <div className="flex justify-center mb-12">
-          {isFree && (
+        <div className="flex justify-center mb-6">
+          {isTrial && (
+            <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-gradient-to-r from-emerald-500/10 to-teal-500/10 dark:from-emerald-400/20 dark:to-teal-400/20 border border-emerald-200 dark:border-emerald-500/30 backdrop-blur-md shadow-lg shadow-emerald-500/10">
+              <Sparkles size={18} className="text-emerald-600 dark:text-emerald-400 animate-pulse" />
+              <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200">
+                {isBn
+                  ? `ফ্রি ${currentPlanTier === 'pro' ? 'প্রো' : 'প্লাস'} ট্রায়াল চলছে — ${status.daysRemaining} দিন বাকি`
+                  : `Free ${currentPlanTier === 'pro' ? 'Pro' : 'Plus'} trial — ${status.daysRemaining} days remaining`}
+              </p>
+            </div>
+          )}
+          {isFree && !isTrial && (
             <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-md">
               <span className="w-2 h-2 rounded-full bg-slate-400 animate-pulse" />
               <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
@@ -125,19 +138,19 @@ const SubscriptionPage = () => {
         </div>
 
         {/* SECTION 2: Header & Toggle */}
-        <div className="text-center mb-10">
-          <h1 className="font-display text-4xl md:text-5xl font-extrabold tracking-tight mb-4">
+        <div className="text-center mb-6">
+          <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight mb-2">
             {isBn ? 'আপনার বাড়ি ম্যানেজ করুন' : 'Manage your home'}
           </h1>
-          <p className="text-slate-600 dark:text-slate-400 text-base md:text-lg max-w-3xl mx-auto mb-6 leading-relaxed">
-            {isBn 
-              ? 'খাতা-কলমের হিসাব বাদ দিন! কে ভাড়া দিয়েছে, কে দেয়নি তার স্মার্ট রিমাইন্ডার এবং হিসাব রাখুন। ভেরিফাইড ভাড়াটিয়া খুঁজুন এবং খুব সহজেই সব ম্যানেজ করুন। প্রথম লগইন এর পর ২ মাস Plus সাবস্ক্রিপশন সম্পূর্ণ ফ্রি!' 
-              : 'Keep track of who paid rent with smart reminders. Find verified tenants and manage everything easily. Get 2 months of Plus subscription absolutely free after your first login!'}
+          <p className="text-slate-600 dark:text-slate-400 text-sm md:text-base max-w-3xl mx-auto mb-4 leading-relaxed">
+            {isBn
+              ? 'খাতা-কলমের হিসাব বাদ দিন! কে ভাড়া দিয়েছে, কে দেয়নি তার স্মার্ট রিমাইন্ডার এবং হিসাব রাখুন। ভেরিফাইড ভাড়াটিয়া খুঁজুন এবং খুব সহজেই সব ম্যানেজ করুন। বাড়িওয়ালা হিসেবে শুরু করলেই ২ মাস Pro সাবস্ক্রিপশন সম্পূর্ণ ফ্রি!'
+              : 'Keep track of who paid rent with smart reminders. Find verified tenants and manage everything easily. Every new landlord gets 2 months of Pro absolutely free!'}
           </p>
 
           {/* Video Guides Row (if any uploaded by admin) */}
           {(guides.length > 0) && (
-            <div className="flex flex-wrap justify-center gap-3 mb-10">
+            <div className="flex flex-wrap justify-center gap-3 mb-6">
               {guides.map(guide => (
                 <button 
                   key={guide._id}
@@ -179,46 +192,10 @@ const SubscriptionPage = () => {
           </div>
         </div>
 
-        {/* SECTION 3: Plan Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 mb-16 items-center">
-          
-          {/* FREE CARD */}
-          <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-8 shadow-xl shadow-slate-200/40 dark:shadow-none flex flex-col h-full hover:-translate-y-1 transition-transform duration-300 relative overflow-hidden backdrop-blur-xl">
-            <div className="mb-6">
-              <span className="inline-block px-3 py-1 bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-black uppercase tracking-widest rounded-full mb-4">
-                {isBn ? 'আজীবন ফ্রি' : 'FREE FOREVER'}
-              </span>
-              <p className="text-sm text-slate-500 dark:text-slate-400 italic mb-3">
-                {isBn ? 'একটি বাড়ি আছে? বিনামূল্যে শুরু করুন' : 'Have one property? Start for free'}
-              </p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-display font-extrabold text-slate-900 dark:text-white">৳0</span>
-                <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">/{billingCycle === 'year' ? 'yr' : 'mo'}</span>
-              </div>
-            </div>
-            
-            <div className="flex-1 space-y-4 mb-8">
-              {['1 Active Listing', '5 Photos per property'].map((feat, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <Check size={18} className="text-emerald-500 shrink-0 mt-0.5" strokeWidth={3} />
-                  <span className="text-slate-700 dark:text-slate-300 text-sm font-medium">{feat}</span>
-                </div>
-              ))}
-              {['No Video Upload', 'No Rent Collection', 'No Bookings', 'No Analytics', 'No Smart Alerts'].map((feat, i) => (
-                <div key={i} className="flex items-start gap-3 opacity-50">
-                  <X size={18} className="text-slate-400 shrink-0 mt-0.5" strokeWidth={3} />
-                  <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">{feat}</span>
-                </div>
-              ))}
-            </div>
-
-            <button 
-              disabled={isFree}
-              className={`w-full py-4 rounded-2xl font-bold transition-all ${isFree ? 'bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-slate-600 cursor-not-allowed' : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200'}`}
-            >
-              {isFree ? (isBn ? 'বর্তমান প্ল্যান' : 'Current Plan') : (isBn ? 'ফ্রি প্ল্যানে যান' : 'Downgrade to Free')}
-            </button>
-          </div>
+        {/* SECTION 3: Plan Cards — paid plans only. The Free tier is still
+            described in the comparison table below, but it is not sold here,
+            so it gets no card. Two cards → a 2-column grid. */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 mb-12 items-center max-w-4xl mx-auto">
 
           {/* PLUS CARD */}
           <div className="bg-white dark:bg-[#13111C] border border-violet-200 dark:border-violet-500/30 rounded-3xl p-8 shadow-2xl shadow-violet-500/10 dark:shadow-[0_0_40px_-15px_rgba(124,58,237,0.3)] flex flex-col h-full hover:-translate-y-1 hover:shadow-violet-500/20 transition-all duration-300 relative overflow-hidden backdrop-blur-xl">
@@ -235,9 +212,6 @@ const SubscriptionPage = () => {
                   ৳{billingCycle === 'year' ? '229' : '19'}
                 </span>
                 <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">/{billingCycle === 'year' ? 'yr' : 'mo'}</span>
-              </div>
-              <div className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 rounded w-max">
-                {isBn ? 'প্রথম ২ মাস সম্পূর্ণ ফ্রি!' : 'First 2 months Free!'}
               </div>
             </div>
             
@@ -259,9 +233,10 @@ const SubscriptionPage = () => {
               ))}
             </div>
 
-            <button 
+            <button
               onClick={() => handleUpgrade('plus')}
-              className="w-full py-4 rounded-2xl font-bold bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-600/30 hover:shadow-xl hover:shadow-violet-600/40 transition-all"
+              disabled={isPlus}
+              className={`w-full py-4 rounded-2xl font-bold transition-all ${isPlus ? 'bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-slate-600 cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-600/30 hover:shadow-xl hover:shadow-violet-600/40'}`}
             >
               {isPlus ? (isBn ? 'বর্তমান প্ল্যান' : 'Current Plan') : (isBn ? 'প্লাস এ আপগ্রেড করুন' : 'Upgrade to Plus')}
             </button>
@@ -285,11 +260,16 @@ const SubscriptionPage = () => {
               <p className="text-sm text-slate-500 dark:text-slate-400 italic mb-3">
                 {isBn ? 'একাধিক বাড়ি আছে? সব কিছু এক জায়গায় কন্ট্রোল করুন' : 'Multiple properties? Control everything in one place'}
               </p>
-              <div className="flex items-baseline gap-1">
+              <div className="flex items-baseline gap-1 mb-2">
                 <span className="text-4xl font-display font-extrabold text-slate-900 dark:text-white">
                   ৳{billingCycle === 'year' ? '599' : '49'}
                 </span>
                 <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">/{billingCycle === 'year' ? 'yr' : 'mo'}</span>
+              </div>
+              {/* The launch trial grants PRO, so the free-months badge belongs
+                  on this card — it used to sit on the Plus card. */}
+              <div className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 rounded w-max">
+                {isBn ? 'নতুন বাড়িওয়ালাদের প্রথম ২ মাস ফ্রি!' : 'First 2 months free for new landlords!'}
               </div>
             </div>
             
@@ -308,9 +288,10 @@ const SubscriptionPage = () => {
               ))}
             </div>
 
-            <button 
+            <button
               onClick={() => handleUpgrade('pro')}
-              className="w-full py-4 rounded-2xl font-bold bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white shadow-xl shadow-amber-500/40 hover:shadow-2xl hover:shadow-amber-500/50 transition-all relative overflow-hidden group-hover:after:animate-shimmer after:absolute after:inset-0 after:bg-gradient-to-r after:from-transparent after:via-white/30 after:to-transparent after:-translate-x-full"
+              disabled={isPro}
+              className={`w-full py-4 rounded-2xl font-bold transition-all relative overflow-hidden ${isPro ? 'bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-slate-600 cursor-not-allowed' : 'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white shadow-xl shadow-amber-500/40 hover:shadow-2xl hover:shadow-amber-500/50 group-hover:after:animate-shimmer after:absolute after:inset-0 after:bg-gradient-to-r after:from-transparent after:via-white/30 after:to-transparent after:-translate-x-full'}`}
             >
               {isPro ? (isBn ? 'বর্তমান প্ল্যান' : 'Current Plan') : (isBn ? 'প্রো তে আপগ্রেড করুন' : 'Upgrade to Pro')}
             </button>

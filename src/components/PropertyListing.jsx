@@ -560,6 +560,8 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 										<p className="text-[11px] font-black text-gray-900 flex items-center gap-1">
 											{landlordName}
 											{property.verified && <ShieldCheck size={12} className="text-[#1ab64f] shrink-0" />}
+                                            {isPro && <span className="bg-[#ba0036] text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center">Pro</span>}
+                                            {isPlus && <span className="bg-gray-900 text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center">Plus</span>}
 										</p>
 										<p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
 											{isBn ? "বাড়িওয়ালা" : "Landlord"}

@@ -701,11 +701,13 @@ const INITIAL_FORM = {
   // Step 4 – Media (structured)
   coverPhoto: null,          // { id, preview, name }
   roomPhotos: [],            // [{ id, room, preview, name }]
-  // Video tour — either a local file (mainVideo: { id, preview, name,
-  // size, file }) OR a YouTube ID (videoId: 'O-P_J_gvALE'). Whichever
-  // is set wins; the other is ignored on submit so we never display
-  // two players for the same listing.
-  mainVideo: null,
+  // Video tour — up to `tierLimits.maxVideos` entries (0 free / 1 plus /
+  // 5 pro). Each entry is either a local file
+  // ({ id, preview, name, size, file }) or a YouTube link
+  // ({ id, youtubeId: 'O-P_J_gvALE' }). Uploaded in order; videos[0] is the
+  // one legacy readers see as `mainVideo`.
+  videos: [],
+  // Draft text for the "paste a YouTube link" input (not submitted directly).
   videoId: '',
   // Step 5 – Pricing + Description (the user asked for description to
   // come LAST so the AI helper has every other field as context when
@@ -1401,7 +1403,21 @@ const AddProperty = () => {
     return INITIAL_FORM;
   });
   const [errors, setErrors] = useState({});
-  const subscriptionStatus = subscriptionService.getStatus();
+
+  // Plan limits (photos / videos / listing count) for THIS host.
+  //
+  // This used to read subscriptionService.getStatus() once at render with no
+  // fetch. getStatus() returns a module-level cache that starts at
+  // { tier: 'free' }, so any landlord who opened /list-property directly — a
+  // reload, a deep link, a PWA cold start — was silently capped at FREE limits
+  // (1 listing, 5 photos, no video) no matter what they were paying for.
+  // Fetch on mount and re-render on change, same as SubscriptionPage and
+  // HostDashboard do.
+  const [subscriptionStatus, setSubscriptionStatus] = useState(() => subscriptionService.getStatus());
+  useEffect(() => {
+    subscriptionService.fetchStatus();
+    return subscriptionService.onChange(() => setSubscriptionStatus(subscriptionService.getStatus()));
+  }, []);
   const tierLimits = TIER_LIMITS[subscriptionStatus.tier] || TIER_LIMITS.free;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -1583,22 +1599,37 @@ const AddProperty = () => {
 
   const removeRoomPhoto = (id) => set('roomPhotos', form.roomPhotos.filter(p => p.id !== id));
 
-  // ── Video tour (file upload back per user-approved Q1 v2) ──────────────
-  // We use a blob: URL for the local preview so we don't push 100MB+ of
-  // base64 through localStorage. The File reference is preserved on
-  // `form.mainVideo.file` so a future multipart upload can stream the
-  // bytes directly. The matching <input> lives in step 4 Media further
-  // down. Picking a file clears `videoId` so we never carry both at once.
+  // ── Video tour ─────────────────────────────────────────────────────────
+  // Up to `tierLimits.maxVideos` walkthroughs per listing (0 free / 1 plus /
+  // 5 pro). We use a blob: URL for each local preview so we don't push 100MB+
+  // of base64 through localStorage; the File reference stays on `entry.file`
+  // so propertyService can upload the raw bytes. The matching <input> lives in
+  // step 4 Media further down.
   const videoInputRef = useRef(null);
+  const videoSlotsLeft = Math.max(0, tierLimits.maxVideos - form.videos.length);
+
   const handleVideoUpload = (files) => {
     const all = Array.from(files);
-    const vid = all.find(f => f.type.startsWith('video/'));
-    
-    if (vid && tierLimits.maxVideos === 0) {
-      setToast({ type: 'error', msg: isBn ? 'ভিডিও আপলোড করতে প্লাস বা প্রো প্ল্যানে আপগ্রেড করুন।' : 'Upgrade to Plus or Pro plan to upload videos.' });
+
+    if (tierLimits.maxVideos === 0) {
+      showToast(
+        isBn ? 'ভিডিও আপলোড করতে প্লাস বা প্রো প্ল্যানে আপগ্রেড করুন।'
+             : 'Upgrade to Plus or Pro plan to upload videos.',
+        'error',
+      );
       return;
     }
-    if (!vid) {
+    if (videoSlotsLeft <= 0) {
+      showToast(
+        isBn ? `আপনার প্ল্যানে সর্বোচ্চ ${tierLimits.maxVideos}টি ভিডিও দেওয়া যায়।`
+             : `Your plan allows up to ${tierLimits.maxVideos} video${tierLimits.maxVideos > 1 ? 's' : ''}.`,
+        'error',
+      );
+      return;
+    }
+
+    const vids = all.filter(f => f.type.startsWith('video/'));
+    if (!vids.length) {
       showToast(
         isBn
           ? 'অনুগ্রহ করে একটি ভিডিও ফাইল বাছুন (MP4/MOV/WEBM)।'
@@ -1607,31 +1638,65 @@ const AddProperty = () => {
       );
       return;
     }
-    if (vid.size > MAX_VIDEO_BYTES) {
+
+    const tooBig = vids.filter(f => f.size > MAX_VIDEO_BYTES);
+    if (tooBig.length) {
       showToast(
         isBn
-          ? `ভিডিওটি ${formatMB(vid.size)} MB — সর্বোচ্চ ${formatMB(MAX_VIDEO_BYTES)} MB পর্যন্ত আপলোড করা যাবে।`
-          : `Video is ${formatMB(vid.size)} MB — maximum ${formatMB(MAX_VIDEO_BYTES)} MB per upload.`,
+          ? `${tooBig.length}টি ভিডিও বাদ পড়েছে — প্রতিটি সর্বোচ্চ ${formatMB(MAX_VIDEO_BYTES)} MB।`
+          : `${tooBig.length} video${tooBig.length > 1 ? 's' : ''} skipped — max ${formatMB(MAX_VIDEO_BYTES)} MB each.`,
+        'error',
+      );
+    }
+
+    const accepted = vids.filter(f => f.size <= MAX_VIDEO_BYTES);
+    if (!accepted.length) return;
+
+    // Silently drop anything past the plan's remaining slots, and say so.
+    if (accepted.length > videoSlotsLeft) {
+      showToast(
+        isBn ? `শুধু ${videoSlotsLeft}টি ভিডিও যোগ করা হয়েছে — প্ল্যানের সীমা ${tierLimits.maxVideos}টি।`
+             : `Only ${videoSlotsLeft} added — your plan allows ${tierLimits.maxVideos} total.`,
+        'error',
+      );
+    }
+
+    const entries = accepted.slice(0, videoSlotsLeft).map((vid, i) => ({
+      id: Date.now() + i,
+      preview: URL.createObjectURL(vid),
+      name: vid.name,
+      size: vid.size,
+      file: vid,
+    }));
+    setForm(f => ({ ...f, videos: [...f.videos, ...entries] }));
+  };
+
+  // Attach a YouTube walkthrough by id/link, subject to the same slot count.
+  const addYoutubeVideo = (rawId) => {
+    const youtubeId = String(rawId || '').trim();
+    if (!youtubeId) return;
+    if (videoSlotsLeft <= 0) {
+      showToast(
+        isBn ? `আপনার প্ল্যানে সর্বোচ্চ ${tierLimits.maxVideos}টি ভিডিও দেওয়া যায়।`
+             : `Your plan allows up to ${tierLimits.maxVideos} video${tierLimits.maxVideos > 1 ? 's' : ''}.`,
         'error',
       );
       return;
     }
-    // Revoke the previous blob URL before overwriting so we don't leak.
-    if (form.mainVideo?.preview?.startsWith('blob:')) {
-      try { URL.revokeObjectURL(form.mainVideo.preview); } catch (_) {}
-    }
-    const preview = URL.createObjectURL(vid);
     setForm(f => ({
       ...f,
-      mainVideo: { id: Date.now(), preview, name: vid.name, size: vid.size, file: vid },
-      videoId:   '', // file wins — clear the YouTube ID so only one renders
+      videos: [...f.videos, { id: Date.now(), youtubeId }],
+      videoId: '',
     }));
   };
-  const removeMainVideo = () => {
-    if (form.mainVideo?.preview?.startsWith('blob:')) {
-      try { URL.revokeObjectURL(form.mainVideo.preview); } catch (_) {}
+
+  const removeVideo = (id) => {
+    const entry = form.videos.find(v => v.id === id);
+    // Release the object URL before dropping the entry so we don't leak.
+    if (entry?.preview?.startsWith('blob:')) {
+      try { URL.revokeObjectURL(entry.preview); } catch (_) {}
     }
-    set('mainVideo', null);
+    set('videos', form.videos.filter(v => v.id !== id));
   };
 
   // ─── SUBMIT ────────────────────────────────────────────────────────────────
@@ -1654,7 +1719,18 @@ const AddProperty = () => {
       // FileLists and other non-serialisable bits get stripped by
       // JSON.stringify — that's fine, because the data: URLs in
       // form.coverImage / form.images are plain strings and survive.
-      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(form));
+      //
+      // Videos are the exception: their previews are blob: URLs, which are
+      // revoked the moment the tab reloads. The File that backs them is
+      // dropped by JSON.stringify too, so a persisted upload would resume as
+      // an unresolvable blob: string and fail at upload time. Keep only the
+      // entries that can actually survive the round-trip (YouTube links and
+      // already-hosted URLs) and let the host re-pick the local files.
+      const serialisable = {
+        ...form,
+        videos: form.videos.filter(v => v.youtubeId || v.url),
+      };
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(serialisable));
     } catch (_) { /* quota / private-mode — non-fatal */ }
   };
 
@@ -2570,68 +2646,100 @@ const AddProperty = () => {
                   )}
                 </div>
 
-                {/* ── VIDEO (file upload OR YouTube ID — whichever wins) ──
-                    User-approved Q1 v2: hosts can now upload a local
-                    walkthrough OR paste a YouTube link. The two inputs
-                    are mutually exclusive — picking a file clears the
-                    YouTube ID and vice-versa — so the listing always
-                    renders exactly one player. */}
+                {/* ── VIDEO TOUR (multi) ──────────────────────────────────
+                    Hosts can attach up to `tierLimits.maxVideos` walkthroughs
+                    (0 free / 1 plus / 5 pro), mixing uploaded files and
+                    YouTube links freely. Both inputs disappear once the plan's
+                    slots are used up; the server enforces the same cap. */}
                 <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_4px_15px_rgba(0,0,0,0.03)]">
                   <div className="flex items-center gap-2 mb-1">
                     <div className="w-7 h-7 bg-rose-600 rounded-lg flex items-center justify-center">
                       <Video size={13} className="text-white" />
                     </div>
                     <p className="text-xs font-black text-gray-900">{isBn ? 'ভিডিও ট্যুর' : 'Video Tour'}</p>
-                    <span className="text-[9px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{isBn ? 'ঐচ্ছিক · শুধু ১টি' : 'Optional · 1 only'}</span>
+                    <span className="text-[9px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
+                      {tierLimits.maxVideos === 0
+                        ? (isBn ? 'প্লাস / প্রো প্ল্যানে' : 'Plus / Pro only')
+                        : (isBn
+                            ? `ঐচ্ছিক · ${form.videos.length}/${tierLimits.maxVideos}টি`
+                            : `Optional · ${form.videos.length}/${tierLimits.maxVideos}`)}
+                    </span>
                   </div>
                   <p className="text-[11px] font-bold text-gray-400 mb-4">
-                    {isBn
-                      ? 'পুরো বাড়ির একটি ভিডিও ট্যুর আপলোড করুন অথবা YouTube লিংক দিন।'
-                      : 'Upload a walkthrough video, or paste a YouTube link instead.'}
+                    {tierLimits.maxVideos === 0
+                      ? (isBn
+                          ? 'ভিডিও ট্যুর যোগ করতে প্লাস বা প্রো প্ল্যানে আপগ্রেড করুন।'
+                          : 'Upgrade to Plus or Pro to add a video tour.')
+                      : (isBn
+                          ? `পুরো বাড়ির ভিডিও ট্যুর আপলোড করুন অথবা YouTube লিংক দিন — সর্বোচ্চ ${tierLimits.maxVideos}টি।`
+                          : `Upload walkthrough videos or paste YouTube links — up to ${tierLimits.maxVideos}.`)}
                   </p>
 
-                  {/* File upload — shown unless a YouTube ID is set */}
-                  {!form.videoId && !form.mainVideo && (
+                  {/* Added videos */}
+                  {form.videos.length > 0 && (
+                    <div className="space-y-3 mb-4">
+                      {form.videos.map((v, idx) => (
+                        <div key={v.id}>
+                          <div className="rounded-xl overflow-hidden aspect-video shadow-sm bg-black">
+                            {v.youtubeId ? (
+                              <iframe
+                                src={`https://www.youtube.com/embed/${v.youtubeId}`}
+                                className="w-full h-full"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                                title={`Property video ${idx + 1}`}
+                              />
+                            ) : (
+                              <video src={v.preview || v.url} controls className="w-full h-full" />
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between mt-2">
+                            <p className="text-[10px] font-bold text-gray-400 truncate flex-1 pr-2">
+                              {idx === 0 && (
+                                <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest mr-1.5">
+                                  {isBn ? 'প্রধান' : 'Main'}
+                                </span>
+                              )}
+                              {v.youtubeId
+                                ? `YouTube · ${v.youtubeId}`
+                                : `${v.name || (isBn ? 'ভিডিও' : 'Video')}${v.size ? ` · ${formatMB(v.size)} MB` : ''}`}
+                            </p>
+                            <button type="button" onClick={() => removeVideo(v.id)}
+                              className="text-[10px] font-black text-red-400 flex items-center gap-1 hover:text-[#ba0036] transition-colors shrink-0">
+                              <X size={10} strokeWidth={3} />{isBn ? 'সরান' : 'Remove'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* File upload — hidden once the plan's slots are full */}
+                  {videoSlotsLeft > 0 && (
                     <div>
-                      <input ref={videoInputRef} type="file" accept="video/*" className="hidden"
-                        onChange={e => handleVideoUpload(e.target.files)} />
+                      <input ref={videoInputRef} type="file" accept="video/*" multiple className="hidden"
+                        onChange={e => { handleVideoUpload(e.target.files); e.target.value = ''; }} />
                       <button type="button" onClick={() => videoInputRef.current?.click()}
                         className="w-full border-2 border-dashed border-gray-200 rounded-xl p-6 flex flex-col items-center gap-2 hover:border-[#ba0036]/40 hover:bg-red-50/30 transition-all">
                         <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center">
                           <Upload size={20} className="text-gray-400" />
                         </div>
                         <p className="text-sm font-black text-gray-700">
-                          {isBn ? 'ভিডিও আপলোড করুন' : 'Upload Walkthrough Video'}
+                          {form.videos.length === 0
+                            ? (isBn ? 'ভিডিও আপলোড করুন' : 'Upload Walkthrough Video')
+                            : (isBn ? 'আরেকটি ভিডিও যোগ করুন' : 'Add another video')}
                         </p>
                         <p className="text-[11px] font-bold text-gray-300">
                           {isBn
-                            ? `MP4 / MOV / WEBM · সর্বোচ্চ ${formatMB(MAX_VIDEO_BYTES)} MB`
-                            : `MP4 / MOV / WEBM · max ${formatMB(MAX_VIDEO_BYTES)} MB`}
+                            ? `MP4 / MOV / WEBM · সর্বোচ্চ ${formatMB(MAX_VIDEO_BYTES)} MB · আরও ${videoSlotsLeft}টি দেওয়া যাবে`
+                            : `MP4 / MOV / WEBM · max ${formatMB(MAX_VIDEO_BYTES)} MB · ${videoSlotsLeft} slot${videoSlotsLeft > 1 ? 's' : ''} left`}
                         </p>
                       </button>
                     </div>
                   )}
 
-                  {/* Local video preview */}
-                  {form.mainVideo && (
-                    <div className="mt-2">
-                      <div className="rounded-xl overflow-hidden aspect-video shadow-sm bg-black">
-                        <video src={form.mainVideo.preview} controls className="w-full h-full" />
-                      </div>
-                      <div className="flex items-center justify-between mt-2">
-                        <p className="text-[10px] font-bold text-gray-400 truncate flex-1 pr-2">
-                          {form.mainVideo.name} · {formatMB(form.mainVideo.size)} MB
-                        </p>
-                        <button type="button" onClick={removeMainVideo}
-                          className="text-[10px] font-black text-red-400 flex items-center gap-1 hover:text-[#ba0036] transition-colors shrink-0">
-                          <X size={10} strokeWidth={3} />{isBn ? 'ভিডিও সরান' : 'Remove video'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* YouTube ID — shown when nothing is uploaded yet */}
-                  {!form.mainVideo && !form.videoId && (
+                  {/* YouTube link — same remaining-slot rule as file upload */}
+                  {videoSlotsLeft > 0 && (
                     <div className="mt-4">
                       <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-2 text-center">
                         {isBn ? 'অথবা YouTube লিংক' : 'Or paste a YouTube ID'}
@@ -2641,33 +2749,32 @@ const AddProperty = () => {
                         <div className="relative">
                           <Play size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
                           <input type="text"
-                            className={`${inputCls} pl-10`}
+                            className={`${inputCls} pl-10 pr-20`}
                             placeholder="e.g. O-P_J_gvALE"
                             value={form.videoId}
                             onChange={e => set('videoId', e.target.value.trim())}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') { e.preventDefault(); addYoutubeVideo(form.videoId); }
+                            }}
                           />
+                          <button type="button"
+                            onClick={() => addYoutubeVideo(form.videoId)}
+                            disabled={!form.videoId}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-[10px] font-black disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#ba0036] transition-colors">
+                            {isBn ? 'যোগ করুন' : 'Add'}
+                          </button>
                         </div>
                       </Field>
                     </div>
                   )}
 
-                  {/* YouTube preview */}
-                  {form.videoId && (
-                    <div>
-                      <div className="mt-2 rounded-xl overflow-hidden aspect-video shadow-sm relative">
-                        <iframe
-                          src={`https://www.youtube.com/embed/${form.videoId}`}
-                          className="w-full h-full"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                          title="Property video preview"
-                        />
-                      </div>
-                      <button type="button" onClick={() => set('videoId', '')}
-                        className="mt-2 text-[10px] font-black text-red-400 flex items-center gap-1 hover:text-[#ba0036] transition-colors">
-                        <X size={10} strokeWidth={3} />{isBn ? 'ভিডিও সরান' : 'Remove video'}
-                      </button>
-                    </div>
+                  {/* Plan cap reached */}
+                  {tierLimits.maxVideos > 0 && videoSlotsLeft === 0 && (
+                    <p className="text-[11px] font-bold text-gray-400 text-center py-2">
+                      {isBn
+                        ? `আপনার প্ল্যানের সর্বোচ্চ ${tierLimits.maxVideos}টি ভিডিও যোগ করা হয়েছে।`
+                        : `You've added the maximum of ${tierLimits.maxVideos} video${tierLimits.maxVideos > 1 ? 's' : ''} for your plan.`}
+                    </p>
                   )}
                 </div>
               </div>

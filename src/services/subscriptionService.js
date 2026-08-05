@@ -20,10 +20,18 @@ export const PREMIUM_FEATURES = [
   'aiInsights',
 ];
 
+// Plan limits. MUST mirror tolet-pro-backend/utils/subscriptionTier.js →
+// TIER_LIMITS, which is where they are actually ENFORCED. This copy exists so
+// the wizard can disable a control before the user wastes an upload; a
+// mismatch here just means the API rejects something the UI allowed.
+//
+// Pro is "unlimited listings" but NOT unlimited media — the plan sells 50
+// photos and 5 videos per property (this used to say Infinity/Infinity, which
+// contradicted the pricing table on the same screen).
 export const TIER_LIMITS = {
   free: { maxProperties: 1, maxPhotos: 5, maxVideos: 0 },
   plus: { maxProperties: 3, maxPhotos: 15, maxVideos: 1 },
-  pro: { maxProperties: Infinity, maxPhotos: Infinity, maxVideos: Infinity }
+  pro: { maxProperties: Infinity, maxPhotos: 50, maxVideos: 5 }
 };
 
 const FEATURE_LABELS = {
@@ -131,10 +139,14 @@ function updateCache(dbSub) {
     const msLeft = new Date(dbSub.trialEndsAt).getTime() - Date.now();
     const daysRemaining = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
     cachedStatus = {
-      tier: 'pro', // Give full access during trial
+      // The launch trial grants full Pro for 2 months. The backend records
+      // which tier it granted (Subscription.trialTier) instead of us assuming
+      // — so a future "1 month of Plus" promo needs no frontend change.
+      // An already-expired trial falls through to free below via daysRemaining.
+      tier: daysRemaining > 0 ? (dbSub.trialTier || 'pro') : 'free',
       plan: null,
       isPaid: false,
-      isTrial: true,
+      isTrial: daysRemaining > 0,
       isExpired: daysRemaining === 0,
       daysRemaining,
       trialEndsAt: dbSub.trialEndsAt

@@ -681,18 +681,39 @@ function useDataUrlToBlobUrl(dataUrl) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VIDEO PLAYER COMPONENT
-// Supports: mainVideo (direct file URL/upload path) OR videoId (YouTube)
-// Both can coexist — mainVideo takes priority if present
+// Plays a listing's walkthrough videos — up to 5 on Pro, 1 on Plus.
+//
+// `videos` is the canonical prop: [{ url, youtubeId }]. The legacy single-video
+// props (`mainVideo` / `videoId`) are still accepted and folded into a
+// one-element list, so listings saved before multi-video existed keep playing
+// without a migration. With more than one video a selector strip appears.
 // ─────────────────────────────────────────────────────────────────────────────
-const VideoPlayer = ({ mainVideo, videoId, coverPhoto, title }) => {
+const VideoPlayer = ({ videos, mainVideo, videoId, coverPhoto, title }) => {
   const [showVideo, setShowVideo] = useState(false);
-  const hasVideo = mainVideo || videoId;
-  const safeMainVideoUrl = useDataUrlToBlobUrl(mainVideo?.preview || mainVideo);
+  const [activeIdx, setActiveIdx] = useState(0);
 
-  if (!hasVideo) return null;
+  const clips = React.useMemo(() => {
+    const list = (Array.isArray(videos) ? videos : [])
+      .map((v) => (typeof v === 'string' ? { url: v } : v))
+      .filter((v) => v && (v.url || v.youtubeId));
+    if (list.length) return list;
+    // Legacy fallback — whichever of the two old props is set.
+    if (mainVideo) return [{ url: mainVideo?.preview || mainVideo }];
+    if (videoId) return [{ youtubeId: videoId }];
+    return [];
+  }, [videos, mainVideo, videoId]);
 
-  const isYouTube = !mainVideo && videoId;
-  const isDirectVideo = !!mainVideo;
+  // Clamp when a shorter list arrives (e.g. the host removed a video).
+  const safeIdx = Math.min(activeIdx, Math.max(0, clips.length - 1));
+  const active = clips[safeIdx] || null;
+
+  // Hook must run unconditionally — pass '' when there's nothing to convert.
+  const safeMainVideoUrl = useDataUrlToBlobUrl(active?.url || '');
+
+  if (!clips.length) return null;
+
+  const isYouTube = !active?.url && !!active?.youtubeId;
+  const isDirectVideo = !!active?.url;
 
   return (
     <div className="mb-6">
@@ -704,7 +725,9 @@ const VideoPlayer = ({ mainVideo, videoId, coverPhoto, title }) => {
         <div>
           <h3 className="text-lg font-black text-slate-900 leading-tight" style={{ fontFamily: 'Oxanium, sans-serif' }}>Video Property Tour</h3>
           <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-            {isYouTube ? 'YouTube walkthrough' : 'Video walkthrough'}
+            {clips.length > 1
+              ? `${clips.length} walkthroughs`
+              : (isYouTube ? 'YouTube walkthrough' : 'Video walkthrough')}
           </p>
         </div>
       </div>
@@ -751,13 +774,16 @@ const VideoPlayer = ({ mainVideo, videoId, coverPhoto, title }) => {
           {isDirectVideo ? (
             // muted + playsInline are required so browsers actually start playback
             // immediately after the click (autoplay policy blocks unmuted autoplay).
-            <video src={safeMainVideoUrl} controls autoPlay muted playsInline
+            // `key` forces a remount when the host switches clips, otherwise the
+            // <video> element keeps playing the previous src.
+            <video key={safeIdx} src={safeMainVideoUrl} controls autoPlay muted playsInline
               className="w-full h-full object-cover" style={{ background: '#000' }} />
           ) : (
             // mute=1 is required so YouTube actually starts playback on autoplay.
             // playsinline=1 keeps it inline on iOS instead of opening fullscreen.
             <iframe
-              src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1`}
+              key={safeIdx}
+              src={`https://www.youtube.com/embed/${active.youtubeId}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1`}
               title="Property Video Tour"
               className="w-full h-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -768,6 +794,28 @@ const VideoPlayer = ({ mainVideo, videoId, coverPhoto, title }) => {
             className="absolute top-4 right-4 w-10 h-10 bg-black/60 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/80 transition-colors">
             <X size={18} />
           </button>
+        </div>
+      )}
+
+      {/* Clip selector — only when the listing has more than one walkthrough
+          (Plus allows 1, Pro allows 5). */}
+      {clips.length > 1 && (
+        <div className="flex gap-2 mt-3 overflow-x-auto pb-1 -mx-1 px-1">
+          {clips.map((clip, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => { setActiveIdx(i); setShowVideo(true); }}
+              className={`shrink-0 px-3.5 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all ${
+                i === safeIdx
+                  ? 'bg-[#ba0036] text-white shadow-[0_6px_16px_rgba(186,0,54,0.3)]'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              {clip.youtubeId && !clip.url ? <Play size={11} className="fill-current" /> : <Video size={11} />}
+              {i === 0 ? 'Main' : `Tour ${i + 1}`}
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -1144,7 +1192,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property }) => 
     }
     grouped[img.room].push(img);
   });
-  const hasVideo = property?.videoId || property?.mainVideo;
+  const hasVideo = property?.videos?.length || property?.videoId || property?.mainVideo;
 
   const [activeRoom, setActiveRoom] = useState(orderedRooms[0] || 'all');
   const sectionRefs = useRef({});
@@ -2076,8 +2124,8 @@ const PropertyDetails = () => {
 
             {/* VIDEO TOUR */}
             <GlassCard className="p-5 md:p-7">
-              <VideoPlayer mainVideo={property.mainVideo} videoId={property.videoId} coverPhoto={property.coverPhoto} title={property.title} />
-              {!property.mainVideo && !property.videoId && (
+              <VideoPlayer videos={property.videos} mainVideo={property.mainVideo} videoId={property.videoId} coverPhoto={property.coverPhoto} title={property.title} />
+              {!property.videos?.length && !property.mainVideo && !property.videoId && (
                 <div className="text-center py-8">
                   <Play size={36} className="mx-auto mb-2 text-slate-300" />
                   <p className="font-bold text-sm text-slate-500">No video tour available for this property.</p>

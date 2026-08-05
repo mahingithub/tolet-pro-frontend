@@ -2,11 +2,12 @@
  * aiGuideService.js
  * ──────────────────────────────────────────────────────────────────────────
  * Public helpers for fetching admin-managed video guides that appear inside
- * page sections (the "How it Works" and "Help & Support" pages).
+ * page sections ("How it Works", "Help & Support", Subscription, Checkout).
  *
  * Videos are created/edited by admins in the AI Video Guides manager
- * (/admin/support → "AI Video Guides") with a `placement` of "how_it_works"
- * or "support" and an `audience` of "tenant" | "landlord" | "all".
+ * (/admin/support → "AI Video Guides") with a `placement` of "how_it_works",
+ * "support", "subscription" or "checkout", and an `audience` of
+ * "tenant" | "landlord" | "all".
  */
 
 const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
@@ -14,7 +15,7 @@ const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').r
 /**
  * Fetch active guides for a public page section.
  *
- * @param {'how_it_works'|'support'} placement
+ * @param {'how_it_works'|'support'|'subscription'|'checkout'} placement
  * @param {'tenant'|'landlord'} [audience] optional role filter (returns that
  *        role's guides plus "all"-audience guides). Omit to get every active
  *        guide for the placement and split by audience client-side.
