@@ -272,6 +272,29 @@ function buildRoomCollage(property) {
 	return { cover, thumbs, totalRoomCategories: uniqueRoomShots.length };
 }
 
+// ─── LANDLORD IDENTITY CHIP ───────────────────────────────────────────────────
+// Avatar + name + tier badge. Rendered in two slots per card because the two
+// layouts put it in different places: inside the amenities strip from md up, and
+// beside the price inside the footer row on mobile. Only one is ever visible.
+const LandlordChip = ({ name, verified, isPro, isPlus, isBn, className = "" }) => (
+	<div className={`flex items-center gap-2 ${className}`}>
+		<div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-black shrink-0">
+			{name.charAt(0).toUpperCase()}
+		</div>
+		<div className="leading-tight min-w-0">
+			<p className="text-[11px] font-black text-gray-900 flex items-center gap-1">
+				<span className="truncate min-w-0">{name}</span>
+				{verified && <ShieldCheck size={12} className="text-[#1ab64f] shrink-0" />}
+				{isPro && <span className="bg-[#ba0036] text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center shrink-0">Pro</span>}
+				{isPlus && <span className="bg-gray-900 text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center shrink-0">Plus</span>}
+			</p>
+			<p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+				{isBn ? "বাড়িওয়ালা" : "Landlord"}
+			</p>
+		</div>
+	</div>
+);
+
 // ─── PROPERTY CARD ────────────────────────────────────────────────────────────
 const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover, onHoverEnd, onInquire }) => {
 	const [isSaved, setIsSaved] = useState(false);
@@ -484,29 +507,35 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 
 			<div className="p-3.5 md:p-4 flex-1 flex flex-col justify-between">
 				<div>
-					<div className="flex justify-between items-start gap-4 mb-2">
-						<div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
-							<div className="bg-gray-900 text-white text-[11px] font-black px-2 py-1 rounded-lg flex items-center gap-1 shadow-sm">
-								<Star size={10} className="fill-yellow-400 text-yellow-400" /> {property.rating}
+					{/* Mobile puts the title and the rating pill on ONE row (title left,
+					    pill right) as in the reference card. `flex-row-reverse` gets that
+					    from the desktop DOM order, so md+ just switches back to a column
+					    and keeps the original stack: rating row on top, title underneath. */}
+					<div className="flex flex-row-reverse items-start gap-3 md:flex-col md:items-stretch md:gap-0">
+						<div className="flex items-start justify-between gap-4 shrink-0 md:mb-2">
+							<div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
+								<div className="bg-gray-900 text-white text-[11px] font-black px-2 py-1 rounded-lg flex items-center gap-1 shadow-sm">
+									<Star size={10} className="fill-yellow-400 text-yellow-400" /> {property.rating}
+								</div>
+								<span className="text-xs font-bold text-gray-400 hover:text-brandRed transition-colors whitespace-nowrap">
+									{property.reviews} {t.reviews || "Reviews"}
+								</span>
 							</div>
-							<span className="text-xs font-bold text-gray-400 hover:text-brandRed transition-colors">
-								{property.reviews} {t.reviews || "Reviews"}
-							</span>
+							<div className="hidden md:flex bg-red-50 px-2.5 py-1 rounded-lg items-center gap-1">
+								<Flame size={12} className="fill-brandRed text-brandRed" />
+								<span className="text-[10px] font-black text-brandRed uppercase tracking-widest">
+									{property.inquiries} {t.inquiriesToday || "Inquiries Today"}
+								</span>
+							</div>
 						</div>
-						<div className="hidden md:flex bg-red-50 px-2.5 py-1 rounded-lg items-center gap-1">
-							<Flame size={12} className="fill-brandRed text-brandRed" />
-							<span className="text-[10px] font-black text-brandRed uppercase tracking-widest">
-								{property.inquiries} {t.inquiriesToday || "Inquiries Today"}
-							</span>
-						</div>
+						<h3 className="min-w-0 flex-1 md:flex-none text-base md:text-lg font-black text-gray-900 leading-tight group-hover:text-brandRed transition-colors cursor-pointer mb-1" onClick={() => navigate(`/property/${property.id}`)}>
+							{property.title}
+						</h3>
 					</div>
-					<h3 className="text-base md:text-lg font-black text-gray-900 leading-tight group-hover:text-brandRed transition-colors cursor-pointer mb-1" onClick={() => navigate(`/property/${property.id}`)}>
-						{property.title}
-					</h3>
 					<p className="text-xs font-bold text-gray-500 flex items-center gap-1.5 mb-2.5">
 						<MapPin size={14} className="text-gray-400" /> {property.location}
 					</p>
-					<div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] font-bold text-gray-600 bg-gray-50 p-2.5 rounded-xl">
+					<div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] font-bold text-gray-600 bg-white border border-gray-100 md:bg-gray-50 md:border-0 p-2.5 rounded-xl">
 						{hasBedsBaths(property.intent, property.type) && (
 							<>
 								<span className="flex items-center gap-1.5">
@@ -523,7 +552,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 						<span className="flex items-center gap-1.5">
 							<Layers size={14} className="text-gray-400" /> {(property.floor || property.floorNumber) ? `${t.floorLabel || "Floor"} ${property.floor || property.floorNumber}` : (t.groundFloor || "Ground")}
 						</span>
-						<span className="hidden sm:flex items-center gap-1.5">
+						<span className="hidden md:flex items-center gap-1.5">
 							<Building size={14} className="text-gray-400" />
 							{property.furnishing === "Furnished" ? t.furnished || "Furnished" : property.furnishing === "Semi-Furnished" ? t.semiFurnished || "Semi-Furnished" : t.unfurnished || "Unfurnished"}
 						</span>
@@ -533,9 +562,11 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 					    Fills the empty band between the specs box and the price
 					    footer: amenity chips on the left (max 4 + "+N"), a compact
 					    landlord identity block on the right. Both halves render
-					    only when the listing actually carries the data. */}
+					    only when the listing actually carries the data.
+					    Hidden below md — the mobile card keeps the specs box next to
+					    the price footer, and the landlord moves INTO that footer. */}
 					{(amenities.length > 0 || landlordName) && (
-						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-3">
+						<div className="hidden md:flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-3">
 							{amenities.length > 0 && (
 								<div className="flex flex-wrap items-center gap-1.5 min-w-0">
 									{amenities.slice(0, 4).map((a) => (
@@ -552,46 +583,54 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 								</div>
 							)}
 							{landlordName && (
-								<div className="flex items-center gap-2 shrink-0 sm:pl-3 sm:border-l sm:border-gray-100">
-									<div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-black shrink-0">
-										{landlordName.charAt(0).toUpperCase()}
-									</div>
-									<div className="leading-tight">
-										<p className="text-[11px] font-black text-gray-900 flex items-center gap-1">
-											{landlordName}
-											{property.verified && <ShieldCheck size={12} className="text-[#1ab64f] shrink-0" />}
-                                            {isPro && <span className="bg-[#ba0036] text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center">Pro</span>}
-                                            {isPlus && <span className="bg-gray-900 text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center">Plus</span>}
-										</p>
-										<p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
-											{isBn ? "বাড়িওয়ালা" : "Landlord"}
-										</p>
-									</div>
-								</div>
+								<LandlordChip
+									name={landlordName}
+									verified={property.verified}
+									isPro={isPro}
+									isPlus={isPlus}
+									isBn={isBn}
+									className="shrink-0 sm:pl-3 sm:border-l sm:border-gray-100"
+								/>
 							)}
 						</div>
 					)}
 				</div>
-				<div className="flex flex-col sm:flex-row justify-between items-center gap-2.5 pt-3 mt-3 border-t border-gray-100">
-					<div className="w-full sm:w-auto flex flex-col cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
-						<div className="flex items-baseline gap-2">
-							<span className="text-lg md:text-xl font-black text-gray-900 tracking-tighter">৳ {property.price.toLocaleString("en-IN")}</span>
-							{property.originalPrice > property.price && (
-								<div className="flex items-center gap-2">
-									<span className="text-xs text-gray-400 line-through font-bold">৳ {property.originalPrice.toLocaleString("en-IN")}</span>
-									<span className="bg-green-100 text-green-700 text-[9px] font-black uppercase px-1.5 py-0.5 rounded">
-										{discountPercent}% {t.off || "Off"}
-									</span>
-								</div>
-							)}
+				{/* FOOTER — mobile stacks two rows to match the reference card:
+				    (1) landlord left / price right, (2) full-width Details + Inquire.
+				    From md up it collapses back to the original single row with the
+				    price on the left and the buttons on the right. */}
+				<div className="flex flex-col md:flex-row md:justify-between md:items-center gap-2.5 pt-3 mt-3 border-t border-gray-100">
+					<div className="flex items-center justify-between gap-3 w-full md:w-auto">
+						{landlordName && (
+							<LandlordChip
+								name={landlordName}
+								verified={property.verified}
+								isPro={isPro}
+								isPlus={isPlus}
+								isBn={isBn}
+								className="md:hidden min-w-0"
+							/>
+						)}
+						<div className="ml-auto md:ml-0 flex flex-col items-end md:items-start shrink-0 cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
+							<div className="flex items-baseline gap-2">
+								<span className="text-lg md:text-xl font-black text-gray-900 tracking-tighter">৳ {property.price.toLocaleString("en-IN")}</span>
+								{property.originalPrice > property.price && (
+									<div className="flex items-center gap-2">
+										<span className="text-xs text-gray-400 line-through font-bold">৳ {property.originalPrice.toLocaleString("en-IN")}</span>
+										<span className="bg-green-100 text-green-700 text-[9px] font-black uppercase px-1.5 py-0.5 rounded">
+											{discountPercent}% {t.off || "Off"}
+										</span>
+									</div>
+								)}
+							</div>
+							<p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
+								{property.intent === 'sale' ? (t.totalPrice || (isBn ? 'মোট মূল্য' : 'Total Price')) :
+								 (t.perMonth || (isBn ? 'প্রতি মাসে' : 'Per Month'))}
+							</p>
 						</div>
-						<p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
-							{property.intent === 'sale' ? (t.totalPrice || (isBn ? 'মোট মূল্য' : 'Total Price')) :
-							 (t.perMonth || (isBn ? 'প্রতি মাসে' : 'Per Month'))}
-						</p>
 					</div>
-					<div className="flex items-center gap-3 w-full sm:w-auto">
-						<button onClick={() => navigate(`/property/${property.id}`)} className="flex-1 sm:flex-none px-4 py-2 rounded-lg text-[11px] font-black text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all">
+					<div className="flex items-center gap-3 w-full md:w-auto">
+						<button onClick={() => navigate(`/property/${property.id}`)} className="flex-1 md:flex-none px-4 py-2.5 md:py-2 rounded-lg text-[11px] font-black text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all">
 							{t.detailsBtn || "Details"}
 						</button>
 						{/* ── INQUIRY BUTTON: opens modal inline, no page navigation ── */}
@@ -600,7 +639,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 								e.stopPropagation();
 								onInquire(property);
 							}}
-							className="flex-1 sm:flex-none px-5 py-2 rounded-lg bg-brandRed hover:bg-[#a0002e] text-white text-[11px] font-black shadow-[0_8px_16px_rgba(186,0,54,0.18)] hover:shadow-[0_12px_24px_rgba(186,0,54,0.28)] hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-1.5">
+							className="flex-1 md:flex-none px-5 py-2.5 md:py-2 rounded-lg bg-brandRed hover:bg-[#a0002e] text-white text-[11px] font-black shadow-[0_8px_16px_rgba(186,0,54,0.18)] hover:shadow-[0_12px_24px_rgba(186,0,54,0.28)] hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-1.5 uppercase md:normal-case tracking-wider md:tracking-normal">
 							<MessageCircle size={13} />
 							{t.inquireBtn || "Inquire"}
 						</button>
