@@ -646,6 +646,5 @@ export default function RentTab(props) {
 
             </div>
           </div>
-          );
-        })()}
+  );
 }
