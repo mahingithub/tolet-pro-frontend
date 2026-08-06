@@ -561,7 +561,7 @@ export default function BookingsTab(props) {
                       )}
                     </div>
                   );
-                })}
+                })()}
               </main>
 
             </div>

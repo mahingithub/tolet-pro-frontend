@@ -4020,7 +4020,7 @@ const HostDashboard = () => {
             formatDate={formatDate} computeLeaseStage={computeLeaseStage} uploadedDocs={uploadedDocs}
           />
         )}
-\n
+
         {/* 🔴 NEW: ANALYTICS OVERVIEW TAB */}
         {/* 🔴 ANALYTICS OVERVIEW — futuristic, ledger-driven */}
         {activeTab === 'analytics' && (
@@ -4059,7 +4059,7 @@ const HostDashboard = () => {
             isInquiryUnread={isInquiryUnread} openModal={openModal}
           />
         )}
-\n        
+        
         {/* ─────────────────────────────────────────────────────────────────
             🔴 BOOKINGS TAB — Lease Management (agreement metadata only)
             ─────────────────────────────────────────────────────────────────
@@ -4208,7 +4208,7 @@ const HostDashboard = () => {
              showBoostButton={showBoostButton} boostStatus={boostStatus} boostingId={boostingId}
           />
         )}
-\n
+
         {/* ─────────────────────────────────────────────────────────────────
             🔴 NEW TABS (Smart Alerts, AI Insights, Settings)
             Help & Support links out to the shared /support page.
