@@ -4198,7 +4198,7 @@ const HostDashboard = () => {
              handleDeleteProperty={handleDeleteProperty} openModal={openModal}
              setActiveTab={setActiveTab} navigate={navigate} isRecent={isRecent}
              rentedDaysLeft={rentedDaysLeft} getRoomTypes={getRoomTypes} firstRoomTypeId={firstRoomTypeId}
-             formatBDT={formatBDT} formatDate={formatDate} roomLabel={roomLabel}
+             formatBDT={formatBDT} formatDate={formatDate} roomLabel={roomLabel} userData={userData}
           />
         )}
 \n

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Search, RefreshCw, MessageSquare, MapPin, Calendar, Clock, Smile, Trash2, CheckCircle2, XCircle, ArrowRight, Hourglass, BadgeCheck, Lock, Sparkles, ChevronDown } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function InquiriesTab({
   activeTab, t, language, inquiries, setInquiries, inquiryTab, setInquiryTab,

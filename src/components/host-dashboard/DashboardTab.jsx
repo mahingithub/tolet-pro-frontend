@@ -1,12 +1,12 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import {
   X, CreditCard, ArrowUpRight, Crown, Building, TrendingUp,
   MessageSquare, LayoutGrid, ChevronUp, ChevronDown, FileText,
   FileEdit, Megaphone, Download, BellRing, AlertCircle,
   Building2, Plus, MapPin, Wallet, MessageCircle, CheckCircle2,
-  Hourglass, Calendar, RefreshCw
+  Hourglass, Calendar, RefreshCw, Settings, Camera, Search, Filter, Trash2, ArrowRight, ChevronRight, Smartphone, Sparkles, Activity
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { isInquiryUnread } from '../../utils/inquiryUnread';
 
 export default function DashboardTab({

@@ -5,7 +5,7 @@ export default function PropertiesTab({
   activeTab, t, language, properties, isPropertiesLoading, propertyLoadError, retryLoadProperties,
   filteredPropertiesByStatus, propertyFilter, setPropertyFilter, showToast, handleBoost, 
   togglePropertyStatus, handleDeleteProperty, openModal, setActiveTab, navigate, isRecent, 
-  rentedDaysLeft, getRoomTypes, firstRoomTypeId, formatBDT, formatDate, roomLabel
+  rentedDaysLeft, getRoomTypes, firstRoomTypeId, formatBDT, formatDate, roomLabel, userData
 }) {
   return (
 <div className="animate-in fade-in zoom-in-95 duration-500">

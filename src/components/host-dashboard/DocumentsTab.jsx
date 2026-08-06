@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, ScanFace, Receipt, Scale, Folder, Search, Filter, Trash2, Eye, Download, ChevronRight, ArrowLeft } from 'lucide-react';
+import { FileText, ScanFace, Receipt, Scale, Folder, Search, Filter, Trash2, Eye, Download, ChevronRight, ArrowLeft, Upload } from 'lucide-react';
 
 export default function DocumentsTab({
   activeTab, t, language, today, bookings, properties, documents,
