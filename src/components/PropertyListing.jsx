@@ -276,10 +276,14 @@ function buildRoomCollage(property) {
 // Avatar + name + tier badge. Rendered in two slots per card because the two
 // layouts put it in different places: inside the amenities strip from md up, and
 // beside the price inside the footer row on mobile. Only one is ever visible.
-const LandlordChip = ({ name, verified, isPro, isPlus, isBn, className = "" }) => (
+const LandlordChip = ({ name, avatar, verified, isPro, isPlus, isBn, className = "" }) => (
 	<div className={`flex items-center gap-2 ${className}`}>
-		<div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-black shrink-0">
-			{name.charAt(0).toUpperCase()}
+		<div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-black shrink-0 overflow-hidden">
+			{avatar ? (
+				<img src={avatar} alt={name} className="w-full h-full object-cover" />
+			) : (
+				name.charAt(0).toUpperCase()
+			)}
 		</div>
 		<div className="leading-tight min-w-0">
 			<p className="text-[11px] font-black text-gray-900 flex items-center gap-1">
@@ -410,12 +414,22 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 
 	const isPro = property.hostTier === 'pro';
 	const isPlus = property.hostTier === 'plus';
-	
-	const cardStyle = isPro 
-		? "border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.3)] bg-gradient-to-r from-amber-50/20 to-transparent" 
-		: isHighlighted 
-			? "border-brandRed shadow-[0_0_0_2px_rgba(186,0,54,0.3)] bg-white" 
-			: "border-gray-100 bg-white";
+
+	// Tier is expressed through the WHOLE card's colour — a gold wash for Pro, an
+	// indigo one for Plus. Both treatments (light + dark) live in index.css as
+	// .tp-card-pro / .tp-card-plus so this card and the mobile one in
+	// mobile/MobileHome.jsx stay identical by construction.
+	//
+	// Geometry is deliberately the SAME across tiers — no premium height bump.
+	// A taller card breaks the feed's vertical rhythm and makes the free listing
+	// beside it read as truncated.
+	const cardStyle = isPro
+		? "tp-card-pro"
+		: isPlus
+			? "tp-card-plus"
+			: isHighlighted
+				? "border-brandRed shadow-[0_0_0_2px_rgba(186,0,54,0.3)] bg-white"
+				: "border-gray-100 bg-white";
 
 	return (
 		<div onMouseEnter={() => onHover && onHover(property.id)} onMouseLeave={() => onHoverEnd && onHoverEnd()} className={`rounded-3xl border overflow-hidden flex flex-col md:flex-row hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] transition-all duration-500 group ${cardStyle} ${property.availabilityStatus === 'rented' ? 'opacity-60 grayscale-[50%]' : ''}`}>
@@ -585,6 +599,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 							{landlordName && (
 								<LandlordChip
 									name={landlordName}
+									avatar={property.landlordAvatar || property.ownerAvatar || property.ownerImage || property.landlord?.avatar}
 									verified={property.verified}
 									isPro={isPro}
 									isPlus={isPlus}
@@ -604,6 +619,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 						{landlordName && (
 							<LandlordChip
 								name={landlordName}
+								avatar={property.landlordAvatar || property.ownerAvatar || property.ownerImage || property.landlord?.avatar}
 								verified={property.verified}
 								isPro={isPro}
 								isPlus={isPlus}

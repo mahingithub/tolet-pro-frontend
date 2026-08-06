@@ -20,6 +20,7 @@ import {
   X,
   TrendingUp,
   Camera,
+  Crown,
 } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
@@ -726,11 +727,25 @@ const PropertyCard = ({ property, t, landlord }) => {
 
   const go = () => navigate(`/property/${property.id}`);
 
+  const isPro = property.hostTier === 'pro';
+  const isPlus = property.hostTier === 'plus';
+  const isBn = language === 'বাংলা';
+
+  // Same premium treatment as the desktop card in PropertyListing.jsx — a gold
+  // wash for Pro, indigo for Plus, defined once in index.css (.tp-card-pro /
+  // .tp-card-plus) with both a light and a dark variant. Card height never
+  // changes with tier; only colour does.
+  const cardStyle = isPro
+    ? "tp-card-pro"
+    : isPlus
+      ? "tp-card-plus"
+      : "border-gray-100 bg-white shadow-[0_10px_30px_-12px_rgba(15,23,42,0.18)]";
+
   return (
     <article className="px-4 mb-5">
       <div
         onClick={go}
-        className="bg-white rounded-[26px] overflow-hidden shadow-[0_10px_30px_-12px_rgba(15,23,42,0.18)] border border-gray-100 active:scale-[0.995] transition-transform cursor-pointer"
+        className={`rounded-[26px] overflow-hidden border active:scale-[0.995] transition-transform cursor-pointer ${cardStyle}`}
       >
         {/* IMAGE BLOCK — big image left, 3 thumbs right */}
         <div className="relative grid grid-cols-[1.7fr_1fr] gap-1 bg-white">
@@ -749,6 +764,21 @@ const PropertyCard = ({ property, t, landlord }) => {
                   <ShieldCheck size={10} strokeWidth={2.6} />
                   {t.mobVerified}
                 </span>
+              )}
+              {isPro && (
+                <>
+                  <div className="bg-gradient-to-r from-amber-400 to-orange-500 text-white px-2 py-0.5 rounded-full flex items-center gap-1 shadow-md text-[9px] font-black tracking-widest uppercase">
+                    <Crown size={10} /> Pro
+                  </div>
+                  <div className="bg-white/90 backdrop-blur-md px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm text-[9px] font-black text-amber-600 uppercase tracking-widest">
+                    <TrendingUp size={10} /> {isBn ? "শীর্ষ অবস্থান" : "Top Position"}
+                  </div>
+                </>
+              )}
+              {isPlus && !isPro && (
+                <div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-2 py-0.5 rounded-full flex items-center gap-1 shadow-md text-[9px] font-black tracking-widest uppercase">
+                  <Sparkles size={10} /> Plus
+                </div>
               )}
               <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-900 text-white text-[9px] font-black uppercase tracking-wider shadow-md">
                 {typeLabel}

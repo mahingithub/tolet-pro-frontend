@@ -3,6 +3,7 @@ import { getDynamicFields } from '../constants/propertyFields';
 import { getRoomTypes, firstRoomTypeId } from '../constants/roomCategories';
 import { SALE_INTENT_ENABLED } from '../constants/listingIntents';
 import SellInterestModal from './SellInterestModal';
+import FreeProTrialModal from './FreeProTrialModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useGoBack from '../hooks/useGoBack';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -1419,6 +1420,61 @@ const AddProperty = () => {
     return subscriptionService.onChange(() => setSubscriptionStatus(subscriptionService.getStatus()));
   }, []);
   const tierLimits = TIER_LIMITS[subscriptionStatus.tier] || TIER_LIMITS.free;
+
+  // ─── FREE PRO TRIAL OFFER ──────────────────────────────────────────────
+  // Hosts on the free plan can earn 2 months of Pro by sharing the app (see
+  // FreeProTrialModal). The offer shows twice: once on entry, and again the
+  // moment a free plan actually blocks them (6th photo, or any video).
+  //
+  // A skip is remembered for the browser SESSION only — the host gets the
+  // pitch again next visit, but isn't nagged on every reload of the wizard.
+  const TRIAL_SKIP_KEY = 'tolet_pro::free-trial-skipped';
+  const [trialModal, setTrialModal] = useState({ open: false, reason: 'entry' });
+  // Files the host picked while still capped. Held (not dropped) so a completed
+  // share task resumes the exact upload they were blocked on.
+  const pendingUploadRef = useRef(null);
+
+  const trialSkippedThisSession = () => {
+    try { return window.sessionStorage.getItem(TRIAL_SKIP_KEY) === '1'; } catch { return false; }
+  };
+
+  /**
+   * Offer the trial. Returns false when the host isn't eligible (already on
+   * Plus/Pro, or already used their one claim) so callers can fall back to the
+   * plain "limit reached" toast.
+   */
+  const offerFreeTrial = (reason) => {
+    if (!subscriptionService.canClaimShareTrial()) return false;
+    setTrialModal({ open: true, reason });
+    return true;
+  };
+
+  const closeTrialModal = () => {
+    try { window.sessionStorage.setItem(TRIAL_SKIP_KEY, '1'); } catch { /* private mode */ }
+    // Skipped without unlocking → drop the held files. Leaving them queued
+    // would replay a long-forgotten upload if the host later upgraded by some
+    // other route (checkout in another tab, say). On a successful unlock the
+    // tier is already 'pro' by this point and the resume effect owns them.
+    if (subscriptionService.getStatus().tier === 'free') pendingUploadRef.current = null;
+    setTrialModal((m) => ({ ...m, open: false }));
+  };
+
+  // Entry pitch — deferred until the real subscription status lands, so a Pro
+  // host never sees a flash of the offer while the cache still says 'free'.
+  const didOfferOnEntryRef = useRef(false);
+  useEffect(() => {
+    let alive = true;
+    subscriptionService.fetchStatus().then(() => {
+      if (!alive || didOfferOnEntryRef.current) return;
+      if (trialSkippedThisSession()) return;
+      if (!subscriptionService.canClaimShareTrial()) return;
+      didOfferOnEntryRef.current = true;
+      setTrialModal({ open: true, reason: 'entry' });
+    });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   // "I am interested in selling" Coming-Soon modal (opened from the intent step).
@@ -1567,6 +1623,14 @@ const AddProperty = () => {
   const handleRoomPhotos = async (files) => {
     const remaining = tierLimits.maxPhotos - form.roomPhotos.length;
     if (remaining <= 0) {
+      // Out of slots on the free plan → pitch the share-for-Pro trial instead
+      // of a dead-end toast, and hold the picked files so the upload resumes
+      // itself the moment Pro lands.
+      if (subscriptionStatus.tier === 'free') {
+        pendingUploadRef.current = { kind: 'photos', files: Array.from(files) };
+        if (offerFreeTrial('photos')) return;
+        pendingUploadRef.current = null;
+      }
       showToast(
         isBn
           ? `আপনি সর্বোচ্চ সংখ্যক (${tierLimits.maxPhotos}টি) ছবি আপলোড করেছেন।`
@@ -1585,7 +1649,16 @@ const AddProperty = () => {
         'error',
       );
     }
-    const accepted = all.filter(f => f.size <= MAX_IMAGE_BYTES).slice(0, Math.max(0, remaining));
+    const withinSize = all.filter(f => f.size <= MAX_IMAGE_BYTES);
+    const accepted = withinSize.slice(0, Math.max(0, remaining));
+    // Picked more than the free plan allows in one go (e.g. 3 already there and
+    // 5 selected) — same situation as hitting the cap, so hold the overflow and
+    // pitch the trial rather than dropping the extras on the floor.
+    const overflow = withinSize.slice(accepted.length);
+    if (overflow.length && subscriptionStatus.tier === 'free') {
+      pendingUploadRef.current = { kind: 'photos', files: overflow };
+      if (!offerFreeTrial('photos')) pendingUploadRef.current = null;
+    }
     if (!accepted.length) return;
     const newPhotos = await Promise.all(accepted.map(async (file) => ({
       id: Date.now() + Math.random(),
@@ -1612,6 +1685,12 @@ const AddProperty = () => {
     const all = Array.from(files);
 
     if (tierLimits.maxVideos === 0) {
+      // Free tier has no video slots — pitch the trial instead of a dead end.
+      if (subscriptionStatus.tier === 'free') {
+        pendingUploadRef.current = { kind: 'video', files: all };
+        if (offerFreeTrial('video')) return;
+        pendingUploadRef.current = null;
+      }
       showToast(
         isBn ? 'ভিডিও আপলোড করতে প্লাস বা প্রো প্ল্যানে আপগ্রেড করুন।'
              : 'Upgrade to Plus or Pro plan to upload videos.',
@@ -1676,6 +1755,10 @@ const AddProperty = () => {
     const youtubeId = String(rawId || '').trim();
     if (!youtubeId) return;
     if (videoSlotsLeft <= 0) {
+      // Free plan has no video slots at all → offer the share-for-Pro trial.
+      // Nothing is queued here: a YouTube id is one keystroke to re-enter, and
+      // it stays in the input field anyway.
+      if (tierLimits.maxVideos === 0 && offerFreeTrial('video')) return;
       showToast(
         isBn ? `আপনার প্ল্যানে সর্বোচ্চ ${tierLimits.maxVideos}টি ভিডিও দেওয়া যায়।`
              : `Your plan allows up to ${tierLimits.maxVideos} video${tierLimits.maxVideos > 1 ? 's' : ''}.`,
@@ -1698,6 +1781,19 @@ const AddProperty = () => {
     }
     set('videos', form.videos.filter(v => v.id !== id));
   };
+
+  // Resume the upload the free plan blocked, once the trial is live. Keyed on
+  // the tier so the handlers re-run with the NEW limits in closure instead of
+  // the free ones they were rejected under — otherwise the resumed files would
+  // be rejected a second time and the host would lose them.
+  useEffect(() => {
+    const pending = pendingUploadRef.current;
+    if (!pending || subscriptionStatus.tier === 'free') return;
+    pendingUploadRef.current = null;
+    if (pending.kind === 'photos') handleRoomPhotos(pending.files);
+    else handleVideoUpload(pending.files);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subscriptionStatus.tier]);
 
   // ─── SUBMIT ────────────────────────────────────────────────────────────────
   //
@@ -1861,6 +1957,16 @@ const AddProperty = () => {
 
       {/* Sell — "Coming Soon" interest modal, opened from the intent step. */}
       <SellInterestModal open={sellInterestOpen} onClose={() => setSellInterestOpen(false)} isBn={isBn} />
+
+      {/* Free Pro trial — pitched on entry and whenever the free plan blocks a
+          photo/video upload. On unlock, subscriptionService broadcasts the new
+          tier, which raises tierLimits and replays any held upload. */}
+      <FreeProTrialModal
+        open={trialModal.open}
+        reason={trialModal.reason}
+        onSkip={closeTrialModal}
+        onUnlocked={() => showToast(isBn ? 'প্রো আনলক হয়েছে!' : 'Pro unlocked!')}
+      />
 
       {/* Toast */}
       <AnimatePresence>

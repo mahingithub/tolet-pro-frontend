@@ -38,6 +38,7 @@ import { listNotifications, getUnreadCount, markRead, markAllRead } from "../ser
 import { openConversation, sendMessage, sendMediaMessage } from "../services/chatService.js";
 import { uploadAvatar, uploadVerificationDoc } from "../services/authService";
 import ProfileSection from './shared/ProfileSection';
+import FreeProTrialModal from './FreeProTrialModal';
 import VerificationModal from './VerificationModal';
 import SharedSettings from './shared/SharedSettings';
 import Smartalertspage from './Smartalertspage';
@@ -1003,6 +1004,16 @@ const HostDashboard = () => {
   // subscriptionService later exposes a more specific flag (e.g. paid tier),
   // swap it in here and everything downstream follows.
   const isPremium = ['plus', 'pro'].includes(subStatus?.tier);
+
+  // ─── Free Pro trial (share the app) ────────────────────────────────────
+  // A once-per-account reward. The CTA disappears for good once taken — the
+  // claim latch lives on the subscription row, so it survives the trial
+  // lapsing and doesn't come back as a re-offer the server would reject.
+  const [trialModalOpen, setTrialModalOpen] = useState(false);
+  const canClaimShareTrial = useMemo(
+    () => subscriptionService.canClaimShareTrial(),
+    [subStatus],
+  );
 
   // ─── Search boost (Plus perk) ──────────────────────────────────────────
   // Plus hosts get one credit a month to pin a listing to the top of search
@@ -3000,6 +3011,14 @@ const HostDashboard = () => {
         onAddMethod={() => setActiveTab('payments')}
       />
 
+      {/* 🎁 FREE PRO TRIAL MODAL — share the app, unlock 2 months Pro. */}
+      <FreeProTrialModal
+        open={trialModalOpen}
+        reason="manual"
+        onSkip={() => setTrialModalOpen(false)}
+        onUnlocked={() => showToast(language === 'বাংলা' ? '২ মাস প্রো আনলক হয়েছে!' : '2 months of Pro unlocked!')}
+      />
+
       {/* 🏠 LOGO "WHERE TO?" POPUP — the dashboard is the landlord's home, so the
           logo asks where to go rather than silently leaving for the public site. */}
       <LandlordHomeChoiceModal
@@ -3273,16 +3292,26 @@ const HostDashboard = () => {
         </nav>
 
         <div className="p-5 border-t border-gray-100 bg-gray-50/50 flex flex-col gap-3 mt-auto">
-          {/* Trial / Pro status pill — gives the host a constant view of
-              their remaining trial days (or active Pro coverage). Tapping
-              the pill or the CTA below sends them to /subscription. */}
+          {/* Plan status pill. Three states, because with no automatic trial a
+              free host may never have HAD one — labelling that "Trial ended"
+              (red) would read as a broken account rather than a starting point. */}
           {!subStatus.isPaid && (
-            <div className={`px-3 py-2 rounded-xl border ${subStatus.isExpired ? 'bg-red-50 border-red-100 text-red-700' : 'bg-blue-50 border-blue-100 text-blue-700'} flex items-center gap-2 text-[10px] font-black uppercase tracking-widest`}>
-              <Clock size={12} />
-              {subStatus.isExpired
-                ? (language === 'বাংলা' ? 'ট্রায়াল শেষ' : 'Trial ended')
-                : (language === 'বাংলা' ? `ট্রায়াল: ${subStatus.daysRemaining} দিন বাকি` : `Trial · ${subStatus.daysRemaining}d left`)}
-            </div>
+            subStatus.isTrial ? (
+              <div className="px-3 py-2 rounded-xl border bg-blue-50 border-blue-100 text-blue-700 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
+                <Clock size={12} />
+                {language === 'বাংলা' ? `ট্রায়াল: ${subStatus.daysRemaining} দিন বাকি` : `Trial · ${subStatus.daysRemaining}d left`}
+              </div>
+            ) : subStatus.isExpired ? (
+              <div className="px-3 py-2 rounded-xl border bg-red-50 border-red-100 text-red-700 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
+                <Clock size={12} />
+                {language === 'বাংলা' ? 'ট্রায়াল শেষ' : 'Trial ended'}
+              </div>
+            ) : (
+              <div className="px-3 py-2 rounded-xl border bg-gray-50 border-gray-200 text-gray-600 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
+                <Clock size={12} />
+                {language === 'বাংলা' ? 'ফ্রি প্ল্যান' : 'Free plan'}
+              </div>
+            )
           )}
           {subStatus.isPaid ? (
             <button
@@ -3517,6 +3546,39 @@ const HostDashboard = () => {
                   </div>
                 </div>
               )
+            )}
+
+            {/* 🎁 FREE PRO TRIAL — share the app, get 2 months of Pro. Shown
+                only while the host can still claim it: `canClaimShareTrial()`
+                is false once the reward has been taken (permanently, even after
+                it lapses) and while they already hold Plus/Pro. */}
+            {canClaimShareTrial && (
+              <div
+                onClick={() => setTrialModalOpen(true)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTrialModalOpen(true); } }}
+                className="group cursor-pointer bg-gradient-to-br from-amber-50 to-yellow-50/60 border border-amber-200 rounded-[1.5rem] p-5 md:p-6 shadow-[0_4px_25px_rgba(245,158,11,0.10)] hover:shadow-[0_12px_35px_rgba(245,158,11,0.18)] hover:-translate-y-0.5 transition-all"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shrink-0 shadow-[0_8px_20px_-6px_rgba(245,158,11,0.7)]">
+                    <Crown size={22} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-base md:text-lg font-black text-gray-900 leading-tight">
+                      {language === 'বাংলা' ? '২ মাসের ফ্রি প্রো ট্রায়াল নিন' : 'Get 2 Months of Pro — Free'}
+                    </h3>
+                    <p className="text-[11px] md:text-xs font-bold text-amber-700/90 mt-0.5">
+                      {language === 'বাংলা'
+                        ? 'অ্যাপের লিংক শেয়ার করলেই ৫০টি ছবি, ভিডিও ট্যুর আর সার্চে শীর্ষ অবস্থান আনলক।'
+                        : 'Share the app link to unlock 50 photos, video tours and top position in search.'}
+                    </p>
+                  </div>
+                  <span className="hidden sm:inline-flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest group-hover:translate-x-0.5 transition-transform shrink-0">
+                    {language === 'বাংলা' ? 'ফ্রি নিন' : 'Claim Free'} <ArrowUpRight size={14} />
+                  </span>
+                </div>
+              </div>
             )}
 
             {/* ১. Stats Bento Grid */}

@@ -637,3 +637,122 @@ html.reduce-motion .tp-home-win { fill: rgba(255,211,122,0) !important; }
 .animate-shimmer {
   animation: shimmer 2s ease-in-out infinite;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PREMIUM PROPERTY CARDS (Pro / Plus)
+   ──────────────────────────────────────────────────────────────────────────
+   Pro and Plus listings are distinguished by COLOUR across the whole card —
+   never by height. A taller card would reflow the feed's rhythm and make free
+   listings look broken next to them; a tinted card reads as premium at a
+   glance and leaves the grid untouched.
+
+   These live here rather than as Tailwind utilities on the components because
+   each one needs a light AND a dark treatment, and the app has no per-component
+   `dark:` variants — dark mode is the global `html.dark` retrofit above. One
+   class per tier keeps the desktop card (PropertyListing) and the mobile card
+   (MobileHome) visually identical by construction.
+
+   `background-image` (not `background-color`) is used for the fills so the
+   dark retrofit's `.bg-white → --tp-surface` rule can't flatten them, and so
+   the two layers (tint + surface) compose in a single property.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── PRO — warm gold. Light: champagne wash on white with a gilded edge.
+      Dark: deep amber-black with a glowing rim. ─────────────────────────── */
+.tp-card-pro {
+  border-color: rgba(217, 155, 40, 0.55);
+  background-image:
+    linear-gradient(135deg, rgba(251, 191, 36, 0.16) 0%, rgba(253, 230, 138, 0.07) 42%, rgba(255, 255, 255, 0) 78%),
+    linear-gradient(#ffffff, #ffffff);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 10px 30px -12px rgba(217, 155, 40, 0.45);
+}
+.tp-card-pro:hover {
+  border-color: rgba(217, 155, 40, 0.8);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 22px 45px -18px rgba(217, 155, 40, 0.6);
+}
+
+html.dark .tp-card-pro {
+  border-color: rgba(251, 191, 36, 0.42);
+  background-image:
+    linear-gradient(135deg, rgba(251, 191, 36, 0.22) 0%, rgba(180, 83, 9, 0.12) 45%, rgba(0, 0, 0, 0) 80%),
+    linear-gradient(var(--tp-surface), var(--tp-surface));
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.14) inset,
+    0 14px 40px -16px rgba(251, 191, 36, 0.42);
+}
+html.dark .tp-card-pro:hover {
+  border-color: rgba(251, 191, 36, 0.65);
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.2) inset,
+    0 22px 55px -18px rgba(251, 191, 36, 0.58);
+}
+
+/* ── PLUS — cool indigo. The same construction one step down the ladder, so
+      the tiers read as a family rather than two unrelated treatments. ───── */
+.tp-card-plus {
+  border-color: rgba(99, 102, 241, 0.45);
+  background-image:
+    linear-gradient(135deg, rgba(99, 102, 241, 0.13) 0%, rgba(165, 180, 252, 0.06) 42%, rgba(255, 255, 255, 0) 78%),
+    linear-gradient(#ffffff, #ffffff);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 10px 30px -12px rgba(79, 70, 229, 0.35);
+}
+.tp-card-plus:hover {
+  border-color: rgba(99, 102, 241, 0.72);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 22px 45px -18px rgba(79, 70, 229, 0.5);
+}
+
+html.dark .tp-card-plus {
+  border-color: rgba(129, 140, 248, 0.4);
+  background-image:
+    linear-gradient(135deg, rgba(99, 102, 241, 0.24) 0%, rgba(67, 56, 202, 0.12) 45%, rgba(0, 0, 0, 0) 80%),
+    linear-gradient(var(--tp-surface), var(--tp-surface));
+  box-shadow:
+    0 0 0 1px rgba(129, 140, 248, 0.14) inset,
+    0 14px 40px -16px rgba(99, 102, 241, 0.42);
+}
+html.dark .tp-card-plus:hover {
+  border-color: rgba(129, 140, 248, 0.62);
+  box-shadow:
+    0 0 0 1px rgba(129, 140, 248, 0.2) inset,
+    0 22px 55px -18px rgba(99, 102, 241, 0.58);
+}
+
+/* The tint is a wash over the card, so the inner panels that assume a plain
+   white parent (the specs box, the price pill) must go translucent — a solid
+   white block sitting on gold reads as a rendering bug. Scoped to the premium
+   cards so free cards are untouched. */
+.tp-card-pro .bg-white,
+.tp-card-plus .bg-white,
+.tp-card-pro .bg-gray-50,
+.tp-card-plus .bg-gray-50 { background-color: rgba(255, 255, 255, 0.55) !important; }
+
+html.dark .tp-card-pro .bg-white,
+html.dark .tp-card-plus .bg-white,
+html.dark .tp-card-pro .bg-gray-50,
+html.dark .tp-card-plus .bg-gray-50 { background-color: rgba(255, 255, 255, 0.05) !important; }
+
+/* Dividers inside a tinted card pick up the tier hue instead of neutral gray,
+   which otherwise cuts a dull line straight through the wash. */
+.tp-card-pro .border-gray-100 { border-color: rgba(217, 155, 40, 0.22) !important; }
+.tp-card-plus .border-gray-100 { border-color: rgba(99, 102, 241, 0.2) !important; }
+html.dark .tp-card-pro .border-gray-100 { border-color: rgba(251, 191, 36, 0.2) !important; }
+html.dark .tp-card-plus .border-gray-100 { border-color: rgba(129, 140, 248, 0.2) !important; }
+
+/* Image tiles keep their neutral loading background — the wash must not bleed
+   into the photo strip while images decode. */
+.tp-card-pro .bg-gray-100,
+.tp-card-plus .bg-gray-100,
+.tp-card-pro .bg-gray-200,
+.tp-card-plus .bg-gray-200 { background-color: #e5e7eb !important; }
+html.dark .tp-card-pro .bg-gray-100,
+html.dark .tp-card-plus .bg-gray-100,
+html.dark .tp-card-pro .bg-gray-200,
+html.dark .tp-card-plus .bg-gray-200 { background-color: var(--tp-surface-2) !important; }

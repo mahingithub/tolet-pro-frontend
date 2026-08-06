@@ -9,7 +9,7 @@ import { broadcast, subscribe as subscribeKey } from './_storage.js';
 const KEY_SUBSCRIPTION = 'subscription:update';
 const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
 
-let cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null };
+let cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed: false };
 
 export const PREMIUM_FEATURES = [
   'analytics',
@@ -118,13 +118,19 @@ async function call(path, { method = 'GET', body } = {}) {
 }
 
 function updateCache(dbSub) {
+  // Whether the one-time "share the app" Pro trial has already been taken.
+  // Read off every branch below (including the free one) so the Free Pro Trial
+  // CTA stays hidden after the reward has been used AND after it expires —
+  // the reward is once per account, not once per free period.
+  const shareTrialClaimed = !!dbSub?.shareTrialClaimedAt;
+
   if (!dbSub) {
-    cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null };
+    cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed };
   } else if (dbSub.status === 'active' && dbSub.currentPeriodEnd) {
     const msLeft = new Date(dbSub.currentPeriodEnd).getTime() - Date.now();
     const daysRemaining = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
     const planDef = PLANS.find(p => p.id === dbSub.planId) || { id: dbSub.planId, name: { en: 'Pro', bn: 'প্রো' }, tier: 'pro' };
-    
+
     cachedStatus = {
       tier: planDef.tier || 'pro',
       plan: { id: planDef.id, name: planDef.name, interval: planDef.interval },
@@ -133,7 +139,8 @@ function updateCache(dbSub) {
       isExpired: daysRemaining === 0,
       daysRemaining,
       paidThroughAt: dbSub.currentPeriodEnd,
-      autoRenew: dbSub.autoRenew
+      autoRenew: dbSub.autoRenew,
+      shareTrialClaimed
     };
   } else if (dbSub.status === 'trialing' && dbSub.trialEndsAt) {
     const msLeft = new Date(dbSub.trialEndsAt).getTime() - Date.now();
@@ -149,10 +156,19 @@ function updateCache(dbSub) {
       isTrial: daysRemaining > 0,
       isExpired: daysRemaining === 0,
       daysRemaining,
-      trialEndsAt: dbSub.trialEndsAt
+      trialEndsAt: dbSub.trialEndsAt,
+      shareTrialClaimed
     };
   } else {
-    cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: true, daysRemaining: 0, trialEndsAt: null, plan: null };
+    // No trial, no paid period — either a brand-new account (there is no
+    // automatic trial any more, so this is the normal starting state) or one
+    // whose row exists only because of a cancelled plan.
+    //
+    // `isExpired` must distinguish those two: it drives a red "Trial ended"
+    // badge, and showing that to someone who never had a trial reads as a
+    // broken account. Only claim expiry when a period actually lapsed.
+    const everHadPeriod = !!(dbSub.trialEndsAt || dbSub.currentPeriodEnd);
+    cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: everHadPeriod, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed };
   }
   broadcast(KEY_SUBSCRIPTION);
   return cachedStatus;
@@ -197,6 +213,29 @@ export const subscriptionService = {
   async cancel() {
     const data = await call('/billing/cancel', { method: 'POST' });
     return updateCache(data.subscription);
+  },
+
+  /**
+   * Claim the one-time free Pro trial earned by sharing the app link
+   * (FreeProTrialModal). The server is the only authority here — the wizard's
+   * photo/video limits and the publish-time validation both read the
+   * Subscription row this writes, so a client-side flag would unlock the UI
+   * and then fail at Publish.
+   *
+   * Throws with `err.code` of 'share_trial_already_claimed' /
+   * 'share_trial_not_eligible' / 'share_trial_not_landlord' when refused.
+   */
+  async claimShareTrial() {
+    const data = await call('/billing/share-trial', { method: 'POST' });
+    return updateCache(data.subscription);
+  },
+
+  /**
+   * Can this host still earn the share trial? False once claimed, and false
+   * while they already hold Plus/Pro (nothing to unlock).
+   */
+  canClaimShareTrial() {
+    return !cachedStatus.shareTrialClaimed && cachedStatus.tier === 'free';
   },
 
   onChange(listener) {
