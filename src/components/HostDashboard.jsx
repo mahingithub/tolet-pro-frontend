@@ -3488,38 +3488,35 @@ const HostDashboard = () => {
 
             {/* ০. প্রমো কার্ড গ্রিড — পেমেন্ট সেটিংস + ট্রায়াল/আপগ্রেড। মোবাইলে ১ কলাম,
                 ট্যাবলেট+ এ ২ কলাম। ইমেজের মতো বড় সাইড-বাই-সাইড কার্ড। */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3 md:gap-4">
 
               {/* ০.১ পেমেন্ট সেটিংস */}
               {!paymentMethodsLoading && (
                 !hasActivePaymentMethod ? (
                   <div
                     onClick={() => setActiveTab('payments')}
-                    className="group cursor-pointer bg-gradient-to-br from-emerald-50 to-green-50/60 dark:from-emerald-950/30 dark:to-green-950/20 border border-emerald-200 dark:border-emerald-800/50 rounded-[1.75rem] md:rounded-[1.5rem] p-6 md:p-4 shadow-[0_4px_25px_rgba(16,185,129,0.12)] hover:shadow-[0_12px_35px_rgba(16,185,129,0.20)] hover:-translate-y-0.5 transition-all"
+                    className="group cursor-pointer bg-gradient-to-br from-emerald-50 to-green-50/60 dark:from-emerald-950/30 dark:to-green-950/20 border border-emerald-200 dark:border-emerald-800/50 rounded-2xl md:rounded-[1.5rem] p-3.5 md:p-4 shadow-[0_4px_25px_rgba(16,185,129,0.12)] hover:shadow-[0_12px_35px_rgba(16,185,129,0.20)] hover:-translate-y-0.5 transition-all flex flex-col"
                   >
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
-                      <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 flex-1 min-w-0">
-                        <div className="flex items-center gap-3 shrink-0">
-                          <div className="relative w-14 h-14 md:w-12 md:h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                            <CreditCard size={26} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
-                            <span className="absolute -top-1.5 -right-1.5 w-6 h-6 md:w-5 md:h-5 rounded-full bg-[#ba0036] text-white text-[11px] md:text-[10px] font-black flex items-center justify-center animate-pulse">!</span>
-                          </div>
-                          <h3 className="text-lg font-black text-gray-900 dark:text-white leading-tight md:hidden">
-                            {language === 'বাংলা' ? 'পেমেন্ট সেটিংস সম্পূর্ণ করুন' : 'Complete Payment Settings'}
-                          </h3>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 h-full">
+                      <div className="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-4 flex-1 min-w-0">
+                        <div className="relative w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl md:rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                          <CreditCard size={20} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
+                          <span className="absolute -top-1.5 -right-1.5 w-4 h-4 md:w-5 md:h-5 rounded-full bg-[#ba0036] text-white text-[9px] md:text-[10px] font-black flex items-center justify-center animate-pulse">!</span>
                         </div>
-                        <div className="flex flex-col gap-3 md:gap-0.5 flex-1 min-w-0">
-                          <h3 className="hidden md:block text-base font-black text-gray-900 dark:text-white leading-tight truncate">
+                        <div className="flex flex-col gap-1 md:gap-0.5 flex-1 min-w-0">
+                          <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight">
                             {language === 'বাংলা' ? 'পেমেন্ট সেটিংস সম্পূর্ণ করুন' : 'Complete Payment Settings'}
                           </h3>
-                          <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300/90 leading-relaxed md:truncate">
+                          <p className="text-[11px] md:text-xs font-bold text-emerald-700 dark:text-emerald-300/90 leading-relaxed md:truncate">
                             {language === 'বাংলা'
                               ? 'পেমেন্ট অ্যাকাউন্ট যোগ করুন যাতে ভাড়াটিয়া সরাসরি ভাড়া পাঠাতে পারে।'
                               : 'Add your account so tenants can send rent directly to you.'}
                           </p>
-                          <div className="flex md:hidden items-center gap-2 text-emerald-700 dark:text-emerald-300 text-xs font-black uppercase tracking-widest mt-1 group-hover:translate-x-1 transition-transform">
-                            {language === 'বাংলা' ? 'সেট আপ করুন' : 'Set Up Now'} <ArrowUpRight size={16} />
-                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-1 md:hidden shrink-0">
+                        <div className="w-fit px-3 py-2 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-lg shadow-emerald-500/20">
+                          {language === 'বাংলা' ? 'সেট আপ করুন' : 'Set Up Now'} <ArrowUpRight size={14} />
                         </div>
                       </div>
                       <div className="hidden md:flex shrink-0">
@@ -3532,26 +3529,21 @@ const HostDashboard = () => {
                 ) : (
                   <div
                     onClick={() => setActiveTab('payments')}
-                    className="group cursor-pointer bg-white dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-[1.75rem] p-6 md:rounded-[1.5rem] md:p-4 shadow-[0_4px_25px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_25px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_35px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_12px_35px_rgba(0,0,0,0.3)] hover:-translate-y-0.5 transition-all"
+                    className="group cursor-pointer bg-white dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-2xl md:rounded-[1.5rem] p-3.5 md:p-4 shadow-[0_4px_25px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_25px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_35px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_12px_35px_rgba(0,0,0,0.3)] hover:-translate-y-0.5 transition-all flex flex-col"
                   >
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
-                      <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 flex-1 min-w-0">
-                        <div className="flex items-center gap-3 shrink-0">
-                          <div className="relative w-14 h-14 md:w-12 md:h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-800/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                            <CreditCard size={26} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
-                            {pendingRentCount > 0 && (
-                              <span className="absolute -top-1.5 -right-1.5 min-w-6 h-6 md:min-w-5 md:h-5 px-1.5 rounded-full bg-[#ba0036] text-white text-[11px] md:text-[10px] font-black flex items-center justify-center">{pendingRentCount}</span>
-                            )}
-                          </div>
-                          <h3 className="text-lg font-black text-gray-900 dark:text-white leading-tight md:hidden">
-                            {language === 'বাংলা' ? 'পেমেন্ট সেটিংস' : 'Payment Settings'}
-                          </h3>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 h-full">
+                      <div className="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-4 flex-1 min-w-0">
+                        <div className="relative w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl md:rounded-2xl bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-800/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                          <CreditCard size={20} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
+                          {pendingRentCount > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 md:min-w-5 md:h-5 px-1 md:px-1.5 rounded-full bg-[#ba0036] text-white text-[9px] md:text-[10px] font-black flex items-center justify-center">{pendingRentCount}</span>
+                          )}
                         </div>
-                        <div className="flex flex-col gap-3 md:gap-0.5 flex-1 min-w-0">
-                          <h3 className="hidden md:block text-base font-black text-gray-900 dark:text-white leading-tight truncate">
+                        <div className="flex flex-col gap-1 md:gap-0.5 flex-1 min-w-0">
+                          <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight">
                             {language === 'বাংলা' ? 'পেমেন্ট সেটিংস' : 'Payment Settings'}
                           </h3>
-                          <p className="text-xs font-bold text-gray-500 dark:text-gray-400 leading-relaxed truncate">
+                          <p className="text-[11px] md:text-xs font-bold text-gray-500 dark:text-gray-400 leading-relaxed truncate">
                             {pendingRentCount > 0
                               ? (language === 'বাংলা'
                                   ? `${pendingRentCount} টি পেমেন্ট যাচাইয়ের অপেক্ষায়`
@@ -3560,9 +3552,11 @@ const HostDashboard = () => {
                                   ? `${({ bkash: 'bKash', nagad: 'Nagad', rocket: 'Rocket', bank: 'Bank' })[defaultPaymentMethod.type] || ''} • ${defaultPaymentMethod.accountNumber}`
                                   : (language === 'বাংলা' ? 'পেমেন্ট অ্যাকাউন্ট কনফিগার করা আছে' : 'Payment account configured'))}
                           </p>
-                          <div className={`flex md:hidden items-center gap-2 text-xs font-black uppercase tracking-widest mt-1 group-hover:translate-x-1 transition-transform ${pendingRentCount > 0 ? 'text-[#ba0036]' : 'text-gray-600 dark:text-gray-400'}`}>
-                            {pendingRentCount > 0 ? (language === 'বাংলা' ? 'যাচাই করুন' : 'Verify Now') : (language === 'বাংলা' ? 'ম্যানেজ করুন' : 'Manage')} <ArrowUpRight size={16} />
-                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-1 md:hidden shrink-0">
+                        <div className={`w-fit px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${pendingRentCount > 0 ? 'bg-[#ba0036] text-white shadow-lg shadow-red-500/20' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}>
+                          {pendingRentCount > 0 ? (language === 'বাংলা' ? 'যাচাই করুন' : 'Verify Now') : (language === 'বাংলা' ? 'ম্যানেজ করুন' : 'Manage')} <ArrowUpRight size={14} />
                         </div>
                       </div>
                       <div className="hidden md:flex shrink-0">
@@ -3582,30 +3576,27 @@ const HostDashboard = () => {
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTrialModalOpen(true); } }}
-                  className="group cursor-pointer bg-gradient-to-br from-amber-50 to-yellow-50/60 dark:from-amber-950/30 dark:to-yellow-950/20 border border-amber-200 dark:border-amber-800/50 rounded-[1.75rem] p-6 md:rounded-[1.5rem] md:p-4 shadow-[0_4px_25px_rgba(245,158,11,0.12)] hover:shadow-[0_12px_35px_rgba(245,158,11,0.20)] hover:-translate-y-0.5 transition-all"
+                  className="group cursor-pointer bg-gradient-to-br from-amber-50 to-yellow-50/60 dark:from-amber-950/30 dark:to-yellow-950/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl md:rounded-[1.5rem] p-3.5 md:p-4 shadow-[0_4px_25px_rgba(245,158,11,0.12)] hover:shadow-[0_12px_35px_rgba(245,158,11,0.20)] hover:-translate-y-0.5 transition-all flex flex-col"
                 >
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
-                    <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 flex-1 min-w-0">
-                      <div className="flex items-center gap-3 shrink-0">
-                        <div className="w-14 h-14 md:w-12 md:h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-[0_8px_20px_-6px_rgba(245,158,11,0.7)]">
-                          <Crown size={26} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
-                        </div>
-                        <h3 className="text-lg font-black text-gray-900 dark:text-white leading-tight md:hidden">
-                          {language === 'বাংলা' ? '২ মাসের ফ্রি প্রো ট্রায়াল নিন' : 'Get 2 Months of Pro — Free'}
-                        </h3>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 h-full">
+                    <div className="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-4 flex-1 min-w-0">
+                      <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl md:rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-[0_8px_20px_-6px_rgba(245,158,11,0.7)]">
+                        <Crown size={20} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
                       </div>
-                      <div className="flex flex-col gap-3 md:gap-0.5 flex-1 min-w-0">
-                        <h3 className="hidden md:block text-base font-black text-gray-900 dark:text-white leading-tight truncate">
+                      <div className="flex flex-col gap-1 md:gap-0.5 flex-1 min-w-0">
+                        <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight">
                           {language === 'বাংলা' ? '২ মাসের ফ্রি প্রো ট্রায়াল নিন' : 'Get 2 Months of Pro — Free'}
                         </h3>
-                        <p className="text-xs font-bold text-amber-700 dark:text-amber-300/90 leading-relaxed md:truncate">
+                        <p className="text-[11px] md:text-xs font-bold text-amber-700 dark:text-amber-300/90 leading-relaxed md:truncate">
                           {language === 'বাংলা'
                             ? 'অ্যাপের লিংক শেয়ার করলেই ৫০টি ছবি, ভিডিও ট্যুর আর সার্চে শীর্ষ অবস্থান আনলক।'
                             : 'Share the app link to unlock 50 photos, video tours and top search position.'}
                         </p>
-                        <div className="flex md:hidden items-center gap-2 text-amber-700 dark:text-amber-300 text-xs font-black uppercase tracking-widest mt-1 group-hover:translate-x-1 transition-transform">
-                          {language === 'বাংলা' ? 'ফ্রি নিন' : 'Claim Free'} <ArrowUpRight size={16} />
-                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-1 md:hidden shrink-0">
+                      <div className="w-fit px-3 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-lg shadow-orange-500/20">
+                        {language === 'বাংলা' ? 'ফ্রি নিন' : 'Claim Free'} <ArrowUpRight size={14} />
                       </div>
                     </div>
                     <div className="hidden md:flex shrink-0">
@@ -3638,22 +3629,21 @@ const HostDashboard = () => {
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }}
-                    className="group cursor-pointer bg-gradient-to-br from-violet-50 to-indigo-50/60 dark:from-violet-950/30 dark:to-indigo-950/20 border border-violet-200 dark:border-violet-800/50 rounded-[1.75rem] p-6 md:rounded-[1.5rem] md:p-4 shadow-[0_4px_25px_rgba(99,102,241,0.12)] hover:shadow-[0_12px_35px_rgba(99,102,241,0.20)] hover:-translate-y-0.5 transition-all"
+                    className="group cursor-pointer bg-gradient-to-br from-violet-50 to-indigo-50/60 dark:from-violet-950/30 dark:to-indigo-950/20 border border-violet-200 dark:border-violet-800/50 rounded-2xl md:rounded-[1.5rem] p-3.5 md:p-4 shadow-[0_4px_25px_rgba(99,102,241,0.12)] hover:shadow-[0_12px_35px_rgba(99,102,241,0.20)] hover:-translate-y-0.5 transition-all flex flex-col"
                   >
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
-                      <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 flex-1 min-w-0">
-                        <div className="flex items-center gap-3 shrink-0">
-                          <div className="w-14 h-14 md:w-12 md:h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shadow-[0_8px_20px_-6px_rgba(99,102,241,0.7)]">
-                            <Crown size={26} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
-                          </div>
-                          <h3 className="text-lg font-black text-gray-900 dark:text-white leading-tight md:hidden">{title}</h3>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 h-full">
+                      <div className="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-4 flex-1 min-w-0">
+                        <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl md:rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shadow-[0_8px_20px_-6px_rgba(99,102,241,0.7)]">
+                          <Crown size={20} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
                         </div>
-                        <div className="flex flex-col gap-3 md:gap-0.5 flex-1 min-w-0">
-                          <h3 className="hidden md:block text-base font-black text-gray-900 dark:text-white leading-tight truncate">{title}</h3>
-                          <p className="text-xs font-bold text-violet-700 dark:text-violet-300/90 leading-relaxed md:truncate">{blurb}</p>
-                          <div className="flex md:hidden items-center gap-2 text-violet-700 dark:text-violet-300 text-xs font-black uppercase tracking-widest mt-1 group-hover:translate-x-1 transition-transform">
-                            {cta} <ArrowUpRight size={16} />
-                          </div>
+                        <div className="flex flex-col gap-1 md:gap-0.5 flex-1 min-w-0">
+                          <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight">{title}</h3>
+                          <p className="text-[11px] md:text-xs font-bold text-violet-700 dark:text-violet-300/90 leading-relaxed md:truncate">{blurb}</p>
+                        </div>
+                      </div>
+                      <div className="mt-1 md:hidden shrink-0">
+                        <div className="w-fit px-3 py-2 rounded-lg bg-gradient-to-r from-violet-500 to-indigo-600 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-lg shadow-indigo-500/20">
+                          {cta} <ArrowUpRight size={14} />
                         </div>
                       </div>
                       <div className="hidden md:flex shrink-0">
@@ -3727,25 +3717,30 @@ const HostDashboard = () => {
             </div>
 
             {/* ১.২ দ্রুত অ্যাকশন — ৪ টাইল, সহজ ও কেন্দ্রস্থ। */}
-            <div className="grid grid-cols-4 gap-3 md:gap-4">
-              {[
-                { label: language === 'বাংলা' ? 'বুকিং' : 'Booking',       Icon: Calendar,      iconBg: 'bg-blue-50 dark:bg-blue-950/40 border-blue-100 dark:border-blue-800/50',     iconColor: 'text-blue-600 dark:text-blue-400',     onClick: () => setActiveTab('bookings') },
-                { label: language === 'বাংলা' ? 'রেন্ট কালেকশন' : 'Rent', Icon: Wallet,        iconBg: 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-800/50', iconColor: 'text-emerald-600 dark:text-emerald-400', onClick: () => setActiveTab('rent') },
-                { label: language === 'বাংলা' ? 'বার্তা' : 'Messages',     Icon: MessageCircle, iconBg: 'bg-violet-50 dark:bg-violet-950/40 border-violet-100 dark:border-violet-800/50', iconColor: 'text-violet-600 dark:text-violet-400', onClick: () => navigate('/messages') },
-                { label: language === 'বাংলা' ? 'নোটিফিকেশন' : 'Alerts', Icon: BellRing,      iconBg: 'bg-amber-50 dark:bg-amber-950/40 border-amber-100 dark:border-amber-800/50',   iconColor: 'text-amber-600 dark:text-amber-400',   onClick: () => setActiveTab('smartAlerts') },
-              ].map(({ label, Icon, iconBg, iconColor, onClick }) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={onClick}
-                  className="group flex flex-col items-center gap-2.5 p-4 rounded-2xl bg-white dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 shadow-[0_4px_20px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_12px_30px_rgba(0,0,0,0.3)] hover:-translate-y-0.5 active:scale-95 transition-all duration-300"
-                >
-                  <span className={`w-14 h-14 rounded-2xl border flex items-center justify-center ${iconBg} ${iconColor} group-hover:scale-110 transition-transform duration-300`}>
-                    <Icon size={24} strokeWidth={2.2} />
-                  </span>
-                  <span className="text-xs font-black text-gray-700 dark:text-gray-300 text-center leading-tight">{label}</span>
-                </button>
-              ))}
+            <div className="bg-white dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800/60 rounded-2xl md:rounded-[1.5rem] p-4 md:p-5 shadow-[0_4px_25px_rgba(0,0,0,0.02)] dark:shadow-none">
+              <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white mb-4">
+                {language === 'বাংলা' ? 'দ্রুত অ্যাকশন' : 'Quick Actions'}
+              </h3>
+              <div className="grid grid-cols-4 gap-3 md:gap-4">
+                {[
+                  { label: language === 'বাংলা' ? 'বুকিং' : 'Booking',       Icon: Calendar,      iconColor: 'text-blue-500 dark:text-blue-400',     onClick: () => setActiveTab('bookings') },
+                  { label: language === 'বাংলা' ? 'রেন্ট কালেকশন' : 'Rent', Icon: Wallet,        iconColor: 'text-emerald-500 dark:text-emerald-400', onClick: () => setActiveTab('rent') },
+                  { label: language === 'বাংলা' ? 'বার্তা' : 'Messages',     Icon: MessageCircle, iconColor: 'text-violet-500 dark:text-violet-400', onClick: () => navigate('/messages') },
+                  { label: language === 'বাংলা' ? 'নোটিফিকেশন' : 'Alerts', Icon: BellRing,      iconColor: 'text-amber-500 dark:text-amber-400',   onClick: () => setActiveTab('smartAlerts') },
+                ].map(({ label, Icon, iconColor, onClick }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={onClick}
+                    className="group flex flex-col items-center justify-center gap-3 p-4 md:p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300"
+                  >
+                    <Icon size={26} strokeWidth={2.2} className={`${iconColor} group-hover:scale-110 transition-transform duration-300`} />
+                    <span className="text-[11px] md:text-sm font-bold text-gray-700 dark:text-gray-300 text-center leading-tight whitespace-nowrap md:whitespace-normal">
+                      {label}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* ১.৫ Shared Ledger Overview — bird's-eye snapshot of the new
