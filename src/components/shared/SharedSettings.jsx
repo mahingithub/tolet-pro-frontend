@@ -205,17 +205,20 @@ const TimeRange = ({ from, until, onFrom, onUntil, bn }) => (
 );
 
 // ─── Scope + master-detail primitives ─────────────────────────────────────────
-const ScopeHeader = ({ icon: Icon, title, subtitle, className = '' }) => (
-  <div className={`flex items-center gap-3 mb-4 ${className}`}>
-    <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#ba0036] to-[#7c0026] text-white flex items-center justify-center shrink-0 shadow-[0_8px_20px_-8px_rgba(186,0,54,0.7)]">
-      <Icon size={17} />
-    </span>
-    <div className="min-w-0">
-      <h2 className="text-base md:text-lg font-black tracking-tight text-gray-900 truncate">{title}</h2>
-      {subtitle && <p className="text-[11px] font-bold text-gray-400 truncate">{subtitle}</p>}
+const ScopeHeader = ({ icon: Icon, title, subtitle, className = '' }) => {
+  if (!title && !Icon) return null;
+  return (
+    <div className={`flex items-center gap-3 mb-4 ${className}`}>
+      {Icon && <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#ba0036] to-[#7c0026] text-white flex items-center justify-center shrink-0 shadow-[0_8px_20px_-8px_rgba(186,0,54,0.7)]">
+        <Icon size={17} />
+      </span>}
+      <div className="min-w-0">
+        {title && <h2 className="text-base md:text-lg font-black tracking-tight text-gray-900 truncate">{title}</h2>}
+        {subtitle && <p className="text-[11px] font-bold text-gray-400 truncate">{subtitle}</p>}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Left-rail category button (desktop). Active = solid brand icon + ring.
 const CategoryNavButton = ({ icon: Icon, title, subtitle, active, onClick }) => (
@@ -303,7 +306,7 @@ const SettingsScope = ({ icon, title, subtitle, categories, isFirst }) => {
       {/* Desktop: master-detail */}
       <div className="hidden lg:grid lg:grid-cols-[340px_minmax(0,1fr)] gap-6 items-start">
         <div className="flex flex-col">
-          <ScopeHeader icon={icon} title={title} subtitle={subtitle} />
+          {(icon || title) && <ScopeHeader icon={icon} title={title} subtitle={subtitle} />}
           <nav className="flex flex-col gap-2.5" aria-label={title}>
             {categories.map((cat) => (
               <CategoryNavButton
@@ -329,7 +332,7 @@ const SettingsScope = ({ icon, title, subtitle, categories, isFirst }) => {
 
       {/* Mobile: accordion */}
       <div className="lg:hidden flex flex-col">
-        <ScopeHeader icon={icon} title={title} subtitle={subtitle} />
+        {(icon || title) && <ScopeHeader icon={icon} title={title} subtitle={subtitle} />}
         <div className="grid gap-4">
           {categories.map((cat, i) => (
             <AccordionCard key={cat.id} icon={cat.icon} title={cat.title} subtitle={cat.subtitle} defaultOpen={i === 0}>
@@ -797,48 +800,23 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
       </div>
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-1 sm:px-2 lg:px-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight bg-gradient-to-br from-[#ba0036] via-[#e11d48] to-[#ff4d6d] bg-clip-text text-transparent [-webkit-text-fill-color:transparent]">
-              {bn ? 'সেটিংস' : 'Settings'}
-            </h1>
-            <p className="text-sm font-bold text-gray-500 mb-2 mt-1">
-              {bn ? 'অ্যাপ, ভাড়াটিয়া ও বাড়িওয়ালা — সব সেটিং এক জায়গায়।' : 'App, tenant and landlord preferences in one place.'}
-            </p>
-          </div>
-          {saving && (
+        {saving && (
+          <div className="flex justify-end mb-4">
             <span className="inline-flex items-center gap-2 text-[11px] font-black text-[#ba0036] mt-1 shrink-0 bg-rose-50 px-3 py-1.5 rounded-full ring-1 ring-[#ba0036]/15">
               <span className="w-1.5 h-1.5 rounded-full bg-[#ba0036] animate-ping" />
               {bn ? 'সেভ হচ্ছে…' : 'Saving…'}
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
         <SettingsScope
-          icon={Globe}
-          title={bn ? 'অ্যাপ সেটিংস' : 'App settings'}
-          subtitle={bn ? 'পুরো অ্যাকাউন্টে প্রযোজ্য' : 'Apply to your whole account'}
-          categories={appCategories}
+          categories={[
+            ...appCategories,
+            ...(isTenant ? tenantCategories : []),
+            ...(isLandlord ? landlordCategories : [])
+          ]}
           isFirst={true}
         />
-
-        {isTenant && (
-          <SettingsScope
-            icon={Home}
-            title={bn ? 'ভাড়াটিয়া সেটিংস' : 'Tenant settings'}
-            subtitle={bn ? 'ভাড়াটিয়া হিসেবে যা প্রযোজ্য' : 'Apply when you rent as a tenant'}
-            categories={tenantCategories}
-          />
-        )}
-
-        {isLandlord && (
-          <SettingsScope
-            icon={Building2}
-            title={bn ? 'বাড়িওয়ালা সেটিংস' : 'Landlord settings'}
-            subtitle={bn ? 'বাড়িওয়ালা হিসেবে যা প্রযোজ্য' : 'Apply when you host as a landlord'}
-            categories={landlordCategories}
-          />
-        )}
       </div>
 
       {/* Change / forgot password — OTP-based reset via the user's phone. */}

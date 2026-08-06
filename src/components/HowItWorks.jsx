@@ -264,13 +264,13 @@ export default function HowItWorks() {
               <Building2 size={18} />
               <h3 className="text-lg font-black">{tr('Landlords', 'বাড়িওয়ালা')}</h3>
             </div>
-            <p className="mt-1 text-3xl font-black">{tr('Free to list', 'লিস্টিং ফ্রি')}</p>
-            <p className="text-xs font-medium text-red-100 mb-4">{tr('Upgrade for premium placement & tools.', 'প্রিমিয়াম প্লেসমেন্ট ও টুলসের জন্য আপগ্রেড করুন।')}</p>
+            <p className="mt-1 text-2xl font-black">{tr('Free, Plus, or Pro', 'ফ্রি, প্লাস, বা প্রো')}</p>
+            <p className="text-xs font-medium text-red-100 mb-4">{tr('Plans start from ৳19/mo.', 'প্ল্যান শুরু মাত্র ৳১৯/মাস থেকে।')}</p>
             <ul className="space-y-2.5 mb-6">
               {[
-                tr('Unlimited free listings', 'আনলিমিটেড ফ্রি লিস্টিং'),
-                tr('Verified-owner badge', 'ভেরিফাইড-মালিক ব্যাজ'),
-                tr('Listing analytics & premium boosts', 'লিস্টিং অ্যানালিটিক্স ও প্রিমিয়াম বুস্ট'),
+                tr('Free: Unlimited basic listings', 'ফ্রি: আনলিমিটেড বেসিক লিস্টিং'),
+                tr('Plus (৳19/mo): Rent collection & bookings', 'প্লাস (৳১৯/মাস): ভাড়া কালেকশন ও বুকিং'),
+                tr('Pro (৳49/mo): Smart alerts, AI & gold card', 'প্রো (৳৪৯/মাস): স্মার্ট অ্যালার্ট, এআই ও গোল্ড কার্ড'),
               ].map((f, i) => (
                 <li key={i} className="flex items-center gap-2 text-sm font-medium text-red-50">
                   <Check size={16} className="text-white shrink-0" /> {f}
@@ -281,7 +281,7 @@ export default function HowItWorks() {
               onClick={() => navigate(isAuthenticated ? '/subscription' : '/login?mode=signup&role=landlord')}
               className="w-full bg-white text-[#ba0036] py-3 rounded-xl font-black text-sm shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
             >
-              {tr('Become a landlord', 'বাড়িওয়ালা হোন')} <ArrowRight size={16} />
+              {tr('View all plans', 'সব প্ল্যান দেখুন')} <ArrowRight size={16} />
             </button>
           </div>
         </div>

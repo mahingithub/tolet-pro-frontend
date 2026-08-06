@@ -139,6 +139,7 @@ const LandlordProfile = () => {
     || (verification.addressVerified ? 'verified' : 'unverified');
 
   const isFullyVerified = idStatus === 'verified' && addressStatus === 'verified';
+  const hasRules = (landlord.preferredTenants?.length > 0 || landlord.houseRules?.length > 0 || landlord.serviceCharge !== null || landlord.communication?.length > 0);
 
   return (
     <div className="w-full bg-[#f4f7fb] min-h-screen font-sans relative pb-20 selection:bg-[#ba0036] selection:text-white">
@@ -300,7 +301,7 @@ const LandlordProfile = () => {
             )}
 
             {/* ── Preferences & Rules ── */}
-            {(landlord.preferredTenants?.length > 0 || landlord.houseRules?.length > 0 || landlord.serviceCharge !== null || landlord.communication?.length > 0) && (
+            {hasRules && (
               <motion.div variants={fadeInUp} className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {(landlord.preferredTenants?.length > 0 || landlord.communication?.length > 0) && (
                   <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 p-6 md:p-8 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
@@ -366,6 +367,12 @@ const LandlordProfile = () => {
                 )}
               </motion.div>
             )}
+
+            {!hasRules && (
+              <div className="hidden lg:block pt-4">
+                <ProfileReviews revieweeId={id} revieweeRole="landlord" revieweeName={landlord.name} />
+              </div>
+            )}
           </div>
 
           <div className="lg:col-span-5">
@@ -411,7 +418,7 @@ const LandlordProfile = () => {
         </div>
 
         {/* ── REVIEWS (person-to-person reputation — replaces property reviews) ── */}
-        <div className="mb-8 md:mb-12">
+        <div className={`mb-8 md:mb-12 ${!hasRules ? 'lg:hidden' : ''}`}>
           <ProfileReviews revieweeId={id} revieweeRole="landlord" revieweeName={landlord.name} />
         </div>
 
