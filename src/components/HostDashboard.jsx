@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Building, Building2, MessageSquare, Calendar,
+  LayoutDashboard, LayoutGrid, Building, Building2, MessageSquare, Calendar,
   Settings, HelpCircle, Plus, PlusCircle, Search, Bell, Filter, ArrowUpDown,
   Edit3, PauseCircle, PlayCircle, FileText, MapPin, Globe, CheckCircle2,
   X, CreditCard, MoreVertical, Download, Trash2, MessageCircle, Archive,
@@ -1010,6 +1010,7 @@ const HostDashboard = () => {
   // claim latch lives on the subscription row, so it survives the trial
   // lapsing and doesn't come back as a re-offer the server would reject.
   const [trialModalOpen, setTrialModalOpen] = useState(false);
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const canClaimShareTrial = useMemo(
     () => subscriptionService.canClaimShareTrial(),
     [subStatus],
@@ -3483,54 +3484,61 @@ const HostDashboard = () => {
 
         {/* 🔴 OPTIMIZED MOBILE-FIRST DASHBOARD */}
         {activeTab === 'dashboard' && (
-          <div className="animate-in fade-in zoom-in-95 duration-500 space-y-6 md:space-y-8">
+          <div className="animate-in fade-in zoom-in-95 duration-500 space-y-5">
 
-            {/* 💳 PAYMENT SETTINGS CARD — highly visible. Warns until a payout
-                account is configured; otherwise surfaces the default account +
-                any pending tenant payments to verify. */}
-            {!paymentMethodsLoading && (
-              !hasActivePaymentMethod ? (
-                <div
-                  onClick={() => setActiveTab('payments')}
-                  className="group cursor-pointer bg-gradient-to-br from-amber-50 to-orange-50/60 border border-amber-200 rounded-[1.5rem] p-5 md:p-6 shadow-[0_4px_25px_rgba(245,158,11,0.10)] hover:shadow-[0_12px_35px_rgba(245,158,11,0.15)] hover:-translate-y-0.5 transition-all"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="relative w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
-                      <CreditCard size={22} />
-                      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#ba0036] text-white text-[10px] font-black flex items-center justify-center animate-pulse">!</span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-base md:text-lg font-black text-gray-900 leading-tight">
-                        {language === 'বাংলা' ? 'পেমেন্ট সেটিংস সম্পূর্ণ করুন' : 'Complete Your Payment Settings'}
-                      </h3>
-                      <p className="text-[11px] md:text-xs font-bold text-amber-700/90 mt-0.5">
+            {/* ০. প্রমো কার্ড গ্রিড — পেমেন্ট সেটিংস + ট্রায়াল/আপগ্রেড। মোবাইলে ১ কলাম,
+                ট্যাবলেট+ এ ২ কলাম। ইমেজের মতো বড় সাইড-বাই-সাইড কার্ড। */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              {/* ০.১ পেমেন্ট সেটিংস */}
+              {!paymentMethodsLoading && (
+                !hasActivePaymentMethod ? (
+                  <div
+                    onClick={() => setActiveTab('payments')}
+                    className="group cursor-pointer bg-gradient-to-br from-emerald-50 to-green-50/60 dark:from-emerald-950/30 dark:to-green-950/20 border border-emerald-200 dark:border-emerald-800/50 rounded-[1.75rem] p-6 shadow-[0_4px_25px_rgba(16,185,129,0.12)] hover:shadow-[0_12px_35px_rgba(16,185,129,0.20)] hover:-translate-y-0.5 transition-all"
+                  >
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="relative w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                          <CreditCard size={26} strokeWidth={2.2} />
+                          <span className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-[#ba0036] text-white text-[11px] font-black flex items-center justify-center animate-pulse">!</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-lg font-black text-gray-900 dark:text-white leading-tight">
+                            {language === 'বাংলা' ? 'পেমেন্ট সেটিংস সম্পূর্ণ করুন' : 'Complete Payment Settings'}
+                          </h3>
+                        </div>
+                      </div>
+                      <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300/90 leading-relaxed">
                         {language === 'বাংলা'
                           ? 'পেমেন্ট অ্যাকাউন্ট যোগ করুন যাতে ভাড়াটিয়া সরাসরি ভাড়া পাঠাতে পারে।'
-                          : 'Add a payment account so tenants can send rent directly to you.'}
+                          : 'Add your account so tenants can send rent directly to you.'}
                       </p>
+                      <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300 text-xs font-black uppercase tracking-widest group-hover:translate-x-1 transition-transform">
+                        {language === 'বাংলা' ? 'সেট আপ করুন' : 'Set Up Now'} <ArrowUpRight size={16} />
+                      </div>
                     </div>
-                    <span className="hidden sm:inline-flex items-center gap-1 bg-amber-500 text-white px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest group-hover:translate-x-0.5 transition-transform shrink-0">
-                      {language === 'বাংলা' ? 'সেট আপ করুন' : 'Set Up'} <ArrowUpRight size={14} />
-                    </span>
                   </div>
-                </div>
-              ) : (
-                <div
-                  onClick={() => setActiveTab('payments')}
-                  className="group cursor-pointer bg-white border border-gray-100 rounded-[1.5rem] p-5 md:p-6 shadow-[0_4px_25px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_35px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="relative w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-                      <CreditCard size={22} />
-                      {pendingRentCount > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-[#ba0036] text-white text-[10px] font-black flex items-center justify-center">{pendingRentCount}</span>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-base md:text-lg font-black text-gray-900 leading-tight">
-                        {language === 'বাংলা' ? 'পেমেন্ট সেটিংস' : 'Payment Settings'}
-                      </h3>
-                      <p className="text-[11px] md:text-xs font-bold text-gray-500 mt-0.5 truncate">
+                ) : (
+                  <div
+                    onClick={() => setActiveTab('payments')}
+                    className="group cursor-pointer bg-white dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-[1.75rem] p-6 shadow-[0_4px_25px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_25px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_35px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_12px_35px_rgba(0,0,0,0.3)] hover:-translate-y-0.5 transition-all"
+                  >
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="relative w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-800/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                          <CreditCard size={26} strokeWidth={2.2} />
+                          {pendingRentCount > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-6 h-6 px-1.5 rounded-full bg-[#ba0036] text-white text-[11px] font-black flex items-center justify-center">{pendingRentCount}</span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-lg font-black text-gray-900 dark:text-white leading-tight">
+                            {language === 'বাংলা' ? 'পেমেন্ট সেটিংস' : 'Payment Settings'}
+                          </h3>
+                        </div>
+                      </div>
+                      <p className="text-xs font-bold text-gray-500 dark:text-gray-400 leading-relaxed truncate">
                         {pendingRentCount > 0
                           ? (language === 'বাংলা'
                               ? `${pendingRentCount} টি পেমেন্ট যাচাইয়ের অপেক্ষায়`
@@ -3539,98 +3547,87 @@ const HostDashboard = () => {
                               ? `${({ bkash: 'bKash', nagad: 'Nagad', rocket: 'Rocket', bank: 'Bank' })[defaultPaymentMethod.type] || ''} • ${defaultPaymentMethod.accountNumber}`
                               : (language === 'বাংলা' ? 'পেমেন্ট অ্যাকাউন্ট কনফিগার করা আছে' : 'Payment account configured'))}
                       </p>
+                      <div className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest group-hover:translate-x-1 transition-transform ${pendingRentCount > 0 ? 'text-[#ba0036]' : 'text-gray-600 dark:text-gray-400'}`}>
+                        {pendingRentCount > 0 ? (language === 'বাংলা' ? 'যাচাই করুন' : 'Verify Now') : (language === 'বাংলা' ? 'ম্যানেজ করুন' : 'Manage')} <ArrowUpRight size={16} />
+                      </div>
                     </div>
-                    <span className={`inline-flex items-center gap-1 px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest group-hover:translate-x-0.5 transition-transform shrink-0 ${pendingRentCount > 0 ? 'bg-[#ba0036] text-white' : 'text-[#ba0036]'}`}>
-                      {pendingRentCount > 0 ? (language === 'বাংলা' ? 'যাচাই করুন' : 'Verify') : (language === 'বাংলা' ? 'ম্যানেজ' : 'Manage')} <ArrowUpRight size={14} />
-                    </span>
                   </div>
-                </div>
-              )
-            )}
+                )
+              )}
 
-            {/* 🎁 FREE PRO TRIAL — share the app, get 2 months of Pro. Shown
-                only while the host can still claim it: `canClaimShareTrial()`
-                is false once the reward has been taken (permanently, even after
-                it lapses) and while they already hold Plus/Pro. */}
-            {canClaimShareTrial && (
-              <div
-                onClick={() => setTrialModalOpen(true)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTrialModalOpen(true); } }}
-                className="group cursor-pointer bg-gradient-to-br from-amber-50 to-yellow-50/60 border border-amber-200 rounded-[1.5rem] p-5 md:p-6 shadow-[0_4px_25px_rgba(245,158,11,0.10)] hover:shadow-[0_12px_35px_rgba(245,158,11,0.18)] hover:-translate-y-0.5 transition-all"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shrink-0 shadow-[0_8px_20px_-6px_rgba(245,158,11,0.7)]">
-                    <Crown size={22} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-base md:text-lg font-black text-gray-900 leading-tight">
-                      {language === 'বাংলা' ? '২ মাসের ফ্রি প্রো ট্রায়াল নিন' : 'Get 2 Months of Pro — Free'}
-                    </h3>
-                    <p className="text-[11px] md:text-xs font-bold text-amber-700/90 mt-0.5">
-                      {language === 'বাংলা'
-                        ? 'অ্যাপের লিংক শেয়ার করলেই ৫০টি ছবি, ভিডিও ট্যুর আর সার্চে শীর্ষ অবস্থান আনলক।'
-                        : 'Share the app link to unlock 50 photos, video tours and top position in search.'}
-                    </p>
-                  </div>
-                  <span className="hidden sm:inline-flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest group-hover:translate-x-0.5 transition-transform shrink-0">
-                    {language === 'বাংলা' ? 'ফ্রি নিন' : 'Claim Free'} <ArrowUpRight size={14} />
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* 🔄 WIN-BACK — the two states where the host is back on Free but
-                has nothing left to claim. Both routes go to /subscription (the
-                existing bKash/Nagad checkout flow); only the wording differs,
-                because "Renew" is meaningless to someone who never paid and
-                "Upgrade" undersells a lapsed customer's history.
-
-                `planState` is derived once in subscriptionService so the
-                listing wizard branches on exactly the same value — see
-                AddProperty.jsx, which routes here instead of opening the
-                share-trial modal for these two states. */}
-            {(subStatus.planState === 'trial_lapsed' || subStatus.planState === 'paid_expired') && (() => {
-              const isRenewal = subStatus.planState === 'paid_expired';
-              const title = isRenewal
-                ? (language === 'বাংলা' ? 'আপনার প্ল্যান রিনিউ করুন' : 'Renew Your Plan')
-                : (language === 'বাংলা' ? 'প্রো-তে আপগ্রেড করুন' : 'Upgrade to Pro');
-              const blurb = isRenewal
-                ? (language === 'বাংলা'
-                    ? 'আপনার প্ল্যানের মেয়াদ শেষ — রিনিউ করে ছবি, ভিডিও ও টপ পজিশন আবার চালু করুন।'
-                    : 'Your plan has expired — renew to restore photos, videos and top position.')
-                : (language === 'বাংলা'
-                    ? 'আপনার ফ্রি ট্রায়াল শেষ — প্রো নিয়ে ৫০টি ছবি, ভিডিও ট্যুর আর টপ পজিশন ফিরে পান।'
-                    : 'Your free trial has ended — go Pro for 50 photos, video tours and top position.');
-              const cta = isRenewal
-                ? (language === 'বাংলা' ? 'রিনিউ করুন' : 'Renew')
-                : (language === 'বাংলা' ? 'আপগ্রেড' : 'Upgrade');
-              const go = () => navigate('/subscription?from=dashboard');
-
-              return (
+              {/* ০.২ ফ্রি প্রো ট্রায়াল / আপগ্রেড / রিনিউ */}
+              {canClaimShareTrial ? (
                 <div
-                  onClick={go}
+                  onClick={() => setTrialModalOpen(true)}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }}
-                  className="group cursor-pointer bg-gradient-to-br from-violet-50 to-indigo-50/60 border border-violet-200 rounded-[1.5rem] p-5 md:p-6 shadow-[0_4px_25px_rgba(99,102,241,0.10)] hover:shadow-[0_12px_35px_rgba(99,102,241,0.18)] hover:-translate-y-0.5 transition-all"
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTrialModalOpen(true); } }}
+                  className="group cursor-pointer bg-gradient-to-br from-amber-50 to-yellow-50/60 dark:from-amber-950/30 dark:to-yellow-950/20 border border-amber-200 dark:border-amber-800/50 rounded-[1.75rem] p-6 shadow-[0_4px_25px_rgba(245,158,11,0.12)] hover:shadow-[0_12px_35px_rgba(245,158,11,0.20)] hover:-translate-y-0.5 transition-all"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-[0_8px_20px_-6px_rgba(99,102,241,0.7)]">
-                      <Crown size={22} />
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shrink-0 shadow-[0_8px_20px_-6px_rgba(245,158,11,0.7)]">
+                        <Crown size={26} strokeWidth={2.2} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-lg font-black text-gray-900 dark:text-white leading-tight">
+                          {language === 'বাংলা' ? '২ মাসের ফ্রি প্রো ট্রায়াল নিন' : 'Get 2 Months of Pro — Free'}
+                        </h3>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-base md:text-lg font-black text-gray-900 leading-tight">{title}</h3>
-                      <p className="text-[11px] md:text-xs font-bold text-violet-700/90 mt-0.5">{blurb}</p>
+                    <p className="text-xs font-bold text-amber-700 dark:text-amber-300/90 leading-relaxed">
+                      {language === 'বাংলা'
+                        ? 'অ্যাপের লিংক শেয়ার করলেই ৫০টি ছবি, ভিডিও ট্যুর আর সার্চে শীর্ষ অবস্থান আনলক।'
+                        : 'Share the app link to unlock 50 photos, video tours and top search position.'}
+                    </p>
+                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300 text-xs font-black uppercase tracking-widest group-hover:translate-x-1 transition-transform">
+                      {language === 'বাংলা' ? 'ফ্রি নিন' : 'Claim Free'} <ArrowUpRight size={16} />
                     </div>
-                    <span className="hidden sm:inline-flex items-center gap-1 bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest group-hover:translate-x-0.5 transition-transform shrink-0">
-                      {cta} <ArrowUpRight size={14} />
-                    </span>
                   </div>
                 </div>
-              );
-            })()}
+              ) : (subStatus.planState === 'trial_lapsed' || subStatus.planState === 'paid_expired') ? (() => {
+                const isRenewal = subStatus.planState === 'paid_expired';
+                const title = isRenewal
+                  ? (language === 'বাংলা' ? 'আপনার প্ল্যান রিনিউ করুন' : 'Renew Your Plan')
+                  : (language === 'বাংলা' ? 'প্রো-তে আপগ্রেড করুন' : 'Upgrade to Pro');
+                const blurb = isRenewal
+                  ? (language === 'বাংলা'
+                      ? 'আপনার প্ল্যানের মেয়াদ শেষ — রিনিউ করে ছবি, ভিডিও ও টপ পজিশন আবার চালু করুন।'
+                      : 'Your plan expired — renew to restore photos, videos and top position.')
+                  : (language === 'বাংলা'
+                      ? 'আপনার ফ্রি ট্রায়াল শেষ — প্রো নিয়ে ৫০টি ছবি, ভিডিও ট্যুর আর টপ পজিশন ফিরে পান।'
+                      : 'Free trial ended — go Pro for 50 photos, video tours and top position.');
+                const cta = isRenewal
+                  ? (language === 'বাংলা' ? 'রিনিউ করুন' : 'Renew Now')
+                  : (language === 'বাংলা' ? 'আপগ্রেড করুন' : 'Upgrade Now');
+                const go = () => navigate('/subscription?from=dashboard');
+
+                return (
+                  <div
+                    onClick={go}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }}
+                    className="group cursor-pointer bg-gradient-to-br from-violet-50 to-indigo-50/60 dark:from-violet-950/30 dark:to-indigo-950/20 border border-violet-200 dark:border-violet-800/50 rounded-[1.75rem] p-6 shadow-[0_4px_25px_rgba(99,102,241,0.12)] hover:shadow-[0_12px_35px_rgba(99,102,241,0.20)] hover:-translate-y-0.5 transition-all"
+                  >
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-[0_8px_20px_-6px_rgba(99,102,241,0.7)]">
+                          <Crown size={26} strokeWidth={2.2} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-lg font-black text-gray-900 dark:text-white leading-tight">{title}</h3>
+                        </div>
+                      </div>
+                      <p className="text-xs font-bold text-violet-700 dark:text-violet-300/90 leading-relaxed">{blurb}</p>
+                      <div className="flex items-center gap-2 text-violet-700 dark:text-violet-300 text-xs font-black uppercase tracking-widest group-hover:translate-x-1 transition-transform">
+                        {cta} <ArrowUpRight size={16} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })() : null}
+            </div>
 
             {/* ১. Stats Bento Grid */}
             <div className="grid grid-cols-3 gap-3 md:gap-5">
@@ -3691,26 +3688,24 @@ const HostDashboard = () => {
               })}
             </div>
 
-            {/* ১.২ Quick actions — one-tap jumps to the key sections. Clean
-                soft-tint tiles (works in light + dark) instead of heavy icons. */}
-            <div className="grid grid-cols-5 gap-2 sm:gap-3 md:gap-4">
+            {/* ১.২ দ্রুত অ্যাকশন — ৪ টাইল, সহজ ও কেন্দ্রস্থ। */}
+            <div className="grid grid-cols-4 gap-3 md:gap-4">
               {[
-                { label: language === 'বাংলা' ? 'বুকিং' : 'Booking',              Icon: Calendar,      iconBg: 'bg-indigo-50 border-indigo-100',   iconColor: 'text-indigo-600',  onClick: () => setActiveTab('bookings') },
-                { label: language === 'বাংলা' ? 'রেন্ট কালেকশন' : 'Rent Collection', Icon: Wallet,        iconBg: 'bg-emerald-50 border-emerald-100', iconColor: 'text-emerald-600', onClick: () => setActiveTab('rent') },
-                { label: language === 'বাংলা' ? 'বার্তা' : 'Messages',            Icon: MessageCircle, iconBg: 'bg-blue-50 border-blue-100',       iconColor: 'text-blue-600',    onClick: () => navigate('/messages') },
-                { label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts', Icon: BellRing,      iconBg: 'bg-amber-50 border-amber-100',     iconColor: 'text-amber-600',   onClick: () => setActiveTab('smartAlerts') },
-                { label: language === 'বাংলা' ? 'ডক ও অ্যানা' : 'Doc & Ana',      Icon: FileText,      iconBg: 'bg-violet-50 border-violet-100',   iconColor: 'text-violet-600',  onClick: () => setActiveTab('documents') },
+                { label: language === 'বাংলা' ? 'বুকিং' : 'Booking',       Icon: Calendar,      iconBg: 'bg-blue-50 dark:bg-blue-950/40 border-blue-100 dark:border-blue-800/50',     iconColor: 'text-blue-600 dark:text-blue-400',     onClick: () => setActiveTab('bookings') },
+                { label: language === 'বাংলা' ? 'রেন্ট কালেকশন' : 'Rent', Icon: Wallet,        iconBg: 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-800/50', iconColor: 'text-emerald-600 dark:text-emerald-400', onClick: () => setActiveTab('rent') },
+                { label: language === 'বাংলা' ? 'বার্তা' : 'Messages',     Icon: MessageCircle, iconBg: 'bg-violet-50 dark:bg-violet-950/40 border-violet-100 dark:border-violet-800/50', iconColor: 'text-violet-600 dark:text-violet-400', onClick: () => navigate('/messages') },
+                { label: language === 'বাংলা' ? 'নোটিফিকেশন' : 'Alerts', Icon: BellRing,      iconBg: 'bg-amber-50 dark:bg-amber-950/40 border-amber-100 dark:border-amber-800/50',   iconColor: 'text-amber-600 dark:text-amber-400',   onClick: () => setActiveTab('smartAlerts') },
               ].map(({ label, Icon, iconBg, iconColor, onClick }) => (
                 <button
                   key={label}
                   type="button"
                   onClick={onClick}
-                  className="group flex flex-col items-center gap-2 p-2.5 sm:p-3 md:p-4 rounded-2xl bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-95 transition-all duration-300"
+                  className="group flex flex-col items-center gap-2.5 p-4 rounded-2xl bg-white dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 shadow-[0_4px_20px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_12px_30px_rgba(0,0,0,0.3)] hover:-translate-y-0.5 active:scale-95 transition-all duration-300"
                 >
-                  <span className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-2xl border flex items-center justify-center ${iconBg} ${iconColor} group-hover:scale-110 transition-transform duration-300`}>
-                    <Icon size={18} className="sm:w-5 sm:h-5 md:w-6 md:h-6" strokeWidth={2.4} />
+                  <span className={`w-14 h-14 rounded-2xl border flex items-center justify-center ${iconBg} ${iconColor} group-hover:scale-110 transition-transform duration-300`}>
+                    <Icon size={24} strokeWidth={2.2} />
                   </span>
-                  <span className="text-[9px] sm:text-[11px] md:text-xs font-black text-gray-700 text-center leading-tight">{label}</span>
+                  <span className="text-xs font-black text-gray-700 dark:text-gray-300 text-center leading-tight">{label}</span>
                 </button>
               ))}
             </div>
@@ -3797,30 +3792,50 @@ const HostDashboard = () => {
               );
             })()}
 
-            {/* ২. Quick Actions */}
+            {/* ২. আরও অ্যাকশন — কোলাপসিবল। আগে এখানে ৪টি বাটনের আলাদা সেকশন ছিল,
+                যা উপরের দ্রুত অ্যাকশন সারির সাথে মিলে ডুপ্লিকেট মনে হতো। সব
+                অপশন রেখে ডিফল্টে লুকানো, যাতে ড্যাশবোর্ড পরিষ্কার থাকে। */}
             <div>
-              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 px-1">{language === 'বাংলা' ? 'কুইক অ্যাকশন' : 'Quick Actions'}</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { id: 'create_lease', icon: FileEdit, label: language === 'বাংলা' ? 'নতুন চুক্তি' : 'New Contract', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', hover: 'hover:bg-blue-50 hover:border-blue-200' },
-                  { id: 'message_all', icon: Megaphone, label: language === 'বাংলা' ? 'সবাইকে মেসেজ' : 'Message All', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100', hover: 'hover:bg-green-50 hover:border-green-200' },
-                  { id: 'export_report', icon: Download, label: language === 'বাংলা' ? 'রিপোর্ট' : 'Report', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100', hover: 'hover:bg-orange-50 hover:border-orange-200' },
-                  { id: 'send_reminders', icon: BellRing, label: language === 'বাংলা' ? 'রিমাইন্ডার' : 'Reminder', color: 'text-[#ba0036]', bg: 'bg-red-50', border: 'border-red-100', hover: 'hover:bg-red-50 hover:border-red-200' }
-                ].map((action, i) => (
-                  <button
-                    key={i}
-                    onClick={() => (action.id === 'create_lease'
-                      ? (isPremium ? openBlankLease() : setActiveModal('premium_gate'))
-                      : openModal(action.id))}
-                    className={`group flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-3 bg-white px-3 sm:px-5 py-4 sm:py-3.5 rounded-2xl border ${action.border} shadow-sm active:scale-95 transition-all duration-200 ${action.hover} hover:shadow-md w-full`}
-                  >
-                    <div className={`w-9 h-9 ${action.bg} ${action.color} rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-200`}>
-                      <action.icon size={17}/>
-                    </div>
-                    <span className="text-[11px] font-black text-gray-700 text-center sm:text-left leading-tight">{action.label}</span>
-                  </button>
-                ))}
-              </div>
+              <button
+                type="button"
+                onClick={() => setMoreActionsOpen((v) => !v)}
+                className="w-full flex items-center justify-between gap-3 bg-white dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 shadow-[0_4px_20px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] active:scale-[0.99] transition-all"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-500 dark:text-gray-400 flex items-center justify-center">
+                    <LayoutGrid size={18} strokeWidth={2.2} />
+                  </span>
+                  <span className="text-sm font-black text-gray-800 dark:text-gray-200">
+                    {language === 'বাংলা' ? 'আরও অ্যাকশন' : 'More Actions'}
+                  </span>
+                </span>
+                {moreActionsOpen
+                  ? <ChevronUp size={18} className="text-gray-400 shrink-0" strokeWidth={2.6} />
+                  : <ChevronDown size={18} className="text-gray-400 shrink-0" strokeWidth={2.6} />}
+              </button>
+
+              {moreActionsOpen && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                  {[
+                    { id: 'documents',       icon: FileText,  label: language === 'বাংলা' ? 'ডকুমেন্ট ও অ্যানালিটিক্স' : 'Docs & Analytics', color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-950/40', border: 'border-violet-100 dark:border-violet-800/50', onClick: () => setActiveTab('documents') },
+                    { id: 'create_lease',    icon: FileEdit,  label: language === 'বাংলা' ? 'নতুন চুক্তি' : 'New Contract',      color: 'text-blue-600 dark:text-blue-400',     bg: 'bg-blue-50 dark:bg-blue-950/40',     border: 'border-blue-100 dark:border-blue-800/50',     onClick: () => (isPremium ? openBlankLease() : setActiveModal('premium_gate')) },
+                    { id: 'message_all',     icon: Megaphone, label: language === 'বাংলা' ? 'সবাইকে মেসেজ' : 'Message All',     color: 'text-green-600 dark:text-green-400',   bg: 'bg-green-50 dark:bg-green-950/40',   border: 'border-green-100 dark:border-green-800/50',   onClick: () => openModal('message_all') },
+                    { id: 'export_report',   icon: Download,  label: language === 'বাংলা' ? 'রিপোর্ট' : 'Report',               color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-950/40', border: 'border-orange-100 dark:border-orange-800/50', onClick: () => openModal('export_report') },
+                    { id: 'send_reminders',  icon: BellRing,  label: language === 'বাংলা' ? 'রিমাইন্ডার' : 'Reminder',           color: 'text-[#ba0036] dark:text-rose-400',    bg: 'bg-red-50 dark:bg-rose-950/40',      border: 'border-red-100 dark:border-rose-800/50',      onClick: () => openModal('send_reminders') },
+                  ].map((action) => (
+                    <button
+                      key={action.id}
+                      onClick={action.onClick}
+                      className={`group flex items-center gap-3 bg-white dark:bg-gray-900/50 px-4 py-3.5 rounded-2xl border ${action.border} shadow-sm active:scale-95 transition-all duration-200 hover:shadow-md w-full`}
+                    >
+                      <div className={`w-9 h-9 ${action.bg} ${action.color} rounded-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-200`}>
+                        <action.icon size={17} />
+                      </div>
+                      <span className="text-[11px] font-black text-gray-700 dark:text-gray-300 text-left leading-tight">{action.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* ৩. Recent Properties Grid */}
