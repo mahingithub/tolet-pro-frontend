@@ -9,7 +9,7 @@ import { broadcast, subscribe as subscribeKey } from './_storage.js';
 const KEY_SUBSCRIPTION = 'subscription:update';
 const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
 
-let cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed: false, everPaid: false, planState: 'free_never' };
+let cachedStatus = { tier: 'free', isLoading: true, isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed: false, everPaid: false, planState: 'free_never' };
 
 export const PREMIUM_FEATURES = [
   'analytics',
@@ -150,7 +150,7 @@ function updateCache(dbSub) {
   const everPaid = !!dbSub?.currentPeriodEnd;
 
   if (!dbSub) {
-    cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed, everPaid };
+    cachedStatus = { tier: 'free', isLoading: false, isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed, everPaid };
   } else if (dbSub.status === 'active' && dbSub.currentPeriodEnd) {
     const msLeft = new Date(dbSub.currentPeriodEnd).getTime() - Date.now();
     const daysRemaining = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
@@ -171,7 +171,8 @@ function updateCache(dbSub) {
       paidThroughAt: dbSub.currentPeriodEnd,
       autoRenew: dbSub.autoRenew,
       shareTrialClaimed,
-      everPaid
+      everPaid,
+      isLoading: false
     };
   } else if (dbSub.status === 'trialing' && dbSub.trialEndsAt) {
     const msLeft = new Date(dbSub.trialEndsAt).getTime() - Date.now();
@@ -189,7 +190,8 @@ function updateCache(dbSub) {
       daysRemaining,
       trialEndsAt: dbSub.trialEndsAt,
       shareTrialClaimed,
-      everPaid
+      everPaid,
+      isLoading: false
     };
   } else {
     // No trial, no paid period — either a brand-new account (there is no
@@ -200,7 +202,7 @@ function updateCache(dbSub) {
     // badge, and showing that to someone who never had a trial reads as a
     // broken account. Only claim expiry when a period actually lapsed.
     const everHadPeriod = !!(dbSub.trialEndsAt || dbSub.currentPeriodEnd);
-    cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: everHadPeriod, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed, everPaid };
+    cachedStatus = { tier: 'free', isLoading: false, isPaid: false, isTrial: false, isExpired: everHadPeriod, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed, everPaid };
   }
   cachedStatus.planState = derivePlanState(cachedStatus);
   broadcast(KEY_SUBSCRIPTION);

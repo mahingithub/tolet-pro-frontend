@@ -58,7 +58,21 @@ import { loadSeenMap, isInquiryUnread, markInquirySeen } from '../utils/inquiryU
 import Aiinsightspage from './Aiinsightspage';
 import { jsPDF } from 'jspdf';
 import useDeepLinkHighlight, { highlightNotifTarget } from '../hooks/useDeepLinkHighlight';
+import useTabHistory from '../hooks/useTabHistory';
+import useBackGuard, { useOverlayNavigate } from '../hooks/useBackGuard';
 import LandlordHomeChoiceModal from './shared/LandlordHomeChoiceModal';
+
+// Every tab the dashboard can render, in sidebar order. This is the single
+// list the Back button and any ?tab= deep link are validated against — an id
+// missing here silently falls back to HOST_ROOT_TAB, so keep it in sync with
+// `menuItems` (plus the sub-views: rent, analytics, profile).
+const HOST_TABS = [
+  'dashboard', 'documents', 'analytics', 'properties', 'inquiries',
+  'bookings', 'rent', 'payments', 'smartAlerts', 'aiInsights',
+  'settings', 'profile',
+];
+// The landlord's home. Back from here leaves the dashboard entirely.
+const HOST_ROOT_TAB = 'dashboard';
 
 // Payment channels offered when converting an inquiry into a booking / recording
 // an advance. Order matches the most-used mobile-money + bank rails in Bangladesh.
@@ -551,38 +565,31 @@ const propTypeToCategory = (type) => {
 
 const HostDashboard = () => {
   const { t = {}, language = 'English', setLanguage } = useLanguage() || {}; 
-  const location = useLocation(); 
-  const navigate = useNavigate(); 
+  const location = useLocation();
+  const navigate = useNavigate();
+  // For links that live inside an overlay (drawer entries, the logo popup) —
+  // consumes the overlay's back-guard entry instead of pushing past it.
+  const overlayNavigate = useOverlayNavigate();
   const { user: authUser, logout: authLogout, updateMe: authUpdateMe, submitVerification: authSubmitVerification } = useAuth();
   
   // 🟢 CORE STATES
-  const initialTab = new URLSearchParams(location.search).get('tab') || (location.state && location.state.activeTab) || 'dashboard';
-  const [activeTab, setActiveTab] = useState(initialTab);
+  // The active tab lives in the URL (`?tab=`), not in component state, so the
+  // Back button walks back through the tabs the landlord actually visited —
+  // Rent → Bookings → Dashboard → the page they came from — instead of jumping
+  // straight out to the public site. See hooks/useTabHistory.js.
+  const [activeTab, setActiveTab] = useTabHistory({
+    tabs: HOST_TABS,
+    defaultTab: HOST_ROOT_TAB,
+  });
   // Logo → "where to?" popup. For a landlord the dashboard IS home, so tapping
   // the TO-LET PRO logo asks whether to visit the public site or stay here
   // (see LandlordHomeChoiceModal at the bottom of the render).
   const [showHomeChoice, setShowHomeChoice] = useState(false);
   const [hidePaymentPromo, setHidePaymentPromo] = useState(false);
-  // Honor ?tab=… deep-links (e.g. notification bell → /host-dashboard?tab=inquiries).
-  useEffect(() => {
-    const tab = new URLSearchParams(location.search).get('tab');
-    if (tab && ['dashboard', 'inquiries', 'rent', 'bookings', 'properties', 'payments', 'profile', 'settings'].includes(tab)) {
-      setActiveTab(tab);
-    }
-  }, [location.search]);
   // Scroll to + flash the specific row a notification points at (uses
   // location.state.highlightId set by NotificationPanel). The row ids are
   // stamped on each inquiry/booking/rent card below.
   useDeepLinkHighlight();
-
-  // Keep the URL in sync with the currently active tab so that hitting the "Back" button
-  // from another page returns the user to the exact tab they were on.
-  useEffect(() => {
-    const currentTabInUrl = new URLSearchParams(window.location.search).get('tab');
-    if (currentTabInUrl !== activeTab) {
-      navigate(`?tab=${activeTab}`, { replace: true, state: location.state });
-    }
-  }, [activeTab]);
 
   useEffect(() => {
     const socket = callProvider.getSocket();
@@ -1075,11 +1082,16 @@ const HostDashboard = () => {
   // (e.g. via a stale link), we bounce them to /subscription with a `from`
   // param so the page can explain why.
   useEffect(() => {
+    if (subStatus.isLoading) return;
     if (isFeatureLocked(activeTab)) {
-      navigate(`/subscription?from=${activeTab}`);
+      // `replace` matters: the locked tab must NOT stay in history. If it did,
+      // Back from /subscription would land on it and this effect would bounce
+      // straight forward again — a trap the user can't Back out of. Replacing
+      // means Back skips the gated tab and returns to wherever they came from.
+      navigate(`/subscription?from=${activeTab}`, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, lockedFeatureIds]);
+  }, [activeTab, lockedFeatureIds, subStatus.isLoading]);
 
   // Rent Collection tab — current ledger year for the 12-month matrix.
   const [ledgerYear, setLedgerYear] = useState(new Date().getFullYear());
@@ -1250,10 +1262,16 @@ const HostDashboard = () => {
     );
   }, [bookings, inquiries, today, language, defaultPaymentMethod]);
 
+  // Land at the top whenever the tab changes — including when the change came
+  // from a Back press, which is what a native screen transition does. Keyed on
+  // `activeTab` rather than the whole location so unrelated URL edits (a
+  // deep-link param being cleaned up, a back-guard entry) don't yank the page.
+  // `location.state.activeTab` is handled by useTabHistory, not here: re-applying
+  // it on every location change used to re-select that tab immediately after a
+  // Back press, which is why Back appeared to do nothing on some tabs.
   useEffect(() => {
     window.scrollTo(0, 0);
-    if (location.state && location.state.activeTab) setActiveTab(location.state.activeTab);
-  }, [location]);
+  }, [activeTab]);
 
   // Backend contract:
   //   GET /api/host/properties (Bearer)  →  { properties[] }
@@ -2978,6 +2996,21 @@ const HostDashboard = () => {
     return false;
   });
 
+  // ── BACK BUTTON → close the top overlay, don't leave the page ─────────────
+  // Each open overlay owns one history entry, so hardware Back (Android),
+  // the edge-swipe (iOS) and the browser's Back arrow all dismiss it exactly
+  // like the X does. Without this, Back on an open modal tore the landlord out
+  // of the dashboard entirely. Layered outermost → innermost: a modal opened
+  // over the drawer closes first, the next Back closes the drawer.
+  useBackGuard(isProfileDrawerOpen, () => setIsProfileDrawerOpen(false));
+  useBackGuard(isNotifOpen, () => setIsNotifOpen(false));
+  useBackGuard(isLangMenuOpen, () => setIsLangMenuOpen(false));
+  useBackGuard(showHomeChoice, () => setShowHomeChoice(false));
+  useBackGuard(trialModalOpen, () => setTrialModalOpen(false));
+  useBackGuard(verifModalOpen, () => setVerifModalOpen(false));
+  useBackGuard(!!confirmDeleteBookingId, () => setConfirmDeleteBookingId(null));
+  useBackGuard(!!activeModal, () => { setActiveModal(null); setModalData(null); });
+
   // The two Smart Features used to live as big CTA cards on the Dashboard tab
   // but they didn't visually fit, so we moved them into the sidebar as proper
   // tabs. They open the existing /smart-alerts and /ai-insights pages — no
@@ -3036,7 +3069,7 @@ const HostDashboard = () => {
       <LandlordHomeChoiceModal
         open={showHomeChoice}
         onClose={() => setShowHomeChoice(false)}
-        onGoHome={() => { setShowHomeChoice(false); navigate('/'); }}
+        onGoHome={() => { setShowHomeChoice(false); overlayNavigate('/'); }}
         onGoDashboard={() => setShowHomeChoice(false)}
         onDashboardPage
         isBn={language === 'বাংলা'}
@@ -3270,10 +3303,13 @@ const HostDashboard = () => {
              // the host to /subscription with a `from` param so the page
              // can highlight exactly which feature triggered the gate.
              const locked = isFeatureLocked(item.id);
+             // Routing out of the drawer uses overlayNavigate so the drawer's
+             // back-guard entry is consumed instead of stranded — one Back
+             // press from /messages returns to the dashboard, not two.
              const handleClick = () => {
                setIsProfileDrawerOpen(false);
-               if (locked) { navigate(`/subscription?from=${item.id}`); return; }
-               if (item.isLink) navigate(item.path);
+               if (locked) { overlayNavigate(`/subscription?from=${item.id}`); return; }
+               if (item.isLink) overlayNavigate(item.path);
                else setActiveTab(item.id);
              };
              return (
@@ -3343,7 +3379,8 @@ const HostDashboard = () => {
           <button
             onClick={async () => {
               showToast(language === 'বাংলা' ? 'লগআউট হচ্ছে...' : 'Logging out...');
-              try { await authLogout(); } finally { setIsProfileDrawerOpen(false); navigate('/'); }
+              // `replace` so Back can't walk back into the signed-out dashboard.
+              try { await authLogout(); } finally { setIsProfileDrawerOpen(false); navigate('/', { replace: true }); }
             }}
             className="flex items-center justify-center gap-2 text-[#3b2a2a] hover:text-[#ba0036] font-bold transition-colors w-full py-1.5 group"
           >

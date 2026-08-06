@@ -18,6 +18,8 @@ import LocationSearchModal from './shared/LocationSearchModal';
 import { buildSearchUrl } from '../data/searchData';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useDeepLinkHighlight from '../hooks/useDeepLinkHighlight';
+import useTabHistory from '../hooks/useTabHistory';
+import useBackGuard, { useOverlayNavigate } from '../hooks/useBackGuard';
 import {
   Building2, Search, Bell, Globe, LayoutDashboard, Heart,
   MessageSquare, MessageCircle, Settings, HelpCircle,
@@ -510,8 +512,21 @@ const isFreshBooking = (b) => {
   return (Date.now() - t) < 7 * 24 * 60 * 60 * 1000; // 7 days
 };
 
+// Every tab the tenant dashboard can render. The Back button and any ?tab=
+// deep link are validated against this list; anything else resolves to
+// TENANT_ROOT_TAB rather than rendering an empty page. Keep in sync with
+// `menuItems` below (plus 'profile', reached from the drawer header).
+const TENANT_TABS = [
+  'overview', 'saved', 'applications', 'alerts', 'payments', 'settings', 'profile',
+];
+// The tenant's home. Back from here leaves the dashboard entirely.
+const TENANT_ROOT_TAB = 'overview';
+
 const TenantDashboard = () => {
   const navigate = useNavigate();
+  // For links that live inside an overlay (drawer entries, the logo popup) —
+  // consumes the overlay's back-guard entry instead of pushing past it.
+  const overlayNavigate = useOverlayNavigate();
   // 🟢 Pull the logged-in user from AuthContext so the header /
   // drawer / welcome banner show the REAL name (e.g. "Ashraf Alam")
   // instead of the hardcoded "John" fallback. The auth user object
@@ -535,8 +550,13 @@ const TenantDashboard = () => {
   // 🔴 100% Connected to your Global LanguageContext from Navbar
   const { t, language, setLanguage } = useLanguage(); 
 
-  const initialTab = new URLSearchParams(location.search).get('tab') || (location.state && location.state.activeTab) || 'overview';
-  const [activeTab, setActiveTab] = useState(initialTab);
+  // The active tab lives in the URL (`?tab=`), so the Back button walks back
+  // through the tabs the tenant actually visited instead of leaving the
+  // dashboard from the first press. See hooks/useTabHistory.js.
+  const [activeTab, setActiveTab] = useTabHistory({
+    tabs: TENANT_TABS,
+    defaultTab: TENANT_ROOT_TAB,
+  });
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   // Logo → "where to?" popup. Like the landlord, a connected tenant's home base
   // is their dashboard, so tapping the TO-LET PRO logo asks whether to visit the
@@ -837,31 +857,10 @@ const TenantDashboard = () => {
     : null;
 
 
-  // 🟢 Tenant profile state — lives entirely inside the dashboard now.
-  // Synced to localStorage so it survives reloads and other tabs.
-  useEffect(() => {
-    if (location.state && location.state.activeTab) {
-      setActiveTab(location.state.activeTab);
-    }
-    const tab = new URLSearchParams(location.search).get('tab');
-    if (tab && ['overview', 'saved', 'applications', 'alerts', 'payments', 'settings', 'profile'].includes(tab)) {
-      setActiveTab(tab);
-    }
-  }, [location.search]);
-
   // Scroll to + flash the specific row a notification points at (uses
   // location.state.highlightId set by NotificationPanel). Matches the
   // #application-<id> / #receipt-<id> / #payment-<id> row ids rendered below.
   useDeepLinkHighlight();
-
-  // Keep the URL in sync with the currently active tab so that hitting the "Back" button
-  // from another page returns the user to the exact tab they were on.
-  useEffect(() => {
-    const currentTabInUrl = new URLSearchParams(window.location.search).get('tab');
-    if (currentTabInUrl !== activeTab) {
-      navigate(`?tab=${activeTab}`, { replace: true, state: location.state });
-    }
-  }, [activeTab]);
 
   // Deep-link scrolling
   useEffect(() => {
@@ -950,10 +949,10 @@ const TenantDashboard = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    if (location.state && location.state.activeTab) {
-      setActiveTab(location.state.activeTab);
-    }
-    
+    // `location.state.activeTab` is handled by useTabHistory. Re-applying it
+    // here used to re-select that tab right after a Back press, so Back looked
+    // dead on any tab reached through router state.
+
     const loadSaved = async () => {
       // Show the cached list instantly so the tab never flashes empty.
       const stored = JSON.parse(localStorage.getItem('savedProperties')) || [];
@@ -1323,6 +1322,18 @@ const TenantDashboard = () => {
   // secure URLs on `verification.{kind}Url`.
   const [verifModalOpen, setVerifModalOpen] = useState(false);
   const [landlordOnboardingOpen, setLandlordOnboardingOpen] = useState(false);
+
+  // ── BACK BUTTON → close the top overlay, don't leave the page ─────────────
+  // Hardware Back (Android), the edge-swipe (iOS) and the browser's Back arrow
+  // all dismiss the open sheet exactly like its X does, instead of tearing the
+  // tenant out of the dashboard. See hooks/useBackGuard.js.
+  useBackGuard(isProfileDrawerOpen, () => setIsProfileDrawerOpen(false));
+  useBackGuard(isNotifOpen, () => setIsNotifOpen(false));
+  useBackGuard(isLangOpen, () => setIsLangOpen(false));
+  useBackGuard(showHomeChoice, () => setShowHomeChoice(false));
+  useBackGuard(addLandlordOpen, () => setAddLandlordOpen(false));
+  useBackGuard(verifModalOpen, () => setVerifModalOpen(false));
+  useBackGuard(landlordOnboardingOpen, () => setLandlordOnboardingOpen(false));
 
   const [hideUpcomingTours, setHideUpcomingTours] = useState(
     () => localStorage.getItem('hideUpcomingTours') === 'true'
@@ -1710,7 +1721,7 @@ const handleWizardSubmit = async (payload) => {
       <LandlordHomeChoiceModal
         open={showHomeChoice}
         onClose={() => setShowHomeChoice(false)}
-        onGoHome={() => { setShowHomeChoice(false); navigate('/'); }}
+        onGoHome={() => { setShowHomeChoice(false); overlayNavigate('/'); }}
         onGoDashboard={() => setShowHomeChoice(false)}
         onDashboardPage
         isBn={language === 'বাংলা'}
@@ -1921,7 +1932,7 @@ const handleWizardSubmit = async (payload) => {
             return (
               <button
                 key={item.id}
-                onClick={() => { if (item.isLink) navigate(item.path); else setActiveTab(item.id); setIsProfileDrawerOpen(false); }}
+                onClick={() => { if (item.isLink) overlayNavigate(item.path); else setActiveTab(item.id); setIsProfileDrawerOpen(false); }}
                 className={`${hideOnMobileCls} w-full items-center gap-3 px-4 py-3 rounded-xl cursor-pointer font-bold text-xs text-left transition-all duration-300 ${isActive ? 'bg-red-50 text-[#ba0036]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}
               >
                 <item.icon size={16} className={isActive ? "text-[#ba0036]" : "text-gray-400"} />
@@ -1939,7 +1950,8 @@ const handleWizardSubmit = async (payload) => {
           <button
             onClick={async () => {
               showProfileToast(language === 'বাংলা' ? 'লগআউট হচ্ছে...' : 'Logging out...');
-              try { await authLogout(); } finally { setIsProfileDrawerOpen(false); navigate('/'); }
+              // `replace` so Back can't walk back into the signed-out dashboard.
+              try { await authLogout(); } finally { setIsProfileDrawerOpen(false); navigate('/', { replace: true }); }
             }}
             className="flex items-center justify-center gap-2 text-[#3b2a2a] hover:text-[#ba0036] font-bold transition-colors w-full py-1.5 group"
           >
