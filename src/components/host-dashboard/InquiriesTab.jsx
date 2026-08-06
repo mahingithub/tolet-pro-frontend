@@ -1,6 +1,7 @@
 import React from 'react';
-import { Search, RefreshCw, MessageSquare, MapPin, Calendar, Clock, Smile, Trash2, CheckCircle2, XCircle, ArrowRight, Hourglass, BadgeCheck, Lock, Sparkles, ChevronDown } from 'lucide-react';
+import { Search, RefreshCw, MessageSquare, MapPin, Calendar, Clock, Smile, Trash2, CheckCircle2, XCircle, ArrowRight, Hourglass, BadgeCheck, Lock, Sparkles, ChevronDown, Send, Check, Phone } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { updateInquiryStatus } from '../../services/inquiryService.js';
 
 export default function InquiriesTab({
   activeTab, t, language, inquiries, setInquiries, inquiryTab, setInquiryTab,
@@ -8,7 +9,7 @@ export default function InquiriesTab({
   inquiryReplies, setInquiryReplies, replyingId, sendInquiryReply, acceptInquiry,
   rejectInquiry, cutInquiry, openConvertInquiry, hostRespondVisit, markInquirySeen,
   inqSeen, setInqSeen, openChatPanel, handleCallUser, openTenantProfile, showToast,
-  isInquiryUnread
+  isInquiryUnread, openModal
 }) {
   const displayedInquiries = inquiries.filter(i => {
     if (inquiryTab === 'pending') return i.status === 'new' || !i.status;

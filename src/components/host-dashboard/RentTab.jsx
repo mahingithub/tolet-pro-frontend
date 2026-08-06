@@ -17,6 +17,11 @@ import {
 } from 'lucide-react';
 import MembersManager from "../MembersManager.jsx";
 
+// Month labels for the 12-month rent matrix cells. Kept local to this file so
+// the tab renders standalone — the parent has its own copy for other tabs.
+const MONTH_NAMES_EN_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_NAMES_BN_SHORT = ['জানু','ফেব্রু','মার্চ','এপ্রিল','মে','জুন','জুলাই','আগস্ট','সেপ্ট','অক্টো','নভে','ডিসে'];
+
 
 export default function RentTab(props) {
   const {
@@ -25,7 +30,8 @@ export default function RentTab(props) {
     handleCallUser, resolveTenantUserId, setActiveTab, t, openMarkPaid, ledgerYear, setLedgerYear,
     rentUnitsOf, getMonthCollectionSummary, enumerateLeaseMonths, getRentStatus, monthKey,
     monthFullLabel, monthShortLabel, getDueDate, parseMonthKey, formatBDT, formatDate,
-    computeBookingStatus, daysUntilNextDue, computeLeaseStage
+    computeBookingStatus, daysUntilNextDue, computeLeaseStage,
+    sendRentReminder, openTenantProfile, openChatPanel, setActiveModal, exportRentCsv, isPremium
   } = props;
 
           const todayDate = today;

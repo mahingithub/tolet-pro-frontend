@@ -1,11 +1,12 @@
 import React from 'react';
-import { RefreshCw, AlertCircle, Search, ArrowUpDown, ArrowUpRight, Lock, Building2, MapPin, Edit3, Settings, PlayCircle, PauseCircle, TrendingUp, Sparkles, Megaphone, MoreVertical, BadgeCheck, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, AlertCircle, Search, ArrowUpDown, ArrowUpRight, Lock, Building2, MapPin, Edit3, Settings, PlayCircle, PauseCircle, TrendingUp, Sparkles, Megaphone, MoreVertical, BadgeCheck, CheckCircle2, Clock, Bed, Bath, Maximize2, Sofa, Zap, FileText, Trash2 } from 'lucide-react';
 
 export default function PropertiesTab({
   activeTab, t, language, properties, isPropertiesLoading, propertyLoadError, retryLoadProperties,
-  filteredPropertiesByStatus, propertyFilter, setPropertyFilter, showToast, handleBoost, 
-  togglePropertyStatus, handleDeleteProperty, openModal, setActiveTab, navigate, isRecent, 
-  rentedDaysLeft, getRoomTypes, firstRoomTypeId, formatBDT, formatDate, roomLabel, userData
+  filteredPropertiesByStatus, propertyFilter, setPropertyFilter, showToast, handleBoost,
+  togglePropertyStatus, handleDeleteProperty, openModal, setActiveTab, navigate, isRecent,
+  rentedDaysLeft, getRoomTypes, firstRoomTypeId, formatBDT, formatDate, roomLabel, userData,
+  showBoostButton, boostStatus, boostingId
 }) {
   return (
 <div className="animate-in fade-in zoom-in-95 duration-500">

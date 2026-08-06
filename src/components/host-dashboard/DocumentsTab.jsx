@@ -1,11 +1,11 @@
 import React from 'react';
-import { FileText, ScanFace, Receipt, Scale, Folder, Search, Filter, Trash2, Eye, Download, ChevronRight, ArrowLeft, Upload } from 'lucide-react';
+import { FileText, ScanFace, Receipt, Scale, Folder, Search, Filter, Trash2, Eye, Download, ChevronRight, ArrowLeft, Upload, File, CheckCircle, X } from 'lucide-react';
 
 export default function DocumentsTab({
   activeTab, t, language, today, bookings, properties, documents,
   leaseStageFilter, setLeaseStageFilter, activeFolder, setActiveFolder,
   searchQuery, setSearchQuery, openModal, handleDocDownload, handleDocPreview,
-  handleDocDelete, formatDate, computeLeaseStage
+  handleDocDelete, formatDate, computeLeaseStage, uploadedDocs = {}
 }) {
 const todayDate = today;
 

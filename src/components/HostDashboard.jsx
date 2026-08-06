@@ -4017,7 +4017,7 @@ const HostDashboard = () => {
             setLeaseStageFilter={setLeaseStageFilter} activeFolder={activeFolder} setActiveFolder={setActiveFolder}
             searchQuery={searchQuery} setSearchQuery={setSearchQuery} openModal={openModal}
             handleDocDownload={handleDocDownload} handleDocPreview={handleDocPreview} handleDocDelete={handleDocDelete}
-            formatDate={formatDate} computeLeaseStage={computeLeaseStage}
+            formatDate={formatDate} computeLeaseStage={computeLeaseStage} uploadedDocs={uploadedDocs}
           />
         )}
 \n
@@ -4056,7 +4056,7 @@ const HostDashboard = () => {
             cutInquiry={cutInquiry} openConvertInquiry={openConvertInquiry} hostRespondVisit={hostRespondVisit}
             markInquirySeen={markInquirySeen} inqSeen={inqSeen} setInqSeen={setInqSeen} openChatPanel={openChatPanel}
             handleCallUser={handleCallUser} openTenantProfile={openTenantProfile} showToast={showToast}
-            isInquiryUnread={isInquiryUnread}
+            isInquiryUnread={isInquiryUnread} openModal={openModal}
           />
         )}
 \n        
@@ -4185,6 +4185,12 @@ const HostDashboard = () => {
             computeBookingStatus={computeBookingStatus}
             daysUntilNextDue={daysUntilNextDue}
             computeLeaseStage={computeLeaseStage}
+            sendRentReminder={sendRentReminder}
+            openTenantProfile={openTenantProfile}
+            openChatPanel={openChatPanel}
+            setActiveModal={setActiveModal}
+            exportRentCsv={exportRentCsv}
+            isPremium={isPremium}
           />
         )}
         {/* 🔴 PROPERTIES GRID (Only for 'properties' tab) */}
@@ -4199,6 +4205,7 @@ const HostDashboard = () => {
              setActiveTab={setActiveTab} navigate={navigate} isRecent={isRecent}
              rentedDaysLeft={rentedDaysLeft} getRoomTypes={getRoomTypes} firstRoomTypeId={firstRoomTypeId}
              formatBDT={formatBDT} formatDate={formatDate} roomLabel={roomLabel} userData={userData}
+             showBoostButton={showBoostButton} boostStatus={boostStatus} boostingId={boostingId}
           />
         )}
 \n
