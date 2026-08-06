@@ -41,6 +41,7 @@ import CallDetailModal from './CallDetailModal';
 import MessageActionsMenu from './MessageActionsMenu';
 import BlockUserModal from './BlockUserModal';
 import ChatPinLock from './ChatPinLock';
+import VideoModal from './shared/VideoModal';
 // ── WhatsApp-style header menu, contact/mute/report modals + reactions ──────
 import ChatHeaderMenu from './ChatHeaderMenu';
 import ViewContactModal from './ViewContactModal';
@@ -102,6 +103,9 @@ const hashPin = (pin) => {
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   return String(h);
 };
+// Backend base URL — same resolution the rest of the app uses.
+const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
+
 const CHAT_LOCKS_KEY = 'tolet_chat_locks';
 const HIDDEN_MSGS_KEY = 'tolet_hidden_msgs';   // messages the user removed "for me"
 
@@ -129,37 +133,6 @@ const initialChats = [
     pinned: true,
   },
 ];
-
-// ─── Local rule-based bot. Kept verbatim from previous version so the floating
-//     GlobalAIAssistant hand-off keeps working. Swap with backend later. ─────
-const getBotReply = (text) => {
-  const lower = (text || '').toLowerCase();
-  if (!lower.trim()) {
-    return "I'm here whenever you're ready. Ask me about properties, rent, tours, or how to contact a landlord.";
-  }
-  if (/(hi|hello|hey|salam|assalam|হ্যালো|হাই)/i.test(lower)) {
-    return "Hi! 👋 I'm the TO-LET PRO AI Assistant. I can help you find properties, schedule a tour, understand rent, or contact a landlord. What would you like to do?";
-  }
-  if (/(rent|ভাড়া|payment|পেমেন্ট|due|বকেয়া)/i.test(lower)) {
-    return "For rent and payment questions: open your dashboard → 'Payments' (tenant) or 'Rent Collection' (host). Receipts arrive automatically when the landlord marks a month as paid. Need anything specific?";
-  }
-  if (/(tour|visit|ভিজিট|দেখ|appointment)/i.test(lower)) {
-    return "To schedule a tour, open the property page and tap 'Request Tour'. The host gets notified instantly and approved tours appear in your dashboard's 'Upcoming Tours' section.";
-  }
-  if (/(contact|landlord|host|বাড়িওয়ালা|message)/i.test(lower)) {
-    return "Tap 'Contact Host' on any property card or use the Messages tab from your dashboard. You can chat, voice-call, or video-call them from here.";
-  }
-  if (/(property|properties|flat|apartment|house|home|প্রপার্টি|বাসা|ফ্ল্যাট)/i.test(lower)) {
-    return "We've got listings across Dhaka — Gulshan, Banani, Dhanmondi, Uttara, Mirpur and more. Use the Explore page filters (price, BHK, location) to narrow down. Want me to open Explore for you?";
-  }
-  if (/(price|cost|budget|দাম)/i.test(lower)) {
-    return "Prices vary widely: studios from ৳18,000, family flats ৳35,000–৳1,20,000, premium suites ৳2,50,000+. Tell me your budget and area — I'll suggest options.";
-  }
-  if (/(thanks|thank you|ধন্যবাদ)/i.test(lower)) {
-    return "You're welcome! Anything else I can help with? 🙂";
-  }
-  return "Got it. I'm still learning, but I can help with: 🏠 finding properties · 💸 rent & payments · 📅 tours · 📞 contacting landlords. Try asking about one of those.";
-};
 
 // ─── Smart-reply chips. Rule-based for now; the chip array is shaped exactly
 //     like an LLM completion would deliver, so swapping in /api/ai/replies
@@ -513,6 +486,9 @@ const ChatSystem = () => {
   });
   // Latest message timestamp per backend conversation — used for delta polling.
   const latestMessageIso = useRef({});
+  // Live mirror of `messages` so stable callbacks can read the latest stream
+  // without taking it as a dependency.
+  const messagesRef = useRef({});
 
   const [activeChatId, setActiveChatId] = useState('ai-bot');
   const activeChat = chats.find(c => c.id === activeChatId) || initialChats[0];
@@ -523,6 +499,8 @@ const ChatSystem = () => {
   const [muted, setMuted] = useState(false);
   const [inputText, setInputText] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
+  // Walkthrough video the AI attached to a reply, opened in VideoModal.
+  const [aiVideo, setAiVideo] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSidebarMobile, setShowSidebarMobile] = useState(true);
@@ -607,6 +585,9 @@ const ChatSystem = () => {
     } catch { /* ignore */ }
     return { 'ai-bot': [] };
   });
+
+  // Keep the ref in lockstep with state (see messagesRef declaration above).
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
 
   // Sync to localStorage for instant hydration on next mount
   useEffect(() => {
@@ -1299,13 +1280,13 @@ const ChatSystem = () => {
     }
   }, [refreshCallHistory]);
 
-  // Send message — AI bot stays local, real chats POST to /api/conversations/:id/messages.
+  // Send message — AI bot calls /api/ai-chat/ask (Gemini), real chats POST to /api/conversations/:id/messages.
   const sendMessageTo = useCallback(async (chatId, text, opts = {}) => {
     if (!text || !text.trim()) return;
     const trimmed = text.trim();
     const chat = chats.find(c => c.id === chatId);
 
-    // AI bot — client-side only.
+    // AI bot — call the real Gemini backend (same as GlobalAIAssistant).
     if (chat?.isAI) {
       const userMsg = {
         id: Date.now(),
@@ -1316,12 +1297,73 @@ const ChatSystem = () => {
       };
       setMessages(prev => ({ ...prev, [chatId]: [...(prev[chatId] || []), userMsg] }));
       setIsBotTyping(true);
-      const reply = getBotReply(trimmed);
-      setTimeout(() => {
+
+      try {
+        const uiLang = language === 'বাংলা' ? 'bn' : 'en';
+        // Read from the ref so this callback doesn't have to depend on
+        // `messages` (which changes on every keystroke-send and would rebuild
+        // sendMessageTo — and every child bound to it — constantly).
+        const historyPayload = (messagesRef.current[chatId] || [])
+          .filter(m => m.text && m.sender)
+          .slice(-15)
+          .map(m => ({ sender: m.sender === 'me' ? 'user' : 'ai', text: m.text }));
+
+        const token = getCurrentToken();
+        const response = await fetch(`${API}/ai-chat/ask`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ text: trimmed, history: historyPayload, language: uiLang }),
+        });
+
+        if (response.status === 401) {
+          const botMsg = {
+            id: Date.now() + 1,
+            sender: 'bot',
+            text: 'AI চ্যাট ব্যবহার করতে প্রথমে লগইন করুন। 🙏\n(Please sign in to use the AI chat.)',
+            iso: new Date().toISOString(),
+          };
+          setMessages(prev => ({ ...prev, [chatId]: [...(prev[chatId] || []), botMsg] }));
+          setIsBotTyping(false);
+          setMessages(prev => ({
+            ...prev,
+            [chatId]: (prev[chatId] || []).map(m => m.id === userMsg.id ? { ...m, status: 'read' } : m),
+          }));
+          return;
+        }
+
+        if (!response.ok) throw new Error('API Error');
+
+        const data = await response.json();
         const botMsg = {
           id: Date.now() + 1,
           sender: 'bot',
-          text: reply,
+          text: data.text || 'দুঃখিত, এই মুহূর্তে উত্তরটি দিতে পারছি না।',
+          iso: new Date().toISOString(),
+          // Attach property cards if the AI found listings.
+          properties: Array.isArray(data.properties) && data.properties.length ? data.properties : undefined,
+          // In-app action buttons (e.g. "Add Property").
+          actions: Array.isArray(data.actions) && data.actions.length ? data.actions : undefined,
+          // Video guide button.
+          videoGuide: data.videoGuide || undefined,
+        };
+        setMessages(prev => ({ ...prev, [chatId]: [...(prev[chatId] || []), botMsg] }));
+        setIsBotTyping(false);
+        setMessages(prev => ({
+          ...prev,
+          [chatId]: (prev[chatId] || []).map(m => m.id === userMsg.id ? { ...m, status: 'read' } : m),
+        }));
+      } catch (err) {
+        console.error('AI Chat Error:', err);
+        const fallback = language === 'বাংলা'
+          ? 'সার্ভারের সাথে সংযোগ করা যাচ্ছে না। 🙏 ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।'
+          : "We couldn't reach the server. 🙏 Please check your connection and try again.";
+        const botMsg = {
+          id: Date.now() + 1,
+          sender: 'bot',
+          text: fallback,
           iso: new Date().toISOString(),
         };
         setMessages(prev => ({ ...prev, [chatId]: [...(prev[chatId] || []), botMsg] }));
@@ -1330,7 +1372,7 @@ const ChatSystem = () => {
           ...prev,
           [chatId]: (prev[chatId] || []).map(m => m.id === userMsg.id ? { ...m, status: 'read' } : m),
         }));
-      }, 700 + Math.min(trimmed.length * 18, 1400));
+      }
       return;
     }
 
@@ -1386,7 +1428,7 @@ const ChatSystem = () => {
         ),
       }));
     }
-  }, [chats]);
+  }, [chats, language]);
 
   // Create a chat row on the fly when a new chatId arrives via state.
   const ensureChat = useCallback((s) => {
@@ -2727,16 +2769,90 @@ const ChatSystem = () => {
               // whole list no longer re-renders when the long-press action sheet
               // opens (menuState is not one of its props), which kills the
               // long-press stutter. All its callbacks are useCallback-stable.
+              // AI replies can carry live property cards, in-app navigation
+              // buttons and one walkthrough video (see /api/ai-chat/ask).
+              const hasAttachments = !mine && (m.properties?.length || m.actions?.length || m.videoGuide);
+
               return (
-                <ChatMessageBubble
-                  key={m.id}
-                  m={m}
-                  currentUserId={currentUserId}
-                  onOpenMenu={openMessageMenu}
-                  onOpenReactions={openReactions}
-                  onReply={handleReply}
-                  onMediaClick={openLightbox}
-                />
+                <React.Fragment key={m.id}>
+                  <ChatMessageBubble
+                    m={m}
+                    currentUserId={currentUserId}
+                    onOpenMenu={openMessageMenu}
+                    onOpenReactions={openReactions}
+                    onReply={handleReply}
+                    onMediaClick={openLightbox}
+                  />
+
+                  {hasAttachments && (
+                    <div className="flex justify-start mb-3">
+                      <div className="max-w-[85%] sm:max-w-[420px] space-y-2">
+                        {m.properties?.map((p) => (
+                          <button
+                            key={p.id}
+                            onClick={() => navigate(`/properties/${p.id}`)}
+                            className="w-full text-left flex gap-3 items-center bg-white border border-gray-100 rounded-2xl p-2.5 shadow-[0_6px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(186,0,54,0.14)] transition-all"
+                          >
+                            {p.coverPhoto ? (
+                              <img
+                                src={p.coverPhoto}
+                                alt={p.title}
+                                loading="lazy"
+                                className="w-16 h-16 rounded-xl object-cover shrink-0 bg-gray-100"
+                              />
+                            ) : (
+                              <span className="w-16 h-16 rounded-xl bg-gray-100 text-gray-300 flex items-center justify-center shrink-0">
+                                <ImageIcon size={18} />
+                              </span>
+                            )}
+                            <span className="flex-1 min-w-0">
+                              <span className="block text-[11px] font-black text-gray-900 line-clamp-1">{p.title}</span>
+                              {p.location && (
+                                <span className="block text-[10px] font-bold text-gray-500 line-clamp-1 mt-0.5">{p.location}</span>
+                              )}
+                              <span className="flex items-center gap-2 mt-1">
+                                {p.price != null && (
+                                  <span className="text-[11px] font-black text-[#ba0036]">{formatBDT(p.price)}</span>
+                                )}
+                                {(p.beds != null || p.baths != null) && (
+                                  <span className="text-[10px] font-bold text-gray-400">
+                                    {[p.beds != null ? `${p.beds} ${isBn ? 'বেড' : 'bed'}` : null,
+                                      p.baths != null ? `${p.baths} ${isBn ? 'বাথ' : 'bath'}` : null]
+                                      .filter(Boolean).join(' · ')}
+                                  </span>
+                                )}
+                              </span>
+                            </span>
+                            <ChevronRight size={14} className="text-gray-300 shrink-0" />
+                          </button>
+                        ))}
+
+                        {(m.actions?.length || m.videoGuide) && (
+                          <div className="flex flex-wrap gap-2">
+                            {m.actions?.map((a) => (
+                              <button
+                                key={a.route}
+                                onClick={() => navigate(a.route)}
+                                className="px-3.5 py-2 rounded-full bg-[#ba0036] text-white text-[11px] font-black shadow-[0_6px_16px_rgba(186,0,54,0.25)] hover:bg-[#a30030] transition-colors"
+                              >
+                                {a.label}
+                              </button>
+                            ))}
+                            {m.videoGuide?.videoUrl && (
+                              <button
+                                onClick={() => setAiVideo(m.videoGuide)}
+                                className="px-3.5 py-2 rounded-full bg-gray-900 text-white text-[11px] font-black inline-flex items-center gap-1.5 hover:bg-black transition-colors"
+                              >
+                                <Video size={12} />
+                                {isBn ? 'ভিডিও দেখুন' : 'Watch'}: {m.videoGuide.title}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </React.Fragment>
               );
             })}
 
@@ -3161,6 +3277,14 @@ const ChatSystem = () => {
         name={activeChat?.name}
         onCancel={() => setShowBlockModal(false)}
         onConfirm={(reason) => blockChat(reason)}
+      />
+
+      {/* Walkthrough video the AI attached to a reply */}
+      <VideoModal
+        isOpen={!!aiVideo}
+        videoUrl={aiVideo?.videoUrl}
+        title={aiVideo?.title}
+        onClose={() => setAiVideo(null)}
       />
 
       {/* WhatsApp-style "Contact info" (opened by tapping the header avatar/name) */}

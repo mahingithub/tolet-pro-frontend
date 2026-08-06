@@ -3525,16 +3525,6 @@ const HostDashboard = () => {
                             </p>
                           </div>
                         </div>
-                        <div className="mt-1 md:hidden shrink-0">
-                          <div className="w-fit px-3 py-2 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-lg shadow-emerald-500/20">
-                            {language === 'বাংলা' ? 'সেট আপ করুন' : 'Set Up Now'} <ArrowUpRight size={14} />
-                          </div>
-                        </div>
-                        <div className="hidden md:flex shrink-0">
-                          <div className="px-4 py-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white text-xs font-black uppercase tracking-widest flex items-center gap-2 group-hover:scale-105 transition-transform shadow-lg shadow-emerald-500/20">
-                            {language === 'বাংলা' ? 'সেট আপ করুন' : 'Set Up Now'} <ArrowUpRight size={16} />
-                          </div>
-                        </div>
                       </div>
                     </div>
                   )
@@ -3588,33 +3578,24 @@ const HostDashboard = () => {
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTrialModalOpen(true); } }}
-                  className="group cursor-pointer bg-gradient-to-br from-amber-50 to-yellow-50/60 dark:from-amber-950/30 dark:to-yellow-950/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl md:rounded-[1.5rem] p-3.5 md:p-4 shadow-[0_4px_25px_rgba(245,158,11,0.12)] hover:shadow-[0_12px_35px_rgba(245,158,11,0.20)] hover:-translate-y-0.5 transition-all flex flex-col"
+                  className="group cursor-pointer bg-white dark:bg-gray-900/40 border border-amber-200 dark:border-amber-500/30 rounded-2xl md:rounded-[1.5rem] p-4 md:p-5 shadow-[0_4px_25px_rgba(245,158,11,0.08)] hover:shadow-[0_12px_35px_rgba(245,158,11,0.15)] hover:-translate-y-0.5 transition-all flex flex-col gap-4 w-full max-w-[320px]"
                 >
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 h-full">
-                    <div className="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-4 flex-1 min-w-0">
-                      <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl md:rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-[0_8px_20px_-6px_rgba(245,158,11,0.7)]">
-                        <Crown size={20} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
-                      </div>
-                      <div className="flex flex-col gap-1 md:gap-0.5 flex-1 min-w-0">
-                        <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight">
-                          {language === 'বাংলা' ? '২ মাসের ফ্রি প্রো ট্রায়াল নিন' : 'Get 2 Months of Pro — Free'}
-                        </h3>
-                        <p className="text-[11px] md:text-xs font-bold text-amber-700 dark:text-amber-300/90 leading-relaxed md:truncate">
-                          {language === 'বাংলা'
-                            ? 'অ্যাপের লিংক শেয়ার করলেই ৫০টি ছবি, ভিডিও ট্যুর আর সার্চে শীর্ষ অবস্থান আনলক।'
-                            : 'Share the app link to unlock 50 photos, video tours and top search position.'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-1 md:hidden shrink-0">
-                      <div className="w-fit px-3 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-lg shadow-orange-500/20">
-                        {language === 'বাংলা' ? 'ফ্রি নিন' : 'Claim Free'} <ArrowUpRight size={14} />
-                      </div>
-                    </div>
-                    <div className="hidden md:flex shrink-0">
-                      <div className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-black uppercase tracking-widest flex items-center gap-2 group-hover:scale-105 transition-transform shadow-lg shadow-orange-500/20">
-                        {language === 'বাংলা' ? 'ফ্রি নিন' : 'Claim Free'} <ArrowUpRight size={16} />
-                      </div>
+                  <div className="w-12 h-12 shrink-0 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-[0_8px_20px_-6px_rgba(245,158,11,0.7)]">
+                    <Crown size={24} strokeWidth={2.2} />
+                  </div>
+                  <div className="flex flex-col gap-1.5 flex-1">
+                    <h3 className="text-base font-black text-gray-900 dark:text-white leading-tight">
+                      {language === 'বাংলা' ? '২ মাসের ফ্রি প্রো ট্রায়াল নিন' : 'Get 2 Months of Pro — Free'}
+                    </h3>
+                    <p className="text-xs font-bold text-amber-600 dark:text-amber-500 leading-relaxed">
+                      {language === 'বাংলা'
+                        ? 'অ্যাপের লিংক শেয়ার করলেই ৫০টি ছবি, ভিডিও ট্যুর আর সার্চে শীর্ষ অবস্থান আনলক।'
+                        : 'Share the app link to unlock 50 photos, video tours and top search position.'}
+                    </p>
+                  </div>
+                  <div className="mt-1">
+                    <div className="w-fit px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-black uppercase tracking-widest flex items-center gap-2 group-hover:scale-105 transition-transform shadow-lg shadow-orange-500/20">
+                      {language === 'বাংলা' ? 'ফ্রি নিন' : 'CLAIM FREE'} <ArrowUpRight size={16} />
                     </div>
                   </div>
                 </div>

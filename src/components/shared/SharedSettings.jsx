@@ -205,8 +205,8 @@ const TimeRange = ({ from, until, onFrom, onUntil, bn }) => (
 );
 
 // ─── Scope + master-detail primitives ─────────────────────────────────────────
-const ScopeHeader = ({ icon: Icon, title, subtitle }) => (
-  <div className="flex items-center gap-3 mt-10 mb-4 first:mt-2">
+const ScopeHeader = ({ icon: Icon, title, subtitle, className = '' }) => (
+  <div className={`flex items-center gap-3 mb-4 ${className}`}>
     <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#ba0036] to-[#7c0026] text-white flex items-center justify-center shrink-0 shadow-[0_8px_20px_-8px_rgba(186,0,54,0.7)]">
       <Icon size={17} />
     </span>
@@ -285,7 +285,7 @@ const AccordionCard = ({ icon: Icon, title, subtitle, defaultOpen, children }) =
  * and a stacked accordion on mobile. `categories` is an array of
  * { id, icon, title, subtitle, content } (content is ready-to-render JSX).
  */
-const SettingsScope = ({ icon, title, subtitle, categories }) => {
+const SettingsScope = ({ icon, title, subtitle, categories, isFirst }) => {
   const ids = categories.map((c) => c.id).join('|');
   const [activeId, setActiveId] = useState(categories[0]?.id);
   // If the category set changes (role toggles) and the active one vanished,
@@ -299,23 +299,24 @@ const SettingsScope = ({ icon, title, subtitle, categories }) => {
   if (!categories.length) return null;
 
   return (
-    <>
-      <ScopeHeader icon={icon} title={title} subtitle={subtitle} />
-
+    <div className={isFirst ? "mt-6" : "mt-12"}>
       {/* Desktop: master-detail */}
       <div className="hidden lg:grid lg:grid-cols-[340px_minmax(0,1fr)] gap-6 items-start">
-        <nav className="flex flex-col gap-2.5" aria-label={title}>
-          {categories.map((cat) => (
-            <CategoryNavButton
-              key={cat.id}
-              icon={cat.icon}
-              title={cat.title}
-              subtitle={cat.subtitle}
-              active={cat.id === active?.id}
-              onClick={() => setActiveId(cat.id)}
-            />
-          ))}
-        </nav>
+        <div className="flex flex-col">
+          <ScopeHeader icon={icon} title={title} subtitle={subtitle} />
+          <nav className="flex flex-col gap-2.5" aria-label={title}>
+            {categories.map((cat) => (
+              <CategoryNavButton
+                key={cat.id}
+                icon={cat.icon}
+                title={cat.title}
+                subtitle={cat.subtitle}
+                active={cat.id === active?.id}
+                onClick={() => setActiveId(cat.id)}
+              />
+            ))}
+          </nav>
+        </div>
         <section className="tp-topline relative bg-white/95 backdrop-blur-xl rounded-2xl border border-gray-100 ring-1 ring-black/5 shadow-[0_24px_70px_-34px_rgba(15,23,42,0.5)] overflow-hidden">
           {active && (
             <div key={active.id} className="animate-tp-fade-in">
@@ -327,14 +328,17 @@ const SettingsScope = ({ icon, title, subtitle, categories }) => {
       </div>
 
       {/* Mobile: accordion */}
-      <div className="lg:hidden grid gap-4">
-        {categories.map((cat, i) => (
-          <AccordionCard key={cat.id} icon={cat.icon} title={cat.title} subtitle={cat.subtitle} defaultOpen={i === 0}>
-            {cat.content}
-          </AccordionCard>
-        ))}
+      <div className="lg:hidden flex flex-col">
+        <ScopeHeader icon={icon} title={title} subtitle={subtitle} />
+        <div className="grid gap-4">
+          {categories.map((cat, i) => (
+            <AccordionCard key={cat.id} icon={cat.icon} title={cat.title} subtitle={cat.subtitle} defaultOpen={i === 0}>
+              {cat.content}
+            </AccordionCard>
+          ))}
+        </div>
       </div>
-    </>
+    </div>
   );
 };
 
@@ -815,6 +819,7 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
           title={bn ? 'অ্যাপ সেটিংস' : 'App settings'}
           subtitle={bn ? 'পুরো অ্যাকাউন্টে প্রযোজ্য' : 'Apply to your whole account'}
           categories={appCategories}
+          isFirst={true}
         />
 
         {isTenant && (
