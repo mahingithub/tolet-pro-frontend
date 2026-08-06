@@ -410,7 +410,7 @@ function PaymentMethodFormModal({ method, language, onClose, onSaved }) {
           </button>
         </div>
 
-        <form onSubmit={submit} className="p-6 overflow-y-auto custom-scrollbar space-y-4">
+        <form onSubmit={submit} className="p-6 pb-28 sm:pb-6 overflow-y-auto custom-scrollbar space-y-4">
           {/* Type selector — multi-select in add mode (one number ⇒ many wallets) */}
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
