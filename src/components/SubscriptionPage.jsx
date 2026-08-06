@@ -144,8 +144,8 @@ const SubscriptionPage = () => {
           </h1>
           <p className="text-slate-600 dark:text-slate-400 text-sm md:text-base max-w-3xl mx-auto mb-4 leading-relaxed">
             {isBn
-              ? 'খাতা-কলমের হিসাব বাদ দিন! কে ভাড়া দিয়েছে, কে দেয়নি তার স্মার্ট রিমাইন্ডার এবং হিসাব রাখুন। ভেরিফাইড ভাড়াটিয়া খুঁজুন এবং খুব সহজেই সব ম্যানেজ করুন। বাড়িওয়ালা হিসেবে শুরু করলেই ২ মাস Pro সাবস্ক্রিপশন সম্পূর্ণ ফ্রি!'
-              : 'Keep track of who paid rent with smart reminders. Find verified tenants and manage everything easily. Every new landlord gets 2 months of Pro absolutely free!'}
+              ? 'খাতা-কলমের হিসাব বাদ দিন! কে ভাড়া দিয়েছে, কে দেয়নি তার স্মার্ট রিমাইন্ডার এবং হিসাব রাখুন। ভেরিফাইড ভাড়াটিয়া খুঁজুন এবং খুব সহজেই সব ম্যানেজ করুন।'
+              : 'Keep track of who paid rent with smart reminders. Find verified tenants and manage everything easily.'}
           </p>
 
           {/* Video Guides Row (if any uploaded by admin) */}
@@ -265,11 +265,6 @@ const SubscriptionPage = () => {
                   ৳{billingCycle === 'year' ? '599' : '49'}
                 </span>
                 <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">/{billingCycle === 'year' ? 'yr' : 'mo'}</span>
-              </div>
-              {/* The launch trial grants PRO, so the free-months badge belongs
-                  on this card — it used to sit on the Plus card. */}
-              <div className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 rounded w-max">
-                {isBn ? 'নতুন বাড়িওয়ালাদের প্রথম ২ মাস ফ্রি!' : 'First 2 months free for new landlords!'}
               </div>
             </div>
             

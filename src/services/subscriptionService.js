@@ -9,7 +9,7 @@ import { broadcast, subscribe as subscribeKey } from './_storage.js';
 const KEY_SUBSCRIPTION = 'subscription:update';
 const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
 
-let cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed: false };
+let cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed: false, everPaid: false, planState: 'free_never' };
 
 export const PREMIUM_FEATURES = [
   'analytics',
@@ -117,36 +117,67 @@ async function call(path, { method = 'GET', body } = {}) {
   return data;
 }
 
+/**
+ * Collapse the cached status into the ONE state the UI branches on, so the
+ * dashboard and the listing wizard can never disagree about what to offer:
+ *
+ *   'paid_active'  — live paid plan            → nothing to prompt
+ *   'trial_active' — share trial running       → nothing to prompt
+ *   'paid_expired' — a paid period lapsed      → "Renew Your Plan"  → /subscription
+ *   'trial_lapsed' — share trial spent + over  → "Upgrade to Pro"   → /subscription
+ *   'free_never'   — never claimed, never paid → the share-trial offer
+ *
+ * Order matters: someone who used the share trial and LATER paid should be
+ * asked to renew, not re-offered a reward the server would refuse.
+ */
+function derivePlanState(s) {
+  if (s.isPaid && !s.isExpired) return 'paid_active';
+  if (s.isTrial) return 'trial_active';
+  if (s.everPaid) return 'paid_expired';
+  if (s.shareTrialClaimed) return 'trial_lapsed';
+  return 'free_never';
+}
+
 function updateCache(dbSub) {
   // Whether the one-time "share the app" Pro trial has already been taken.
   // Read off every branch below (including the free one) so the Free Pro Trial
   // CTA stays hidden after the reward has been used AND after it expires —
   // the reward is once per account, not once per free period.
   const shareTrialClaimed = !!dbSub?.shareTrialClaimedAt;
+  // Did money ever change hands? `currentPeriodEnd` is stamped only by
+  // checkout, so it's what separates "renew" from "upgrade" once a host is
+  // back on free.
+  const everPaid = !!dbSub?.currentPeriodEnd;
 
   if (!dbSub) {
-    cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed };
+    cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed, everPaid };
   } else if (dbSub.status === 'active' && dbSub.currentPeriodEnd) {
     const msLeft = new Date(dbSub.currentPeriodEnd).getTime() - Date.now();
     const daysRemaining = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
     const planDef = PLANS.find(p => p.id === dbSub.planId) || { id: dbSub.planId, name: { en: 'Pro', bn: 'প্রো' }, tier: 'pro' };
+    const live = daysRemaining > 0;
 
     cachedStatus = {
-      tier: planDef.tier || 'pro',
+      // A LAPSED paid period is free, not the tier they used to hold. This
+      // mirrors the server's tierOf() — without it the wizard would hand an
+      // expired payer Pro's 50-photo allowance and the API would then reject
+      // the listing at publish.
+      tier: live ? (planDef.tier || 'pro') : 'free',
       plan: { id: planDef.id, name: planDef.name, interval: planDef.interval },
-      isPaid: true,
+      isPaid: live,
       isTrial: false,
-      isExpired: daysRemaining === 0,
+      isExpired: !live,
       daysRemaining,
       paidThroughAt: dbSub.currentPeriodEnd,
       autoRenew: dbSub.autoRenew,
-      shareTrialClaimed
+      shareTrialClaimed,
+      everPaid
     };
   } else if (dbSub.status === 'trialing' && dbSub.trialEndsAt) {
     const msLeft = new Date(dbSub.trialEndsAt).getTime() - Date.now();
     const daysRemaining = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
     cachedStatus = {
-      // The launch trial grants full Pro for 2 months. The backend records
+      // The share trial grants full Pro for 2 months. The backend records
       // which tier it granted (Subscription.trialTier) instead of us assuming
       // — so a future "1 month of Plus" promo needs no frontend change.
       // An already-expired trial falls through to free below via daysRemaining.
@@ -157,7 +188,8 @@ function updateCache(dbSub) {
       isExpired: daysRemaining === 0,
       daysRemaining,
       trialEndsAt: dbSub.trialEndsAt,
-      shareTrialClaimed
+      shareTrialClaimed,
+      everPaid
     };
   } else {
     // No trial, no paid period — either a brand-new account (there is no
@@ -168,8 +200,9 @@ function updateCache(dbSub) {
     // badge, and showing that to someone who never had a trial reads as a
     // broken account. Only claim expiry when a period actually lapsed.
     const everHadPeriod = !!(dbSub.trialEndsAt || dbSub.currentPeriodEnd);
-    cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: everHadPeriod, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed };
+    cachedStatus = { tier: 'free', isPaid: false, isTrial: false, isExpired: everHadPeriod, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed, everPaid };
   }
+  cachedStatus.planState = derivePlanState(cachedStatus);
   broadcast(KEY_SUBSCRIPTION);
   return cachedStatus;
 }

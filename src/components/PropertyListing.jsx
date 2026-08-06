@@ -434,7 +434,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 	return (
 		<div onMouseEnter={() => onHover && onHover(property.id)} onMouseLeave={() => onHoverEnd && onHoverEnd()} className={`rounded-3xl border overflow-hidden flex flex-col md:flex-row hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] transition-all duration-500 group ${cardStyle} ${property.availabilityStatus === 'rented' ? 'opacity-60 grayscale-[50%]' : ''}`}>
 			<div className="w-full md:w-[280px] lg:w-[300px] h-[190px] md:h-auto shrink-0">
-				<div className="relative w-full h-full overflow-hidden flex gap-1.5 bg-gray-100">
+				<div className="relative w-full h-full overflow-hidden flex bg-gray-100">
 					<div className="relative w-[75%] h-full overflow-hidden cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
 						{coverImg ? (
 							<img src={coverImg} alt={property.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out" loading="lazy" decoding="async" />
@@ -501,7 +501,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 					    bathroom / living / kitchen / other) instead of downloading the whole gallery.
 					    Falls back to the flat images list only for older records that
 					    did not tag photos by room. */}
-					<div className="w-[25%] flex flex-col gap-1.5 h-full">
+					<div className="w-[25%] flex flex-col h-full">
 						{collageThumbs.map((shot, idx) => (
 							<div key={`${shot.room || "x"}-${idx}`} className="relative flex-1 overflow-hidden cursor-pointer bg-gray-200" onClick={() => navigate(`/property/${property.id}`)}>
 								<img src={shot.url} className="w-full h-full object-cover hover:opacity-80 transition-opacity duration-300" alt={shot.room ? roomLabel(shot.room, isBn) : ""} loading="lazy" decoding="async" />

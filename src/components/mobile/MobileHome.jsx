@@ -748,7 +748,7 @@ const PropertyCard = ({ property, t, landlord }) => {
         className={`rounded-[26px] overflow-hidden border active:scale-[0.995] transition-transform cursor-pointer ${cardStyle}`}
       >
         {/* IMAGE BLOCK — big image left, 3 thumbs right */}
-        <div className="relative grid grid-cols-[1.7fr_1fr] gap-1 bg-white">
+        <div className="relative grid grid-cols-[1.7fr_1fr] bg-white">
           {/* Primary image */}
           <div className="relative overflow-hidden bg-gray-100 aspect-[4/3.4]">
             <SafeImg
@@ -820,7 +820,7 @@ const PropertyCard = ({ property, t, landlord }) => {
           </div>
 
           {/* Right column — 3 stacked thumbs */}
-          <div className="grid grid-rows-3 gap-1">
+          <div className="grid grid-rows-3">
             {thumbs.map((shot, i) => {
               // Convert shot string (fallback) to object just in case
               const s = typeof shot === 'string' ? { url: shot, room: null } : shot;

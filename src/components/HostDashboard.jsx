@@ -3581,6 +3581,57 @@ const HostDashboard = () => {
               </div>
             )}
 
+            {/* 🔄 WIN-BACK — the two states where the host is back on Free but
+                has nothing left to claim. Both routes go to /subscription (the
+                existing bKash/Nagad checkout flow); only the wording differs,
+                because "Renew" is meaningless to someone who never paid and
+                "Upgrade" undersells a lapsed customer's history.
+
+                `planState` is derived once in subscriptionService so the
+                listing wizard branches on exactly the same value — see
+                AddProperty.jsx, which routes here instead of opening the
+                share-trial modal for these two states. */}
+            {(subStatus.planState === 'trial_lapsed' || subStatus.planState === 'paid_expired') && (() => {
+              const isRenewal = subStatus.planState === 'paid_expired';
+              const title = isRenewal
+                ? (language === 'বাংলা' ? 'আপনার প্ল্যান রিনিউ করুন' : 'Renew Your Plan')
+                : (language === 'বাংলা' ? 'প্রো-তে আপগ্রেড করুন' : 'Upgrade to Pro');
+              const blurb = isRenewal
+                ? (language === 'বাংলা'
+                    ? 'আপনার প্ল্যানের মেয়াদ শেষ — রিনিউ করে ছবি, ভিডিও ও টপ পজিশন আবার চালু করুন।'
+                    : 'Your plan has expired — renew to restore photos, videos and top position.')
+                : (language === 'বাংলা'
+                    ? 'আপনার ফ্রি ট্রায়াল শেষ — প্রো নিয়ে ৫০টি ছবি, ভিডিও ট্যুর আর টপ পজিশন ফিরে পান।'
+                    : 'Your free trial has ended — go Pro for 50 photos, video tours and top position.');
+              const cta = isRenewal
+                ? (language === 'বাংলা' ? 'রিনিউ করুন' : 'Renew')
+                : (language === 'বাংলা' ? 'আপগ্রেড' : 'Upgrade');
+              const go = () => navigate('/subscription?from=dashboard');
+
+              return (
+                <div
+                  onClick={go}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }}
+                  className="group cursor-pointer bg-gradient-to-br from-violet-50 to-indigo-50/60 border border-violet-200 rounded-[1.5rem] p-5 md:p-6 shadow-[0_4px_25px_rgba(99,102,241,0.10)] hover:shadow-[0_12px_35px_rgba(99,102,241,0.18)] hover:-translate-y-0.5 transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-[0_8px_20px_-6px_rgba(99,102,241,0.7)]">
+                      <Crown size={22} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base md:text-lg font-black text-gray-900 leading-tight">{title}</h3>
+                      <p className="text-[11px] md:text-xs font-bold text-violet-700/90 mt-0.5">{blurb}</p>
+                    </div>
+                    <span className="hidden sm:inline-flex items-center gap-1 bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest group-hover:translate-x-0.5 transition-transform shrink-0">
+                      {cta} <ArrowUpRight size={14} />
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* ১. Stats Bento Grid */}
             <div className="grid grid-cols-3 gap-3 md:gap-5">
               {[

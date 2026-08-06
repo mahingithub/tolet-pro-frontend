@@ -1439,14 +1439,29 @@ const AddProperty = () => {
   };
 
   /**
-   * Offer the trial. Returns false when the host isn't eligible (already on
-   * Plus/Pro, or already used their one claim) so callers can fall back to the
-   * plain "limit reached" toast.
+   * Handle a free-tier ceiling. Returns false only when there is nothing to
+   * offer (the host already holds Plus/Pro), so callers fall back to the plain
+   * "limit reached" toast.
+   *
+   * Two different destinations, keyed off the same `planState` the dashboard
+   * banners use:
+   *   • free_never  → the share-trial modal, the reward is still claimable
+   *   • trial_lapsed / paid_expired → /subscription, because the one-time
+   *     reward is spent and paying is the only way up. Opening a modal they
+   *     can't act on (the server would reject the claim) would be a dead end.
    */
   const offerFreeTrial = (reason) => {
-    if (!subscriptionService.canClaimShareTrial()) return false;
-    setTrialModal({ open: true, reason });
-    return true;
+    if (subscriptionService.canClaimShareTrial() && subscriptionStatus.planState === 'free_never') {
+      setTrialModal({ open: true, reason });
+      return true;
+    }
+    if (subscriptionStatus.planState === 'trial_lapsed' || subscriptionStatus.planState === 'paid_expired') {
+      // Nothing is queued for a resume — they're leaving the wizard.
+      pendingUploadRef.current = null;
+      navigate('/subscription?from=list-property');
+      return true;
+    }
+    return false;
   };
 
   const closeTrialModal = () => {
@@ -1461,6 +1476,11 @@ const AddProperty = () => {
 
   // Entry pitch — deferred until the real subscription status lands, so a Pro
   // host never sees a flash of the offer while the cache still says 'free'.
+  //
+  // Only 'free_never' gets pitched on entry. A lapsed host is NOT bounced to
+  // /subscription here: they came to list a property, and redirecting before
+  // they've typed anything would be hostile. They meet the upgrade prompt when
+  // a limit actually bites (offerFreeTrial above).
   const didOfferOnEntryRef = useRef(false);
   useEffect(() => {
     let alive = true;
@@ -1468,6 +1488,7 @@ const AddProperty = () => {
       if (!alive || didOfferOnEntryRef.current) return;
       if (trialSkippedThisSession()) return;
       if (!subscriptionService.canClaimShareTrial()) return;
+      if (subscriptionService.getStatus().planState !== 'free_never') return;
       didOfferOnEntryRef.current = true;
       setTrialModal({ open: true, reason: 'entry' });
     });
