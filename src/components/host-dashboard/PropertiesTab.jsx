@@ -381,12 +381,5 @@ export default function PropertiesTab({
       </div>
             )}
           </div>
-        )}
-
-        {/* ─────────────────────────────────────────────────────────────────
-            🔴 NEW TABS (Smart Alerts, AI Insights, Settings)
-            Help & Support links out to the shared /support page.
-            ───────────────────────────────────────────────────────────────── */}
-        {/* 🟢 PAYMENT SETTINGS TAB — V1 manual rent: pending verification + payout accounts */}
   );
 }

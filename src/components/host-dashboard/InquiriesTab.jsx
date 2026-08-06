@@ -395,20 +395,5 @@ export default function InquiriesTab({
               
             </div>
           </div>
-        )}      
-        
-        {/* ─────────────────────────────────────────────────────────────────
-            🔴 BOOKINGS TAB — Lease Management (agreement metadata only)
-            ─────────────────────────────────────────────────────────────────
-            The Bookings tab is now exclusively about the *contract* between
-            host and tenant: term length, move-in / expiry dates, deposits,
-            service charge, next payment date, and auto-reminder cadence.
-            Month-by-month rent collection (12-month matrix, mark-paid modal,
-            collection summaries, overdue list) lives on the new
-            `rent` tab — they share the same `bookings` state + helpers, so
-            both tabs always reflect the same source of truth. */}
-        {/* Combined section toggle — Booking ⇄ Rent Collection. Both views use
-            the same `bookings` state, so they share one sidebar entry with this
-            segmented switch pinned on top. */}
   );
 }

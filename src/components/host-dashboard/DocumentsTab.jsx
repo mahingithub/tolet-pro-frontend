@@ -351,9 +351,5 @@ const todayDate = today;
                 </main>
               </div>
             </div>
-          );
-        })()}
-
-        {/* 🔴 NEW: ANALYTICS OVERVIEW TAB */}
-        {/* 🔴 ANALYTICS OVERVIEW — futuristic, ledger-driven */}
+            );
 }

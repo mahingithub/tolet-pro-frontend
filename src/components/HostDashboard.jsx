@@ -25,6 +25,11 @@ import { listHostInquiries, updateInquiryStatus, deleteInquiry, replyToInquiry, 
 import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi, cancelBooking as cancelBookingApi, updateBookingSettings as updateBookingSettingsApi, updateMemberLedger as updateMemberLedgerApi, undoMemberLedger as undoMemberLedgerApi } from "../services/bookingService.js";
 import { getRoomTypes, firstRoomTypeId, roomLabel } from '../constants/roomCategories';
 import MembersManager from "./MembersManager.jsx";
+import DashboardTab from "./host-dashboard/DashboardTab";
+import ProfileTab from "./host-dashboard/ProfileTab";
+import PropertiesTab from "./host-dashboard/PropertiesTab";
+import DocumentsTab from "./host-dashboard/DocumentsTab";
+import InquiriesTab from "./host-dashboard/InquiriesTab";
 import BookingsTab from "./host-dashboard/BookingsTab";
 import RentTab from "./host-dashboard/RentTab";
 import AnalyticsTab from "./host-dashboard/AnalyticsTab";
