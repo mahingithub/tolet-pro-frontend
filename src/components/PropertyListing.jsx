@@ -655,6 +655,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 								e.stopPropagation();
 								onInquire(property);
 							}}
+							data-tour="inquiry-button"
 							className="flex-1 md:flex-none px-5 py-2.5 md:py-2 rounded-lg bg-brandRed hover:bg-[#a0002e] text-white text-[11px] font-black shadow-[0_8px_16px_rgba(186,0,54,0.18)] hover:shadow-[0_12px_24px_rgba(186,0,54,0.28)] hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-1.5 uppercase md:normal-case tracking-wider md:tracking-normal">
 							<MessageCircle size={13} />
 							{t.inquireBtn || "Inquire"}

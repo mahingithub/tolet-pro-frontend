@@ -2084,7 +2084,7 @@ const AddProperty = () => {
 
                 {/* ── INTENT SELECTOR ── */}
                 <Field label={isBn ? 'আপনি কী করতে চান?' : 'What are you listing for?'} required>
-                  <div className={`grid ${INTENT_CARD_COUNT >= 3 ? 'grid-cols-3' : 'grid-cols-2'} gap-3`}>
+                  <div className={`grid ${INTENT_CARD_COUNT >= 3 ? 'grid-cols-3' : 'grid-cols-2'} gap-3`} data-tour="property-intent">
                     {AVAILABLE_LISTING_INTENTS.map(({ id, label, labelBn, icon: Icon, desc, descBn, color, bg }) => (
                       <button key={id} type="button"
                         onClick={() => {
@@ -2224,6 +2224,7 @@ const AddProperty = () => {
                   hint={isBn ? 'আকর্ষণীয় এবং পরিষ্কার শিরোনাম দিন' : 'Give a clear, attractive title that stands out'}>
                   <input type="text"
                     className={`${inputCls} ${err('title') ? 'border-red-200 bg-red-50' : ''}`}
+                    data-tour="property-title"
                     placeholder={isBn ? 'যেমন: গুলশানে বিলাসবহুল ৩BHK অ্যাপার্টমেন্ট' : 'e.g. Luxurious 3BHK Apartment in Gulshan'}
                     value={form.title}
                     onChange={e => { set('title', e.target.value); setErrors(er => ({ ...er, title: false })); }}
@@ -2378,6 +2379,7 @@ const AddProperty = () => {
                     <MapPin size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
                     <input type="text"
                       className={`${inputCls} pl-10 ${err('location') ? 'border-red-200 bg-red-50' : ''}`}
+                      data-tour="property-location"
                       placeholder={isBn ? 'যেমন: রোড ১২, গুলশান ২, ঢাকা' : 'e.g. Road 12, Gulshan 2, Dhaka'}
                       value={form.location}
                       onChange={e => { set('location', e.target.value); setErrors(er => ({ ...er, location: false })); }}
@@ -2923,6 +2925,7 @@ const AddProperty = () => {
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-gray-400">৳</span>
                       <input type="number"
                         className={`${inputCls} pl-9 ${err('price') ? 'border-red-200 bg-red-50' : ''}`}
+                        data-tour="property-pricing"
                         placeholder={isBn ? currentIntentData.pricePlaceholderBn : currentIntentData.pricePlaceholder}
                         value={form.price}
                         onChange={e => { set('price', e.target.value); setErrors(er => ({ ...er, price: false })); }}

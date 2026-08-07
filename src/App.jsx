@@ -4,6 +4,7 @@ import { LanguageProvider } from "./context/LanguageContext";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { SettingsProvider } from "./context/SettingsContext.jsx";
 import { NotificationProvider } from "./context/NotificationContext.jsx";
+import { TourProvider } from "./context/TourContext.jsx";
 import callProvider from "./services/callProvider";
 import { getCurrentToken } from "./services/authService";
 import { listTenantBookings } from "./services/bookingService";
@@ -323,7 +324,9 @@ function App() {
 					<SettingsProvider>
 						<Router>
 							<NotificationProvider>
-								<AppLayout />
+								<TourProvider>
+									<AppLayout />
+								</TourProvider>
 							</NotificationProvider>
 						</Router>
 					</SettingsProvider>

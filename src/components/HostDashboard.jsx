@@ -75,6 +75,19 @@ const HOST_TABS = [
 // The landlord's home. Back from here leaves the dashboard entirely.
 const HOST_ROOT_TAB = 'dashboard';
 
+// `data-tour` anchors for the guided onboarding tour (see context/TourContext).
+// Only the tabs the host tour actually walks through are listed; anything else
+// resolves to undefined, which React drops from the DOM entirely.
+const TOUR_TAB_ANCHORS = {
+  dashboard:   'dashboard-tab',
+  documents:   'documents-tab',
+  inquiries:   'inquiries-tab',
+  bookings:    'bookings-tab',
+  payments:    'payments-tab',
+  smartAlerts: 'smart-alerts-tab',
+  aiInsights:  'ai-insights-tab',
+};
+
 // Payment channels offered when converting an inquiry into a booking / recording
 // an advance. Order matches the most-used mobile-money + bank rails in Bangladesh.
 const PAYMENT_METHODS = ['bKash', 'Nagad', 'Rocket', 'Bank Transfer', 'Cash'];
@@ -3285,7 +3298,7 @@ const HostDashboard = () => {
         </div>
 
         <div className="px-5 pb-2">
-          <Link to="/list-property" className="w-full relative group overflow-hidden bg-gray-900 text-white py-3 rounded-xl font-black text-xs shadow-md flex items-center justify-center gap-2 hover:shadow-[0_10px_20px_rgba(186,0,54,0.3)] hover:bg-[#ba0036] transition-all duration-500">
+          <Link to="/list-property" data-tour="add-property-button" className="w-full relative group overflow-hidden bg-gray-900 text-white py-3 rounded-xl font-black text-xs shadow-md flex items-center justify-center gap-2 hover:shadow-[0_10px_20px_rgba(186,0,54,0.3)] hover:bg-[#ba0036] transition-all duration-500">
             <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out"></div>
             <Plus size={16} className="relative z-10" /> <span className="relative z-10">{t?.newListing || (language === 'বাংলা' ? 'নতুন লিস্টিং যোগ করুন' : 'Add New Listing')}</span>
           </Link>
@@ -3317,6 +3330,7 @@ const HostDashboard = () => {
               <button
                 key={item.id}
                 onClick={handleClick}
+                data-tour={TOUR_TAB_ANCHORS[item.id]}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer font-bold text-xs text-left transition-all duration-300 ${isActive ? 'bg-red-50 text-[#ba0036]' : locked ? 'text-gray-400 hover:bg-amber-50/40' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}
                 title={locked ? (language === 'বাংলা' ? 'প্রিমিয়াম ফিচার — সাবস্ক্রাইব করুন' : 'Premium feature — subscribe to unlock') : undefined}
               >
