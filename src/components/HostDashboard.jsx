@@ -599,8 +599,6 @@ const HostDashboard = () => {
   // the TO-LET PRO logo asks whether to visit the public site or stay here
   // (see LandlordHomeChoiceModal at the bottom of the render).
   const [isLogoModalOpen, setIsLogoModalOpen] = useState(false);
-  const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
-  const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
 
   // 🟢 TOUR SUPPORT: Listen for global events to open/close the drawer programmatically
   useEffect(() => {
