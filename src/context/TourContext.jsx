@@ -761,6 +761,128 @@ export const TourProvider = ({ children }) => {
     }
   }, [isBn, hasTourCompleted]);
 
+  const startLivingTour = useCallback(async () => {
+    if (hasTourCompleted('living') || startingRef.current) return;
+    startingRef.current = true;
+    if (!(await waitForAnchor('[data-tour="living-header"]'))) {
+      startingRef.current = false;
+      return;
+    }
+
+    try {
+      const isMobile = window.innerWidth < 1024;
+      const steps = resolveSteps([
+        {
+          element: '[data-tour="living-header"]',
+          popover: {
+            title: isBn ? 'রুমমেট ওয়ালেট' : 'Roommate Wallet',
+            description: isBn
+              ? 'এখানে আপনি আপনার মেস বা ফ্ল্যাটের সব খরচ, মিলস এবং বিল ম্যানেজ করতে পারবেন।'
+              : 'Manage all your shared expenses, meals, and bills for your flat or mess here.',
+            side: 'bottom',
+            align: 'start',
+          },
+        },
+        {
+          element: isMobile ? '[data-tour="living-mobile-nav"]' : '[data-tour="living-desktop-nav"]',
+          popover: {
+            title: isBn ? 'নেভিগেশন মেনু' : 'Navigation Menu',
+            description: isBn
+              ? 'এখান থেকে আপনি খরচ, মিলস, বিলস এবং ব্যালেন্সের মাঝে নেভিগেট করতে পারবেন।'
+              : 'Navigate between Expenses, Meals, Bills, and Balances from here.',
+            side: isMobile ? 'top' : 'right',
+            align: 'center',
+          },
+        },
+        {
+          element: '[data-tour="living-content"]',
+          popover: {
+            title: isBn ? 'ওভারভিউ' : 'Overview',
+            description: isBn
+              ? 'আপনার মেসের বর্তমান খরচের একটি সারসংক্ষেপ এখানে দেখতে পাবেন।'
+              : 'See a quick summary of your current shared expenses here.',
+            side: 'top',
+            align: 'center',
+          },
+        },
+        {
+          element: '[data-tour="living-reminders"]',
+          popover: {
+            title: isBn ? 'রিমাইন্ডার' : 'Reminders',
+            description: isBn
+              ? 'যেকোনো বকেয়া বিল বা নোটিফিকেশন এখানে দেখতে পাবেন।'
+              : 'Check any due bills or notifications here.',
+            side: 'bottom',
+            align: 'end',
+          },
+        },
+        {
+          element: '[data-tour="living-add-roommate"]',
+          popover: {
+            title: isBn ? 'লোকাল রুমমেট যোগ করুন' : 'Add Local Roommate',
+            description: isBn
+              ? 'ম্যানুয়ালি রুমমেট যোগ করতে এখানে ক্লিক করুন (শুধু আপনার ফোনে হিসেব রাখার জন্য)।'
+              : 'Click here to manually add a roommate (for local tracking on your phone).',
+            side: 'top',
+            align: 'end',
+          },
+        },
+        {
+          element: '[data-tour="living-connect-roommates"]',
+          popover: {
+            title: isBn ? 'রুমমেট কানেক্ট বা জয়েন করুন' : 'Connect or Join Roommates',
+            description: isBn
+              ? 'নতুন শেয়ার্ড ওয়ালেট তৈরি করতে অথবা ইনভাইট কোড দিয়ে অন্য কারো ওয়ালেটে জয়েন করতে এখানে ক্লিক করুন।'
+              : 'Click here to create a shared wallet or join an existing one using an invite code.',
+            side: 'top',
+            align: 'center',
+          },
+        },
+        {
+          element: '[data-tour="living-profile"]',
+          popover: {
+            title: isBn ? 'প্রোফাইল' : 'Profile',
+            description: isBn
+              ? 'আপনার প্রোফাইল দেখতে বা এডিট করতে এখানে ক্লিক করুন।'
+              : 'Click here to view or edit your profile.',
+            side: 'bottom',
+            align: 'end',
+          },
+        },
+      ]);
+
+      if (!steps.length) {
+        startingRef.current = false;
+        return;
+      }
+
+      const driverObj = driver({
+        allowClose: true,
+        showProgress: true,
+        steps,
+        nextBtnText: isBn ? 'পরবর্তী' : 'Next',
+        prevBtnText: isBn ? 'পূর্ববর্তী' : 'Previous',
+        doneBtnText: isBn ? 'শেষ' : 'Done',
+        progressText: isBn ? '{{current}} এর {{total}}' : '{{current}} of {{total}}',
+        onDestroyed: () => {
+          markTourCompleted('living');
+          startingRef.current = false;
+          setActiveTour(null);
+          setDriverInstance(null);
+        },
+      });
+
+      setActiveTour('living');
+      setDriverInstance(driverObj);
+      driverObj.drive();
+    } catch (error) {
+      console.error('Failed to start living tour:', error);
+      startingRef.current = false;
+      setActiveTour(null);
+      setDriverInstance(null);
+    }
+  }, [isBn, hasTourCompleted]);
+
   // Store the role when welcome robot is triggered
   const [pendingTourRole, setPendingTourRole] = useState(null);
 
@@ -820,6 +942,17 @@ export const TourProvider = ({ children }) => {
     }
   }, [location.pathname, hasTourCompleted, activeTour, startHostDashboardTour]);
 
+  // Auto-start living tour for tenants arriving at /living
+  useEffect(() => {
+    if (
+      location.pathname === '/living' &&
+      !hasTourCompleted('living') &&
+      activeTour === null
+    ) {
+      startLivingTour();
+    }
+  }, [location.pathname, hasTourCompleted, activeTour, startLivingTour]);
+
 
   const value = {
     activeTour,
@@ -827,6 +960,7 @@ export const TourProvider = ({ children }) => {
     startHostTour,
     startHostDashboardTour,
     startAddPropertyTour,
+    startLivingTour,
     hasTourCompleted,
   };
 
