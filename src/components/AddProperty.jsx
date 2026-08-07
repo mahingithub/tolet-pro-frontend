@@ -2986,16 +2986,18 @@ const AddProperty = () => {
                 {/* Description (moved to LAST step per user request — every
                     other field is filled by this point so the AI helper
                     can analyse the whole listing before drafting copy). */}
-                <Field label={isBn ? 'বিস্তারিত বিবরণ' : 'Detailed Description'} required
-                  hint={isBn ? 'কমপক্ষে ৩০ অক্ষর লিখুন' : 'Minimum 30 characters required'}>
-                  <AiDescriptionHelper
+                <div data-tour="property-description">
+                  <Field label={isBn ? 'বিস্তারিত বিবরণ' : 'Detailed Description'} required
+                    hint={isBn ? 'কমপক্ষে ৩০ অক্ষর লিখুন' : 'Minimum 30 characters required'}>
+                    <AiDescriptionHelper
                     form={form}
                     value={form.description}
                     onChange={(val) => { set('description', val); setErrors(er => ({ ...er, description: false })); }}
                     isBn={isBn}
                     err={err('description')}
                   />
-                </Field>
+                  </Field>
+                </div>
 
                 {/* Summary Preview */}
                 <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-5 text-white shadow-[0_12px_32px_rgba(0,0,0,0.15)] overflow-hidden relative">

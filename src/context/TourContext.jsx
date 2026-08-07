@@ -693,6 +693,17 @@ export const TourProvider = ({ children }) => {
             side: 'top',
             align: 'start',
           },
+        },
+        {
+          element: '[data-tour="property-description"]',
+          popover: {
+            title: isBn ? 'বিস্তারিত বিবরণ' : 'Detailed Description',
+            description: isBn
+              ? 'আপনার প্রপার্টি সম্পর্কে বিস্তারিত লিখুন, অথবা AI ব্যবহার করে লিখিয়ে নিন।'
+              : 'Write detailed information about your property, or let AI generate it for you.',
+            side: 'top',
+            align: 'start',
+          },
         }
       ];
     }
