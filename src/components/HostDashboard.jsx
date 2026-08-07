@@ -3534,9 +3534,8 @@ const HostDashboard = () => {
         {activeTab === 'dashboard' && (
           <div className="animate-in fade-in zoom-in-95 duration-500 space-y-5">
 
-            {/* ০. প্রমো কার্ড গ্রিড — পেমেন্ট সেটিংস + ট্রায়াল/আপগ্রেড। মোবাইলে ১ কলাম,
-                ট্যাবলেট+ এ ২ কলাম। ইমেজের মতো বড় সাইড-বাই-সাইড কার্ড। */}
-            <div className="grid grid-cols-2 gap-3 md:gap-4">
+            {/* ০. প্রমো কার্ড — পেমেন্ট সেটিংস + ট্রায়াল/আপগ্রেড। ইমেজের মতো ফুল-উইডথ (১ রো ১ প্রমো)। যদি দুটি থাকে তবে পাশাপাশি (md:flex-row) বসবে। */}
+            <div className="flex flex-col md:flex-row gap-3 md:gap-4 w-full">
 
               {/* ০.১ পেমেন্ট সেটিংস */}
               {!paymentMethodsLoading && (
@@ -3544,7 +3543,7 @@ const HostDashboard = () => {
                   bookings.length > 0 && !hidePaymentPromo && (
                     <div
                       onClick={() => setActiveTab('payments')}
-                      className="relative group cursor-pointer bg-gradient-to-br from-emerald-50 to-green-50/60 dark:from-emerald-950/30 dark:to-green-950/20 border border-emerald-200 dark:border-emerald-800/50 rounded-2xl md:rounded-[1.5rem] p-3.5 md:p-4 shadow-[0_4px_25px_rgba(16,185,129,0.12)] hover:shadow-[0_12px_35px_rgba(16,185,129,0.20)] hover:-translate-y-0.5 transition-all flex flex-col"
+                      className="relative group cursor-pointer bg-gradient-to-br from-emerald-50 to-green-50/60 dark:from-emerald-950/30 dark:to-green-950/20 border border-emerald-200 dark:border-emerald-800/50 rounded-2xl md:rounded-[1.5rem] p-3.5 md:p-4 shadow-[0_4px_25px_rgba(16,185,129,0.12)] hover:shadow-[0_12px_35px_rgba(16,185,129,0.20)] hover:-translate-y-0.5 transition-all flex flex-col flex-1 w-full min-w-0"
                     >
                       <button
                         onClick={(e) => {
@@ -3556,13 +3555,13 @@ const HostDashboard = () => {
                         <X size={14} strokeWidth={2.5} />
                       </button>
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 h-full pt-2 md:pt-0">
-                        <div className="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-4 flex-1 min-w-0">
+                        <div className="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-4 flex-1 min-w-0 pr-8 md:pr-10">
                           <div className="relative w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl md:rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                             <CreditCard size={20} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
                             <span className="absolute -top-1.5 -right-1.5 w-4 h-4 md:w-5 md:h-5 rounded-full bg-[#ba0036] text-white text-[9px] md:text-[10px] font-black flex items-center justify-center animate-pulse">!</span>
                           </div>
-                          <div className="flex flex-col gap-1 md:gap-0.5 flex-1 min-w-0 pr-4 md:pr-0">
-                            <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight">
+                          <div className="flex flex-col gap-1 md:gap-0.5 flex-1 min-w-0">
+                            <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight truncate">
                               {language === 'বাংলা' ? 'পেমেন্ট সেটিংস সম্পূর্ণ করুন' : 'Complete Payment Settings'}
                             </h3>
                             <p className="text-[11px] md:text-xs font-bold text-emerald-700 dark:text-emerald-300/90 leading-relaxed md:truncate">
@@ -3572,13 +3571,18 @@ const HostDashboard = () => {
                             </p>
                           </div>
                         </div>
+                        <div className="hidden md:flex shrink-0">
+                          <div className="px-4 py-2.5 rounded-xl bg-[#ba0036] text-white text-xs font-black uppercase tracking-widest flex items-center gap-2 group-hover:scale-105 transition-transform shadow-lg shadow-red-500/20">
+                            {language === 'বাংলা' ? 'সেটআপ করুন' : 'SETUP NOW'} <ArrowUpRight size={16} />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )
                 ) : (
                   <div
                     onClick={() => setActiveTab('payments')}
-                    className="group cursor-pointer bg-white dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-2xl md:rounded-[1.5rem] p-3.5 md:p-4 shadow-[0_4px_25px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_25px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_35px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_12px_35px_rgba(0,0,0,0.3)] hover:-translate-y-0.5 transition-all flex flex-col"
+                    className="group cursor-pointer bg-white dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-2xl md:rounded-[1.5rem] p-3.5 md:p-4 shadow-[0_4px_25px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_25px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_35px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_12px_35px_rgba(0,0,0,0.3)] hover:-translate-y-0.5 transition-all flex flex-col flex-1 w-full min-w-0"
                   >
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 h-full">
                       <div className="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-4 flex-1 min-w-0">
@@ -3589,7 +3593,7 @@ const HostDashboard = () => {
                           )}
                         </div>
                         <div className="flex flex-col gap-1 md:gap-0.5 flex-1 min-w-0">
-                          <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight">
+                          <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight truncate">
                             {language === 'বাংলা' ? 'পেমেন্ট সেটিংস' : 'Payment Settings'}
                           </h3>
                           <p className="text-[11px] md:text-xs font-bold text-gray-500 dark:text-gray-400 leading-relaxed truncate">
@@ -3625,24 +3629,33 @@ const HostDashboard = () => {
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTrialModalOpen(true); } }}
-                  className="group cursor-pointer bg-white dark:bg-gray-900/40 border border-amber-200 dark:border-amber-500/30 rounded-2xl md:rounded-[1.5rem] p-4 md:p-5 shadow-[0_4px_25px_rgba(245,158,11,0.08)] hover:shadow-[0_12px_35px_rgba(245,158,11,0.15)] hover:-translate-y-0.5 transition-all flex flex-col gap-4 w-full max-w-[320px]"
+                  className="group cursor-pointer bg-gradient-to-br from-amber-50 to-orange-50/60 dark:from-amber-950/30 dark:to-orange-950/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl md:rounded-[1.5rem] p-3.5 md:p-4 shadow-[0_4px_25px_rgba(245,158,11,0.12)] hover:shadow-[0_12px_35px_rgba(245,158,11,0.20)] hover:-translate-y-0.5 transition-all flex flex-col flex-1 w-full min-w-0"
                 >
-                  <div className="w-12 h-12 shrink-0 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-[0_8px_20px_-6px_rgba(245,158,11,0.7)]">
-                    <Crown size={24} strokeWidth={2.2} />
-                  </div>
-                  <div className="flex flex-col gap-1.5 flex-1">
-                    <h3 className="text-base font-black text-gray-900 dark:text-white leading-tight">
-                      {language === 'বাংলা' ? '২ মাসের ফ্রি প্রো ট্রায়াল নিন' : 'Get 2 Months of Pro — Free'}
-                    </h3>
-                    <p className="text-xs font-bold text-amber-600 dark:text-amber-500 leading-relaxed">
-                      {language === 'বাংলা'
-                        ? 'অ্যাপের লিংক শেয়ার করলেই ৫০টি ছবি, ভিডিও ট্যুর আর সার্চে শীর্ষ অবস্থান আনলক।'
-                        : 'Share the app link to unlock 50 photos, video tours and top search position.'}
-                    </p>
-                  </div>
-                  <div className="mt-1">
-                    <div className="w-fit px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-black uppercase tracking-widest flex items-center gap-2 group-hover:scale-105 transition-transform shadow-lg shadow-orange-500/20">
-                      {language === 'বাংলা' ? 'ফ্রি নিন' : 'CLAIM FREE'} <ArrowUpRight size={16} />
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 h-full">
+                    <div className="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-4 flex-1 min-w-0">
+                      <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl md:rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-[0_8px_20px_-6px_rgba(245,158,11,0.7)]">
+                        <Crown size={20} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
+                      </div>
+                      <div className="flex flex-col gap-1 md:gap-0.5 flex-1 min-w-0">
+                        <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight truncate">
+                          {language === 'বাংলা' ? '২ মাসের ফ্রি প্রো ট্রায়াল নিন' : 'Get 2 Months of Pro — Free'}
+                        </h3>
+                        <p className="text-[11px] md:text-xs font-bold text-amber-700 dark:text-amber-300/90 leading-relaxed md:truncate">
+                          {language === 'বাংলা'
+                            ? 'অ্যাপের লিংক শেয়ার করলেই ৫০টি ছবি, ভিডিও ট্যুর আর সার্চে শীর্ষ অবস্থান আনলক।'
+                            : 'Share the app link to unlock 50 photos, video tours and top search position.'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-1 md:hidden shrink-0">
+                      <div className="w-fit px-3 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-lg shadow-orange-500/20">
+                        {language === 'বাংলা' ? 'ফ্রি নিন' : 'CLAIM FREE'} <ArrowUpRight size={14} />
+                      </div>
+                    </div>
+                    <div className="hidden md:flex shrink-0">
+                      <div className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-black uppercase tracking-widest flex items-center gap-2 group-hover:scale-105 transition-transform shadow-lg shadow-orange-500/20">
+                        {language === 'বাংলা' ? 'ফ্রি নিন' : 'CLAIM FREE'} <ArrowUpRight size={16} />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -3669,7 +3682,7 @@ const HostDashboard = () => {
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }}
-                    className="group cursor-pointer bg-gradient-to-br from-violet-50 to-indigo-50/60 dark:from-violet-950/30 dark:to-indigo-950/20 border border-violet-200 dark:border-violet-800/50 rounded-2xl md:rounded-[1.5rem] p-3.5 md:p-4 shadow-[0_4px_25px_rgba(99,102,241,0.12)] hover:shadow-[0_12px_35px_rgba(99,102,241,0.20)] hover:-translate-y-0.5 transition-all flex flex-col"
+                    className="group cursor-pointer bg-gradient-to-br from-violet-50 to-indigo-50/60 dark:from-violet-950/30 dark:to-indigo-950/20 border border-violet-200 dark:border-violet-800/50 rounded-2xl md:rounded-[1.5rem] p-3.5 md:p-4 shadow-[0_4px_25px_rgba(99,102,241,0.12)] hover:shadow-[0_12px_35px_rgba(99,102,241,0.20)] hover:-translate-y-0.5 transition-all flex flex-col flex-1 w-full min-w-0"
                   >
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 h-full">
                       <div className="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-4 flex-1 min-w-0">
@@ -3677,7 +3690,7 @@ const HostDashboard = () => {
                           <Crown size={20} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
                         </div>
                         <div className="flex flex-col gap-1 md:gap-0.5 flex-1 min-w-0">
-                          <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight">{title}</h3>
+                          <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight truncate">{title}</h3>
                           <p className="text-[11px] md:text-xs font-bold text-violet-700 dark:text-violet-300/90 leading-relaxed md:truncate">{blurb}</p>
                         </div>
                       </div>
