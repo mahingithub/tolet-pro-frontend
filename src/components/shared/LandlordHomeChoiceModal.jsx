@@ -44,7 +44,7 @@ const LandlordHomeChoiceModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4 font-sans"
+      className="fixed inset-0 z-[100001] flex items-center justify-center p-4 font-sans"
       role="dialog"
       aria-modal="true"
     >
@@ -55,7 +55,7 @@ const LandlordHomeChoiceModal = ({
       />
 
       {/* Panel */}
-      <div className="relative bg-white rounded-3xl shadow-[0_40px_80px_rgba(0,0,0,0.2)] w-full max-w-sm overflow-hidden animate-tp-modal-in">
+      <div className="relative bg-white rounded-3xl shadow-[0_40px_80px_rgba(0,0,0,0.2)] w-full max-w-sm overflow-hidden animate-tp-modal-in z-[100002]">
         {/* Brand header */}
         <div className="relative bg-gradient-to-br from-[#BA0036] to-[#7A0024] px-6 pt-7 pb-6 text-white text-center overflow-hidden">
           <div className="absolute -top-8 -right-8 w-28 h-28 bg-white/10 rounded-full blur-2xl pointer-events-none" />

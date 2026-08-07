@@ -240,6 +240,7 @@ export const TourProvider = ({ children }) => {
     }
 
     try {
+      let dashboardDriverObj = null;
       const resolvedSteps = resolveSteps([
         {
           element: '[data-tour="host-stats-grid"]',
@@ -333,8 +334,11 @@ export const TourProvider = ({ children }) => {
           },
           onHighlighted: () => {
             window.dispatchEvent(new Event('close-home-choice-modal'));
+          },
+          onNextClick: () => {
+            window.dispatchEvent(new Event('open-host-drawer'));
             setTimeout(() => {
-              window.dispatchEvent(new Event('open-host-drawer'));
+              if (dashboardDriverObj) dashboardDriverObj.moveNext();
             }, 300);
           }
         },
@@ -438,7 +442,7 @@ export const TourProvider = ({ children }) => {
         return;
       }
 
-      const driverObj = driver({
+      dashboardDriverObj = driver({
         allowClose: false,
         showProgress: true,
         steps,
@@ -455,8 +459,8 @@ export const TourProvider = ({ children }) => {
       });
 
       setActiveTour('host-dashboard');
-      setDriverInstance(driverObj);
-      driverObj.drive();
+      setDriverInstance(dashboardDriverObj);
+      dashboardDriverObj.drive();
     } catch (error) {
       console.error('Failed to start host dashboard tour:', error);
       startingRef.current = false;
@@ -469,7 +473,26 @@ export const TourProvider = ({ children }) => {
     if (hasTourCompleted('host')) return;
 
     if (window.location.pathname === '/') {
+      let driverObj = null;
+
       const steps = [
+        {
+          element: '[data-tour="navbar-profile"]',
+          popover: {
+            title: isBn ? 'মেইন মেনু' : 'Main Menu',
+            description: isBn
+              ? 'ড্যাশবোর্ডে যেতে প্রথমে এখানে ক্লিক করে মেনু ওপেন করুন।'
+              : 'Click here to open the menu and go to your dashboard.',
+            side: 'bottom',
+            align: 'end',
+            onNextClick: () => {
+              window.dispatchEvent(new Event('open-navbar-profile'));
+              setTimeout(() => {
+                if (driverObj) driverObj.moveNext();
+              }, 300);
+            }
+          },
+        },
         {
           element: '[data-tour="host-dashboard-link"]',
           popover: {
@@ -477,10 +500,9 @@ export const TourProvider = ({ children }) => {
             description: isBn
               ? 'আপনার সকল প্রপার্টি এবং ভাড়াটিয়া পরিচালনা করতে ড্যাশবোর্ডে প্রবেশ করুন।'
               : 'Access your dashboard to manage all your properties and tenants.',
-            side: 'bottom',
+            side: 'left',
             align: 'start',
           },
-          waitForElement: 3000,
         },
         {
           popover: {
@@ -498,7 +520,7 @@ export const TourProvider = ({ children }) => {
         },
       ];
 
-      const driverObj = driver({
+      driverObj = driver({
         allowClose: false,
         showProgress: true,
         steps,

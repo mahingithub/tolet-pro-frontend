@@ -417,6 +417,12 @@ useEffect(() => {
     }, 300);
     return () => clearTimeout(timer);
   }, [mobileNavLoc]);
+  // 🟢 TOUR SUPPORT: listen for global event to open profile dropdown
+  useEffect(() => {
+    const handleOpenProfile = () => setIsProfileMenuOpen(true);
+    window.addEventListener('open-navbar-profile', handleOpenProfile);
+    return () => window.removeEventListener('open-navbar-profile', handleOpenProfile);
+  }, []);
 
   const hiddenPaths = ['/inquire', '/success', '/login', '/host-dashboard', '/tenant-dashboard', '/list-property', '/services'];
   if (hiddenPaths.some(p => location.pathname.includes(p))) return null;
@@ -660,6 +666,7 @@ useEffect(() => {
               {isLoggedIn ? (
                 <>
                   <div onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                    data-tour="navbar-profile"
                     className="flex items-center gap-3 cursor-pointer p-1.5 pr-4 bg-white hover:bg-gray-50 rounded-full border border-gray-200 shadow-sm transition-all">
                     <div className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-white text-xs font-black ${userRole === 'landlord' ? 'bg-[#ba0036]' : 'bg-blue-500'}`}>
                       {authUser?.avatar ? (
@@ -693,7 +700,7 @@ useEffect(() => {
 
                       {userRole === 'landlord' ? (
                         <>
-                          <Link to="/host-dashboard" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-red-50 hover:text-[#ba0036] rounded-xl transition-colors"><LayoutDashboard size={17} /> {t?.menuHostDashboard || 'Host Dashboard'}</Link>
+                          <Link to="/host-dashboard" data-tour="host-dashboard-link" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-red-50 hover:text-[#ba0036] rounded-xl transition-colors"><LayoutDashboard size={17} /> {t?.menuHostDashboard || 'Host Dashboard'}</Link>
                           <button onClick={() => handleProtected('/list-property')} className="w-full flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-red-50 hover:text-[#ba0036] rounded-xl transition-colors text-left"><PlusCircle size={17} /> {t?.menuAddProperty || 'Add Property'}</button>
                           {/* Direct Messages shortcut — the chat previously
                               required dashboard → messages, two hops on desktop. */}
