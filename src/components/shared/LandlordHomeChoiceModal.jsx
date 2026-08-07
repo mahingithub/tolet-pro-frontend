@@ -76,6 +76,7 @@ const LandlordHomeChoiceModal = ({
         <div className="p-5 grid gap-3">
           <button
             type="button"
+            data-tour="host-home-option"
             onClick={onGoHome}
             className="group flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 hover:border-[#ba0036] hover:bg-red-50/40 transition-all text-left active:scale-[0.98]"
           >
@@ -91,6 +92,7 @@ const LandlordHomeChoiceModal = ({
 
           <button
             type="button"
+            data-tour="host-dashboard-option"
             onClick={onGoDashboard}
             className="group flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 hover:border-[#ba0036] hover:bg-red-50/40 transition-all text-left active:scale-[0.98]"
           >

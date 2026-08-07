@@ -200,6 +200,7 @@ export const TourProvider = ({ children }) => {
       }
 
       const driverObj = driver({
+        allowClose: false,
         showProgress: true,
         steps,
         nextBtnText: isBn ? 'পরবর্তী' : 'Next',
@@ -239,7 +240,7 @@ export const TourProvider = ({ children }) => {
     }
 
     try {
-      const steps = resolveSteps([
+      const resolvedSteps = resolveSteps([
         {
           element: '[data-tour="host-stats-grid"]',
           popover: {
@@ -285,6 +286,42 @@ export const TourProvider = ({ children }) => {
           },
         },
         {
+          element: '[data-tour="host-logo"]',
+          popover: {
+            title: isBn ? 'মেইন হোমে ফিরুন' : 'Return to Main Home',
+            description: isBn
+              ? 'লোগোতে ক্লিক করলে আপনি মেইন হোমে যাওয়ার অপশন পাবেন।'
+              : 'Click the logo to see options for returning to the main home.',
+            side: 'bottom',
+            align: 'start',
+          },
+          onHighlighted: () => {
+            window.dispatchEvent(new Event('open-home-choice-modal'));
+          }
+        },
+        {
+          element: '[data-tour="host-home-option"]',
+          popover: {
+            title: isBn ? 'পাবলিক সাইটে যান' : 'Go to Public Site',
+            description: isBn
+              ? 'এখানে ক্লিক করলে আপনি পাবলিক TO-LET PRO সাইটে ফিরে যাবেন।'
+              : 'Click here to return to the public TO-LET PRO site.',
+            side: 'right',
+            align: 'start',
+          },
+        },
+        {
+          element: '[data-tour="host-dashboard-option"]',
+          popover: {
+            title: isBn ? 'ড্যাশবোর্ডেই থাকুন' : 'Stay on Dashboard',
+            description: isBn
+              ? 'আর এখানে ক্লিক করলে আপনি ড্যাশবোর্ডেই থাকবেন।'
+              : 'And click here if you want to stay on your dashboard.',
+            side: 'right',
+            align: 'start',
+          },
+        },
+        {
           element: '[data-tour="host-profile-menu"]',
           popover: {
             title: isBn ? 'মেইন মেনু' : 'Main Menu',
@@ -294,8 +331,107 @@ export const TourProvider = ({ children }) => {
             side: 'bottom',
             align: 'end',
           },
+          onHighlighted: () => {
+            window.dispatchEvent(new Event('close-home-choice-modal'));
+            setTimeout(() => {
+              window.dispatchEvent(new Event('open-host-drawer'));
+            }, 300);
+          }
         },
       ]);
+
+      const sidebarSteps = [
+        {
+          element: '[data-tour="dashboard-tab"]',
+          popover: {
+            title: isBn ? 'ড্যাশবোর্ড' : 'Dashboard',
+            description: isBn
+              ? 'আপনার সকল প্রপার্টির সামারি এখানে দেখতে পাবেন।'
+              : 'View a summary of all your properties here.',
+            side: 'right',
+            align: 'start',
+          },
+        },
+        {
+          element: '[data-tour="documents-tab"]',
+          popover: {
+            title: isBn ? 'ডকুমেন্ট ও অ্যানালিটিক্স' : 'Documents & Analytics',
+            description: isBn
+              ? 'আপনার প্রপার্টির ডকুমেন্টস এবং আয়ের এনালাইটিক্স এখানে দেখুন।'
+              : 'View your property documents and income analytics here.',
+            side: 'right',
+            align: 'start',
+          },
+        },
+        {
+          element: '[data-tour="inquiries-tab"]',
+          popover: {
+            title: isBn ? 'ইনকোয়ারি' : 'Inquiries',
+            description: isBn
+              ? 'ভাড়াটিয়াদের সকল ইনকোয়ারি এখানে আসবে।'
+              : 'All tenant inquiries will appear here.',
+            side: 'right',
+            align: 'start',
+          },
+        },
+        {
+          element: '[data-tour="bookings-tab"]',
+          popover: {
+            title: isBn ? 'ভাড়াটিয়া ও রেন্ট' : 'Tenants & Rent',
+            description: isBn
+              ? 'আপনার বর্তমান ভাড়াটিয়াদের লিস্ট এবং ভাড়া কালেকশনের হিসাব এখানে রাখুন।'
+              : 'Manage your current tenants list and rent collection here.',
+            side: 'right',
+            align: 'start',
+          },
+        },
+        {
+          element: '[data-tour="payments-tab"]',
+          popover: {
+            title: isBn ? 'পেমেন্ট সেটিংস' : 'Payment Settings',
+            description: isBn
+              ? 'অনলাইনে ভাড়া রিসিভ করার জন্য পেমেন্ট মেথড যুক্ত করুন।'
+              : 'Add payment methods to receive rent online.',
+            side: 'right',
+            align: 'start',
+          },
+        },
+        {
+          element: '[data-tour="smart-alerts-tab"]',
+          popover: {
+            title: isBn ? 'স্মার্ট অ্যালার্টস' : 'Smart Alerts',
+            description: isBn
+              ? 'গুরুত্বপূর্ণ নোটিফিকেশনগুলো এখানে পাবেন।'
+              : 'Find important notifications here.',
+            side: 'right',
+            align: 'start',
+          },
+        },
+        {
+          element: '[data-tour="ai-insights-tab"]',
+          popover: {
+            title: isBn ? 'এআই ইনসাইটস' : 'AI Insights',
+            description: isBn
+              ? 'ভাড়া ও প্রপার্টি সম্পর্কিত এআই পরামর্শগুলো এখানে দেখুন।'
+              : 'Get AI-powered insights about rent and properties here.',
+            side: 'right',
+            align: 'start',
+          },
+        },
+        {
+          element: '[data-tour="add-property-button"]',
+          popover: {
+            title: isBn ? 'নতুন প্রপার্টি যোগ করুন' : 'Add New Property',
+            description: isBn
+              ? 'নতুন বাড়ি বা প্রপার্টি যুক্ত করতে এখানে ক্লিক করুন।'
+              : 'Click here to add a new property listing.',
+            side: 'right',
+            align: 'start',
+          },
+        },
+      ];
+
+      const steps = [...resolvedSteps, ...sidebarSteps];
 
       if (!steps.length) {
         startingRef.current = false;
@@ -303,6 +439,7 @@ export const TourProvider = ({ children }) => {
       }
 
       const driverObj = driver({
+        allowClose: false,
         showProgress: true,
         steps,
         nextBtnText: isBn ? 'পরবর্তী' : 'Next',
@@ -328,16 +465,64 @@ export const TourProvider = ({ children }) => {
     }
   }, [isBn, hasTourCompleted]);
 
-  // The landlord tour is a single leg: signup already routes to
-  // /host-dashboard, and the navbar "Host Dashboard" entry lives inside a
-  // closed dropdown (so it cannot be highlighted). Go straight to the tabs.
   const startHostTour = useCallback(async () => {
-    if (hasTourCompleted('host-dashboard')) return;
-    if (window.location.pathname !== '/host-dashboard') {
-      navigate('/host-dashboard');
+    if (hasTourCompleted('host')) return;
+
+    if (window.location.pathname === '/') {
+      const steps = [
+        {
+          element: '[data-tour="host-dashboard-link"]',
+          popover: {
+            title: isBn ? 'হোস্ট ড্যাশবোর্ড' : 'Host Dashboard',
+            description: isBn
+              ? 'আপনার সকল প্রপার্টি এবং ভাড়াটিয়া পরিচালনা করতে ড্যাশবোর্ডে প্রবেশ করুন।'
+              : 'Access your dashboard to manage all your properties and tenants.',
+            side: 'bottom',
+            align: 'start',
+          },
+          waitForElement: 3000,
+        },
+        {
+          popover: {
+            title: isBn ? 'স্বাগতম!' : 'Welcome!',
+            description: isBn
+              ? 'এখন আমরা হোস্ট ড্যাশবোর্ডে যাচ্ছি। একটু অপেক্ষা করুন...'
+              : 'Now we are navigating to the Host Dashboard. Please wait...',
+            side: 'top',
+            align: 'center',
+          },
+          onHighlighted: () => {
+            // Navigate to host dashboard
+            navigate('/host-dashboard');
+          },
+        },
+      ];
+
+      const driverObj = driver({
+        allowClose: false,
+        showProgress: true,
+        steps,
+        nextBtnText: isBn ? 'পরবর্তী' : 'Next',
+        prevBtnText: isBn ? 'পূর্ববর্তী' : 'Previous',
+        doneBtnText: isBn ? 'শেষ' : 'Done',
+        progressText: isBn ? '{{current}} এর {{total}}' : '{{current}} of {{total}}',
+        onDestroyed: () => {
+          markTourCompleted('host');
+          setActiveTour(null);
+          setDriverInstance(null);
+        },
+      });
+
+      setActiveTour('host');
+      setDriverInstance(driverObj);
+      driverObj.drive();
+    } else {
+      if (window.location.pathname !== '/host-dashboard') {
+        navigate('/host-dashboard');
+      }
+      await startHostDashboardTour();
     }
-    await startHostDashboardTour();
-  }, [hasTourCompleted, navigate, startHostDashboardTour]);
+  }, [hasTourCompleted, navigate, isBn, startHostDashboardTour]);
 
   const startAddPropertyTour = useCallback(async () => {
     if (hasTourCompleted('add-property') || startingRef.current) return;
@@ -404,6 +589,7 @@ export const TourProvider = ({ children }) => {
       }
 
       const driverObj = driver({
+        allowClose: false,
         showProgress: true,
         steps,
         nextBtnText: isBn ? 'পরবর্তী' : 'Next',
@@ -463,6 +649,18 @@ export const TourProvider = ({ children }) => {
       window.removeEventListener('welcomeRobotFinished', handleRobotFinish);
     };
   }, [startTenantTour, startHostTour, pendingTourRole, activeRole]);
+
+  // Auto-start the hero section tour if the host goes back to the home page
+  useEffect(() => {
+    if (
+      location.pathname === '/' &&
+      (activeRole === 'landlord' || activeRole === 'host') &&
+      !hasTourCompleted('host') &&
+      activeTour === null
+    ) {
+      startHostTour();
+    }
+  }, [location.pathname, activeRole, hasTourCompleted, activeTour, startHostTour]);
 
   // Resume the dashboard tour if the landlord reaches /host-dashboard without
   // having seen it (e.g. they dismissed the welcome robot before it fired).

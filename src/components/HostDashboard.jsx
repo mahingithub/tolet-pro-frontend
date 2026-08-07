@@ -604,11 +604,19 @@ const HostDashboard = () => {
   useEffect(() => {
     const handleOpen = () => setIsProfileDrawerOpen(true);
     const handleClose = () => setIsProfileDrawerOpen(false);
+    const openHomeModal = () => setIsLogoModalOpen(true);
+    const closeHomeModal = () => setIsLogoModalOpen(false);
+    
     window.addEventListener('open-host-drawer', handleOpen);
     window.addEventListener('close-host-drawer', handleClose);
+    window.addEventListener('open-home-choice-modal', openHomeModal);
+    window.addEventListener('close-home-choice-modal', closeHomeModal);
+    
     return () => {
       window.removeEventListener('open-host-drawer', handleOpen);
       window.removeEventListener('close-host-drawer', handleClose);
+      window.removeEventListener('open-home-choice-modal', openHomeModal);
+      window.removeEventListener('close-home-choice-modal', closeHomeModal);
     };
   }, []);
   const [showHomeChoice, setShowHomeChoice] = useState(false);
@@ -3094,10 +3102,10 @@ const HostDashboard = () => {
       {/* 🏠 LOGO "WHERE TO?" POPUP — the dashboard is the landlord's home, so the
           logo asks where to go rather than silently leaving for the public site. */}
       <LandlordHomeChoiceModal
-        open={showHomeChoice}
-        onClose={() => setShowHomeChoice(false)}
-        onGoHome={() => { setShowHomeChoice(false); overlayNavigate('/'); }}
-        onGoDashboard={() => setShowHomeChoice(false)}
+        open={showHomeChoice || isLogoModalOpen}
+        onClose={() => { setShowHomeChoice(false); setIsLogoModalOpen(false); }}
+        onGoHome={() => { setShowHomeChoice(false); setIsLogoModalOpen(false); overlayNavigate('/'); }}
+        onGoDashboard={() => { setShowHomeChoice(false); setIsLogoModalOpen(false); }}
         onDashboardPage
         isBn={language === 'বাংলা'}
       />
@@ -3141,6 +3149,7 @@ const HostDashboard = () => {
               the public homepage, because the dashboard is the landlord's home. */}
           <button
             type="button"
+            data-tour="host-logo"
             onClick={() => setShowHomeChoice(true)}
             className="flex items-center gap-3 z-10 group shrink-0"
             aria-label={language === 'বাংলা' ? 'নেভিগেশন মেনু' : 'Navigation menu'}
