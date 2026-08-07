@@ -228,7 +228,8 @@ export const TourProvider = ({ children }) => {
   const startHostDashboardTour = useCallback(async () => {
     if (hasTourCompleted('host-dashboard') || startingRef.current) return;
     startingRef.current = true;
-    if (!(await waitForAnchor('[data-tour="dashboard-tab"]'))) {
+    
+    if (!(await waitForAnchor('[data-tour="host-stats-grid"]'))) {
       startingRef.current = false;
       return;
     }
@@ -236,97 +237,62 @@ export const TourProvider = ({ children }) => {
     try {
       const steps = resolveSteps([
         {
-          element: '[data-tour="dashboard-tab"]',
+          element: '[data-tour="host-stats-grid"]',
           popover: {
-            title: isBn ? 'ড্যাশবোর্ড' : 'Dashboard',
+            title: isBn ? 'ড্যাশবোর্ড সামারি' : 'Dashboard Summary',
             description: isBn
-              ? 'আপনার সকল প্রপার্টির সামারি এখানে দেখতে পাবেন।'
-              : 'View a summary of all your properties here.',
-            side: 'right',
+              ? 'এখানে আপনার প্রপার্টি এবং ইনকোয়ারির একটি দ্রুত ওভারভিউ দেখতে পাবেন।'
+              : 'Get a quick overview of your properties and inquiries here.',
+            side: 'bottom',
             align: 'start',
           },
         },
         {
-          element: '[data-tour="documents-tab"]',
+          element: '[data-tour="host-quick-actions"]',
           popover: {
-            title: isBn ? 'ডকুমেন্ট ও অ্যানালিটিক্স' : 'Documents & Analytics',
+            title: isBn ? 'দ্রুত অ্যাকশন' : 'Quick Actions',
             description: isBn
-              ? 'আপনার প্রপার্টির ডকুমেন্টস এবং আয়ের এনালাইটিক্স এখানে দেখুন।'
-              : 'View your property documents and income analytics here.',
-            side: 'right',
+              ? 'ভাড়াটিয়া যোগ করা, ভাড়া কালেকশন বা মেসেজ দেওয়ার মতো জরুরি কাজগুলো এখান থেকেই করতে পারবেন।'
+              : 'Quickly add tenants, collect rent, or send messages right from here.',
+            side: 'top',
             align: 'start',
           },
         },
         {
-          element: '[data-tour="inquiries-tab"]',
+          element: '[data-tour="host-shared-ledger"]',
           popover: {
-            title: isBn ? 'ইনকোয়ারি' : 'Inquiries',
+            title: isBn ? 'ভাড়া লেজার ওভারভিউ' : 'Shared Ledger Overview',
             description: isBn
-              ? 'ভাড়াটিয়াদের সকল ইনকোয়ারি এখানে আসবে।'
-              : 'All tenant inquiries will appear here.',
-            side: 'right',
+              ? 'আপনার মোট কত টাকা ভাড়া উঠেছে এবং কত বকেয়া আছে, তার হিসাব এখানে থাকবে।'
+              : 'Track your total rent collection and outstanding dues at a glance.',
+            side: 'top',
             align: 'start',
           },
         },
         {
-          element: '[data-tour="bookings-tab"]',
-          popover: {
-            title: isBn ? 'ভাড়াটিয়া ও রেন্ট' : 'Tenants & Rent',
-            description: isBn
-              ? 'আপনার বর্তমান ভাড়াটিয়াদের লিস্ট এবং ভাড়া কালেকশনের হিসাব এখানে রাখুন।'
-              : 'Manage your current tenants list and rent collection here.',
-            side: 'right',
-            align: 'start',
-          },
-        },
-        {
-          element: '[data-tour="payments-tab"]',
-          popover: {
-            title: isBn ? 'পেমেন্ট সেটিংস' : 'Payment Settings',
-            description: isBn
-              ? 'অনলাইনে ভাড়া রিসিভ করার জন্য পেমেন্ট মেথড যুক্ত করুন।'
-              : 'Add payment methods to receive rent online.',
-            side: 'right',
-            align: 'start',
-          },
-        },
-        {
-          element: '[data-tour="smart-alerts-tab"]',
-          popover: {
-            title: isBn ? 'স্মার্ট অ্যালার্টস' : 'Smart Alerts',
-            description: isBn
-              ? 'গুরুত্বপূর্ণ নোটিফিকেশনগুলো এখানে পাবেন।'
-              : 'Find important notifications here.',
-            side: 'right',
-            align: 'start',
-          },
-        },
-        {
-          element: '[data-tour="ai-insights-tab"]',
-          popover: {
-            title: isBn ? 'এআই ইনসাইটস' : 'AI Insights',
-            description: isBn
-              ? 'ভাড়া ও প্রপার্টি সম্পর্কিত এআই পরামর্শগুলো এখানে দেখুন।'
-              : 'Get AI-powered insights about rent and properties here.',
-            side: 'right',
-            align: 'start',
-          },
-        },
-        {
-          element: '[data-tour="add-property-button"]',
+          element: '[data-tour="host-header-add-property"]',
           popover: {
             title: isBn ? 'নতুন প্রপার্টি যোগ করুন' : 'Add New Property',
             description: isBn
-              ? 'নতুন বাড়ি বা প্রপার্টি যুক্ত করতে এখানে ক্লিক করুন।'
-              : 'Click here to add a new property listing.',
-            side: 'right',
-            align: 'start',
+              ? 'নতুন কোনো বাসা বা প্রপার্টি ভাড়া দিতে চাইলে এখানে ক্লিক করুন।'
+              : 'Click here anytime to list a new property.',
+            side: 'bottom',
+            align: 'end',
+          },
+        },
+        {
+          element: '[data-tour="host-profile-menu"]',
+          popover: {
+            title: isBn ? 'মেইন মেনু' : 'Main Menu',
+            description: isBn
+              ? 'আপনার প্রোফাইল, ড্যাশবোর্ডের সব ট্যাব এবং সেটিংস পেতে এই মেনুটিতে ক্লিক করুন।'
+              : 'Click here to open the menu and access all your dashboard tabs, settings, and more.',
+            side: 'bottom',
+            align: 'end',
           },
         },
       ]);
 
-      // Premium tabs are hidden on some plans and the sidebar collapses on
-      // mobile; resolveSteps has already dropped anchors that are not visible.
       if (!steps.length) {
         startingRef.current = false;
         return;

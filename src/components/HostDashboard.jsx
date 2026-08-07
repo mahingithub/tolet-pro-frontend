@@ -598,6 +598,21 @@ const HostDashboard = () => {
   // Logo → "where to?" popup. For a landlord the dashboard IS home, so tapping
   // the TO-LET PRO logo asks whether to visit the public site or stay here
   // (see LandlordHomeChoiceModal at the bottom of the render).
+  const [isLogoModalOpen, setIsLogoModalOpen] = useState(false);
+  const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
+  const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
+
+  // 🟢 TOUR SUPPORT: Listen for global events to open/close the drawer programmatically
+  useEffect(() => {
+    const handleOpen = () => setIsProfileDrawerOpen(true);
+    const handleClose = () => setIsProfileDrawerOpen(false);
+    window.addEventListener('open-host-drawer', handleOpen);
+    window.addEventListener('close-host-drawer', handleClose);
+    return () => {
+      window.removeEventListener('open-host-drawer', handleOpen);
+      window.removeEventListener('close-host-drawer', handleClose);
+    };
+  }, []);
   const [showHomeChoice, setShowHomeChoice] = useState(false);
   const [hidePaymentPromo, setHidePaymentPromo] = useState(false);
   // Scroll to + flash the specific row a notification points at (uses
@@ -3206,6 +3221,7 @@ const HostDashboard = () => {
 
             {/* List Property CTA — jumps straight to the listing wizard. */}
             <button
+              data-tour="host-header-add-property"
               onClick={() => navigate('/list-property')}
               className="hidden sm:inline-flex items-center gap-1.5 pl-2.5 pr-3 py-2 rounded-xl border border-[#ba0036]/30 text-[#ba0036] bg-white/60 hover:bg-[#ba0036]/[0.06] hover:border-[#ba0036]/50 transition-all shadow-sm active:scale-95"
             >
@@ -3249,7 +3265,7 @@ const HostDashboard = () => {
               )}
             </div>
 
-            <button onClick={() => setIsProfileDrawerOpen(true)} className="flex items-center gap-2 p-1 pr-3 bg-white/60 rounded-xl border border-white/80 shadow-sm hover:shadow-md hover:bg-white transition-all active:scale-95">
+            <button data-tour="host-profile-menu" onClick={() => setIsProfileDrawerOpen(true)} className="flex items-center gap-2 p-1 pr-3 bg-white/60 rounded-xl border border-white/80 shadow-sm hover:shadow-md hover:bg-white transition-all active:scale-95">
               <div className="relative">
                 {userData.avatar ? (
                   <img src={userData.avatar} alt={userData.fullName} className="w-8 h-8 rounded-full object-cover" />
@@ -3726,7 +3742,7 @@ const HostDashboard = () => {
             </div>
 
             {/* ১. Stats Bento Grid */}
-            <div className="grid grid-cols-3 gap-3 md:gap-5">
+            <div data-tour="host-stats-grid" className="grid grid-cols-3 gap-3 md:gap-5">
               {[
                 {
 	                  icon: Building, bg: 'bg-gradient-to-br from-red-50 to-rose-100/60', iconColor: 'text-[#ba0036]',
@@ -3785,7 +3801,7 @@ const HostDashboard = () => {
             </div>
 
             {/* ১.২ দ্রুত অ্যাকশন — ৪ টাইল, সহজ ও কেন্দ্রস্থ। */}
-            <div className="bg-white dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800/60 rounded-2xl md:rounded-[1.5rem] p-4 md:p-5 shadow-[0_4px_25px_rgba(0,0,0,0.02)] dark:shadow-none">
+            <div data-tour="host-quick-actions" className="bg-white dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800/60 rounded-2xl md:rounded-[1.5rem] p-4 md:p-5 shadow-[0_4px_25px_rgba(0,0,0,0.02)] dark:shadow-none">
               <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white mb-4">
                 {language === 'বাংলা' ? 'দ্রুত অ্যাকশন' : 'Quick Actions'}
               </h3>
@@ -3822,6 +3838,7 @@ const HostDashboard = () => {
               const collectedPct = sm.expectedTotal > 0 ? Math.min(100, Math.round((sm.collectedTotal / sm.expectedTotal) * 100)) : 0;
               return (
                 <div
+                  data-tour="host-shared-ledger"
                   onClick={() => setActiveTab('rent')}
                   className="group relative w-full cursor-pointer bg-white rounded-[1.5rem] p-5 md:p-7 border border-gray-100 shadow-[0_4px_25px_rgba(0,0,0,0.04)] hover:shadow-[0_15px_45px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 overflow-hidden"
                 >
