@@ -1165,7 +1165,7 @@ const MobileHome = () => {
       <div className="px-4 -mt-6 relative z-10">
         <div className="rounded-3xl shadow-[0_20px_50px_-20px_rgba(15,23,42,0.30)] p-3 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 ring-1 ring-white/40">
           {/* Rent / Buy / Commercial pill toggle */}
-          <div className="flex items-center bg-gray-100 rounded-full p-1 mb-3">
+          <div className="flex items-center bg-gray-100 rounded-full p-1 mb-3" data-tour="mode-switcher">
             {SEARCH_TYPES.map((typ) => {
               const active = searchType === typ.id;
               return (
@@ -1186,7 +1186,7 @@ const MobileHome = () => {
 
           {/* Location trigger — opens the full-screen LocationSearchModal
               (replaces the old inline autocomplete dropdown). */}
-          <div className="relative mb-2">
+          <div className="relative mb-2" data-tour="location">
             <div className="w-full flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2.5">
               <span className="w-9 h-9 rounded-xl bg-red-50 text-[#ba0036] flex items-center justify-center shrink-0">
                 <MapPin size={16} strokeWidth={2.5} />
@@ -1220,6 +1220,7 @@ const MobileHome = () => {
           <div className="grid grid-cols-2 gap-2 mb-3">
             <button
               onClick={() => setTypeOpen(true)}
+              data-tour="property-type"
               className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2.5 active:scale-[0.99] transition-transform text-left"
             >
               <span className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
@@ -1244,6 +1245,7 @@ const MobileHome = () => {
 
             <button
               onClick={() => setBudgetOpen(true)}
+              data-tour="budget"
               className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2.5 active:scale-[0.99] transition-transform text-left"
             >
               <span className="w-8 h-8 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
@@ -1264,6 +1266,7 @@ const MobileHome = () => {
           {/* Search button */}
           <button
             onClick={handleSearch}
+            data-tour="search-button"
             className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#ba0036] to-[#d4143a] text-white font-black uppercase tracking-widest text-[13px] py-3.5 rounded-2xl shadow-[0_10px_28px_-10px_rgba(186,0,54,0.6)] hover:scale-[1.02] hover:shadow-[0_14px_32px_-10px_rgba(186,0,54,0.7)] active:scale-[0.96] active:shadow-sm transition-all duration-300"
           >
             <Search size={16} strokeWidth={2.5} />

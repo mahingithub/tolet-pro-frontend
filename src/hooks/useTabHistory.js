@@ -98,7 +98,12 @@ export default function useTabHistory({ tabs, defaultTab, param = 'tab' }) {
   // — entries from other pages simply stay `undefined` and never false-match.
   const stackRef = useRef([]);
   useEffect(() => {
-    const idx = window.history.state?.idx ?? 0;
+    // `idx` comes from history state, which survives reloads and can be
+    // restored as a non-integer (or missing) after a session restore or a
+    // cross-origin bounce. Truncating with a bad value throws
+    // `RangeError: Invalid array length`, so normalise before using it.
+    const rawIdx = window.history.state?.idx;
+    const idx = Number.isInteger(rawIdx) && rawIdx >= 0 ? rawIdx : 0;
     stackRef.current.length = idx + 1; // a push invalidates the forward entries
     stackRef.current[idx] = activeTab;
   }, [activeTab, location.key]);
@@ -116,7 +121,8 @@ export default function useTabHistory({ tabs, defaultTab, param = 'tab' }) {
         return;
       }
 
-      const idx = window.history.state?.idx ?? 0;
+      const rawIdx = window.history.state?.idx;
+      const idx = Number.isInteger(rawIdx) && rawIdx >= 0 ? rawIdx : 0;
       // Returning to the entry right below us is a Back, not a new page. This
       // is what keeps Dashboard ⇄ Bookings ping-ponging 1 entry deep forever.
       if (idx > 0 && stackRef.current[idx - 1] === next) {
