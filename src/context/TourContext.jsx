@@ -181,17 +181,7 @@ export const TourProvider = ({ children }) => {
             side: 'bottom',
             align: 'center',
           },
-        },
-        {
-          popover: {
-            title: isBn ? 'যোগাযোগ করুন' : 'Contact Landlord',
-            description: isBn
-              ? 'যেকোনো প্রপার্টি কার্ডে "Inquiry" বাটনে ক্লিক করে মালিকের সাথে সরাসরি যোগাযোগ করতে পারবেন।'
-              : 'You can contact the landlord directly by clicking the "Inquiry" button on any property card.',
-            side: 'top',
-            align: 'center',
-          },
-        },
+        }
       ]);
 
       if (!steps.length) {
@@ -953,6 +943,70 @@ export const TourProvider = ({ children }) => {
     }
   }, [location.pathname, hasTourCompleted, activeTour, startLivingTour]);
 
+  const startSearchTour = useCallback(async () => {
+    if (hasTourCompleted('search') || startingRef.current) return;
+    startingRef.current = true;
+    if (!(await waitForAnchor('[data-tour="inquiry-button"]'))) {
+      startingRef.current = false;
+      return;
+    }
+
+    try {
+      const steps = resolveSteps([
+        {
+          element: '[data-tour="inquiry-button"]',
+          popover: {
+            title: isBn ? 'যোগাযোগ করুন' : 'Contact Landlord',
+            description: isBn
+              ? 'যেকোনো প্রপার্টি কার্ডে "Inquiry" বাটনে ক্লিক করে মালিকের সাথে সরাসরি যোগাযোগ করতে পারবেন।'
+              : 'You can contact the landlord directly by clicking the "Inquiry" button on any property card.',
+            side: 'top',
+            align: 'center',
+          },
+        },
+      ]);
+
+      if (!steps.length) {
+        startingRef.current = false;
+        return;
+      }
+
+      const driverObj = driver({
+        allowClose: true,
+        showProgress: false,
+        steps,
+        nextBtnText: isBn ? 'পরবর্তী' : 'Next',
+        prevBtnText: isBn ? 'পূর্ববর্তী' : 'Previous',
+        doneBtnText: isBn ? 'শেষ' : 'Done',
+        onDestroyed: () => {
+          markTourCompleted('search');
+          startingRef.current = false;
+          setActiveTour(null);
+          setDriverInstance(null);
+        },
+      });
+
+      setActiveTour('search');
+      setDriverInstance(driverObj);
+      driverObj.drive();
+    } catch (error) {
+      console.error('Failed to start search tour:', error);
+      startingRef.current = false;
+      setActiveTour(null);
+      setDriverInstance(null);
+    }
+  }, [isBn, hasTourCompleted]);
+
+  // Auto-start search tour for users arriving at /properties
+  useEffect(() => {
+    if (
+      location.pathname.startsWith('/properties') &&
+      !hasTourCompleted('search') &&
+      activeTour === null
+    ) {
+      startSearchTour();
+    }
+  }, [location.pathname, hasTourCompleted, activeTour, startSearchTour]);
 
   const value = {
     activeTour,
@@ -961,6 +1015,7 @@ export const TourProvider = ({ children }) => {
     startHostDashboardTour,
     startAddPropertyTour,
     startLivingTour,
+    startSearchTour,
     hasTourCompleted,
   };
 
