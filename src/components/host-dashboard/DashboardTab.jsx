@@ -116,7 +116,7 @@ export default function DashboardTab({
                     </p>
                   </div>
                 </div>
-                </div>
+
                 <div className="md:hidden shrink-0">
                   <div className={`w-fit px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1 ${pendingRentCount > 0 ? 'bg-[#ba0036] text-white shadow-lg shadow-red-500/20' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}>
                     {pendingRentCount > 0 ? (language === 'বাংলা' ? 'যাচাই করুন' : 'Verify Now') : (language === 'বাংলা' ? 'ম্যানেজ করুন' : 'Manage')} <ArrowUpRight size={14} />
