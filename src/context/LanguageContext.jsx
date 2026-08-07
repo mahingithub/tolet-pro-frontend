@@ -811,7 +811,7 @@ const translations = {
     // Navbar & Hero
     brand: "টু-লেট প্রো", 
     business: "ব্যবসা", 
-    listProperty: "বাড়ি দিন", 
+    listProperty: "ভাড়া দিন", 
     login: "লগইন / সাইনআপ", 
     allCities: "সব শহর",
     findYourNext: "খুঁজে নিন আপনার", 

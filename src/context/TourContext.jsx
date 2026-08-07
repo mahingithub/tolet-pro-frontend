@@ -200,7 +200,7 @@ export const TourProvider = ({ children }) => {
       }
 
       const driverObj = driver({
-        allowClose: false,
+        allowClose: true,
         showProgress: true,
         steps,
         nextBtnText: isBn ? 'পরবর্তী' : 'Next',
@@ -455,7 +455,7 @@ export const TourProvider = ({ children }) => {
       }
 
       dashboardDriverObj = driver({
-        allowClose: false,
+        allowClose: true,
         showProgress: true,
         steps,
         nextBtnText: isBn ? 'পরবর্তী' : 'Next',
@@ -541,7 +541,7 @@ export const TourProvider = ({ children }) => {
       ];
 
       driverObj = driver({
-        allowClose: false,
+        allowClose: true,
         showProgress: true,
         steps,
         nextBtnText: isBn ? 'পরবর্তী' : 'Next',
@@ -566,16 +566,18 @@ export const TourProvider = ({ children }) => {
     }
   }, [hasTourCompleted, navigate, isBn, startHostDashboardTour]);
 
-  const startAddPropertyTour = useCallback(async () => {
-    if (hasTourCompleted('add-property') || startingRef.current) return;
+  const startAddPropertyTour = useCallback(async (stepIndex = 1) => {
+    const tourId = `add-property-step-${stepIndex}`;
+    if (hasTourCompleted(tourId) || startingRef.current) return;
     startingRef.current = true;
-    if (!(await waitForAnchor('[data-tour="property-intent"]'))) {
-      startingRef.current = false;
-      return;
-    }
-
-    try {
-      const steps = resolveSteps([
+    
+    let rawSteps = [];
+    if (stepIndex === 1) {
+      if (!(await waitForAnchor('[data-tour="property-intent"]'))) {
+        startingRef.current = false;
+        return;
+      }
+      rawSteps = [
         {
           element: '[data-tour="property-intent"]',
           popover: {
@@ -608,30 +610,91 @@ export const TourProvider = ({ children }) => {
             side: 'top',
             align: 'start',
           },
-        },
+        }
+      ];
+    } else if (stepIndex === 2) {
+      if (!(await waitForAnchor('[data-tour="property-details"]'))) {
+        startingRef.current = false;
+        return;
+      }
+      rawSteps = [
+        {
+          element: '[data-tour="property-details"]',
+          popover: {
+            title: isBn ? 'বিবরণ' : 'Details',
+            description: isBn
+              ? 'বেডরুম, বাথরুম এবং অন্যান্য বিবরণ এখানে দিন।'
+              : 'Enter bedrooms, bathrooms, and other details here.',
+            side: 'top',
+            align: 'start',
+          },
+        }
+      ];
+    } else if (stepIndex === 3) {
+      if (!(await waitForAnchor('[data-tour="property-amenities"]'))) {
+        startingRef.current = false;
+        return;
+      }
+      rawSteps = [
+        {
+          element: '[data-tour="property-amenities"]',
+          popover: {
+            title: isBn ? 'সুযোগ-সুবিধা' : 'Amenities',
+            description: isBn
+              ? 'যেসব সুযোগ-সুবিধা আছে সেগুলো সিলেক্ট করুন।'
+              : 'Select the available amenities.',
+            side: 'top',
+            align: 'start',
+          },
+        }
+      ];
+    } else if (stepIndex === 4) {
+      if (!(await waitForAnchor('[data-tour="property-media"]'))) {
+        startingRef.current = false;
+        return;
+      }
+      rawSteps = [
+        {
+          element: '[data-tour="property-media"]',
+          popover: {
+            title: isBn ? 'ছবি ও ভিডিও' : 'Photos & Videos',
+            description: isBn
+              ? 'প্রপার্টির সুন্দর ছবি এবং ভিডিও আপলোড করুন।'
+              : 'Upload beautiful photos and videos of the property.',
+            side: 'top',
+            align: 'start',
+          },
+        }
+      ];
+    } else if (stepIndex === 5) {
+      if (!(await waitForAnchor('[data-tour="property-pricing"]'))) {
+        startingRef.current = false;
+        return;
+      }
+      rawSteps = [
         {
           element: '[data-tour="property-pricing"]',
           popover: {
-            title: isBn ? 'মূল্য' : 'Pricing',
+            title: isBn ? 'মূল্য নির্ধারণ' : 'Pricing',
             description: isBn
               ? 'আপনার প্রপার্টির ভাড়া বা মূল্য এখানে লিখুন।'
               : 'Enter the rent or price for your property here.',
             side: 'top',
             align: 'start',
           },
-        },
-      ]);
+        }
+      ];
+    }
 
-      // Pricing lives on a later wizard page, so its anchor is not visible while
-      // the user is still on page 1 — resolveSteps drops it rather than showing
-      // an unanchored popover.
+    try {
+      const steps = resolveSteps(rawSteps);
       if (!steps.length) {
         startingRef.current = false;
         return;
       }
 
       const driverObj = driver({
-        allowClose: false,
+        allowClose: true,
         showProgress: true,
         steps,
         nextBtnText: isBn ? 'পরবর্তী' : 'Next',
@@ -639,14 +702,14 @@ export const TourProvider = ({ children }) => {
         doneBtnText: isBn ? 'শেষ' : 'Done',
         progressText: isBn ? '{{current}} এর {{total}}' : '{{current}} of {{total}}',
         onDestroyed: () => {
-          markTourCompleted('add-property');
+          markTourCompleted(tourId);
           startingRef.current = false;
           setActiveTour(null);
           setDriverInstance(null);
         },
       });
 
-      setActiveTour('add-property');
+      setActiveTour(tourId);
       setDriverInstance(driverObj);
       driverObj.drive();
     } catch (error) {
@@ -716,16 +779,6 @@ export const TourProvider = ({ children }) => {
     }
   }, [location.pathname, hasTourCompleted, activeTour, startHostDashboardTour]);
 
-  // Auto-start add property tour when arriving at the listing form
-  useEffect(() => {
-    if (
-      location.pathname === '/list-property' &&
-      !hasTourCompleted('add-property') &&
-      activeTour === null
-    ) {
-      startAddPropertyTour();
-    }
-  }, [location.pathname, hasTourCompleted, activeTour, startAddPropertyTour]);
 
   const value = {
     activeTour,

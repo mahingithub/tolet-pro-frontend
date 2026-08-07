@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useTour } from '../context/TourContext.jsx';
 import { propertyService } from '../services/Propertyservice';
 import { subscriptionService, TIER_LIMITS } from '../services/subscriptionService';
 import { GoogleMap, MarkerF, useJsApiLoader } from '@react-google-maps/api';
@@ -1384,6 +1385,7 @@ const AddProperty = () => {
   const goBack = useGoBack('/host-dashboard');
   const location = useLocation();
   const { user, isAuthenticated } = useAuth();
+  const { startAddPropertyTour, hasTourCompleted } = useTour();
   const isBn = language === 'বাংলা';
 
   // localStorage key for the in-progress wizard draft. Used to bridge the
@@ -1482,19 +1484,36 @@ const AddProperty = () => {
   // they've typed anything would be hostile. They meet the upgrade prompt when
   // a limit actually bites (offerFreeTrial above).
   const didOfferOnEntryRef = useRef(false);
+  const [isInitialCheckDone, setIsInitialCheckDone] = useState(false);
   useEffect(() => {
     let alive = true;
     subscriptionService.fetchStatus().then(() => {
-      if (!alive || didOfferOnEntryRef.current) return;
-      if (trialSkippedThisSession()) return;
-      if (!subscriptionService.canClaimShareTrial()) return;
-      if (subscriptionService.getStatus().planState !== 'free_never') return;
-      didOfferOnEntryRef.current = true;
-      setTrialModal({ open: true, reason: 'entry' });
+      if (!alive) return;
+      if (
+        !didOfferOnEntryRef.current &&
+        !trialSkippedThisSession() &&
+        subscriptionService.canClaimShareTrial() &&
+        subscriptionService.getStatus().planState === 'free_never'
+      ) {
+        didOfferOnEntryRef.current = true;
+        setTrialModal({ open: true, reason: 'entry' });
+      }
+      setIsInitialCheckDone(true);
     });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-start add property tour after the initial trial check completes and
+  // only if the modal is not open.
+  useEffect(() => {
+    if (isInitialCheckDone && !trialModal.open && !hasTourCompleted(`add-property-step-${step}`)) {
+      const t = setTimeout(() => {
+        startAddPropertyTour(step);
+      }, 500);
+      return () => clearTimeout(t);
+    }
+  }, [isInitialCheckDone, trialModal.open, step, hasTourCompleted, startAddPropertyTour]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -2395,7 +2414,7 @@ const AddProperty = () => {
 
             {/* ════════ STEP 2: DETAILS ════════ */}
             {step === 2 && (
-              <div className="space-y-6">
+              <div className="space-y-6" data-tour="property-details">
                 <SectionHeader icon={FileText}
                   title={isBn ? 'প্রপার্টির বিবরণ' : 'Property Details'}
                   subtitle={isBn ? 'রুম এবং আয়তনের তথ্য দিন' : 'Provide room counts, size, and description'} />
@@ -2590,7 +2609,7 @@ const AddProperty = () => {
 
             {/* ════════ STEP 3: AMENITIES ════════ */}
             {step === 3 && (
-              <div className="space-y-6">
+              <div className="space-y-6" data-tour="property-amenities">
                 <SectionHeader icon={CheckCircle2}
                   title={isBn ? 'সুবিধাদি' : 'Amenities & Features'}
                   subtitle={isBn ? 'প্রপার্টিতে যা আছে তা সিলেক্ট করুন' : 'Select all features available in your property'} />
@@ -2639,7 +2658,7 @@ const AddProperty = () => {
 
             {/* ════════ STEP 4: MEDIA ════════ */}
             {step === 4 && (
-              <div className="space-y-6">
+              <div className="space-y-6" data-tour="property-media">
                 <SectionHeader icon={ImageIcon}
                   title={isBn ? 'ছবি ও ভিডিও' : 'Photos & Video'}
                   subtitle={isBn ? 'প্রথমে মূল ছবি, তারপর রুম অনুযায়ী ছবি যোগ করুন' : 'Add cover photo first, then room-by-room photos'} />
