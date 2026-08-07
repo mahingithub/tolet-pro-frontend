@@ -227,6 +227,10 @@ export const TourProvider = ({ children }) => {
 
   const startHostDashboardTour = useCallback(async () => {
     if (hasTourCompleted('host-dashboard') || startingRef.current) return;
+    
+    // Do not start if the welcome robot is currently active on screen
+    if (document.getElementById('welcome-robot-overlay')) return;
+    
     startingRef.current = true;
     
     if (!(await waitForAnchor('[data-tour="host-stats-grid"]'))) {

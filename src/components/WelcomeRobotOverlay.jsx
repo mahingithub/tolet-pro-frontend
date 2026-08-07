@@ -306,6 +306,7 @@ const WelcomeRobotOverlay = () => {
       <AnimatePresence>
         {phase === 'open' && eventInfo && (
           <motion.div
+            id="welcome-robot-overlay"
             key="wr-root"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
