@@ -273,6 +273,25 @@ export const TourProvider = ({ children }) => {
               : 'Track your total rent collection and outstanding dues at a glance.',
             side: 'top',
             align: 'start',
+            onNextClick: () => {
+              const btn = document.getElementById('host-more-actions-btn');
+              const dropdown = document.getElementById('host-more-actions-dropdown');
+              if (btn && !dropdown) {
+                btn.click();
+              }
+              setTimeout(() => { dashboardDriverObj.moveNext(); }, 300);
+            }
+          },
+        },
+        {
+          element: '[data-tour="host-more-actions"]',
+          popover: {
+            title: isBn ? 'আরও অ্যাকশন' : 'More Actions',
+            description: isBn
+              ? 'এখানে আপনি রিপোর্ট দেখা, নতুন চুক্তি তৈরি বা সবাইকে মেসেজ দেওয়ার মতো অতিরিক্ত অপশনগুলো পাবেন।'
+              : 'Here you will find additional options like viewing reports, creating new leases, or messaging all tenants.',
+            side: 'top',
+            align: 'start',
           },
         },
         {

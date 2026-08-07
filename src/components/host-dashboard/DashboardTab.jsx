@@ -377,8 +377,9 @@ export default function DashboardTab({
       {/* ২. আরও অ্যাকশন — কোলাপসিবল।  {/* ১.৩.২ Rent Card - Dashboard e ar dorkar nai, 
           যা উপরের শর্টকাট সারির সাথে মিলে ডুপ্লিকেট মনে হতো। সব
           অপশন রেখে ডিফল্টে লুকানো, যাতে ড্যাশবোর্ড পরিষ্কার থাকে। */}
-      <div>
+      <div data-tour="host-more-actions">
         <button
+          id="host-more-actions-btn"
           type="button"
           onClick={() => setMoreActionsOpen((v) => !v)}
           className="w-full flex items-center justify-between gap-3 bg-white dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 shadow-[0_4px_20px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] active:scale-[0.99] transition-all"
@@ -397,7 +398,7 @@ export default function DashboardTab({
         </button>
 
         {moreActionsOpen && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div id="host-more-actions-dropdown" className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3 animate-in fade-in slide-in-from-top-2 duration-300">
             {[
               { id: 'documents',       icon: FileText,  label: language === 'বাংলা' ? 'ডকুমেন্ট ও অ্যানালিটিক্স' : 'Docs & Analytics', color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-950/40', border: 'border-violet-100 dark:border-violet-800/50', onClick: () => setActiveTab('documents') },
               { id: 'create_lease',    icon: FileEdit,  label: language === 'বাংলা' ? 'নতুন চুক্তি' : 'New Contract',      color: 'text-blue-600 dark:text-blue-400',     bg: 'bg-blue-50 dark:bg-blue-950/40',     border: 'border-blue-100 dark:border-blue-800/50',     onClick: () => (isPremium ? openBlankLease() : setActiveModal('premium_gate')) },
