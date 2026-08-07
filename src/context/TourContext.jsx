@@ -579,6 +579,17 @@ export const TourProvider = ({ children }) => {
       }
       rawSteps = [
         {
+          element: '[data-tour="property-gps"]',
+          popover: {
+            title: isBn ? 'GPS লোকেশন' : 'GPS Location',
+            description: isBn
+              ? 'ঐচ্ছিক\nGPS বাটন চাপলে আপনার বর্তমান অবস্থান স্বয়ংক্রিয়ভাবে সেট হবে এবং মানচিত্রে দেখাবে।'
+              : 'Optional\nClicking the GPS button will automatically set your current location and show it on the map.',
+            side: 'top',
+            align: 'start',
+          },
+        },
+        {
           element: '[data-tour="property-intent"]',
           popover: {
             title: isBn ? 'উদ্দেশ্য' : 'Listing Intent',

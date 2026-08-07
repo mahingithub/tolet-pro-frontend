@@ -1099,6 +1099,7 @@ const GpsPanel = ({ form, set, isBn }) => {
           type="button"
           onClick={detectLocation}
           disabled={gpsLoading}
+          data-tour="property-gps"
           className="flex items-center gap-2.5 px-5 py-3 rounded-xl bg-[#ba0036] text-white text-xs font-black shadow-[0_6px_16px_rgba(186,0,54,0.25)] hover:shadow-[0_10px_24px_rgba(186,0,54,0.35)] hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-60 disabled:pointer-events-none"
         >
           {gpsLoading ? (
