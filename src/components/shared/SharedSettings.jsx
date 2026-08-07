@@ -361,9 +361,9 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
   // session token, so sign the user out locally and send them to login.
   const handlePasswordChanged = useCallback(async () => {
     setPwModalOpen(false);
+    // logout() performs the redirect itself.
     try { await logout(); } catch { /* ignore */ }
-    navigate('/');
-  }, [logout, navigate]);
+  }, [logout]);
 
   const isTenant = typeof hasRole === 'function' ? hasRole('tenant') : true;
   const isLandlord = typeof hasRole === 'function' ? hasRole('landlord') : false;
@@ -487,7 +487,7 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
           <Row
             label={bn ? 'লগ আউট' : 'Sign out'}
             right={
-              <ActionButton onClick={async () => { await logout(); navigate('/'); }} tone="danger" icon={LogOut}>
+              <ActionButton onClick={async () => { await logout(); }} tone="danger" icon={LogOut}>
                 {bn ? 'এখন লগআউট' : 'Sign out'}
               </ActionButton>
             }

@@ -752,7 +752,114 @@ html.dark .tp-card-plus .border-gray-100 { border-color: rgba(129, 140, 248, 0.2
 .tp-card-plus .bg-gray-100,
 .tp-card-pro .bg-gray-200,
 .tp-card-plus .bg-gray-200 { background-color: #e5e7eb !important; }
-html.dark .tp-card-pro .bg-gray-100,
 html.dark .tp-card-plus .bg-gray-100,
 html.dark .tp-card-pro .bg-gray-200,
 html.dark .tp-card-plus .bg-gray-200 { background-color: var(--tp-surface-2) !important; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   FUTURISTIC DRIVER.JS POPOVER
+   ────────────────────────────────────────────────────────────────────────── */
+div.driver-popover {
+  background: rgba(15, 23, 42, 0.85) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 1.5rem !important;
+  padding: 24px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+  color: #fff !important;
+  min-width: 320px !important;
+}
+
+div.driver-popover-title {
+  color: #fff !important;
+  font-size: 1.25rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.025em !important;
+  margin-bottom: 8px !important;
+}
+
+div.driver-popover-description {
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-size: 0.9rem !important;
+  line-height: 1.5 !important;
+}
+
+button.driver-popover-close-btn {
+  color: rgba(255, 255, 255, 0.4) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 50% !important;
+  width: 28px !important;
+  height: 28px !important;
+  top: 16px !important;
+  right: 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-shadow: none !important;
+  font-weight: 300 !important;
+  transition: all 0.2s ease !important;
+}
+
+button.driver-popover-close-btn:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+div.driver-popover-footer {
+  margin-top: 24px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  padding-top: 16px !important;
+}
+
+span.driver-popover-progress-text {
+  color: rgba(255, 255, 255, 0.5) !important;
+  font-weight: 600 !important;
+  font-size: 0.8rem !important;
+}
+
+.driver-popover-navigation-btns {
+  display: flex !important;
+  gap: 8px !important;
+}
+
+button.driver-popover-footer-btn {
+  border: none !important;
+  border-radius: 0.75rem !important;
+  padding: 8px 16px !important;
+  font-weight: 700 !important;
+  font-size: 0.85rem !important;
+  text-shadow: none !important;
+  transition: all 0.2s ease !important;
+}
+
+button.driver-popover-footer-btn.driver-popover-btn-disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+}
+
+button.driver-popover-prev-btn {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+}
+
+button.driver-popover-prev-btn:hover:not(.driver-popover-btn-disabled) {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+button.driver-popover-next-btn {
+  background: #ba0036 !important;
+  color: #fff !important;
+  box-shadow: 0 4px 15px rgba(186, 0, 54, 0.3) !important;
+}
+
+button.driver-popover-next-btn:hover:not(.driver-popover-btn-disabled) {
+  background: #ff004c !important;
+  box-shadow: 0 6px 20px rgba(255, 0, 76, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Hide the arrow completely for a cleaner floating HUD look */
+.driver-popover-arrow {
+  display: none !important;
+}

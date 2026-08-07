@@ -1322,7 +1322,7 @@ useEffect(() => {
                   setShowTypeChoice(false);
                   navigate(`/properties/${pendingDistrictSlug}?category=family`);
                 }}
-                className="group relative w-full flex items-center gap-4 p-5 rounded-2xl border-2 border-gray-100 bg-gradient-to-br from-white to-gray-50/80 hover:border-[#ba0036]/40 hover:shadow-[0_8px_30px_rgba(186,0,54,0.12)] transition-all duration-200 active:scale-[0.98] text-left overflow-hidden"
+                className="group relative w-full flex items-center gap-4 p-5 rounded-2xl border-2 border-gray-100 bg-gray-50 hover:border-[#ba0036]/40 hover:shadow-[0_8px_30px_rgba(186,0,54,0.12)] transition-all duration-200 active:scale-[0.98] text-left overflow-hidden"
               >
                 <div className="absolute -top-6 -right-6 w-20 h-20 bg-[#ba0036]/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                 <div className="w-14 h-14 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center shrink-0 group-hover:bg-[#ba0036] group-hover:border-[#ba0036] transition-all duration-200 shadow-sm">
@@ -1345,7 +1345,7 @@ useEffect(() => {
                   setShowTypeChoice(false);
                   navigate(`/properties/${pendingDistrictSlug}?category=commercial`);
                 }}
-                className="group relative w-full flex items-center gap-4 p-5 rounded-2xl border-2 border-gray-100 bg-gradient-to-br from-white to-gray-50/80 hover:border-blue-400/40 hover:shadow-[0_8px_30px_rgba(59,130,246,0.12)] transition-all duration-200 active:scale-[0.98] text-left overflow-hidden"
+                className="group relative w-full flex items-center gap-4 p-5 rounded-2xl border-2 border-gray-100 bg-gray-50 hover:border-blue-400/40 hover:shadow-[0_8px_30px_rgba(59,130,246,0.12)] transition-all duration-200 active:scale-[0.98] text-left overflow-hidden"
               >
                 <div className="absolute -top-6 -right-6 w-20 h-20 bg-blue-500/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                 <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 group-hover:bg-blue-500 group-hover:border-blue-500 transition-all duration-200 shadow-sm">

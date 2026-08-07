@@ -53,10 +53,13 @@ export const isAdminRole = (role) => ADMIN_ROLES.includes(role);
 export const getCurrentUser  = () => readJson(KEY_USER);
 export const getCurrentToken = () => window.localStorage.getItem(KEY_TOKEN);
 
-async function api(path, { method = 'POST', body, auth: useAuth = false } = {}) {
+// `token` overrides the stored session token. Only logout needs it: it clears
+// storage up front so the UI can flip immediately, and still has to authenticate
+// its own best-effort revocation call afterwards.
+async function api(path, { method = 'POST', body, auth: useAuth = false, token } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (useAuth) {
-    const t = getCurrentToken();
+    const t = token || getCurrentToken();
     if (t) headers.Authorization = `Bearer ${t}`;
   }
   const res = await fetch(`${API_URL}${path}`, {
@@ -183,13 +186,33 @@ export const resetPassword = ({ phoneNumber, otp, newPassword }) =>
 // ─── Session ───────────────────────────────────────────────────────────────
 export const fetchMe = () => api('/me', { method: 'GET', auth: true }).then((d) => d.user);
 
-export const logout = async () => {
-  try { await unsubscribeFromPushNotifications(); } catch { /* ignore */ }
-  try { await api('/logout', { auth: true }); } catch { /* ignore */ }
+export const logout = () => {
+  // Keep the token so the background revocation below can still authenticate
+  // after storage is wiped.
+  const token = getCurrentToken();
+
   // Full wipe (keeps only language + PWA prefs). Matches the product rule:
   // "on logout the data is gone". The AuthContext hard-reloads afterwards so
   // no stale in-memory state from this account survives either.
+  //
+  // This runs FIRST and synchronously. Signing out is a local decision — the
+  // session is dead the moment we drop the token — so the UI must never wait
+  // on the network to reflect it. Awaiting the two calls below meant a slow or
+  // unreachable backend left the user parked on a still-logged-in dashboard
+  // for seconds after they clicked, and the redirect only landed once the
+  // requests settled.
   clearAllAppData();
+
+  // Best-effort server-side cleanup: revoke the session and stop push for this
+  // device. Deliberately fire-and-forget — the caller redirects immediately and
+  // the page may well unload mid-flight, which is fine. Nothing the user sees
+  // depends on the outcome, and failures are already non-fatal (an unrevoked
+  // access token expires on its own).
+  void (async () => {
+    try { await unsubscribeFromPushNotifications({ token }); } catch { /* ignore */ }
+    try { await api('/logout', { auth: true, token }); } catch { /* ignore */ }
+  })();
+
   return { ok: true };
 };
 

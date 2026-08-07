@@ -1951,7 +1951,9 @@ const handleWizardSubmit = async (payload) => {
             onClick={async () => {
               showProfileToast(language === 'বাংলা' ? 'লগআউট হচ্ছে...' : 'Logging out...');
               // `replace` so Back can't walk back into the signed-out dashboard.
-              try { await authLogout(); } finally { setIsProfileDrawerOpen(false); navigate('/', { replace: true }); }
+              // authLogout() redirects on its own — no navigate() here, or the
+              // two compete and the loser flashes a route on the way out.
+              try { await authLogout(); } finally { setIsProfileDrawerOpen(false); }
             }}
             className="flex items-center justify-center gap-2 text-[#3b2a2a] hover:text-[#ba0036] font-bold transition-colors w-full py-1.5 group"
           >

@@ -25,6 +25,10 @@ export const AuthProvider = ({ children }) => {
   // the previous user's data before the effect below wipes it).
   const [user, setUser] = useState(() => (isSessionExpired() ? null : getCurrentUser()));
 
+  // True from the moment a logout starts until the page navigates away. Lets
+  // route guards suppress their /login redirect during the teardown window.
+  const [loggingOut, setLoggingOut] = useState(false);
+
   // On boot, if a token exists, validate it server-side via /me. If the token
   // is invalid or the user was deleted, this returns null and we clear the
   // local session so stale data can't impersonate a real account.
@@ -185,13 +189,26 @@ export const AuthProvider = ({ children }) => {
         // অ্যাডমিন প্যানেলে ওয়েলকাম রোবট দেখানো হয় না, তাই এখানে dispatch নেই।
         return u;
       },
+      loggingOut,
       logout: async () => {
-        await svcLogout();
+        // Mark the logout as in flight BEFORE the session disappears. Clearing
+        // the user re-renders every <RequireAuth> on screen, and a dashboard
+        // that suddenly has no user would redirect to /login?next=<dashboard>
+        // — a login screen nobody asked for, flashed up for however long the
+        // hard reload below takes to commit. RequireAuth checks this flag and
+        // holds its redirect instead.
+        setLoggingOut(true);
+        svcLogout();
         setUser(null);
         // Hard reload to a clean state so NO stale in-memory data from this
         // account (dashboard cards, chat threads, etc.) lingers until the next
         // manual reload — the exact bug where a re-login showed the old data.
-        try { window.location.assign('/'); } catch { /* ignore */ }
+        //
+        // replace(), not assign(): the page they signed out of must not stay in
+        // history, or Back lands on a protected route and bounces to /login.
+        // This is the ONLY navigation logout performs — callers must not add
+        // their own navigate(), which used to race this one.
+        try { window.location.replace('/'); } catch { setLoggingOut(false); }
       },
       updateMe: async (patch) => {
         const u = await svcUpdateMe(patch);
@@ -219,7 +236,7 @@ export const AuthProvider = ({ children }) => {
       },
       refresh,
     };
-  }, [user, refresh]);
+  }, [user, refresh, loggingOut]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

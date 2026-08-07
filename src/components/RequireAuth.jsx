@@ -21,8 +21,14 @@ import { useAuth } from '../context/AuthContext.jsx';
  * single-valued `role`, so role switching mid-session works correctly.
  */
 const RequireAuth = ({ children, requireRole }) => {
-  const { isAuthenticated, roles } = useAuth();
+  const { isAuthenticated, roles, loggingOut } = useAuth();
   const location = useLocation();
+
+  // A logout in progress is already navigating this page away. Redirecting to
+  // /login here would only paint a login screen the user never asked for, on
+  // top of the destination they're actually headed to. Render nothing and let
+  // the pending navigation land.
+  if (loggingOut) return null;
 
   if (!isAuthenticated) {
     const next = encodeURIComponent(location.pathname + location.search);

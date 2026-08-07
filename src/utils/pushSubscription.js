@@ -65,13 +65,21 @@ const saveSubscriptionToBackend = async (subscription) => {
   }
 };
 
-export const unsubscribeFromPushNotifications = async () => {
+/**
+ * Tear down this device's push subscription.
+ *
+ * `token` may be passed explicitly by callers that have already cleared the
+ * stored session (logout does this so the UI can flip instantly). Without it
+ * the token read below would come back null once storage is wiped, the DELETE
+ * would be skipped, and the server would keep pushing to a signed-out device.
+ */
+export const unsubscribeFromPushNotifications = async ({ token: explicitToken } = {}) => {
   if (!('serviceWorker' in navigator)) return;
   try {
     const registration = await navigator.serviceWorker.ready;
     const subscription = await registration.pushManager.getSubscription();
     if (subscription) {
-      const token = getCurrentToken();
+      const token = explicitToken || getCurrentToken();
       if (token) {
         await fetch(`${API_URL}/push/subscribe`, {
           method: 'DELETE',
