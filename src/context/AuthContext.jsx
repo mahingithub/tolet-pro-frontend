@@ -131,11 +131,33 @@ export const AuthProvider = ({ children }) => {
       // ──────────────────────────────────────────────────────────────────
       login: async (input, requestedRole) => {
         let u = await svcLogin(input);
-        
+
         const loggedInRoles = Array.isArray(u?.roles) && u.roles.length ? u.roles : (u?.role ? [u.role] : []);
-        
-        // If the user requested a specific role on the login screen, and they have that role,
-        // but it's not their active role, switch them to the requested role.
+
+        // ── Role gate ───────────────────────────────────────────────────────
+        // The login screen asks which side the user is signing in on. If the
+        // account doesn't own that role the login must FAIL LOUDLY, not hand
+        // back a session for the other side: a tenant-only account picking
+        // "Landlord" used to log in fine and then get silently bounced from
+        // /host-dashboard to /tenant-dashboard by <RequireAuth requireRole>,
+        // with no hint as to why. Admin-type accounts are exempt — they sign in
+        // through this same form and get routed to the admin panel.
+        if (requestedRole
+          && !loggedInRoles.some(isAdminRole)
+          && !loggedInRoles.includes(requestedRole)) {
+          // svcLogin has already persisted the token, so tear the session back
+          // down — a rejected login must not leave a usable one behind.
+          try { await svcLogout(); } catch { /* storage is cleared regardless */ }
+          setUser(null);
+          const err = new Error('ROLE_MISMATCH');
+          err.code = 'ROLE_MISMATCH';
+          err.requestedRole = requestedRole;
+          err.actualRoles = loggedInRoles;
+          throw err;
+        }
+
+        // They own the requested role but it isn't the active one — switch, so
+        // the UI opens on the side they picked.
         if (requestedRole && loggedInRoles.includes(requestedRole) && u.role !== requestedRole) {
            try {
              u = await svcSetActiveRole(requestedRole);

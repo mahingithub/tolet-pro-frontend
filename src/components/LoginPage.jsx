@@ -121,6 +121,10 @@ const LoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [infoMsg, setInfoMsg] = useState('');
+  // Set to the role the account ACTUALLY owns after a wrong-side login attempt,
+  // so we can offer a one-tap "switch and try again" instead of leaving the
+  // user to work out which tab they were supposed to use.
+  const [roleMismatch, setRoleMismatch] = useState(null);
 
   const [formData, setFormData] = useState({ name: '', phone: '', password: '' });
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -155,11 +159,20 @@ const LoginPage = () => {
   const handlePhoneChange = (e) =>
     setFormData((d) => ({ ...d, phone: normalizePhoneInput(e.target.value).slice(0, 10) }));
 
+  // Changing the tenant/landlord tab clears a previous wrong-side error so the
+  // stale "You are not a landlord." message doesn't sit above the other tab.
+  const selectRole = (r) => {
+    setRole(r);
+    setRoleMismatch(null);
+    setErrorMsg('');
+  };
+
   const switchMode = (m) => {
     setMode(m);
     setStep(STEPS.FORM);
     setErrorMsg('');
     setInfoMsg('');
+    setRoleMismatch(null);
     setOtp(['', '', '', '', '', '']);
     setFormData({ name: '', phone: '', password: '' });
     setNewPassword('');
@@ -168,7 +181,7 @@ const LoginPage = () => {
   // ─── LOGIN flow (no OTP) ──────────────────────────────────────────────────
   const submitLogin = async (e) => {
     e.preventDefault();
-    setIsLoading(true); setErrorMsg(''); setInfoMsg('');
+    setIsLoading(true); setErrorMsg(''); setInfoMsg(''); setRoleMismatch(null);
     try {
       const loggedInUser = await login({ phone: toE164(formData.phone), password: formData.password }, role);
       if (['super_admin', 'moderator', 'support_agent'].includes(loggedInUser?.role)) {
@@ -177,6 +190,22 @@ const LoginPage = () => {
         goToNextOrDashboard(role);
       }
     } catch (err) {
+      // The account exists and the password is right, but it doesn't own the
+      // role selected above. Say so plainly and point at the side they DO own,
+      // instead of a generic "login failed" that looks like a wrong password.
+      if (err?.code === 'ROLE_MISMATCH') {
+        const owns = Array.isArray(err.actualRoles) ? err.actualRoles : [];
+        const otherSide = owns.includes('landlord') ? 'landlord'
+          : owns.includes('tenant') ? 'tenant'
+          : null;
+        setErrorMsg(
+          role === 'tenant'
+            ? L('You are not a tenant.', 'আপনি ভাড়াটিয়া নন।')
+            : L('You are not a landlord.', 'আপনি বাড়িওয়ালা নন।'),
+        );
+        setRoleMismatch(otherSide);
+        return;
+      }
       handleError(err, 'লগইন ব্যর্থ হয়েছে।', 'Login failed.');
     } finally {
       setIsLoading(false);
@@ -512,6 +541,19 @@ const LoginPage = () => {
             {errorMsg && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm font-semibold text-red-600 text-center">
                 {errorMsg}
+                {/* Wrong side: offer the correct one so the user isn't stuck
+                    guessing which tab their account lives on. */}
+                {roleMismatch && (
+                  <button
+                    type="button"
+                    onClick={() => selectRole(roleMismatch)}
+                    className="block w-full mt-2 text-xs font-bold text-brandRed underline"
+                  >
+                    {roleMismatch === 'landlord'
+                      ? L('This account is a landlord — log in as landlord', 'এই অ্যাকাউন্টটি বাড়িওয়ালার — বাড়িওয়ালা হিসেবে লগইন করুন')
+                      : L('This account is a tenant — log in as tenant', 'এই অ্যাকাউন্টটি ভাড়াটিয়ার — ভাড়াটিয়া হিসেবে লগইন করুন')}
+                  </button>
+                )}
               </div>
             )}
             {infoMsg && !errorMsg && (
@@ -532,14 +574,14 @@ const LoginPage = () => {
                   <div className="flex bg-gray-100 p-1 rounded-xl mb-5">
                     <button
                       type="button"
-                      onClick={() => setRole('tenant')}
+                      onClick={() => selectRole('tenant')}
                       className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all ${role === 'tenant' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                       {L('Tenant', 'ভাড়াটিয়া')}
                     </button>
                     <button
                       type="button"
-                      onClick={() => setRole('landlord')}
+                      onClick={() => selectRole('landlord')}
                       className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all ${role === 'landlord' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                       {L('Landlord', 'বাড়িওয়ালা')}

@@ -153,7 +153,7 @@ const Living = () => {
 
       {/* ── Header (full width) ─────────────────────────────────────── */}
       <div className="w-full max-w-6xl xl:max-w-7xl mx-auto z-40 relative px-4">
-        <header className="mt-4 bg-white/60 backdrop-blur-3xl border border-white/80 rounded-[2rem] px-3.5 py-3 flex items-center justify-between gap-3 shadow-[0_8px_30px_rgb(0,0,0,0.05)]">
+        <header data-tour="living-header" className="mt-4 bg-white/60 backdrop-blur-3xl border border-white/80 rounded-[2rem] px-3.5 py-3 flex items-center justify-between gap-3 shadow-[0_8px_30px_rgb(0,0,0,0.05)]">
           <div className="flex items-center gap-2.5 min-w-0">
             <button
               onClick={back}
@@ -179,6 +179,7 @@ const Living = () => {
 
           <div className="flex items-center gap-2 shrink-0">
             <button
+              data-tour="living-reminders"
               onClick={() => go('reminders')}
               className="relative p-2.5 bg-white/70 rounded-xl border border-white/80 shadow-sm text-gray-500 hover:text-[#ba0036] hover:bg-white active:scale-90 transition"
               aria-label={isBn ? 'রিমাইন্ডার' : 'Reminders'}
@@ -193,6 +194,7 @@ const Living = () => {
 
             {/* Profile — reachable straight from the Living tab (mobile + desktop). */}
             <button
+              data-tour="living-profile"
               onClick={() => navigate('/tenant-dashboard?tab=profile')}
               className="rounded-full border border-white/80 shadow-sm active:scale-90 transition"
               aria-label={isBn ? 'প্রোফাইল' : 'Profile'}
@@ -217,7 +219,7 @@ const Living = () => {
       <div className="w-full max-w-6xl xl:max-w-7xl mx-auto px-4 relative z-10 mt-3 lg:flex lg:gap-6 lg:items-start">
         {/* MOBILE: sticky segmented tab bar (5 primary modules) */}
         <div className="lg:hidden sticky top-0 z-30 -mx-4 px-4 pt-1 pb-1.5 bg-[#eaeff5]/85 backdrop-blur-xl">
-          <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/70 border border-white/80 shadow-[0_6px_20px_-14px_rgba(15,23,42,0.3)]">
+          <div data-tour="living-mobile-nav" className="flex items-center gap-1 p-1 rounded-2xl bg-white/70 border border-white/80 shadow-[0_6px_20px_-14px_rgba(15,23,42,0.3)]">
             {NAV_MODULES.map((m) => {
               const Icon = m.icon;
               const active = module === m.id;
@@ -243,7 +245,7 @@ const Living = () => {
         <aside className="hidden lg:block w-60 shrink-0 lg:sticky lg:top-4">
           {/* Solid bg (no backdrop-blur): this rail is sticky, so blurring its
               backdrop every scroll frame was a desktop-jank source. */}
-          <nav className="bg-white/95 border border-white/80 rounded-3xl p-2 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.35)] space-y-1">
+          <nav data-tour="living-desktop-nav" className="bg-white/95 border border-white/80 rounded-3xl p-2 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.35)] space-y-1">
             {MODULES.map((m) => {
               const Icon = m.icon;
               const active = module === m.id;
@@ -273,8 +275,8 @@ const Living = () => {
           </nav>
         </aside>
 
-        {/* Content */}
-        <main id="living-scroll" className="flex-1 min-w-0 pt-3 lg:pt-0 pb-28 lg:pb-12">
+        {/* Main Content Area */}
+        <main id="living-scroll" data-tour="living-content" className="flex-1 min-w-0 pb-24 lg:pb-12 mt-3 lg:mt-0 relative z-20">
           <AnimatePresence mode="wait">
             <motion.div
               key={module}

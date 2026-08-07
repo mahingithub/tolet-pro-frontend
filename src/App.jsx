@@ -257,7 +257,14 @@ const AppLayout = () => {
 					}
 				/>
 				<Route path="/messages" element={<ChatSystem />} />
-				<Route path="/tenant-dashboard" element={<TenantDashboard />} />
+				<Route
+					path="/tenant-dashboard"
+					element={
+						<RequireAuth requireRole="tenant">
+							<TenantDashboard />
+						</RequireAuth>
+					}
+				/>
 				<Route
 					path="/living"
 					element={

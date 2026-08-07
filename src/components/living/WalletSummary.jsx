@@ -428,12 +428,12 @@ const WalletSummary = ({ go, me, language }) => {
                 </p>
               </div>
             </div>
-            <button onClick={() => setAddOpen(true)} className="flex items-center gap-1 bg-gray-100 text-gray-700 pl-2.5 pr-3 py-2 rounded-xl text-[12px] font-black active:scale-95 transition shrink-0">
+            <button data-tour="living-add-roommate" onClick={() => setAddOpen(true)} className="flex items-center gap-1 bg-gray-100 text-gray-700 pl-2.5 pr-3 py-2 rounded-xl text-[12px] font-black active:scale-95 transition shrink-0">
               <UserPlus size={15} /> {isBn ? 'যোগ' : 'Add'}
             </button>
           </div>
 
-          <button onClick={() => setConnectOpen(true)} className="w-full flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#ba0036]/[0.07] to-transparent border border-[#ba0036]/15 px-3.5 py-3 active:scale-[0.99] transition">
+          <button data-tour="living-connect-roommates" onClick={() => setConnectOpen(true)} className="w-full flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#ba0036]/[0.07] to-transparent border border-[#ba0036]/15 px-3.5 py-3 active:scale-[0.99] transition">
             <IconBadge icon={Users} tint="bg-[#ba0036]/10" text="text-[#ba0036]" size={40} iconSize={18} />
             <div className="flex-1 text-left min-w-0">
               <p className="text-[13px] font-black text-gray-900">{isBn ? 'রুমমেট কানেক্ট করুন' : 'Connect your roommates'}</p>
