@@ -56,6 +56,7 @@ import SmartAlertsPopup from './SmartAlertsPopup';
 import { buildRentAlerts, buildLeaseAlerts, buildInquiryAlerts } from '../utils/rentAlerts';
 import { loadSeenMap, isInquiryUnread, markInquirySeen } from '../utils/inquiryUnread';
 import Aiinsightspage from './Aiinsightspage';
+import MediaLightbox from './MediaLightbox';
 import { jsPDF } from 'jspdf';
 import useDeepLinkHighlight, { highlightNotifTarget } from '../hooks/useDeepLinkHighlight';
 import useTabHistory from '../hooks/useTabHistory';
@@ -534,7 +535,6 @@ const rentUnitsOf = (booking) => {
     ledger: m.ledger || {},
   }));
 };
-
 // The property formats the New Lease form supports. Hostel is multi-member
 // (seats); the rest are classic single-tenant.
 const PROPERTY_FORMATS = {
@@ -581,6 +581,7 @@ const HostDashboard = () => {
     tabs: HOST_TABS,
     defaultTab: HOST_ROOT_TAB,
   });
+  const [lightbox, setLightbox] = useState(null);
   // Logo → "where to?" popup. For a landlord the dashboard IS home, so tapping
   // the TO-LET PRO logo asks whether to visit the public site or stay here
   // (see LandlordHomeChoiceModal at the bottom of the render).
@@ -3023,11 +3024,11 @@ const HostDashboard = () => {
     { id: 'documents', icon: Folder, label: language === 'বাংলা' ? 'ডকুমেন্ট ও অ্যানালিটিক্স' : "Documents & Analytics" },
     { id: 'properties', icon: Building, label: t?.myProperties || (language === 'বাংলা' ? 'আমার বাসাসমূহ' : "My Properties") },
     { id: 'inquiries', icon: Zap, label: t?.inquiries || (language === 'বাংলা' ? 'যোগাযোগ সমূহ' : "Inquiries") },
-    { id: 'messages', icon: MessageCircle, label: t?.messages || (language === 'বাংলা' ? 'বার্তা' : "Messages"), isLink: true, path: '/messages' },
+    { id: 'messages', icon: MessageCircle, label: t?.messages || (language === 'বাংলা' ? 'মেসেজ' : "Messages"), isLink: true, path: '/messages' },
     // Bookings + Rent Collection share the same `bookings` data and now live
     // under ONE sidebar entry; a segmented toggle at the top of the view
     // switches between the two (setActiveTab still uses 'bookings' | 'rent').
-    { id: 'bookings', icon: Calendar, label: language === 'বাংলা' ? 'বুকিং ও রেন্ট' : "Bookings & Rent" },
+    { id: 'bookings', icon: Calendar, label: language === 'বাংলা' ? 'ভাড়াটিয়া ও রেন্ট' : "Tenants & Rent" },
     { id: 'payments', icon: CreditCard, label: language === 'বাংলা' ? 'পেমেন্ট সেটিংস' : 'Payment Settings' },
     { id: 'smartAlerts', icon: BellRing, label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্টস' : 'Smart Alerts' },
     { id: 'aiInsights',  icon: Sparkles, label: language === 'বাংলা' ? 'এআই ইনসাইটস'   : 'AI Insights' },
@@ -3155,7 +3156,7 @@ const HostDashboard = () => {
                 // sm+:  revert to the original absolute placement under the bell.
                 <div className="fixed sm:absolute top-[5.25rem] sm:top-full inset-x-3 sm:inset-auto sm:right-0 sm:mt-3 w-auto sm:w-72 max-h-[calc(100vh-6rem)] sm:max-h-none overflow-y-auto sm:overflow-visible bg-white/95 backdrop-blur-3xl border border-white shadow-[0_30px_60px_rgba(0,0,0,0.12)] rounded-[1.5rem] p-2 z-[100] animate-in fade-in zoom-in-95 origin-top-right">
                   <div className="p-3 border-b border-gray-50 flex justify-between items-center">
-                    <h3 className="text-[13px] font-black text-gray-900 tracking-tight">{t?.notifications || (language === 'বাংলা' ? 'নোটিফিকেশন' : 'Notifications')}</h3>
+                    <h3 className="text-[13px] font-black text-gray-900 tracking-tight">{t?.notifications || (language === 'বাংলা' ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts')}</h3>
                     {unreadCount > 0 && (
                       <span className="bg-[#ba0036]/10 text-[#ba0036] px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest">{unreadCount} {t?.new || (language === 'বাংলা' ? 'নতুন' : 'New')}</span>
                     )}
@@ -3196,7 +3197,7 @@ const HostDashboard = () => {
               className="hidden sm:inline-flex items-center gap-1.5 pl-2.5 pr-3 py-2 rounded-xl border border-[#ba0036]/30 text-[#ba0036] bg-white/60 hover:bg-[#ba0036]/[0.06] hover:border-[#ba0036]/50 transition-all shadow-sm active:scale-95"
             >
               <PlusCircle size={16} strokeWidth={2.5} />
-              <span className="text-[12px] font-black">{language === 'বাংলা' ? 'বাড়ি দিন' : 'List Property'}</span>
+              <span className="text-[12px] font-black">{language === 'বাংলা' ? 'ভাড়া দিন' : 'List Property'}</span>
               <span className="hidden lg:inline text-[8px] font-black uppercase tracking-wider bg-[#ba0036]/10 px-1.5 py-0.5 rounded-md">{language === 'বাংলা' ? 'ফ্রি' : 'Free'}</span>
             </button>
 
@@ -3250,7 +3251,7 @@ const HostDashboard = () => {
                   {subStatus.isPaid && subStatus.tier === 'pro' && <span className="bg-[#ba0036] text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center">Pro</span>}
                   {subStatus.isPaid && subStatus.tier === 'plus' && <span className="bg-gray-900 text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center">Plus</span>}
                 </div>
-                <p className="text-[9px] font-bold text-[#ba0036] uppercase tracking-widest mt-1">{t?.hostPortal || (language === 'বাংলা' ? 'হোস্ট পোর্টাল' : 'Host Portal')}</p>
+                <p className="text-[9px] font-bold text-[#ba0036] uppercase tracking-widest mt-1">{t?.hostPortal || (language === 'বাংলা' ? 'বাড়িওয়ালা' : 'Host Portal')}</p>
               </div>
             </button>
           </div>
@@ -3278,7 +3279,7 @@ const HostDashboard = () => {
                 {subStatus.isPaid && subStatus.tier === 'pro' && <span className="bg-[#ba0036] text-white text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center">Pro</span>}
                 {subStatus.isPaid && subStatus.tier === 'plus' && <span className="bg-gray-900 text-white text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center">Plus</span>}
               </div>
-              <p className="text-[9px] font-bold text-[#ba0036] uppercase tracking-widest mt-1">{t?.managingUrbanLiving || (language === 'বাংলা' ? 'ম্যানেজিং আরবান লিভিং' : 'MANAGING URBAN LIVING')}</p>
+              <p className="text-[9px] font-bold text-[#ba0036] uppercase tracking-widest mt-1">{t?.managingUrbanLiving || (language === 'বাংলা' ? 'বাড়িওয়ালা' : 'MANAGING URBAN LIVING')}</p>
             </div>
           </div>
         </div>
@@ -3391,7 +3392,7 @@ const HostDashboard = () => {
       </div>
 
       {/* --- MAIN CONTENT --- */}
-      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-8 lg:px-12 pt-6 md:pt-10 relative z-10 custom-scrollbar overflow-y-auto pb-24">
+      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-8 lg:px-12 pt-3 md:pt-4 relative z-10 custom-scrollbar overflow-y-auto pb-24">
         
         {activeDropdownId && <div className="fixed inset-0 z-20" onClick={() => setActiveDropdownId(null)}></div>}
 
@@ -3776,10 +3777,10 @@ const HostDashboard = () => {
               </h3>
               <div className="grid grid-cols-4 gap-3 md:gap-4">
                 {[
-                  { label: language === 'বাংলা' ? 'বুকিং' : 'Booking',       Icon: Calendar,      iconColor: 'text-blue-500 dark:text-blue-400',     onClick: () => setActiveTab('bookings') },
-                  { label: language === 'বাংলা' ? 'রেন্ট কালেকশন' : 'Rent', Icon: Wallet,        iconColor: 'text-emerald-500 dark:text-emerald-400', onClick: () => setActiveTab('rent') },
-                  { label: language === 'বাংলা' ? 'বার্তা' : 'Messages',     Icon: MessageCircle, iconColor: 'text-violet-500 dark:text-violet-400', onClick: () => navigate('/messages') },
-                  { label: language === 'বাংলা' ? 'নোটিফিকেশন' : 'Alerts', Icon: BellRing,      iconColor: 'text-amber-500 dark:text-amber-400',   onClick: () => setActiveTab('smartAlerts') },
+                  { label: language === 'বাংলা' ? 'ভাড়াটিয়া যোগ করুন' : 'Add Tenant',       Icon: Calendar,      iconColor: 'text-blue-500 dark:text-blue-400',     onClick: () => setActiveTab('bookings') },
+                  { label: language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent', Icon: Wallet,        iconColor: 'text-emerald-500 dark:text-emerald-400', onClick: () => setActiveTab('rent') },
+                  { label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-violet-500 dark:text-violet-400', onClick: () => navigate('/messages') },
+                  { label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts', Icon: BellRing,      iconColor: 'text-amber-500 dark:text-amber-400',   onClick: () => setActiveTab('smartAlerts') },
                 ].map(({ label, Icon, iconColor, onClick }) => (
                   <button
                     key={label}
@@ -3817,7 +3818,7 @@ const HostDashboard = () => {
                       </div>
                       <div className="min-w-0">
                         <h3 className="text-base md:text-xl font-black text-gray-900 leading-tight">
-                          {language === 'বাংলা' ? 'শেয়ার্ড লেজার ওভারভিউ' : 'Shared Ledger Overview'}
+                          {language === 'বাংলা' ? 'ভাড়া লেজার ওভারভিউ' : 'Shared Ledger Overview'}
                         </h3>
                         <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">
                           {monthFullLabel(sm.key, language)}
@@ -4127,8 +4128,8 @@ const HostDashboard = () => {
           <div className="w-full mb-4 md:mb-5 animate-in fade-in duration-300">
             <div className="flex items-stretch gap-1.5 p-1.5 rounded-2xl bg-white shadow-[0_2px_12px_rgba(0,0,0,0.05)] border border-gray-100">
               {[
-                { id: 'bookings', label: language === 'বাংলা' ? 'বুকিং' : 'Booking' },
-                { id: 'rent', label: language === 'বাংলা' ? 'রেন্ট কালেকশন' : 'Rent Collection' },
+                { id: 'bookings', label: language === 'বাংলা' ? 'ভাড়াটিয়া যোগ করুন' : 'Add Tenant' },
+                { id: 'rent', label: language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent Collection' },
               ].map(({ id, label }) => {
                 const on = activeTab === id;
                 return (
@@ -4309,6 +4310,10 @@ const HostDashboard = () => {
         )}
 
       </main>
+
+      {/* MEDIA LIGHTBOX */}
+      <MediaLightbox open={!!lightbox} media={lightbox} onClose={() => setLightbox(null)} />
+
 
       {/* 🔴 DYNAMIC MODALS */}
       {activeModal && (

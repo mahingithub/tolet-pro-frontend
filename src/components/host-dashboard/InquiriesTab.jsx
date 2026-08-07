@@ -198,8 +198,8 @@ export default function InquiriesTab({
                                   if (msgs.length === 0) {
                                     return (
                                       <div>
-                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'বার্তা' : 'Message'}</p>
-                                        <p className="text-xs md:text-sm font-bold text-gray-700 whitespace-pre-wrap leading-relaxed">{language === 'বাংলা' ? 'কোনো বার্তা নেই' : 'No message provided'}</p>
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'মেসেজ' : 'Message'}</p>
+                                        <p className="text-xs md:text-sm font-bold text-gray-700 whitespace-pre-wrap leading-relaxed">{language === 'বাংলা' ? 'কোনো মেসেজ নেই' : 'No message provided'}</p>
                                       </div>
                                     );
                                   }

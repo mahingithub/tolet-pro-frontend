@@ -715,7 +715,7 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
           />
           {ll.autoReplyEnabled && (
             <div className="py-3 border-b border-gray-50">
-              <p className="text-[11px] font-black text-gray-400 mb-2">{bn ? 'অটো-রিপ্লাই বার্তা' : 'Auto-reply message'}</p>
+              <p className="text-[11px] font-black text-gray-400 mb-2">{bn ? 'অটো-রিপ্লাই মেসেজ' : 'Auto-reply message'}</p>
               <TextField
                 multiline
                 value={ll.autoReplyMessage}

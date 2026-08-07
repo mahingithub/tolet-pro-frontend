@@ -7,6 +7,7 @@ import {
   Hourglass, Calendar, RefreshCw, Settings, Camera, Search, Filter, Trash2, ArrowRight, ChevronRight, Smartphone, Sparkles, Activity
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import Footer from '../Footer';
 import { isInquiryUnread } from '../../utils/inquiryUnread';
 
 export default function DashboardTab({
@@ -45,7 +46,7 @@ export default function DashboardTab({
   formatBDT
 }) {
   return (
-    <div className="animate-in fade-in zoom-in-95 duration-500 space-y-5">
+    <div className="animate-in fade-in zoom-in-95 duration-500 space-y-3 md:space-y-4">
       {/* ০. প্রমো কার্ড গ্রিড — পেমেন্ট সেটিংস + ট্রায়াল/আপগ্রেড। মোবাইলে ১ কলাম,
           ট্যাবলেট+ এ ২ কলাম। ইমেজের মতো বড় সাইড-বাই-সাইড কার্ড। */}
       <div className="grid grid-cols-2 gap-3 md:gap-4">
@@ -67,8 +68,8 @@ export default function DashboardTab({
                 >
                   <X size={14} strokeWidth={2.5} />
                 </button>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 h-full pt-2 md:pt-0">
-                  <div className="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-4 flex-1 min-w-0">
+                <div className="flex flex-row md:items-center justify-between gap-3 md:gap-4 h-full pt-2 md:pt-0">
+                  <div className="flex flex-row items-center gap-3 md:gap-4 flex-1 min-w-0">
                     <div className="relative w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl md:rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                       <CreditCard size={20} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
                       <span className="absolute -top-1.5 -right-1.5 w-4 h-4 md:w-5 md:h-5 rounded-full bg-[#ba0036] text-white text-[9px] md:text-[10px] font-black flex items-center justify-center animate-pulse">!</span>
@@ -92,15 +93,15 @@ export default function DashboardTab({
               onClick={() => setActiveTab('payments')}
               className="group cursor-pointer bg-white dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-2xl md:rounded-[1.5rem] p-3.5 md:p-4 shadow-[0_4px_25px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_25px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_35px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_12px_35px_rgba(0,0,0,0.3)] hover:-translate-y-0.5 transition-all flex flex-col"
             >
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 h-full">
-                <div className="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-4 flex-1 min-w-0">
+              <div className="flex flex-row items-center justify-between gap-3 md:gap-4 h-full">
+                <div className="flex flex-row items-center gap-3 md:gap-4 flex-1 min-w-0">
                   <div className="relative w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl md:rounded-2xl bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-800/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                     <CreditCard size={20} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
                     {pendingRentCount > 0 && (
                       <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 md:min-w-5 md:h-5 px-1 md:px-1.5 rounded-full bg-[#ba0036] text-white text-[9px] md:text-[10px] font-black flex items-center justify-center">{pendingRentCount}</span>
                     )}
                   </div>
-                  <div className="flex flex-col gap-1 md:gap-0.5 flex-1 min-w-0">
+                  <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                     <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight">
                       {language === 'বাংলা' ? 'পেমেন্ট সেটিংস' : 'Payment Settings'}
                     </h3>
@@ -115,8 +116,9 @@ export default function DashboardTab({
                     </p>
                   </div>
                 </div>
-                <div className="mt-1 md:hidden shrink-0">
-                  <div className={`w-fit px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${pendingRentCount > 0 ? 'bg-[#ba0036] text-white shadow-lg shadow-red-500/20' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}>
+                </div>
+                <div className="md:hidden shrink-0">
+                  <div className={`w-fit px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1 ${pendingRentCount > 0 ? 'bg-[#ba0036] text-white shadow-lg shadow-red-500/20' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}>
                     {pendingRentCount > 0 ? (language === 'বাংলা' ? 'যাচাই করুন' : 'Verify Now') : (language === 'বাংলা' ? 'ম্যানেজ করুন' : 'Manage')} <ArrowUpRight size={14} />
                   </div>
                 </div>
@@ -139,32 +141,27 @@ export default function DashboardTab({
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTrialModalOpen(true); } }}
             className="group cursor-pointer bg-white dark:bg-gray-900/40 border border-amber-200 dark:border-amber-500/30 rounded-2xl md:rounded-[1.5rem] p-4 md:p-5 shadow-[0_4px_25px_rgba(245,158,11,0.08)] hover:shadow-[0_12px_35px_rgba(245,158,11,0.15)] hover:-translate-y-0.5 transition-all flex flex-col w-full"
           >
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 h-full">
-              <div className="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-4 flex-1 min-w-0">
-                <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl md:rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-[0_8px_20px_-6px_rgba(245,158,11,0.7)]">
-                  <Crown size={24} strokeWidth={2.2} />
-                </div>
-                <div className="flex flex-col gap-1 md:gap-0.5 flex-1 min-w-0">
-                  <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight">
+            <div className="flex flex-col gap-2 md:gap-3 h-full justify-center">
+              <div className="flex flex-row items-center justify-between gap-3 md:gap-4">
+                <div className="flex flex-row items-center gap-3 md:gap-4 flex-1 min-w-0">
+                  <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl md:rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-[0_8px_20px_-6px_rgba(245,158,11,0.7)]">
+                    <Crown size={24} strokeWidth={2.2} />
+                  </div>
+                  <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight flex-1 min-w-0">
                     {language === 'বাংলা' ? '২ মাসের ফ্রি প্রো ট্রায়াল নিন' : 'Get 2 Months of Pro — Free'}
                   </h3>
-                  <p className="text-[11px] md:text-xs font-bold text-amber-600 dark:text-amber-500 leading-relaxed md:truncate">
-                    {language === 'বাংলা'
-                      ? 'অ্যাপের লিংক শেয়ার করলেই ৫০টি ছবি, ভিডিও ট্যুর আর সার্চে শীর্ষ অবস্থান আনলক।'
-                      : 'Share the app link to unlock 50 photos, video tours and top search position.'}
-                  </p>
+                </div>
+                <div className="shrink-0">
+                  <div className="w-fit px-3 py-2 md:px-4 md:py-2.5 rounded-lg md:rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-1.5 md:gap-2 shadow-lg shadow-orange-500/20 group-hover:scale-105 transition-transform">
+                    {language === 'বাংলা' ? 'ফ্রি নিন' : 'CLAIM FREE'} <ArrowUpRight size={14} className="md:w-4 md:h-4" />
+                  </div>
                 </div>
               </div>
-              <div className="mt-1 md:hidden shrink-0">
-                <div className="w-fit px-3 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-lg shadow-orange-500/20">
-                  {language === 'বাংলা' ? 'ফ্রি নিন' : 'CLAIM FREE'} <ArrowUpRight size={14} />
-                </div>
-              </div>
-              <div className="hidden md:flex shrink-0">
-                <div className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-black uppercase tracking-widest flex items-center gap-2 group-hover:scale-105 transition-transform shadow-lg shadow-orange-500/20">
-                  {language === 'বাংলা' ? 'ফ্রি নিন' : 'CLAIM FREE'} <ArrowUpRight size={16} />
-                </div>
-              </div>
+              <p className="text-[11px] md:text-xs font-bold text-amber-600 dark:text-amber-500 leading-relaxed md:truncate pl-[52px] md:pl-[64px]">
+                {language === 'বাংলা'
+                  ? 'অ্যাপের লিংক শেয়ার করলেই ৫০টি ছবি, ভিডিও ট্যুর আর সার্চে শীর্ষ অবস্থান আনলক।'
+                  : 'Share the app link to unlock 50 photos, video tours and top search position.'}
+              </p>
             </div>
           </div>
         ) : (subStatus.planState === 'trial_lapsed' || subStatus.planState === 'paid_expired') ? (() => {
@@ -192,26 +189,21 @@ export default function DashboardTab({
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }}
               className="group cursor-pointer bg-gradient-to-br from-violet-50 to-indigo-50/60 dark:from-violet-950/30 dark:to-indigo-950/20 border border-violet-200 dark:border-violet-800/50 rounded-2xl md:rounded-[1.5rem] p-3.5 md:p-4 shadow-[0_4px_25px_rgba(99,102,241,0.12)] hover:shadow-[0_12px_35px_rgba(99,102,241,0.20)] hover:-translate-y-0.5 transition-all flex flex-col"
             >
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 h-full">
-                <div className="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-4 flex-1 min-w-0">
-                  <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl md:rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shadow-[0_8px_20px_-6px_rgba(99,102,241,0.7)]">
-                    <Crown size={20} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
+              <div className="flex flex-col gap-2 md:gap-3 h-full justify-center">
+                <div className="flex flex-row items-center justify-between gap-3 md:gap-4">
+                  <div className="flex flex-row items-center gap-3 md:gap-4 flex-1 min-w-0">
+                    <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl md:rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shadow-[0_8px_20px_-6px_rgba(99,102,241,0.7)]">
+                      <Crown size={20} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
+                    </div>
+                    <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight flex-1 min-w-0">{title}</h3>
                   </div>
-                  <div className="flex flex-col gap-1 md:gap-0.5 flex-1 min-w-0">
-                    <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight">{title}</h3>
-                    <p className="text-[11px] md:text-xs font-bold text-violet-700 dark:text-violet-300/90 leading-relaxed md:truncate">{blurb}</p>
-                  </div>
-                </div>
-                <div className="mt-1 md:hidden shrink-0">
-                  <div className="w-fit px-3 py-2 rounded-lg bg-gradient-to-r from-violet-500 to-indigo-600 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-lg shadow-indigo-500/20">
-                    {cta} <ArrowUpRight size={14} />
-                  </div>
-                </div>
-                <div className="hidden md:flex shrink-0">
-                  <div className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-600 text-white text-xs font-black uppercase tracking-widest flex items-center gap-2 group-hover:scale-105 transition-transform shadow-lg shadow-indigo-500/20">
-                    {cta} <ArrowUpRight size={16} />
+                  <div className="shrink-0">
+                    <div className="w-fit px-3 py-2 md:px-4 md:py-2.5 rounded-lg md:rounded-xl bg-gradient-to-r from-violet-500 to-indigo-600 text-white text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-1.5 md:gap-2 shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform">
+                      {cta} <ArrowUpRight size={14} className="md:w-4 md:h-4" />
+                    </div>
                   </div>
                 </div>
+                <p className="text-[11px] md:text-xs font-bold text-violet-700 dark:text-violet-300/90 leading-relaxed md:truncate pl-[52px] md:pl-[64px]">{blurb}</p>
               </div>
             </div>
           );
@@ -284,10 +276,10 @@ export default function DashboardTab({
         </h3>
         <div className="grid grid-cols-4 gap-3 md:gap-4">
           {[
-            { label: language === 'বাংলা' ? 'বুকিং' : 'Booking',       Icon: Calendar,      iconColor: 'text-blue-500 dark:text-blue-400',     onClick: () => setActiveTab('bookings') },
-            { label: language === 'বাংলা' ? 'রেন্ট কালেকশন' : 'Rent', Icon: Wallet,        iconColor: 'text-emerald-500 dark:text-emerald-400', onClick: () => setActiveTab('rent') },
-            { label: language === 'বাংলা' ? 'বার্তা' : 'Messages',     Icon: MessageCircle, iconColor: 'text-violet-500 dark:text-violet-400', onClick: () => navigate('/messages') },
-            { label: language === 'বাংলা' ? 'নোটিফিকেশন' : 'Alerts', Icon: BellRing,      iconColor: 'text-amber-500 dark:text-amber-400',   onClick: () => setActiveTab('smartAlerts') },
+            { label: language === 'বাংলা' ? 'ভাড়াটিয়া যোগ করুন' : 'Add Tenant', Icon: Calendar,      iconColor: 'text-blue-500 dark:text-blue-400',     onClick: () => setActiveTab('bookings') },
+            { label: language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent', Icon: Wallet,        iconColor: 'text-emerald-500 dark:text-emerald-400', onClick: () => setActiveTab('rent') },
+            { label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-violet-500 dark:text-violet-400', onClick: () => navigate('/messages') },
+            { label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts', Icon: BellRing,      iconColor: 'text-amber-500 dark:text-amber-400',   onClick: () => setActiveTab('smartAlerts') },
           ].map(({ label, Icon, iconColor, onClick }) => (
             <button
               key={label}
@@ -324,8 +316,8 @@ export default function DashboardTab({
                   <Wallet size={18} className="text-emerald-600" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-base md:text-xl font-black text-gray-900 leading-tight">
-                    {language === 'বাংলা' ? 'শেয়ার্ড লেজার ওভারভিউ' : 'Shared Ledger Overview'}
+                  <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight">
+                    {language === 'বাংলা' ? 'ভাড়া লেজার ওভারভিউ' : 'Shared Ledger Overview'}
                   </h3>
                   <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">
                     {monthFullLabel(sm.key, language)}
@@ -339,7 +331,7 @@ export default function DashboardTab({
             </div>
 
             {/* Collection rate progress bar */}
-            <div className="mt-5 md:mt-6">
+            <div className="mt-3 md:mt-6">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest">
                   {language === 'বাংলা' ? 'কালেকশন রেট' : 'Collection Rate'}
@@ -386,8 +378,8 @@ export default function DashboardTab({
         );
       })()}
 
-      {/* ২. আরও অ্যাকশন — কোলাপসিবল। আগে এখানে ৪টি বাটনের আলাদা সেকশন ছিল,
-          যা উপরের দ্রুত অ্যাকশন সারির সাথে মিলে ডুপ্লিকেট মনে হতো। সব
+      {/* ২. আরও অ্যাকশন — কোলাপসিবল।  {/* ১.৩.২ Rent Card - Dashboard e ar dorkar nai, 
+          যা উপরের শর্টকাট সারির সাথে মিলে ডুপ্লিকেট মনে হতো। সব
           অপশন রেখে ডিফল্টে লুকানো, যাতে ড্যাশবোর্ড পরিষ্কার থাকে। */}
       <div>
         <button
@@ -539,6 +531,10 @@ export default function DashboardTab({
         </div>
       </div>
 
+
+      <div className="hidden md:block mt-8">
+        <Footer />
+      </div>
     </div>
   );
 }

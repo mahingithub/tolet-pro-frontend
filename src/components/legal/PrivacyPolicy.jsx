@@ -42,7 +42,7 @@ export default function PrivacyPolicy() {
           <LI>{t('Account details: name, phone number, and password.', 'অ্যাকাউন্টের তথ্য: নাম, ফোন নম্বর, এবং পাসওয়ার্ড।')}</LI>
           <LI>{t('Verification documents you choose to upload (e.g. National ID, profile photo, profession proof, utility bill for landlords).', 'আপনি যে যাচাইকরণ নথি আপলোড করতে চান (যেমন জাতীয় পরিচয়পত্র, প্রোফাইল ছবি, পেশার প্রমাণ, বাড়িওয়ালাদের জন্য ইউটিলিটি বিল)।')}</LI>
           <LI>{t('Property listings, photos, and descriptions you post.', 'আপনি যে সম্পত্তির তালিকা, ছবি ও বিবরণ পোস্ট করেন।')}</LI>
-          <LI>{t('Messages and call activity between users on the platform.', 'প্ল্যাটফর্মে ব্যবহারকারীদের মধ্যে বার্তা ও কল কার্যকলাপ।')}</LI>
+          <LI>{t('Messages and call activity between users on the platform.', 'প্ল্যাটফর্মে ব্যবহারকারীদের মধ্যে মেসেজ ও কল কার্যকলাপ।')}</LI>
           <LI>{t('Optional profile information such as email, date of birth, profession, and emergency contact.', 'ঐচ্ছিক প্রোফাইল তথ্য যেমন ইমেইল, জন্মতারিখ, পেশা, এবং জরুরি যোগাযোগ।')}</LI>
         </ul>
         <P>
@@ -58,7 +58,7 @@ export default function PrivacyPolicy() {
         <ul style={{ paddingLeft: '20px' }}>
           <LI>{t('To create and manage your account and verify your identity.', 'আপনার অ্যাকাউন্ট তৈরি ও পরিচালনা এবং পরিচয় যাচাই করতে।')}</LI>
           <LI>{t('To display your listings and connect tenants with landlords.', 'আপনার তালিকা দেখাতে এবং ভাড়াটে ও বাড়িওয়ালাদের সংযুক্ত করতে।')}</LI>
-          <LI>{t('To enable messaging, calls, and notifications.', 'বার্তা, কল, এবং নোটিফিকেশন সক্ষম করতে।')}</LI>
+          <LI>{t('To enable messaging, calls, and notifications.', 'মেসেজ, কল, এবং নোটিফিকেশন সক্ষম করতে।')}</LI>
           <LI>{t('To maintain safety, prevent fraud, and enforce our terms.', 'নিরাপত্তা বজায় রাখতে, জালিয়াতি রোধ করতে, এবং আমাদের শর্তাবলী প্রয়োগ করতে।')}</LI>
           <LI>{t('To improve features and provide support.', 'ফিচার উন্নত করতে এবং সহায়তা প্রদান করতে।')}</LI>
         </ul>
