@@ -302,7 +302,10 @@ export const TourProvider = ({ children }) => {
               }, 400);
             }
           }
-        },
+        }
+      ]);
+
+      const modalSteps = [
         {
           element: '[data-tour="host-home-option"]',
           popover: {
@@ -330,7 +333,10 @@ export const TourProvider = ({ children }) => {
               }, 400);
             }
           },
-        },
+        }
+      ];
+
+      const resolvedProfileMenu = resolveSteps([
         {
           element: '[data-tour="host-profile-menu"]',
           popover: {
@@ -441,7 +447,7 @@ export const TourProvider = ({ children }) => {
         },
       ];
 
-      const steps = [...resolvedSteps, ...sidebarSteps];
+      const steps = [...resolvedSteps, ...modalSteps, ...resolvedProfileMenu, ...sidebarSteps];
 
       if (!steps.length) {
         startingRef.current = false;
@@ -481,7 +487,25 @@ export const TourProvider = ({ children }) => {
     if (window.location.pathname === '/') {
       let driverObj = null;
 
-      const steps = [
+      const isMobile = window.innerWidth < 768;
+      
+      const steps = isMobile ? [
+        {
+          element: '[data-tour="mobile-nav-home"]',
+          popover: {
+            title: isBn ? 'হোস্ট ড্যাশবোর্ড' : 'Host Dashboard',
+            description: isBn
+              ? 'আপনার সকল প্রপার্টি এবং ভাড়াটিয়া পরিচালনা করতে ড্যাশবোর্ডে প্রবেশ করুন।'
+              : 'Access your dashboard to manage all your properties and tenants.',
+            side: 'top',
+            align: 'center',
+            onNextClick: () => {
+              if (driverObj) driverObj.destroy();
+              navigate('/host-dashboard');
+            }
+          },
+        }
+      ] : [
         {
           element: '[data-tour="navbar-profile"]',
           popover: {
@@ -508,22 +532,12 @@ export const TourProvider = ({ children }) => {
               : 'Access your dashboard to manage all your properties and tenants.',
             side: 'left',
             align: 'start',
+            onNextClick: () => {
+              if (driverObj) driverObj.destroy();
+              navigate('/host-dashboard');
+            }
           },
-        },
-        {
-          popover: {
-            title: isBn ? 'স্বাগতম!' : 'Welcome!',
-            description: isBn
-              ? 'এখন আমরা হোস্ট ড্যাশবোর্ডে যাচ্ছি। একটু অপেক্ষা করুন...'
-              : 'Now we are navigating to the Host Dashboard. Please wait...',
-            side: 'top',
-            align: 'center',
-          },
-          onHighlighted: () => {
-            // Navigate to host dashboard
-            navigate('/host-dashboard');
-          },
-        },
+        }
       ];
 
       driverObj = driver({

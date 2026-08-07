@@ -151,6 +151,7 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
         className="flex-1 h-full flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform select-none"
         aria-label={item.label}
         aria-current={active ? 'page' : undefined}
+        data-tour={item.id === 'home' ? 'mobile-nav-home' : undefined}
       >
         <span
           className={`relative w-11 h-7 flex items-center justify-center transition-all duration-300 ${
