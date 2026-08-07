@@ -295,9 +295,12 @@ export const TourProvider = ({ children }) => {
               : 'Click the logo to see options for returning to the main home.',
             side: 'bottom',
             align: 'start',
-          },
-          onHighlighted: () => {
-            window.dispatchEvent(new Event('open-home-choice-modal'));
+            onNextClick: () => {
+              window.dispatchEvent(new Event('open-home-choice-modal'));
+              setTimeout(() => {
+                if (dashboardDriverObj) dashboardDriverObj.moveNext();
+              }, 400);
+            }
           }
         },
         {
@@ -320,6 +323,12 @@ export const TourProvider = ({ children }) => {
               : 'And click here if you want to stay on your dashboard.',
             side: 'right',
             align: 'start',
+            onNextClick: () => {
+              window.dispatchEvent(new Event('close-home-choice-modal'));
+              setTimeout(() => {
+                if (dashboardDriverObj) dashboardDriverObj.moveNext();
+              }, 400);
+            }
           },
         },
         {
@@ -331,16 +340,13 @@ export const TourProvider = ({ children }) => {
               : 'Click here to open the menu and access all your dashboard tabs, settings, and more.',
             side: 'bottom',
             align: 'end',
+            onNextClick: () => {
+              window.dispatchEvent(new Event('open-host-drawer'));
+              setTimeout(() => {
+                if (dashboardDriverObj) dashboardDriverObj.moveNext();
+              }, 400);
+            }
           },
-          onHighlighted: () => {
-            window.dispatchEvent(new Event('close-home-choice-modal'));
-          },
-          onNextClick: () => {
-            window.dispatchEvent(new Event('open-host-drawer'));
-            setTimeout(() => {
-              if (dashboardDriverObj) dashboardDriverObj.moveNext();
-            }, 300);
-          }
         },
       ]);
 
