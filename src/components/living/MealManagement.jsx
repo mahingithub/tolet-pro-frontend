@@ -283,6 +283,21 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
     }
   }, [intent, clearIntent]);
 
+  useEffect(() => {
+    const handleTourAction = (e) => {
+      switch(e.detail) {
+        case 'open-deposit': setDepositOpen(true); break;
+        case 'close-deposit': setDepositOpen(false); break;
+        case 'open-bazar': setBazarOpen(true); break;
+        case 'close-bazar': setBazarOpen(false); break;
+        case 'open-rate': setRateOpen(true); break;
+        case 'close-rate': setRateOpen(false); break;
+      }
+    };
+    window.addEventListener('tour:action', handleTourAction);
+    return () => window.removeEventListener('tour:action', handleTourAction);
+  }, []);
+
   const iso = dayISO(dayOffset);
   const dayKey = iso.slice(0, 10);
   const getMeal = (rid) => {

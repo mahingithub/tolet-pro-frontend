@@ -258,6 +258,19 @@ const WalletSummary = ({ go, me, language }) => {
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [pendingRemove, setPendingRemove] = useState(null);
 
+  useEffect(() => {
+    const handleTourAction = (e) => {
+      switch(e.detail) {
+        case 'open-connect': setConnectOpen(true); break;
+        case 'close-connect': setConnectOpen(false); break;
+        case 'open-add-roommate': setAddOpen(true); break;
+        case 'close-add-roommate': setAddOpen(false); break;
+      }
+    };
+    window.addEventListener('tour:action', handleTourAction);
+    return () => window.removeEventListener('tour:action', handleTourAction);
+  }, []);
+
   const copyCode = async () => {
     try {
       await navigator.clipboard.writeText(inviteCode);

@@ -132,8 +132,8 @@ export const TourProvider = ({ children }) => {
           popover: {
             title: isBn ? 'ধাপ ১: ধরন বেছে নিন' : 'Step 1: Choose Mode',
             description: isBn
-              ? 'প্রথমে বেছে নিন আবাসিক, বাণিজ্যিক নাকি ক্রয়।'
-              : 'First, select whether you want Residential, Commercial, or Buy.',
+              ? 'প্রথমে বেছে নিন আবাসিক নাকি বাণিজ্যিক।'
+              : 'First, select whether you want Residential or Commercial.',
             side: 'bottom',
             align: 'center',
           },
@@ -783,17 +783,20 @@ export const TourProvider = ({ children }) => {
 
     try {
       const isMobile = window.innerWidth < 1024;
-      const tabSelector = (id) => isMobile ? `.lg\\:hidden [data-tour="living-tab-${id}"]` : `aside [data-tour="living-tab-${id}"]`;
+      const tabSelector = (id) => isMobile ? `[data-tour="living-mobile-nav"] [data-tour="living-tab-${id}"]` : `aside [data-tour="living-tab-${id}"]`;
       
-      const clickAndNext = (selector, driverObj) => {
-        const el = document.querySelector(selector);
-        if (el) el.click();
+      const triggerActionAndNext = (action, driverObj) => {
+        window.dispatchEvent(new CustomEvent('tour:action', { detail: action }));
         setTimeout(() => driverObj.moveNext(), 400);
       };
 
-      const closeSheetAndNext = (driverObj) => {
-        const backdrop = document.querySelector('.fixed.inset-0.z-\\[100\\]');
-        if (backdrop) backdrop.click();
+      const goToTabAndNext = (tab, driverObj) => {
+        navigate(`/living?m=${tab}`, { replace: true });
+        setTimeout(() => driverObj.moveNext(), 400);
+      };
+
+      const closeSheetAndNext = (action, driverObj) => {
+        window.dispatchEvent(new CustomEvent('tour:action', { detail: action }));
         setTimeout(() => driverObj.moveNext(), 400);
       };
 
@@ -826,7 +829,7 @@ export const TourProvider = ({ children }) => {
               side: 'top',
               align: 'center',
             },
-            onNextClick: (el, step, opts) => clickAndNext('[data-tour="living-connect-roommates"]', opts.config.driverObj || opts.driver),
+            onNextClick: (el, step, opts) => triggerActionAndNext('open-connect', opts.config.driverObj || opts.driver),
           },
           {
             element: '[data-tour="connect-sheet"]',
@@ -838,7 +841,7 @@ export const TourProvider = ({ children }) => {
               side: 'top',
               align: 'center',
             },
-            onNextClick: (el, step, opts) => closeSheetAndNext(opts.config.driverObj || opts.driver),
+            onNextClick: (el, step, opts) => closeSheetAndNext('close-connect', opts.config.driverObj || opts.driver),
           }
         );
       } else {
@@ -871,7 +874,7 @@ export const TourProvider = ({ children }) => {
               side: 'top',
               align: 'end',
             },
-            onNextClick: (el, step, opts) => clickAndNext('[data-tour="living-add-roommate"]', opts.config.driverObj || opts.driver),
+            onNextClick: (el, step, opts) => triggerActionAndNext('open-add-roommate', opts.config.driverObj || opts.driver),
           },
           {
             element: '[data-tour="add-roommate-sheet"]',
@@ -883,7 +886,7 @@ export const TourProvider = ({ children }) => {
               side: 'top',
               align: 'center',
             },
-            onNextClick: (el, step, opts) => closeSheetAndNext(opts.config.driverObj || opts.driver),
+            onNextClick: (el, step, opts) => closeSheetAndNext('close-add-roommate', opts.config.driverObj || opts.driver),
           }
         );
       }
@@ -899,7 +902,7 @@ export const TourProvider = ({ children }) => {
             side: isMobile ? 'bottom' : 'right',
             align: 'center',
           },
-          onNextClick: (el, step, opts) => clickAndNext(tabSelector('meals'), opts.config.driverObj || opts.driver),
+          onNextClick: (el, step, opts) => goToTabAndNext('meals', opts.config.driverObj || opts.driver),
         },
         {
           element: '[data-tour="add-deposit-btn"]',
@@ -911,7 +914,7 @@ export const TourProvider = ({ children }) => {
             side: 'top',
             align: 'center',
           },
-          onNextClick: (el, step, opts) => clickAndNext('[data-tour="add-deposit-btn"]', opts.config.driverObj || opts.driver),
+          onNextClick: (el, step, opts) => triggerActionAndNext('open-deposit', opts.config.driverObj || opts.driver),
         },
         {
           element: '[data-tour="deposit-sheet"]',
@@ -923,7 +926,7 @@ export const TourProvider = ({ children }) => {
             side: 'top',
             align: 'center',
           },
-          onNextClick: (el, step, opts) => closeSheetAndNext(opts.config.driverObj || opts.driver),
+          onNextClick: (el, step, opts) => closeSheetAndNext('close-deposit', opts.config.driverObj || opts.driver),
         },
         {
           element: '[data-tour="add-bazar-btn"]',
@@ -935,7 +938,7 @@ export const TourProvider = ({ children }) => {
             side: 'top',
             align: 'center',
           },
-          onNextClick: (el, step, opts) => clickAndNext('[data-tour="add-bazar-btn"]', opts.config.driverObj || opts.driver),
+          onNextClick: (el, step, opts) => triggerActionAndNext('open-bazar', opts.config.driverObj || opts.driver),
         },
         {
           element: '[data-tour="grocery-sheet"]',
@@ -947,7 +950,7 @@ export const TourProvider = ({ children }) => {
             side: 'top',
             align: 'center',
           },
-          onNextClick: (el, step, opts) => closeSheetAndNext(opts.config.driverObj || opts.driver),
+          onNextClick: (el, step, opts) => closeSheetAndNext('close-bazar', opts.config.driverObj || opts.driver),
         },
         {
           element: '[data-tour="set-rate-btn"]',
@@ -959,7 +962,7 @@ export const TourProvider = ({ children }) => {
             side: 'bottom',
             align: 'start',
           },
-          onNextClick: (el, step, opts) => clickAndNext('[data-tour="set-rate-btn"]', opts.config.driverObj || opts.driver),
+          onNextClick: (el, step, opts) => triggerActionAndNext('open-rate', opts.config.driverObj || opts.driver),
         },
         {
           element: '[data-tour="rate-sheet"]',
@@ -971,7 +974,7 @@ export const TourProvider = ({ children }) => {
             side: 'top',
             align: 'center',
           },
-          onNextClick: (el, step, opts) => closeSheetAndNext(opts.config.driverObj || opts.driver),
+          onNextClick: (el, step, opts) => closeSheetAndNext('close-rate', opts.config.driverObj || opts.driver),
         },
         {
           element: tabSelector('expenses'),
@@ -983,7 +986,7 @@ export const TourProvider = ({ children }) => {
             side: isMobile ? 'bottom' : 'right',
             align: 'center',
           },
-          onNextClick: (el, step, opts) => clickAndNext(tabSelector('expenses'), opts.config.driverObj || opts.driver),
+          onNextClick: (el, step, opts) => goToTabAndNext('expenses', opts.config.driverObj || opts.driver),
         },
         {
           element: tabSelector('bills'),
@@ -995,7 +998,7 @@ export const TourProvider = ({ children }) => {
             side: isMobile ? 'bottom' : 'right',
             align: 'center',
           },
-          onNextClick: (el, step, opts) => clickAndNext(tabSelector('bills'), opts.config.driverObj || opts.driver),
+          onNextClick: (el, step, opts) => goToTabAndNext('bills', opts.config.driverObj || opts.driver),
         }
       );
 
