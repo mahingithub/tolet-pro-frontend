@@ -79,6 +79,22 @@ const SHEET_EXIT_MS = 260;
 // Living's module swap runs a 0.22s framer-motion enter transition.
 const MODULE_SETTLE_MS = 320;
 
+// A click on the dimmed backdrop used to tear the tour down, and since every
+// onDestroyed writes the tour id into localStorage, one stray click outside the
+// popover retired that tour for good — the user never saw it again. driver.js
+// only closes on a backdrop click when `overlayClickBehavior` is the literal
+// string 'close'; handing it a no-op function instead leaves the overlay inert.
+// A tour now ends only when the user says so: the Done button, or the popover's
+// × (skip).
+//
+// `allowClose` has to stay true for that ×: driver.js drops the button from the
+// footer entirely when it is false. It also gates Esc, which is a deliberate
+// keypress rather than a slip, so that stays as the keyboard equivalent of skip.
+const TOUR_EXIT_CONFIG = {
+  allowClose: true,
+  overlayClickBehavior: () => {},
+};
+
 // Swap each step's selector for the visible element it resolves to, dropping
 // steps with no visible anchor (premium tabs, later wizard pages). Steps with no
 // `element` at all are intentional centred popovers and always survive.
@@ -222,7 +238,7 @@ export const TourProvider = ({ children }) => {
       }
 
       const driverObj = driver({
-        allowClose: false,
+        ...TOUR_EXIT_CONFIG,
         showProgress: true,
         steps,
         nextBtnText: isBn ? 'পরবর্তী' : 'Next',
@@ -496,7 +512,7 @@ export const TourProvider = ({ children }) => {
       }
 
       dashboardDriverObj = driver({
-        allowClose: true,
+        ...TOUR_EXIT_CONFIG,
         showProgress: true,
         steps,
         nextBtnText: isBn ? 'পরবর্তী' : 'Next',
@@ -582,7 +598,7 @@ export const TourProvider = ({ children }) => {
       ];
 
       driverObj = driver({
-        allowClose: true,
+        ...TOUR_EXIT_CONFIG,
         showProgress: true,
         steps,
         nextBtnText: isBn ? 'পরবর্তী' : 'Next',
@@ -757,7 +773,7 @@ export const TourProvider = ({ children }) => {
       }
 
       const driverObj = driver({
-        allowClose: true,
+        ...TOUR_EXIT_CONFIG,
         showProgress: true,
         steps,
         nextBtnText: isBn ? 'পরবর্তী' : 'Next',
@@ -1052,8 +1068,9 @@ export const TourProvider = ({ children }) => {
       const driverObj = driver({
         // A step can still strand (a sheet that fails to open, a module that
         // never mounts). Leaving the user with no way out of a 14-step overlay
-        // is worse than letting them dismiss it.
-        allowClose: true,
+        // is worse than letting them dismiss it — the × in the popover is that
+        // way out, and the backdrop stays inert so it is never hit by accident.
+        ...TOUR_EXIT_CONFIG,
         showProgress: true,
         steps: rawSteps,
         // If an anchor never lands, skip that step instead of parking a
@@ -1218,7 +1235,7 @@ export const TourProvider = ({ children }) => {
       }
 
       const driverObj = driver({
-        allowClose: true,
+        ...TOUR_EXIT_CONFIG,
         showProgress: false,
         steps,
         nextBtnText: isBn ? 'পরবর্তী' : 'Next',
