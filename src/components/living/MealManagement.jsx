@@ -101,7 +101,7 @@ const DepositSheet = ({ open, onClose, roommates, onSave }) => {
         </PrimaryButton>
       }
     >
-      <div className="space-y-4 py-1">
+      <div data-tour="deposit-sheet" className="space-y-4 py-1">
         <Field label={isBn ? 'কে জমা দিচ্ছে' : 'Who deposited'}>
           <div className="flex gap-2 flex-wrap">
             {roommates.map((r) => (
@@ -157,7 +157,7 @@ const GrocerySheet = ({ open, onClose, roommates, onSave }) => {
         </PrimaryButton>
       }
     >
-      <div className="space-y-4 py-1">
+      <div data-tour="grocery-sheet" className="space-y-4 py-1">
         <Field label={isBn ? 'পরিমাণ' : 'Amount'}>
           <MoneyInput value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" autoFocus />
         </Field>
@@ -209,7 +209,7 @@ const RateSheet = ({ open, onClose, autoRate, current, onSave, language }) => {
         </PrimaryButton>
       }
     >
-      <div className="space-y-4 py-1">
+      <div data-tour="rate-sheet" className="space-y-4 py-1">
         <SegmentedControl
           value={mode}
           onChange={setMode}
@@ -399,7 +399,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
           <MiniStat icon={HandCoins} label={isBn ? 'মোট জমা' : 'Total deposit'} value={taka(summary.totalDeposit, language)} valueClass="text-emerald-600" sub={isBn ? 'এ মাসে' : 'This month'} />
           <MiniStat icon={ShoppingBasket} label={isBn ? 'মোট মিল খরচ' : 'Meal cost'} value={taka(summary.totalMealCost, language)} />
           <MiniStat icon={UtensilsCrossed} label={isBn ? 'মোট মিল' : 'Total meals'} value={num(summary.totalMeals, language)} />
-          <button onClick={() => setRateOpen(true)} className="rounded-2xl bg-gray-50 border border-gray-100 p-3 text-left active:scale-95 transition">
+          <button data-tour="set-rate-btn" onClick={() => setRateOpen(true)} className="rounded-2xl bg-gray-50 border border-gray-100 p-3 text-left active:scale-95 transition">
             <span className="flex items-center justify-between">
               <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-gray-400">
                 <Gauge size={12} /> {isBn ? 'মিল রেট' : 'Meal rate'}
@@ -427,11 +427,11 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
 
       {/* quick actions */}
       <div className="grid grid-cols-2 gap-3">
-        <button onClick={() => setDepositOpen(true)} className="flex items-center justify-center gap-2 bg-white rounded-2xl border border-gray-100 py-3.5 shadow-[0_8px_22px_-16px_rgba(15,23,42,0.3)] active:scale-95 transition">
+        <button data-tour="add-deposit-btn" onClick={() => setDepositOpen(true)} className="flex items-center justify-center gap-2 bg-white rounded-2xl border border-gray-100 py-3.5 shadow-[0_8px_22px_-16px_rgba(15,23,42,0.3)] active:scale-95 transition">
           <IconBadge icon={PiggyBank} tint="bg-emerald-50" text="text-emerald-600" size={34} iconSize={16} />
           <span className="text-[13px] font-black text-gray-800">{isBn ? 'জমা দিন' : 'Add Deposit'}</span>
         </button>
-        <button onClick={() => setBazarOpen(true)} className="flex items-center justify-center gap-2 bg-white rounded-2xl border border-gray-100 py-3.5 shadow-[0_8px_22px_-16px_rgba(15,23,42,0.3)] active:scale-95 transition">
+        <button data-tour="add-bazar-btn" onClick={() => setBazarOpen(true)} className="flex items-center justify-center gap-2 bg-white rounded-2xl border border-gray-100 py-3.5 shadow-[0_8px_22px_-16px_rgba(15,23,42,0.3)] active:scale-95 transition">
           <IconBadge icon={ShoppingBasket} tint="bg-amber-50" text="text-amber-600" size={34} iconSize={16} />
           <span className="text-[13px] font-black text-gray-800">{isBn ? 'বাজার যোগ' : 'Add Bazar'}</span>
         </button>

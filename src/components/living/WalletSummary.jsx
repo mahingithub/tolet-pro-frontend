@@ -43,7 +43,7 @@ const AddRoommateSheet = ({ open, onClose, isBn, onAdd }) => {
         </PrimaryButton>
       }
     >
-      <div className="space-y-4 py-1">
+      <div data-tour="add-roommate-sheet" className="space-y-4 py-1">
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center justify-center rounded-full font-black text-white shrink-0" style={{ width: 48, height: 48, background: color, fontSize: 18 }}>
             {(name.trim()[0] || '?').toUpperCase()}
@@ -111,7 +111,7 @@ const ConnectSheet = ({ open, onClose, isBn }) => {
         </PrimaryButton>
       }
     >
-      <div className="space-y-4 py-1">
+      <div data-tour="connect-sheet" className="space-y-4 py-1">
         <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-2xl">
           {[{ id: 'create', en: 'Create', bn: 'তৈরি' }, { id: 'join', en: 'Join', bn: 'জয়েন' }].map((o) => (
             <button
@@ -356,7 +356,7 @@ const WalletSummary = ({ go, me, language }) => {
             )}
           </div>
 
-          <button onClick={copyCode} className="w-full flex items-center justify-between rounded-2xl bg-gray-50 border border-gray-100 px-3.5 py-3 active:scale-[0.99] transition">
+          <button data-tour="living-invite-code" onClick={copyCode} className="w-full flex items-center justify-between rounded-2xl bg-gray-50 border border-gray-100 px-3.5 py-3 active:scale-[0.99] transition">
             <div className="text-left">
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{isBn ? 'ইনভাইট কোড' : 'Invite code'}</p>
               <p className="text-xl font-black tracking-[0.28em] text-gray-900">{inviteCode}</p>

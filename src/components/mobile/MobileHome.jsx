@@ -1278,13 +1278,17 @@ const MobileHome = () => {
 
 
       {/* ───────── DIVISIONS STRIP ───────── */}
-      <DivisionsStrip onPick={setOpenDivision} t={t} />
+      <div data-tour="explore-divisions">
+        <DivisionsStrip onPick={setOpenDivision} t={t} />
+      </div>
 
       {/* ───────── POPULAR AREAS — FUTURISTIC BENTO ─────────
           Tapping a tile opens the sub-zone bottom-sheet (Dhanmondi 1, 2,
           3, Lalmatia, …) — the user then picks a sub-zone, which routes
           to the property listing page filtered by that sub-zone. */}
-      <PopularAreasBento t={t} onPickArea={setOpenArea} properties={properties} />
+      <div data-tour="popular-areas">
+        <PopularAreasBento t={t} onPickArea={setOpenArea} properties={properties} />
+      </div>
 
       {/* ───────── FEED HEADER ───────── */}
       <div className="flex items-center justify-between px-4 mt-3 mb-1">

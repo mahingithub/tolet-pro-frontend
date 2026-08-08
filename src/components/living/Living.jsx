@@ -226,6 +226,7 @@ const Living = () => {
               return (
                 <button
                   key={m.id}
+                  data-tour={`living-tab-${m.id}`}
                   onClick={() => go(m.id)}
                   className={cx(
                     'flex-1 min-w-0 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl text-[10px] font-black tracking-tight transition-all active:scale-95',
@@ -253,6 +254,7 @@ const Living = () => {
               return (
                 <button
                   key={m.id}
+                  data-tour={`living-tab-${m.id}`}
                   onClick={() => go(m.id)}
                   className={cx(
                     'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-[13px] font-black tracking-tight transition-all active:scale-[0.98]',

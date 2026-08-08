@@ -1545,6 +1545,7 @@ const PropertyListing = () => {
 					<div className="flex items-center gap-2 shrink-0">
 						{/* Filter button */}
 						<button
+							data-tour="mobile-filter-btn"
 							onClick={() => setIsMobileFilterOpen(true)}
 							className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-black border transition-all active:scale-95 ${
 								(selectedCategories.length > 0 || selectedFurnish || selectedBeds !== "any" || minRating > 0)
@@ -1603,7 +1604,9 @@ const PropertyListing = () => {
 				      • Map mode             → bottom-sheet on EVERY breakpoint so the Filter
 				                                button in the map's bottom dock can open it on top
 				                                of the full-screen map. */}
-				<aside className={`bg-white max-h-[90vh] overflow-y-auto transition-transform duration-300 transform ${
+				<aside
+					data-tour="desktop-filter-sidebar"
+					className={`bg-white max-h-[90vh] overflow-y-auto transition-transform duration-300 transform ${
 					isMapMode
 						? `fixed inset-x-0 bottom-0 z-[80] rounded-t-[2rem] ${isMobileFilterOpen ? "translate-y-0" : "translate-y-full"}`
 						: `fixed inset-x-0 bottom-0 z-50 rounded-t-[2rem] lg:sticky lg:top-[90px] lg:z-10 lg:h-[calc(100vh-110px)] lg:block lg:rounded-[2rem] lg:border lg:border-gray-100 lg:shadow-sm lg:p-0 ${isMobileFilterOpen ? "translate-y-0" : "translate-y-full lg:translate-y-0"}`
@@ -2053,6 +2056,7 @@ const PropertyListing = () => {
 										</button>
 									)}
 									<button
+										data-tour="mobile-filter-btn"
 										onClick={() => setIsMobileFilterOpen(true)}
 										aria-label={t.filtersBtn || "Filters"}
 										className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-900 text-white text-[12px] font-black active:scale-95 transition-transform shrink-0">

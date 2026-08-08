@@ -181,6 +181,28 @@ export const TourProvider = ({ children }) => {
             side: 'bottom',
             align: 'center',
           },
+        },
+        {
+          element: '[data-tour="explore-divisions"]',
+          popover: {
+            title: isBn ? 'ধাপ ৬: এক্সপ্লোর ডিভিশনস' : 'Step 6: Explore Divisions',
+            description: isBn
+              ? 'দেশের বিভিন্ন বড় শহরের প্রপার্টিগুলো এক নজরে দেখুন।'
+              : 'Discover properties across major cities at a glance.',
+            side: 'bottom',
+            align: 'start',
+          },
+        },
+        {
+          element: '[data-tour="popular-areas"]',
+          popover: {
+            title: isBn ? 'ধাপ ৭: জনপ্রিয় এলাকা' : 'Step 7: Popular Areas',
+            description: isBn
+              ? 'সবচেয়ে চাহিদাসম্পন্ন এলাকাগুলোর তালিকা থেকে দ্রুত বেছে নিন আপনার পছন্দের স্থান।'
+              : 'Quickly select your preferred location from the most in-demand areas.',
+            side: 'top',
+            align: 'center',
+          },
         }
       ]);
 
@@ -190,7 +212,7 @@ export const TourProvider = ({ children }) => {
       }
 
       const driverObj = driver({
-        allowClose: true,
+        allowClose: false,
         showProgress: true,
         steps,
         nextBtnText: isBn ? 'পরবর্তী' : 'Next',
@@ -761,7 +783,23 @@ export const TourProvider = ({ children }) => {
 
     try {
       const isMobile = window.innerWidth < 1024;
-      const steps = resolveSteps([
+      const tabSelector = (id) => isMobile ? `.lg\\:hidden [data-tour="living-tab-${id}"]` : `aside [data-tour="living-tab-${id}"]`;
+      
+      const clickAndNext = (selector, driverObj) => {
+        const el = document.querySelector(selector);
+        if (el) el.click();
+        setTimeout(() => driverObj.moveNext(), 400);
+      };
+
+      const closeSheetAndNext = (driverObj) => {
+        const backdrop = document.querySelector('.fixed.inset-0.z-\\[100\\]');
+        if (backdrop) backdrop.click();
+        setTimeout(() => driverObj.moveNext(), 400);
+      };
+
+      // We don't use resolveSteps here because many elements won't be in the DOM
+      // until we programmatically navigate to their respective tabs.
+      const rawSteps = [
         {
           element: '[data-tour="living-header"]',
           popover: {
@@ -772,84 +810,202 @@ export const TourProvider = ({ children }) => {
             side: 'bottom',
             align: 'start',
           },
-        },
-        {
-          element: isMobile ? '[data-tour="living-mobile-nav"]' : '[data-tour="living-desktop-nav"]',
-          popover: {
-            title: isBn ? 'নেভিগেশন মেনু' : 'Navigation Menu',
-            description: isBn
-              ? 'এখান থেকে আপনি খরচ, মিলস, বিলস এবং ব্যালেন্সের মাঝে নেভিগেট করতে পারবেন।'
-              : 'Navigate between Expenses, Meals, Bills, and Balances from here.',
-            side: isMobile ? 'top' : 'right',
-            align: 'center',
-          },
-        },
-        {
-          element: '[data-tour="living-content"]',
-          popover: {
-            title: isBn ? 'ওভারভিউ' : 'Overview',
-            description: isBn
-              ? 'আপনার মেসের বর্তমান খরচের একটি সারসংক্ষেপ এখানে দেখতে পাবেন।'
-              : 'See a quick summary of your current shared expenses here.',
-            side: 'top',
-            align: 'center',
-          },
-        },
-        {
-          element: '[data-tour="living-reminders"]',
-          popover: {
-            title: isBn ? 'রিমাইন্ডার' : 'Reminders',
-            description: isBn
-              ? 'যেকোনো বকেয়া বিল বা নোটিফিকেশন এখানে দেখতে পাবেন।'
-              : 'Check any due bills or notifications here.',
-            side: 'bottom',
-            align: 'end',
-          },
-        },
-        {
-          element: '[data-tour="living-add-roommate"]',
-          popover: {
-            title: isBn ? 'লোকাল রুমমেট যোগ করুন' : 'Add Local Roommate',
-            description: isBn
-              ? 'ম্যানুয়ালি রুমমেট যোগ করতে এখানে ক্লিক করুন (শুধু আপনার ফোনে হিসেব রাখার জন্য)।'
-              : 'Click here to manually add a roommate (for local tracking on your phone).',
-            side: 'top',
-            align: 'end',
-          },
-        },
-        {
-          element: '[data-tour="living-connect-roommates"]',
-          popover: {
-            title: isBn ? 'রুমমেট কানেক্ট বা জয়েন করুন' : 'Connect or Join Roommates',
-            description: isBn
-              ? 'নতুন শেয়ার্ড ওয়ালেট তৈরি করতে অথবা ইনভাইট কোড দিয়ে অন্য কারো ওয়ালেটে জয়েন করতে এখানে ক্লিক করুন।'
-              : 'Click here to create a shared wallet or join an existing one using an invite code.',
-            side: 'top',
-            align: 'center',
-          },
-        },
-        {
-          element: '[data-tour="living-profile"]',
-          popover: {
-            title: isBn ? 'প্রোফাইল' : 'Profile',
-            description: isBn
-              ? 'আপনার প্রোফাইল দেখতে বা এডিট করতে এখানে ক্লিক করুন।'
-              : 'Click here to view or edit your profile.',
-            side: 'bottom',
-            align: 'end',
-          },
-        },
-      ]);
+        }
+      ];
 
-      if (!steps.length) {
-        startingRef.current = false;
-        return;
+      const connectBtn = document.querySelector('[data-tour="living-connect-roommates"]');
+      if (connectBtn) {
+        rawSteps.push(
+          {
+            element: '[data-tour="living-connect-roommates"]',
+            popover: {
+              title: isBn ? 'শেয়ার্ড ওয়ালেট তৈরি' : 'Create Shared Wallet',
+              description: isBn
+                ? 'এখানে ক্লিক করে নতুন শেয়ার্ড ওয়ালেট তৈরি করুন বা ইনভাইট কোড দিয়ে যুক্ত হোন।'
+                : 'Click here to create a new shared wallet or join using an invite code.',
+              side: 'top',
+              align: 'center',
+            },
+            onNextClick: (el, step, opts) => clickAndNext('[data-tour="living-connect-roommates"]', opts.config.driverObj || opts.driver),
+          },
+          {
+            element: '[data-tour="connect-sheet"]',
+            popover: {
+              title: isBn ? 'শেয়ার্ড ওয়ালেট' : 'Shared Wallet',
+              description: isBn
+                ? 'তৈরি করার পর আপনি একটি ইনভাইট কোড পাবেন, যা দিয়ে আপনার রুমমেটরা যুক্ত হতে পারবে।'
+                : 'After creating, you will get an invite code that your roommates can use to join.',
+              side: 'top',
+              align: 'center',
+            },
+            onNextClick: (el, step, opts) => closeSheetAndNext(opts.config.driverObj || opts.driver),
+          }
+        );
+      } else {
+        const inviteBtn = document.querySelector('[data-tour="living-invite-code"]');
+        if (inviteBtn) {
+          rawSteps.push({
+            element: '[data-tour="living-invite-code"]',
+            popover: {
+              title: isBn ? 'ইনভাইট কোড' : 'Invite Code',
+              description: isBn
+                ? 'এই কোডটি শেয়ার করে রুমমেটদের ওয়ালেটে যুক্ত হতে বলুন।'
+                : 'Share this code with your roommates so they can join the wallet.',
+              side: 'top',
+              align: 'center',
+            }
+          });
+        }
       }
 
+      const addBtn = document.querySelector('[data-tour="living-add-roommate"]');
+      if (addBtn) {
+        rawSteps.push(
+          {
+            element: '[data-tour="living-add-roommate"]',
+            popover: {
+              title: isBn ? 'ম্যানুয়াল রুমমেট' : 'Manual Roommate',
+              description: isBn
+                ? 'যারা অ্যাপ ব্যবহার করেন না, তাদের হিসাব রাখার জন্য এখান থেকে ম্যানুয়ালি রুমমেট যোগ করতে পারেন।'
+                : 'For roommates who don\'t use the app, you can add them manually here to keep track.',
+              side: 'top',
+              align: 'end',
+            },
+            onNextClick: (el, step, opts) => clickAndNext('[data-tour="living-add-roommate"]', opts.config.driverObj || opts.driver),
+          },
+          {
+            element: '[data-tour="add-roommate-sheet"]',
+            popover: {
+              title: isBn ? 'রুমমেট যোগ' : 'Add Roommate',
+              description: isBn
+                ? 'এখানে নাম এবং রঙ দিয়ে রুমমেট সেভ করতে পারবেন।'
+                : 'Save your roommate here with their name and a color.',
+              side: 'top',
+              align: 'center',
+            },
+            onNextClick: (el, step, opts) => closeSheetAndNext(opts.config.driverObj || opts.driver),
+          }
+        );
+      }
+
+      rawSteps.push(
+        {
+          element: tabSelector('meals'),
+          popover: {
+            title: isBn ? 'মিলস সেকশন' : 'Meals Section',
+            description: isBn
+              ? 'মিলের সব হিসাব রাখতে এখানে যান। পরবর্তী ধাপে আমরা মিলের ভেতরের ফিচারগুলো দেখব।'
+              : 'Keep track of all meal calculations here. Next, we will explore the features inside.',
+            side: isMobile ? 'bottom' : 'right',
+            align: 'center',
+          },
+          onNextClick: (el, step, opts) => clickAndNext(tabSelector('meals'), opts.config.driverObj || opts.driver),
+        },
+        {
+          element: '[data-tour="add-deposit-btn"]',
+          popover: {
+            title: isBn ? 'জমা দিন' : 'Add Deposit',
+            description: isBn
+              ? 'মেস ফান্ডে টাকা জমা দিতে এই বাটনটি ব্যবহার করুন।'
+              : 'Use this button to add money into the shared meal fund.',
+            side: 'top',
+            align: 'center',
+          },
+          onNextClick: (el, step, opts) => clickAndNext('[data-tour="add-deposit-btn"]', opts.config.driverObj || opts.driver),
+        },
+        {
+          element: '[data-tour="deposit-sheet"]',
+          popover: {
+            title: isBn ? 'জমা ফর্ম' : 'Deposit Form',
+            description: isBn
+              ? 'এখান থেকে পরিমাণ এবং নোট দিয়ে টাকা জমা করতে পারবেন।'
+              : 'Enter the amount and note to deposit money here.',
+            side: 'top',
+            align: 'center',
+          },
+          onNextClick: (el, step, opts) => closeSheetAndNext(opts.config.driverObj || opts.driver),
+        },
+        {
+          element: '[data-tour="add-bazar-btn"]',
+          popover: {
+            title: isBn ? 'বাজার যোগ' : 'Add Bazar',
+            description: isBn
+              ? 'প্রতিদিনের বাজারের খরচ এখানে যোগ করুন।'
+              : 'Add your daily grocery expenses here.',
+            side: 'top',
+            align: 'center',
+          },
+          onNextClick: (el, step, opts) => clickAndNext('[data-tour="add-bazar-btn"]', opts.config.driverObj || opts.driver),
+        },
+        {
+          element: '[data-tour="grocery-sheet"]',
+          popover: {
+            title: isBn ? 'বাজার ফর্ম' : 'Bazar Form',
+            description: isBn
+              ? 'বাজারের খরচ এবং নোট দিয়ে মিলের বাজার সেভ করুন।'
+              : 'Save your meal groceries with cost and notes.',
+            side: 'top',
+            align: 'center',
+          },
+          onNextClick: (el, step, opts) => closeSheetAndNext(opts.config.driverObj || opts.driver),
+        },
+        {
+          element: '[data-tour="set-rate-btn"]',
+          popover: {
+            title: isBn ? 'মিল রেট' : 'Meal Rate',
+            description: isBn
+              ? 'অটোমেটিক অথবা আপনার ইচ্ছামতো নির্দিষ্ট মিল রেট সেট করতে পারবেন।'
+              : 'You can set an automatic or a fixed meal rate here.',
+            side: 'bottom',
+            align: 'start',
+          },
+          onNextClick: (el, step, opts) => clickAndNext('[data-tour="set-rate-btn"]', opts.config.driverObj || opts.driver),
+        },
+        {
+          element: '[data-tour="rate-sheet"]',
+          popover: {
+            title: isBn ? 'রেট ফর্ম' : 'Rate Form',
+            description: isBn
+              ? 'রেট অপশনটি সিলেক্ট করে সেভ করুন।'
+              : 'Select your preferred rate mode and save.',
+            side: 'top',
+            align: 'center',
+          },
+          onNextClick: (el, step, opts) => closeSheetAndNext(opts.config.driverObj || opts.driver),
+        },
+        {
+          element: tabSelector('expenses'),
+          popover: {
+            title: isBn ? 'শেয়ার্ড খরচ' : 'Shared Expenses',
+            description: isBn
+              ? 'বাসার অন্যান্য শেয়ার্ড খরচ (যেমন বুয়া, ওয়াইফাই) এখানে দেখতে পাবেন।'
+              : 'View other shared flat expenses (like maid, WiFi) here.',
+            side: isMobile ? 'bottom' : 'right',
+            align: 'center',
+          },
+          onNextClick: (el, step, opts) => clickAndNext(tabSelector('expenses'), opts.config.driverObj || opts.driver),
+        },
+        {
+          element: tabSelector('bills'),
+          popover: {
+            title: isBn ? 'মাসিক বিল' : 'Monthly Bills',
+            description: isBn
+              ? 'বাড়িভাড়া, গ্যাস, বিদ্যুৎ ইত্যাদি মাসিক বিলের হিসেব এখানে থাকে।'
+              : 'Keep track of rent, gas, electricity, and other monthly bills here.',
+            side: isMobile ? 'bottom' : 'right',
+            align: 'center',
+          },
+          onNextClick: (el, step, opts) => clickAndNext(tabSelector('bills'), opts.config.driverObj || opts.driver),
+        }
+      );
+
+      // fallback helper for older/newer driver versions where driverObj is exposed differently
+      let driverObjRef = null;
+
       const driverObj = driver({
-        allowClose: true,
+        allowClose: false,
         showProgress: true,
-        steps,
+        steps: rawSteps,
         nextBtnText: isBn ? 'পরবর্তী' : 'Next',
         prevBtnText: isBn ? 'পূর্ববর্তী' : 'Previous',
         doneBtnText: isBn ? 'শেষ' : 'Done',
@@ -861,6 +1017,15 @@ export const TourProvider = ({ children }) => {
           setDriverInstance(null);
         },
       });
+
+      // Hook up driverObj to the options in case driver.js v1 doesn't inject it correctly in onNextClick
+      rawSteps.forEach(s => {
+        if (s.onNextClick) {
+          const original = s.onNextClick;
+          s.onNextClick = (el, step, opts) => original(el, step, { ...opts, driver: driverObjRef, config: { ...opts.config, driverObj: driverObjRef } });
+        }
+      });
+      driverObjRef = driverObj;
 
       setActiveTour('living');
       setDriverInstance(driverObj);
@@ -946,13 +1111,24 @@ export const TourProvider = ({ children }) => {
   const startSearchTour = useCallback(async () => {
     if (hasTourCompleted('search') || startingRef.current) return;
     startingRef.current = true;
-    if (!(await waitForAnchor('[data-tour="inquiry-button"]'))) {
+    if (!(await waitForAnchor('[data-tour="desktop-filter-sidebar"], [data-tour="mobile-filter-btn"]'))) {
       startingRef.current = false;
       return;
     }
 
     try {
       const steps = resolveSteps([
+        {
+          element: '[data-tour="desktop-filter-sidebar"], [data-tour="mobile-filter-btn"]',
+          popover: {
+            title: isBn ? 'ফিল্টার অপশন' : 'Filter Options',
+            description: isBn
+              ? 'এখান থেকে আপনার পছন্দমতো লোকেশন, প্রপার্টির ধরন, এবং বাজেট অনুযায়ী সার্চ রেজাল্ট ফিল্টার করতে পারবেন।'
+              : 'Use these filters to refine your search results by location, property type, and budget.',
+            side: 'right',
+            align: 'start',
+          },
+        },
         {
           element: '[data-tour="inquiry-button"]',
           popover: {

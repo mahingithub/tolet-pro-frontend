@@ -958,7 +958,7 @@ const HeroSection = () => {
         {/* ═══════════════════════════════════════════════════════════════ */}
         {/* 3. POPULAR DISTRICTS (Marquee Slider)                         */}
         {/* ═══════════════════════════════════════════════════════════════ */}
-        <section className="w-full mt-12 md:mt-24 overflow-hidden relative">
+        <section className="w-full mt-12 md:mt-24 overflow-hidden relative" data-tour="explore-divisions">
           <div className="max-w-[1400px] mx-auto px-4 md:px-6 mb-6">
             <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">{t?.exploreDivisions || 'Explore Divisions'}</h2>
             <p className="text-sm font-bold text-slate-500 mt-1">{t?.exploreDivisionsDesc || 'Discover properties across all major cities'}</p>
@@ -1110,19 +1110,21 @@ const HeroSection = () => {
         {/* ═══════════════════════════════════════════════════════════════ */}
         {/* 4. POPULAR AREAS — Futuristic Hover Accordion                 */}
         {/* ═══════════════════════════════════════════════════════════════ */}
-        <PopularAreasAccordion
-          areas={POPULAR_AREAS}
-          images={POPULAR_AREA_IMAGES}
-          desktopImages={POPULAR_AREA_IMAGES_DESKTOP}
-          taglines={POPULAR_AREA_TAGLINES}
-          subzones={POPULAR_AREA_SUBZONES}
-          t={t}
-          language={language}
-          navigate={navigate}
-          setOpenArea={setOpenArea}
-          setPendingLocation={setPendingLocation}
-          setIsCategoryPromptOpen={setIsCategoryPromptOpen}
-        />
+        <div data-tour="popular-areas">
+          <PopularAreasAccordion
+            areas={POPULAR_AREAS}
+            images={POPULAR_AREA_IMAGES}
+            desktopImages={POPULAR_AREA_IMAGES_DESKTOP}
+            taglines={POPULAR_AREA_TAGLINES}
+            subzones={POPULAR_AREA_SUBZONES}
+            t={t}
+            language={language}
+            navigate={navigate}
+            setOpenArea={setOpenArea}
+            setPendingLocation={setPendingLocation}
+            setIsCategoryPromptOpen={setIsCategoryPromptOpen}
+          />
+        </div>
 
         {/* ═══════════════════════════════════════════════════════════════ */}
         {/* 5. SOCIAL PROOF — stats + testimonials                        */}
