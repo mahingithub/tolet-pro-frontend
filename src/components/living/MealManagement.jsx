@@ -292,6 +292,13 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
         case 'close-bazar': setBazarOpen(false); break;
         case 'open-rate': setRateOpen(true); break;
         case 'close-rate': setRateOpen(false); break;
+        // The tour can end on a sheet step (Done, Esc, overlay click) — don't
+        // leave the sheet stranded over the page once the overlay is gone.
+        case 'close-all':
+          setDepositOpen(false);
+          setBazarOpen(false);
+          setRateOpen(false);
+          break;
       }
     };
     window.addEventListener('tour:action', handleTourAction);

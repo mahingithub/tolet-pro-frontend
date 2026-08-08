@@ -248,6 +248,9 @@ export const EmptyState = ({ icon: Icon, title, subtitle, action }) => (
 // ancestor and the bottom nav (z-40) paints OVER the sheet, hiding the footer
 // action button. At body level with z-[110] it sits above everything, and a
 // safe-area-aware footer keeps the primary button clear of the home indicator.
+// The `tp-sheet-*` classes are stable hooks index.css uses to lift the sheet
+// over driver.js's tour overlay (inline z-index 10000) — without them a tour
+// step that highlights a sheet renders it dimmed underneath the overlay.
 export const Sheet = ({ open, onClose, title, subtitle, children, footer, maxWidth = 'max-w-md' }) => {
   if (typeof document === 'undefined') return null;
   return createPortal(
@@ -256,7 +259,7 @@ export const Sheet = ({ open, onClose, title, subtitle, children, footer, maxWid
         <>
           <motion.div
             key="backdrop"
-            className="fixed inset-0 z-[100] bg-gray-900/50 backdrop-blur-sm"
+            className="tp-sheet-backdrop fixed inset-0 z-[100] bg-gray-900/50 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -264,7 +267,7 @@ export const Sheet = ({ open, onClose, title, subtitle, children, footer, maxWid
           />
           <motion.div
             key="panel"
-            className="fixed inset-x-0 bottom-0 sm:inset-0 z-[110] flex sm:items-center justify-center sm:p-4 pointer-events-none"
+            className="tp-sheet-panel fixed inset-x-0 bottom-0 sm:inset-0 z-[110] flex sm:items-center justify-center sm:p-4 pointer-events-none"
           >
             <motion.div
               className={cx(

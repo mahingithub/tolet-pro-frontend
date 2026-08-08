@@ -265,6 +265,9 @@ const WalletSummary = ({ go, me, language }) => {
         case 'close-connect': setConnectOpen(false); break;
         case 'open-add-roommate': setAddOpen(true); break;
         case 'close-add-roommate': setAddOpen(false); break;
+        // The tour can end on a sheet step (Done, Esc, overlay click) — don't
+        // leave the sheet stranded over the page once the overlay is gone.
+        case 'close-all': setConnectOpen(false); setAddOpen(false); break;
       }
     };
     window.addEventListener('tour:action', handleTourAction);

@@ -11,6 +11,8 @@
  */
 
 import { getCurrentToken } from './authService';
+import { directUpload } from './cloudinaryUpload.js';
+
 
 const BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000')
   .replace(/\/+$/, '')
@@ -86,11 +88,24 @@ export async function deletePaymentMethod(id) {
 }
 
 /** Upload / replace the QR image for a method. `file` is a File/Blob. */
-export async function uploadPaymentMethodQr(id, file) {
-  const fd = new FormData();
-  fd.append('file', file);
-  const { method } = await upload(`/api/payment-methods/${id}/qr`, fd);
-  return method;
+export async function uploadPaymentMethodQr(id, file, onProgress) {
+  if (!(file instanceof Blob)) throw new Error('Invalid file.');
+  
+  const result = await directUpload(file, {
+    folder: `tolet-pro/payment-methods/direct`,
+    resourceType: 'image',
+    onProgress: (pct) => {
+      if (onProgress) onProgress(Math.round(pct * 0.9));
+    }
+  });
+
+  const data = await request(`/api/payment-methods/${encodeURIComponent(id)}/direct-qr`, {
+    method: 'POST',
+    body: JSON.stringify({ secureUrl: result.secureUrl, publicId: result.publicId })
+  });
+  
+  if (onProgress) onProgress(100);
+  return data.paymentMethod;
 }
 
 /** Remove the QR image from a method. */

@@ -69,6 +69,16 @@ const waitForAnchor = (selector, timeout = 5000) =>
     }, 120);
   });
 
+// Ceiling for driver.js's own per-step `waitForElement`. It watches the DOM with
+// a MutationObserver and proceeds the instant the anchor appears, so a generous
+// ceiling costs nothing on the happy path and only bounds the pathological case.
+const ANCHOR_WAIT_MS = 3000;
+// A Sheet leaves on a spring; give it a beat to clear the anchor sitting behind
+// it before the next step spotlights that anchor.
+const SHEET_EXIT_MS = 260;
+// Living's module swap runs a 0.22s framer-motion enter transition.
+const MODULE_SETTLE_MS = 320;
+
 // Swap each step's selector for the visible element it resolves to, dropping
 // steps with no visible anchor (premium tabs, later wizard pages). Steps with no
 // `element` at all are intentional centred popovers and always survive.
@@ -782,22 +792,40 @@ export const TourProvider = ({ children }) => {
     }
 
     try {
-      const isMobile = window.innerWidth < 1024;
-      const tabSelector = (id) => isMobile ? `[data-tour="living-mobile-nav"] [data-tour="living-tab-${id}"]` : `aside [data-tour="living-tab-${id}"]`;
+      // Both tab rails are always mounted — the breakpoint only hides one — and
+      // driver.js resolves string selectors with a plain querySelector that
+      // ignores visibility. Resolve lazily (element-as-function) so each step
+      // spotlights the rail the user can actually see, even after a resize.
+      const tabAnchor = (id) => () =>
+        visibleAnchor(`[data-tour="living-mobile-nav"] [data-tour="living-tab-${id}"]`) ||
+        visibleAnchor(`[data-tour="living-desktop-nav"] [data-tour="living-tab-${id}"]`);
+      const tabSide = () => (window.innerWidth < 1024 ? 'bottom' : 'right');
       
-      const triggerActionAndNext = (action, driverObj) => {
-        window.dispatchEvent(new CustomEvent('tour:action', { detail: action }));
-        setTimeout(() => driverObj.moveNext(), 800);
+      // Assigned right below, before drive() — every handler runs after that.
+      let livingDriver = null;
+
+      // Ask the app for a UI change, then advance. No guessed delay: the step
+      // we are advancing *to* carries `waitForElement`, so driver.js holds it
+      // (MutationObserver) until the anchor genuinely lands in the DOM.
+      const emit = (type, detail) => window.dispatchEvent(new CustomEvent(type, { detail }));
+
+      const actThenNext = (type, detail, delay = 0) => {
+        emit(type, detail);
+        window.setTimeout(() => livingDriver?.moveNext(), delay);
       };
 
-      const goToTabAndNext = (tab, driverObj) => {
-        window.dispatchEvent(new CustomEvent('tour:tab', { detail: tab }));
-        setTimeout(() => driverObj.moveNext(), 800);
+      const actThenPrev = (type, detail) => {
+        emit(type, detail);
+        window.setTimeout(() => livingDriver?.movePrevious(), 0);
       };
 
-      const closeSheetAndNext = (action, driverObj) => {
-        window.dispatchEvent(new CustomEvent('tour:action', { detail: action }));
-        setTimeout(() => driverObj.moveNext(), 800);
+      // A module swap mounts behind a framer-motion enter transition, so the
+      // rect driver.js measured at highlight time is a few px stale. Re-measure
+      // once that transition has settled.
+      const settle = () => {
+        window.setTimeout(() => {
+          if (livingDriver?.isActive()) livingDriver.refresh();
+        }, MODULE_SETTLE_MS);
       };
 
       // We don't use resolveSteps here because many elements won't be in the DOM
@@ -816,7 +844,7 @@ export const TourProvider = ({ children }) => {
         }
       ];
 
-      const connectBtn = document.querySelector('[data-tour="living-connect-roommates"]');
+      const connectBtn = visibleAnchor('[data-tour="living-connect-roommates"]');
       if (connectBtn) {
         rawSteps.push(
           {
@@ -828,11 +856,12 @@ export const TourProvider = ({ children }) => {
                 : 'Click here to create a new shared wallet or join using an invite code.',
               side: 'top',
               align: 'center',
+              onNextClick: () => actThenNext('tour:action', 'open-connect'),
             },
-            onNextClick: (el, step, opts) => triggerActionAndNext('open-connect', opts.config.driverObj || opts.driver),
           },
           {
             element: '[data-tour="connect-sheet"]',
+            waitForElement: ANCHOR_WAIT_MS,
             popover: {
               title: isBn ? 'শেয়ার্ড ওয়ালেট' : 'Shared Wallet',
               description: isBn
@@ -840,12 +869,13 @@ export const TourProvider = ({ children }) => {
                 : 'After creating, you will get an invite code that your roommates can use to join.',
               side: 'top',
               align: 'center',
+              onNextClick: () => actThenNext('tour:action', 'close-connect', SHEET_EXIT_MS),
+              onPrevClick: () => actThenPrev('tour:action', 'close-connect'),
             },
-            onNextClick: (el, step, opts) => closeSheetAndNext('close-connect', opts.config.driverObj || opts.driver),
           }
         );
       } else {
-        const inviteBtn = document.querySelector('[data-tour="living-invite-code"]');
+        const inviteBtn = visibleAnchor('[data-tour="living-invite-code"]');
         if (inviteBtn) {
           rawSteps.push({
             element: '[data-tour="living-invite-code"]',
@@ -861,7 +891,7 @@ export const TourProvider = ({ children }) => {
         }
       }
 
-      const addBtn = document.querySelector('[data-tour="living-add-roommate"]');
+      const addBtn = visibleAnchor('[data-tour="living-add-roommate"]');
       if (addBtn) {
         rawSteps.push(
           {
@@ -873,11 +903,12 @@ export const TourProvider = ({ children }) => {
                 : 'For roommates who don\'t use the app, you can add them manually here to keep track.',
               side: 'top',
               align: 'end',
+              onNextClick: () => actThenNext('tour:action', 'open-add-roommate'),
             },
-            onNextClick: (el, step, opts) => triggerActionAndNext('open-add-roommate', opts.config.driverObj || opts.driver),
           },
           {
             element: '[data-tour="add-roommate-sheet"]',
+            waitForElement: ANCHOR_WAIT_MS,
             popover: {
               title: isBn ? 'রুমমেট যোগ' : 'Add Roommate',
               description: isBn
@@ -885,27 +916,30 @@ export const TourProvider = ({ children }) => {
                 : 'Save your roommate here with their name and a color.',
               side: 'top',
               align: 'center',
+              onNextClick: () => actThenNext('tour:action', 'close-add-roommate', SHEET_EXIT_MS),
+              onPrevClick: () => actThenPrev('tour:action', 'close-add-roommate'),
             },
-            onNextClick: (el, step, opts) => closeSheetAndNext('close-add-roommate', opts.config.driverObj || opts.driver),
           }
         );
       }
 
       rawSteps.push(
         {
-          element: tabSelector('meals'),
+          element: tabAnchor('meals'),
           popover: {
             title: isBn ? 'মিলস সেকশন' : 'Meals Section',
             description: isBn
               ? 'মিলের সব হিসাব রাখতে এখানে যান। পরবর্তী ধাপে আমরা মিলের ভেতরের ফিচারগুলো দেখব।'
               : 'Keep track of all meal calculations here. Next, we will explore the features inside.',
-            side: isMobile ? 'bottom' : 'right',
+            side: tabSide(),
             align: 'center',
+            onNextClick: () => actThenNext('tour:tab', 'meals'),
           },
-          onNextClick: (el, step, opts) => goToTabAndNext('meals', opts.config.driverObj || opts.driver),
         },
         {
           element: '[data-tour="add-deposit-btn"]',
+          waitForElement: ANCHOR_WAIT_MS,
+          onHighlighted: settle,
           popover: {
             title: isBn ? 'জমা দিন' : 'Add Deposit',
             description: isBn
@@ -913,11 +947,12 @@ export const TourProvider = ({ children }) => {
               : 'Use this button to add money into the shared meal fund.',
             side: 'top',
             align: 'center',
+            onNextClick: () => actThenNext('tour:action', 'open-deposit'),
           },
-          onNextClick: (el, step, opts) => triggerActionAndNext('open-deposit', opts.config.driverObj || opts.driver),
         },
         {
           element: '[data-tour="deposit-sheet"]',
+          waitForElement: ANCHOR_WAIT_MS,
           popover: {
             title: isBn ? 'জমা ফর্ম' : 'Deposit Form',
             description: isBn
@@ -925,8 +960,9 @@ export const TourProvider = ({ children }) => {
               : 'Enter the amount and note to deposit money here.',
             side: 'top',
             align: 'center',
+            onNextClick: () => actThenNext('tour:action', 'close-deposit', SHEET_EXIT_MS),
+            onPrevClick: () => actThenPrev('tour:action', 'close-deposit'),
           },
-          onNextClick: (el, step, opts) => closeSheetAndNext('close-deposit', opts.config.driverObj || opts.driver),
         },
         {
           element: '[data-tour="add-bazar-btn"]',
@@ -937,11 +973,12 @@ export const TourProvider = ({ children }) => {
               : 'Add your daily grocery expenses here.',
             side: 'top',
             align: 'center',
+            onNextClick: () => actThenNext('tour:action', 'open-bazar'),
           },
-          onNextClick: (el, step, opts) => triggerActionAndNext('open-bazar', opts.config.driverObj || opts.driver),
         },
         {
           element: '[data-tour="grocery-sheet"]',
+          waitForElement: ANCHOR_WAIT_MS,
           popover: {
             title: isBn ? 'বাজার ফর্ম' : 'Bazar Form',
             description: isBn
@@ -949,8 +986,9 @@ export const TourProvider = ({ children }) => {
               : 'Save your meal groceries with cost and notes.',
             side: 'top',
             align: 'center',
+            onNextClick: () => actThenNext('tour:action', 'close-bazar', SHEET_EXIT_MS),
+            onPrevClick: () => actThenPrev('tour:action', 'close-bazar'),
           },
-          onNextClick: (el, step, opts) => closeSheetAndNext('close-bazar', opts.config.driverObj || opts.driver),
         },
         {
           element: '[data-tour="set-rate-btn"]',
@@ -961,11 +999,12 @@ export const TourProvider = ({ children }) => {
               : 'You can set an automatic or a fixed meal rate here.',
             side: 'bottom',
             align: 'start',
+            onNextClick: () => actThenNext('tour:action', 'open-rate'),
           },
-          onNextClick: (el, step, opts) => triggerActionAndNext('open-rate', opts.config.driverObj || opts.driver),
         },
         {
           element: '[data-tour="rate-sheet"]',
+          waitForElement: ANCHOR_WAIT_MS,
           popover: {
             title: isBn ? 'রেট ফর্ম' : 'Rate Form',
             description: isBn
@@ -973,47 +1012,62 @@ export const TourProvider = ({ children }) => {
               : 'Select your preferred rate mode and save.',
             side: 'top',
             align: 'center',
+            onNextClick: () => actThenNext('tour:action', 'close-rate', SHEET_EXIT_MS),
+            onPrevClick: () => actThenPrev('tour:action', 'close-rate'),
           },
-          onNextClick: (el, step, opts) => closeSheetAndNext('close-rate', opts.config.driverObj || opts.driver),
         },
         {
-          element: tabSelector('expenses'),
+          element: tabAnchor('expenses'),
           popover: {
             title: isBn ? 'শেয়ার্ড খরচ' : 'Shared Expenses',
             description: isBn
               ? 'বাসার অন্যান্য শেয়ার্ড খরচ (যেমন বুয়া, ওয়াইফাই) এখানে দেখতে পাবেন।'
               : 'View other shared flat expenses (like maid, WiFi) here.',
-            side: isMobile ? 'bottom' : 'right',
+            side: tabSide(),
             align: 'center',
+            onNextClick: () => actThenNext('tour:tab', 'expenses'),
           },
-          onNextClick: (el, step, opts) => goToTabAndNext('expenses', opts.config.driverObj || opts.driver),
         },
         {
-          element: tabSelector('bills'),
+          element: tabAnchor('bills'),
           popover: {
             title: isBn ? 'মাসিক বিল' : 'Monthly Bills',
             description: isBn
               ? 'বাড়িভাড়া, গ্যাস, বিদ্যুৎ ইত্যাদি মাসিক বিলের হিসেব এখানে থাকে।'
               : 'Keep track of rent, gas, electricity, and other monthly bills here.',
-            side: isMobile ? 'bottom' : 'right',
+            side: tabSide(),
             align: 'center',
+            onNextClick: () => actThenNext('tour:tab', 'bills'),
+            // Last step. driver.js prefers onDoneClick here, and any popover
+            // click handler *replaces* the built-in advance — so this one has to
+            // land the user on Bills and tear the tour down itself.
+            onDoneClick: () => {
+              emit('tour:tab', 'bills');
+              livingDriver?.destroy();
+            },
           },
-          onNextClick: (el, step, opts) => goToTabAndNext('bills', opts.config.driverObj || opts.driver),
         }
       );
 
-      // fallback helper for older/newer driver versions where driverObj is exposed differently
-      let driverObjRef = null;
-
       const driverObj = driver({
-        allowClose: false,
+        // A step can still strand (a sheet that fails to open, a module that
+        // never mounts). Leaving the user with no way out of a 14-step overlay
+        // is worse than letting them dismiss it.
+        allowClose: true,
         showProgress: true,
         steps: rawSteps,
+        // If an anchor never lands, skip that step instead of parking a
+        // detached, centred popover over the page. Steps with no `element` are
+        // deliberate centred popovers and are never affected by this.
+        skipMissingElement: true,
         nextBtnText: isBn ? 'পরবর্তী' : 'Next',
         prevBtnText: isBn ? 'পূর্ববর্তী' : 'Previous',
         doneBtnText: isBn ? 'শেষ' : 'Done',
         progressText: isBn ? '{{current}} এর {{total}}' : '{{current}} of {{total}}',
         onDestroyed: () => {
+          // The tour can end mid-sheet (Done, Esc, overlay click), so make sure
+          // we never leave a Sheet open over the page on the way out.
+          emit('tour:action', 'close-all');
           markTourCompleted('living');
           startingRef.current = false;
           setActiveTour(null);
@@ -1021,14 +1075,7 @@ export const TourProvider = ({ children }) => {
         },
       });
 
-      // Hook up driverObj to the options in case driver.js v1 doesn't inject it correctly in onNextClick
-      rawSteps.forEach(s => {
-        if (s.onNextClick) {
-          const original = s.onNextClick;
-          s.onNextClick = (el, step, opts) => original(el, step, { ...opts, driver: driverObjRef, config: { ...opts.config, driverObj: driverObjRef } });
-        }
-      });
-      driverObjRef = driverObj;
+      livingDriver = driverObj;
 
       setActiveTour('living');
       setDriverInstance(driverObj);

@@ -5,6 +5,8 @@
  */
 
 import { getCurrentToken } from './authService';
+import { directUpload } from './cloudinaryUpload.js';
+
 
 const BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000')
   .replace(/\/+$/, '')
@@ -34,21 +36,46 @@ export async function listDocuments(folder) {
  *   const fd = new FormData();
  *   fd.append('file', fileObject);
  *   fd.append('folder', 'agreements');
- *   fd.append('tenantId', '...'); fd.append('tenantName', '...'); fd.append('tenantPhone', '...');
  *   fd.append('fileName', 'Lease - Araf.pdf');
- *
- * IMPORTANT: never set Content-Type yourself — the browser must set the
- * multipart boundary automatically.
  */
-export async function uploadDocument(formData) {
-  const token = getCurrentToken();
-  const res = await fetch(`${BASE}/api/documents`, {
-    method: 'POST',
-    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: formData,
+export async function uploadDocument(formData, onProgress) {
+  const file = formData.get('file');
+  const folder = formData.get('folder');
+  const fileName = formData.get('fileName');
+  
+  if (!(file instanceof Blob)) throw new Error('Invalid file.');
+  
+  const resourceType = file.type.startsWith('image/') ? 'image' : 'raw';
+  
+  const result = await directUpload(file, {
+    folder: `tolet-pro/documents/direct`,
+    resourceType,
+    onProgress: (pct) => {
+      if (onProgress) onProgress(Math.round(pct * 0.9));
+    }
   });
+
+  const token = getCurrentToken();
+  const res = await fetch(`${BASE}/api/documents/direct`, {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}) 
+    },
+    body: JSON.stringify({ 
+      secureUrl: result.secureUrl, 
+      publicId: result.publicId,
+      fileName,
+      folder,
+      format: result.format || file.name.split('.').pop(),
+      bytes: result.bytes || file.size
+    })
+  });
+  
   if (!res.ok) throw await readError(res);
   const { document } = await res.json();
+  
+  if (onProgress) onProgress(100);
   return document;
 }
 

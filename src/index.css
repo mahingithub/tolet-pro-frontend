@@ -863,3 +863,95 @@ button.driver-popover-next-btn:hover:not(.driver-popover-btn-disabled) {
 .driver-popover-arrow {
   display: none !important;
 }
+
+/* ── Tour mascot ──────────────────────────────────────────────────────────
+   The same robot the chatbot uses (lucide `Bot` in a crimson orb, see
+   WelcomeRobotOverlay) now fronts every tour card, so the guided tour reads as
+   the same assistant rather than an anonymous popup.
+
+   Purely decorative and deliberately low-key — the tour already asks for the
+   user's attention, so the mascot must not compete with it:
+     • drawn as a ::before on the title, so it sits in normal flow and can never
+       overlap the copy, the Next/Back buttons, or the close X;
+     • a pseudo-element has no hit box of its own and the title is not
+       interactive, so it cannot swallow a click;
+     • one slow 3.4s breath — no spin, flash, bounce or attention loop;
+     • honours prefers-reduced-motion below.
+
+   Gated on [style*="block"]: driver.js toggles the title's inline display, so
+   this keeps the orb off popovers that have no title instead of forcing an
+   empty title row to appear. The selector is intentionally tag-agnostic —
+   driver.js builds the title as a <header>, not a <div>. */
+.driver-popover-title[style*="block"] {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  /* keep long titles from sliding under the absolutely-positioned close X */
+  padding-right: 34px;
+}
+
+.driver-popover-title[style*="block"]::before {
+  content: '';
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 8V4H8'/%3E%3Crect width='16' height='12' x='4' y='8' rx='2'/%3E%3Cpath d='M2 14h2'/%3E%3Cpath d='M20 14h2'/%3E%3Cpath d='M15 13v2'/%3E%3Cpath d='M9 13v2'/%3E%3C/svg%3E")
+      center / 19px 19px no-repeat,
+    linear-gradient(135deg, #ba0036 0%, #7a0026 100%);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.22),
+    0 0 0 0 rgba(255, 77, 109, 0.45),
+    0 6px 14px -6px rgba(186, 0, 54, 0.9);
+  animation: tp-tour-bot-breathe 3.4s ease-in-out infinite;
+}
+
+/* A slow hover-and-glow: ~3px of travel and a single soft halo that fades out.
+   Small enough to register as "alive" in peripheral vision without pulling the
+   eye off the instruction the card is actually giving. */
+@keyframes tp-tour-bot-breathe {
+  0%,
+  100% {
+    transform: translateY(0);
+    box-shadow:
+      inset 0 0 0 1.5px rgba(255, 255, 255, 0.22),
+      0 0 0 0 rgba(255, 77, 109, 0.45),
+      0 6px 14px -6px rgba(186, 0, 54, 0.9);
+  }
+  50% {
+    transform: translateY(-3px);
+    box-shadow:
+      inset 0 0 0 1.5px rgba(255, 255, 255, 0.34),
+      0 0 0 7px rgba(255, 77, 109, 0),
+      0 10px 18px -6px rgba(186, 0, 54, 1);
+  }
+}
+
+/* Motion sensitivity / vestibular disorders: keep the mascot, drop the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .driver-popover-title[style*="block"]::before {
+    animation: none;
+  }
+}
+
+/* Tour steps that highlight a bottom sheet (Connect wallet, Add deposit, …).
+   driver.js paints its overlay SVG at an inline z-index of 10000; the Sheet
+   portal sits at z-[100]/[110], so without this the sheet renders *underneath*
+   the dimmer and the step looks broken. Scoped to an active tour, so normal
+   sheet stacking is untouched. The popover stays on top at its own 1e9. */
+body.driver-active .tp-sheet-backdrop {
+  z-index: 10001 !important;
+}
+
+body.driver-active .tp-sheet-panel {
+  z-index: 10002 !important;
+}
+
+/* driver.js sets `.driver-active * { pointer-events: none }` and re-enables only
+   the highlighted element. A sheet's close button and inputs live outside that
+   subtree, so re-enable the sheet to keep it operable mid-tour. */
+body.driver-active .tp-sheet-panel,
+body.driver-active .tp-sheet-panel * {
+  pointer-events: auto;
+}

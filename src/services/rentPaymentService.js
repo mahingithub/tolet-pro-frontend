@@ -7,6 +7,8 @@
  */
 
 import { getCurrentToken } from './authService';
+import { directUpload } from './cloudinaryUpload.js';
+
 
 const BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000')
   .replace(/\/+$/, '')
@@ -65,11 +67,26 @@ export async function submitRentPayment(data) {
 }
 
 /** Attach a payment screenshot to a submission. `file` is a File/Blob. */
-export async function uploadRentPaymentScreenshot(id, file) {
-  const fd = new FormData();
-  fd.append('file', file);
-  const { submission } = await upload(`/api/rent-payments/${id}/screenshot`, fd);
-  return submission;
+export async function uploadRentPaymentScreenshot(id, file, onProgress) {
+  if (!(file instanceof Blob)) throw new Error('Invalid file.');
+  
+  // 1. Direct upload to Cloudinary
+  const result = await directUpload(file, {
+    folder: `tolet-pro/rent-payments/direct`,
+    resourceType: 'image',
+    onProgress: (pct) => {
+      if (onProgress) onProgress(Math.round(pct * 0.9));
+    }
+  });
+
+  // 2. Save to backend
+  const data = await request(`/api/rent-payments/${encodeURIComponent(id)}/direct-screenshot`, {
+    method: 'POST',
+    body: JSON.stringify({ secureUrl: result.secureUrl, publicId: result.publicId })
+  });
+  
+  if (onProgress) onProgress(100);
+  return data.submission;
 }
 
 /** List the tenant's own submissions. */

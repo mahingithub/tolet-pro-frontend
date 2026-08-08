@@ -22,6 +22,7 @@
 import { readJson, writeJson, broadcast } from './_storage.js';
 import { unsubscribeFromPushNotifications } from '../utils/pushSubscription.js';
 import { isInstalledApp } from '../utils/platform.js';
+import { directUpload, privateUpload } from './cloudinaryUpload.js';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL
   ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/auth`
@@ -270,165 +271,94 @@ export const submitVerification = async (verification) => {
   return data.user;
 };
 
-// ─── Verification document upload ───────────────────────────────────────────
-export const uploadVerificationDoc = (kind, file, { onProgress } = {}) => {
-  return new Promise((resolve, reject) => {
-    const token = getCurrentToken();
-    if (!token) {
-      const err = new Error('NOT_LOGGED_IN');
-      err.code = 'unauthenticated';
-      return reject(err);
-    }
-    if (!(file instanceof Blob)) {
-      const err = new Error('Invalid file.');
-      err.code = 'invalid_file';
-      return reject(err);
-    }
+// ─── Verification document upload (Direct Cloudinary Upload) ────────────────
+// NID scans use privateUpload (Cloudinary type:'authenticated' — URL is useless
+// without a signed token). Profile photo uses directUpload (public). The file
+// goes straight from the browser to Cloudinary; only the resulting URL + public_id
+// are sent to our backend via the /me/verification/direct-upload/:kind endpoint.
+export const uploadVerificationDoc = async (kind, file, { onProgress } = {}) => {
+  if (!(file instanceof Blob)) {
+    throw Object.assign(new Error('Invalid file.'), { code: 'invalid_file' });
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw Object.assign(new Error('FILE_TOO_LARGE'), { code: 'file_too_large' });
+  }
 
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${API_URL}/me/verification/upload/${encodeURIComponent(kind)}`, true);
-    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+  const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!ALLOWED_MIMES.includes(file.type)) {
+    throw Object.assign(
+      new Error('JPG, PNG বা WEBP ছবি ব্যবহার করুন।'),
+      { code: 'invalid_mime' },
+    );
+  }
 
-    if (xhr.upload && typeof onProgress === 'function') {
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          onProgress(Math.min(99, Math.round((e.loaded / e.total) * 100)));
-        }
-      };
-    }
+  const currentUser = getCurrentUser();
+  const userId = currentUser?._id || currentUser?.id || 'unknown';
 
-    xhr.onload = () => {
-      let data = {};
-      try { data = JSON.parse(xhr.responseText || '{}'); } catch { /* ignore */ }
-      if (xhr.status >= 200 && xhr.status < 300) {
-        if (data.user) {
-          writeJson(KEY_USER, data.user);
-          broadcast(KEY_USER);
-        }
-        if (typeof onProgress === 'function') onProgress(100);
-        resolve(data);
-      } else {
-        const err = new Error(data.message || `Upload failed (HTTP ${xhr.status}).`);
-        err.code   = data.code;
-        err.status = xhr.status;
-        reject(err);
-      }
-    };
-    xhr.onerror = () => {
-      const err = new Error('NETWORK_ERROR');
-      err.code = 'network_error';
-      reject(err);
-    };
-    xhr.onabort = () => {
-      const err = new Error('Upload cancelled.');
-      err.code = 'upload_aborted';
-      reject(err);
-    };
+  // NID documents are PRIVATE (authenticated) — photo is public.
+  const isNid = kind === 'nidFront' || kind === 'nidBack';
+  const publicIdMap = { photo: 'profile_photo', nidFront: 'nid_front', nidBack: 'nid_back' };
+  const uploadFn = isNid ? privateUpload : directUpload;
 
-    const form = new FormData();
-    form.append('file', file);
-    xhr.send(form);
+  // 1. Upload directly to Cloudinary (zero server RAM).
+  const result = await uploadFn(file, {
+    folder:    `tolet-pro/verification/${userId}`,
+    publicId:  publicIdMap[kind] || kind,
+    onProgress: (pct) => {
+      if (typeof onProgress === 'function') onProgress(Math.round(pct * 0.9));
+    },
   });
+
+  // 2. Persist the URL + publicId on the user document via the new endpoint.
+  const data = await api(`/me/verification/direct-upload/${encodeURIComponent(kind)}`, {
+    body: { secureUrl: result.secureUrl, publicId: result.publicId },
+    auth: true,
+  });
+  if (data.user) {
+    writeJson(KEY_USER, data.user);
+    broadcast(KEY_USER);
+  }
+  if (typeof onProgress === 'function') onProgress(100);
+  return data;
 };
+
 
 // ─── Avatar upload (Bug 1 Fix) ──────────────────────────────────────────────
 
 // OPTION A — Dedicated avatar route (RECOMMENDED if backend has it)
-export const uploadAvatar = (file, { onProgress } = {}) => {
-  return new Promise((resolve, reject) => {
-    const token = getCurrentToken();
-    if (!token) {
-      const err = new Error('NOT_LOGGED_IN');
-      err.code = 'unauthenticated';
-      return reject(err);
-    }
-    if (!(file instanceof Blob)) {
-      const err = new Error('Invalid file.');
-      err.code = 'invalid_file';
-      return reject(err);
-    }
+// ─── Avatar upload (Direct Cloudinary Upload) ───────────────────────────────
+// File goes straight from the browser to Cloudinary (zero server RAM), then we
+// persist the resulting URL on the user doc via PATCH /me.
+export const uploadAvatar = async (file, { onProgress } = {}) => {
+  if (!(file instanceof Blob)) {
+    throw Object.assign(new Error('Invalid file.'), { code: 'invalid_file' });
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw Object.assign(new Error('FILE_TOO_LARGE'), { code: 'file_too_large' });
+  }
 
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${API_URL}/me/avatar`, true);
-    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+  // Read the current user to build the Cloudinary folder path.
+  const currentUser = getCurrentUser();
+  const userId = currentUser?._id || currentUser?.id || 'unknown';
 
-    if (xhr.upload && typeof onProgress === 'function') {
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          onProgress(Math.min(99, Math.round((e.loaded / e.total) * 100)));
-        }
-      };
-    }
-
-    xhr.onload = () => {
-      let data = {};
-      try { data = JSON.parse(xhr.responseText || '{}'); } catch { /* ignore */ }
-      if (xhr.status >= 200 && xhr.status < 300) {
-        if (data.user) {
-          writeJson(KEY_USER, data.user);
-          broadcast(KEY_USER);
-        }
-        if (typeof onProgress === 'function') onProgress(100);
-        resolve(data.user || data);
-      } else {
-        const err = new Error(data.message || `Upload failed (HTTP ${xhr.status}).`);
-        err.code   = data.code;
-        err.status = xhr.status;
-        reject(err);
-      }
-    };
-    xhr.onerror = () => {
-      const err = new Error('NETWORK_ERROR');
-      err.code = 'network_error';
-      reject(err);
-    };
-    xhr.onabort = () => {
-      const err = new Error('Upload cancelled.');
-      err.code = 'upload_aborted';
-      reject(err);
-    };
-
-    const form = new FormData();
-    form.append('file', file);
-    xhr.send(form);
+  // 1. Upload directly to Cloudinary (the big bytes never touch our server).
+  const result = await directUpload(file, {
+    folder:    `tolet-pro/avatars/${userId}`,
+    publicId:  'avatar',
+    onProgress: (pct) => {
+      // Scale to 0–90% for the upload phase; the remaining 10% is the save.
+      if (typeof onProgress === 'function') onProgress(Math.round(pct * 0.9));
+    },
   });
+
+  // 2. Persist the new avatar URL on the user document.
+  const user = await updateMe({ avatar: result.secureUrl });
+  if (typeof onProgress === 'function') onProgress(100);
+  return user;
 };
 
-// OPTION B — Fallback via existing PATCH /me (if no /me/avatar route)
-export const uploadAvatarFallback = (file, { onProgress } = {}) => {
-  return new Promise((resolve, reject) => {
-    if (!(file instanceof Blob)) {
-      return reject(Object.assign(new Error('Invalid file.'), { code: 'invalid_file' }));
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      return reject(Object.assign(
-        new Error('FILE_TOO_LARGE'),
-        { code: 'file_too_large' },
-      ));
-    }
-
-    const reader = new FileReader();
-    reader.onprogress = (e) => {
-      if (e.lengthComputable && typeof onProgress === 'function') {
-        onProgress(Math.min(50, Math.round((e.loaded / e.total) * 50)));
-      }
-    };
-    reader.onload = async () => {
-      try {
-        if (typeof onProgress === 'function') onProgress(70);
-        const user = await updateMe({ avatar: reader.result });
-        if (typeof onProgress === 'function') onProgress(100);
-        resolve(user);
-      } catch (err) {
-        reject(err);
-      }
-    };
-    reader.onerror = () => reject(
-      Object.assign(new Error('FILE_READ_ERROR'), { code: 'read_error' }),
-    );
-    reader.readAsDataURL(file);
-  });
-};
+// Legacy fallback kept for compatibility — now just delegates to the primary.
+export const uploadAvatarFallback = uploadAvatar;
 
 
 // ─── Backwards-compat shim ──────────────────────────────────────────────────

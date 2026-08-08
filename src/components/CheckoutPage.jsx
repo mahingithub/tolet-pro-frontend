@@ -7,6 +7,7 @@ import { getSectionGuides } from '../services/aiGuideService';
 import { ArrowLeft, ShieldCheck, Check, Info, Lock, CreditCard, Zap, CheckCircle2, Shield, X } from 'lucide-react';
 import { BkashGateway, NagadGateway } from './payment/MerchantGateways';
 import Footer from './Footer';
+import FreeProTrialModal from './FreeProTrialModal';
 
 const PAYMENT_METHODS = [
   { 
@@ -78,8 +79,20 @@ const CheckoutPage = () => {
 
   const [toast, setToast] = useState(null);
   const [activeGateway, setActiveGateway] = useState(null);
+  const [showAlreadyProModal, setShowAlreadyProModal] = useState(false);
+  const [showClaimTrialModal, setShowClaimTrialModal] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState(PAYMENT_METHODS[0].id);
   const [autoRenew, setAutoRenew] = useState(true);
+  
+  // Subscription status for dynamic free trial banner
+  const [subStatus, setSubStatus] = useState(subscriptionService.getStatus());
+
+  useEffect(() => {
+    const unsub = subscriptionService.onChange(() => {
+      setSubStatus(subscriptionService.getStatus());
+    });
+    return () => unsub && unsub();
+  }, []);
   
   // Video Guide State
   const [activeVideo, setActiveVideo] = useState(null);
@@ -352,7 +365,13 @@ const CheckoutPage = () => {
 
               {/* Pay Button */}
               <button
-                onClick={() => setActiveGateway(selectedMethod)}
+                onClick={() => {
+                  if (!subStatus.shareTrialClaimed) {
+                    setShowClaimTrialModal(true);
+                  } else {
+                    setShowAlreadyProModal(true);
+                  }
+                }}
                 className={`w-full py-5 rounded-2xl font-bold text-lg text-white shadow-lg transition-all hover:shadow-2xl hover:-translate-y-1 active:translate-y-0 ${themeClasses.buttonBg} flex items-center justify-center gap-3 group`}
               >
                 <Lock size={20} className="group-hover:rotate-12 transition-transform" />
@@ -401,6 +420,46 @@ const CheckoutPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Already on Pro Modal */}
+      {showAlreadyProModal && (
+        <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#13111C] w-full max-w-md rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-white/10 relative animate-tp-modal-in text-center">
+            <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 size={32} className="text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3">
+              {isBn ? 'আপনি ইতিমধ্যেই প্রো-তে আছেন!' : 'You are already on Pro!'}
+            </h3>
+            <p className="text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
+              {isBn 
+                ? 'লঞ্চিং অফার উপলক্ষে প্রথম ২ মাস সবার জন্য প্রো ফিচার সম্পূর্ণ ফ্রি! তাই বর্তমানে আপনার কোনো পেমেন্ট করার প্রয়োজন নেই।' 
+                : 'As a launch offer, Pro features are completely free for everyone for the first 2 months! So you don\'t need to make any payment right now.'
+              }
+            </p>
+            <button
+              onClick={() => {
+                setShowAlreadyProModal(false);
+                navigate('/host-dashboard');
+              }}
+              className="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-lg transition-all active:scale-95"
+            >
+              {isBn ? 'ড্যাশবোর্ডে ফিরে যান' : 'Back to Dashboard'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Claim Free Trial Modal */}
+      <FreeProTrialModal
+        open={showClaimTrialModal}
+        onSkip={() => setShowClaimTrialModal(false)}
+        onUnlocked={() => {
+          setShowClaimTrialModal(false);
+          setShowAlreadyProModal(true);
+        }}
+        reason="manual"
+      />
 
       {/* Render Active Gateway Overlay */}
       {activeGateway === 'bkash' && (
