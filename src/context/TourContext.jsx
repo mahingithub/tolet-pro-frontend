@@ -787,17 +787,17 @@ export const TourProvider = ({ children }) => {
       
       const triggerActionAndNext = (action, driverObj) => {
         window.dispatchEvent(new CustomEvent('tour:action', { detail: action }));
-        setTimeout(() => driverObj.moveNext(), 400);
+        setTimeout(() => driverObj.moveNext(), 800);
       };
 
       const goToTabAndNext = (tab, driverObj) => {
-        navigate(`/living?m=${tab}`, { replace: true });
-        setTimeout(() => driverObj.moveNext(), 400);
+        window.dispatchEvent(new CustomEvent('tour:tab', { detail: tab }));
+        setTimeout(() => driverObj.moveNext(), 800);
       };
 
       const closeSheetAndNext = (action, driverObj) => {
         window.dispatchEvent(new CustomEvent('tour:action', { detail: action }));
-        setTimeout(() => driverObj.moveNext(), 400);
+        setTimeout(() => driverObj.moveNext(), 800);
       };
 
       // We don't use resolveSteps here because many elements won't be in the DOM

@@ -132,6 +132,16 @@ const Living = () => {
     [location.search, navigate]
   );
 
+  useEffect(() => {
+    const handleTourTab = (e) => {
+      if (VALID.includes(e.detail)) {
+        go(e.detail);
+      }
+    };
+    window.addEventListener('tour:tab', handleTourTab);
+    return () => window.removeEventListener('tour:tab', handleTourTab);
+  }, [go]);
+
   const reminders = useMemo(() => buildReminders(state, ME), [state]);
   const back = useGoBack('/tenant-dashboard');
 
