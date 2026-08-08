@@ -622,7 +622,7 @@ const LoginPage = () => {
 
                   <div>
                     <label className="block text-[11px] font-bold text-gray-700 mb-1 ml-1 uppercase tracking-wider">
-                      {L('Phone number', 'ফোন নম্বর')}
+                      {L('WhatsApp Number', 'হোয়াটসঅ্যাপ নম্বর')}
                     </label>
                     <div className="relative flex items-center bg-gray-50 border border-gray-200 rounded-xl focus-within:bg-white focus-within:border-brandRed focus-within:ring-2 focus-within:ring-brandRed/20 transition-all overflow-hidden">
                       <div className="pl-3.5 pr-2.5 text-gray-400"><Phone size={16} /></div>

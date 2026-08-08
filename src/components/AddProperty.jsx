@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { getDynamicFields } from '../constants/propertyFields';
 import { getRoomTypes, firstRoomTypeId } from '../constants/roomCategories';
 import { SALE_INTENT_ENABLED } from '../constants/listingIntents';
@@ -16,7 +16,7 @@ import {
   LayoutDashboard, Navigation, Map, Wand2, RefreshCw,
   ShoppingBag, Briefcase, Store,
   User, GraduationCap, Leaf, Utensils, Coffee, Rocket,
-  Flame, Droplets
+  Flame, Droplets, Search
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -876,6 +876,70 @@ const THANA_BN = {
 };
 const thanaBn = (districtId, thanaLabel) => (THANA_BN[districtId] || {})[thanaLabel] || '';
 
+// ── LOCATION KEYWORD SEARCH INDEX ──────────────────────────────────────────────
+// Pre-built flat array of every division / district / thana for fast keyword
+// search. Computed once at module level so it's shared across renders.
+const LOCATION_SEARCH_INDEX = (() => {
+  const items = [];
+
+  // Add divisions
+  DIVISIONS.forEach(div => {
+    items.push({
+      type: 'division',
+      id: div.id,
+      label: div.label,
+      labelBn: div.labelBn,
+      divisionId: div.id,
+      divisionLabel: div.label,
+      divisionLabelBn: div.labelBn,
+    });
+  });
+
+  // Add districts
+  DIVISIONS.forEach(div => {
+    (DISTRICTS_BY_DIVISION[div.id] || []).forEach(dist => {
+      items.push({
+        type: 'district',
+        id: dist.id,
+        label: dist.label,
+        labelBn: dist.labelBn,
+        divisionId: div.id,
+        divisionLabel: div.label,
+        divisionLabelBn: div.labelBn,
+        districtId: dist.id,
+        districtLabel: dist.label,
+        districtLabelBn: dist.labelBn,
+      });
+    });
+  });
+
+  // Add thanas
+  DIVISIONS.forEach(div => {
+    (DISTRICTS_BY_DIVISION[div.id] || []).forEach(dist => {
+      (THANAS_BY_DISTRICT[dist.id] || []).forEach(thana => {
+        const thLabel = typeof thana === 'string' ? thana : thana.label;
+        const thLabelBn = typeof thana === 'string' ? (thanaBn(dist.id, thana) || thana) : (thana.labelBn || thana);
+        items.push({
+          type: 'thana',
+          id: thLabel,
+          label: thLabel,
+          labelBn: thLabelBn,
+          divisionId: div.id,
+          divisionLabel: div.label,
+          divisionLabelBn: div.labelBn,
+          districtId: dist.id,
+          districtLabel: dist.label,
+          districtLabelBn: dist.labelBn,
+          thanaLabel: thLabel,
+          thanaLabelBn: thLabelBn,
+        });
+      });
+    });
+  });
+
+  return items;
+})();
+
 // Bengali area labels (district -> thana -> area)
 const AREA_BN = {
   dhaka: {
@@ -1037,15 +1101,17 @@ const GpsPanel = ({ form, set, isBn }) => {
             const v = String(p || '').trim();
             if (v && !out.some((q) => q.toLowerCase() === v.toLowerCase())) out.push(v);
           }
-          if (out.length) set('location', out.join(', '));
-
           // Confirmation address line — also language-aware.
+          let fullAddressText = '';
           if (isBn) {
             const divLabel = divMatch ? divMatch.labelBn : String(g.division || '').trim();
-            set('gpsAddress', [...out, divLabel, 'বাংলাদেশ'].filter(Boolean).join(', '));
+            fullAddressText = [...out, divLabel, 'বাংলাদেশ'].filter(Boolean).join(', ');
           } else {
-            set('gpsAddress', g.formatted || out.join(', '));
+            fullAddressText = g.formatted || out.join(', ');
           }
+          
+          set('gpsAddress', fullAddressText);
+          set('location', fullAddressText);
         };
 
         try {
@@ -1520,6 +1586,55 @@ const AddProperty = () => {
   const [submitted, setSubmitted] = useState(false);
   // "I am interested in selling" Coming-Soon modal (opened from the intent step).
   const [sellInterestOpen, setSellInterestOpen] = useState(false);
+
+  // ── Location keyword search state ──
+  const [locationQuery, setLocationQuery] = useState('');
+  const [locationSearchOpen, setLocationSearchOpen] = useState(false);
+  const locationSearchRef = useRef(null);
+
+  // Close location search dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (locationSearchRef.current && !locationSearchRef.current.contains(e.target)) {
+        setLocationSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filtered search results, grouped later in UI
+  const locationSearchResults = useMemo(() => {
+    const q = locationQuery.trim().toLowerCase();
+    if (!q || q.length < 1) return [];
+    return LOCATION_SEARCH_INDEX.filter(item =>
+      item.label.toLowerCase().includes(q) ||
+      item.labelBn.includes(locationQuery.trim())
+    ).slice(0, 20);
+  }, [locationQuery]);
+
+  // Auto-fill division / district / thana from a search result
+  const handleLocationSelect = (item) => {
+    if (item.type === 'division') {
+      set('division', item.divisionId);
+      set('district', '');
+      set('thana', '');
+      set('area', '');
+    } else if (item.type === 'district') {
+      set('division', item.divisionId);
+      set('district', item.districtId);
+      set('thana', '');
+      set('area', '');
+    } else if (item.type === 'thana') {
+      set('division', item.divisionId);
+      set('district', item.districtId);
+      set('thana', item.thanaLabel);
+      set('area', '');
+    }
+    setLocationQuery('');
+    setLocationSearchOpen(false);
+    setErrors(er => ({ ...er, division: false, district: false }));
+  };
 
   // Media refs
   const coverInputRef = useRef(null);
@@ -2255,6 +2370,98 @@ const AddProperty = () => {
                     <span className="text-[10px] text-gray-300 font-bold">{form.title.length}/80</span>
                   </div>
                 </Field>
+
+                {/* ── LOCATION KEYWORD SEARCH ── */}
+                <Field label={isBn ? 'লোকেশন খুঁজুন' : 'Search Location'}
+                  hint={isBn ? 'থানা, জেলা বা বিভাগের নাম লিখুন' : 'Type a thana, district, or division name'}>
+                  <div className="relative" ref={locationSearchRef}>
+                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
+                    <input
+                      type="text"
+                      className={`${inputCls} pl-10 pr-10`}
+                      placeholder={isBn ? 'যেমন: ধানমন্ডি, গাজীপুর, সিলেট...' : 'e.g. Dhanmondi, Gazipur, Sylhet...'}
+                      value={locationQuery}
+                      onChange={e => { setLocationQuery(e.target.value); setLocationSearchOpen(true); }}
+                      onFocus={() => { if (locationQuery.trim()) setLocationSearchOpen(true); }}
+                    />
+                    {locationQuery && (
+                      <button type="button" onClick={() => { setLocationQuery(''); setLocationSearchOpen(false); }}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors">
+                        <X size={16} />
+                      </button>
+                    )}
+
+                    <AnimatePresence>
+                      {locationSearchOpen && locationQuery.trim() && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-gray-100 shadow-[0_12px_40px_rgba(0,0,0,0.12)] z-50 max-h-72 overflow-y-auto"
+                        >
+                          {locationSearchResults.length === 0 ? (
+                            <div className="p-4 text-center">
+                              <p className="text-sm font-bold text-gray-400">
+                                {isBn ? 'কোনো ফলাফল পাওয়া যায়নি' : 'No results found'}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="p-2">
+                              {['thana', 'district', 'division'].map(type => {
+                                const items = locationSearchResults.filter(r => r.type === type);
+                                if (!items.length) return null;
+                                const typeLabel = type === 'thana'
+                                  ? (isBn ? 'থানা / উপজেলা' : 'Thana / Upazila')
+                                  : type === 'district'
+                                    ? (isBn ? 'জেলা' : 'District')
+                                    : (isBn ? 'বিভাগ' : 'Division');
+                                return (
+                                  <div key={type}>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-3 pt-2 pb-1">{typeLabel}</p>
+                                    {items.map((item, idx) => (
+                                      <button
+                                        key={`${item.type}-${item.id}-${idx}`}
+                                        type="button"
+                                        onClick={() => handleLocationSelect(item)}
+                                        className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-red-50 hover:text-[#ba0036] transition-all duration-150 flex items-center gap-3 group"
+                                      >
+                                        <div className="w-8 h-8 rounded-lg bg-gray-50 group-hover:bg-[#ba0036]/10 flex items-center justify-center shrink-0 transition-colors">
+                                          <MapPin size={14} className="text-gray-400 group-hover:text-[#ba0036] transition-colors" />
+                                        </div>
+                                        <div className="min-w-0">
+                                          <p className="text-sm font-black text-gray-900 group-hover:text-[#ba0036] truncate transition-colors">
+                                            {isBn ? item.labelBn : item.label}
+                                          </p>
+                                          {item.type !== 'division' && (
+                                            <p className="text-[11px] font-bold text-gray-400 truncate">
+                                              {item.type === 'thana'
+                                                ? (isBn ? `${item.districtLabelBn}, ${item.divisionLabelBn}` : `${item.districtLabel}, ${item.divisionLabel}`)
+                                                : (isBn ? item.divisionLabelBn : item.divisionLabel)
+                                              }
+                                            </p>
+                                          )}
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </Field>
+
+                <div className="relative flex items-center gap-3 my-1">
+                  <div className="flex-1 h-px bg-gray-200" />
+                  <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
+                    {isBn ? 'অথবা নিচ থেকে বেছে নিন' : 'or select manually'}
+                  </span>
+                  <div className="flex-1 h-px bg-gray-200" />
+                </div>
 
                 {/* Division */}
                 <Field label={isBn ? 'বিভাগ' : 'Division'} required>

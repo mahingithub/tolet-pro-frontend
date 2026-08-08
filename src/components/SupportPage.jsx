@@ -92,13 +92,6 @@ const HELP_TOPICS = [
   { Icon: ShieldCheck, en: 'Safety & verification',   bn: 'নিরাপত্তা ও ভেরিফিকেশন' },
 ];
 
-// Reassurance chips shown in the hero.
-const ASSURANCES = [
-  { Icon: Clock,         en: 'Fast replies',      bn: 'দ্রুত উত্তর' },
-  { Icon: MessageSquare, en: 'In-app updates',    bn: 'অ্যাপে আপডেট' },
-  { Icon: ShieldCheck,   en: 'Real support team', bn: 'আসল সাপোর্ট টিম' },
-];
-
 export default function SupportPage() {
   const navigate = useNavigate();
   const goBack = useGoBack('/');
@@ -359,11 +352,11 @@ export default function SupportPage() {
     <div className="min-h-[100dvh] bg-gray-50 pb-28 md:pb-10">
       {/* Hero */}
       <div className="bg-gradient-to-br from-[#ba0036] to-[#e60045] text-white">
-        <div className="max-w-5xl mx-auto px-5 pt-6 pb-10 md:pt-10 md:pb-16 relative overflow-hidden">
+        <div className="max-w-5xl mx-auto px-5 pt-4 pb-6 md:pt-6 md:pb-8 relative overflow-hidden">
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
           <button
             onClick={goBack}
-            className="inline-flex items-center gap-2 text-sm font-bold text-white/90 hover:text-white mb-5 active:scale-95 transition-all"
+            className="hidden md:inline-flex items-center gap-2 text-sm font-bold text-white/90 hover:text-white mb-5 active:scale-95 transition-all"
           >
             <ArrowLeft size={18} /> {tr('Back', 'পেছনে')}
           </button>
@@ -375,13 +368,6 @@ export default function SupportPage() {
               <h1 className="text-2xl font-black leading-tight">{tr('Help & Support', 'সহায়তা ও সাপোর্ট')}</h1>
               <p className="text-sm font-medium text-red-100">{tr("We're here to help you", 'আমরা আপনাকে সাহায্য করতে এখানে আছি')}</p>
             </div>
-          </div>
-          <div className="flex flex-wrap gap-2 mt-5">
-            {ASSURANCES.map((a, i) => (
-              <span key={i} className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur px-3 py-1.5 rounded-full text-[11px] font-black">
-                <a.Icon size={13} /> {tr(a.en, a.bn)}
-              </span>
-            ))}
           </div>
         </div>
       </div>

@@ -23,7 +23,8 @@ export default function HowItWorks() {
   const navigate = useNavigate();
   const location = useLocation();
   const { language } = useLanguage();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, activeRole } = useAuth();
+  const isLandlord = activeRole === 'landlord';
   const isBn = language === 'বাংলা' || language === 'bn';
   const tr = (en, bn) => (isBn ? bn : en);
   const [openFaq, setOpenFaq] = useState(null);
@@ -76,7 +77,7 @@ export default function HowItWorks() {
 
   // Frequently asked questions shown on the marketing page.
   const faqs = [
-    { q: { en: 'Is TO-LET PRO free to use?', bn: 'টু-লেট প্রো ব্যবহার কি ফ্রি?' }, a: { en: 'Yes. Searching, contacting verified owners and listing a property are all free. Landlords can optionally upgrade for premium placement and tools.', bn: 'হ্যাঁ। সার্চ করা, ভেরিফাইড মালিকের সাথে যোগাযোগ ও বাড়ি লিস্ট করা সবই ফ্রি। মালিকরা চাইলে প্রিমিয়াম প্লেসমেন্ট ও টুলসের জন্য আপগ্রেড করতে পারেন।' } },
+    { q: { en: 'Is TO-LET PRO free to use?', bn: 'টু-লেট প্রো ব্যবহার কি ফ্রি?' }, a: { en: 'Yes. Searching, contacting verified owners and listing a property are all free. Owners can optionally upgrade for premium placement and tools.', bn: 'হ্যাঁ। সার্চ করা, ভেরিফাইড মালিকের সাথে যোগাযোগ ও প্রপার্টি লিস্ট করা সবই ফ্রি। মালিকরা চাইলে প্রিমিয়াম প্লেসমেন্ট ও টুলসের জন্য আপগ্রেড করতে পারেন।' } },
     { q: { en: 'Do I have to pay any brokerage?', bn: 'আমাকে কি কোনো দালাল ফি দিতে হবে?' }, a: { en: 'Never. Tenants deal directly with verified owners, so there is zero brokerage on TO-LET PRO.', bn: 'কখনো না। ভাড়াটিয়ারা সরাসরি ভেরিফাইড মালিকের সাথে লেনদেন করেন, তাই টু-লেট প্রো-তে কোনো দালাল ফি নেই।' } },
     { q: { en: 'How do I know a listing is genuine?', bn: 'একটি লিস্টিং আসল কিনা কীভাবে বুঝব?' }, a: { en: 'Look for the verified badge. It means our team has checked the owner\u2019s documents and the property details.', bn: 'ভেরিফাইড ব্যাজ খুঁজুন। এর মানে আমাদের টিম মালিকের কাগজপত্র ও বাড়ির তথ্য যাচাই করেছে।' } },
     { q: { en: 'How long does owner verification take?', bn: 'মালিক ভেরিফিকেশনে কত সময় লাগে?' }, a: { en: 'Most verifications are completed within 24\u201348 hours once you submit a valid NID and ownership proof.', bn: 'সঠিক এনআইডি ও মালিকানার প্রমাণ জমা দিলে বেশিরভাগ ভেরিফিকেশন ২৪–৪৮ ঘণ্টার মধ্যে সম্পন্ন হয়।' } },
@@ -152,12 +153,12 @@ export default function HowItWorks() {
         </section>
       )}
 
-      {/* For landlords */}
+      {/* For owners */}
       <section className="max-w-5xl mx-auto px-4 mt-8">
         <div className="bg-white/60 backdrop-blur rounded-[2rem] p-2 md:p-4">
           <div className="px-3 pt-3 pb-1">
-            <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036] mb-1">{tr('For landlords', 'বাড়িওয়ালাদের জন্য')}</p>
-            <h2 className="text-xl md:text-2xl font-black text-gray-900">{tr('List and let out with ease', 'সহজে বাড়ি লিস্ট ও ভাড়া দিন')}</h2>
+            <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036] mb-1">{tr('For owners', 'মালিকদের জন্য')}</p>
+            <h2 className="text-xl md:text-2xl font-black text-gray-900">{tr('List and let out with ease', 'সহজে প্রপার্টি লিস্ট ও ভাড়া দিন')}</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3">
             {landlordSteps.map((s, i) => (
@@ -167,14 +168,14 @@ export default function HowItWorks() {
         </div>
       </section>
 
-      {/* Landlord video guides (admin-managed via /admin/support → AI Video Guides) */}
+      {/* Owner video guides (admin-managed via /admin/support → AI Video Guides) */}
       {landlordVideos.length > 0 && (
         <section className="max-w-5xl mx-auto px-4 mt-8">
           <div className="flex items-center gap-2.5 mb-3 px-1">
             <PlayCircle size={20} className="text-[#ba0036] shrink-0" />
             <div>
               <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036]">{tr('Watch & learn', 'দেখে শিখুন')}</p>
-              <h3 className="text-lg font-black text-gray-900 leading-tight">{tr('Video guides for landlords', 'বাড়িওয়ালাদের জন্য ভিডিও গাইড')}</h3>
+              <h3 className="text-lg font-black text-gray-900 leading-tight">{tr('Video guides for owners', 'মালিকদের জন্য ভিডিও গাইড')}</h3>
             </div>
           </div>
           <VideoGuides guides={landlordVideos} />
@@ -228,61 +229,167 @@ export default function HowItWorks() {
 
       {/* Pricing */}
       <section id="pricing" className="max-w-5xl mx-auto px-4 mt-12 scroll-mt-24">
-        <div className="text-center mb-6">
+        <div className="text-center mb-8">
           <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036] mb-1">{tr('Pricing', 'মূল্য')}</p>
           <h2 className="text-2xl md:text-3xl font-black text-gray-900">{tr('Simple, honest pricing', 'সহজ ও স্বচ্ছ মূল্য')}</h2>
+          <p className="text-sm font-medium text-gray-500 mt-2 max-w-xl mx-auto">{tr('Everything tenants need is free. Owners can choose the plan that fits.', 'ভাড়াটিয়াদের সবকিছু ফ্রি। মালিকরা নিজের মতো প্ল্যান বেছে নিন।')}</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Tenant plan */}
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
-            <h3 className="text-lg font-black text-gray-900">{tr('Tenants', 'ভাড়াটিয়া')}</h3>
-            <p className="mt-1 text-3xl font-black text-gray-900">{tr('Free', 'ফ্রি')}</p>
-            <p className="text-xs font-medium text-gray-400 mb-4">{tr('Always. No brokerage, ever.', 'সবসময়। কোনো দালাল ফি নেই।')}</p>
-            <ul className="space-y-2.5 mb-6">
-              {[
-                tr('Unlimited search & saved homes', 'আনলিমিটেড সার্চ ও সেভ করা বাড়ি'),
-                tr('Message verified owners', 'ভেরিফাইড মালিকের সাথে মেসেজ'),
-                tr('Smart alerts for new listings', 'নতুন লিস্টিং-এর স্মার্ট অ্যালার্ট'),
-              ].map((f, i) => (
-                <li key={i} className="flex items-center gap-2 text-sm font-medium text-gray-600">
-                  <Check size={16} className="text-emerald-500 shrink-0" /> {f}
-                </li>
-              ))}
-            </ul>
-            <button
-              onClick={() => navigate('/properties/all')}
-              className="w-full bg-gray-900 text-white py-3 rounded-xl font-black text-sm active:scale-95 transition-transform"
-            >
-              {tr('Start searching', 'সার্চ শুরু করুন')}
-            </button>
-          </div>
 
-          {/* Landlord plan */}
-          <div className="relative bg-gradient-to-br from-[#ba0036] to-[#e60045] text-white rounded-3xl shadow-[0_16px_40px_rgba(186,0,54,0.28)] p-6 overflow-hidden">
-            <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
-            <div className="flex items-center gap-2 mb-1">
-              <Building2 size={18} />
-              <h3 className="text-lg font-black">{tr('Landlords', 'বাড়িওয়ালা')}</h3>
+        {/* ── ভাড়াটিয়া (Tenant) — Always Free ─────────────────────── */}
+        <div className="mb-6">
+          <p className="text-[11px] font-black uppercase tracking-wider text-emerald-600 mb-3 px-1">{tr('For Tenants', 'ভাড়াটিয়াদের জন্য')}</p>
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.04)] p-6 md:p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-wider">
+                    <Sparkles size={12} /> {tr('Always free', 'সবসময় ফ্রি')}
+                  </span>
+                </div>
+                <h3 className="text-2xl font-black text-gray-900">{tr('Free', 'ফ্রি')}</h3>
+                <p className="text-sm font-medium text-gray-400 mt-0.5">{tr('No brokerage, no hidden fees — ever.', 'কোনো দালাল ফি নেই, কোনো লুকানো চার্জ নেই — কখনোই।')}</p>
+              </div>
+              <button
+                onClick={() => navigate('/properties/all')}
+                className="shrink-0 bg-gray-900 text-white px-6 py-3 rounded-xl font-black text-sm active:scale-95 transition-transform"
+              >
+                {tr('Start searching', 'সার্চ শুরু করুন')}
+              </button>
             </div>
-            <p className="mt-1 text-2xl font-black">{tr('Free, Plus, or Pro', 'ফ্রি, প্লাস, বা প্রো')}</p>
-            <p className="text-xs font-medium text-red-100 mb-4">{tr('Plans start from ৳19/mo.', 'প্ল্যান শুরু মাত্র ৳১৯/মাস থেকে।')}</p>
-            <ul className="space-y-2.5 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
               {[
-                tr('Free: Unlimited basic listings', 'ফ্রি: আনলিমিটেড বেসিক লিস্টিং'),
-                tr('Plus (৳19/mo): Rent collection & bookings', 'প্লাস (৳১৯/মাস): ভাড়া কালেকশন ও বুকিং'),
-                tr('Pro (৳49/mo): Smart alerts, AI & gold card', 'প্রো (৳৪৯/মাস): স্মার্ট অ্যালার্ট, এআই ও গোল্ড কার্ড'),
+                { en: 'Unlimited property search & filters', bn: 'আনলিমিটেড প্রপার্টি সার্চ ও ফিল্টার' },
+                { en: 'Save & bookmark favourite homes', bn: 'পছন্দের বাড়ি সেভ ও বুকমার্ক' },
+                { en: 'Message verified owners directly', bn: 'ভেরিফাইড মালিকের সাথে সরাসরি মেসেজ' },
+                { en: 'In-app voice & video calls', bn: 'অ্যাপে ভয়েস ও ভিডিও কল' },
+                { en: 'Smart alerts for new listings', bn: 'নতুন লিস্টিং-এর স্মার্ট অ্যালার্ট' },
+                { en: 'Schedule property visits', bn: 'প্রপার্টি ভিজিট শিডিউল করুন' },
+                { en: 'Roommate Wallet (shared expenses)', bn: 'রুমমেট ওয়ালেট (শেয়ারড খরচ)' },
+                { en: 'Report & block suspicious users', bn: 'সন্দেহজনক ব্যবহারকারী রিপোর্ট ও ব্লক' },
               ].map((f, i) => (
-                <li key={i} className="flex items-center gap-2 text-sm font-medium text-red-50">
-                  <Check size={16} className="text-white shrink-0" /> {f}
-                </li>
+                <div key={i} className="flex items-center gap-2.5 py-1.5">
+                  <div className="w-5 h-5 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
+                    <Check size={12} className="text-emerald-600" strokeWidth={3} />
+                  </div>
+                  <span className="text-sm font-medium text-gray-600">{tr(f.en, f.bn)}</span>
+                </div>
               ))}
-            </ul>
-            <button
-              onClick={() => navigate(isAuthenticated ? '/subscription' : '/login?mode=signup&role=landlord')}
-              className="w-full bg-white text-[#ba0036] py-3 rounded-xl font-black text-sm shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
-            >
-              {tr('View all plans', 'সব প্ল্যান দেখুন')} <ArrowRight size={16} />
-            </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── মালিক (Owner) — Free / Plus / Pro ────────────── */}
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036] mb-3 px-1">{tr('For Owners', 'মালিকদের জন্য')}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+            {/* Owner FREE */}
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.04)] p-6 flex flex-col">
+              <span className="inline-flex self-start items-center px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full text-[10px] font-black uppercase tracking-wider mb-3">{tr('Free', 'ফ্রি')}</span>
+              <p className="text-3xl font-black text-gray-900 mb-0.5">৳০</p>
+              <p className="text-xs font-medium text-gray-400 mb-5">{tr('Forever free to list', 'লিস্ট করা চিরকাল ফ্রি')}</p>
+              <ul className="space-y-2.5 flex-1 mb-6">
+                {[
+                  { en: '1 active listing', bn: '১টি অ্যাক্টিভ লিস্টিং' },
+                  { en: '5 photos per property', bn: 'প্রতি প্রপার্টিতে ৫টি ছবি' },
+                  { en: 'Direct tenant messages', bn: 'সরাসরি ভাড়াটিয়া মেসেজ' },
+                  { en: 'In-app chat & calls', bn: 'অ্যাপে চ্যাট ও কল' },
+                  { en: 'Owner verification badge', bn: 'মালিক ভেরিফিকেশন ব্যাজ' },
+                ].map((f, i) => (
+                  <li key={i} className="flex items-center gap-2.5 text-sm font-medium text-gray-600">
+                    <div className="w-5 h-5 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
+                      <Check size={12} className="text-gray-500" strokeWidth={3} />
+                    </div>
+                    {tr(f.en, f.bn)}
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => navigate(isAuthenticated ? '/add-property' : '/login?mode=signup&role=landlord')}
+                className="w-full bg-gray-100 text-gray-800 py-3 rounded-xl font-black text-sm active:scale-95 transition-transform hover:bg-gray-200"
+              >
+                {tr('List for free', 'ফ্রিতে লিস্ট করুন')}
+              </button>
+            </div>
+
+            {/* Owner PLUS */}
+            <div className="bg-white rounded-3xl border-2 border-violet-200 shadow-[0_4px_20px_rgba(124,58,237,0.08)] p-6 flex flex-col relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-400 to-purple-500" />
+              <span className="inline-flex self-start items-center gap-1 px-2.5 py-1 bg-violet-50 text-violet-700 rounded-full text-[10px] font-black uppercase tracking-wider mb-3">
+                <Sparkles size={10} /> {tr('Plus', 'প্লাস')}
+              </span>
+              <div className="flex items-baseline gap-1 mb-0.5">
+                <p className="text-3xl font-black text-gray-900">৳১৯</p>
+                <span className="text-sm font-bold text-gray-400">{tr('/month', '/মাস')}</span>
+              </div>
+              <p className="text-xs font-medium text-gray-400 mb-5">{tr('For 2-3 property owners', '২-৩টি প্রপার্টির মালিকদের জন্য')}</p>
+              <ul className="space-y-2.5 flex-1 mb-6">
+                {[
+                  { en: 'Up to 3 active listings', bn: 'সর্বোচ্চ ৩টি অ্যাক্টিভ লিস্টিং' },
+                  { en: '15 photos + 1 video/property', bn: '১৫ ছবি + ১ ভিডিও/প্রপার্টি' },
+                  { en: '1× top search boost/month', bn: 'মাসে ১টি টপ সার্চ বুস্ট' },
+                  { en: 'Rent collection ledger', bn: 'ভাড়া কালেকশন লেজার' },
+                  { en: 'Bookings pipeline', bn: 'বুকিং পাইপলাইন' },
+                  { en: 'Facebook boost post', bn: 'ফেসবুক বুস্ট পোস্ট' },
+                  { en: 'Plus badge on profile', bn: 'প্রোফাইলে প্লাস ব্যাজ' },
+                ].map((f, i) => (
+                  <li key={i} className="flex items-center gap-2.5 text-sm font-medium text-gray-600">
+                    <div className="w-5 h-5 rounded-full bg-violet-50 flex items-center justify-center shrink-0">
+                      <Check size={12} className="text-violet-600" strokeWidth={3} />
+                    </div>
+                    {tr(f.en, f.bn)}
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => navigate(isAuthenticated ? '/subscription' : '/login?mode=signup&role=landlord')}
+                className="w-full bg-violet-600 text-white py-3 rounded-xl font-black text-sm shadow-md shadow-violet-600/20 active:scale-95 transition-transform hover:bg-violet-700"
+              >
+                {tr('Get Plus', 'প্লাস নিন')}
+              </button>
+            </div>
+
+            {/* Owner PRO — highlighted */}
+            <div className="relative bg-gradient-to-br from-[#ba0036] to-[#e60045] text-white rounded-3xl shadow-[0_16px_40px_rgba(186,0,54,0.28)] p-6 flex flex-col overflow-hidden">
+              <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
+              <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-white/5 rounded-full blur-2xl" />
+              <div className="flex items-center gap-2 mb-3 relative z-10">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-white/20 backdrop-blur text-white rounded-full text-[10px] font-black uppercase tracking-wider">
+                  <Building2 size={10} /> {tr('Pro — Most Popular', 'প্রো — সবচেয়ে জনপ্রিয়')}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1 mb-0.5 relative z-10">
+                <p className="text-3xl font-black">৳৪৯</p>
+                <span className="text-sm font-bold text-red-200">{tr('/month', '/মাস')}</span>
+              </div>
+              <p className="text-xs font-medium text-red-100 mb-5 relative z-10">{tr('Unlimited properties, full power', 'আনলিমিটেড প্রপার্টি, সম্পূর্ণ ক্ষমতা')}</p>
+              <ul className="space-y-2.5 flex-1 mb-6 relative z-10">
+                {[
+                  { en: 'Unlimited listings', bn: 'আনলিমিটেড লিস্টিং' },
+                  { en: '50 photos + 5 videos/property', bn: '৫০ ছবি + ৫ ভিডিও/প্রপার্টি' },
+                  { en: 'Super boost + top position', bn: 'সুপার বুস্ট + টপ পজিশন' },
+                  { en: 'Smart alerts & notifications', bn: 'স্মার্ট অ্যালার্ট ও নোটিফিকেশন' },
+                  { en: 'AI insights & pricing help', bn: 'এআই ইনসাইটস ও প্রাইসিং সাহায্য' },
+                  { en: 'Advanced analytics dashboard', bn: 'অ্যাডভান্সড অ্যানালিটিক্স ড্যাশবোর্ড' },
+                  { en: 'Rent collection & bookings', bn: 'ভাড়া কালেকশন ও বুকিং' },
+                  { en: 'Facebook super boost post', bn: 'ফেসবুক সুপার বুস্ট পোস্ট' },
+                  { en: 'Pro badge + Gold Card', bn: 'প্রো ব্যাজ + গোল্ড কার্ড' },
+                ].map((f, i) => (
+                  <li key={i} className="flex items-center gap-2.5 text-sm font-medium text-red-50">
+                    <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                      <Check size={12} className="text-white" strokeWidth={3} />
+                    </div>
+                    {tr(f.en, f.bn)}
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => navigate(isAuthenticated ? '/subscription' : '/login?mode=signup&role=landlord')}
+                className="w-full bg-white text-[#ba0036] py-3 rounded-xl font-black text-sm shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2 relative z-10 hover:bg-red-50"
+              >
+                {tr('Get Pro', 'প্রো নিন')} <ArrowRight size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -344,10 +451,12 @@ export default function HowItWorks() {
         <p className="text-sm font-medium text-gray-500 mb-5">{tr('Join over a million Bangladeshis renting the smarter way.', '১০ লাখেরও বেশি বাংলাদেশির সাথে যুক্ত হয়ে স্মার্ট উপায়ে ভাড়া নিন।')}</p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <button
-            onClick={() => navigate('/properties/all')}
+            onClick={() => navigate(isLandlord ? '/add-property' : '/properties/all')}
             className="w-full sm:w-auto bg-[#ba0036] text-white px-6 py-3 rounded-xl font-black text-sm shadow-md active:scale-95 transition-transform"
           >
-            {tr('Browse homes', 'বাড়ি দেখুন')}
+            {isLandlord
+              ? tr('List property', 'প্রপার্টি লিস্ট করুন')
+              : tr('Browse properties', 'প্রপার্টি দেখুন')}
           </button>
           {!isAuthenticated && (
             <button

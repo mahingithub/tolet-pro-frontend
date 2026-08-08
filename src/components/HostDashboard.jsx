@@ -4932,7 +4932,7 @@ const HostDashboard = () => {
                       </div>
                       <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ব্যবসার নাম' : 'Business / Trade Name'}</label>
-                        <input id="lease-businessName" type="text" value={leaseForm.businessName} onChange={e => setLeaseForm(f => ({ ...f, businessName: e.target.value }))} placeholder={language === 'বাংলা' ? 'যেমন: রহিম এন্টারপ্রাইজ' : 'e.g. Rahim Enterprise'} className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('businessName')}`} />
+                        <input id="lease-businessName" type="text" value={leaseForm.businessName} onChange={e => setLeaseForm(f => ({ ...f, businessName: e.target.value }))} placeholder={language === 'বাংলা' ? 'যেমন: আশরাফ আলম এন্টারপ্রাইজ' : 'e.g. Asraf Alom Enterprise'} className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('businessName')}`} />
                       </div>
                       <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ট্রেড লাইসেন্স নম্বর (ঐচ্ছিক)' : 'Trade License No. (optional)'}</label>
@@ -4976,11 +4976,11 @@ const HostDashboard = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ভাড়াটিয়ার নাম' : 'Tenant Name'}</label>
-                      <input id="lease-tenant" type="text" value={leaseForm.tenant} onChange={e => setLeaseForm(f => ({ ...f, tenant: e.target.value }))} placeholder={language === 'বাংলা' ? 'নাম লিখুন' : 'e.g. John Doe'} className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('tenant')}`} />
+                      <input id="lease-tenant" type="text" value={leaseForm.tenant} onChange={e => setLeaseForm(f => ({ ...f, tenant: e.target.value }))} placeholder={language === 'বাংলা' ? 'যেমন: আশরাফ আলম' : 'e.g. Asraf Alom'} className={`w-full mt-1.5 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl text-sm font-bold text-gray-900 dark:text-gray-100 outline-none focus:bg-white dark:focus:bg-gray-900 focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('tenant')}`} />
                     </div>
                     <div>
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ফোন নম্বর' : 'Tenant Phone'}</label>
-                      <input id="lease-tenantPhone" type="tel" value={leaseForm.tenantPhone} onChange={e => setLeaseForm(f => ({ ...f, tenantPhone: e.target.value }))} placeholder="+880 1xxx xxxxxx" className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('tenantPhone')}`} />
+                      <input id="lease-tenantPhone" type="tel" value={leaseForm.tenantPhone} onChange={e => setLeaseForm(f => ({ ...f, tenantPhone: e.target.value }))} placeholder="+880 1xxx xxxxxx" className={`w-full mt-1.5 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl text-sm font-bold text-gray-900 dark:text-gray-100 outline-none focus:bg-white dark:focus:bg-gray-900 focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('tenantPhone')}`} />
                     </div>
 
                     <div className="sm:col-span-2">
@@ -5005,7 +5005,7 @@ const HostDashboard = () => {
                           value={leaseForm.property}
                           onChange={e => setLeaseForm(f => ({ ...f, property: e.target.value }))}
                           placeholder={language === 'বাংলা' ? 'প্রপার্টির নাম লিখুন' : 'Type the property name'}
-                          className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('property')}`}
+                          className={`w-full mt-1.5 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl text-sm font-bold text-gray-900 dark:text-gray-100 outline-none focus:bg-white dark:focus:bg-gray-900 focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('property')}`}
                         />
                       ) : (
                         <select value={leaseForm.propertyId} onChange={e => {
@@ -5025,7 +5025,7 @@ const HostDashboard = () => {
                             category: commercial ? '' : (f.category || propTypeToCategory(prop?.type)),
                             leaseTermMonths: commercial ? (f.leaseTermMonths || '24') : f.leaseTermMonths,
                           }));
-                        }} id="lease-property" className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('property')}`}>
+                        }} id="lease-property" className={`w-full mt-1.5 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl text-sm font-bold text-gray-900 dark:text-gray-100 outline-none focus:bg-white dark:focus:bg-gray-900 focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all ${leaseErrCls('property')}`}>
                           <option value="">{language === 'বাংলা' ? 'প্রপার্টি সিলেক্ট করুন' : 'Select a property'}</option>
                           {properties
                             .filter(p => !leaseForm.category || (CATEGORY_TYPES[leaseForm.category] || []).includes(p.type))
@@ -5046,16 +5046,16 @@ const HostDashboard = () => {
                       const hostel = leaseForm.category === 'hostel';
                       const catLabel = { flat: isBn ? 'ফ্ল্যাট' : 'Flat', single_room: isBn ? 'সিঙ্গেল রুম' : 'Single Room', hostel: isBn ? 'হোস্টেল' : 'Hostel' }[leaseForm.category] || leaseForm.category;
                       return (
-                        <div className={`sm:col-span-2 rounded-2xl p-3.5 flex items-start gap-2.5 border ${hostel ? 'bg-[#ba0036]/5 border-[#ba0036]/15' : 'bg-blue-50/70 border-blue-100'}`}>
+                        <div className={`sm:col-span-2 rounded-2xl p-3.5 flex items-start gap-2.5 border ${hostel ? 'bg-[#ba0036]/5 border-[#ba0036]/15 dark:bg-[#ba0036]/10 dark:border-[#ba0036]/20' : 'bg-blue-50/70 border-blue-100 dark:bg-blue-900/30 dark:border-blue-800/50'}`}>
                           {hostel
-                            ? <Users size={16} className="text-[#ba0036] shrink-0 mt-0.5" />
-                            : <User size={16} className="text-blue-600 shrink-0 mt-0.5" />}
+                            ? <Users size={16} className="text-[#ba0036] dark:text-rose-400 shrink-0 mt-0.5" />
+                            : <User size={16} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />}
                           <div className="min-w-0">
                             <p className="text-[10px] font-black uppercase tracking-widest mb-1 flex items-center gap-1.5">
-                              <span className={hostel ? 'text-[#ba0036]' : 'text-blue-700'}>{isBn ? 'ফরম্যাট' : 'Format'}</span>
-                              <span className="px-1.5 py-0.5 rounded bg-white text-gray-800 border border-gray-200">{catLabel}</span>
+                              <span className={hostel ? 'text-[#ba0036] dark:text-rose-400' : 'text-blue-700 dark:text-blue-400'}>{isBn ? 'ফরম্যাট' : 'Format'}</span>
+                              <span className="px-1.5 py-0.5 rounded bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700">{catLabel}</span>
                             </p>
-                            <p className="text-[11px] font-bold text-gray-700 leading-relaxed">
+                            <p className="text-[11px] font-bold text-gray-700 dark:text-gray-300 leading-relaxed">
                               {hostel
                                 ? (isBn
                                     ? 'হোস্টেল — এই ভাড়াটিয়া "সিট ১" হবে। বুকিং তৈরির পর প্রতিটি সিট (আলাদা নাম, আলাদা ভাড়া, আলাদা রেন্ট বক্স) বুকিং কার্ড থেকে যোগ করুন।'
@@ -5082,11 +5082,11 @@ const HostDashboard = () => {
                           value={leaseForm.location}
                           onChange={e => setLeaseForm(f => ({ ...f, location: e.target.value }))}
                           placeholder={language === 'বাংলা' ? 'ঠিকানা লিখুন' : 'Type the address'}
-                          className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all"
+                          className="w-full mt-1.5 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl text-sm font-bold text-gray-900 dark:text-gray-100 outline-none focus:bg-white dark:focus:bg-gray-900 focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all"
                         />
                       ) : (
                         <>
-                          <div className="w-full mt-1.5 p-4 bg-gray-100/70 rounded-xl text-sm font-bold text-gray-700 border border-transparent flex items-center gap-2 min-h-[52px]">
+                          <div className="w-full mt-1.5 p-4 bg-gray-100/70 dark:bg-gray-800/70 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-300 border border-transparent flex items-center gap-2 min-h-[52px]">
                             <span className="truncate">
                               {leaseForm.location || (language === 'বাংলা' ? 'প্রপার্টি সিলেক্ট করলে অটো-ফিল হবে' : 'Auto-fills when you pick a property')}
                             </span>

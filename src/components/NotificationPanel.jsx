@@ -50,7 +50,7 @@ function NotificationRow({ n, onOpen, onRemove }) {
           if (Math.abs(info.offset.x) > 96 || Math.abs(info.velocity.x) > 600) onRemove(n.id);
         }}
         whileDrag={{ cursor: 'grabbing' }}
-        className={`relative flex items-start gap-3 px-4 py-3 bg-white hover:bg-gray-50 transition-colors ${!n.read ? 'bg-red-50/40' : ''}`}
+        className={`relative flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors ${!n.read ? 'bg-red-50' : 'bg-white'}`}
       >
         <div className="mt-0.5 shrink-0 cursor-pointer" onClick={() => onOpen(n)}>
           {n.data?.avatar || n.data?.senderAvatar ? (
