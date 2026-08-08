@@ -276,28 +276,42 @@ function buildRoomCollage(property) {
 // Avatar + name + tier badge. Rendered in two slots per card because the two
 // layouts put it in different places: inside the amenities strip from md up, and
 // beside the price inside the footer row on mobile. Only one is ever visible.
-const LandlordChip = ({ name, avatar, verified, isPro, isPlus, isBn, className = "" }) => (
-	<div className={`flex items-center gap-2 ${className}`}>
-		<div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-black shrink-0 overflow-hidden">
-			{avatar ? (
-				<img src={avatar} alt={name} className="w-full h-full object-cover" />
-			) : (
-				name.charAt(0).toUpperCase()
-			)}
+const LandlordChip = ({ name, avatar, verified, isPro, isPlus, isBn, className = "" }) => {
+	// A dead avatar URL (deleted from Cloudinary, hotlink blocked, offline)
+	// otherwise renders as an empty dark circle — worse than no avatar at all.
+	// Falling back to the initial on error keeps the chip readable.
+	const [imgFailed, setImgFailed] = useState(false);
+	const initial = (name || "").trim().charAt(0).toUpperCase();
+	return (
+		<div className={`flex items-center gap-2 ${className}`}>
+			<div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-black shrink-0 overflow-hidden">
+				{avatar && !imgFailed ? (
+					<img
+						src={avatar}
+						alt={name}
+						className="w-full h-full object-cover"
+						loading="lazy"
+						decoding="async"
+						onError={() => setImgFailed(true)}
+					/>
+				) : (
+					initial
+				)}
+			</div>
+			<div className="leading-tight min-w-0">
+				<p className="text-[11px] font-black text-gray-900 flex items-center gap-1">
+					<span className="truncate min-w-0">{name}</span>
+					{verified && <ShieldCheck size={12} className="text-[#1ab64f] shrink-0" />}
+					{isPro && <span className="bg-[#ba0036] text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center shrink-0">Pro</span>}
+					{isPlus && <span className="bg-gray-900 text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center shrink-0">Plus</span>}
+				</p>
+				<p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+					{isBn ? "বাড়িওয়ালা" : "Landlord"}
+				</p>
+			</div>
 		</div>
-		<div className="leading-tight min-w-0">
-			<p className="text-[11px] font-black text-gray-900 flex items-center gap-1">
-				<span className="truncate min-w-0">{name}</span>
-				{verified && <ShieldCheck size={12} className="text-[#1ab64f] shrink-0" />}
-				{isPro && <span className="bg-[#ba0036] text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center shrink-0">Pro</span>}
-				{isPlus && <span className="bg-gray-900 text-white text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shadow-sm leading-none flex items-center shrink-0">Plus</span>}
-			</p>
-			<p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
-				{isBn ? "বাড়িওয়ালা" : "Landlord"}
-			</p>
-		</div>
-	</div>
-);
+	);
+};
 
 // ─── PROPERTY CARD ────────────────────────────────────────────────────────────
 const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover, onHoverEnd, onInquire }) => {
@@ -646,7 +660,11 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 						</div>
 					</div>
 					<div className="flex items-center gap-3 w-full md:w-auto">
-						<button onClick={() => navigate(`/property/${property.id}`)} className="flex-1 md:flex-none px-4 py-2.5 md:py-2 rounded-lg text-[11px] font-black text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all">
+						{/* ── DETAILS BUTTON: full listing page (also a tour anchor) ── */}
+						<button
+							onClick={() => navigate(`/property/${property.id}`)}
+							data-tour="details-button"
+							className="flex-1 md:flex-none px-4 py-2.5 md:py-2 rounded-lg text-[11px] font-black text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all">
 							{t.detailsBtn || "Details"}
 						</button>
 						{/* ── INQUIRY BUTTON: opens modal inline, no page navigation ── */}

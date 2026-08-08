@@ -117,7 +117,12 @@ export default function useTabHistory({ tabs, defaultTab, param = 'tab' }) {
       // overlay pushed instead of stacking on top of it, or it would sit in the
       // middle of the stack and make one Back press look like a no-op.
       if (isOnBackGuardEntry()) {
-        navigate(urlForTab(next), { replace: true });
+        // Pop the throwaway drawer entry natively, then push the new tab entry 
+        // to React Router so that the previous state is preserved in history.
+        window.history.back();
+        setTimeout(() => {
+          navigate(urlForTab(next));
+        }, 0);
         return;
       }
 

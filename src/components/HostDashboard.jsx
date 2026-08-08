@@ -3083,10 +3083,14 @@ const HostDashboard = () => {
         onViewAll={() => setActiveTab('smartAlerts')}
       />
 
-      {/* 💳 PAYMENT SETTINGS REMINDER — after login, if no payment method is
-          configured yet, nudge the landlord to complete Payment Settings. */}
+      {/* 💳 PAYMENT SETTINGS REMINDER — once a tenant is connected to one of
+          their properties, nudge the landlord to complete Payment Settings if
+          they still have no payment method. Gated on bookings for the same
+          reason as the inline promo card: before a tenant exists there is no
+          rent to collect, so a brand-new landlord shouldn't be stopped by it. */}
       <PaymentSettingsPopup
         hasPaymentMethod={hasActivePaymentMethod}
+        hasBookings={bookings.length > 0}
         loading={paymentMethodsLoading}
         onAddMethod={() => setActiveTab('payments')}
       />

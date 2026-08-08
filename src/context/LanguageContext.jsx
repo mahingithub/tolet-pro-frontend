@@ -1268,8 +1268,8 @@ const translations = {
     getApp: "অ্যাপ ডাউনলোড করুন",
 
     // Popular divisions slider
-    exploreDivisions: "বিভাগ অন্বেষণ করুন",
-    exploreDivisionsDesc: "প্রধান শহরগুলোতে বাড়ি আবিষ্কার করুন",
+    exploreDivisions: "বিভাগে খুজুন",
+    exploreDivisionsDesc: "প্রধান শহরগুলোতে বাড়ি আবিষ্কার করুন", 
 
     // Host promo banner
     premiumHostOffer: "প্রিমিয়াম হোস্ট অফার",

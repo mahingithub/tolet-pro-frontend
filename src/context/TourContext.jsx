@@ -142,7 +142,7 @@ export const TourProvider = ({ children }) => {
           popover: {
             title: isBn ? 'ধাপ ১: ধরন বেছে নিন' : 'Step 1: Choose Mode',
             description: isBn
-              ? 'প্রথমে বেছে নিন আবাসিক নাকি বাণিজ্যিক।'
+              ? 'প্রথমে বেছে নিন কি খুজছেন আবাসিক নাকি বাণিজ্যিক।'
               : 'First, select whether you want Residential or Commercial.',
             side: 'bottom',
             align: 'center',
@@ -164,8 +164,8 @@ export const TourProvider = ({ children }) => {
           popover: {
             title: isBn ? 'ধাপ ৩: প্রপার্টির ধরন' : 'Step 3: Property Type',
             description: isBn
-              ? 'আপনার পছন্দের ধরন নির্বাচন করুন (ফ্ল্যাট, বাসা, রুম ইত্যাদি)।'
-              : 'Select your preferred property type (Flat, House, Room, etc.).',
+              ? 'আপনার পছন্দের ধরন নির্বাচন করুন (ফ্ল্যাট, স্টুডেন্ট হোটেল, রেস্টুরেন্ট, অফিস, ইত্যাদি)।'
+              : 'Select your preferred property type (Flat, Student Hotel, Restaurant, Office etc.).',
             side: 'bottom',
             align: 'start',
           },
@@ -1166,6 +1166,15 @@ export const TourProvider = ({ children }) => {
       return;
     }
 
+    // The filter sidebar renders synchronously, but the property cards behind
+    // the two steps below arrive from an async fetch — until it resolves the
+    // list is nothing but skeletons. resolveSteps() drops any step whose anchor
+    // isn't on screen YET, so starting the instant the sidebar appeared threw
+    // both card steps away and left a one-step tour whose only button read
+    // "Done". Wait for a real card button too, and tolerate it never arriving
+    // (empty result set, failed load) — the filter step alone still helps.
+    await waitForAnchor('[data-tour="details-button"], [data-tour="inquiry-button"]');
+
     try {
       const steps = resolveSteps([
         {
@@ -1184,8 +1193,19 @@ export const TourProvider = ({ children }) => {
           popover: {
             title: isBn ? 'যোগাযোগ করুন' : 'Contact Landlord',
             description: isBn
-              ? 'যেকোনো প্রপার্টি কার্ডে "Inquiry" বাটনে ক্লিক করে মালিকের সাথে সরাসরি যোগাযোগ করতে পারবেন।'
-              : 'You can contact the landlord directly by clicking the "Inquiry" button on any property card.',
+              ? 'পছন্দের বাসা পেলে "যোগাযোগ করুন" বাটনে চাপ দিন — আপনার আগ্রহ সরাসরি বাড়িওয়ালার কাছে পৌঁছে যাবে, এরপর চ্যাট বা কলে কথা বলতে পারবেন।'
+              : 'Found a place you like? Tap "Contact" to send the landlord your interest — you can then chat or call them directly.',
+            side: 'top',
+            align: 'center',
+          },
+        },
+        {
+          element: '[data-tour="details-button"]',
+          popover: {
+            title: isBn ? 'বিস্তারিত' : 'Details',
+            description: isBn
+              ? '"বিস্তারিত"-এ চাপ দিলে বাসার সব ছবি ও ভিডিও, সুযোগ-সুবিধা, ভাড়ার শর্ত এবং ম্যাপে অবস্থান — সবকিছু একসাথে দেখতে পাবেন।'
+              : 'Tap "Details" to see everything about a property — all its photos and videos, amenities, rent terms, and its location on the map.',
             side: 'top',
             align: 'center',
           },

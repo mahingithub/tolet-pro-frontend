@@ -8,15 +8,23 @@ const SNOOZE_KEY = 'tolet_payment_settings_snoozed';
 
 /**
  * PaymentSettingsPopup — reminds a landlord to configure Payment Settings when
- * they haven't added any payment method yet. Shows automatically after login
- * (once per session). Parent passes whether a method exists + a loading flag.
+ * they haven't added any payment method yet. Shows once per session, but ONLY
+ * once a tenant is actually connected to one of their properties.
+ *
+ * The bookings gate is the point of this component's timing: a brand-new
+ * landlord with no tenant has nobody to collect rent from, so a modal demanding
+ * a payment account is a dead end on their first visit. It becomes useful the
+ * moment there IS someone to be paid by. This mirrors the inline promo card in
+ * HostDashboard / DashboardTab, which has always required `bookings.length > 0`
+ * — the two surfaces now agree instead of one firing on day zero.
  *
  * Props:
  *   hasPaymentMethod : boolean  — landlord already has ≥1 method
+ *   hasBookings      : boolean  — ≥1 tenant connected to a property
  *   loading          : boolean  — methods still loading (suppress until known)
  *   onAddMethod      : ()=>void — open the Payment Settings screen
  */
-export default function PaymentSettingsPopup({ hasPaymentMethod, loading, onAddMethod }) {
+export default function PaymentSettingsPopup({ hasPaymentMethod, hasBookings, loading, onAddMethod }) {
   const { language } = useLanguage();
   const bn = language === 'বাংলা';
   const [visible, setVisible] = useState(false);
@@ -24,10 +32,15 @@ export default function PaymentSettingsPopup({ hasPaymentMethod, loading, onAddM
   useEffect(() => {
     if (loading) return;
     if (hasPaymentMethod) { setVisible(false); return; }
+    // No tenant connected yet → nothing to collect, so don't interrupt. Bookings
+    // arrive from an async fetch (and refresh on a 30s poll), so this correctly
+    // stays closed on first paint and opens later if a tenant connects while the
+    // dashboard is open.
+    if (!hasBookings) { setVisible(false); return; }
     let snoozed = false;
     try { snoozed = sessionStorage.getItem(SNOOZE_KEY) === '1'; } catch { /* ignore */ }
     if (!snoozed) setVisible(true);
-  }, [hasPaymentMethod, loading]);
+  }, [hasPaymentMethod, hasBookings, loading]);
 
   if (!visible) return null;
 
