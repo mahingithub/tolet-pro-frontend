@@ -80,6 +80,46 @@ const IMAGE_JPEG_QUALITY = 0.85;
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024;  // 100 MB ceiling
 const formatMB = (bytes) => (bytes / (1024 * 1024)).toFixed(1);
 
+// ─── Walkthrough link parsing (YouTube + Google Drive) ─────────────────────
+// Hosts can paste a link instead of uploading a file. Two shapes are stored:
+//   YouTube      → { youtubeId }   (embedded via youtube.com/embed/<id>)
+//   Google Drive → { url }         (embedded via the /preview form)
+// A Drive URL rides in `url` — the same field an uploaded Cloudinary MP4 uses —
+// so nothing in the schema or API changes. Readers tell them apart with
+// isGoogleDriveUrl, because a Drive URL is a viewer page, not a playable file.
+const isGoogleDriveUrl = (value) =>
+  /^https?:\/\/(?:[\w-]+\.)*drive\.google\.com\//i.test(String(value || '').trim());
+
+/**
+ * Rewrite a Drive share link to its embeddable /preview form, dropping
+ * `?usp=sharing`-style noise. Mirrors toGoogleDrivePreviewUrl in
+ * services/facebook.service.js — keep the two in step.
+ */
+const toGoogleDrivePreviewUrl = (value) => {
+  const raw = String(value || '').trim();
+  if (!isGoogleDriveUrl(raw)) return raw;
+  const clean = raw.split(/[?#]/)[0].replace(/\/+$/, '');
+  if (/\/preview$/i.test(clean)) return clean;
+  if (/\/view$/i.test(clean)) return clean.replace(/\/view$/i, '/preview');
+  if (/\/file\/d\/[^/]+$/i.test(clean)) return `${clean}/preview`;
+  return clean;
+};
+
+/**
+ * Pull the 11-character video id out of any YouTube URL shape (watch?v=,
+ * youtu.be/, /embed/, /shorts/). A bare id is returned as-is, so the field
+ * keeps accepting what it accepted before.
+ */
+const extractYoutubeId = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^[\w-]{11}$/.test(raw)) return raw; // already a bare id
+  const match = raw.match(
+    /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/i,
+  );
+  return match ? match[1] : '';
+};
+
 /**
  * Downscale + recompress a phone-camera photo so it fits comfortably in
  * localStorage and uploads quickly on Bangladesh mobile networks. Falls
@@ -704,12 +744,15 @@ const INITIAL_FORM = {
   coverPhoto: null,          // { id, preview, name }
   roomPhotos: [],            // [{ id, room, preview, name }]
   // Video tour — up to `tierLimits.maxVideos` entries (0 free / 1 plus /
-  // 5 pro). Each entry is either a local file
-  // ({ id, preview, name, size, file }) or a YouTube link
-  // ({ id, youtubeId: 'O-P_J_gvALE' }). Uploaded in order; videos[0] is the
-  // one legacy readers see as `mainVideo`.
+  // 5 pro). Each entry is a local file ({ id, preview, name, size, file }), a
+  // YouTube link ({ id, youtubeId: 'O-P_J_gvALE' }), or a Google Drive link
+  // ({ id, url: 'https://drive.google.com/file/d/…/preview' }) — a Drive link
+  // reuses `url` so it saves to the property's video field with no schema
+  // change. Uploaded in order; videos[0] is the one legacy readers see as
+  // `mainVideo`.
   videos: [],
-  // Draft text for the "paste a YouTube link" input (not submitted directly).
+  // Draft text for the "paste a YouTube or Google Drive link" input (not
+  // submitted directly — addVideoLink turns it into a videos[] entry).
   videoId: '',
   // Step 5 – Pricing + Description (the user asked for description to
   // come LAST so the AI helper has every other field as context when
@@ -1906,14 +1949,16 @@ const AddProperty = () => {
     setForm(f => ({ ...f, videos: [...f.videos, ...entries] }));
   };
 
-  // Attach a YouTube walkthrough by id/link, subject to the same slot count.
-  const addYoutubeVideo = (rawId) => {
-    const youtubeId = String(rawId || '').trim();
-    if (!youtubeId) return;
+  // Attach a walkthrough by LINK — YouTube or Google Drive — subject to the
+  // same slot count as an upload. YouTube is stored as an id, Drive as a
+  // /preview url; anything else is rejected with a hint.
+  const addVideoLink = (rawValue) => {
+    const value = String(rawValue || '').trim();
+    if (!value) return;
     if (videoSlotsLeft <= 0) {
       // Free plan has no video slots at all → offer the share-for-Pro trial.
-      // Nothing is queued here: a YouTube id is one keystroke to re-enter, and
-      // it stays in the input field anyway.
+      // Nothing is queued here: a link is one paste to re-enter, and it stays
+      // in the input field anyway.
       if (tierLimits.maxVideos === 0 && offerFreeTrial('video')) return;
       showToast(
         isBn ? `আপনার প্ল্যানে সর্বোচ্চ ${tierLimits.maxVideos}টি ভিডিও দেওয়া যায়।`
@@ -1922,6 +1967,33 @@ const AddProperty = () => {
       );
       return;
     }
+
+    if (isGoogleDriveUrl(value)) {
+      // Drive files must be shared as "Anyone with the link" or the embed shows
+      // a permission wall to everyone but the host.
+      setForm(f => ({
+        ...f,
+        videos: [...f.videos, { id: Date.now(), url: toGoogleDrivePreviewUrl(value) }],
+        videoId: '',
+      }));
+      showToast(
+        isBn ? 'গুগল ড্রাইভ লিংক যোগ হয়েছে — শেয়ার সেটিং "যেকেউ লিংক দিয়ে দেখতে পারবে" রাখুন।'
+             : 'Google Drive link added — set its sharing to "Anyone with the link".',
+        'success',
+      );
+      return;
+    }
+
+    const youtubeId = extractYoutubeId(value);
+    if (!youtubeId) {
+      showToast(
+        isBn ? 'সঠিক ইউটিউব বা গুগল ড্রাইভ লিংক দিন।'
+             : 'Enter a valid YouTube or Google Drive link.',
+        'error',
+      );
+      return;
+    }
+
     setForm(f => ({
       ...f,
       videos: [...f.videos, { id: Date.now(), youtubeId }],
@@ -3004,9 +3076,10 @@ const AddProperty = () => {
 
                 {/* ── VIDEO TOUR (multi) ──────────────────────────────────
                     Hosts can attach up to `tierLimits.maxVideos` walkthroughs
-                    (0 free / 1 plus / 5 pro), mixing uploaded files and
-                    YouTube links freely. Both inputs disappear once the plan's
-                    slots are used up; the server enforces the same cap. */}
+                    (0 free / 1 plus / 5 pro), mixing uploaded files, YouTube
+                    links and Google Drive links freely. Both inputs disappear
+                    once the plan's slots are used up; the server enforces the
+                    same cap. */}
                 <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_4px_15px_rgba(0,0,0,0.03)]">
                   <div className="flex items-center gap-2 mb-1">
                     <div className="w-7 h-7 bg-rose-600 rounded-lg flex items-center justify-center">
@@ -3027,8 +3100,8 @@ const AddProperty = () => {
                           ? 'ভিডিও ট্যুর যোগ করতে প্লাস বা প্রো প্ল্যানে আপগ্রেড করুন।'
                           : 'Upgrade to Plus or Pro to add a video tour.')
                       : (isBn
-                          ? `পুরো বাড়ির ভিডিও ট্যুর আপলোড করুন অথবা YouTube লিংক দিন — সর্বোচ্চ ${tierLimits.maxVideos}টি।`
-                          : `Upload walkthrough videos or paste YouTube links — up to ${tierLimits.maxVideos}.`)}
+                          ? `পুরো বাড়ির ভিডিও ট্যুর আপলোড করুন অথবা ইউটিউব বা গুগল ড্রাইভ লিংক দিন — সর্বোচ্চ ${tierLimits.maxVideos}টি।`
+                          : `Upload walkthrough videos or paste a YouTube or Google Drive link — up to ${tierLimits.maxVideos}.`)}
                   </p>
 
                   {/* Added videos */}
@@ -3045,6 +3118,16 @@ const AddProperty = () => {
                                 allowFullScreen
                                 title={`Property video ${idx + 1}`}
                               />
+                            ) : isGoogleDriveUrl(v.url) ? (
+                              // Drive serves a viewer page, not a media file — it
+                              // has to be embedded, never fed to <video>.
+                              <iframe
+                                src={toGoogleDrivePreviewUrl(v.url)}
+                                className="w-full h-full"
+                                allow="autoplay; encrypted-media"
+                                allowFullScreen
+                                title={`Property video ${idx + 1}`}
+                              />
                             ) : (
                               <video src={v.preview || v.url} controls className="w-full h-full" />
                             )}
@@ -3058,7 +3141,9 @@ const AddProperty = () => {
                               )}
                               {v.youtubeId
                                 ? `YouTube · ${v.youtubeId}`
-                                : `${v.name || (isBn ? 'ভিডিও' : 'Video')}${v.size ? ` · ${formatMB(v.size)} MB` : ''}`}
+                                : isGoogleDriveUrl(v.url)
+                                  ? (isBn ? 'গুগল ড্রাইভ ভিডিও' : 'Google Drive video')
+                                  : `${v.name || (isBn ? 'ভিডিও' : 'Video')}${v.size ? ` · ${formatMB(v.size)} MB` : ''}`}
                             </p>
                             <button type="button" onClick={() => removeVideo(v.id)}
                               className="text-[10px] font-black text-red-400 flex items-center gap-1 hover:text-[#ba0036] transition-colors shrink-0">
@@ -3094,27 +3179,32 @@ const AddProperty = () => {
                     </div>
                   )}
 
-                  {/* YouTube link — same remaining-slot rule as file upload */}
+                  {/* Video link — YouTube or Google Drive. Same remaining-slot
+                      rule as file upload. */}
                   {videoSlotsLeft > 0 && (
                     <div className="mt-4">
                       <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-2 text-center">
-                        {isBn ? 'অথবা YouTube লিংক' : 'Or paste a YouTube ID'}
+                        {isBn ? 'অথবা ইউটিউব বা গুগল ড্রাইভ লিংক' : 'Or paste a YouTube or Google Drive link'}
                       </p>
-                      <Field label={isBn ? 'YouTube ভিডিও ID' : 'YouTube Video ID'}
-                        hint="e.g. O-P_J_gvALE from youtube.com/watch?v=O-P_J_gvALE">
+                      <Field label={isBn ? 'ইউটিউব বা গুগল ড্রাইভ লিংক' : 'YouTube or Google Drive Link'}
+                        hint={isBn
+                          ? 'যেমন youtube.com/watch?v=... অথবা drive.google.com/file/d/.../view — ড্রাইভ ফাইলের শেয়ার সেটিং "যেকেউ লিংক দিয়ে দেখতে পারবে" রাখুন।'
+                          : 'e.g. youtube.com/watch?v=… or drive.google.com/file/d/…/view — set Drive sharing to "Anyone with the link".'}>
                         <div className="relative">
                           <Play size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
                           <input type="text"
                             className={`${inputCls} pl-10 pr-20`}
-                            placeholder="e.g. O-P_J_gvALE"
+                            placeholder={isBn
+                              ? 'ইউটিউব বা গুগল ড্রাইভ লিংক পেস্ট করুন'
+                              : 'Paste a YouTube or Google Drive link'}
                             value={form.videoId}
                             onChange={e => set('videoId', e.target.value.trim())}
                             onKeyDown={e => {
-                              if (e.key === 'Enter') { e.preventDefault(); addYoutubeVideo(form.videoId); }
+                              if (e.key === 'Enter') { e.preventDefault(); addVideoLink(form.videoId); }
                             }}
                           />
                           <button type="button"
-                            onClick={() => addYoutubeVideo(form.videoId)}
+                            onClick={() => addVideoLink(form.videoId)}
                             disabled={!form.videoId}
                             className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-[10px] font-black disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#ba0036] transition-colors">
                             {isBn ? 'যোগ করুন' : 'Add'}

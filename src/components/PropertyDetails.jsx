@@ -688,6 +688,23 @@ function useDataUrlToBlobUrl(dataUrl) {
 // one-element list, so listings saved before multi-video existed keep playing
 // without a migration. With more than one video a selector strip appears.
 // ─────────────────────────────────────────────────────────────────────────────
+// A Google Drive share link lands in the same `url` field an uploaded MP4 uses,
+// but it points at Drive's viewer page — feeding it to <video> renders a black
+// box. Detect it and embed the /preview form in an iframe instead. Mirrors
+// isGoogleDriveUrl / toGoogleDrivePreviewUrl in the backend facebook.service.js.
+const isGoogleDriveUrl = (value) =>
+  /^https?:\/\/(?:[\w-]+\.)*drive\.google\.com\//i.test(String(value || '').trim());
+
+const toGoogleDrivePreviewUrl = (value) => {
+  const raw = String(value || '').trim();
+  if (!isGoogleDriveUrl(raw)) return raw;
+  const clean = raw.split(/[?#]/)[0].replace(/\/+$/, '');
+  if (/\/preview$/i.test(clean)) return clean;
+  if (/\/view$/i.test(clean)) return clean.replace(/\/view$/i, '/preview');
+  if (/\/file\/d\/[^/]+$/i.test(clean)) return `${clean}/preview`;
+  return clean;
+};
+
 const VideoPlayer = ({ videos, mainVideo, videoId, coverPhoto, title }) => {
   const [showVideo, setShowVideo] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -713,7 +730,10 @@ const VideoPlayer = ({ videos, mainVideo, videoId, coverPhoto, title }) => {
   if (!clips.length) return null;
 
   const isYouTube = !active?.url && !!active?.youtubeId;
-  const isDirectVideo = !!active?.url;
+  // A Drive link lives in `url` but plays in an iframe, so it is deliberately
+  // NOT a "direct" video — that flag means "real file the <video> tag can play".
+  const isDrive = isGoogleDriveUrl(active?.url);
+  const isDirectVideo = !!active?.url && !isDrive;
 
   return (
     <div className="mb-6">
@@ -727,7 +747,7 @@ const VideoPlayer = ({ videos, mainVideo, videoId, coverPhoto, title }) => {
           <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
             {clips.length > 1
               ? `${clips.length} walkthroughs`
-              : (isYouTube ? 'YouTube walkthrough' : 'Video walkthrough')}
+              : (isYouTube ? 'YouTube walkthrough' : isDrive ? 'Google Drive walkthrough' : 'Video walkthrough')}
           </p>
         </div>
       </div>
@@ -761,6 +781,12 @@ const VideoPlayer = ({ videos, mainVideo, videoId, coverPhoto, title }) => {
                 YouTube
               </span>
             )}
+            {isDrive && (
+              <span className="text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 uppercase tracking-widest"
+                style={{ background: 'rgba(15,23,42,0.75)', border: '1px solid rgba(255,255,255,0.2)' }}>
+                <Video size={10} /> Drive
+              </span>
+            )}
             {isDirectVideo && (
               <span className="text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 uppercase tracking-widest"
                 style={{ background: 'rgba(186,0,54,0.85)', border: '1px solid rgba(255,255,255,0.2)' }}>
@@ -778,6 +804,20 @@ const VideoPlayer = ({ videos, mainVideo, videoId, coverPhoto, title }) => {
             // <video> element keeps playing the previous src.
             <video key={safeIdx} src={safeMainVideoUrl} controls autoPlay muted playsInline
               className="w-full h-full object-cover" style={{ background: '#000' }} />
+          ) : isDrive ? (
+            // Google Drive walkthrough — /preview is Drive's embeddable player.
+            // The file must be shared as "Anyone with the link" or viewers get a
+            // permission wall. Drive ignores autoplay params, so the viewer taps
+            // play inside the frame.
+            <iframe
+              key={safeIdx}
+              src={toGoogleDrivePreviewUrl(active.url)}
+              title="Property Video Tour"
+              className="w-full h-full"
+              style={{ background: '#000' }}
+              allow="autoplay; encrypted-media"
+              allowFullScreen
+            />
           ) : (
             // mute=1 is required so YouTube actually starts playback on autoplay.
             // playsinline=1 keeps it inline on iOS instead of opening fullscreen.
@@ -1193,6 +1233,10 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property }) => 
     grouped[img.room].push(img);
   });
   const hasVideo = property?.videos?.length || property?.videoId || property?.mainVideo;
+  // First playable entry from the canonical videos[] list, if any.
+  const modalClip = (Array.isArray(property?.videos) ? property.videos : [])
+    .map((v) => (typeof v === 'string' ? { url: v } : v))
+    .find((v) => v && (v.url || v.youtubeId)) || null;
 
   const [activeRoom, setActiveRoom] = useState(orderedRooms[0] || 'all');
   const sectionRefs = useRef({});
@@ -1439,7 +1483,34 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property }) => 
                         <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest mt-1">Watch the full walkthrough</p>
                       </div>
                     </div>
-                    {property?.mainVideo ? (
+                    {modalClip ? (
+                      // videos[] is canonical (videoId/videoUrl are mirrors of
+                      // videos[0]), so it is checked first — otherwise a listing
+                      // whose only walkthrough lives here rendered an empty
+                      // section. Drive links embed; real files use <video>.
+                      isGoogleDriveUrl(modalClip.url) ? (
+                        <div className="relative rounded-[1.25rem] overflow-hidden" style={{ aspectRatio: '16/9', border: '1px solid rgba(15,23,42,0.06)' }}>
+                          <iframe
+                            src={toGoogleDrivePreviewUrl(modalClip.url)}
+                            title="Property Video Tour" className="w-full h-full"
+                            style={{ background: '#000' }}
+                            allow="autoplay; encrypted-media"
+                            allowFullScreen />
+                        </div>
+                      ) : modalClip.url ? (
+                        <div className="relative rounded-[1.25rem] overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                          <video src={modalClip.url} controls className="w-full h-full object-cover" style={{ background: '#000' }} />
+                        </div>
+                      ) : (
+                        <div className="relative rounded-[1.25rem] overflow-hidden" style={{ aspectRatio: '16/9', border: '1px solid rgba(15,23,42,0.06)' }}>
+                          <iframe
+                            src={`https://www.youtube.com/embed/${modalClip.youtubeId}?rel=0`}
+                            title="Property Video Tour" className="w-full h-full"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen />
+                        </div>
+                      )
+                    ) : property?.mainVideo ? (
                       <div className="relative rounded-[1.25rem] overflow-hidden" style={{ aspectRatio: '16/9' }}>
                         <video src={modalVideoUrl} controls className="w-full h-full object-cover" style={{ background: '#000' }} />
                       </div>

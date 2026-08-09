@@ -139,6 +139,10 @@ export const TourProvider = ({ children }) => {
 
   const startTenantTour = useCallback(async () => {
     if (hasTourCompleted('tenant') || startingRef.current) return;
+    
+    // Do not start if any modal/popup is currently active
+    if (document.querySelector('[role="dialog"]')) return;
+    
     startingRef.current = true;
 
     // The search bar only exists on the public home page, so make sure we are
@@ -267,8 +271,13 @@ export const TourProvider = ({ children }) => {
   const startHostDashboardTour = useCallback(async () => {
     if (hasTourCompleted('host-dashboard') || startingRef.current) return;
     
-    // Do not start if the welcome robot is currently active on screen
-    if (document.getElementById('welcome-robot-overlay')) return;
+    // Do not start if the welcome robot or any modal/popup is currently active on screen
+    if (
+      document.getElementById('welcome-robot-overlay') ||
+      document.querySelector('[role="dialog"]')
+    ) {
+      return;
+    }
     
     startingRef.current = true;
     
@@ -539,7 +548,10 @@ export const TourProvider = ({ children }) => {
   }, [isBn, hasTourCompleted]);
 
   const startHostTour = useCallback(async () => {
-    if (hasTourCompleted('host')) return;
+    if (hasTourCompleted('host') || startingRef.current) return;
+    
+    // Do not start if any modal/popup is currently active
+    if (document.querySelector('[role="dialog"]')) return;
 
     if (window.location.pathname === '/') {
       let driverObj = null;
@@ -626,6 +638,10 @@ export const TourProvider = ({ children }) => {
   const startAddPropertyTour = useCallback(async (stepIndex = 1) => {
     const tourId = `add-property-step-${stepIndex}`;
     if (hasTourCompleted(tourId) || startingRef.current) return;
+    
+    // Do not start if any modal/popup is currently active
+    if (document.querySelector('[role="dialog"]')) return;
+    
     startingRef.current = true;
     
     let rawSteps = [];
