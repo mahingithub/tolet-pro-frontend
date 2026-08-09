@@ -698,10 +698,14 @@ const translations = {
     notifTitle: "Notifications",
     notifMarkAllRead: "Mark all read",
     notifClearAll: "Clear all",
+    notifClearAllConfirm: "This removes every notification. It cannot be undone.",
+    notifClearAllYes: "Clear all",
     notifEmpty: "You're all caught up.",
     notifRemove: "Remove",
     notifSwipeHint: "Swipe a card left or right to remove",
     loading: "Loading…",
+    cancel: "Cancel",
+    close: "Close",
 
     contactInfo: "Contact info",
     contactCall: "Call",
@@ -1453,12 +1457,17 @@ const translations = {
     chatSearchCalls: "কল খুঁজুন…",
 
     notifTitle: "নোটিফিকেশন",
-    notifMarkAllRead: "সব পড়া হিসেবে চিহ্নিত করুন",
+    // "সব পড়া হিসেবে চিহ্নিত করুন" ছিল — হেডারে ধরত না, তাই ছোট করা হয়েছে।
+    notifMarkAllRead: "সব পড়া",
     notifClearAll: "সব মুছুন",
+    notifClearAllConfirm: "সব নোটিফিকেশন মুছে যাবে। এটি ফেরানো যাবে না।",
+    notifClearAllYes: "মুছে ফেলুন",
     notifEmpty: "সব দেখা হয়ে গেছে।",
     notifRemove: "সরান",
     notifSwipeHint: "সরাতে কার্ডটি বাঁয়ে বা ডানে সোয়াইপ করুন",
     loading: "লোড হচ্ছে…",
+    cancel: "বাতিল",
+    close: "বন্ধ করুন",
 
     contactInfo: "কন্টাক্ট তথ্য",
     contactCall: "কল",

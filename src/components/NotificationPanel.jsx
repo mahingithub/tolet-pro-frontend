@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Bell, MessageCircle, Inbox, CheckCheck, X, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { useNotificationContext } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -29,23 +29,37 @@ const formatTime = (iso) => {
 };
 
 // ─── One notification row — swipe LEFT or RIGHT to dismiss ───────────────────
-// The row is a horizontally draggable motion.div. A red "delete" strip is
-// revealed behind it on either side as you pull; releasing past ~96px (or
-// flinging fast) removes the notification. Tapping the body still deep-links.
+// The row is a horizontally draggable motion.div. A red "delete" strip fades in
+// behind it as you pull; releasing past ~96px (or flinging fast) removes the
+// notification. The strip's opacity is driven off the drag position and sits at
+// 0 at rest — previously it was painted opaque at all times and only hidden by
+// the row's own background, so unread rows (bg-red-50, which index.css remaps to
+// a 16%-alpha fill in dark mode) ghosted both trash icons through the card.
 function NotificationRow({ n, onOpen, onRemove }) {
   const { t } = useLanguage();
+  const x = useMotionValue(0);
+  const opacity = useTransform(x, [-96, -20, 0, 20, 96], [1, 0.6, 0, 0.6, 1]);
+
   return (
     <div className="relative overflow-hidden border-b border-gray-50 last:border-b-0">
-      {/* Delete affordance revealed on swipe (both edges). */}
-      <div className="absolute inset-0 flex items-center justify-between px-5 bg-red-500 text-white pointer-events-none">
-        <span className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider"><Trash2 size={14} /> {t.notifRemove || 'Remove'}</span>
-        <span className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider">{t.notifRemove || 'Remove'} <Trash2 size={14} /></span>
-      </div>
+      {/* Delete affordance — transparent at rest, fades in with the drag. */}
+      <motion.div
+        style={{ opacity }}
+        className="absolute inset-0 flex items-center justify-between px-5 bg-red-500 text-white pointer-events-none"
+      >
+        <span className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider">
+          <Trash2 size={14} /> {t.notifRemove || 'Remove'}
+        </span>
+        <span className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider">
+          {t.notifRemove || 'Remove'} <Trash2 size={14} />
+        </span>
+      </motion.div>
 
       <motion.div
         drag="x"
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={0.6}
+        style={{ x }}
         onDragEnd={(_e, info) => {
           if (Math.abs(info.offset.x) > 96 || Math.abs(info.velocity.x) > 600) onRemove(n.id);
         }}
@@ -60,15 +74,15 @@ function NotificationRow({ n, onOpen, onRemove }) {
           )}
         </div>
         <button type="button" className="w-full min-w-0 flex-1 text-left" onClick={() => onOpen(n)}>
-          <div className="flex justify-between items-start">
-            <p className={`text-[12px] truncate ${!n.read ? 'font-black text-gray-900' : 'font-bold text-gray-700'}`}>
+          <div className="flex justify-between items-start gap-2">
+            <p className={`text-[12px] flex-1 min-w-0 truncate ${!n.read ? 'font-black text-gray-900' : 'font-bold text-gray-700'}`}>
               {n.title || 'Notification'}
             </p>
-            {!n.read && <span className="w-2 h-2 rounded-full bg-[#ba0036] shrink-0 ml-2" />}
+            {!n.read && <span className="w-2 h-2 rounded-full bg-[#ba0036] shrink-0 mt-1" />}
           </div>
           {n.body ? (
-            <p className="text-[11px] text-gray-500 line-clamp-2 mt-0.5" style={{ maxWidth: '60ch' }}>
-              {n.body.length > 60 ? n.body.substring(0, 60) + '...' : n.body}
+            <p className="text-[11px] text-gray-500 line-clamp-2 mt-0.5">
+              {n.body}
             </p>
           ) : null}
           <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 mt-1">
@@ -78,8 +92,9 @@ function NotificationRow({ n, onOpen, onRemove }) {
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onRemove(n.id); }}
-          className="shrink-0 text-gray-300 hover:text-red-500 transition-colors p-2 rounded-md hover:bg-red-50 self-start"
+          className="shrink-0 self-start -mr-1 p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
           title={t.notifRemove || 'Remove notification'}
+          aria-label={t.notifRemove || 'Remove notification'}
         >
           <Trash2 size={14} />
         </button>
@@ -93,6 +108,8 @@ export default function NotificationPanel({ onClose }) {
   const { t } = useLanguage();
   const { items, unreadCount, loading, markAsRead, markAllRead, removeNotification, clearAllNotifications } = useNotificationContext();
   const { user } = useAuth();
+  // "Clear all" wipes every notification with no undo, so it asks first.
+  const [confirmClear, setConfirmClear] = useState(false);
   const isLandlord = user?.roles?.includes('landlord') || user?.roles?.includes('host') || user?.role === 'landlord';
 
   const handleRowClick = async (n) => {
@@ -216,37 +233,52 @@ export default function NotificationPanel({ onClose }) {
   };
 
   return (
-    <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-[0_18px_60px_rgba(0,0,0,0.15)] border border-gray-100 z-50 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-        <h4 className="text-sm font-black text-gray-900">{t.notifTitle || 'Notifications'}</h4>
-        <div className="flex items-center gap-2">
-          {unreadCount > 0 && (
-            <button
-              type="button"
-              onClick={markAllRead}
-              className="text-[10px] font-black text-[#ba0036] hover:underline uppercase tracking-wide"
-            >
-              {t.notifMarkAllRead || 'Mark all read'}
-            </button>
-          )}
-          {items.length > 0 && (
-            <button
-              type="button"
-              onClick={clearAllNotifications}
-              className="text-[10px] font-black text-gray-400 hover:text-red-500 hover:underline uppercase tracking-wide"
-            >
-              {t.notifClearAll || 'Clear all'}
-            </button>
-          )}
+    <div className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-1.5rem))] sm:w-96 bg-white rounded-2xl shadow-[0_18px_60px_rgba(0,0,0,0.15)] border border-gray-100 z-50 overflow-hidden">
+      {/* Header. The Bengali action labels are long ("সব পড়া হিসেবে চিহ্নিত করুন"),
+          so the title truncates and the actions sit on their own row underneath
+          rather than being squeezed into the title line. */}
+      <div className="px-4 pt-3 pb-2 border-b border-gray-100">
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="flex items-center gap-2 min-w-0 text-sm font-black text-gray-900">
+            <span className="truncate">{t.notifTitle || 'Notifications'}</span>
+            {unreadCount > 0 && (
+              <span className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-[#ba0036] text-white text-[10px] font-black flex items-center justify-center">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </h4>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-gray-400 hover:text-gray-700"
-            aria-label="Close"
+            className="shrink-0 -mr-1 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            aria-label={t.close || 'Close'}
           >
             <X size={14} />
           </button>
         </div>
+
+        {(unreadCount > 0 || items.length > 0) && (
+          <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1.5">
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={markAllRead}
+                className="text-[11px] font-bold text-[#ba0036] hover:underline"
+              >
+                {t.notifMarkAllRead || 'Mark all read'}
+              </button>
+            )}
+            {items.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setConfirmClear(true)}
+                className="text-[11px] font-bold text-gray-400 hover:text-red-500 hover:underline"
+              >
+                {t.notifClearAll || 'Clear all'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="max-h-96 overflow-y-auto">
@@ -275,9 +307,40 @@ export default function NotificationPanel({ onClose }) {
 
       {items.length > 0 && (
         <div className="px-4 py-2 border-t border-gray-50 text-center">
-          <p className="text-[9px] font-bold text-gray-300 uppercase tracking-wider">
+          <p className="text-[10px] font-bold text-gray-400">
             {t.notifSwipeHint || 'Swipe a card left or right to remove'}
           </p>
+        </div>
+      )}
+
+      {/* Clear-all confirmation — an in-panel sheet rather than a window.confirm
+          so it inherits the app's theme and stays inside the dropdown. */}
+      {confirmClear && (
+        <div className="absolute inset-0 z-10 flex items-end bg-gray-900/40 backdrop-blur-[2px]">
+          <div className="w-full bg-white border-t border-gray-100 rounded-b-2xl p-4 shadow-[0_-8px_30px_rgba(0,0,0,0.12)]">
+            <p className="text-[13px] font-black text-gray-900 mb-1">
+              {t.notifClearAll || 'Clear all'}
+            </p>
+            <p className="text-[11px] text-gray-500 mb-4 leading-relaxed">
+              {t.notifClearAllConfirm || 'This removes every notification. It cannot be undone.'}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmClear(false)}
+                className="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-[12px] font-black transition-colors"
+              >
+                {t.cancel || 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { clearAllNotifications(); setConfirmClear(false); }}
+                className="flex-1 py-2.5 rounded-xl bg-[#ba0036] hover:bg-[#9a002d] text-white text-[12px] font-black transition-colors"
+              >
+                {t.notifClearAllYes || 'Clear all'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
