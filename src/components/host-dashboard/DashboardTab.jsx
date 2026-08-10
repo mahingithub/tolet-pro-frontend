@@ -281,10 +281,10 @@ export default function DashboardTab({
               key={label}
               type="button"
               onClick={onClick}
-              className="group flex flex-col items-center justify-center gap-2 md:gap-3 px-1 py-3 md:p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300"
+              className="group min-w-0 w-full flex flex-col items-center justify-start gap-2 md:gap-3 px-1 py-3 md:p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300"
             >
-              <Icon size={24} strokeWidth={2.2} className={`md:w-[26px] md:h-[26px] ${iconColor} group-hover:scale-110 transition-transform duration-300`} />
-              <span className="text-[9px] sm:text-[10px] md:text-sm font-bold text-gray-700 dark:text-gray-300 text-center leading-tight break-words hyphens-auto">
+              <Icon size={24} strokeWidth={2.2} className={`shrink-0 md:w-[26px] md:h-[26px] ${iconColor} group-hover:scale-110 transition-transform duration-300`} />
+              <span className="w-full block whitespace-normal text-[9px] sm:text-[10px] md:text-sm font-bold text-gray-700 dark:text-gray-300 text-center leading-tight">
                 {label}
               </span>
             </button>
