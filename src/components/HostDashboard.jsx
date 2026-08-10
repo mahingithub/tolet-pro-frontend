@@ -3820,11 +3820,11 @@ const HostDashboard = () => {
               </h3>
               <div className="grid grid-cols-4 gap-3 md:gap-4">
                 {[
-                  { label: language === 'বাংলা' ? 'ভাড়াটিয়া যোগ করুন' : 'Add Tenant',       Icon: Calendar,      iconColor: 'text-blue-500 dark:text-blue-400',     onClick: () => setActiveTab('bookings') },
+                  { label: language === 'বাংলা' ? 'ভাড়াটিয়া যোগ করুন' : 'Add Tenant', mobileLines: language === 'বাংলা' ? ['ভাড়াটিয়া যোগ', 'করুন'] : null,       Icon: Calendar,      iconColor: 'text-blue-500 dark:text-blue-400',     onClick: () => setActiveTab('bookings') },
                   { label: language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent', Icon: Wallet,        iconColor: 'text-emerald-500 dark:text-emerald-400', onClick: () => setActiveTab('rent') },
                   { label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-violet-500 dark:text-violet-400', onClick: () => navigate('/messages') },
                   { label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts', Icon: BellRing,      iconColor: 'text-amber-500 dark:text-amber-400',   onClick: () => setActiveTab('smartAlerts') },
-                ].map(({ label, Icon, iconColor, onClick }) => (
+                ].map(({ label, mobileLines, Icon, iconColor, onClick }) => (
                   <button
                     key={label}
                     type="button"
@@ -3833,7 +3833,16 @@ const HostDashboard = () => {
                   >
                     <Icon size={26} strokeWidth={2.2} className={`${iconColor} group-hover:scale-110 transition-transform duration-300`} />
                     <span className="text-[11px] md:text-sm font-bold text-gray-700 dark:text-gray-300 text-center leading-tight whitespace-nowrap md:whitespace-normal">
-                      {label}
+                      {mobileLines ? (
+                        <>
+                          <span className="md:hidden">
+                            {mobileLines[0]}
+                            <br />
+                            {mobileLines[1]}
+                          </span>
+                          <span className="hidden md:inline">{label}</span>
+                        </>
+                      ) : label}
                     </span>
                   </button>
                 ))}
