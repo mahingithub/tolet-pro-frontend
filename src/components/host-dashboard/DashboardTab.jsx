@@ -272,10 +272,10 @@ export default function DashboardTab({
         </h3>
         <div className="grid grid-cols-4 gap-2 md:gap-4">
           {[
-            { id: 'add_tenant', label: language === 'বাংলা' ? <span>ভাড়াটিয়া যোগ<span className="hidden md:inline"> </span><br className="md:hidden" />করুন</span> : 'Add Tenant', Icon: Calendar,      iconColor: 'text-blue-500 dark:text-blue-400',     onClick: () => setActiveTab('bookings') },
-            { id: 'rent_collection', label: language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent', Icon: Wallet,        iconColor: 'text-emerald-500 dark:text-emerald-400', onClick: () => setActiveTab('rent') },
+            { id: 'add_tenant', label: language === 'বাংলা' ? <><span className="md:hidden whitespace-pre-line text-[10px] leading-tight">{'ভাড়াটিয়া যোগ\nকরুন'}</span><span className="hidden md:block">ভাড়াটিয়া যোগ করুন</span></> : 'Add Tenant', Icon: Calendar,      iconColor: 'text-blue-500 dark:text-blue-400',     onClick: () => setActiveTab('bookings') },
+            { id: 'rent_collection', label: language === 'বাংলা' ? <><span className="md:hidden whitespace-pre-line text-[10px] leading-tight">{'ভাড়া\nকালেকশন'}</span><span className="hidden md:block">ভাড়া কালেকশন</span></> : 'Rent', Icon: Wallet,        iconColor: 'text-emerald-500 dark:text-emerald-400', onClick: () => setActiveTab('rent') },
             { id: 'messages', label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-violet-500 dark:text-violet-400', onClick: () => navigate('/messages') },
-            { id: 'smart_alerts', label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts', Icon: BellRing,      iconColor: 'text-amber-500 dark:text-amber-400',   onClick: () => setActiveTab('smartAlerts') },
+            { id: 'smart_alerts', label: language === 'বাংলা' ? <><span className="md:hidden whitespace-pre-line text-[10px] leading-tight">{'স্মার্ট\nঅ্যালার্ট'}</span><span className="hidden md:block">স্মার্ট অ্যালার্ট</span></> : 'Smart Alerts', Icon: BellRing,      iconColor: 'text-amber-500 dark:text-amber-400',   onClick: () => setActiveTab('smartAlerts') },
           ].map(({ id, label, Icon, iconColor, onClick }) => (
             <div
               key={id}
