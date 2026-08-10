@@ -277,15 +277,17 @@ export default function DashboardTab({
             { label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-violet-500 dark:text-violet-400', onClick: () => navigate('/messages') },
             { label: language === 'বাংলা' ? 'স্মার্ট\nঅ্যালার্ট' : 'Smart Alerts', Icon: BellRing,      iconColor: 'text-amber-500 dark:text-amber-400',   onClick: () => setActiveTab('smartAlerts') },
           ].map(({ label, Icon, iconColor, onClick }) => (
-            <button
+            <div
               key={label}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={onClick}
-              className="group min-w-0 w-full overflow-hidden flex flex-col items-center justify-start gap-2 md:gap-3 px-1 py-3 md:p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300"
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
+              className="group min-w-0 w-full overflow-hidden flex flex-col items-center justify-start gap-2 md:gap-3 px-1 py-3 md:p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300 cursor-pointer"
             >
               <Icon size={24} strokeWidth={2.2} className={`shrink-0 md:w-[26px] md:h-[26px] ${iconColor} group-hover:scale-110 transition-transform duration-300`} />
               <span className="w-full block whitespace-pre-line text-[9px] sm:text-[10px] md:text-sm font-bold text-gray-700 dark:text-gray-300 text-center leading-tight" style={{ overflowWrap: 'anywhere' }}>{label}</span>
-            </button>
+            </div>
           ))}
         </div>
       </div>
