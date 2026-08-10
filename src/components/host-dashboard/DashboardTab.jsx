@@ -270,7 +270,7 @@ export default function DashboardTab({
         <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white mb-4">
           {language === 'বাংলা' ? 'দ্রুত অ্যাকশন' : 'Quick Actions'}
         </h3>
-        <div className="grid grid-cols-4 gap-3 md:gap-4">
+        <div className="grid grid-cols-4 gap-2 md:gap-4">
           {[
             { label: language === 'বাংলা' ? 'ভাড়াটিয়া যোগ করুন' : 'Add Tenant', Icon: Calendar,      iconColor: 'text-blue-500 dark:text-blue-400',     onClick: () => setActiveTab('bookings') },
             { label: language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent', Icon: Wallet,        iconColor: 'text-emerald-500 dark:text-emerald-400', onClick: () => setActiveTab('rent') },
@@ -281,10 +281,10 @@ export default function DashboardTab({
               key={label}
               type="button"
               onClick={onClick}
-              className="group flex flex-col items-center justify-center gap-3 p-4 md:p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300"
+              className="group flex flex-col items-center justify-center gap-2 md:gap-3 px-1 py-3 md:p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300"
             >
-              <Icon size={26} strokeWidth={2.2} className={`${iconColor} group-hover:scale-110 transition-transform duration-300`} />
-              <span className="text-[11px] md:text-sm font-bold text-gray-700 dark:text-gray-300 text-center leading-tight">
+              <Icon size={24} strokeWidth={2.2} className={`md:w-[26px] md:h-[26px] ${iconColor} group-hover:scale-110 transition-transform duration-300`} />
+              <span className="text-[9px] sm:text-[10px] md:text-sm font-bold text-gray-700 dark:text-gray-300 text-center leading-tight break-words hyphens-auto">
                 {label}
               </span>
             </button>
