@@ -372,7 +372,7 @@ export default function SupportPage() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 -mt-5 md:-mt-10">
+      <div className="max-w-5xl mx-auto px-4 pt-2 md:pt-4">
         {/* Browse help topics — quick-start into a categorised request */}
         <div className="mb-5">
           <p className="text-[11px] font-black uppercase tracking-wider text-gray-400 px-2 mb-2">
