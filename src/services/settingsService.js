@@ -51,6 +51,13 @@ export const DEFAULT_SETTINGS = {
     inquiries: true,
     visits: true,
     priceAlerts: true,
+
+    // Marketing consent, kept apart from the transactional switches above:
+    // wanting rent reminders is not agreement to promotions. `whatsappOptIn`
+    // defaults to false because Meta requires an explicit opt-in before a
+    // business may send a marketing template.
+    whatsappOptIn: false,
+    marketingPush: true,
   },
 
   // Global app / display preferences.

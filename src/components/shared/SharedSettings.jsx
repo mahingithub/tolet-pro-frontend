@@ -507,6 +507,8 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
           <Row label={bn ? 'SMS অ্যালার্ট' : 'SMS alerts'} right={<Toggle checked={settings.smsAlerts} onChange={(v) => save({ smsAlerts: v })} />} />
           <Row label={bn ? 'কল নোটিফিকেশন' : 'Call notifications'} sublabel={bn ? 'ইনকামিং কল পুশ' : 'Incoming call push'} right={<Toggle checked={settings.callNotifications} onChange={(v) => save({ callNotifications: v })} />} />
           <Row label={bn ? 'মার্কেটিং ইমেইল' : 'Marketing emails'} sublabel={bn ? 'অফার ও টিপস' : 'Offers and tips'} right={<Toggle checked={settings.marketingEmails} onChange={(v) => save({ marketingEmails: v })} />} />
+          <Row label={bn ? 'মার্কেটিং পুশ' : 'Marketing push'} sublabel={bn ? 'বিশেষ অফারের পুশ নোটিফিকেশন' : 'Push notifications for special offers'} right={<Toggle checked={n.marketingPush} onChange={(v) => save({ notifications: { marketingPush: v } })} />} />
+          <Row label={bn ? 'WhatsApp অফার' : 'WhatsApp offers'} sublabel={bn ? 'WhatsApp-এ অফার পেতে সম্মতি দিন' : 'Opt in to receive offers on WhatsApp'} right={<Toggle checked={n.whatsappOptIn} onChange={(v) => save({ notifications: { whatsappOptIn: v } })} />} />
           <Row label={bn ? 'সাউন্ড' : 'Sound'} sublabel={bn ? 'নোটিফিকেশন সাউন্ড' : 'Play notification sounds'} right={<Toggle checked={n.sound} onChange={(v) => save({ notifications: { sound: v } })} />} />
 
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-3 border-b border-gray-50">

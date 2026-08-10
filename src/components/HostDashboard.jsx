@@ -3818,31 +3818,22 @@ const HostDashboard = () => {
               <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white mb-4">
                 {language === 'বাংলা' ? 'দ্রুত অ্যাকশন' : 'Quick Actions'}
               </h3>
-              <div className="grid grid-cols-4 gap-3 md:gap-4">
+              <div className="grid grid-cols-4 gap-[clamp(0.375rem,2vw,1rem)] items-stretch">
                 {[
-                  { label: language === 'বাংলা' ? 'ভাড়াটিয়া যোগ করুন' : 'Add Tenant', mobileLines: language === 'বাংলা' ? ['ভাড়াটিয়া যোগ', 'করুন'] : null,       Icon: Calendar,      iconColor: 'text-blue-500 dark:text-blue-400',     onClick: () => setActiveTab('bookings') },
+                  { label: language === 'বাংলা' ? 'ভাড়াটিয়া যোগ করুন' : 'Add Tenant',       Icon: Calendar,      iconColor: 'text-blue-500 dark:text-blue-400',     onClick: () => setActiveTab('bookings') },
                   { label: language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent', Icon: Wallet,        iconColor: 'text-emerald-500 dark:text-emerald-400', onClick: () => setActiveTab('rent') },
                   { label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-violet-500 dark:text-violet-400', onClick: () => navigate('/messages') },
                   { label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts', Icon: BellRing,      iconColor: 'text-amber-500 dark:text-amber-400',   onClick: () => setActiveTab('smartAlerts') },
-                ].map(({ label, mobileLines, Icon, iconColor, onClick }) => (
+                ].map(({ label, Icon, iconColor, onClick }) => (
                   <button
                     key={label}
                     type="button"
                     onClick={onClick}
-                    className="group flex flex-col items-center justify-center gap-3 p-4 md:p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300"
+                    className="group min-w-0 w-full overflow-hidden flex flex-col items-center justify-start gap-[clamp(0.375rem,2vw,0.75rem)] px-[clamp(0.25rem,1.5vw,1.25rem)] py-[clamp(0.625rem,2.5vw,1.25rem)] rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300"
                   >
-                    <Icon size={26} strokeWidth={2.2} className={`${iconColor} group-hover:scale-110 transition-transform duration-300`} />
-                    <span className="text-[11px] md:text-sm font-bold text-gray-700 dark:text-gray-300 text-center leading-tight whitespace-nowrap md:whitespace-normal">
-                      {mobileLines ? (
-                        <>
-                          <span className="md:hidden">
-                            {mobileLines[0]}
-                            <br />
-                            {mobileLines[1]}
-                          </span>
-                          <span className="hidden md:inline">{label}</span>
-                        </>
-                      ) : label}
+                    <Icon strokeWidth={2.2} className={`shrink-0 w-[clamp(20px,5.5vw,26px)] h-[clamp(20px,5.5vw,26px)] ${iconColor} group-hover:scale-110 transition-transform duration-300`} />
+                    <span className="w-full block text-[clamp(9px,2.6vw,0.875rem)] font-bold text-gray-700 dark:text-gray-300 text-center leading-snug break-words hyphens-auto">
+                      {label}
                     </span>
                   </button>
                 ))}

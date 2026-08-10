@@ -662,8 +662,8 @@ html.reduce-motion .tp-home-win { fill: rgba(255,211,122,0) !important; }
 .tp-card-pro {
   border-color: rgba(217, 155, 40, 0.55);
   background-image:
-    linear-gradient(135deg, rgba(251, 191, 36, 0.16) 0%, rgba(253, 230, 138, 0.07) 42%, rgba(255, 255, 255, 0) 78%),
-    linear-gradient(#ffffff, #ffffff);
+    linear-gradient(135deg, rgba(245, 176, 24, 0.30) 0%, rgba(252, 220, 138, 0.20) 48%, rgba(254, 243, 210, 0.14) 100%),
+    linear-gradient(#fffdf6, #fffdf6);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.9) inset,
     0 10px 30px -12px rgba(217, 155, 40, 0.45);
@@ -696,8 +696,8 @@ html.dark .tp-card-pro:hover {
 .tp-card-plus {
   border-color: rgba(99, 102, 241, 0.45);
   background-image:
-    linear-gradient(135deg, rgba(99, 102, 241, 0.13) 0%, rgba(165, 180, 252, 0.06) 42%, rgba(255, 255, 255, 0) 78%),
-    linear-gradient(#ffffff, #ffffff);
+    linear-gradient(135deg, rgba(99, 102, 241, 0.24) 0%, rgba(165, 180, 252, 0.17) 48%, rgba(224, 231, 255, 0.13) 100%),
+    linear-gradient(#fbfbff, #fbfbff);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.9) inset,
     0 10px 30px -12px rgba(79, 70, 229, 0.35);
@@ -739,6 +739,21 @@ html.dark .tp-card-plus .bg-white,
 html.dark .tp-card-pro .bg-gray-50,
 html.dark .tp-card-plus .bg-gray-50 { background-color: rgba(255, 255, 255, 0.05) !important; }
 
+/* …but NOT the badges layered on top of the photo. The rule above matches by
+   class, and the overlay stamps wear the same `.bg-white` as the content
+   panels — while sitting on a coloured scrim. The "ভাড়া হয়ে গেছে" stamp is
+   `text-brandRed` inside a `bg-brandRed/70` overlay, so at 55% opacity its red
+   text lands on red and the label vanishes. Free cards never had the wash,
+   which is why this read as "the Pro/Plus cards hide their text".
+   Restoring solid white inside any positioned overlay fixes it; the extra
+   descendant bumps specificity above the rule above, so no !important war.
+   Both premium cards' image areas use absolute overlays, so this covers the
+   desktop card and the mobile one alike. */
+.tp-card-pro .absolute .bg-white,
+.tp-card-plus .absolute .bg-white,
+html.dark .tp-card-pro .absolute .bg-white,
+html.dark .tp-card-plus .absolute .bg-white { background-color: #ffffff !important; }
+
 /* Dividers inside a tinted card pick up the tier hue instead of neutral gray,
    which otherwise cuts a dull line straight through the wash. */
 .tp-card-pro .border-gray-100 { border-color: rgba(217, 155, 40, 0.22) !important; }
@@ -752,6 +767,7 @@ html.dark .tp-card-plus .border-gray-100 { border-color: rgba(129, 140, 248, 0.2
 .tp-card-plus .bg-gray-100,
 .tp-card-pro .bg-gray-200,
 .tp-card-plus .bg-gray-200 { background-color: #e5e7eb !important; }
+html.dark .tp-card-pro .bg-gray-100,
 html.dark .tp-card-plus .bg-gray-100,
 html.dark .tp-card-pro .bg-gray-200,
 html.dark .tp-card-plus .bg-gray-200 { background-color: var(--tp-surface-2) !important; }
