@@ -24,7 +24,11 @@ const VideoModal = ({ isOpen, onClose, videoUrl, title }) => {
 				const urlObj = new URL(url);
 				videoId = urlObj.searchParams.get('v');
 			} else if (url.includes('youtu.be/')) {
-				videoId = url.split('youtu.be/')[1].split('?')[0];
+				videoId = url.split('youtu.be/')[1].split(/[?&]/)[0];
+			} else if (url.includes('youtube.com/shorts/')) {
+				videoId = url.split('youtube.com/shorts/')[1].split(/[?&]/)[0];
+			} else if (url.includes('youtube.com/embed/')) {
+				videoId = url.split('youtube.com/embed/')[1].split(/[?&]/)[0];
 			}
 
 			if (videoId) {

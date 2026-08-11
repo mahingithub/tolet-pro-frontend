@@ -10,6 +10,7 @@ const youTubeId = (url = '') => {
     if (url.includes('youtube.com/watch')) return new URL(url).searchParams.get('v') || '';
     if (url.includes('youtu.be/')) return url.split('youtu.be/')[1].split(/[?&]/)[0];
     if (url.includes('youtube.com/embed/')) return url.split('embed/')[1].split(/[?&]/)[0];
+    if (url.includes('youtube.com/shorts/')) return url.split('shorts/')[1].split(/[?&]/)[0];
   } catch {
     /* ignore malformed URLs */
   }
