@@ -1326,7 +1326,7 @@ const translations = {
     testimonial3Type: "বাণিজ্যিক স্থান",
 
     // Footer
-    exploreFooter: "অন্বেষণ",
+    exploreFooter: "খুঁজুন",
     legalFooter: "আইনি",
     contactUs: "যোগাযোগ করুন",
     allProperties: "সব বাড়ি",

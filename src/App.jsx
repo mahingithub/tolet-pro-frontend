@@ -46,6 +46,7 @@ import AppDownloadBanner from "./components/AppDownloadBanner";
 import PrivacyPolicy from "./components/legal/PrivacyPolicy";
 import TermsOfService from "./components/legal/TermsOfService";
 import RefundPolicy from "./components/legal/RefundPolicy";
+import TrustSafety from "./components/legal/TrustSafety";
 
 // --- Beta feedback button (Phase 7) ---
 import FeedbackButton from "./components/FeedbackButton";
@@ -239,6 +240,7 @@ const AppLayout = () => {
 				<Route path="/privacy-policy" element={<PrivacyPolicy />} />
 				<Route path="/terms" element={<TermsOfService />} />
 				<Route path="/refund" element={<RefundPolicy />} />
+				<Route path="/trust-safety" element={<TrustSafety />} />
 
 				<Route
 					path="/host-dashboard"

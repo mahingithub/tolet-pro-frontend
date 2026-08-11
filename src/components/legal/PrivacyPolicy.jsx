@@ -11,7 +11,7 @@ import React, { useState } from 'react';
 import LegalPage, { Section, H2, P, LI } from './LegalPage';
 
 // One place to edit the contact email later.
-const CONTACT_EMAIL = '[COMPANY EMAIL — e.g. support@toletpro.com]';
+const CONTACT_EMAIL = 'support@toletpro.rent';
 
 export default function PrivacyPolicy() {
   const [lang, setLang] = useState('en');

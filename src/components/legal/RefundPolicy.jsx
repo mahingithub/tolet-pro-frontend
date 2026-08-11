@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import LegalPage, { Section, H2, P, LI } from './LegalPage';
 
-const CONTACT_EMAIL = '[COMPANY EMAIL — e.g. support@toletpro.com]';
+const CONTACT_EMAIL = 'support@toletpro.rent';
 
 export default function RefundPolicy() {
   const [lang, setLang] = useState('en');

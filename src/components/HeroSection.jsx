@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Search, MapPin, Home as HomeIcon, Wallet, ChevronDown, Check, X, ArrowLeft, Navigation,
   CheckCircle2, Clock, HeadphonesIcon, ArrowRight, Star, ShieldCheck, Map, Users, Building,
@@ -1287,22 +1287,22 @@ const HeroSection = () => {
                 <p className="text-[11px] md:text-sm font-medium text-slate-400 leading-relaxed max-w-[280px]">
                   {t?.footerDesc || "Bangladesh's most trusted property rental platform. Designed for the modern era, built for your comfort."}
                 </p>
-                <div className="flex items-center gap-3 text-slate-400">
-                  <a href="https://www.facebook.com/profile.php?id=61593003425206" target="_blank" rel="noreferrer" aria-label="Facebook" className="hover:text-crimson-500 transition-colors">
+                <div className="flex items-center gap-3 mt-2">
+                  <a href="https://www.facebook.com/profile.php?id=61593003425206" target="_blank" rel="noreferrer" aria-label="Facebook" className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-[#1877F2] hover:border-[#1877F2] transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5">
                     <svg fill="currentColor" viewBox="0 0 24 24" className="w-4 h-4"><path d="M22.675 0h-21.35c-.732 0-1.325.593-1.325 1.325v21.351c0 .731.593 1.324 1.325 1.324h11.495v-9.294h-3.128v-3.622h3.128v-2.671c0-3.1 1.893-4.788 4.659-4.788 1.325 0 2.463.099 2.795.143v3.24l-1.918.001c-1.504 0-1.795.715-1.795 1.763v2.312h3.587l-.467 3.622h-3.12v9.293h6.116c.73 0 1.323-.593 1.323-1.325v-21.35c0-.732-.593-1.325-1.325-1.325z" /></svg>
                   </a>
-                  <a href="https://www.youtube.com/channel/UC7mc__2GpSdoqUMglb7BS8g" target="_blank" rel="noreferrer" aria-label="YouTube" className="hover:text-crimson-500 transition-colors">
+                  <a href="https://www.youtube.com/channel/UC7mc__2GpSdoqUMglb7BS8g" target="_blank" rel="noreferrer" aria-label="YouTube" className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-[#FF0000] hover:border-[#FF0000] transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5">
                     <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="w-4 h-4">
                       <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33Z" />
                       <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" />
                     </svg>
                   </a>
-                  <a href="https://wa.me/+8801742898206" target="_blank" rel="noreferrer" aria-label="WhatsApp" className="hover:text-crimson-500 transition-colors">
+                  <a href="https://wa.me/+8801742898206" target="_blank" rel="noreferrer" aria-label="WhatsApp" className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-[#25D366] hover:border-[#25D366] transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5">
                     <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="w-4 h-4">
                       <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
                     </svg>
                   </a>
-                  <a href="https://www.instagram.com/toletpro.rent/" target="_blank" rel="noreferrer" aria-label="Instagram" className="hover:text-crimson-500 transition-colors">
+                  <a href="https://www.instagram.com/toletpro.rent/" target="_blank" rel="noreferrer" aria-label="Instagram" className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-[#E1306C] hover:border-[#E1306C] transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5">
                     <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="w-4 h-4">
                       <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
                       <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37Z" />
@@ -1315,28 +1315,28 @@ const HeroSection = () => {
               <div>
                 <h4 className="text-white font-black uppercase tracking-widest text-[9px] md:text-xs mb-3 md:mb-6">{t?.exploreFooter || 'Explore'}</h4>
                 <ul className="flex flex-col gap-2 md:gap-4 text-[11px] md:text-sm font-bold text-slate-400">
-                  <li><a href="#" className="hover:text-white transition-colors">{t?.allProperties || 'All Properties'}</a></li>
-                  <li><a href="#" className="hover:text-white transition-colors">{t?.popularDistrictsFooter || 'Popular Districts'}</a></li>
-                  <li><a href="#" className="hover:text-white transition-colors">{t?.commercialSpaces || 'Commercial Spaces'}</a></li>
-                  <li><a href="#" className="hover:text-white transition-colors">{t?.hostDashboard || 'Host Dashboard'}</a></li>
+                  <li><Link to="/properties/all?intent=rent" className="hover:text-white transition-colors">{t?.allProperties || 'All Properties'}</Link></li>
+                  <li><Link to="/properties/dhaka" className="hover:text-white transition-colors">{t?.popularDistrictsFooter || 'Popular Districts'}</Link></li>
+                  <li><Link to="/properties/all?intent=commercial" className="hover:text-white transition-colors">{t?.commercialSpaces || 'Commercial Spaces'}</Link></li>
+                  <li><Link to="/host-dashboard" className="hover:text-white transition-colors">{t?.hostDashboard || 'Host Dashboard'}</Link></li>
                 </ul>
               </div>
 
               <div>
                 <h4 className="text-white font-black uppercase tracking-widest text-[9px] md:text-xs mb-3 md:mb-6">{t?.legalFooter || 'Legal'}</h4>
                 <ul className="flex flex-col gap-2 md:gap-4 text-[11px] md:text-sm font-bold text-slate-400">
-                  <li><a href="#" className="hover:text-white transition-colors">{t?.termsOfService || 'Terms of Service'}</a></li>
-                  <li><a href="#" className="hover:text-white transition-colors">{t?.privacyPolicy || 'Privacy Policy'}</a></li>
-                  <li><a href="#" className="hover:text-white transition-colors">{t?.trustSafety || 'Trust & Safety'}</a></li>
-                  <li><a href="#" className="hover:text-white transition-colors">{t?.refundPolicy || 'Refund Policy'}</a></li>
+                  <li><Link to="/terms" className="hover:text-white transition-colors">{t?.termsOfService || 'Terms of Service'}</Link></li>
+                  <li><Link to="/privacy-policy" className="hover:text-white transition-colors">{t?.privacyPolicy || 'Privacy Policy'}</Link></li>
+                  <li><Link to="/trust-safety" className="hover:text-white transition-colors">{t?.trustSafety || 'Trust & Safety'}</Link></li>
+                  <li><Link to="/refund" className="hover:text-white transition-colors">{t?.refundPolicy || 'Refund Policy'}</Link></li>
                 </ul>
               </div>
 
               <div>
                 <h4 className="text-white font-black uppercase tracking-widest text-[9px] md:text-xs mb-3 md:mb-6">{t?.contactUs || 'Contact Us'}</h4>
                 <ul className="flex flex-col gap-2 md:gap-4 text-[11px] md:text-sm font-bold text-slate-400">
-                  <li className="flex items-center gap-2"><Mail size={13} className="text-crimson-500 shrink-0" /> support@toletpro.com</li>
-                  <li className="flex items-center gap-2"><Phone size={13} className="text-crimson-500 shrink-0" /> +880 1234 567890</li>
+                  <li className="flex items-center gap-2"><Mail size={13} className="text-crimson-500 shrink-0" /> support@toletpro.rent</li>
+                  <li className="flex items-center gap-2"><Phone size={13} className="text-crimson-500 shrink-0" /> +880 1742898206</li>
                   <li className="flex items-center gap-2"><MapPin size={13} className="text-crimson-500 shrink-0" /> Banani, Dhaka, Bangladesh</li>
                 </ul>
               </div>
