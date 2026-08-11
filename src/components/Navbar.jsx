@@ -473,7 +473,7 @@ useEffect(() => {
           route-level sticky bar (e.g. the PropertyDetails page nav at z-30),
           regardless of any wrapper that React Router or animation libs may
           add between the navbar and the routed page. */}
-      <header className={`w-full bg-white/95 backdrop-blur-2xl font-sans sticky top-0 z-[60] transition-all duration-300 ease-in-out ${isScrolled ? 'shadow-[0_4px_24px_rgba(0,0,0,0.10)] border-b border-gray-100/80' : 'border-b border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)]'} ${isMobileMenuOpen ? 'md:opacity-100 max-md:opacity-0 max-md:pointer-events-none' : ''}`}>
+      <header className={`w-full bg-white/95 backdrop-blur-2xl font-sans sticky top-0 z-[60] transition-all duration-300 ease-in-out ${isScrolled ? 'md:-translate-y-[64px] shadow-[0_4px_24px_rgba(0,0,0,0.10)] border-b border-gray-100/80' : 'md:translate-y-0 border-b border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)]'} ${isMobileMenuOpen ? 'md:opacity-100 max-md:opacity-0 max-md:pointer-events-none' : ''}`}>
 
         <div className="w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 flex items-center gap-2.5 md:gap-4 h-[56px] md:h-[64px]">
 
