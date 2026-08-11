@@ -20,6 +20,19 @@ const InstagramIcon = ({ size = 18 }) => (
   </svg>
 );
 
+const YoutubeIcon = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33Z" />
+    <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" />
+  </svg>
+);
+
+const WhatsAppIcon = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+  </svg>
+);
+
 const Footer = () => {
   const { t } = useLanguage(); 
   const location = useLocation();
@@ -50,7 +63,7 @@ const Footer = () => {
             </p>
             <div className="flex gap-4">
               <a
-                href="https://facebook.com"
+                href="https://www.facebook.com/profile.php?id=61593003425206"
                 target="_blank"
                 rel="noreferrer noopener"
                 aria-label="Facebook"
@@ -59,7 +72,25 @@ const Footer = () => {
                 <FacebookIcon size={18} />
               </a>
               <a
-                href="https://instagram.com"
+                href="https://www.youtube.com/channel/UC7mc__2GpSdoqUMglb7BS8g"
+                target="_blank"
+                rel="noreferrer noopener"
+                aria-label="YouTube"
+                className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-brandRed hover:text-white transition-colors cursor-pointer"
+              >
+                <YoutubeIcon size={18} />
+              </a>
+              <a
+                href="https://wa.me/+8801742898206"
+                target="_blank"
+                rel="noreferrer noopener"
+                aria-label="WhatsApp"
+                className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-brandRed hover:text-white transition-colors cursor-pointer"
+              >
+                <WhatsAppIcon size={18} />
+              </a>
+              <a
+                href="https://www.instagram.com/toletpro.rent/"
                 target="_blank"
                 rel="noreferrer noopener"
                 aria-label="Instagram"
