@@ -22,9 +22,19 @@ const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').r
  *        guide for the placement and split by audience client-side.
  * @returns {Promise<Array>} guides sorted by `order` (empty array on failure).
  */
+export const getDeviceCategory = () => {
+  if (typeof window === 'undefined') return 'desktop';
+  const w = window.innerWidth;
+  if (w < 768) return 'mobile';
+  if (w < 1024) return 'tablet';
+  return 'desktop';
+};
+
 export const getSectionGuides = async (placement, audience) => {
   try {
-    const qs = audience ? `?audience=${encodeURIComponent(audience)}` : '';
+    const devCat = getDeviceCategory();
+    let qs = `?deviceCategory=${devCat}`;
+    if (audience) qs += `&audience=${encodeURIComponent(audience)}`;
     const res = await fetch(`${API}/ai-guides/section/${placement}${qs}`);
     if (!res.ok) return [];
     const data = await res.json();

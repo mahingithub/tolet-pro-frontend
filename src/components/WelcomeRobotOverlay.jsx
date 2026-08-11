@@ -7,6 +7,7 @@ import {
   MapPin, MessageCircle, BadgeCheck, PlusCircle, LayoutDashboard,
 } from 'lucide-react';
 import VideoModal from './shared/VideoModal';
+import { getDeviceCategory } from '../services/aiGuideService';
 
 /* ═══════════════════════════════════════════════════════════════
    ⚙️ কনফিগারেশন
@@ -264,7 +265,8 @@ const WelcomeRobotOverlay = () => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${API}/ai-guides/welcome?audience=${aud}`);
+        const devCat = getDeviceCategory();
+        const res = await fetch(`${API}/ai-guides/welcome?audience=${aud}&deviceCategory=${devCat}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (!cancelled) {

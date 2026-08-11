@@ -16,6 +16,9 @@ const VideoModal = ({ isOpen, onClose, videoUrl, title }) => {
 
 	if (!isOpen || !videoUrl) return null;
 
+	// Detect if the original URL is a YouTube Shorts link (vertical video)
+	const isShorts = videoUrl.includes('youtube.com/shorts/') || videoUrl.includes('/shorts/');
+
 	// Extract YouTube video ID if it's a YouTube link to use the embed format
 	const getEmbedUrl = (url) => {
 		try {
@@ -45,7 +48,13 @@ const VideoModal = ({ isOpen, onClose, videoUrl, title }) => {
 
 	return (
 		<div className="fixed inset-0 z-[100001] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300 p-4">
-			<div className="bg-white w-full max-w-4xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col relative animate-in zoom-in-95 duration-300">
+			<div
+				className={`bg-white shadow-2xl overflow-hidden flex flex-col relative animate-in zoom-in-95 duration-300 ${
+					isShorts
+						? 'w-full max-w-[360px] md:max-w-[400px] rounded-[2rem]'
+						: 'w-full max-w-4xl rounded-[2rem]'
+				}`}
+			>
 				
 				{/* Header */}
 				<div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
@@ -61,8 +70,14 @@ const VideoModal = ({ isOpen, onClose, videoUrl, title }) => {
 					</button>
 				</div>
 
-				{/* Video Container */}
-				<div className="relative w-full aspect-video bg-black shrink-0">
+				{/* Video Container — portrait for Shorts, landscape for normal videos */}
+				<div
+					className={`relative w-full bg-black shrink-0 ${
+						isShorts
+							? 'aspect-[9/16] max-h-[70vh]'
+							: 'aspect-video'
+					}`}
+				>
 					{isYouTube ? (
 						<iframe
 							src={embedUrl}

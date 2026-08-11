@@ -17,6 +17,7 @@ import {
   sendMessage as svcSendMessage,
   onTicketsChanged,
 } from '../services/supportService.js';
+import { getDeviceCategory } from '../services/aiGuideService.js';
 
 /**
  * Global AI assistant + support widget.
@@ -121,7 +122,8 @@ const GlobalAIAssistant = () => {
   }, []);
 
   useEffect(() => {
-    fetch(`${API}/ai-guides`)
+    const devCat = getDeviceCategory();
+    fetch(`${API}/ai-guides?deviceCategory=${devCat}`)
       .then(res => {
         if (!res.ok) throw new Error("Failed to fetch AI guides");
         return res.json();
