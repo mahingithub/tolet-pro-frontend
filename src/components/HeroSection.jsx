@@ -618,10 +618,51 @@ const HeroSection = () => {
   const scrollDivisions = (dir) => {
     const el = divisionsRef.current;
     if (!el) return;
-    // Page by ~80% of the visible width so each click reveals fresh cards.
-    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' });
+    const cardWidth = el.firstElementChild ? el.firstElementChild.offsetWidth + 16 : 300;
+    el.scrollBy({ left: dir * cardWidth, behavior: 'smooth' });
   };
   const sliderItems = popularCities;
+
+  useEffect(() => {
+    let interval;
+    const el = divisionsRef.current;
+    
+    const startAutoScroll = () => {
+      interval = setInterval(() => {
+        if (!el) return;
+        if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 10) {
+          el.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+          scrollDivisions(1);
+        }
+      }, 3000);
+    };
+
+    startAutoScroll();
+
+    const pauseScroll = () => clearInterval(interval);
+    const resumeScroll = () => {
+      clearInterval(interval);
+      startAutoScroll();
+    };
+
+    if (el) {
+      el.addEventListener('mouseenter', pauseScroll);
+      el.addEventListener('mouseleave', resumeScroll);
+      el.addEventListener('touchstart', pauseScroll, { passive: true });
+      el.addEventListener('touchend', resumeScroll, { passive: true });
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (el) {
+        el.removeEventListener('mouseenter', pauseScroll);
+        el.removeEventListener('mouseleave', resumeScroll);
+        el.removeEventListener('touchstart', pauseScroll);
+        el.removeEventListener('touchend', resumeScroll);
+      }
+    };
+  }, []);
 
   return (
     <>
@@ -1022,7 +1063,7 @@ const HeroSection = () => {
                   }}
                   className="snap-start group w-[260px] md:w-[320px] h-[300px] md:h-[360px] rounded-[1.5rem] md:rounded-[2rem] overflow-hidden relative cursor-pointer shadow-[0_10px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgba(186,0,54,0.15)] transition-all duration-500 shrink-0 bg-white"
                 >
-                  <div className="absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-700 ease-out" style={{ backgroundImage: `url(${div.image})` }} />
+                  <img src={div.image} alt={div.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
                   <div className="absolute bottom-6 left-6 pr-6">
                     <span className="bg-white/20 backdrop-blur-md text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border border-white/20 mb-3 block w-max shadow-sm">

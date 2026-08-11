@@ -811,7 +811,7 @@ useEffect(() => {
         </div>
 
         {/* Desktop district bar — Hover cut off issue fixed with overflow-visible */}
-        <div className={`hidden md:block border-t border-gray-100 bg-[#f8f9fa]/90 backdrop-blur-xl transition-all duration-300 ${(isScrolled || compactHeader) ? 'max-h-0 opacity-0 pointer-events-none overflow-hidden' : 'max-h-[38px] opacity-100 overflow-visible'}`}>
+        <div className={`hidden md:block border-t border-gray-100 bg-[#f8f9fa]/90 backdrop-blur-xl transition-all duration-300 max-h-[38px] opacity-100 overflow-visible`}>
           <div className="w-full max-w-[1400px] mx-auto px-4 lg:px-6 h-[38px] flex items-center justify-between">
             
             {/* OYO এর মতো সমানভাবে স্পেস নেওয়ার জন্য ম্যাপ করা আইটেমগুলোকে সরাসরি justify-between কন্টেইনারে রাখা হয়েছে */}

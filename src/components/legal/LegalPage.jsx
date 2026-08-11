@@ -17,6 +17,7 @@
 
 import React from 'react';
 import useGoBack from '../../hooks/useGoBack';
+import { Home } from 'lucide-react';
 
 export default function LegalPage({ titleEn, titleBn, lastUpdated, lang, setLang, children }) {
   const goBack = useGoBack('/');
@@ -52,8 +53,8 @@ export default function LegalPage({ titleEn, titleBn, lastUpdated, lang, setLang
           ‹
         </button>
 
-        {/* Logo + title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+        {/* Original Logo */}
+        <a href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
           <div
             style={{
               width: '34px', height: '34px', borderRadius: '9px',
@@ -61,21 +62,12 @@ export default function LegalPage({ titleEn, titleBn, lastUpdated, lang, setLang
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <svg width="20" height="20" viewBox="0 0 512 512" fill="#fff" xmlns="http://www.w3.org/2000/svg">
-              <rect x="176" y="150" width="160" height="226" rx="10"/>
-              <rect x="232" y="120" width="48" height="36" rx="8"/>
-              <rect x="236" y="320" width="40" height="56" rx="6" fill="#ba0036"/>
-              <g fill="#ba0036">
-                <rect x="200" y="182" width="34" height="30" rx="5"/><rect x="278" y="182" width="34" height="30" rx="5"/>
-                <rect x="200" y="232" width="34" height="30" rx="5"/><rect x="278" y="232" width="34" height="30" rx="5"/>
-                <rect x="200" y="282" width="34" height="30" rx="5"/><rect x="278" y="282" width="34" height="30" rx="5"/>
-              </g>
-            </svg>
+            <Home size={18} color="#fff" strokeWidth={2.5} />
           </div>
-          <div style={{ fontWeight: 800, fontSize: '16px', color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {isBn ? titleBn : titleEn}
-          </div>
-        </div>
+          <h1 style={{ margin: 0, fontWeight: 900, fontSize: '18px', color: '#1f2937', letterSpacing: '-0.5px' }}>
+            TO-LET <span style={{ color: '#ba0036' }}>PRO</span>
+          </h1>
+        </a>
 
         {/* EN / BN toggle */}
         <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: '10px', padding: '3px', flexShrink: 0 }}>
