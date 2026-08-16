@@ -17,6 +17,7 @@ const AnalyticsTab = ({
   enumerateLeaseMonths,
   getDueDate,
   computeLeaseStage,
+  isLeaseEndingSoon,
   formatBDT,
   monthShortLabel
 }) => {
@@ -69,16 +70,19 @@ const AnalyticsTab = ({
   const collectionRate = totalExpectedYTD > 0
     ? Math.round((totalRevenueYTD / totalExpectedYTD) * 100)
     : 0;
-  const activeLeases = bookings.filter(b => computeLeaseStage(b, todayDate) === 'active').length;
-  const noticeLeases = bookings.filter(b => computeLeaseStage(b, todayDate) === 'notice').length;
-  const draftLeases  = bookings.filter(b => computeLeaseStage(b, todayDate) === 'draft').length;
-  const doneLeases   = bookings.filter(b => computeLeaseStage(b, todayDate) === 'done').length;
+  // Two lease stages exist now: active | done. "Ending soon" is a nudge on top
+  // of active (the renewal window), not a stage of its own.
+  const activeLeases     = bookings.filter(b => computeLeaseStage(b, todayDate) === 'active').length;
+  const doneLeases       = bookings.filter(b => computeLeaseStage(b, todayDate) === 'done').length;
+  const endingSoonLeases = typeof isLeaseEndingSoon === 'function'
+    ? bookings.filter(b => isLeaseEndingSoon(b, todayDate)).length
+    : 0;
   const totalProperties = properties.length;
   const occupancyRate = totalProperties > 0
-    ? Math.round(((activeLeases + noticeLeases) / totalProperties) * 100)
+    ? Math.round((activeLeases / totalProperties) * 100)
     : 0;
   const totalMonthlyRevenue = bookings
-    .filter(b => ['active','notice'].includes(computeLeaseStage(b, todayDate)))
+    .filter(b => computeLeaseStage(b, todayDate) === 'active')
     .reduce((s, b) => s + Number(b.monthlyRent || 0), 0);
   const avgRentPerProperty = totalProperties > 0
     ? Math.round(totalMonthlyRevenue / totalProperties)
@@ -191,7 +195,7 @@ const AnalyticsTab = ({
                 </p>
                 <p className="text-[15px] sm:text-base font-black tabular-nums leading-tight">{formatBDT(totalMonthlyRevenue)}</p>
                 <p className="text-[9px] font-bold text-indigo-200 mt-1">
-                  {language === 'বাংলা' ? `${activeLeases + noticeLeases} সক্রিয় লিজ` : `${activeLeases + noticeLeases} active leases`}
+                  {language === 'বাংলা' ? `${activeLeases} সক্রিয় লিজ` : `${activeLeases} active leases`}
                 </p>
               </div>
               <div className="bg-white/10 backdrop-blur rounded-2xl p-3 border border-white/10">
@@ -200,7 +204,7 @@ const AnalyticsTab = ({
                 </p>
                 <p className="text-[15px] sm:text-base font-black tabular-nums leading-tight">{occupancyRate}%</p>
                 <p className="text-[9px] font-bold text-indigo-200 mt-1 tabular-nums">
-                  {activeLeases + noticeLeases}/{totalProperties} {language === 'বাংলা' ? 'প্রপার্টি' : 'units'}
+                  {activeLeases}/{totalProperties} {language === 'বাংলা' ? 'প্রপার্টি' : 'units'}
                 </p>
               </div>
               <div className="bg-white/10 backdrop-blur rounded-2xl p-3 border border-white/10">
@@ -221,12 +225,11 @@ const AnalyticsTab = ({
                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"/>{activeLeases}
                 </span>
-                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-200 border border-amber-400/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"/>{noticeLeases}
-                </span>
-                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400"/>{draftLeases}
-                </span>
+                {endingSoonLeases > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-200 border border-amber-400/30" title={language === 'বাংলা' ? '৩০ দিনে শেষ হচ্ছে' : 'ending within 30 days'}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"/>{endingSoonLeases}
+                  </span>
+                )}
                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/10 text-gray-300 border border-white/15">
                   <span className="w-1.5 h-1.5 rounded-full bg-gray-400"/>{doneLeases}
                 </span>

@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import useGoBack from '../hooks/useGoBack';
+// Lets an open overlay (photo viewer, photo tour, inquiry sheet) absorb ONE
+// Back press instead of letting it navigate this page away. See the hook's
+// header for the history-entry mechanics.
+import useBackGuard, { useOverlayNavigate } from '../hooks/useBackGuard';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MapPin, Bed, Bath, Maximize2, Share2, Heart,
@@ -870,27 +874,232 @@ const VideoPlayer = ({ videos, mainVideo, videoId, coverPhoto, title }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FULLSCREEN PHOTO VIEWER
+// FULLSCREEN MEDIA VIEWER — one viewer for photos AND walkthrough videos.
+//
+// Layout (matches the agreed design):
+//        ┌─────────────────────────────┐
+//    ‹   │        media stage          │   ›     ← arrows pinned to the sides
+//        └─────────────────────────────┘
+//          ▢  ▢  ▢  ▢   ← thumbnail rail, active thumb ringed
+//
+// Behaviour:
+//   • ‹ / › and ← / → step through every item; the rail scrolls the active
+//     thumb into view so you always know where you are in the set.
+//   • Esc, the X, or a tap on the empty backdrop closes it. Back/edge-swipe is
+//     handled by the caller's useBackGuard, so closing NEVER leaves the page.
+//   • Uploaded videos play in <video>; YouTube / Google Drive links embed.
+//     Switching items remounts the player (keyed) so audio never bleeds over.
+//   • Body scroll is locked while open, and the page behind keeps its position.
 // ─────────────────────────────────────────────────────────────────────────────
-const FullscreenPhoto = ({ src, onClose }) => (
-  <AnimatePresence>
-    {src && (
-      <motion.div
-        className="fixed inset-0 z-[200] flex items-center justify-center"
-        style={{ background: 'rgba(15,23,42,0.94)' }}
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        onClick={onClose}
-      >
-        <button onClick={onClose}
-          className="absolute top-5 right-5 z-10 w-11 h-11 rounded-full flex items-center justify-center text-white transition-colors"
-          style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)' }}>
-          <X size={20} />
-        </button>
-        <img src={src} alt="Full view" className="max-w-full max-h-full object-contain px-4" onClick={e => e.stopPropagation()} />
-      </motion.div>
-    )}
-  </AnimatePresence>
-);
+const MediaViewer = ({ items = [], index, onIndexChange, onClose }) => {
+  const total = items.length;
+  const isOpen = index != null && index >= 0 && total > 0;
+  // Clamp so a shorter list (host removed a photo mid-view) can't blank the stage.
+  const safeIdx = Math.min(Math.max(index ?? 0, 0), Math.max(total - 1, 0));
+  const current = isOpen ? items[safeIdx] : null;
+
+  const railRef = useRef(null);
+  const thumbRefs = useRef({});
+  const touchStartX = useRef(null);
+  const swipedRef = useRef(false);
+
+  // Hook must run unconditionally — '' when the active item isn't a video file.
+  const videoSrc = useDataUrlToBlobUrl(current?.kind === 'video' ? (current.url || '') : '');
+
+  const step = useCallback((delta) => {
+    if (!total) return;
+    onIndexChange((safeIdx + delta + total) % total);
+  }, [onIndexChange, safeIdx, total]);
+
+  // Keyboard: arrows navigate, Esc closes.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+      else if (e.key === 'Escape') { e.preventDefault(); onClose?.(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, step, onClose]);
+
+  // Lock body scroll so the page behind doesn't drift while you swipe.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [isOpen]);
+
+  // Keep the active thumbnail visible in the rail.
+  useEffect(() => {
+    if (!isOpen) return;
+    const el = thumbRefs.current[safeIdx];
+    if (el?.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [isOpen, safeIdx]);
+
+  const onTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; swipedRef.current = false; };
+  const onTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(dx) > 10) swipedRef.current = true; // a drag, not a tap
+    if (Math.abs(dx) > 50) step(dx < 0 ? 1 : -1);
+    touchStartX.current = null;
+  };
+
+  // A tap on the empty space around the media closes the viewer — but a swipe
+  // must not, or every flick through the gallery would also dismiss it.
+  const onBackdropClick = () => {
+    if (swipedRef.current) { swipedRef.current = false; return; }
+    onClose?.();
+  };
+
+  const isVideo = current?.kind === 'video';
+  const isDriveClip = isVideo && isGoogleDriveUrl(current.url);
+  const isFileClip = isVideo && !!current.url && !isDriveClip;
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 z-[300] flex flex-col"
+          style={{ background: 'rgba(8,11,18,0.97)' }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+        >
+          {/* ── Top bar: what you're looking at + position + close ── */}
+          <div className="shrink-0 flex items-center justify-between gap-3 px-4 md:px-6"
+            style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.85rem)', paddingBottom: '0.85rem' }}>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                style={{ background: 'linear-gradient(135deg,#ba0036,#7c0026)' }}>
+                {current?.Icon ? <current.Icon size={14} className="text-white" strokeWidth={2.5} /> : <Camera size={14} className="text-white" />}
+              </span>
+              <p className="text-white text-[12px] md:text-sm font-black uppercase tracking-widest truncate"
+                style={{ fontFamily: 'Oxanium, sans-serif' }}>
+                {current?.label || (isVideo ? 'Video Tour' : 'Photo')}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-white text-[11px] md:text-xs font-black px-3 py-1.5 rounded-full select-none"
+                style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.16)' }}>
+                {safeIdx + 1} / {total}
+              </span>
+              <button onClick={onClose} aria-label="Close viewer"
+                className="w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center text-white transition-colors active:scale-95"
+                style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)' }}>
+                <X size={19} />
+              </button>
+            </div>
+          </div>
+
+          {/* ── Stage: the big image / video, with the arrows on its edges ── */}
+          <div className="relative flex-1 min-h-0 flex items-center justify-center px-3 md:px-20"
+            onClick={onBackdropClick} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+            <AnimatePresence mode="wait" initial={false}>
+              {isVideo ? (
+                <motion.div
+                  key={`v-${safeIdx}`}
+                  initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="w-full max-w-5xl rounded-2xl overflow-hidden"
+                  style={{ aspectRatio: '16/9', background: '#000', boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {isFileClip ? (
+                    <video key={`file-${safeIdx}`} src={videoSrc} controls autoPlay playsInline
+                      className="w-full h-full object-contain" style={{ background: '#000' }} />
+                  ) : isDriveClip ? (
+                    <iframe key={`drive-${safeIdx}`} src={toGoogleDrivePreviewUrl(current.url)}
+                      title={current.label || 'Property video tour'} className="w-full h-full"
+                      style={{ background: '#000', border: 'none' }}
+                      allow="autoplay; encrypted-media" allowFullScreen />
+                  ) : (
+                    <iframe key={`yt-${safeIdx}`}
+                      src={`https://www.youtube.com/embed/${current.youtubeId}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1`}
+                      title={current.label || 'Property video tour'} className="w-full h-full"
+                      style={{ border: 'none' }}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen />
+                  )}
+                </motion.div>
+              ) : (
+                <motion.img
+                  key={`p-${safeIdx}`}
+                  src={current?.url}
+                  alt={current?.label || 'Property photo'}
+                  initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="max-w-full max-h-full object-contain rounded-2xl select-none"
+                  style={{ boxShadow: '0 24px 60px rgba(0,0,0,0.55)' }}
+                  draggable={false}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              )}
+            </AnimatePresence>
+
+            {/* Prev / next — pinned to the stage edges, mid-height */}
+            {total > 1 && (
+              <>
+                <button onClick={(e) => { e.stopPropagation(); step(-1); }} aria-label="Previous item"
+                  className="absolute left-2 md:left-6 top-1/2 -translate-y-1/2 w-11 h-11 md:w-14 md:h-14 rounded-full flex items-center justify-center text-white transition-all active:scale-90 hover:bg-white/20"
+                  style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)', backdropFilter: 'blur(8px)' }}>
+                  <ChevronLeft size={24} strokeWidth={2.4} />
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); step(1); }} aria-label="Next item"
+                  className="absolute right-2 md:right-6 top-1/2 -translate-y-1/2 w-11 h-11 md:w-14 md:h-14 rounded-full flex items-center justify-center text-white transition-all active:scale-90 hover:bg-white/20"
+                  style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)', backdropFilter: 'blur(8px)' }}>
+                  <ChevronRight size={24} strokeWidth={2.4} />
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* ── Thumbnail rail ── */}
+          {total > 1 && (
+            <div ref={railRef}
+              className="no-scrollbar shrink-0 flex gap-2.5 md:gap-3 overflow-x-auto px-4 md:px-6 pt-3"
+              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.9rem)' }}>
+              {items.map((item, i) => {
+                const active = i === safeIdx;
+                return (
+                  <button
+                    key={`${item.url || item.youtubeId || 'item'}-${i}`}
+                    ref={(el) => { thumbRefs.current[i] = el; }}
+                    onClick={() => onIndexChange(i)}
+                    aria-label={`${item.label || 'Item'} ${i + 1} of ${total}`}
+                    aria-current={active ? 'true' : undefined}
+                    className="relative shrink-0 rounded-xl overflow-hidden transition-all active:scale-95"
+                    style={{
+                      width: 78,
+                      height: 58,
+                      opacity: active ? 1 : 0.55,
+                      outline: active ? '2px solid #ba0036' : '1px solid rgba(255,255,255,0.22)',
+                      outlineOffset: active ? '1px' : '0px',
+                      background: '#111827',
+                    }}>
+                    {item.kind === 'video' ? (
+                      <>
+                        {item.poster
+                          ? <img src={item.poster} alt="" className="w-full h-full object-cover" loading="lazy" />
+                          : <span className="w-full h-full block" style={{ background: '#1f2937' }} />}
+                        <span className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.35)' }}>
+                          <Play size={16} className="text-white fill-white" />
+                        </span>
+                      </>
+                    ) : (
+                      <img src={item.url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GALLERY BUILDER
@@ -977,24 +1186,33 @@ const slideVariants = {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HERO CAROUSEL — Mobile (Flatio-style full-width slider)
+//
+// The visible photo is CONTROLLED by the page (`index` / `onIndexChange`) so the
+// strip and the fullscreen viewer stay on the same photo: open the viewer, page
+// through it, close it, and the hero is exactly where you left off.
 // ─────────────────────────────────────────────────────────────────────────────
-const HeroCarousel = ({ images, isUnavailable, property, priceLabel, onShowAll, onPhotoClick }) => {
-  const [idx, setIdx] = useState(0);
+const HeroCarousel = ({ images, isUnavailable, property, priceLabel, onShowAll, onPhotoClick, index = 0, onIndexChange, keyNavEnabled = true }) => {
   const [dir, setDir] = useState(1);
   const touchStartX = useRef(null);
   const total = images.length;
+  const idx = Math.min(Math.max(index, 0), Math.max(total - 1, 0));
 
-  const goPrev = useCallback(() => { setDir(-1); setIdx(i => (i - 1 + total) % total); }, [total]);
-  const goNext = useCallback(() => { setDir(1); setIdx(i => (i + 1) % total); }, [total]);
+  const goPrev = useCallback(() => { setDir(-1); onIndexChange?.((idx - 1 + total) % total); }, [idx, total, onIndexChange]);
+  const goNext = useCallback(() => { setDir(1); onIndexChange?.((idx + 1) % total); }, [idx, total, onIndexChange]);
 
+  // Arrow keys drive this strip only while it OWNS the keyboard. The fullscreen
+  // viewer takes over when it opens (keyNavEnabled=false) — otherwise one press
+  // moved both the viewer and the strip underneath it, and closing the viewer
+  // dumped you on a different photo than the one you were looking at.
   useEffect(() => {
+    if (!keyNavEnabled) return undefined;
     const handleKey = (e) => {
       if (e.key === 'ArrowLeft') goPrev();
       if (e.key === 'ArrowRight') goNext();
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [goPrev, goNext]);
+  }, [goPrev, goNext, keyNavEnabled]);
 
   const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
   const handleTouchEnd = (e) => {
@@ -1018,7 +1236,7 @@ const HeroCarousel = ({ images, isUnavailable, property, priceLabel, onShowAll, 
             variants={slideVariants} initial="enter" animate="center" exit="exit"
             className="absolute inset-0 w-full h-full object-cover cursor-pointer"
             draggable={false}
-            onClick={() => !isUnavailable && onPhotoClick && onPhotoClick(current.url)}
+            onClick={() => !isUnavailable && onPhotoClick && onPhotoClick(idx)}
           />
         </AnimatePresence>
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
@@ -1103,13 +1321,15 @@ const HeroCarousel = ({ images, isUnavailable, property, priceLabel, onShowAll, 
 // counter top-right, and the "Show all photos" pill anchored bottom-RIGHT.
 // All overlay chrome is z-[5] so it never overlaps the sticky top nav.
 // ─────────────────────────────────────────────────────────────────────────────
-const WidePhotoCarousel = ({ images, isUnavailable, property, onShowAll, onPhotoClick, showAllLabel = 'Show all photos' }) => {
-  const [idx, setIdx] = useState(0);
+const WidePhotoCarousel = ({ images, isUnavailable, property, onShowAll, onPhotoClick, index = 0, onIndexChange, showAllLabel = 'Show all photos' }) => {
   const [dir, setDir] = useState(1);
   const total = images.length;
+  // Controlled by the page — same index the fullscreen viewer uses, so the two
+  // never disagree about which photo you are on.
+  const idx = Math.min(Math.max(index, 0), Math.max(total - 1, 0));
 
-  const goPrev = useCallback((e) => { e?.stopPropagation?.(); setDir(-1); setIdx(i => (i - 1 + total) % total); }, [total]);
-  const goNext = useCallback((e) => { e?.stopPropagation?.(); setDir(1);  setIdx(i => (i + 1) % total); }, [total]);
+  const goPrev = useCallback((e) => { e?.stopPropagation?.(); setDir(-1); onIndexChange?.((idx - 1 + total) % total); }, [idx, total, onIndexChange]);
+  const goNext = useCallback((e) => { e?.stopPropagation?.(); setDir(1);  onIndexChange?.((idx + 1) % total); }, [idx, total, onIndexChange]);
 
   if (total === 0) return null;
   const current = images[idx];
@@ -1118,7 +1338,7 @@ const WidePhotoCarousel = ({ images, isUnavailable, property, onShowAll, onPhoto
     <div className="mb-6 relative">
       <div className="relative overflow-hidden group cursor-pointer"
         style={{ aspectRatio: '16/9', borderRadius: '1.5rem', background: '#0f172a' }}
-        onClick={() => !isUnavailable && (onPhotoClick ? onPhotoClick(current.url) : onShowAll())}>
+        onClick={() => !isUnavailable && (onPhotoClick ? onPhotoClick(idx) : onShowAll())}>
         <AnimatePresence initial={false} custom={dir}>
           <motion.img
             key={idx} src={current.url} alt={current.label} custom={dir}
@@ -1219,18 +1439,21 @@ const WidePhotoCarousel = ({ images, isUnavailable, property, onShowAll, onPhoto
 //     responsive frame so the layout feels like a magazine, not a flat grid.
 //   • Close button (X) is anchored TOP-RIGHT.
 // ─────────────────────────────────────────────────────────────────────────────
-const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property }) => {
+const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property, allowEscape = true }) => {
   const modalVideoUrl = useDataUrlToBlobUrl(property?.mainVideo?.preview || property?.mainVideo);
 
   // Group by room — preserving the order rooms first appear in the gallery.
+  // Each entry keeps `flatIdx`, its position in the flat gallery array, so a
+  // tap can open the fullscreen viewer AT that photo and the viewer's arrows
+  // continue through the rest of the set.
   const grouped = {};
   const orderedRooms = [];
-  images.forEach((img) => {
+  images.forEach((img, flatIdx) => {
     if (!grouped[img.room]) {
       grouped[img.room] = [];
       orderedRooms.push(img.room);
     }
-    grouped[img.room].push(img);
+    grouped[img.room].push({ ...img, flatIdx });
   });
   const hasVideo = property?.videos?.length || property?.videoId || property?.mainVideo;
   // First playable entry from the canonical videos[] list, if any.
@@ -1251,6 +1474,24 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property }) => 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+
+  // The page behind the tour stays put instead of scrolling under it.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prevOverflow; };
+  }, [isOpen]);
+
+  // Escape closes the tour — but only while the tour is the TOP layer. With a
+  // photo open over it the viewer owns Escape, otherwise one press would close
+  // both and drop the user all the way back to the page.
+  useEffect(() => {
+    if (!isOpen || !allowEscape) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, allowEscape, onClose]);
 
   const scrollToRoom = (room) => {
     setActiveRoom(room);
@@ -1429,7 +1670,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property }) => 
 
                       {/* Hero (full width) + remaining as 2-up / 3-up grid below */}
                       <div className="grid gap-3 md:gap-4">
-                        <div onClick={() => onPhotoClick(hero.url)}
+                        <div onClick={() => onPhotoClick(hero.flatIdx)}
                           className="relative overflow-hidden cursor-pointer group"
                           style={{ aspectRatio: '16/9', borderRadius: '1.25rem', border: '1px solid rgba(15,23,42,0.06)' }}>
                           <img src={hero.url} alt={hero.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" />
@@ -1448,7 +1689,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property }) => 
                                 initial={{ opacity: 0, y: 12 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.3, ease: 'easeOut' }}
-                                onClick={() => onPhotoClick(img.url)}
+                                onClick={() => onPhotoClick(img.flatIdx)}
                                 className="relative overflow-hidden cursor-pointer group"
                                 style={{ aspectRatio: '4/3', borderRadius: '1rem', border: '1px solid rgba(15,23,42,0.06)' }}>
                                 <img src={img.url} alt={img.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" loading="lazy" />
@@ -1623,6 +1864,11 @@ const PropertyDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const goBack = useGoBack('/properties/all');
+  // Routing OUT of an open overlay (the Call / Message sheets jump to
+  // /messages) replaces the overlay's throwaway history entry instead of
+  // pushing past it, so Back from the destination lands on this page in one
+  // press rather than appearing to do nothing.
+  const overlayNavigate = useOverlayNavigate();
   // Auth-aware CTAs — guests can browse everything, but Inquire / Call /
   // Message are gated so the landlord only ever receives signed-in,
   // contactable leads. Guest taps redirect to /login with the current
@@ -1806,13 +2052,73 @@ const PropertyDetails = () => {
 
   const galleryImages = useMemo(() => buildGallery(property), [property]);
 
+  // ── ONE MEDIA LIST FOR THE FULLSCREEN VIEWER ──────────────────────────────
+  // Every gallery photo, then every walkthrough video. Because photos and
+  // videos share a single list, the viewer's arrows and thumbnail rail step
+  // through BOTH — a viewer never dead-ends and the user never has to close
+  // it to get to the video. `videos[]` is canonical; the legacy single-video
+  // fields are folded in for listings saved before multi-video existed.
+  const viewerMedia = useMemo(() => {
+    const photos = galleryImages.map((img) => ({ ...img, kind: 'image' }));
+    const clips = (Array.isArray(property?.videos) ? property.videos : [])
+      .map((v) => (typeof v === 'string' ? { url: v } : v))
+      .filter((v) => v && (v.url || v.youtubeId));
+    if (!clips.length) {
+      if (property?.mainVideo) clips.push({ url: property.mainVideo?.preview || property.mainVideo });
+      else if (property?.videoId) clips.push({ youtubeId: property.videoId });
+    }
+    const poster = property?.coverPhoto || galleryImages[0]?.url || '';
+    const videos = clips.map((clip, i) => ({
+      kind: 'video',
+      url: clip.url || '',
+      youtubeId: clip.youtubeId || '',
+      label: clips.length > 1 ? `Video Tour ${i + 1}` : 'Video Tour',
+      room: 'video',
+      emoji: '🎬',
+      Icon: Video,
+      poster,
+    }));
+    return [...photos, ...videos];
+  }, [galleryImages, property]);
+
   const [isSaved, setIsSaved] = useState(false);
   const [activeModal, setActiveModal] = useState(null);
   const [showInquiry, setShowInquiry] = useState(false);
   const [showPhotoGrid, setShowPhotoGrid] = useState(false);
-  const [fullscreenPhoto, setFullscreenPhoto] = useState(null);
+  // Index into `viewerMedia` — null when the fullscreen viewer is closed.
+  const [viewerIndex, setViewerIndex] = useState(null);
+  // Photo the hero strip is showing (shared by the mobile + desktop carousels).
+  const [heroIndex, setHeroIndex] = useState(0);
   const [toastMsg, setToastMsg] = useState(null);
   const [expandAbout, setExpandAbout] = useState(false);
+
+  const openViewer = useCallback((i) => {
+    setViewerIndex(Number.isInteger(i) ? i : 0);
+  }, []);
+  // Closing hands the viewer's position back to the hero strip, so the page
+  // behind reflects the photo you actually ended on. Videos live past the end
+  // of the photo list, so those are ignored — the hero only holds photos.
+  const closeViewer = useCallback(() => {
+    if (viewerIndex != null && viewerIndex >= 0 && viewerIndex < galleryImages.length) {
+      setHeroIndex(viewerIndex);
+    }
+    setViewerIndex(null);
+  }, [viewerIndex, galleryImages.length]);
+
+  // A different listing means a different gallery — start from its cover photo.
+  useEffect(() => { setHeroIndex(0); setViewerIndex(null); }, [id]);
+
+  // ── BACK / EDGE-SWIPE HANDLING ────────────────────────────────────────────
+  // Every overlay on this page absorbs one Back press instead of letting the
+  // router unwind the page. That fixes the reported bug: opening a photo and
+  // pressing Back used to throw the user out to the listing page; now Back
+  // closes the photo and you are still on the property. Layered outermost →
+  // innermost, so a photo opened from the photo tour closes back INTO the tour,
+  // and the next Back closes the tour — one press per layer.
+  useBackGuard(!!activeModal, () => setActiveModal(null));
+  useBackGuard(showInquiry, () => setShowInquiry(false));
+  useBackGuard(showPhotoGrid, () => setShowPhotoGrid(false));
+  useBackGuard(viewerIndex !== null, closeViewer);
 
   // Sticky page navbar (Back | breadcrumb | Save/Share). Stays put while you
   // scroll — does NOT auto-hide. Only the visual surface intensifies a touch
@@ -2051,7 +2357,10 @@ const PropertyDetails = () => {
             images={galleryImages}
             isUnavailable={isUnavailable}
             property={property}
+            index={heroIndex}
+            onIndexChange={setHeroIndex}
             onShowAll={() => setShowPhotoGrid(true)}
+            onPhotoClick={openViewer}
             showAllLabel={lt('showAllPhotos') || 'Show all photos'}
           />
         </div>
@@ -2063,8 +2372,11 @@ const PropertyDetails = () => {
             isUnavailable={isUnavailable}
             property={property}
             priceLabel={priceLabel}
+            index={heroIndex}
+            onIndexChange={setHeroIndex}
             onShowAll={() => setShowPhotoGrid(true)}
-            onPhotoClick={(src) => setFullscreenPhoto(src)}
+            onPhotoClick={openViewer}
+            keyNavEnabled={viewerIndex === null}
           />
         </div>
 
@@ -2641,7 +2953,7 @@ const PropertyDetails = () => {
                         return;
                       }
                       setActiveModal(null);
-                      navigate('/messages', {
+                      overlayNavigate('/messages', {
                         state: {
                           peerUserId: peerId,
                           peerName: landlord?.name,
@@ -2673,7 +2985,7 @@ const PropertyDetails = () => {
                         return;
                       }
                       setActiveModal(null);
-                      navigate('/messages', {
+                      overlayNavigate('/messages', {
                         state: {
                           peerUserId: peerId,
                           peerName: landlord?.name,
@@ -2697,20 +3009,26 @@ const PropertyDetails = () => {
       {/* ── INQUIRY MODAL ── */}
       <InquiryModal isOpen={showInquiry} onClose={() => setShowInquiry(false)} property={property} landlord={landlord} />
 
-      {/* ── PHOTO GRID MODAL ── */}
+      {/* ── PHOTO GRID MODAL ──
+          Tapping a photo opens the fullscreen viewer ON TOP of the tour instead
+          of replacing it, so closing the viewer (X, Esc or Back) drops you back
+          into the tour exactly where you left off. */}
       <PhotoGridModal
         images={galleryImages}
         isOpen={showPhotoGrid}
         onClose={() => setShowPhotoGrid(false)}
         property={property}
-        onPhotoClick={(src) => {
-          setShowPhotoGrid(false);
-          setFullscreenPhoto(src);
-        }}
+        onPhotoClick={openViewer}
+        allowEscape={viewerIndex === null}
       />
 
-      {/* ── FULLSCREEN PHOTO ── */}
-      <FullscreenPhoto src={fullscreenPhoto} onClose={() => setFullscreenPhoto(null)} />
+      {/* ── FULLSCREEN MEDIA VIEWER (photos + videos) ── */}
+      <MediaViewer
+        items={viewerMedia}
+        index={viewerIndex}
+        onIndexChange={setViewerIndex}
+        onClose={closeViewer}
+      />
 
     </div>
   );

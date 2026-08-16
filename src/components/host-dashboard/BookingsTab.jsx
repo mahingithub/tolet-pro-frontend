@@ -26,30 +26,41 @@ export default function BookingsTab(props) {
     setActiveTab, setExpandedRentId, downloadAgreement, t, showToast, toggleAutoReminder,
     openTenantProfile, openChatPanel, openModal, isPremium, openBlankLease, setActiveModal,
     handleBookingUpdated,
-    getLeaseSummary, computeLeaseStage, formatBDT, daysUntilNextDue, computeBookingProgress,
+    getLeaseSummary, computeLeaseStage, isLeaseEndingSoon, leaseDaysLeft, openTenantChangeLease,
+    formatBDT, daysUntilNextDue, computeBookingProgress,
     isHostelBooking, formatDate, stageLabel
   } = props;
 
+          const isBn = language === 'বাংলা';
           const todayDate = today;
           const leaseSummary = getLeaseSummary(bookings, todayDate);
           const matchesSearch = (b) => b.tenant.toLowerCase().includes(searchQuery.toLowerCase()) || b.property.toLowerCase().includes(searchQuery.toLowerCase());
+          // Only 'active' and 'done' are real stages now. `leaseStageFilter` is
+          // shared with the Documents tab (which reuses the same state for its
+          // own pills), so anything we don't recognise falls back to "All"
+          // rather than silently rendering an empty list.
+          const stageFilter = (leaseStageFilter === 'active' || leaseStageFilter === 'done') ? leaseStageFilter : 'all';
           const filtered = bookings.filter(b => {
             const stage = computeLeaseStage(b, todayDate);
-            return (leaseStageFilter === 'all' || stage === leaseStageFilter) && matchesSearch(b);
+            return (stageFilter === 'all' || stage === stageFilter) && matchesSearch(b);
           });
-          // Stage → coloured pill class for the compact row badge.
-          const stageBadge = (stage) => {
-            if (stage === 'active')  return 'bg-green-50 text-green-700 border-green-100';
-            if (stage === 'notice')  return 'bg-amber-50 text-amber-700 border-amber-100';
-            if (stage === 'draft')   return 'bg-blue-50 text-blue-700 border-blue-100';
+          // Stage → coloured pill class for the compact row badge. Two stages
+          // only (active | done); a live lease inside its renewal window gets
+          // the amber treatment without being a stage of its own.
+          const stageBadge = (stage, endingSoon) => {
+            if (stage === 'active') {
+              return endingSoon
+                ? 'bg-amber-50 text-amber-700 border-amber-100'
+                : 'bg-green-50 text-green-700 border-green-100';
+            }
             return 'bg-gray-100 text-gray-600 border-gray-200';
           };
-          // "Needs Attention" group — leases in their renewal window (notice
-          // stage). Only auto-pinned when the host hasn't filtered to a
-          // specific stage; otherwise the pill filter takes precedence and
-          // we render a flat list.
-          const attentionLeases = filtered.filter(b => computeLeaseStage(b, todayDate) === 'notice');
-          const otherLeases     = filtered.filter(b => computeLeaseStage(b, todayDate) !== 'notice');
+          // "Needs Attention" group — live leases whose term runs out within the
+          // next 30 days, so the host can renew or line up the next tenant before
+          // the unit sits empty. Only auto-pinned on the "All" filter; picking a
+          // specific filter renders a flat list instead.
+          const attentionLeases = filtered.filter(b => isLeaseEndingSoon(b, todayDate));
+          const otherLeases     = filtered.filter(b => !isLeaseEndingSoon(b, todayDate));
 
           // ── RENDER ONE COMPACT ROW (collapsed-by-default accordion) ────
           // Collapsed: avatar + tenant + property + ৳rent + stage pill + next-due chip + chevron (~76px tall on mobile)
@@ -62,7 +73,10 @@ export default function BookingsTab(props) {
           // layout instead of accordion friction.
           const renderBookingRow = (booking, forceOpen = false) => {
             const stage = computeLeaseStage(booking, todayDate);
+            const endingSoon = isLeaseEndingSoon(booking, todayDate);
+            const daysLeft = leaseDaysLeft(booking, todayDate);
             const progress = computeBookingProgress(booking, todayDate);
+            const progressBar = stage !== 'active' ? 'bg-gray-400' : endingSoon ? 'bg-amber-500' : 'bg-green-500';
             const next = daysUntilNextDue(booking, todayDate);
             const monthlyTotal = Number(booking.monthlyRent || 0) + Number(booking.serviceCharge || 0);
             const tenantsLabel = (booking.tenantsCount || 1) === 1
@@ -77,10 +91,9 @@ export default function BookingsTab(props) {
             const cardTitle = hostelBooking ? [booking.property, roomLabelTxt].filter(Boolean).join(' · ') : booking.tenant;
             const cardSubLead = hostelBooking ? (booking.floorNumber ? `${language === 'বাংলা' ? 'ফ্লোর' : 'Floor'} ${booking.floorNumber}` : tenantsLabel) : booking.property;
             const cardAvatarText = hostelBooking ? ((booking.property || 'H').trim()[0] || 'H').toUpperCase() : booking.tenantInit;
-            const stageAvatar = stage === 'active' ? 'bg-gradient-to-br from-green-500 to-emerald-600'
-                              : stage === 'notice' ? 'bg-gradient-to-br from-amber-500 to-orange-500'
-                              : stage === 'draft'  ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
-                              : 'bg-gradient-to-br from-gray-400 to-gray-500';
+            const stageAvatar = stage !== 'active' ? 'bg-gradient-to-br from-gray-400 to-gray-500'
+                              : endingSoon ? 'bg-gradient-to-br from-amber-500 to-orange-500'
+                              : 'bg-gradient-to-br from-green-500 to-emerald-600';
 
             return (
               <div id={`booking-${booking.id}`} key={booking.id} className={`bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
@@ -111,9 +124,16 @@ export default function BookingsTab(props) {
                           🏢 {language === 'বাংলা' ? 'কমার্শিয়াল' : 'Commercial'}
                         </span>
                       )}
-                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 ${stageBadge(stage)}`}>
+                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 ${stageBadge(stage, endingSoon)}`}>
                         {stageLabel(stage, language)}
                       </span>
+                      {/* Renewal window chip — the lease is live but runs out
+                          soon, so the host can renew or line up the next tenant. */}
+                      {endingSoon && daysLeft != null && (
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border border-amber-200 bg-amber-100 text-amber-800 shrink-0 tabular-nums">
+                          {daysLeft === 0 ? (isBn ? 'আজ শেষ' : 'ends today') : (isBn ? `${daysLeft}দিন বাকি` : `${daysLeft}d left`)}
+                        </span>
+                      )}
                     </div>
                     <p className="text-[10px] font-bold text-gray-500 truncate">
                       {cardSubLead} <span className="mx-0.5 text-gray-300">·</span> <span className="tabular-nums">{formatBDT(monthlyTotal)}</span>
@@ -133,7 +153,7 @@ export default function BookingsTab(props) {
                   <div className={`flex-col items-end gap-0.5 shrink-0 mr-1 ${isExpanded ? 'hidden' : 'hidden sm:flex'}`}>
                     <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest tabular-nums">{progress}%</span>
                     <div className="w-12 h-1 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${stage === 'done' ? 'bg-gray-400' : stage === 'active' ? 'bg-green-500' : stage === 'notice' ? 'bg-amber-500' : 'bg-blue-500'}`} style={{ width: `${progress}%` }}/>
+                      <div className={`h-full rounded-full ${progressBar}`} style={{ width: `${progress}%` }}/>
                     </div>
                   </div>
                   {/* 3-dot actions menu — top-right of the card, next to the profile
@@ -152,6 +172,10 @@ export default function BookingsTab(props) {
                       </button>
                       {activeDropdownId === booking.id && (
                         <div className="absolute right-0 top-full mt-2 w-52 bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[50] animate-in fade-in zoom-in-95 origin-top-right border border-gray-100">
+                          {/* Tenant change — the outgoing tenant left, so hand
+                              this unit to the next one. Carries the whole unit
+                              over; the host only edits name + phone. */}
+                          <button onClick={() => openTenantChangeLease(booking)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-700 transition-colors text-left"><RefreshCw size={14}/> {isBn ? 'নতুন ভাড়াটিয়া · নতুন লিজ' : 'New Tenant · New Lease'}</button>
                           <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
                           <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
                           <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
@@ -266,7 +290,7 @@ export default function BookingsTab(props) {
                         <span className="text-[10px] font-black text-gray-700 tabular-nums">{progress}%</span>
                       </div>
                       <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full transition-all duration-1000 ease-out ${stage === 'done' ? 'bg-gray-400' : stage === 'active' ? 'bg-green-500' : stage === 'notice' ? 'bg-amber-500' : 'bg-blue-500'}`} style={{ width: `${progress}%` }}></div>
+                        <div className={`h-full rounded-full transition-all duration-1000 ease-out ${progressBar}`} style={{ width: `${progress}%` }}></div>
                       </div>
                     </div>
 
@@ -293,6 +317,40 @@ export default function BookingsTab(props) {
                           className="shrink-0 px-2.5 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 text-[10px] font-black text-gray-700 inline-flex items-center gap-1"
                         >
                           <ClipboardCheck size={12} /> {language === 'বাংলা' ? 'কপি' : 'Copy'}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* ── Hand the unit to the next tenant ──────────────────
+                        A landlord sets a unit up ONCE. When the tenancy ends —
+                        or is about to — this is the whole "old tenant out, new
+                        tenant in" step: the unit, rent, service charge, due day
+                        and reminders carry over, the host edits just the name +
+                        number, and saving closes this lease while starting a
+                        fresh one with its own rent ledger. */}
+                    {(stage === 'done' || endingSoon) && (
+                      <div className={`mt-3 rounded-xl border p-3 flex items-center gap-2.5 ${stage === 'done' ? 'bg-white border-gray-200' : 'bg-amber-50 border-amber-200'}`}>
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${stage === 'done' ? 'bg-gray-100 text-gray-500' : 'bg-white text-amber-600 border border-amber-200'}`}>
+                          <RefreshCw size={15} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-black text-gray-900 leading-tight">
+                            {stage === 'done'
+                              ? (isBn ? 'এই লিজ শেষ হয়েছে' : 'This lease has ended')
+                              : (isBn ? 'লিজ শেষ হতে চলেছে' : 'Lease is ending soon')}
+                          </p>
+                          <p className="text-[10px] font-bold text-gray-500 leading-tight mt-0.5">
+                            {isBn
+                              ? 'নতুন ভাড়াটিয়া এলে শুধু নাম ও নম্বর বদলে সেভ করুন — নতুন লিজ ও রেন্ট কালেকশন চালু হবে।'
+                              : 'When the next tenant arrives, just change the name + number — a new lease and rent ledger start.'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openTenantChangeLease(booking)}
+                          className={`shrink-0 px-2.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider active:scale-95 transition-all inline-flex items-center gap-1 ${stage === 'done' ? 'bg-gray-900 text-white hover:bg-black' : 'bg-amber-600 text-white hover:bg-amber-700'}`}
+                        >
+                          <Plus size={12} className="shrink-0" /> {isBn ? 'নতুন লিজ' : 'New Lease'}
                         </button>
                       </div>
                     )}
@@ -356,63 +414,73 @@ export default function BookingsTab(props) {
               {/* ── LEFT RAIL — full Financial Overview ALWAYS visible (mobile + desktop) ── */}
               <aside className="xl:col-span-4 w-full flex flex-col gap-3 xl:gap-5 xl:h-full xl:overflow-y-auto custom-scrollbar xl:pt-1 xl:pb-4 xl:pr-1">
 
-                {/* Financial Overview — full hero card, always visible.
-                    Padding/font sizes scale down on mobile so the entire KPI
-                    block fits comfortably on a 6.7" viewport. No accordion,
-                    no toggle — the host always sees their portfolio at a glance. */}
-                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl xl:rounded-[2rem] p-5 xl:p-7 text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] xl:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
+                {/* Financial Overview — always visible, but SLIM on mobile.
+                    The card used to run ~340px tall on a phone (big title, four
+                    stage tiles, generous padding) and pushed the actual lease
+                    list below the fold. On mobile it now reads as one compact
+                    block: revenue + deposits side by side, then a single inline
+                    row of counts. Desktop (xl) keeps the roomy hero treatment. */}
+                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl xl:rounded-[2rem] p-3.5 xl:p-7 text-white shadow-[0_6px_20px_rgba(0,0,0,0.15)] xl:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-10 translate-x-10"></div>
-                  <div className="flex items-start justify-between mb-1 relative z-10">
-                    <h3 className="text-lg xl:text-2xl font-black">{language === 'বাংলা' ? 'ফাইন্যান্সিয়াল ওভারভিউ' : 'Financial Overview'}</h3>
+                  <div className="flex items-center justify-between gap-2 mb-2.5 xl:mb-1 relative z-10">
+                    <h3 className="text-[13px] xl:text-2xl font-black truncate">{isBn ? 'ফাইন্যান্সিয়াল ওভারভিউ' : 'Financial Overview'}</h3>
                     {isPremium ? (
-                      <div className="bg-[#ba0036] text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md">
+                      <div className="bg-[#ba0036] text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md shrink-0">
                          <Crown size={10} /> PRO
                       </div>
                     ) : (
-                      <button onClick={() => setActiveModal('premium_gate')} className="bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 transition-colors">
+                      <button onClick={() => setActiveModal('premium_gate')} className="bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 transition-colors shrink-0">
                          <Lock size={10} /> Free
                       </button>
                     )}
                   </div>
-                  <p className="text-white/50 text-[9px] xl:text-[10px] font-bold uppercase tracking-widest mb-4 xl:mb-7 relative z-10">
-                    {language === 'বাংলা' ? 'লিজ পোর্টফোলিও সারাংশ' : 'Lease Portfolio Snapshot'}
+                  {/* Subtitle is desktop-only — on a phone the card title plus
+                      the KPI labels already say what this is. */}
+                  <p className="hidden xl:block text-white/50 text-[10px] font-bold uppercase tracking-widest mb-7 relative z-10">
+                    {isBn ? 'লিজ পোর্টফোলিও সারাংশ' : 'Lease Portfolio Snapshot'}
                   </p>
-                  <div className="space-y-4 xl:space-y-6 relative z-10">
-                    {/* Revenue + Security Deposits sit side by side across every
-                        breakpoint (mobile · tablet · desktop). Two equal columns
-                        so the deposit KPI reads beside the monthly revenue rather
-                        than stacking at the bottom. min-w-0 + break-words keep the
-                        currency figures from overflowing narrow phone columns. */}
-                    <div className="grid grid-cols-2 gap-2.5 xl:gap-3 items-stretch">
+                  <div className="space-y-2.5 xl:space-y-6 relative z-10">
+                    {/* Revenue + Security Deposits side by side at every width.
+                        min-w-0 + break-words keep the currency figures inside
+                        narrow phone columns. */}
+                    <div className="grid grid-cols-2 gap-2 xl:gap-3 items-stretch">
                       <div className="min-w-0">
-                        <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-1 leading-tight">{language === 'বাংলা' ? 'মোট মাসিক আয়' : 'Total Monthly Revenue'}</p>
-                        <p className="text-2xl sm:text-3xl xl:text-4xl font-black text-white tracking-tight tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalMonthlyRevenue)}</p>
-                        <p className="text-[8px] xl:text-[9px] font-bold text-white/50 mt-1.5 leading-tight">{language === 'বাংলা' ? 'অ্যাক্টিভ + নোটিশ লিজ থেকে (ভাড়া + সার্ভিস)' : 'from active + notice leases (rent + service)'}</p>
+                        <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">{isBn ? 'মাসিক আয়' : 'Monthly Revenue'}</p>
+                        <p className="text-xl sm:text-2xl xl:text-4xl font-black text-white tracking-tight tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalMonthlyRevenue)}</p>
+                        <p className="text-[8px] xl:text-[9px] font-bold text-white/50 mt-1 leading-tight">{isBn ? 'চলমান লিজ (ভাড়া + সার্ভিস)' : 'live leases (rent + service)'}</p>
                       </div>
-                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2.5 xl:p-3 min-w-0">
-                        <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-1 leading-tight">{language === 'বাংলা' ? 'মোট সিকিউরিটি ডিপোজিট' : 'Total Security Deposits'}</p>
-                        <p className="text-lg sm:text-xl xl:text-2xl font-black text-white tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalSecurityDeposits)}</p>
-                        <p className="text-[8px] xl:text-[9px] font-bold text-white/50 mt-1.5 leading-tight">{language === 'বাংলা' ? 'লিজ শেষে রিটার্নযোগ্য' : 'returnable at lease end'}</p>
+                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2 xl:p-3 min-w-0">
+                        <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">{isBn ? 'সিকিউরিটি ডিপোজিট' : 'Security Deposits'}</p>
+                        <p className="text-base sm:text-lg xl:text-2xl font-black text-white tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalSecurityDeposits)}</p>
+                        <p className="text-[8px] xl:text-[9px] font-bold text-white/50 mt-1 leading-tight">{isBn ? 'লিজ শেষে রিটার্নযোগ্য' : 'returnable at lease end'}</p>
                       </div>
                     </div>
+                    {/* Stage counts — Active / Done only (Draft + Notice are gone;
+                        a unit is either rented or it isn't). "Ending soon" rides
+                        along as an amber chip since it's a nudge, not a stage. */}
                     <div className="grid grid-cols-2 gap-2 xl:gap-3">
-                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2.5 xl:p-3">
-                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{stageLabel('active', language)}</p>
-                        <p className="text-xl xl:text-2xl font-black text-green-400 tabular-nums">{leaseSummary.activeCount}</p>
+                      <div className="bg-white/5 rounded-xl xl:rounded-2xl px-2.5 py-2 xl:p-3 flex items-center justify-between gap-2 xl:flex-col xl:items-start">
+                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest xl:mb-1">{stageLabel('active', language)}</p>
+                        <p className="text-lg xl:text-2xl font-black text-green-400 tabular-nums leading-none">{leaseSummary.activeCount}</p>
                       </div>
-                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2.5 xl:p-3">
-                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{stageLabel('notice', language)}</p>
-                        <p className="text-xl xl:text-2xl font-black text-amber-300 tabular-nums">{leaseSummary.noticeCount}</p>
-                      </div>
-                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2.5 xl:p-3">
-                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{stageLabel('draft', language)}</p>
-                        <p className="text-xl xl:text-2xl font-black text-blue-300 tabular-nums">{leaseSummary.draftCount}</p>
-                      </div>
-                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2.5 xl:p-3">
-                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{stageLabel('done', language)}</p>
-                        <p className="text-xl xl:text-2xl font-black text-white/70 tabular-nums">{leaseSummary.doneCount}</p>
+                      <div className="bg-white/5 rounded-xl xl:rounded-2xl px-2.5 py-2 xl:p-3 flex items-center justify-between gap-2 xl:flex-col xl:items-start">
+                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest xl:mb-1">{stageLabel('done', language)}</p>
+                        <p className="text-lg xl:text-2xl font-black text-white/70 tabular-nums leading-none">{leaseSummary.doneCount}</p>
                       </div>
                     </div>
+                    {leaseSummary.endingSoonCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setLeaseStageFilter('active')}
+                        className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl bg-amber-400/15 border border-amber-300/25 text-left transition-colors hover:bg-amber-400/25"
+                      >
+                        <AlertCircle size={13} className="text-amber-300 shrink-0" />
+                        <span className="text-[10px] font-black text-amber-200 uppercase tracking-wider flex-1 truncate">
+                          {isBn ? '৩০ দিনে শেষ হচ্ছে' : 'Ending within 30 days'}
+                        </span>
+                        <span className="text-[11px] font-black text-amber-100 tabular-nums shrink-0">{leaseSummary.endingSoonCount}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -427,10 +495,8 @@ export default function BookingsTab(props) {
                   </h4>
                   <div className="space-y-2 xl:space-y-3">
                     {[
-                      { stage: 'draft',  count: leaseSummary.draftCount,  dot: 'bg-blue-500',  bg: 'bg-blue-50',  text: 'text-blue-700',  hint: language === 'বাংলা' ? 'মুভ-ইনের অপেক্ষায়' : 'awaiting move-in' },
-                      { stage: 'active', count: leaseSummary.activeCount, dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700', hint: language === 'বাংলা' ? 'বর্তমানে রেসিডেন্স' : 'currently in residence' },
-                      { stage: 'notice', count: leaseSummary.noticeCount, dot: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', hint: language === 'বাংলা' ? 'রিনিউয়াল উইন্ডো · শেষ ৩০ দিন' : 'renewal window · last 30 days' },
-                      { stage: 'done',   count: leaseSummary.doneCount,   dot: 'bg-gray-400',  bg: 'bg-gray-100', text: 'text-gray-600',  hint: language === 'বাংলা' ? 'মেয়াদ শেষ' : 'lease ended' },
+                      { stage: 'active', count: leaseSummary.activeCount, dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700', hint: isBn ? 'ভাড়াটিয়া আছেন' : 'unit is rented' },
+                      { stage: 'done',   count: leaseSummary.doneCount,   dot: 'bg-gray-400',  bg: 'bg-gray-100', text: 'text-gray-600',  hint: isBn ? 'শেষ · নতুন লিজ দেওয়া যাবে' : 'ended · ready to re-let' },
                     ].map(row => (
                       <button key={row.stage} onClick={() => setLeaseStageFilter(row.stage)} className="w-full flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-gray-50 transition-colors text-left">
                         <span className={`w-2 h-2 rounded-full ${row.dot}`}></span>
@@ -439,6 +505,14 @@ export default function BookingsTab(props) {
                         <span className={`${row.bg} ${row.text} px-2.5 py-1 rounded-lg text-xs font-black tabular-nums`}>{row.count}</span>
                       </button>
                     ))}
+                    {leaseSummary.endingSoonCount > 0 && (
+                      <div className="flex items-center gap-3 p-2 -mx-2 rounded-xl bg-amber-50/60">
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                        <span className="text-xs font-black text-gray-900 w-20">{isBn ? 'শেষ হচ্ছে' : 'Ending'}</span>
+                        <span className="text-[10px] font-bold text-gray-500 flex-1 truncate">{isBn ? 'রিনিউয়াল উইন্ডো · শেষ ৩০ দিন' : 'renewal window · last 30 days'}</span>
+                        <span className="bg-amber-100 text-amber-700 px-2.5 py-1 rounded-lg text-xs font-black tabular-nums">{leaseSummary.endingSoonCount}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -491,11 +565,14 @@ export default function BookingsTab(props) {
                         Lease (+) button sits right next to the "Done" pill
                         instead of being pushed to the far edge. */}
                     <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar xl:flex-none order-1 sm:order-none min-w-0">
-                      {['all', 'draft', 'active', 'notice', 'done'].map(f => (
+                      {/* Three filters, nothing more: All / Active / Done.
+                          Draft and Notice were removed — they described dates,
+                          not decisions, and hosts read them as broken states. */}
+                      {['all', 'active', 'done'].map(f => (
                         <button
                           key={f}
                           onClick={() => setLeaseStageFilter(f)}
-                          className={`shrink-0 px-2.5 sm:px-3 py-2 rounded-xl text-[10px] font-black capitalize transition-all whitespace-nowrap ${leaseStageFilter === f ? 'bg-gray-900 text-white shadow-[0_2px_8px_rgba(0,0,0,0.15)]' : 'bg-white text-gray-500 hover:text-gray-900 shadow-[0_2px_6px_rgba(0,0,0,0.03)]'}`}
+                          className={`shrink-0 px-2.5 sm:px-3 py-2 rounded-xl text-[10px] font-black capitalize transition-all whitespace-nowrap ${stageFilter === f ? 'bg-gray-900 text-white shadow-[0_2px_8px_rgba(0,0,0,0.15)]' : 'bg-white text-gray-500 hover:text-gray-900 shadow-[0_2px_6px_rgba(0,0,0,0.03)]'}`}
                         >
                           {stageLabel(f, language)}
                         </button>
@@ -522,21 +599,50 @@ export default function BookingsTab(props) {
                   const AUTO_EXPAND_THRESHOLD = 5;
                   const forceOpen = filtered.length > 0 && filtered.length <= AUTO_EXPAND_THRESHOLD;
                   if (filtered.length === 0) {
+                    // Empty state carries the primary action. A host with no
+                    // bookings yet used to land on a dead card that only told
+                    // them to "convert an inquiry" — with no way to start a
+                    // lease from here. The + New Lease button is now right in
+                    // the box, so the next step is obvious and one tap away.
+                    const filteredOut = bookings.length > 0;
                     return (
-                      <div className="text-center py-20 bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] border-none">
+                      <div className="text-center py-12 sm:py-16 px-5 bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] border-none">
                         <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
                            <Calendar className="text-gray-300" size={26} />
                         </div>
-                        <h3 className="text-sm font-black text-gray-900">{t?.noBookingsFound || (language === 'বাংলা' ? 'কোনো লিজ পাওয়া যায়নি।' : 'No leases found.')}</h3>
-                        <p className="text-[10px] font-bold text-gray-500 mt-1.5 px-6">
-                          {language === 'বাংলা' ? 'ইনকোয়ারি থেকে ভাড়াটিয়াকে অ্যাড করুন।' : 'Convert an inquiry into a booking to start.'}
+                        <h3 className="text-sm font-black text-gray-900">
+                          {filteredOut
+                            ? (isBn ? 'এই ফিল্টারে কোনো লিজ নেই।' : 'No leases match this filter.')
+                            : (t?.noBookingsFound || (isBn ? 'এখনো কোনো লিজ নেই।' : 'No leases yet.'))}
+                        </h3>
+                        <p className="text-[11px] font-bold text-gray-500 mt-1.5 max-w-[320px] mx-auto leading-relaxed">
+                          {filteredOut
+                            ? (isBn ? '"সকল" ফিল্টার দেখুন, অথবা নতুন ভাড়াটিয়ার জন্য নতুন লিজ তৈরি করুন।' : 'Try the "All" filter, or add a new lease for an incoming tenant.')
+                            : (isBn ? 'ভাড়াটিয়া যোগ করতে নতুন লিজ তৈরি করুন — ফ্ল্যাট, সিঙ্গেল রুম, হোস্টেল বা কমার্শিয়াল। সেভ করলেই রেন্ট কালেকশন চালু হবে।' : 'Add a tenant by creating a lease — flat, single room, hostel or commercial. Saving it starts Rent Collection.')}
                         </p>
+                        <div className="mt-5 flex flex-col sm:flex-row items-center justify-center gap-2">
+                          <button
+                            onClick={() => isPremium ? openBlankLease() : setActiveModal('premium_gate')}
+                            className="w-full sm:w-auto bg-[#ba0036] hover:bg-[#90002a] text-white px-5 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-[0_6px_18px_rgba(186,0,54,0.28)] transition-all inline-flex items-center justify-center gap-2 active:scale-95"
+                          >
+                            {isPremium ? <Plus size={15}/> : <Crown size={15}/>}
+                            {isBn ? 'নতুন লিজ' : 'New Lease'}
+                          </button>
+                          {filteredOut && stageFilter !== 'all' && (
+                            <button
+                              onClick={() => setLeaseStageFilter('all')}
+                              className="w-full sm:w-auto bg-white border-2 border-gray-200 text-gray-600 px-4 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-gray-50 transition-all inline-flex items-center justify-center gap-1.5 active:scale-95"
+                            >
+                              {isBn ? 'সকল লিজ দেখুন' : 'Show all leases'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   }
                   return (
                     <div className="space-y-2">
-                      {leaseStageFilter === 'all' && attentionLeases.length > 0 ? (
+                      {stageFilter === 'all' && attentionLeases.length > 0 ? (
                         <>
                           <div className="flex items-center gap-2 mt-1 px-1 pt-1">
                             <AlertCircle size={12} className="text-amber-600 shrink-0"/>

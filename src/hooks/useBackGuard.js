@@ -98,6 +98,14 @@ export default function useBackGuard(isOpen, onClose) {
     window.history.pushState({ ...base, [GUARD_KEY]: token }, '');
 
     const onPop = () => {
+      // EVERY mounted guard hears every pop, so each one has to work out
+      // whether the entry that just went away was its own. `history.state` is
+      // now the entry we LANDED on: if that is still our token, our entry is
+      // alive further up the stack and a guard above us answered this press —
+      // stay open. Without this check a photo opened over a photo tour would
+      // take the tour down with it on one Back press, and the tour's own entry
+      // would be stranded so the NEXT press did nothing.
+      if (window.history.state?.[GUARD_KEY] === token) return;
       // Our entry is gone from the stack, so nothing is left to clean up.
       tokenRef.current = null;
       onCloseRef.current?.();

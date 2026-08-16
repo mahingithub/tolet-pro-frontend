@@ -10,8 +10,9 @@ export default function DocumentsTab({
 const todayDate = today;
 
           // --- Real counts derived from the rest of the dashboard's state -------------------
-          // Lease agreements: one per booking that has progressed past 'draft'.
-          const leaseAgreements = bookings.filter(b => computeLeaseStage(b, todayDate) !== 'draft');
+          // Lease agreements: one per lease on file (cancelled ones excluded).
+          // There's no 'draft' stage any more — a lease exists or it doesn't.
+          const leaseAgreements = bookings.filter(b => b.status !== 'cancelled');
           // Tenant IDs: assume one NID file per booking with tenantInit (proxy for "tenant on file").
           const tenantIdCount = bookings.filter(b => b.tenantInit).length;
           // Payment receipts: count of paid ledger entries across all bookings (matches the cross-system bridge).
@@ -21,7 +22,7 @@ const todayDate = today;
           // Legal docs (NOC, ownership): 1 per property by convention.
           const legalCount = properties.length;
           // Inspection reports: 1 move-in + 1 move-out per booking that has ever been active.
-          const inspectionCount = bookings.filter(b => ['active','notice','done'].includes(computeLeaseStage(b, todayDate))).length * 2;
+          const inspectionCount = bookings.filter(b => ['active','done'].includes(computeLeaseStage(b, todayDate))).length * 2;
 
           const docCount = (fid) => documents.filter(d => d.folder === fid).length;
           const folders = [

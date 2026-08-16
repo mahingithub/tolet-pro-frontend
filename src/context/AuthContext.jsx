@@ -11,27 +11,27 @@ import {
   setActiveRole as svcSetActiveRole,
   submitVerification as svcSubmitVerification,
   isAdminRole,
-  isSessionExpired,
-  ensureSessionExpiry,
-  clearAllAppData,
+  purgeLegacySessionExpiry,
 } from '../services/authService.js';
 import { subscribe } from '../services/_storage.js';
-import { isInstalledApp } from '../utils/platform.js';
+import { isSessionTerminated } from '../utils/fetchInterceptor.js';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  // Never boot into an expired website session (prevents a one-frame flash of
-  // the previous user's data before the effect below wipes it).
-  const [user, setUser] = useState(() => (isSessionExpired() ? null : getCurrentUser()));
+  // Boot straight from the cached session. There is no client-side expiry check
+  // any more: the server owns session lifetime (see purgeLegacySessionExpiry).
+  const [user, setUser] = useState(() => getCurrentUser());
 
   // True from the moment a logout starts until the page navigates away. Lets
   // route guards suppress their /login redirect during the teardown window.
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // On boot, if a token exists, validate it server-side via /me. If the token
-  // is invalid or the user was deleted, this returns null and we clear the
-  // local session so stale data can't impersonate a real account.
+  // On boot, if a token exists, validate it server-side via /me. The session is
+  // only torn down when the SERVER says it is finished (a revoked/expired
+  // refresh token, a deleted account, a security revocation) so stale data can't
+  // impersonate a real account. Everything else — offline, a 5xx, a rate-limited
+  // refresh — keeps the cached session and retries.
   //
   // RACE GUARD: we capture the token at the start of the effect. If a user
   // manually logs in while /me is still pending, the localStorage token gets
@@ -39,61 +39,64 @@ export const AuthProvider = ({ children }) => {
   // call — that was killing fresh logins immediately and forcing the user back
   // to the login screen.
   useEffect(() => {
-    // Website-only 7-day session cap: if the stored session has aged out, wipe
-    // all local data and stay logged out — never hit /me with a dead session.
-    if (isSessionExpired()) {
-      clearAllAppData();
-      setUser(null);
-      return;
-    }
-    // Backfill a 7-day window for sessions created before this shipped, so
-    // existing logins aren't immortal.
-    ensureSessionExpiry();
+    // One-off cleanup of the old client-side session cap. Its stale stamps were
+    // wiping storage and hard-navigating people to /login while their server
+    // session was still perfectly alive. See purgeLegacySessionExpiry().
+    purgeLegacySessionExpiry();
 
     const initialToken = getCurrentToken();
-    if (!initialToken) return;
-    let cancelled = false;
-    fetchMe()
-      .then((u) => { if (!cancelled) setUser(u); })
-      .catch((err) => {
-        if (cancelled) return;
-        // If the token in localStorage changed (or was cleared) while /me
-        // was pending, treat the failure as belonging to the previous
-        // session. The new session is the source of truth — leave it alone.
-        if (getCurrentToken() !== initialToken) return;
-        // ONLY drop the session on a genuine auth failure (HTTP 401 — an
-        // expired, invalid, or server-revoked token, or a deleted account).
-        // Transient problems — the device being offline, a backend restart, a
-        // 5xx — must NOT log the user out: those have no `status` (network
-        // reject) or a non-401 status. We keep the cached session (set in the
-        // useState initializer above) so a blip can't bounce a freshly
-        // signed-up user back to the login screen.
-        if (err?.status === 401) {
-          svcLogout().finally(() => setUser(null));
-        }
-      });
-    return () => { cancelled = true; };
-  }, []);
+    if (!initialToken) return undefined;
 
-  // While a website tab stays open, enforce the 7-day cap in the background so
-  // a long-lived tab (or one reopened after the cap) logs itself out and clears
-  // its data. Installed apps (native / standalone PWA) opt out entirely.
-  useEffect(() => {
-    if (isInstalledApp()) return undefined;
-    const enforce = () => {
-      if (!isSessionExpired()) return;
-      clearAllAppData();
-      setUser(null);
-      // Hard reload to a clean, logged-out screen (drops stale in-memory UI).
-      try { window.location.assign('/login'); } catch { /* ignore */ }
+    let cancelled = false;
+    let retryTimer = null;
+    let attempt = 0;
+
+    const validate = () => {
+      fetchMe()
+        .then((u) => { if (!cancelled) setUser(u); })
+        .catch((err) => {
+          if (cancelled) return;
+          // If the token in localStorage changed (or was cleared) while /me
+          // was pending, treat the failure as belonging to the previous
+          // session. The new session is the source of truth — leave it alone.
+          if (getCurrentToken() !== initialToken) return;
+
+          // Anything that isn't a 401 — offline, a backend restart, a 5xx — has
+          // nothing to say about whether the session is valid. Keep the cached
+          // session from the useState initializer above.
+          if (err?.status !== 401) return;
+
+          // A 401 that reaches here has ALREADY been through the fetch
+          // interceptor, which tried to refresh the access token and replay the
+          // call. So the question is not "did this request fail" but "did the
+          // server tell us the session is over".
+          //
+          // Only a definitive answer ends the session. A refresh that failed for
+          // a transient reason (offline, a 429 from the refresh limiter, a
+          // backend restart, the refresh cookie momentarily not being sent) must
+          // NOT log the user out — treating those as fatal is exactly why people
+          // were being thrown back to the login screen mid-session.
+          if (isSessionTerminated()) {
+            svcLogout();
+            setUser(null);
+            return;
+          }
+
+          // Transient. Keep the session and retry with backoff, so a blip
+          // resolves itself instead of leaving the app in a half-authed state.
+          attempt += 1;
+          if (attempt <= 5) {
+            const delay = Math.min(30_000, 2_000 * (2 ** (attempt - 1)));
+            retryTimer = window.setTimeout(validate, delay);
+          }
+        });
     };
-    const id = window.setInterval(enforce, 60 * 1000);
-    window.addEventListener('focus', enforce);
-    document.addEventListener('visibilitychange', enforce);
+
+    validate();
+
     return () => {
-      window.clearInterval(id);
-      window.removeEventListener('focus', enforce);
-      document.removeEventListener('visibilitychange', enforce);
+      cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
     };
   }, []);
 

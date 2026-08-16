@@ -21,7 +21,6 @@
 
 import { readJson, writeJson, broadcast } from './_storage.js';
 import { unsubscribeFromPushNotifications } from '../utils/pushSubscription.js';
-import { isInstalledApp } from '../utils/platform.js';
 import { directUpload, privateUpload } from './cloudinaryUpload.js';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL
@@ -30,18 +29,14 @@ const API_URL = import.meta.env.VITE_API_BASE_URL
 
 const KEY_USER  = 'auth:user';
 const KEY_TOKEN = 'auth:token';
-const KEY_EXPIRES = 'auth:expiresAt';
 
-// Website sessions persist for a full year so a freshly signed-up user isn't
-// kicked back to the login screen while they're still using the app. Installed
-// apps (native / standalone PWA) ignore this entirely and never time out: see
-// isSessionExpired(). Keep this in sync with the backend token lifetime
-// (jwtExpiresIn in config/env.js).
-const SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000;
+// Legacy key left over from the old client-side session cap. Nothing writes it
+// any more — purgeLegacySessionExpiry() deletes it. See the note there.
+const KEY_LEGACY_EXPIRES = 'auth:expiresAt';
 
 // localStorage keys that are DEVICE-level, not account-level. clearAllAppData()
-// preserves ONLY these so a logout / auto-expiry doesn't reset the user's
-// language choice or re-trigger the PWA install banner.
+// preserves ONLY these so a logout doesn't reset the user's language choice or
+// re-trigger the PWA install banner.
 const DEVICE_KEEP_KEYS = new Set([
   'tolet_lang',           // LanguageContext — chosen language
   'toletpro_app_banner_dismissed', // AppDownloadBanner — "don't show again"
@@ -86,49 +81,36 @@ async function api(path, { method = 'POST', body, auth: useAuth = false, token }
 function persistSession({ token, user }) {
   window.localStorage.setItem(KEY_TOKEN, token);
   writeJson(KEY_USER, user);
-  stampSessionExpiry();
   broadcast(KEY_USER);
 }
 
-// ─── Session expiry (website only) ──────────────────────────────────────────
-// Start the 7-day clock. Called every time a session is persisted (login /
-// signup) so expiry is measured from login, not from first page load.
-function stampSessionExpiry() {
-  try {
-    window.localStorage.setItem(KEY_EXPIRES, String(Date.now() + SESSION_TTL_MS));
-  } catch { /* ignore */ }
-}
-
-// Backfill an expiry for sessions that predate this feature so already
-// logged-in users still get a 7-day window (from now) rather than an immortal
-// session. No-op when one already exists or there's no session.
-export function ensureSessionExpiry() {
-  try {
-    if (getCurrentToken() && !window.localStorage.getItem(KEY_EXPIRES)) stampSessionExpiry();
-  } catch { /* ignore */ }
-}
-
-// True when a WEBSITE session has passed its 7-day cap. Always false inside an
-// installed app (native build / standalone PWA) — those keep the session until
-// an explicit logout or uninstall, so the user's data is there on next launch.
-export function isSessionExpired() {
-  try {
-    if (isInstalledApp()) return false;
-    const raw = window.localStorage.getItem(KEY_EXPIRES);
-    if (!raw) return false; // legacy session — ensureSessionExpiry() backfills it
-    const expiresAt = Number(raw);
-    if (!Number.isFinite(expiresAt)) return false;
-    return Date.now() > expiresAt;
-  } catch {
-    return false;
-  }
+// ─── Legacy client-side session cap (REMOVED) ───────────────────────────────
+// The website used to stamp `auth:expiresAt` at login and wipe ALL local data
+// the moment it passed, independently of whether the server still considered the
+// session valid. That is a second, competing source of truth for "am I logged
+// in", and it is why people got thrown out mid-use:
+//
+//   - The cap started at 7 days and was later widened to 365. But the stamp was
+//     only ever written at LOGIN, and the old ensureSessionExpiry() explicitly
+//     refused to overwrite an existing value. So every user who had logged in
+//     under the 7-day rule kept a 7-day deadline sitting in localStorage, and
+//     when it landed the background enforcer wiped their data and hard-navigated
+//     them to /login — no matter how recently they had used the app.
+//   - A successful /auth/refresh never touched the stamp, so simply staying
+//     active could not push it out.
+//
+// A session's lifetime now lives in exactly one place: the server. The refresh
+// token (30 days, rotated and slid forward on every use) decides how long a
+// session lasts, and locally only an explicit logout ends it. All this function
+// does is delete the stale key so the old deadline can never fire again.
+export function purgeLegacySessionExpiry() {
+  try { window.localStorage.removeItem(KEY_LEGACY_EXPIRES); } catch { /* ignore */ }
 }
 
 // 🧹 Wipe EVERY account-scoped key from localStorage, preserving only the
-// device-level prefs in DEVICE_KEEP_KEYS. Used on logout and the 7-day auto-
-// expiry ("all data deleted"), and when a DIFFERENT account signs in so
-// account B can never inherit account A's cached dashboard / chat / profile
-// data on the same browser.
+// device-level prefs in DEVICE_KEEP_KEYS. Used on logout ("all data deleted"),
+// and when a DIFFERENT account signs in so account B can never inherit account
+// A's cached dashboard / chat / profile data on the same browser.
 export function clearAllAppData() {
   try {
     const toRemove = [];

@@ -441,39 +441,53 @@ export default function RentTab(props) {
               {/* ── LEFT RAIL — full Shared Ledger ALWAYS visible (mobile + desktop) ── */}
               <aside className="xl:col-span-4 w-full flex flex-col gap-3 xl:gap-5 xl:h-full xl:overflow-y-auto custom-scrollbar xl:pt-1 xl:pb-4 xl:pr-1">
 
-                {/* Shared Ledger hero — full KPI card, always visible. */}
-                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl xl:rounded-[2rem] p-5 xl:p-7 text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] xl:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
+                {/* Shared Ledger hero — always visible, SLIM on mobile.
+                    On a phone this card used to push the tenant rows well below
+                    the fold. The month label now rides on the title line, the
+                    "Expected" figure shares its row with the collection rate,
+                    and padding tightens up. Desktop (xl) keeps the tall hero. */}
+                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl xl:rounded-[2rem] p-3.5 xl:p-7 text-white shadow-[0_6px_20px_rgba(0,0,0,0.15)] xl:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-10 translate-x-10"></div>
-                  <div className="flex items-start justify-between mb-1 relative z-10">
-                    <h3 className="text-lg xl:text-2xl font-black">{language === 'বাংলা' ? 'শেয়ার্ড লেজার' : 'Shared Ledger'}</h3>
+                  <div className="flex items-center justify-between gap-2 mb-2.5 xl:mb-1 relative z-10">
+                    <h3 className="text-[13px] xl:text-2xl font-black truncate">{language === 'বাংলা' ? 'শেয়ার্ড লেজার' : 'Shared Ledger'}</h3>
                     {isPremium ? (
-                      <div className="bg-[#ba0036] text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md">
+                      <div className="bg-[#ba0036] text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md shrink-0">
                          <Crown size={10} /> PRO
                       </div>
                     ) : (
-                      <button onClick={() => setActiveModal('premium_gate')} className="bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 transition-colors">
+                      <button onClick={() => setActiveModal('premium_gate')} className="bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 transition-colors shrink-0">
                          <Lock size={10} /> Free
                       </button>
                     )}
                   </div>
-                  <p className="text-white/50 text-[9px] xl:text-[10px] font-bold uppercase tracking-widest mb-4 xl:mb-7 relative z-10">
+                  <p className="hidden xl:block text-white/50 text-[10px] font-bold uppercase tracking-widest mb-7 relative z-10">
                     {monthFullLabel(sm.key, language)} · {language === 'বাংলা' ? 'এই মাসের আদায়' : "This Month's Collection"}
                   </p>
-                  <div className="space-y-4 xl:space-y-6 relative z-10">
-                    <div>
-                      <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'প্রত্যাশিত আয়' : 'Expected'}</p>
-                      <p className="text-3xl xl:text-4xl font-black text-white tracking-tight tabular-nums">{formatBDT(sm.expectedTotal)}</p>
+                  <div className="space-y-2.5 xl:space-y-6 relative z-10">
+                    {/* Expected — mobile puts the collection rate beside it so the
+                        two headline numbers occupy one row instead of three. */}
+                    <div className="flex items-end justify-between gap-3 xl:block">
+                      <div className="min-w-0">
+                        <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">
+                          <span className="xl:hidden">{monthFullLabel(sm.key, language)} · </span>{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}
+                        </p>
+                        <p className="text-2xl xl:text-4xl font-black text-white tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.expectedTotal)}</p>
+                      </div>
+                      <div className="shrink-0 text-right xl:hidden">
+                        <p className="text-white/50 text-[8px] font-black uppercase tracking-widest leading-tight">{language === 'বাংলা' ? 'রেট' : 'Rate'}</p>
+                        <p className="text-lg font-black text-white tabular-nums leading-none">{collectedPct}%</p>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2 xl:gap-4">
-                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2.5 xl:p-3">
-                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'আদায় হয়েছে' : 'Collected'}</p>
-                        <p className="text-lg xl:text-xl font-black text-green-400 tracking-tight tabular-nums">{formatBDT(sm.collectedTotal)}</p>
-                        <p className="text-[9px] text-white/60 font-bold mt-1">{sm.paidCount}/{sm.totalDueCount} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}</p>
+                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2 xl:p-3 min-w-0">
+                        <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">{language === 'বাংলা' ? 'আদায় হয়েছে' : 'Collected'}</p>
+                        <p className="text-base xl:text-xl font-black text-green-400 tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.collectedTotal)}</p>
+                        <p className="text-[8px] xl:text-[9px] text-white/60 font-bold mt-1 leading-tight">{sm.paidCount}/{sm.totalDueCount} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}</p>
                       </div>
-                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2.5 xl:p-3">
-                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'বাকি' : 'Outstanding'}</p>
-                        <p className="text-lg xl:text-xl font-black text-orange-400 tracking-tight tabular-nums">{formatBDT(sm.outstandingTotal)}</p>
-                        <p className="text-[9px] text-white/60 font-bold mt-1">
+                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2 xl:p-3 min-w-0">
+                        <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">{language === 'বাংলা' ? 'বাকি' : 'Outstanding'}</p>
+                        <p className="text-base xl:text-xl font-black text-orange-400 tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.outstandingTotal)}</p>
+                        <p className="text-[8px] xl:text-[9px] text-white/60 font-bold mt-1 leading-tight">
                           <span className={sm.overdueCount > 0 ? 'text-red-300' : 'text-white/60'}>
                             {sm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'overdue'}
                           </span>
@@ -481,7 +495,9 @@ export default function RentTab(props) {
                       </div>
                     </div>
                     <div>
-                      <div className="flex items-center justify-between mb-1.5">
+                      {/* Rate label is desktop-only — mobile already shows the %
+                          next to Expected, so only the bar remains here. */}
+                      <div className="hidden xl:flex items-center justify-between mb-1.5">
                         <span className="text-white/50 text-[9px] font-black uppercase tracking-widest">{language === 'বাংলা' ? 'কালেকশন রেট' : 'Collection Rate'}</span>
                         <span className="text-xs font-black text-white tabular-nums">{collectedPct}%</span>
                       </div>
@@ -611,12 +627,43 @@ export default function RentTab(props) {
                   const AUTO_EXPAND_THRESHOLD = 5;
                   const forceOpen = filteredBookings.length > 0 && filteredBookings.length <= AUTO_EXPAND_THRESHOLD;
                   if (filteredBookings.length === 0) {
+                    // Nothing to collect. Distinguish "no tenants at all" (send
+                    // the host to create a lease — the ledger is built FROM a
+                    // lease) from "this filter is empty" (offer All).
+                    const noLeasesAtAll = rentRows.length === 0;
+                    const isBn = language === 'বাংলা';
                     return (
-                      <div className="text-center py-20 bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] border-none">
+                      <div className="text-center py-12 sm:py-16 px-5 bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] border-none">
                         <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
                            <Receipt className="text-gray-300" size={26} />
                         </div>
-                        <h3 className="text-sm font-black text-gray-900">{language === 'বাংলা' ? 'এই ফিল্টারে কোনো ভাড়াটিয়া পাওয়া যায়নি।' : 'No tenants match this filter.'}</h3>
+                        <h3 className="text-sm font-black text-gray-900">
+                          {noLeasesAtAll
+                            ? (isBn ? 'এখনো কোনো ভাড়াটিয়া নেই।' : 'No tenants yet.')
+                            : (isBn ? 'এই ফিল্টারে কোনো ভাড়াটিয়া পাওয়া যায়নি।' : 'No tenants match this filter.')}
+                        </h3>
+                        <p className="text-[11px] font-bold text-gray-500 mt-1.5 max-w-[320px] mx-auto leading-relaxed">
+                          {noLeasesAtAll
+                            ? (isBn ? 'লিজ তৈরি করলেই এখানে ১২ মাসের রেন্ট লেজার চালু হবে।' : 'Create a lease and a 12-month rent ledger opens up here.')
+                            : (isBn ? '"সকল" ফিল্টার দেখুন।' : 'Try the "All" filter.')}
+                        </p>
+                        <div className="mt-5 flex flex-col sm:flex-row items-center justify-center gap-2">
+                          {noLeasesAtAll ? (
+                            <button
+                              onClick={() => setActiveTab('bookings')}
+                              className="w-full sm:w-auto bg-[#ba0036] hover:bg-[#90002a] text-white px-5 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-[0_6px_18px_rgba(186,0,54,0.28)] transition-all inline-flex items-center justify-center gap-2 active:scale-95"
+                            >
+                              <Plus size={15} /> {isBn ? 'নতুন লিজ' : 'New Lease'}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setRentPriorityFilter('all')}
+                              className="w-full sm:w-auto bg-white border-2 border-gray-200 text-gray-600 px-4 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-gray-50 transition-all inline-flex items-center justify-center gap-1.5 active:scale-95"
+                            >
+                              {isBn ? 'সকল দেখুন' : 'Show all'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   }
