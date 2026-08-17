@@ -14,6 +14,15 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
+    <!-- Google Maps: the property details page injects the Maps JS SDK at
+         runtime, which means a cold DNS + TLS handshake right when the user is
+         waiting on the Location card. Warming these connections up front takes
+         a few hundred ms off the map's first paint. -->
+    <link rel="preconnect" href="https://maps.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://maps.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://maps.googleapis.com">
+    <link rel="dns-prefetch" href="https://maps.gstatic.com">
+
 
     <!-- SEO (Phase 7) -->
     <meta name="description" content="TO-LET PRO — find and list rental properties across Bangladesh. Browse verified flats, apartments, and rooms, chat with landlords, and book viewings. বাংলাদেশে ভাড়া বাসা খুঁজুন ও তালিকাভুক্ত করুন।" />

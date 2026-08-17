@@ -29,10 +29,14 @@ const mKey = (y, m) => `${y}-${pad(m)}`;
 const MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTHS_BN = ['জানু', 'ফেব্রু', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্ট', 'অক্টো', 'নভে', 'ডিসে'];
 
+// A tenancy with no end date is ONGOING — the normal case here, where people
+// stay for years without signing a renewal. The month window then rolls to the
+// end of the current year so each seat's rent boxes keep appearing instead of
+// the ledger going blank.
 function enumerateLeaseMonths(leaseStart, leaseEnd) {
-  if (!leaseStart || !leaseEnd) return [];
+  if (!leaseStart) return [];
   const start = new Date(leaseStart);
-  const end = new Date(leaseEnd);
+  const end = leaseEnd ? new Date(leaseEnd) : new Date(new Date().getFullYear(), 11, 31);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
   const out = [];
   const cur = new Date(start.getFullYear(), start.getMonth(), 1);

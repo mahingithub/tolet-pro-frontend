@@ -10,13 +10,17 @@
 //   open           boolean
 //   media          { type: 'image' | 'video' | 'document', url, name? }
 //   onClose()
+//   onDownload()   optional — when supplied, the top-bar download button calls
+//                  it instead of using a plain <a download>. Needed for
+//                  cross-origin (Cloudinary) files, where the download
+//                  attribute is ignored and the browser just navigates.
 
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Download, FileText } from 'lucide-react';
 
-export default function MediaLightbox({ open, media, onClose }) {
+export default function MediaLightbox({ open, media, onClose, onDownload }) {
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -58,17 +62,28 @@ export default function MediaLightbox({ open, media, onClose }) {
               <span className="truncate">{name}</span>
             </p>
             <div className="flex items-center gap-2 shrink-0">
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                download
-                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-                aria-label="Download"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Download size={18} />
-              </a>
+              {onDownload ? (
+                <button
+                  type="button"
+                  className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                  aria-label="Download"
+                  onClick={(e) => { e.stopPropagation(); onDownload(media); }}
+                >
+                  <Download size={18} />
+                </button>
+              ) : (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                  aria-label="Download"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Download size={18} />
+                </a>
+              )}
               <button
                 onClick={onClose}
                 className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"

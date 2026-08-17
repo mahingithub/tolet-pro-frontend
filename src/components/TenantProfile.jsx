@@ -606,9 +606,15 @@ const TenantProfile = () => {
                         <Home size={12} className="text-gray-400" /> {activeBooking.property}
                       </span>
                     )}
-                    {activeBooking.leaseStart && activeBooking.leaseEnd && (
+                    {/* A tenancy with no end date is ongoing, so show the
+                        move-in date on its own rather than hiding the chip —
+                        "living here since March 2023" is the useful fact. */}
+                    {activeBooking.leaseStart && (
                       <span className="inline-flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
-                        <Calendar size={12} className="text-gray-400" /> {prettyDate(activeBooking.leaseStart)} – {prettyDate(activeBooking.leaseEnd)}
+                        <Calendar size={12} className="text-gray-400" />
+                        {activeBooking.leaseEnd
+                          ? `${prettyDate(activeBooking.leaseStart)} – ${prettyDate(activeBooking.leaseEnd)}`
+                          : `${prettyDate(activeBooking.leaseStart)} – ongoing`}
                       </span>
                     )}
                   </div>

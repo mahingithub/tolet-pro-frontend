@@ -177,8 +177,15 @@ const PaymentsTab = ({
                   <p className="text-[10px] font-black text-gray-900 truncate">{b.paymentMethod || '—'}</p>
                 </div>
               </div>
-              {(b.leaseStart && b.leaseEnd) && (
-                <p className="text-[10px] font-bold text-gray-400 mt-2.5 flex items-center gap-1.5"><Calendar size={11} /> {fmtLeaseDate(b.leaseStart)} – {fmtLeaseDate(b.leaseEnd)}</p>
+              {/* No end date = ongoing tenancy — show the move-in date instead
+                  of hiding the line entirely. */}
+              {b.leaseStart && (
+                <p className="text-[10px] font-bold text-gray-400 mt-2.5 flex items-center gap-1.5">
+                  <Calendar size={11} />
+                  {b.leaseEnd
+                    ? `${fmtLeaseDate(b.leaseStart)} – ${fmtLeaseDate(b.leaseEnd)}`
+                    : `${fmtLeaseDate(b.leaseStart)} – ${language === 'বাংলা' ? 'চলমান' : 'ongoing'}`}
+                </p>
               )}
             </div>
           );

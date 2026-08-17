@@ -30,7 +30,7 @@ export default function RentTab(props) {
     handleCallUser, resolveTenantUserId, setActiveTab, t, openMarkPaid, ledgerYear, setLedgerYear,
     rentUnitsOf, getMonthCollectionSummary, enumerateLeaseMonths, getRentStatus, monthKey,
     monthFullLabel, monthShortLabel, getDueDate, parseMonthKey, formatBDT, formatDate,
-    computeBookingStatus, daysUntilNextDue, computeLeaseStage,
+    computeBookingStatus, daysUntilNextDue, computeLeaseStage, isOpenEndedLease,
     sendRentReminder, openTenantProfile, openChatPanel, setActiveModal, exportRentCsv, isPremium
   } = props;
 
@@ -47,7 +47,7 @@ export default function RentTab(props) {
           // priority filter pills + per-row status badge. Aligned with the
           // matrix vocabulary so colours stay consistent across the tab.
           const tenantBucket = (booking) => {
-            const months = enumerateLeaseMonths(booking.leaseStart, booking.leaseEnd);
+            const months = enumerateLeaseMonths(booking.leaseStart, booking.leaseEnd, todayDate);
             if (!months.includes(sm.key)) return 'none';
             const entry = booking.ledger?.[sm.key];
             if (entry?.paid) {
@@ -61,12 +61,15 @@ export default function RentTab(props) {
           const matchesQuery = (b) => b.tenant.toLowerCase().includes(searchQuery.toLowerCase()) || b.property.toLowerCase().includes(searchQuery.toLowerCase());
 
           // Year scope: a booking belongs to the selected ledger year when its
-          // lease term overlaps that year. Bad/missing dates fall back to
-          // "included" so a parse error never hides real data.
+          // lease term overlaps that year. An ONGOING tenancy has no end, so it
+          // belongs to every year from its move-in onward. Bad/missing dates
+          // fall back to "included" so a parse error never hides real data.
           const leaseTouchesYear = (b, year) => {
             const sy = new Date(b.leaseStart).getFullYear();
+            if (Number.isNaN(sy)) return true;
+            if (isOpenEndedLease(b)) return sy <= year;
             const ey = new Date(b.leaseEnd).getFullYear();
-            if (Number.isNaN(sy) || Number.isNaN(ey)) return true;
+            if (Number.isNaN(ey)) return true;
             return sy <= year && year <= ey;
           };
           const viewingPastYear = ledgerYear < today.getFullYear();
@@ -121,7 +124,9 @@ export default function RentTab(props) {
           const renderRentRow = (booking, forceOpen = false) => {
             const bucket = tenantBucket(booking);
             const theme = bucketTheme[bucket];
-            const leaseMonths = enumerateLeaseMonths(booking.leaseStart, booking.leaseEnd);
+            // Pass the ledger year so an ongoing tenancy keeps producing months
+            // when the host steps forward past the current year.
+            const leaseMonths = enumerateLeaseMonths(booking.leaseStart, booking.leaseEnd, ledgerYear);
             const monthEntry = booking.ledger?.[sm.key];
             const monthInLease = leaseMonths.includes(sm.key);
             const expectedThisMonth = monthInLease ? Number(booking.monthlyRent || 0) : 0;
@@ -576,16 +581,29 @@ export default function RentTab(props) {
                       <span className="text-[11px] font-black text-gray-900 tabular-nums w-10 text-center">{ledgerYear}</span>
                       <button onClick={() => setLedgerYear(y => y + 1)} className="p-1 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-gray-700 transition-colors"><ChevronRight size={12}/></button>
                     </div>
-                    {/* Search input — grows to fill the rest of the row. */}
+                    {/* Search input — grows to fill the rest of the row. Same
+                        field treatment as the Add Tenant tab (clear button,
+                        brand focus ring) so the two toolbars feel like one. */}
                     <div className="relative flex-1 min-w-0 xl:max-w-[220px]">
-                      <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                      <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                       <input
                         type="search"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder={language === 'বাংলা' ? 'খুঁজুন...' : 'Search tenants...'}
-                        className="w-full pl-7 pr-2 py-2 rounded-xl bg-white text-[11px] font-bold text-gray-900 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-transparent focus:border-gray-200 focus:outline-none placeholder:text-gray-400"
+                        placeholder={language === 'বাংলা' ? 'ভাড়াটিয়া খুঁজুন...' : 'Search tenants...'}
+                        aria-label={language === 'বাংলা' ? 'ভাড়াটিয়া খুঁজুন' : 'Search tenants'}
+                        className="w-full pl-8 pr-8 py-2.5 rounded-xl bg-white text-[11px] font-bold text-gray-900 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-transparent focus:border-[#ba0036]/25 focus:shadow-[0_4px_14px_rgba(186,0,54,0.08)] focus:outline-none placeholder:text-gray-400 transition-all"
                       />
+                      {searchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchQuery('')}
+                          aria-label={language === 'বাংলা' ? 'সার্চ মুছুন' : 'Clear search'}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                        >
+                          <X size={12} strokeWidth={3} />
+                        </button>
+                      )}
                     </div>
                     {/* Export action. */}
                     <button

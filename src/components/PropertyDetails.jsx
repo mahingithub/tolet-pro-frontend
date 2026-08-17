@@ -23,6 +23,9 @@ import InquiryModal from './InquiryModal';
 import FullScreenLoader from './shared/FullScreenLoader';
 // ─── DATA SOURCE: live property + landlord. NO demo data. ─────────────────────
 import { propertyService } from '../services/Propertyservice.js';
+// "What's nearby" POIs. readCachedNearby() is synchronous so a revisited
+// property renders its nearby grid on the first paint with no request at all.
+import { fetchNearbyPlaces, readCachedNearby } from '../services/nearbyService.js';
 // Same field config the Add-Property wizard + dashboard editor use, so the
 // details we RENDER here always match the fields a host can ENTER.
 import { getDynamicFields, hasBedsBaths } from '../constants/propertyFields';
@@ -216,6 +219,7 @@ const LOCAL_TRANSLATIONS = {
     photoTour: 'Photo tour', rooms: 'Rooms', allPhotos: 'All Photos',
     photo: 'photo', photos: 'photos',
     openInGoogleMaps: 'Open in Google Maps',
+    whatsNearby: "What's nearby", loadingNearby: 'Loading nearby places',
     howItWorks: 'How it works',
     safetyTips: 'Safety Tips',
     listedBy: 'Listed by',
@@ -252,6 +256,7 @@ const LOCAL_TRANSLATIONS = {
     photoTour: 'ছবি ট্যুর', rooms: 'কক্ষ', allPhotos: 'সব ছবি',
     photo: 'ছবি', photos: 'ছবি',
     openInGoogleMaps: 'গুগল ম্যাপে দেখুন',
+    whatsNearby: 'আশেপাশে কী আছে', loadingNearby: 'আশেপাশের তথ্য আসছে',
     howItWorks: 'কিভাবে কাজ করে',
     safetyTips: 'নিরাপত্তা টিপস',
     listedBy: 'তালিকাভুক্ত করেছেন',
@@ -288,6 +293,7 @@ const LOCAL_TRANSLATIONS = {
     photoTour: 'جولة الصور', rooms: 'الغرف', allPhotos: 'كل الصور',
     photo: 'صورة', photos: 'صور',
     openInGoogleMaps: 'فتح في خرائط جوجل',
+    whatsNearby: 'ما هو قريب', loadingNearby: 'جارٍ تحميل الأماكن القريبة',
     howItWorks: 'كيف يعمل',
     safetyTips: 'نصائح السلامة',
     listedBy: 'مدرج بواسطة',
@@ -312,128 +318,97 @@ const LOCAL_TRANSLATIONS = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NEARBY POIs — LIVE from OpenStreetMap Overpass API
-// Fetches real nearby hospitals, schools, markets, mosques, bus stops, and
-// parks based on the property's actual GPS coordinates. Works for ANY
-// location in Bangladesh (or worldwide) — not limited to Dhaka.
+// NEARBY POIs
+//
+// Real nearby hospitals, schools, markets, mosques, bus stops and parks for the
+// property's actual GPS coordinates, anywhere in Bangladesh (or the world).
+//
+// The Overpass query, mirror racing, distance maths and caching all moved to
+// services/nearbyService.js + the backend's /api/geo/nearby. Doing it here used
+// to mean a fresh, uncached, sequentially-retried Overpass call on every single
+// page view — 5–45 s before this section appeared, and frequently nothing at
+// all. What's left below is purely presentation: labels, icons, and formatting.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Static labels + icons — drives the rendering order.
+// `key` matches the server's category ids and drives the rendering order.
+// Labels live here (not in the service) so they can be translated per language.
 const NEARBY_PLACE_TYPES = [
-  { label: 'Hospital', icon: '🏥', osmTags: '["amenity"="hospital"]' },
-  { label: 'School',   icon: '🏫', osmTags: '["amenity"~"school|college"]' },
-  { label: 'Market',   icon: '🛒', osmTags: '["shop"~"supermarket|mall|marketplace|convenience"]["name"]' },
-  { label: 'Mosque',   icon: '🕌', osmTags: '["amenity"="place_of_worship"]["religion"="muslim"]' },
-  { label: 'Bus Stop', icon: '🚌', osmTags: '["highway"="bus_stop"]' },
-  { label: 'Park',     icon: '🌳', osmTags: '["leisure"="park"]' },
+  { key: 'hospital', label: 'Hospital', labelBn: 'হাসপাতাল',   labelAr: 'مستشفى',   icon: '🏥' },
+  { key: 'school',   label: 'School',   labelBn: 'স্কুল',        labelAr: 'مدرسة',    icon: '🏫' },
+  { key: 'market',   label: 'Market',   labelBn: 'বাজার',        labelAr: 'سوق',      icon: '🛒' },
+  { key: 'mosque',   label: 'Mosque',   labelBn: 'মসজিদ',       labelAr: 'مسجد',     icon: '🕌' },
+  { key: 'bus_stop', label: 'Bus Stop', labelBn: 'বাস স্টপ',     labelAr: 'موقف باص', icon: '🚌' },
+  { key: 'park',     label: 'Park',     labelBn: 'পার্ক',        labelAr: 'حديقة',    icon: '🌳' },
 ];
 
-// Haversine — shortest distance over Earth's surface in kilometres.
-const haversineKm = (a, b) => {
-  const R = 6371;
-  const toRad = (deg) => (deg * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const lat1 = toRad(a.lat);
-  const lat2 = toRad(b.lat);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
+// Western digits → Bengali digits. Rendering "1.2 km" next to Bengali labels
+// looks half-translated, so numerals get localised too.
+const BN_DIGITS = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+const toBnDigits = (s) => String(s).replace(/\d/g, (d) => BN_DIGITS[Number(d)]);
+
+/**
+ * Human-friendly distance, localised.
+ * Sub-kilometre reads in metres (rounded to 10 m — OSM precision doesn't
+ * justify more), otherwise one decimal of a kilometre.
+ */
+const formatDistance = (km, langKey = 'en') => {
+  if (!Number.isFinite(km) || km == null) return '—';
+
+  const units = {
+    en: { m: 'm', km: 'km' },
+    bn: { m: 'মি', km: 'কিমি' },
+    ar: { m: 'م', km: 'كم' },
+  }[langKey] || { m: 'm', km: 'km' };
+
+  const value = km < 1
+    ? String(Math.max(50, Math.round((km * 1000) / 10) * 10))
+    : km.toFixed(1);
+  const unit = km < 1 ? units.m : units.km;
+  const digits = langKey === 'bn' ? toBnDigits(value) : value;
+
+  return `${digits} ${unit}`;
 };
 
-// Format distance in a human-friendly way (sub-km in metres, otherwise km).
-const formatDistance = (km) => {
-  if (!Number.isFinite(km)) return '—';
-  if (km < 1) return `${Math.max(50, Math.round(km * 1000 / 10) * 10)} m`;
-  return `${km.toFixed(1)} km`;
-};
+/**
+ * Merge the server's rows into display rows, in NEARBY_PLACE_TYPES order.
+ *
+ * Bengali place names come from OpenStreetMap's `name:bn` tag when a mapper has
+ * supplied one; otherwise we fall back to the default name rather than showing
+ * nothing. A place with no name at all shows just its category and distance.
+ */
+const toDisplayPlaces = (serverPlaces, langKey) => {
+  const byKey = new Map((serverPlaces || []).map((p) => [p.key, p]));
 
-// Fetch REAL nearby places from OpenStreetMap's Overpass API using the
-// property's actual GPS coordinates. Returns the same shape the UI consumes:
-// [{ label, icon, name, distKm, dist }]
-const fetchNearbyPlaces = async (lat, lng) => {
-  const origin = { lat, lng };
-  const radius = 3000; // 3 km search radius
+  return NEARBY_PLACE_TYPES.map((type) => {
+    const hit = byKey.get(type.key);
+    const label = langKey === 'bn' ? type.labelBn
+                : langKey === 'ar' ? type.labelAr
+                : type.label;
+    const name = langKey === 'bn'
+      ? (hit?.nameBn || hit?.name || '')
+      : (hit?.name || '');
 
-  // Build a single Overpass query for ALL place types at once (efficient!)
-  const unionParts = NEARBY_PLACE_TYPES.map(({ osmTags }, i) =>
-    `node${osmTags}(around:${radius},${lat},${lng});`
-  ).join('\n');
-
-  const query = `
-    [out:json][timeout:10];
-    (
-      ${unionParts}
-    );
-    out center body 20;
-  `;
-
-  try {
-    // Routed through our own backend proxy (server-side Overpass call). The
-    // browser can't hit overpass-api.de directly — CORS-blocked + 406 on the
-    // browser User-Agent. The proxy returns Overpass JSON untouched, so the
-    // parsing below is unchanged.
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
-    const res = await fetch(`${API_BASE}/geo/overpass`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const elements = data.elements || [];
-
-    // Categorize results by matching OSM tags back to our place types
-    return NEARBY_PLACE_TYPES.map(({ label, icon, osmTags }) => {
-      // Filter elements that belong to this category
-      const matches = elements.filter(el => {
-        const tags = el.tags || {};
-        switch (label) {
-          case 'Hospital':  return tags.amenity === 'hospital';
-          case 'School':    return tags.amenity === 'school' || tags.amenity === 'college';
-          case 'Market':    return ['supermarket', 'mall', 'marketplace', 'convenience'].includes(tags.shop) && tags.name;
-          case 'Mosque':    return tags.amenity === 'place_of_worship' && tags.religion === 'muslim';
-          case 'Bus Stop':  return tags.highway === 'bus_stop';
-          case 'Park':      return tags.leisure === 'park';
-          default:          return false;
-        }
-      });
-
-      // Find nearest match
-      let nearest = null;
-      let nearestKm = Infinity;
-      for (const el of matches) {
-        const elLat = el.lat ?? el.center?.lat;
-        const elLng = el.lon ?? el.center?.lon;
-        if (elLat == null || elLng == null) continue;
-        const d = haversineKm(origin, { lat: elLat, lng: elLng });
-        if (d < nearestKm) {
-          nearestKm = d;
-          nearest = el;
-        }
-      }
-
-      return {
-        label,
-        icon,
-        name: nearest?.tags?.name || (nearest ? label : null),
-        distKm: nearestKm,
-        dist: formatDistance(nearestKm),
-      };
-    });
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn('[NearbyPlaces] Overpass API failed, returning empty:', err.message);
-    return NEARBY_PLACE_TYPES.map(({ label, icon }) => ({
+    return {
+      key: type.key,
+      icon: type.icon,
       label,
-      icon,
-      name: null,
-      distKm: Infinity,
-      dist: '—',
-    }));
-  }
+      name: name || null,
+      distKm: hit?.distKm ?? null,
+      dist: formatDistance(hit?.distKm, langKey),
+    };
+  });
 };
+
+/** Placeholder rows used while the first lookup is still in flight. */
+const loadingPlaces = (langKey) =>
+  NEARBY_PLACE_TYPES.map((type) => ({
+    key: type.key,
+    icon: type.icon,
+    label: langKey === 'bn' ? type.labelBn : langKey === 'ar' ? type.labelAr : type.label,
+    name: null,
+    distKm: null,
+    dist: null, // null → render the shimmer bar instead of text
+  }));
 
 // ─── ROOM TYPES ───────────────────────────────────────────────────────────────
 // Each room now carries BOTH a futuristic lucide Icon (used in the gallery
@@ -1795,8 +1770,19 @@ const GlassCard = ({ children, className = '', style = {} }) => (
 // BACKEND: pass `lat` / `lng` from the API response. The `title` is used as
 // the marker tooltip and the iframe `<iframe title="...">` for a11y.
 // ─────────────────────────────────────────────────────────────────────────────
-const PropertyLocationMap = ({ lat, lng, title }) => {
+const PropertyLocationMap = ({ lat, lng, title, langKey = 'en' }) => {
   const center = useMemo(() => ({ lat, lng }), [lat, lng]);
+
+  // Status copy for the two non-map states. Lives here rather than in
+  // LOCAL_TRANSLATIONS because this component sits outside the main one and so
+  // has no access to lt().
+  const mapCopy = {
+    en: { unavailable: 'Map unavailable', hint: 'Set VITE_GOOGLE_MAPS_API_KEY to enable the map', loading: 'Loading map…' },
+    bn: { unavailable: 'ম্যাপ দেখানো যাচ্ছে না', hint: 'ম্যাপ চালু করতে VITE_GOOGLE_MAPS_API_KEY সেট করুন', loading: 'ম্যাপ আসছে…' },
+    ar: { unavailable: 'الخريطة غير متاحة', hint: 'اضبط VITE_GOOGLE_MAPS_API_KEY لتفعيل الخريطة', loading: 'جارٍ تحميل الخريطة…' },
+  }[langKey] || {
+    unavailable: 'Map unavailable', hint: 'Set VITE_GOOGLE_MAPS_API_KEY to enable the map', loading: 'Loading map…',
+  };
 
   const mapOptions = useMemo(
     () => ({
@@ -1828,8 +1814,8 @@ const PropertyLocationMap = ({ lat, lng, title }) => {
         style={{ width: '100%', height: '100%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, borderRadius: 16 }}
       >
         <MapPin size={28} style={{ color: '#94a3b8' }} />
-        <span style={{ fontSize: 13, fontWeight: 800, color: '#64748b' }}>Map unavailable</span>
-        <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8' }}>Set VITE_GOOGLE_MAPS_API_KEY to enable the map</span>
+        <span style={{ fontSize: 13, fontWeight: 800, color: '#64748b' }}>{mapCopy.unavailable}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8' }}>{mapCopy.hint}</span>
       </div>
     );
   }
@@ -1839,7 +1825,7 @@ const PropertyLocationMap = ({ lat, lng, title }) => {
       <div className="w-full h-full flex items-center justify-center" style={{ background: '#fafbfc' }}>
         <div className="flex flex-col items-center gap-2">
           <div className="w-9 h-9 border-[3px] border-[#ba0036] border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-bold text-slate-400">Loading map…</span>
+          <span className="text-xs font-bold text-slate-400">{mapCopy.loading}</span>
         </div>
       </div>
     );
@@ -1898,7 +1884,12 @@ const PropertyDetails = () => {
     saved: 'save', call: 'callNow', message: 'messageBtn',
     bedrooms: 'bedrooms', area: 'sqft',
     aboutProperty: 'aboutProperty', amenities: 'amenities',
-    location: 'locationText', verified: 'verified',
+    // NOTE: `location` deliberately has NO context mapping. It used to point at
+    // `locationText`, whose Bengali value is "পছন্দের শহরে" ("in your preferred
+    // city") — a fragment of the homepage hero headline, not a heading. Because
+    // the context lookup wins in lt(), the Location card rendered that fragment
+    // instead of "অবস্থান". Falling through to LOCAL_TRANSLATIONS fixes it.
+    verified: 'verified',
     monthlyRent: 'monthlyRentText', sendInquiry: 'sendInquiry',
     inquireNow: 'inquireNowBtn', viewProfile: 'viewProfile',
     forRent: 'tabRent', forSale: 'tabBuy',
@@ -2203,21 +2194,68 @@ const PropertyDetails = () => {
   };
 
   const amenities = property?.amenities || [];
-  const mapLat = parseFloat(property?.gpsLat) || 23.7925;
-  const mapLng = parseFloat(property?.gpsLng) || 90.4078;
 
-  // Fetch REAL nearby places from the Overpass API based on this property's
-  // actual GPS coordinates. Shows loading state while fetching.
-  const [nearbyPlaces, setNearbyPlaces] = useState(
-    NEARBY_PLACE_TYPES.map(({ label, icon }) => ({ label, icon, name: null, distKm: Infinity, dist: '...' }))
+  // The property's own coordinates, and a flag for whether they're real. The
+  // Dhaka pair is only a centring fallback for the map — it must NOT drive the
+  // nearby lookup, because `property` is still null on the first render and we
+  // would fire a throwaway request for downtown Dhaka on every page view (then
+  // a second one once the real coordinates arrived).
+  const parsedLat = parseFloat(property?.gpsLat);
+  const parsedLng = parseFloat(property?.gpsLng);
+  const hasRealCoords =
+    Number.isFinite(parsedLat) && Number.isFinite(parsedLng) &&
+    !(parsedLat === 0 && parsedLng === 0);
+  const mapLat = hasRealCoords ? parsedLat : 23.7925;
+  const mapLng = hasRealCoords ? parsedLng : 90.4078;
+
+  // ── "WHAT'S NEARBY" ───────────────────────────────────────────────────────
+  // Raw rows from the API, kept separate from their rendered form so switching
+  // language re-labels the grid instantly without re-fetching anything.
+  //
+  // The initial value is a synchronous cache read: if this visitor has seen
+  // this area before, the grid is fully populated on the very first paint —
+  // no spinner, no request, no layout shift.
+  const [nearbyRaw, setNearbyRaw] = useState(() =>
+    hasRealCoords ? readCachedNearby(parsedLat, parsedLng) : null
   );
+
   useEffect(() => {
-    let cancelled = false;
-    fetchNearbyPlaces(mapLat, mapLng).then(places => {
-      if (!cancelled) setNearbyPlaces(places);
-    });
-    return () => { cancelled = true; };
-  }, [mapLat, mapLng]);
+    if (!hasRealCoords) {
+      // Distinguish "coordinates not known yet" from "this listing has none".
+      // While the property is still loading we leave the state null so the grid
+      // shimmers; once it has resolved without usable coordinates we settle on
+      // empty rows (—), because otherwise the shimmer would never end.
+      //
+      // Note we deliberately do NOT fall back to the map's Dhaka centre here.
+      // Plenty of older listings carry gps 0,0, and centring on Dhaka would
+      // present downtown Dhaka's hospitals and schools as if they were next
+      // door to a property that could be anywhere in the country.
+      if (!loadingProperty) setNearbyRaw([]);
+      return undefined;
+    }
+
+    // Cached (including from a previous visit) → render immediately.
+    const cached = readCachedNearby(mapLat, mapLng);
+    if (cached) { setNearbyRaw(cached); return undefined; }
+
+    // Nothing cached for these coordinates. Clear first so navigating from one
+    // property to another doesn't briefly show the previous one's POIs.
+    setNearbyRaw(null);
+
+    const controller = new AbortController();
+    fetchNearbyPlaces(mapLat, mapLng, { signal: controller.signal })
+      .then((places) => { if (!controller.signal.aborted) setNearbyRaw(places); })
+      .catch(() => { /* aborted, or already logged by the service */ });
+
+    // Abort on unmount so navigating away doesn't leave a request hanging.
+    return () => controller.abort();
+  }, [hasRealCoords, mapLat, mapLng, loadingProperty]);
+
+  // Display rows, re-derived on language change only.
+  const nearbyPlaces = useMemo(
+    () => (nearbyRaw ? toDisplayPlaces(nearbyRaw, langKey) : loadingPlaces(langKey)),
+    [nearbyRaw, langKey]
+  );
 
   // Suppress lint warnings for retained-but-currently-unused language vars (logic kept intact)
   void ctxLanguage; void setLanguage;
@@ -2589,7 +2627,7 @@ const PropertyDetails = () => {
                   render a real Google Map. See <PropertyLocationMap /> above. */}
               <div className="w-full h-[260px] md:h-[340px] rounded-[1.5rem] overflow-hidden relative z-0"
                 style={{ border: '1px solid rgba(15,23,42,0.08)' }}>
-                <PropertyLocationMap lat={mapLat} lng={mapLng} title={property.title} />
+                <PropertyLocationMap lat={mapLat} lng={mapLng} title={property.title} langKey={langKey} />
               </div>
               <a
                 href={`https://www.google.com/maps/search/?api=1&query=${mapLat},${mapLng}`}
@@ -2598,25 +2636,35 @@ const PropertyDetails = () => {
               >
                 <MapPin size={13} /> {lt('openInGoogleMaps') || 'Open in Google Maps'} <ChevronRight size={13} />
               </a>
-              {/* "Nearby" grid — fetched LIVE from OpenStreetMap's Overpass
-                  API using the property's actual GPS coordinates. Shows the
-                  real nearest mosque, market, hospital, etc. for ANY location
-                  — no longer limited to hardcoded Dhaka landmarks. */}
+              {/* "Nearby" grid — real OpenStreetMap POIs for this property's
+                  coordinates, served from /api/geo/nearby (cached per ~110 m
+                  cell, so it is normally instant). Labels, place names and
+                  distances all follow the selected language. */}
               <div className="mt-5 mb-2 flex items-center gap-2">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">What's nearby</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{lt('whatsNearby')}</span>
                 <span className="flex-1 h-px bg-slate-200/70" />
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {nearbyPlaces.map((place, i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 rounded-2xl"
+                {nearbyPlaces.map((place) => (
+                  <div key={place.key} className="flex items-center gap-3 p-3 rounded-2xl"
                     style={{ background: '#fafbfc', border: '1px solid rgba(15,23,42,0.06)' }}>
                     <span className="text-xl shrink-0" aria-hidden>{place.icon}</span>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-xs font-black text-slate-800 leading-tight">{place.label}</p>
                       {place.name && (
                         <p className="text-[10px] font-bold text-slate-600 truncate" title={place.name}>{place.name}</p>
                       )}
-                      <p className="text-[10px] font-black text-[#ba0036] mt-0.5">{place.dist}</p>
+                      {/* dist === null means the lookup is still in flight —
+                          show a shimmer bar rather than a bare "..." so the
+                          card keeps its height and nothing jumps on arrival. */}
+                      {place.dist === null ? (
+                        <span
+                          className="mt-1 block h-2 w-10 rounded-full bg-slate-200 animate-pulse"
+                          aria-label={lt('loadingNearby')}
+                        />
+                      ) : (
+                        <p className="text-[10px] font-black text-[#ba0036] mt-0.5">{place.dist}</p>
+                      )}
                     </div>
                   </div>
                 ))}

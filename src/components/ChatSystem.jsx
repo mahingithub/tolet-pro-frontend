@@ -95,6 +95,74 @@ const replyQuoteLabel = (r) => {
   if (r.type === 'document') return '📄 Document';
   return (r.text || '').slice(0, 120);
 };
+// ── Media download helpers (photo / video "Download" in the ⋮ actions menu) ──
+// Chat attachments live on Cloudinary, so a bare <a download href="https://res…">
+// is IGNORED by the browser (the download attribute only applies same-origin) —
+// it would just navigate to the file. So we fetch the bytes and save a Blob,
+// and keep Cloudinary's `fl_attachment` delivery flag as the fallback for when
+// fetch is blocked (offline, CORS proxy, iOS quirks): that makes the CDN send
+// `Content-Disposition: attachment` so the browser saves instead of previews.
+const withCloudinaryAttachment = (url, filename) => {
+  try {
+    const u = new URL(url);
+    if (!/(^|\.)res\.cloudinary\.com$/i.test(u.hostname)) return url;
+    const marker = '/upload/';
+    const i = u.pathname.indexOf(marker);
+    if (i === -1) return url;
+    const rest = u.pathname.slice(i + marker.length);
+    if (/(^|\/)fl_attachment/.test(rest)) return url;   // already flagged
+    const stem = String(filename || '').replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 60);
+    const flag = stem ? `fl_attachment:${stem}` : 'fl_attachment';
+    u.pathname = `${u.pathname.slice(0, i + marker.length)}${flag}/${rest}`;
+    return u.toString();
+  } catch { return url; }
+};
+
+// Best-effort filename: the sender's original name → the URL's last segment →
+// a generated `tolet-photo-<date>.jpg` style name.
+const mediaFileName = (m) => {
+  const explicit = m?.mediaMeta?.originalName;
+  if (explicit) return explicit;
+  try {
+    const seg = decodeURIComponent(new URL(m.mediaUrl || m.url || '').pathname.split('/').pop() || '');
+    if (seg && /\.[a-z0-9]{2,5}$/i.test(seg)) return seg;
+  } catch { /* not a parseable URL */ }
+  const kind = m?.type === 'video' ? 'video' : m?.type === 'audio' ? 'voice' : m?.type === 'document' ? 'document' : 'photo';
+  const ext  = m?.type === 'video' ? 'mp4' : m?.type === 'audio' ? 'webm' : m?.type === 'document' ? 'pdf' : 'jpg';
+  const d = new Date(m?.iso || Date.now());
+  const stamp = isNaN(d.getTime()) ? Date.now() : d.toISOString().slice(0, 19).replace(/[:T]/g, '-');
+  return `tolet-${kind}-${stamp}.${ext}`;
+};
+
+// What (if anything) a message offers for download. Photos + videos only —
+// including a lone image/GIF URL sent as text, since that renders as media too.
+const mediaDownloadTarget = (m) => {
+  if (!m || m.isDeleted) return null;
+  if ((m.type === 'image' || m.type === 'video') && m.mediaUrl) {
+    return { url: m.mediaUrl, name: mediaFileName(m) };
+  }
+  if (m.type === 'text' || !m.type) {
+    const body = parseReplyQuote(m.text)?.body ?? m.text;
+    if (isImageUrl(body)) {
+      const url = body.trim();
+      return { url, name: mediaFileName({ type: 'image', mediaUrl: url, iso: m.iso }) };
+    }
+  }
+  return null;
+};
+
+const saveBlobAs = (blob, filename) => {
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = href;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 10000);
+};
+
 // Tiny non-crypto hash for the per-chat PIN. Enough to gate over-the-shoulder /
 // shared-device snooping — NOT real security (see ChatPinLock's note).
 const hashPin = (pin) => {
@@ -1888,8 +1956,8 @@ const ChatSystem = () => {
   };
 
   // ── Message long-press / context menu (unified action sheet) ──────────────
-  // Opens the single popup that carries reactions + Reply/Forward/Copy/Pin/
-  // Mute/Remove. Deleted bubbles get no menu. useCallback → stable identity so
+  // Opens the single popup that carries reactions + Reply/Forward/Copy/
+  // Download/Pin/Remove. Deleted bubbles get no menu. useCallback → stable so
   // the memoized ChatMessageBubble doesn't re-render when other state changes.
   const openMessageMenu = useCallback((message, x, y) => {
     if (!message || message.isDeleted) return;
@@ -1967,6 +2035,42 @@ const ChatSystem = () => {
     const body = (m.type === 'text' || !m.type) ? (parseReplyQuote(m.text)?.body || m.text || '') : (m.mediaUrl || '');
     try { await navigator.clipboard?.writeText(body); toast.success(t.chatCopied || 'Copied'); }
     catch { /* clipboard blocked */ }
+  };
+
+  // Save an attachment to the device. Fetch → Blob → <a download> gives a real
+  // "Save as" with the right filename; if the fetch is blocked (CORS/offline)
+  // we hand the browser Cloudinary's fl_attachment URL, which makes the CDN
+  // serve it as a download instead.
+  const downloadFromUrl = async (url, name) => {
+    if (!url) return;
+    const toastId = toast.loading(t.chatDownloading || 'Downloading…');
+    try {
+      const res = await fetch(url, { mode: 'cors', credentials: 'omit' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      saveBlobAs(await res.blob(), name);
+      toast.success(t.chatDownloaded || 'Saved to your device', { id: toastId });
+    } catch {
+      try {
+        const a = document.createElement('a');
+        a.href = withCloudinaryAttachment(url, name);
+        a.download = name;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        toast.dismiss(toastId);
+      } catch {
+        toast.error(t.chatDownloadFailed || 'Download failed. Please try again.', { id: toastId });
+      }
+    }
+  };
+
+  // "Download" in the ⋮ actions menu — photos and videos.
+  const handleDownloadMedia = (m) => {
+    const target = mediaDownloadTarget(m);
+    if (!target) return;
+    downloadFromUrl(target.url, target.name);
   };
 
   // Pin / unpin a message (shared banner for both participants).
@@ -3243,30 +3347,29 @@ const ChatSystem = () => {
       />
 
       {/* Actions menu (3-dot button / right-click / reaction-bar "⋯"):
-          Reply · Copy · Forward · Pin · Mute · Remove. */}
+          Reply · Forward · Copy · Download (photo/video) · Pin · Remove. */}
       <MessageActionsMenu
         open={!!menuState}
         x={menuState?.x || 0}
         y={menuState?.y || 0}
         mine={menuState?.message?.sender === 'me'}
         canCopy={!menuState?.message?.type || menuState?.message?.type === 'text'}
+        canDownload={!!mediaDownloadTarget(menuState?.message)}
         pinned={menuState?.message ? (activeChat.pinnedMessageIds || []).map(String).includes(String(menuState.message.id)) : false}
-        muted={!!activeChat.muted}
         labels={{
           reply: t.msgReply || 'Reply',
           forward: t.msgForward || 'Forward',
           copy: t.msgCopy || 'Copy',
+          download: t.msgDownload || 'Download',
           pin: t.msgPin || 'Pin',
           unpin: t.msgUnpin || 'Unpin',
-          mute: t.msgMute || 'Mute',
-          unmute: t.msgUnmute || 'Unmute',
           remove: t.msgRemove || 'Remove',
         }}
         onReply={() => menuState && handleReply(menuState.message)}
         onForward={() => menuState && handleForward(menuState.message)}
         onCopy={() => menuState && handleCopyMessage(menuState.message)}
+        onDownload={() => menuState && handleDownloadMedia(menuState.message)}
         onPin={activeChat.isAI ? undefined : () => menuState && handlePinMessage(menuState.message)}
-        onMute={activeChat.isAI ? undefined : () => (activeChat.muted ? toggleMuteChat() : setShowMuteModal(true))}
         onDelete={() => menuState && handleRemoveMessage(menuState.message)}
         onClose={() => setMenuState(null)}
       />
@@ -3326,8 +3429,14 @@ const ChatSystem = () => {
       />
 
       {/* In-app media lightbox — opens photos / videos / PDFs OVER the chat
-          instead of a new browser tab. */}
-      <MediaLightbox open={!!lightbox} media={lightbox} onClose={() => setLightbox(null)} />
+          instead of a new browser tab. Its download button saves the file
+          through the same blob path as the ⋮ menu. */}
+      <MediaLightbox
+        open={!!lightbox}
+        media={lightbox}
+        onClose={() => setLightbox(null)}
+        onDownload={(item) => downloadFromUrl(item?.url, item?.name || mediaFileName({ type: item?.type, mediaUrl: item?.url }))}
+      />
 
       {/* Chat-list row context menu (long-press mobile / right-click desktop) */}
       <ChatListItemMenu

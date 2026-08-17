@@ -265,11 +265,50 @@ const monthFullLabel = (key, lang) => {
   return `${name} ${year}`;
 };
 
-// Iterate every month-key from leaseStart through leaseEnd, inclusive.
-const enumerateLeaseMonths = (leaseStart, leaseEnd) => {
-  if (!leaseStart || !leaseEnd) return [];
+// ─── Open-ended tenancy ──────────────────────────────────────────────────────
+// A tenancy here does not expire. Someone moves in, pays every month, and stays
+// three years without a single renewal being signed — that IS the normal case in
+// Bangladesh, not an edge case. A mandatory end date made the app disagree with
+// reality: the lease flipped itself to "Done" on a date nobody agreed to, and the
+// only way back was to re-enter the SAME tenant as a brand-new lease. So the end
+// date is now optional and blank means ONGOING. A term is only recorded when it
+// genuinely is one — a commercial deal with a fixed tenure, or a landlord who
+// types an end date on purpose. The tenancy otherwise ends exactly when the
+// landlord says it did: by handing the unit to the next tenant, which closes the
+// old lease out and stamps the real move-out date.
+const isOpenEndedLease = (booking) => !String(booking?.leaseEnd || '').trim();
+
+// How far an open-ended ledger is projected: through December of the year being
+// looked at (never earlier than this year), so the rent matrix keeps producing
+// months for as long as the tenant stays instead of running out of lease.
+// `through` accepts a Date or a bare year (the Rent tab's ledger year).
+const openEndedLeaseHorizon = (through = null) => {
+  let year = new Date().getFullYear();
+  if (through instanceof Date && !Number.isNaN(through.getTime())) {
+    year = Math.max(year, through.getFullYear());
+  } else if (Number(through) > 1970) {
+    year = Math.max(year, Number(through));
+  }
+  return new Date(year, 11, 31);
+};
+
+// Whole months this tenancy has been running — the honest answer to "how long
+// has this tenant been here?" when there is no term to show progress against.
+const leaseMonthsRunning = (booking, today = new Date()) => {
+  const start = new Date(booking?.leaseStart);
+  if (Number.isNaN(start.getTime())) return 0;
+  const end = isOpenEndedLease(booking) ? today : new Date(booking.leaseEnd);
+  const cap = Number.isNaN(end.getTime()) ? today : (end < today ? end : today);
+  const months = (cap.getFullYear() - start.getFullYear()) * 12 + (cap.getMonth() - start.getMonth());
+  return Math.max(0, months + (cap.getDate() >= start.getDate() ? 1 : 0));
+};
+
+// Iterate every month-key from leaseStart through leaseEnd, inclusive. With no
+// end date the window rolls forward (see openEndedLeaseHorizon).
+const enumerateLeaseMonths = (leaseStart, leaseEnd, through = null) => {
+  if (!leaseStart) return [];
   const start = new Date(leaseStart);
-  const end = new Date(leaseEnd);
+  const end = leaseEnd ? new Date(leaseEnd) : openEndedLeaseHorizon(through);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
   const out = [];
   const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
@@ -390,20 +429,25 @@ const getMonthCollectionSummary = (bookings, year, month, today = new Date()) =>
 };
 
 // Lease status from dates + today. Independent of payment state.
+// No end date ⇒ it can never read 'completed' on its own.
 const computeBookingStatus = (booking, today = new Date()) => {
   const start = new Date(booking?.leaseStart);
-  const end = new Date(booking?.leaseEnd);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 'upcoming';
+  if (Number.isNaN(start.getTime())) return 'upcoming';
   if (today < start) return 'upcoming';
-  if (today > end) return 'completed';
-  return 'active';
+  if (isOpenEndedLease(booking)) return 'active';
+  const end = new Date(booking.leaseEnd);
+  if (Number.isNaN(end.getTime())) return 'active';
+  return today > end ? 'completed' : 'active';
 };
 
-// Lease completion 0-100, used for the existing progress bar.
+// Lease completion 0-100 for the term progress bar. Returns null when there is
+// no term to be a percentage of — an ongoing tenancy isn't "40% done", and a bar
+// frozen at 0% reads as a bug. Callers show months-running instead.
 const computeBookingProgress = (booking, today = new Date()) => {
+  if (isOpenEndedLease(booking)) return null;
   const start = new Date(booking?.leaseStart).getTime();
   const end = new Date(booking?.leaseEnd).getTime();
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
   const t = today.getTime();
   if (t <= start) return 0;
   if (t >= end) return 100;
@@ -412,9 +456,12 @@ const computeBookingProgress = (booking, today = new Date()) => {
 
 // ─── Lease lifecycle — TWO stages only: active | done ────────────────────────
 // Independent of payment state (which lives on the Rent Collection tab).
-//   • active — someone is renting this unit right now (or moves in shortly)
-//   • done   — the tenancy is over: the term expired, or the host closed it out
-//              when the tenant left early (status 'completed').
+//   • active — someone is renting this unit right now (or moves in shortly).
+//              An ongoing tenancy (no end date) stays here indefinitely.
+//   • done   — the tenancy is over because the HOST said so: they handed the
+//              unit to the next tenant, or closed it out when this one left
+//              (status 'completed'). A typed-in term running out also lands
+//              here, but nothing expires on a date the landlord never set.
 //
 // "Draft" and "Notice" used to be separate stages, but a landlord doesn't think
 // that way — a unit is either rented or it isn't. The renewal window still
@@ -429,25 +476,31 @@ const isLeaseClosed = (booking) => booking?.status === 'completed';
 
 const computeLeaseStage = (booking, today = new Date()) => {
   if (isLeaseClosed(booking)) return 'done';
-  const end = new Date(booking?.leaseEnd);
-  // Unparseable dates count as live: a bad date should never hide a real tenant.
+  // Ongoing tenancy — nothing to expire, so it stays live until the host hands
+  // the unit over. Same for an unparseable date: a bad value should never hide
+  // a real tenant.
+  if (isOpenEndedLease(booking)) return 'active';
+  const end = new Date(booking.leaseEnd);
   if (Number.isNaN(end.getTime())) return 'active';
   return today > end ? 'done' : 'active';
 };
 
-// Whole days until the lease expires — negative once it's past. null when the
-// end date is missing / unparseable.
+// Whole days until the lease expires — negative once it's past. null when there
+// is no end date (ongoing tenancy) or it's unparseable.
 const leaseDaysLeft = (booking, today = new Date()) => {
-  const end = new Date(booking?.leaseEnd);
+  if (isOpenEndedLease(booking)) return null;
+  const end = new Date(booking.leaseEnd);
   if (Number.isNaN(end.getTime())) return null;
   const a = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const b = new Date(end.getFullYear(), end.getMonth(), end.getDate());
   return Math.round((b - a) / DAY_MS);
 };
 
-// Renewal window: a live lease whose term runs out within the next 30 days.
-// Drives the amber "ends in Xd" chip and the Needs Attention group.
+// Renewal window: a live lease whose TYPED term runs out within the next 30
+// days. Drives the amber "ends in Xd" chip and the Needs Attention group. An
+// ongoing tenancy never shows up here — there is no renewal to chase.
 const isLeaseEndingSoon = (booking, today = new Date()) => {
+  if (isOpenEndedLease(booking)) return false;
   if (computeLeaseStage(booking, today) !== 'active') return false;
   const left = leaseDaysLeft(booking, today);
   return left != null && left >= 0 && left <= NOTICE_WINDOW_DAYS;
@@ -1307,6 +1360,12 @@ const HostDashboard = () => {
     // Each: { name, phone, monthlyRent }. Rent blank ⇒ equal split of the room rent.
     seats: [],
     rentDueDay: 5,
+    // Late fee — OPT-IN. Blank / 0 means the landlord charges nothing for late
+    // rent, and in that case no reminder, invoice or overdue notice ever mentions
+    // a fee. Only a landlord who fills this in gets "৳X late fee" in the message.
+    lateFeeAmount: '',
+    // Days after the due date before rent counts as late (and the fee applies).
+    gracePeriodDays: 5,
     reminderLeadDays: 3,
     autoReminder: true,
     notes: '',
@@ -1346,13 +1405,36 @@ const HostDashboard = () => {
       if (isCommercial && !String(f.businessName || '').trim()) missing.push('businessName');
     }
     if (step === 3) {
-      if (!f.leaseStart) missing.push('leaseStart');
-      if (isCommercial) {
-        if ((Number(f.leaseTermMonths) || 0) <= 0) missing.push('leaseTermMonths');
-      } else if (!f.leaseEnd) missing.push('leaseEnd');
+      // Dates are OPTIONAL. A landlord entering their whole building in one
+      // sitting gives every tenant the same start date anyway, so we default it
+      // (today + a 12-month term) instead of making them confirm it 20 times.
+      // Rent is the only thing we genuinely can't guess.
       if ((Number(f.monthlyRent) || 0) <= 0) missing.push('monthlyRent');
     }
     return missing;
+  };
+
+  // Resolve what actually gets saved as the term. Used by both the wizard
+  // preview and submit so what's shown is what gets stored.
+  //
+  // `endIso: ''` means ONGOING — no expiry. That's the default for a residential
+  // tenancy, because that's how renting works here: the tenant stays until they
+  // leave, and the landlord marks that by handing the unit to the next tenant.
+  // We used to auto-fill a 12-month term "to be helpful", which quietly turned
+  // every long-staying tenant into an expired lease the host had to re-create.
+  const resolveLeaseDates = (f = leaseForm) => {
+    const startIso = f.leaseStart || todayIso();
+    const sd = new Date(startIso);
+    const isCommercial = f.dealType === 'commercial';
+    const termMonths = Number(f.leaseTermMonths) || 0;
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    // Commercial leases genuinely are defined by their tenure, so the term wins.
+    if (isCommercial && termMonths > 0) {
+      return { startIso, endIso: iso(new Date(sd.getFullYear(), sd.getMonth() + termMonths, sd.getDate())) };
+    }
+    // A host who typed an end date on purpose gets exactly that.
+    if (f.leaseEnd) return { startIso, endIso: f.leaseEnd };
+    return { startIso, endIso: '' };
   };
 
   // Move between wizard steps. Going forward validates every step being stepped
@@ -2382,8 +2464,12 @@ const HostDashboard = () => {
       y += 4; rule();
 
       line('Lease Terms', { size: 12, bold: true, gap: 20 });
-      kv('Lease Start', formatDate(booking.leaseStart, language));
-      kv('Lease End', formatDate(booking.leaseEnd, language));
+      kv('Move-In Date', formatDate(booking.leaseStart, language));
+      // An ongoing tenancy has no end date to print — the agreement says so
+      // instead of leaving a blank the tenant could read as an expiry.
+      kv('Lease End', isOpenEndedLease(booking)
+        ? 'Ongoing — until either party gives notice'
+        : formatDate(booking.leaseEnd, language));
       kv('Monthly Rent', formatBDT(booking.monthlyRent));
       kv('Service Charge', formatBDT(booking.serviceCharge || 0));
       kv('Security Deposit', formatBDT(booking.securityDeposit || 0));
@@ -2457,7 +2543,7 @@ const HostDashboard = () => {
       lines.push([
         b.tenant || '', b.property || '', b.location || '', b.tenantPhone || '', b.tenantsCount || 1,
         Number(b.monthlyRent) || 0, Number(b.advancePayment) || 0, b.paymentMethod || '',
-        ...monthCells, yearTotal, b.leaseStart || '', b.leaseEnd || '', computeLeaseStage(b, today),
+        ...monthCells, yearTotal, b.leaseStart || '', b.leaseEnd || 'Ongoing', computeLeaseStage(b, today),
       ].map(esc).join(','));
     });
     // Prefix a BOM so Excel opens the UTF-8 (Bangla-safe) file correctly.
@@ -2668,7 +2754,7 @@ const HostDashboard = () => {
         .map((b) => [
           b.tenant || b.tenantName || '—', b.property || '—', b.location || '—',
           String(Number(b.monthlyRent) || 0), String(Number(b.serviceCharge) || 0),
-          b.leaseStart || '—', b.leaseEnd || '—',
+          b.leaseStart || '—', b.leaseEnd || 'Ongoing',
           stageLabel(computeLeaseStage(b, now), 'English'),
           String((Number(b.advancePayment) || 0) + (Number(b.securityDeposit) || 0)),
         ]);
@@ -2798,10 +2884,8 @@ const HostDashboard = () => {
     // Commercial when the inquiry (denormalised) or the property says so.
     const inqCommercial = inquiry.dealType === 'commercial' || matchingProp?.intent === 'commercial';
     const start = todayIso();
-    // Default to a 12-month lease ending the day before the same date next year.
-    const startDate = new Date(start);
-    const endDate = new Date(startDate.getFullYear() + 1, startDate.getMonth(), startDate.getDate() - 1);
-    const endIso = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+    // Residential tenancies are ONGOING — no end date. Commercial deals carry a
+    // real tenure instead (leaseTermMonths below), which derives the end date.
     setLeaseForm({
       inquiryId: inquiry.id,
       inquirerUserId: inquiry.inquirerUserId || null,
@@ -2812,7 +2896,7 @@ const HostDashboard = () => {
       tenant: inquiry.user || '',
       tenantPhone: inquiry.phone || '',
       leaseStart: start,
-      leaseEnd: endIso,
+      leaseEnd: '',
       monthlyRent: String(matchingProp?.price || '').replace(/[^\d]/g, '') || '',
       advancePayment: '',
       paymentMethod: 'bKash',
@@ -2830,6 +2914,8 @@ const HostDashboard = () => {
       manualProperty: false,
       seats: [],
       serviceCharge: String(landlordProfile?.serviceCharge ?? authUser?.landlordProfile?.serviceCharge ?? ''),
+      lateFeeAmount: '',
+      gracePeriodDays: 5,
       rentDueDay: 5,
       reminderLeadDays: 3,
       autoReminder: true,
@@ -2888,12 +2974,10 @@ const HostDashboard = () => {
 
   // Open create_lease standalone (no inquiry pre-fill).
   const openBlankLease = () => {
-    // Default a 12-month lease so the form is complete out of the box (only
-    // tenant + rent left to fill) — reduces "why won't it submit" friction.
+    // Starts today, runs ONGOING — the tenancy has no expiry until the host
+    // either types a term or hands the unit to the next tenant. Only the tenant
+    // and the rent are left to fill in.
     const startIso = todayIso();
-    const sd = new Date(startIso);
-    const ed = new Date(sd.getFullYear() + 1, sd.getMonth(), sd.getDate() - 1);
-    const endIso = `${ed.getFullYear()}-${String(ed.getMonth() + 1).padStart(2, '0')}-${String(ed.getDate()).padStart(2, '0')}`;
     setLeaseForm({
       inquiryId: null,
       inquirerUserId: null,
@@ -2904,7 +2988,7 @@ const HostDashboard = () => {
       tenant: '',
       tenantPhone: '',
       leaseStart: startIso,
-      leaseEnd: endIso,
+      leaseEnd: '',
       monthlyRent: '',
       advancePayment: '',
       paymentMethod: 'bKash',
@@ -2922,6 +3006,8 @@ const HostDashboard = () => {
       manualProperty: false,
       seats: [],
       serviceCharge: String(landlordProfile?.serviceCharge ?? authUser?.landlordProfile?.serviceCharge ?? ''),
+      lateFeeAmount: '',
+      gracePeriodDays: 5,
       rentDueDay: 5,
       reminderLeadDays: 3,
       autoReminder: true,
@@ -2943,15 +3029,15 @@ const HostDashboard = () => {
   const openTenantChangeLease = (booking) => {
     if (!booking) return;
     if (!isPremium) { setModalData(booking); setActiveModal('premium_gate'); return; }
-    // New tenancy starts today (or the day the old term ended, if that's later —
-    // the outgoing tenant is still in place until then).
-    const oldEnd = new Date(booking.leaseEnd);
+    // New tenancy starts today. An ongoing lease has no end date to wait for; a
+    // typed term still in the future means the outgoing tenant holds the unit
+    // until then, so the next one starts the day after.
+    const oldEnd = isOpenEndedLease(booking) ? null : new Date(booking.leaseEnd);
     const todayDate = new Date(todayIso());
-    const startDate = (!Number.isNaN(oldEnd.getTime()) && oldEnd > todayDate)
+    const startDate = (oldEnd && !Number.isNaN(oldEnd.getTime()) && oldEnd > todayDate)
       ? new Date(oldEnd.getFullYear(), oldEnd.getMonth(), oldEnd.getDate() + 1)
       : todayDate;
     const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const endDate = new Date(startDate.getFullYear() + 1, startDate.getMonth(), startDate.getDate() - 1);
     const termMonths = Number(booking.commercialTerms?.leaseTermMonths) || 0;
     setLeaseForm({
       inquiryId: null,
@@ -2968,6 +3054,8 @@ const HostDashboard = () => {
       manualProperty: !booking.propertyId,
       monthlyRent: String(booking.monthlyRent ?? ''),
       serviceCharge: String(booking.serviceCharge ?? ''),
+      lateFeeAmount: Number(booking.lateFeeAmount) > 0 ? String(booking.lateFeeAmount) : '',
+      gracePeriodDays: Number(booking.gracePeriodDays) ?? 5,
       rentDueDay: Number(booking.rentDueDay) || 5,
       reminderLeadDays: Number(booking.reminderLeadDays) || 3,
       autoReminder: booking.autoReminder !== false,
@@ -2983,7 +3071,8 @@ const HostDashboard = () => {
       seats: [],
       notes: '',
       leaseStart: iso(startDate),
-      leaseEnd: iso(endDate),
+      // Ongoing, like the lease it replaces.
+      leaseEnd: '',
     });
     setConfirmDeleteBookingId(null);
     setActiveDropdownId(null);
@@ -3040,26 +3129,18 @@ const HostDashboard = () => {
       }, 80);
     };
     const isCommercial = leaseForm.dealType === 'commercial';
-    // Commercial deals collect a lease TERM (months); we derive the end date
-    // from start + term. Residential keeps the explicit end-date picker.
+    // Dates are optional. Blank start ⇒ today; blank end ⇒ ONGOING (no expiry).
+    // A commercial tenure derives the end date.
+    const { startIso: effLeaseStart, endIso: effLeaseEnd } = resolveLeaseDates(leaseForm);
     const termMonths = Number(leaseForm.leaseTermMonths) || 0;
-    let effLeaseEnd = leaseEnd;
-    if (isCommercial && leaseStart && termMonths > 0) {
-      const sd = new Date(leaseStart);
-      const ed = new Date(sd.getFullYear(), sd.getMonth() + termMonths, sd.getDate());
-      effLeaseEnd = `${ed.getFullYear()}-${String(ed.getMonth() + 1).padStart(2, '0')}-${String(ed.getDate()).padStart(2, '0')}`;
-    }
     const missing = [];
     if (!tenant.trim()) missing.push('tenant');
     if (!tenantPhone.trim()) missing.push('tenantPhone');
     if (manualProperty ? !String(leaseForm.property || '').trim() : !propertyId) missing.push('property');
     if (isCommercial) {
       if (!String(leaseForm.businessName || '').trim()) missing.push('businessName');
-      if (!leaseStart) missing.push('leaseStart');
-      if (termMonths <= 0) missing.push('leaseTermMonths');
-    } else {
-      if ((leaseForm.category === 'single_room' || leaseForm.category === 'hostel') && !String(leaseForm.roomNumber || '').trim()) missing.push('roomNumber');
-      if (!leaseStart || !leaseEnd) missing.push('leaseEnd');
+    } else if ((leaseForm.category === 'single_room' || leaseForm.category === 'hostel') && !String(leaseForm.roomNumber || '').trim()) {
+      missing.push('roomNumber');
     }
     const rent = Number(monthlyRent) || 0;
     if (rent <= 0) missing.push('monthlyRent');
@@ -3069,7 +3150,9 @@ const HostDashboard = () => {
       scrollToLeaseField(missing[0]);
       return;
     }
-    if (new Date(effLeaseEnd) <= new Date(leaseStart)) {
+    // Only reachable when the host typed an end date and inverted it. An ongoing
+    // tenancy has no end date to be out of order.
+    if (effLeaseEnd && new Date(effLeaseEnd) <= new Date(effLeaseStart)) {
       setLeaseErrors(['leaseEnd']);
       showToast(language === 'বাংলা' ? 'শেষ তারিখ শুরুর তারিখের পরে হতে হবে' : 'End date must be after start date');
       scrollToLeaseField('leaseEnd');
@@ -3163,13 +3246,16 @@ const HostDashboard = () => {
       tenantPhone: tenantPhone.trim(),
       tenantEmail: '',
       tenantsCount: occupants,
-      leaseStart, leaseEnd: effLeaseEnd,
+      // Empty leaseEnd = ongoing tenancy, no expiry.
+      leaseStart: effLeaseStart, leaseEnd: effLeaseEnd,
       dealType: isCommercial ? 'commercial' : 'residential',
       ...(isCommercial ? { commercialTerms: { businessName: String(leaseForm.businessName || '').trim(), licenseNumber: String(leaseForm.licenseNumber || '').trim(), leaseTermMonths: termMonths } } : {}),
       monthlyRent: rent,
       advancePayment,
       paymentMethod,
       serviceCharge: Number(leaseForm.serviceCharge) || 0,
+      lateFeeAmount: Math.max(0, Number(leaseForm.lateFeeAmount) || 0),
+      gracePeriodDays: Math.max(0, Number(leaseForm.gracePeriodDays) || 0),
       rentDueDay: Number(leaseForm.rentDueDay) || 5,
       reminderLeadDays: Number(leaseForm.reminderLeadDays) || 3,
       autoReminder: !!leaseForm.autoReminder,
@@ -3186,7 +3272,7 @@ const HostDashboard = () => {
     // Financial Overview stops counting its rent, and Rent Collection swaps in
     // the new tenant with a clean ledger.
     if (replacesId) {
-      const sd = new Date(leaseStart);
+      const sd = new Date(effLeaseStart);
       const prevEnd = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate() - 1);
       closeOutLease(replacesId, `${prevEnd.getFullYear()}-${String(prevEnd.getMonth() + 1).padStart(2, '0')}-${String(prevEnd.getDate()).padStart(2, '0')}`);
     }
@@ -3199,9 +3285,12 @@ const HostDashboard = () => {
       location: leaseForm.location || matchingProp?.location || '',
       serviceCharge: Number(leaseForm.serviceCharge) || 0,
       inquiryId: leaseForm.inquiryId,
-      leaseStart, leaseEnd: effLeaseEnd,
+      // null ⇒ the server stores an ongoing tenancy with no expiry.
+      leaseStart: effLeaseStart, leaseEnd: effLeaseEnd || null,
       dealType: isCommercial ? 'commercial' : 'residential',
       ...(isCommercial ? { commercialTerms: { businessName: String(leaseForm.businessName || '').trim(), licenseNumber: String(leaseForm.licenseNumber || '').trim(), leaseTermMonths: termMonths } } : {}),
+      lateFeeAmount: Math.max(0, Number(leaseForm.lateFeeAmount) || 0),
+      gracePeriodDays: Math.max(0, Number(leaseForm.gracePeriodDays) || 0),
       rentDueDay: Number(leaseForm.rentDueDay) || 5,
       reminderLeadDays: Number(leaseForm.reminderLeadDays) || 3,
       autoReminder: !!leaseForm.autoReminder,
@@ -4487,6 +4576,8 @@ const HostDashboard = () => {
             computeLeaseStage={computeLeaseStage}
             isLeaseEndingSoon={isLeaseEndingSoon}
             leaseDaysLeft={leaseDaysLeft}
+            isOpenEndedLease={isOpenEndedLease}
+            leaseMonthsRunning={leaseMonthsRunning}
             openTenantChangeLease={openTenantChangeLease}
             formatBDT={formatBDT}
             daysUntilNextDue={daysUntilNextDue}
@@ -4545,6 +4636,7 @@ const HostDashboard = () => {
             computeBookingStatus={computeBookingStatus}
             daysUntilNextDue={daysUntilNextDue}
             computeLeaseStage={computeLeaseStage}
+            isOpenEndedLease={isOpenEndedLease}
             sendRentReminder={sendRentReminder}
             openTenantProfile={openTenantProfile}
             openChatPanel={openChatPanel}
@@ -5418,9 +5510,19 @@ const HostDashboard = () => {
                             <div className="min-w-0 flex-1">
                               <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-1">{isBn ? 'এই ইউনিটে লিজ চলছে' : 'Unit is currently leased'}</p>
                               <p className="text-[11px] font-bold text-gray-700 leading-relaxed">
-                                {isBn
-                                  ? `${occupiedBy.tenant || 'একজন ভাড়াটিয়া'} এখনও এই ইউনিটে আছেন (${formatDate(occupiedBy.leaseEnd, language)} পর্যন্ত)। পুরোনো ভাড়াটিয়া চলে গেলে নিচে ট্যাপ করুন — পুরোনো লিজ বন্ধ হবে, নতুনটি চালু হবে।`
-                                  : `${occupiedBy.tenant || 'A tenant'} still holds this unit (through ${formatDate(occupiedBy.leaseEnd, language)}). If they have moved out, hand the unit over — the old lease closes and this new one takes its place.`}
+                                {(() => {
+                                  // An ongoing tenancy has no "through <date>" to
+                                  // quote — it runs until this very hand-over.
+                                  const since = formatDate(occupiedBy.leaseStart, language);
+                                  const until = formatDate(occupiedBy.leaseEnd, language);
+                                  const who = occupiedBy.tenant || (isBn ? 'একজন ভাড়াটিয়া' : 'A tenant');
+                                  const window = isOpenEndedLease(occupiedBy)
+                                    ? (isBn ? `${since} থেকে` : `since ${since}`)
+                                    : (isBn ? `${until} পর্যন্ত` : `through ${until}`);
+                                  return isBn
+                                    ? `${who} এখনও এই ইউনিটে আছেন (${window})। পুরোনো ভাড়াটিয়া চলে গেলে নিচে ট্যাপ করুন — পুরোনো লিজ বন্ধ হবে, নতুনটি চালু হবে।`
+                                    : `${who} still holds this unit (${window}). If they have moved out, hand the unit over — the old lease closes and this new one takes its place.`;
+                                })()}
                               </p>
                               <button
                                 type="button"
@@ -5590,22 +5692,6 @@ const HostDashboard = () => {
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <label className={labelCls}>{isBn ? 'লিজ শুরু' : 'Lease Start'}</label>
-                          <input id="lease-leaseStart" type="date" value={leaseForm.leaseStart} onChange={e => setLeaseForm(f => ({ ...f, leaseStart: e.target.value }))} className={`${inputCls} ${leaseErrCls('leaseStart')}`} />
-                        </div>
-                        {isCommercial ? (
-                          <div>
-                            <label className={labelCls}>{isBn ? 'লিজ মেয়াদ (মাস)' : 'Lease Term (months)'}</label>
-                            <input id="lease-leaseTermMonths" type="number" min="1" max="600" value={leaseForm.leaseTermMonths} onChange={e => setLeaseForm(f => ({ ...f, leaseTermMonths: e.target.value }))} placeholder="24" className={`${inputCls} ${leaseErrCls('leaseTermMonths')}`} />
-                            <p className="text-[9px] font-bold text-gray-400 mt-1">{isBn ? 'শুরুর তারিখ + মেয়াদ থেকে শেষ তারিখ হিসাব হয়' : 'Lease end is computed from start + term'}</p>
-                          </div>
-                        ) : (
-                          <div>
-                            <label className={labelCls}>{isBn ? 'লিজ শেষ' : 'Lease End'}</label>
-                            <input id="lease-leaseEnd" type="date" value={leaseForm.leaseEnd} onChange={e => setLeaseForm(f => ({ ...f, leaseEnd: e.target.value }))} className={`${inputCls} ${leaseErrCls('leaseEnd')}`} />
-                          </div>
-                        )}
-                        <div>
                           <label className={labelCls}>{leaseForm.category === 'hostel' ? (isBn ? 'রুম ভাড়া (৳) — সিটে ভাগ হবে' : 'Room Rent (৳) — split across seats') : (isBn ? 'মাসিক ভাড়া (৳)' : 'Monthly Rent (৳)')}</label>
                           <input id="lease-monthlyRent" type="number" min="0" value={leaseForm.monthlyRent} onChange={e => setLeaseForm(f => ({ ...f, monthlyRent: e.target.value }))} placeholder="85000" className={`${inputCls} ${leaseErrCls('monthlyRent')}`} />
                         </div>
@@ -5619,6 +5705,151 @@ const HostDashboard = () => {
                           <p className="text-[9px] font-bold text-gray-400 mt-1">{isBn ? 'প্রোফাইল থেকে অটো-ফিল · এডিটযোগ্য' : 'Auto-filled from profile · editable'}</p>
                         </div>
                       </div>
+
+                      {/* ── Late fee — OPT-IN ─────────────────────────────────
+                          Nothing is charged unless the landlord puts a number
+                          here. Left blank, no reminder or overdue notice ever
+                          mentions a fee — we don't invent a charge on the
+                          landlord's behalf. Fill it in and the tenant is told the
+                          amount up front, in every reminder. */}
+                      {(() => {
+                        const fee = Math.max(0, Number(leaseForm.lateFeeAmount) || 0);
+                        const grace = Math.max(0, Number(leaseForm.gracePeriodDays) || 0);
+                        const dueDay = Number(leaseForm.rentDueDay) || 5;
+                        const on = fee > 0;
+                        return (
+                          <div className={`rounded-2xl border p-3 transition-colors ${on ? 'border-amber-200 bg-amber-50/70' : 'border-gray-100 bg-gray-50/60'}`}>
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <span className="text-[11px] font-black text-gray-900 uppercase tracking-widest flex items-center gap-1.5">
+                                <AlertCircle size={13} className={on ? 'text-amber-600' : 'text-gray-400'} /> {isBn ? 'লেট ফি' : 'Late Fee'}
+                              </span>
+                              <span className={`text-[9px] font-black uppercase tracking-widest ${on ? 'text-amber-700' : 'text-gray-400'}`}>
+                                {on ? (isBn ? 'চালু' : 'On') : (isBn ? 'ঐচ্ছিক · বন্ধ' : 'Optional · off')}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className={labelCls}>{isBn ? 'লেট ফি (৳)' : 'Late Fee (৳)'}</label>
+                                <input
+                                  type="number" min="0" max="100000" inputMode="numeric"
+                                  value={leaseForm.lateFeeAmount}
+                                  onChange={e => setLeaseForm(f => ({ ...f, lateFeeAmount: e.target.value.replace(/[^0-9]/g, '') }))}
+                                  placeholder={isBn ? 'নেই' : 'None'}
+                                  className="w-full mt-1.5 p-3.5 bg-white rounded-xl text-sm font-bold text-gray-900 outline-none focus:shadow-[0_4px_15px_rgba(245,158,11,0.15)] border border-gray-100 focus:border-amber-300 transition-all tabular-nums"
+                                />
+                              </div>
+                              <div>
+                                <label className={labelCls}>{isBn ? 'গ্রেস (দিন)' : 'Grace (days)'}</label>
+                                <input
+                                  type="number" min="0" max="28" inputMode="numeric"
+                                  value={leaseForm.gracePeriodDays}
+                                  onChange={e => setLeaseForm(f => ({ ...f, gracePeriodDays: e.target.value.replace(/[^0-9]/g, '') }))}
+                                  placeholder="5"
+                                  className="w-full mt-1.5 p-3.5 bg-white rounded-xl text-sm font-bold text-gray-900 outline-none focus:shadow-[0_4px_15px_rgba(245,158,11,0.15)] border border-gray-100 focus:border-amber-300 transition-all tabular-nums"
+                                />
+                              </div>
+                            </div>
+                            <p className="text-[10px] font-bold text-gray-500 mt-2 leading-relaxed">
+                              {on
+                                ? (isBn
+                                    ? `${dueDay} তারিখের পর ${grace} দিন পেরোলে ৳${fee.toLocaleString('en-IN')} লেট ফি যোগ হবে — রিমাইন্ডারে ভাড়াটিয়াকে এটা জানিয়ে দেওয়া হবে।`
+                                    : `৳${fee.toLocaleString('en-IN')} is added once ${grace} day${grace === 1 ? '' : 's'} pass after the ${dueDay}th — and every reminder tells the tenant so.`)
+                                : (isBn
+                                    ? 'খালি রাখলে কোনো লেট ফি নেই — রিমাইন্ডারেও লেট ফির কথা থাকবে না।'
+                                    : 'Leave it blank for no late fee — reminders then never mention one.')}
+                            </p>
+                          </div>
+                        );
+                      })()}
+
+                      {/* ── Move-in date + tenancy type ───────────────────────
+                          Renting here is open-ended. A tenant moves in and stays
+                          — often for years — and nobody signs a renewal. So the
+                          default is ONGOING: one date (move-in) and no expiry.
+                          The tenancy ends when the host says it did, by handing
+                          the unit to the next tenant.
+
+                          A fixed term is still available for the cases where it's
+                          real (a company let, a written contract), and commercial
+                          deals always carry their tenure in months. */}
+                      {(() => {
+                        const fixedTerm = isCommercial || !!leaseForm.leaseEnd;
+                        return (
+                          <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-3">
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <span className="text-[11px] font-black text-gray-900 uppercase tracking-widest flex items-center gap-1.5">
+                                <CalendarRange size={13} className="text-[#ba0036]" /> {isBn ? 'ভাড়ার মেয়াদ' : 'Tenancy'}
+                              </span>
+                              <span className={`text-[9px] font-black uppercase tracking-widest ${fixedTerm ? 'text-gray-500' : 'text-emerald-600'}`}>
+                                {isCommercial
+                                  ? (isBn ? 'নির্দিষ্ট মেয়াদ' : 'Fixed tenure')
+                                  : fixedTerm ? (isBn ? 'নির্দিষ্ট তারিখ' : 'Fixed end date') : (isBn ? 'চলমান · মেয়াদ নেই' : 'Ongoing · no expiry')}
+                              </span>
+                            </div>
+
+                            {/* Move-in is the only date a residential tenancy needs. */}
+                            <div className={`grid grid-cols-1 gap-3 ${(isCommercial || fixedTerm) ? 'sm:grid-cols-2' : ''}`}>
+                              <div>
+                                <label className={labelCls}>{isBn ? 'মুভ-ইন তারিখ' : 'Move-In Date'}</label>
+                                <input id="lease-leaseStart" type="date" value={leaseForm.leaseStart} onChange={e => setLeaseForm(f => ({ ...f, leaseStart: e.target.value }))} className="w-full mt-1.5 p-3.5 bg-white rounded-xl text-sm font-bold text-gray-900 outline-none focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-gray-100 focus:border-[#ba0036]/30 transition-all" />
+                              </div>
+                              {isCommercial ? (
+                                <div>
+                                  <label className={labelCls}>{isBn ? 'লিজ মেয়াদ (মাস)' : 'Lease Term (months)'}</label>
+                                  <input id="lease-leaseTermMonths" type="number" min="1" max="600" value={leaseForm.leaseTermMonths} onChange={e => setLeaseForm(f => ({ ...f, leaseTermMonths: e.target.value }))} placeholder="24" className="w-full mt-1.5 p-3.5 bg-white rounded-xl text-sm font-bold text-gray-900 outline-none focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-gray-100 focus:border-[#ba0036]/30 transition-all" />
+                                </div>
+                              ) : fixedTerm ? (
+                                <div>
+                                  <label className={labelCls}>{isBn ? 'শেষ তারিখ' : 'End Date'}</label>
+                                  <input id="lease-leaseEnd" type="date" value={leaseForm.leaseEnd} onChange={e => setLeaseForm(f => ({ ...f, leaseEnd: e.target.value }))} className="w-full mt-1.5 p-3.5 bg-white rounded-xl text-sm font-bold text-gray-900 outline-none focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-gray-100 focus:border-[#ba0036]/30 transition-all" />
+                                </div>
+                              ) : null}
+                            </div>
+
+                            {/* Ongoing ⇄ fixed toggle — residential only. Turning
+                                the term off clears the date, so nothing expires by
+                                accident later. */}
+                            {!isCommercial && (
+                              <button
+                                type="button"
+                                onClick={() => setLeaseForm(f => {
+                                  if (f.leaseEnd) return { ...f, leaseEnd: '' };
+                                  const sd = new Date(f.leaseStart || todayIso());
+                                  const ed = new Date(sd.getFullYear() + 1, sd.getMonth(), sd.getDate() - 1);
+                                  return { ...f, leaseEnd: `${ed.getFullYear()}-${String(ed.getMonth() + 1).padStart(2, '0')}-${String(ed.getDate()).padStart(2, '0')}` };
+                                })}
+                                className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border border-gray-200 text-[10px] font-black uppercase tracking-widest text-gray-600 hover:text-gray-900 hover:border-gray-300 transition-all active:scale-95"
+                              >
+                                {fixedTerm
+                                  ? <><RefreshCw size={11} /> {isBn ? 'মেয়াদ সরিয়ে চলমান করুন' : 'Make it ongoing'}</>
+                                  : <><CalendarRange size={11} /> {isBn ? 'নির্দিষ্ট মেয়াদ যোগ করুন' : 'Add a fixed term'}</>}
+                              </button>
+                            )}
+
+                            {/* What actually gets saved, resolved live. */}
+                            {(() => {
+                              const { startIso, endIso } = resolveLeaseDates(leaseForm);
+                              return (
+                                <p className="text-[10px] font-bold text-gray-500 mt-2 leading-relaxed">
+                                  {endIso ? (
+                                    <>
+                                      {isBn ? 'মেয়াদ: ' : 'Term: '}
+                                      <span className="font-black text-gray-800 tabular-nums">{formatDate(startIso, language)} → {formatDate(endIso, language)}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="font-black text-gray-800 tabular-nums">{formatDate(startIso, language)}</span>
+                                      {isBn
+                                        ? ' থেকে চলমান — কোনো শেষ তারিখ নেই। ভাড়াটিয়া চলে গেলে "নতুন ভাড়াটিয়া" দিলেই এই লিজ বন্ধ হবে।'
+                                        : ' onward, ongoing — no end date. It closes the day you hand the unit to the next tenant.'}
+                                    </>
+                                  )}
+                                </p>
+                              );
+                            })()}
+                          </div>
+                        );
+                      })()}
 
                       {/* Advance + method — the up-front money and the channel it
                           came through. */}
@@ -5658,6 +5889,16 @@ const HostDashboard = () => {
                         </div>
                         <label className={labelCls}>{isBn ? 'কত দিন আগে রিমাইন্ডার?' : 'Remind X days before due'}</label>
                         <input type="number" min="0" max="14" value={leaseForm.reminderLeadDays} onChange={e => setLeaseForm(f => ({ ...f, reminderLeadDays: e.target.value }))} className="w-full mt-1.5 p-3 bg-white rounded-xl text-sm font-bold text-gray-900 outline-none focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
+                        {/* The cap is a promise to the tenant, so it's stated
+                            plainly to the landlord too: three messages a month,
+                            not a daily drip. */}
+                        {leaseForm.autoReminder && (
+                          <p className="text-[10px] font-bold text-gray-500 mt-2 leading-relaxed">
+                            {isBn
+                              ? `মাসে সর্বোচ্চ ৩টি রিমাইন্ডার: (১) ${Number(leaseForm.reminderLeadDays) || 3} দিন আগে, (২) ভাড়ার তারিখে, (৩) সময় পেরোলে। এর বেশি মেসেজ যাবে না।`
+                              : `Max 3 reminders a month: ${Number(leaseForm.reminderLeadDays) || 3} days before, on the due date, and once it's overdue. Never more than that.`}
+                          </p>
+                        )}
                       </div>
 
                       <div>
@@ -6421,9 +6662,13 @@ const HostDashboard = () => {
                 const rentDisplay = typeof booking?.monthlyRent === 'number'
                   ? formatBDT(booking.monthlyRent)
                   : (modalData.price ? `৳ ${modalData.price}` : '—');
+                // No end date on a live lease means ongoing, not "not set" —
+                // that read like the host had forgotten to fill something in.
                 const validUntil = booking?.leaseEnd
                   ? new Date(booking.leaseEnd).toLocaleDateString(language === 'বাংলা' ? 'bn-BD' : 'en-US', { month: 'short', year: 'numeric' })
-                  : (language === 'বাংলা' ? 'নির্ধারিত হয়নি' : 'Not set');
+                  : booking
+                    ? (language === 'বাংলা' ? 'চলমান' : 'Ongoing')
+                    : (language === 'বাংলা' ? 'নির্ধারিত হয়নি' : 'Not set');
                 return (
                   <div className="text-center space-y-6">
                     <div className="w-20 h-20 bg-blue-50 text-blue-500 rounded-[1.2rem] flex items-center justify-center mx-auto mb-3 shadow-sm"><FileText size={32} /></div>

@@ -27,6 +27,7 @@ export default function BookingsTab(props) {
     openTenantProfile, openChatPanel, openModal, isPremium, openBlankLease, setActiveModal,
     handleBookingUpdated,
     getLeaseSummary, computeLeaseStage, isLeaseEndingSoon, leaseDaysLeft, openTenantChangeLease,
+    isOpenEndedLease, leaseMonthsRunning,
     formatBDT, daysUntilNextDue, computeBookingProgress,
     isHostelBooking, formatDate, stageLabel
   } = props;
@@ -40,10 +41,18 @@ export default function BookingsTab(props) {
           // own pills), so anything we don't recognise falls back to "All"
           // rather than silently rendering an empty list.
           const stageFilter = (leaseStageFilter === 'active' || leaseStageFilter === 'done') ? leaseStageFilter : 'all';
-          const filtered = bookings.filter(b => {
+          const searchMatched = bookings.filter(matchesSearch);
+          const filtered = searchMatched.filter(b => {
             const stage = computeLeaseStage(b, todayDate);
-            return (stageFilter === 'all' || stage === stageFilter) && matchesSearch(b);
+            return stageFilter === 'all' || stage === stageFilter;
           });
+          // How many rows each filter would yield, so a pill says what it does
+          // before it's tapped instead of after.
+          const stageCounts = {
+            all: searchMatched.length,
+            active: searchMatched.filter(b => computeLeaseStage(b, todayDate) === 'active').length,
+            done: searchMatched.filter(b => computeLeaseStage(b, todayDate) === 'done').length,
+          };
           // Stage → coloured pill class for the compact row badge. Two stages
           // only (active | done); a live lease inside its renewal window gets
           // the amber treatment without being a stage of its own.
@@ -75,7 +84,13 @@ export default function BookingsTab(props) {
             const stage = computeLeaseStage(booking, todayDate);
             const endingSoon = isLeaseEndingSoon(booking, todayDate);
             const daysLeft = leaseDaysLeft(booking, todayDate);
+            // Ongoing tenancy — no end date, so there is no term to be a
+            // percentage of. computeBookingProgress returns null and we show how
+            // long the tenant has actually been here instead of a bar stuck at 0%.
+            const openEnded = isOpenEndedLease(booking);
             const progress = computeBookingProgress(booking, todayDate);
+            const monthsRunning = leaseMonthsRunning(booking, todayDate);
+            const runningLabel = isBn ? `${monthsRunning} মাস চলছে` : `${monthsRunning} mo running`;
             const progressBar = stage !== 'active' ? 'bg-gray-400' : endingSoon ? 'bg-amber-500' : 'bg-green-500';
             const next = daysUntilNextDue(booking, todayDate);
             const monthlyTotal = Number(booking.monthlyRent || 0) + Number(booking.serviceCharge || 0);
@@ -147,14 +162,24 @@ export default function BookingsTab(props) {
                       )}
                     </p>
                   </div>
-                  {/* Progress mini-bar — desktop, COLLAPSED only. Hidden once
-                      expanded (the body already shows the full Lease Progress bar),
-                      freeing the top-right corner for the 3-dot menu. */}
+                  {/* Right-hand meter — desktop, COLLAPSED only. Hidden once
+                      expanded (the body already shows the full detail), freeing
+                      the top-right corner for the 3-dot menu.
+                      Fixed term ⇒ % complete. Ongoing tenancy ⇒ how long the
+                      tenant has been here, which is the only honest number. */}
                   <div className={`flex-col items-end gap-0.5 shrink-0 mr-1 ${isExpanded ? 'hidden' : 'hidden sm:flex'}`}>
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest tabular-nums">{progress}%</span>
-                    <div className="w-12 h-1 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${progressBar}`} style={{ width: `${progress}%` }}/>
-                    </div>
+                    {progress == null ? (
+                      <span className="px-1.5 py-0.5 rounded-md bg-green-50 text-green-700 text-[9px] font-black uppercase tracking-wider tabular-nums whitespace-nowrap">
+                        {monthsRunning}{isBn ? ' মাস' : ' mo'}
+                      </span>
+                    ) : (
+                      <>
+                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest tabular-nums">{progress}%</span>
+                        <div className="w-12 h-1 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${progressBar}`} style={{ width: `${progress}%` }}/>
+                        </div>
+                      </>
+                    )}
                   </div>
                   {/* 3-dot actions menu — top-right of the card, next to the profile
                       photo/name. Shown when the lease is expanded. stopPropagation
@@ -258,9 +283,12 @@ export default function BookingsTab(props) {
 
                     {/* Advance money is shown in the "Deposit (Advance)" tile above. */}
 
-                    {/* Lease term — Move-In · Next Payment · Lease Expiry.
+                    {/* Lease term — Move-In · Next Payment · Tenancy.
                         3 columns on EVERY width (matches the mobile card design)
-                        instead of stacking to one column on phones. */}
+                        instead of stacking to one column on phones. The third
+                        tile reads "Ongoing" for a tenancy with no end date — the
+                        normal case — and only shows an expiry when the host
+                        actually set one. */}
                     <div className="mt-3 grid grid-cols-3 gap-1.5 sm:gap-3">
                       <div className="rounded-xl p-2 sm:p-2.5 border border-gray-100 bg-white min-w-0">
                         <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><Calendar size={9} className="shrink-0"/> <span className="truncate">{language === 'বাংলা' ? 'মুভ-ইন' : 'Move-In'}</span></p>
@@ -277,22 +305,74 @@ export default function BookingsTab(props) {
                           </p>
                         )}
                       </div>
-                      <div className="rounded-xl p-2 sm:p-2.5 border border-gray-100 bg-white min-w-0">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><CalendarRange size={9} className="shrink-0"/> <span className="truncate">{language === 'বাংলা' ? 'লিজ এক্সপায়ারি' : 'Lease Expiry'}</span></p>
-                        <p className="text-[10px] sm:text-xs font-black text-gray-900 mt-0.5">{formatDate(booking.leaseEnd, language)}</p>
+                      <div className={`rounded-xl p-2 sm:p-2.5 border min-w-0 ${openEnded && stage === 'active' ? 'border-green-100 bg-green-50/50' : 'border-gray-100 bg-white'}`}>
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><CalendarRange size={9} className="shrink-0"/> <span className="truncate">{openEnded ? (isBn ? 'ভাড়ার মেয়াদ' : 'Tenancy') : (isBn ? 'লিজ এক্সপায়ারি' : 'Lease Expiry')}</span></p>
+                        {openEnded ? (
+                          <>
+                            <p className={`text-[10px] sm:text-xs font-black mt-0.5 ${stage === 'active' ? 'text-green-700' : 'text-gray-900'}`}>
+                              {stage === 'done'
+                                ? (isBn ? 'বন্ধ করা হয়েছে' : 'Closed out')
+                                : (isBn ? 'চলমান' : 'Ongoing')}
+                            </p>
+                            <p className="text-[9px] font-bold text-gray-500 mt-0.5 tabular-nums leading-tight">
+                              {stage === 'done' ? (isBn ? 'নতুন ভাড়াটিয়া দেওয়া হয়েছে' : 'unit handed over') : runningLabel}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-[10px] sm:text-xs font-black text-gray-900 mt-0.5">{formatDate(booking.leaseEnd, language)}</p>
+                        )}
                       </div>
                     </div>
 
-                    {/* Lease progress bar */}
-                    <div className="mt-3">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'লিজের অগ্রগতি' : 'Lease Progress'}</span>
-                        <span className="text-[10px] font-black text-gray-700 tabular-nums">{progress}%</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full transition-all duration-1000 ease-out ${progressBar}`} style={{ width: `${progress}%` }}></div>
-                      </div>
+                    {/* Late fee — shown so the landlord can see at a glance what
+                        this tenant is actually being told. No fee set ⇒ the row
+                        says so, because "no late fee" is a real answer, not a
+                        missing setting. */}
+                    <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                      {Number(booking.lateFeeAmount) > 0 ? (
+                        <>
+                          <span className="px-2 py-1 rounded-lg bg-amber-50 border border-amber-100 text-[9px] sm:text-[10px] font-black text-amber-700 inline-flex items-center gap-1">
+                            <AlertCircle size={10} className="shrink-0"/>
+                            {isBn ? 'লেট ফি' : 'Late fee'} {formatBDT(booking.lateFeeAmount)}
+                          </span>
+                          <span className="px-2 py-1 rounded-lg bg-white border border-gray-100 text-[9px] sm:text-[10px] font-bold text-gray-600">
+                            {isBn
+                              ? `${booking.rentDueDay || 5} তারিখের পর ${booking.gracePeriodDays ?? 5} দিন গ্রেস`
+                              : `${booking.gracePeriodDays ?? 5}d grace after the ${booking.rentDueDay || 5}th`}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="px-2 py-1 rounded-lg bg-white border border-gray-100 text-[9px] sm:text-[10px] font-bold text-gray-500 inline-flex items-center gap-1">
+                          <MinusCircle size={10} className="shrink-0"/> {isBn ? 'কোনো লেট ফি নেই' : 'No late fee'}
+                        </span>
+                      )}
                     </div>
+
+                    {/* Term progress — only where there IS a term. An ongoing
+                        tenancy gets a plain "living here since X" line instead:
+                        a bar can't show progress toward a date that doesn't
+                        exist, and one frozen at 0% just looked broken. */}
+                    {progress == null ? (
+                      <div className="mt-3 flex items-center gap-2 px-2.5 py-2 rounded-xl bg-white border border-gray-100">
+                        <Clock size={12} className="text-green-600 shrink-0" />
+                        <span className="text-[10px] font-black text-gray-700 tracking-wide">
+                          {isBn ? 'বাস করছেন' : 'Living here since'} <span className="tabular-nums">{formatDate(booking.leaseStart, language)}</span>
+                        </span>
+                        <span className="ml-auto shrink-0 px-2 py-0.5 rounded-md bg-green-50 text-green-700 text-[9px] font-black uppercase tracking-wider tabular-nums">
+                          {runningLabel}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'লিজের অগ্রগতি' : 'Lease Progress'}</span>
+                          <span className="text-[10px] font-black text-gray-700 tabular-nums">{progress}%</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all duration-1000 ease-out ${progressBar}`} style={{ width: `${progress}%` }}></div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Seats — HOSTEL bookings only (each seat = a member with
                         their own rent box). Flat / sublet stay single-tenant. */}
@@ -328,32 +408,38 @@ export default function BookingsTab(props) {
                         and reminders carry over, the host edits just the name +
                         number, and saving closes this lease while starting a
                         fresh one with its own rent ledger. */}
-                    {(stage === 'done' || endingSoon) && (
-                      <div className={`mt-3 rounded-xl border p-3 flex items-center gap-2.5 ${stage === 'done' ? 'bg-white border-gray-200' : 'bg-amber-50 border-amber-200'}`}>
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${stage === 'done' ? 'bg-gray-100 text-gray-500' : 'bg-white text-amber-600 border border-amber-200'}`}>
-                          <RefreshCw size={15} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[11px] font-black text-gray-900 leading-tight">
-                            {stage === 'done'
-                              ? (isBn ? 'এই লিজ শেষ হয়েছে' : 'This lease has ended')
-                              : (isBn ? 'লিজ শেষ হতে চলেছে' : 'Lease is ending soon')}
-                          </p>
-                          <p className="text-[10px] font-bold text-gray-500 leading-tight mt-0.5">
-                            {isBn
-                              ? 'নতুন ভাড়াটিয়া এলে শুধু নাম ও নম্বর বদলে সেভ করুন — নতুন লিজ ও রেন্ট কালেকশন চালু হবে।'
-                              : 'When the next tenant arrives, just change the name + number — a new lease and rent ledger start.'}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => openTenantChangeLease(booking)}
-                          className={`shrink-0 px-2.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider active:scale-95 transition-all inline-flex items-center gap-1 ${stage === 'done' ? 'bg-gray-900 text-white hover:bg-black' : 'bg-amber-600 text-white hover:bg-amber-700'}`}
-                        >
-                          <Plus size={12} className="shrink-0" /> {isBn ? 'নতুন লিজ' : 'New Lease'}
-                        </button>
+                    {/* Always available — a tenant can leave on any day, not
+                        only when the term happens to be running out. The copy
+                        adapts to where the lease stands; the action is the same. */}
+                    <div className={`mt-3 rounded-xl border p-3 flex items-center gap-2.5 ${stage === 'done' ? 'bg-white border-gray-200' : endingSoon ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50/50 border-emerald-100'}`}>
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${stage === 'done' ? 'bg-gray-100 text-gray-500' : endingSoon ? 'bg-white text-amber-600 border border-amber-200' : 'bg-white text-emerald-600 border border-emerald-100'}`}>
+                        <RefreshCw size={15} />
                       </div>
-                    )}
+                      <div className="min-w-0 flex-1">
+                        {/* For an ongoing tenancy this panel IS how a lease
+                            ends, so it names the actual event — the tenant
+                            moved out — rather than a vague "changed". */}
+                        <p className="text-[11px] font-black text-gray-900 leading-tight">
+                          {stage === 'done'
+                            ? (isBn ? 'এই লিজ শেষ হয়েছে' : 'This lease has ended')
+                            : endingSoon
+                              ? (isBn ? 'লিজ শেষ হতে চলেছে' : 'Lease is ending soon')
+                              : (isBn ? 'ভাড়াটিয়া চলে গেছেন?' : 'Tenant moved out?')}
+                        </p>
+                        <p className="text-[10px] font-bold text-gray-500 leading-tight mt-0.5">
+                          {isBn
+                            ? 'নতুন ভাড়াটিয়া এলে শুধু নাম ও নম্বর বদলে সেভ করুন — একই ইউনিটে নতুন লিজ ও নতুন রেন্ট লেজার চালু হবে।'
+                            : 'When the next tenant arrives, just change the name + number — the same unit gets a new lease and a fresh rent ledger.'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openTenantChangeLease(booking)}
+                        className={`shrink-0 px-2.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider active:scale-95 transition-all inline-flex items-center gap-1 ${stage === 'done' ? 'bg-gray-900 text-white hover:bg-black' : endingSoon ? 'bg-amber-600 text-white hover:bg-amber-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
+                      >
+                        <Plus size={12} className="shrink-0" /> {isBn ? 'নতুন লিজ' : 'New Lease'}
+                      </button>
+                    </div>
 
                     {/* Auto-reminder + actions row — stays on ONE line on every
                         device. Never wraps (that's what pushed the ⋮ menu onto its
@@ -406,6 +492,90 @@ export default function BookingsTab(props) {
               </div>
             );
           };
+          // ── TOOLBAR PIECES ─────────────────────────────────────────────
+          // Built once, positioned three different ways so each screen gets a
+          // layout that suits it rather than one row squeezed or stretched:
+          //   mobile  → identity + Add Tenant on line 1, full-width search on
+          //             line 2, filter pills on line 3
+          //   tablet  → identity + search + Add Tenant on line 1, pills below
+          //   desktop → everything on a single line, action pinned right
+          const searchField = (
+            <div className="relative w-full">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={isBn ? 'ভাড়াটিয়া বা বাড়ি খুঁজুন...' : 'Search tenant or property...'}
+                aria-label={isBn ? 'ভাড়াটিয়া খুঁজুন' : 'Search tenants'}
+                className="w-full pl-8 pr-8 py-2.5 rounded-xl bg-white text-[11px] font-bold text-gray-900 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-transparent focus:border-[#ba0036]/25 focus:shadow-[0_4px_14px_rgba(186,0,54,0.08)] focus:outline-none placeholder:text-gray-400 transition-all"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  aria-label={isBn ? 'সার্চ মুছুন' : 'Clear search'}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  <X size={12} strokeWidth={3} />
+                </button>
+              )}
+            </div>
+          );
+
+          // Three filters, nothing more: All / Active / Done. Draft and Notice
+          // were removed — they described dates, not decisions, and hosts read
+          // them as broken states. Each pill carries its own result count.
+          const filterPills = ['all', 'active', 'done'].map(f => {
+            const on = stageFilter === f;
+            return (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setLeaseStageFilter(f)}
+                aria-pressed={on}
+                className={`shrink-0 px-3 py-2 rounded-xl text-[10px] font-black capitalize transition-all whitespace-nowrap inline-flex items-center gap-1.5 ${on ? 'bg-gray-900 text-white shadow-[0_3px_10px_rgba(0,0,0,0.18)]' : 'bg-white text-gray-500 hover:text-gray-900 shadow-[0_2px_6px_rgba(0,0,0,0.03)]'}`}
+              >
+                {stageLabel(f, language)}
+                <span className={`tabular-nums ${on ? 'text-white/70' : 'text-gray-400'}`}>{stageCounts[f]}</span>
+              </button>
+            );
+          });
+
+          // Primary action. A landlord's whole reason for being on this tab is
+          // to put a tenant in a unit, so it looks like the main thing: brand
+          // gradient, a lifted shadow, an icon chip, and a label that never
+          // collapses to a bare "+" (an unlabelled icon is guesswork).
+          // Fills the remaining width on a phone, content-width from tablet up,
+          // pinned to the right edge on desktop.
+          const addTenantButton = (
+            <button
+              type="button"
+              onClick={() => isPremium ? openBlankLease() : setActiveModal('premium_gate')}
+              aria-label={isBn ? 'নতুন ভাড়াটিয়া যোগ করুন' : 'Add a new tenant'}
+              className="group relative overflow-hidden flex-1 sm:flex-none sm:shrink-0 min-w-0 px-3 sm:px-3.5 py-2.5 rounded-xl bg-gradient-to-br from-[#ba0036] via-[#d1003d] to-[#ff004c] text-white shadow-[0_5px_16px_rgba(186,0,54,0.32)] hover:shadow-[0_9px_24px_rgba(186,0,54,0.42)] active:scale-[0.97] transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ba0036]/40 focus-visible:ring-offset-2 xl:ml-auto"
+            >
+              {/* Soft top-light sheen on hover — depth without a colour change. */}
+              <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <span className="relative flex items-center justify-center gap-1.5">
+                <span className="w-5 h-5 rounded-lg bg-white/20 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110">
+                  {isPremium ? <Plus size={13} strokeWidth={3.5} /> : <Crown size={12} strokeWidth={3} />}
+                </span>
+                <span className="text-[11px] font-black uppercase tracking-wider truncate">
+                  {isBn ? 'ভাড়াটিয়া যোগ' : 'Add Tenant'}
+                </span>
+              </span>
+            </button>
+          );
+
+          const countChip = (
+            <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
+              <CalendarRange size={12} className="text-[#ba0036]"/>
+              <span className="hidden sm:inline">{isBn ? 'ভাড়াটিয়া' : 'Tenants'}</span>
+              <span className="text-gray-400 tabular-nums">{filtered.length}</span>
+            </span>
+          );
+
           return (
           <div className="w-full animate-in fade-in zoom-in-95 duration-500">
 
@@ -536,59 +706,38 @@ export default function BookingsTab(props) {
               {/* ── RIGHT MAIN — main IS the scroll container; sticky toolbar pins inside it ── */}
               <main className="xl:col-span-8 w-full xl:h-full xl:overflow-y-auto custom-scrollbar pb-24 xl:pr-3 min-w-0">
 
-                {/* Sticky toolbar — ONE row. Title is a tiny chip in the
-                    corner; search + filter pills + New Lease share the same
-                    sticky line. Because <main> is the scroll container, this
-                    bar pins to the top of the list as the host scrolls (works
-                    on both desktop and mobile). */}
+                {/* Sticky toolbar — three layouts, one set of controls.
+                    Because <main> is the scroll container this bar pins to the
+                    top of the list as the host scrolls, on every device.
+
+                      mobile   line 1 · count chip + Add Tenant (fills the row)
+                               line 2 · search, full width
+                               line 3 · filter pills
+                      tablet   line 1 · count chip + search + Add Tenant
+                               line 2 · filter pills
+                      desktop  one line · chip + search + pills + Add Tenant
+
+                    The search box and the pills that act on it always sit
+                    together, directly above the results they produce. */}
                 <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:-mx-4 xl:mx-0 px-3 sm:px-4 xl:px-0 pt-2 pb-3 mb-2 xl:pt-1">
-                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap xl:flex-nowrap">
-                    {/* Title corner chip — small, gray, with live count. */}
-                    <span className="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/70 text-[9px] xl:text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-                      <CalendarRange size={11} className="text-[#ba0036]"/>
-                      <span className="hidden sm:inline">{language === 'বাংলা' ? 'লিজ' : 'Leases'}</span>
-                      <span className="text-gray-400 tabular-nums">{filtered.length}</span>
-                    </span>
-                    {/* Search input — flexes to fill, capped on desktop. */}
-                    <div className="relative flex-1 min-w-[120px] xl:max-w-[260px] order-3 sm:order-none basis-full sm:basis-auto">
-                      <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                      <input
-                        type="search"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder={language === 'বাংলা' ? 'খুঁজুন...' : 'Search tenants...'}
-                        className="w-full pl-7 pr-2 py-2 rounded-xl bg-white text-[11px] font-bold text-gray-900 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-transparent focus:border-gray-200 focus:outline-none placeholder:text-gray-400"
-                      />
-                    </div>
-                    {/* Filter pills — horizontal scroll on narrow viewports.
-                        No flex-1 so the pills stay content-width and the New
-                        Lease (+) button sits right next to the "Done" pill
-                        instead of being pushed to the far edge. */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar xl:flex-none order-1 sm:order-none min-w-0">
-                      {/* Three filters, nothing more: All / Active / Done.
-                          Draft and Notice were removed — they described dates,
-                          not decisions, and hosts read them as broken states. */}
-                      {['all', 'active', 'done'].map(f => (
-                        <button
-                          key={f}
-                          onClick={() => setLeaseStageFilter(f)}
-                          className={`shrink-0 px-2.5 sm:px-3 py-2 rounded-xl text-[10px] font-black capitalize transition-all whitespace-nowrap ${stageFilter === f ? 'bg-gray-900 text-white shadow-[0_2px_8px_rgba(0,0,0,0.15)]' : 'bg-white text-gray-500 hover:text-gray-900 shadow-[0_2px_6px_rgba(0,0,0,0.03)]'}`}
-                        >
-                          {stageLabel(f, language)}
-                        </button>
-                      ))}
-                    </div>
-                    {/* New Lease action (add booking) — sits right next to the
-                        "Done" filter pill on mobile (order-2, after the pills),
-                        then reverts to its corner-pinned spot from sm up. */}
-                    <button
-                      onClick={() => isPremium ? openBlankLease() : setActiveModal('premium_gate')}
-                      className="shrink-0 bg-[#ba0036] hover:bg-[#90002a] text-white px-3 py-2 rounded-xl font-black text-[10px] shadow-[0_4px_12px_rgba(186,0,54,0.25)] transition-all flex items-center gap-1.5 active:scale-95 order-2 sm:order-none sm:ml-auto"
-                    >
-                      {isPremium ? <Plus size={13}/> : <Crown size={13}/>}
-                      <span className="hidden sm:inline">{language === 'বাংলা' ? 'নতুন লিজ' : 'New Lease'}</span>
-                    </button>
+                  {/* Line 1 — who/what + the primary action. Search joins this
+                      line from the sm breakpoint up. */}
+                  <div className="flex items-center gap-2">
+                    {countChip}
+                    {/* Search absorbs the slack, so it's the one thing that
+                        shrinks when the desktop row gets tight — the pills and
+                        the action keep their full size. */}
+                    <div className="hidden sm:block flex-1 min-w-0 xl:max-w-[220px] 2xl:max-w-[300px]">{searchField}</div>
+                    {/* Desktop: pills sit inline, between search and the action. */}
+                    <div className="hidden xl:flex items-center gap-1.5 shrink-0">{filterPills}</div>
+                    {addTenantButton}
                   </div>
+                  {/* Line 2 — mobile-only search, given the full width so a long
+                      tenant name is actually readable while typing. */}
+                  <div className="mt-2 sm:hidden">{searchField}</div>
+                  {/* Line 3 — filter pills (below desktop). Horizontal scroll
+                      keeps them on one line on the narrowest phones. */}
+                  <div className="flex xl:hidden items-center gap-1.5 mt-2 overflow-x-auto no-scrollbar">{filterPills}</div>
                 </div>
 
                 {/* List — flat sequence of compact rows. Sticky toolbar above
@@ -621,12 +770,21 @@ export default function BookingsTab(props) {
                             : (isBn ? 'ভাড়াটিয়া যোগ করতে নতুন লিজ তৈরি করুন — ফ্ল্যাট, সিঙ্গেল রুম, হোস্টেল বা কমার্শিয়াল। সেভ করলেই রেন্ট কালেকশন চালু হবে।' : 'Add a tenant by creating a lease — flat, single room, hostel or commercial. Saving it starts Rent Collection.')}
                         </p>
                         <div className="mt-5 flex flex-col sm:flex-row items-center justify-center gap-2">
+                          {/* Same treatment as the toolbar action so the primary
+                              step looks identical wherever the host meets it. */}
                           <button
+                            type="button"
                             onClick={() => isPremium ? openBlankLease() : setActiveModal('premium_gate')}
-                            className="w-full sm:w-auto bg-[#ba0036] hover:bg-[#90002a] text-white px-5 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-[0_6px_18px_rgba(186,0,54,0.28)] transition-all inline-flex items-center justify-center gap-2 active:scale-95"
+                            aria-label={isBn ? 'নতুন ভাড়াটিয়া যোগ করুন' : 'Add a new tenant'}
+                            className="group relative overflow-hidden w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-br from-[#ba0036] via-[#d1003d] to-[#ff004c] text-white shadow-[0_8px_24px_rgba(186,0,54,0.3)] hover:shadow-[0_12px_32px_rgba(186,0,54,0.4)] active:scale-[0.97] transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ba0036]/40 focus-visible:ring-offset-2"
                           >
-                            {isPremium ? <Plus size={15}/> : <Crown size={15}/>}
-                            {isBn ? 'নতুন লিজ' : 'New Lease'}
+                            <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                            <span className="relative inline-flex items-center justify-center gap-2">
+                              <span className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110">
+                                {isPremium ? <Plus size={15} strokeWidth={3.5}/> : <Crown size={14} strokeWidth={3}/>}
+                              </span>
+                              <span className="text-xs font-black uppercase tracking-widest">{isBn ? 'ভাড়াটিয়া যোগ করুন' : 'Add Tenant'}</span>
+                            </span>
                           </button>
                           {filteredOut && stageFilter !== 'all' && (
                             <button

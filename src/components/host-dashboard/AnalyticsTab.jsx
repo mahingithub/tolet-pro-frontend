@@ -27,7 +27,9 @@ const AnalyticsTab = ({
   const yearMonths = Array.from({length: 12}, (_, i) => `${ledgerScopeYear}-${String(i+1).padStart(2,'0')}`);
 
   const scorecards = bookings.map((b) => {
-    const leaseMonths = enumerateLeaseMonths(b.leaseStart, b.leaseEnd);
+    // Scope year is passed through so an ONGOING tenancy (no end date) still
+    // reports months when the host looks at a year ahead of this one.
+    const leaseMonths = enumerateLeaseMonths(b.leaseStart, b.leaseEnd, ledgerScopeYear);
     const inLeaseYearMonths = yearMonths.filter(k => leaseMonths.includes(k));
     const cutoffIdx = ledgerScopeYear === currentYear ? todayDate.getMonth() : 11;
     const dueSoFar = inLeaseYearMonths.filter(k => {
@@ -94,7 +96,7 @@ const AnalyticsTab = ({
       return sum + (e?.paid ? Number(e?.amount || 0) : 0);
     }, 0);
     const expected = bookings.reduce((sum, b) => {
-      const leaseMonths = enumerateLeaseMonths(b.leaseStart, b.leaseEnd);
+      const leaseMonths = enumerateLeaseMonths(b.leaseStart, b.leaseEnd, ledgerScopeYear);
       return sum + (leaseMonths.includes(k) ? Number(b.monthlyRent || 0) : 0);
     }, 0);
     return { key: k, monthIdx: i, collected, expected };

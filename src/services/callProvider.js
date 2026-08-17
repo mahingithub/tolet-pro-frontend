@@ -34,9 +34,10 @@
  *   STUN is a free service that answers the question "what does my address look
  *   like from the outside?" so the two peers can find each other. For the vast
  *   majority of networks, STUN alone is enough. A small number of strict/mobile
- *   networks (symmetric NAT) also need a TURN relay to connect — TURN is NOT
- *   free to run, so we don't use one. If some users on strict networks can't
- *   connect, see the note next to ICE_SERVERS for how to add a TURN server later.
+ *   networks (symmetric NAT) also need a TURN relay, which forwards the media
+ *   instead of the peers talking directly. We DO use TURN: Metered (metered.ca),
+ *   configured in ICE_SERVERS below. Media only goes through that relay when a
+ *   direct link can't be established.
  *
  * ── Public API (imported by GlobalCallUI, ChatSystem, CallQualityOverlay) ────
  *   connect, disconnect, getSocket, isConnected
@@ -59,47 +60,89 @@ const SOCKET_URL = import.meta.env.VITE_API_BASE_URL
 // a direct peer-to-peer link can't be established (strict/mobile/carrier NAT) —
 // this is what stops calls from flapping "connected → disconnected" on mobile.
 //
-// The TURN entries below are Metered (metered.ca). NOTE: these credentials are
-// intended for client-side (browser) use and are therefore visible in the built
-// bundle — that is normal for TURN. Prefer moving them to a VITE_ env var and/or
-// Metered's short-lived credential API if you want to rotate them without a
-// redeploy. The tcp/443 + turns entries let calls punch through firewalls that
-// only allow HTTPS traffic.
+// The TURN entries are Metered (metered.ca). TURN credentials are used by the
+// browser, so they are always visible in the built bundle — that is normal and
+// unavoidable. What matters is being able to ROTATE them, hence the env vars:
+//
+//   VITE_TURN_HOST        default global.relay.metered.ca
+//   VITE_TURN_STUN_HOST   default stun.relay.metered.ca
+//   VITE_TURN_USERNAME    default = the committed Metered key
+//   VITE_TURN_CREDENTIAL  default = the committed Metered secret
+//
+// Set them in the deploy environment to swap credentials (or providers) without
+// a code change; unset, everything behaves exactly as before. The real fix for
+// scraped credentials is Metered's short-lived credential API behind a backend
+// endpoint — these vars are the step that makes that swap a one-liner here.
+const TURN_HOST       = import.meta.env.VITE_TURN_HOST       || 'global.relay.metered.ca';
+const TURN_STUN_HOST  = import.meta.env.VITE_TURN_STUN_HOST  || 'stun.relay.metered.ca';
+const TURN_USERNAME   = import.meta.env.VITE_TURN_USERNAME   || 'cf7ceeb95aa081e6df81e60f';
+const TURN_CREDENTIAL = import.meta.env.VITE_TURN_CREDENTIAL || 'C0QeQUvvuyE2ur2z';
+
 const ICE_SERVERS = [
   // Google free STUN
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
 
-  // Metered STUN + TURN
-  { urls: 'stun:stun.relay.metered.ca:80' },
-  {
-    urls: 'turn:global.relay.metered.ca:80',
-    username: 'cf7ceeb95aa081e6df81e60f',
-    credential: 'C0QeQUvvuyE2ur2z',
-  },
-  {
-    urls: 'turn:global.relay.metered.ca:80?transport=tcp',
-    username: 'cf7ceeb95aa081e6df81e60f',
-    credential: 'C0QeQUvvuyE2ur2z',
-  },
-  {
-    urls: 'turn:global.relay.metered.ca:443',
-    username: 'cf7ceeb95aa081e6df81e60f',
-    credential: 'C0QeQUvvuyE2ur2z',
-  },
-  {
-    urls: 'turns:global.relay.metered.ca:443?transport=tcp',
-    username: 'cf7ceeb95aa081e6df81e60f',
-    credential: 'C0QeQUvvuyE2ur2z',
-  },
+  // Metered STUN + TURN. The tcp/443 + turns entries are what get through
+  // firewalls that only allow HTTPS-looking traffic.
+  { urls: `stun:${TURN_STUN_HOST}:80` },
+  ...[
+    `turn:${TURN_HOST}:80`,
+    `turn:${TURN_HOST}:80?transport=tcp`,
+    `turn:${TURN_HOST}:443`,
+    `turns:${TURN_HOST}:443?transport=tcp`,
+  ].map((urls) => ({ urls, username: TURN_USERNAME, credential: TURN_CREDENTIAL })),
 ];
 
-// ─── Media quality (kept modest so it works on 3G/4G) ───────────────────────
-const VIDEO_CONSTRAINTS = {
+// ─── Media quality ───────────────────────────────────────────────────────────
+// Two profiles. Phones stay at 360p/15fps because most of our users are on
+// mobile data. Laptops capture 720p: the call overlay is full-screen there, so
+// a 640x360 frame had to be upscaled 2-3x and looked soft and blocky.
+//
+// Anything that smells like a metered or slow link (Save-Data, 2G/3G) drops back
+// to the mobile profile even on a laptop.
+const VIDEO_PROFILE_MOBILE = {
   width: { ideal: 640, max: 640 },
   height: { ideal: 360, max: 360 },
   frameRate: { ideal: 15, max: 24 },
 };
+
+const VIDEO_PROFILE_DESKTOP = {
+  width: { ideal: 1280, max: 1280 },
+  height: { ideal: 720, max: 720 },
+  frameRate: { ideal: 24, max: 30 },
+};
+
+// Upper bound on what we SEND, per profile. Without this a laptop encoder will
+// happily push 2.5 Mbps at 720p to a phone on 4G and the receiver stutters.
+// WebRTC's own congestion control still scales below these numbers; this only
+// stops it from aiming too high in the first place.
+const MAX_SEND_BITRATE = { mobile: 600_000, desktop: 1_200_000 };
+
+// A laptop/desktop reports a fine pointer + hover, and so does a touchscreen
+// laptop (the query describes the PRIMARY input, which is still the trackpad).
+// Phones and tablets report a coarse pointer and no hover, so they stay on the
+// mobile profile whatever their size. The width floor keeps a small or narrow
+// browser window on the mobile profile too, since the video is rendered small
+// there anyway.
+const isDesktopLike = () => {
+  try {
+    return window.matchMedia('(pointer: fine) and (hover: hover)').matches && window.innerWidth >= 1024;
+  } catch {
+    return false;
+  }
+};
+
+const prefersLowBandwidth = () => {
+  const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (!c) return false;
+  if (c.saveData) return true;
+  return ['slow-2g', '2g', '3g'].includes(c.effectiveType);
+};
+
+// 'desktop' | 'mobile' — which capture profile this device should use.
+const videoProfileName = () => (isDesktopLike() && !prefersLowBandwidth() ? 'desktop' : 'mobile');
+const videoConstraints = () => (videoProfileName() === 'desktop' ? VIDEO_PROFILE_DESKTOP : VIDEO_PROFILE_MOBILE);
 
 const AUDIO_CONSTRAINTS = {
   echoCancellation: true,
@@ -301,7 +344,7 @@ function disconnect() {
 async function getLocalStream(type) {
   const constraints = {
     audio: AUDIO_CONSTRAINTS,
-    video: type === 'video' ? { ...VIDEO_CONSTRAINTS, facingMode: _facingMode } : false,
+    video: type === 'video' ? { ...videoConstraints(), facingMode: _facingMode } : false,
   };
   try {
     _localStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -320,6 +363,26 @@ async function getLocalStream(type) {
 }
 
 /**
+ * Cap the outgoing video bitrate for the current capture profile. Called right
+ * after the tracks are attached. Best-effort: browsers that don't support
+ * per-encoding parameters just keep their own defaults, and prefer-degrade
+ * keeps motion smooth by dropping resolution before frame rate.
+ */
+async function applySendBitrateCap() {
+  try {
+    const sender = _peerConnection?.getSenders().find((s) => s.track?.kind === 'video');
+    if (!sender?.getParameters) return;
+    const params = sender.getParameters();
+    if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+    params.encodings[0].maxBitrate = MAX_SEND_BITRATE[videoProfileName()];
+    params.degradationPreference = 'balanced';
+    await sender.setParameters(params);
+  } catch (err) {
+    console.warn('[callProvider] could not set send bitrate cap:', err?.message || err);
+  }
+}
+
+/**
  * Build the RTCPeerConnection — the object that actually holds the direct link
  * to the other person. We attach our media, listen for theirs, and relay ICE
  * candidates through the socket.
@@ -330,6 +393,7 @@ function createPeerConnection() {
   // 1. Send our own audio/video tracks to the peer.
   if (_localStream) {
     _localStream.getTracks().forEach((track) => _peerConnection.addTrack(track, _localStream));
+    applySendBitrateCap();
   }
 
   // 2. When the peer's media arrives, hand it up to the UI to render.
@@ -483,42 +547,103 @@ function attemptReconnect() {
 }
 
 // ─── Optional call-quality monitor (drives CallQualityOverlay) ────────────────
-// Reads WebRTC stats every 2s and turns packet loss into a 0–4 level
-// (0 = excellent, 4 = unusable). Purely informational; never affects the call.
+// Reads WebRTC stats every 2s and turns packet loss, jitter and round-trip time
+// into a 0–4 level (0 = excellent, 4 = unusable), emitted as
+// { level, lossPct, jitterMs, rttMs, kbps }. Consumers only need `level`; the
+// rest is there for debugging. It also logs, once per call, whether the media
+// went direct or through the TURN relay. Purely informational — it never
+// changes the call.
 
 function startStatsMonitor() {
   if (_statsTimer || !_peerConnection) return;
   let lastLost = 0;
   let lastTotal = 0;
+  let lastBytes = 0;
+  let lastAt = 0;
+  let pathLogged = false;
 
   _statsTimer = setInterval(async () => {
     if (!_peerConnection) return;
     try {
       const stats = await _peerConnection.getStats();
+
+      // Index by id so a candidate-pair can be resolved to its candidates.
+      const byId = new Map();
+      stats.forEach((report) => byId.set(report.id, report));
+
       let packetsLost = 0;
       let packetsReceived = 0;
+      let bytesReceived = 0;
+      let jitterMs = 0;
+      let rttMs = 0;
+      let pair = null;
+
       stats.forEach((report) => {
         if (report.type === 'inbound-rtp' && !report.isRemote) {
           packetsLost += report.packetsLost || 0;
           packetsReceived += report.packetsReceived || 0;
+          bytesReceived += report.bytesReceived || 0;
+          // jitter is reported in seconds.
+          if (typeof report.jitter === 'number') jitterMs = Math.max(jitterMs, report.jitter * 1000);
+        }
+        if (report.type === 'candidate-pair' && (report.selected || report.nominated) && report.state === 'succeeded') {
+          pair = report;
+          if (typeof report.currentRoundTripTime === 'number') {
+            rttMs = Math.max(rttMs, report.currentRoundTripTime * 1000);
+          }
         }
       });
 
+      // Log the media path once per call: did we get a direct link, or is
+      // everything being relayed through TURN? This is the only place in the app
+      // that surfaces it, and it's the first thing to check when a call is rough.
+      if (!pathLogged && pair) {
+        const lc = byId.get(pair.localCandidateId);
+        const rc = byId.get(pair.remoteCandidateId);
+        const relayed = lc?.candidateType === 'relay' || rc?.candidateType === 'relay';
+        console.log(
+          `[callProvider] media path: ${relayed ? 'TURN relay' : 'direct P2P'} `
+          + `(${lc?.candidateType || '?'} <-> ${rc?.candidateType || '?'}, ${lc?.protocol || '?'}) `
+          + `· capture profile: ${videoProfileName()}`,
+        );
+        pathLogged = true;
+      }
+
+      const now = Date.now();
       const deltaLost = packetsLost - lastLost;
       const deltaTotal = (packetsReceived + packetsLost) - lastTotal;
+      const kbps = lastAt ? Math.round(((bytesReceived - lastBytes) * 8) / (now - lastAt)) : null;
       lastLost = packetsLost;
       lastTotal = packetsReceived + packetsLost;
+      lastBytes = bytesReceived;
+      lastAt = now;
+
+      const lossPct = deltaTotal > 0 ? (deltaLost / deltaTotal) * 100 : 0;
 
       let level = 0;
-      if (deltaTotal > 0) {
-        const loss = deltaLost / deltaTotal;
-        if (loss > 0.30) level = 4;
-        else if (loss > 0.15) level = 3;
-        else if (loss > 0.07) level = 2;
-        else if (loss > 0.02) level = 1;
-        else level = 0;
-      }
-      _emit(_networkQualityCbs, { level });
+      if (lossPct > 30) level = 4;
+      else if (lossPct > 15) level = 3;
+      else if (lossPct > 7) level = 2;
+      else if (lossPct > 2) level = 1;
+
+      // Loss alone under-reports: a call with high jitter or a long round trip
+      // feels choppy and laggy while barely dropping packets. Report the worst
+      // of the three so the indicator matches what the user actually hears.
+      if (jitterMs > 120) level = Math.max(level, 3);
+      else if (jitterMs > 60) level = Math.max(level, 2);
+      else if (jitterMs > 30) level = Math.max(level, 1);
+
+      if (rttMs > 700) level = Math.max(level, 3);
+      else if (rttMs > 400) level = Math.max(level, 2);
+      else if (rttMs > 250) level = Math.max(level, 1);
+
+      _emit(_networkQualityCbs, {
+        level,
+        lossPct: Number(lossPct.toFixed(1)),
+        jitterMs: Math.round(jitterMs),
+        rttMs: Math.round(rttMs),
+        kbps,
+      });
     } catch {
       /* getStats can fail transiently — safe to ignore */
     }
@@ -700,7 +825,7 @@ async function switchCamera() {
   _facingMode = _facingMode === 'user' ? 'environment' : 'user';
   try {
     const newStream = await navigator.mediaDevices.getUserMedia({
-      video: { ...VIDEO_CONSTRAINTS, facingMode: _facingMode },
+      video: { ...videoConstraints(), facingMode: _facingMode },
       audio: false,
     });
     const newTrack = newStream.getVideoTracks()[0];

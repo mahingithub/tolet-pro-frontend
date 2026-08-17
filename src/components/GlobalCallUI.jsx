@@ -561,11 +561,24 @@ const GlobalCallUI = () => {
             {/* Remote + local video (connected video call) */}
             {isInCall && isVideoCall && (
               <div className="absolute inset-0 bg-black">
-                <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                {/* Local self-view — mirrored (scale-x-[-1]) like every camera app. */}
-                <video ref={localVideoRef} autoPlay playsInline muted className={`absolute bottom-32 right-4 w-28 h-40 sm:w-40 sm:h-56 object-cover rounded-2xl border-2 border-white/25 shadow-2xl bg-black scale-x-[-1] ${videoOff ? 'hidden' : ''}`} />
+                {/* Remote view.
+                    Phone/tablet (< lg): object-cover — full-bleed is what a
+                    native call app looks like, and the crop is small because a
+                    phone screen and a phone camera are both portrait.
+                    Laptop/desktop (lg+): object-contain. `cover` scales the
+                    frame until it fills a wide 16:9-or-wider window, so a
+                    portrait stream from the other person's phone got blown up
+                    and cropped to a head-and-shoulders zoom. `contain` fits the
+                    whole frame and letterboxes into the black backdrop — the
+                    same thing Meet/Zoom do on desktop. */}
+                <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover lg:object-contain" />
+                {/* Local self-view — mirrored (scale-x-[-1]) like every camera app.
+                    Portrait tile on phones (portrait camera), landscape 16:9
+                    tile on laptops (lg:w-64 = 256px / lg:h-36 = 144px) so a
+                    webcam frame isn't cropped into a zoomed portrait box. */}
+                <video ref={localVideoRef} autoPlay playsInline muted className={`absolute bottom-32 right-4 w-28 h-40 sm:w-40 sm:h-56 lg:w-64 lg:h-36 object-cover rounded-2xl border-2 border-white/25 shadow-2xl bg-black scale-x-[-1] ${videoOff ? 'hidden' : ''}`} />
                 {videoOff && (
-                  <div className="absolute bottom-32 right-4 w-28 h-40 sm:w-40 sm:h-56 rounded-2xl border-2 border-white/25 shadow-2xl bg-gray-800 flex items-center justify-center">
+                  <div className="absolute bottom-32 right-4 w-28 h-40 sm:w-40 sm:h-56 lg:w-64 lg:h-36 rounded-2xl border-2 border-white/25 shadow-2xl bg-gray-800 flex items-center justify-center">
                     <VideoOff size={26} className="text-white/50" />
                   </div>
                 )}
