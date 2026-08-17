@@ -279,7 +279,11 @@ const translations = {
     availableNow: "Available Now",
     availableThisMonth: "Available This Month",
     availableNextMonth: "Available Next Month",
-    filterRating: "Property Rating",
+    // The star value on a listing card is the average of the LANDLORD's
+    // reviews (property.controller.js derives it from Review docs with
+    // revieweeRole 'landlord'), never a score for the house itself — so the
+    // filter is labelled for what it actually measures.
+    filterRating: "Landlord Rating",
     star4Above: "4★ & Above",
     star3Above: "3★ & Above",
     anyRating: "Any Rating",
@@ -1039,7 +1043,7 @@ const translations = {
     availableNow: "তাৎক্ষণিক প্রবেশযোগ্য",
     availableThisMonth: "চলতি মাসে",
     availableNextMonth: "আগামী মাসে",
-    filterRating: "বাসার রেটিং",
+    filterRating: "বাড়িওয়ালার রেটিং",
     star4Above: "৪.০ ও তার উপরে",
     star3Above: "৩.০ ও তার উপরে",
     anyRating: "যেকোনো রেটিং",

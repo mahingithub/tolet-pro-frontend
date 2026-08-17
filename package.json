@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "geo:generate": "node scripts/generate-bd-geo.mjs",
+    "geo:verify": "node scripts/verify-bd-geo.mjs"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",

@@ -1,8 +1,7 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import notificationService from '../services/notificationService';
-import chatService from '../services/chatService';
 import callProvider from '../services/callProvider';
 import { useAuth } from './AuthContext'; // Need to make sure AuthContext exists and can be imported
 
@@ -28,8 +27,6 @@ export function NotificationProvider({ children }) {
     const saved = localStorage.getItem('notif_dnd_schedule');
     return saved !== null ? JSON.parse(saved) : { enabled: false, from: '22:00', until: '08:00' };
   });
-
-  const lastConnectedTimeRef = useRef(new Date().toISOString());
 
   useEffect(() => {
     localStorage.setItem('notif_sound_enabled', JSON.stringify(soundEnabled));
@@ -99,13 +96,29 @@ export function NotificationProvider({ children }) {
       // RECEIVE_MESSAGE event), so we must NOT toast them again here — that was
       // the duplicate. We still added the item + bumped unread above, so the
       // notification bell/list stays accurate.
-      if (['booking', 'payment', 'receipt', 'rent_receipt'].includes(data.type)) {
+      //
+      // 'marketing' (admin Subscriptions → Send Offer) must be in this list: the
+      // admin console advertises the in-app channel as a live pop-up, but
+      // without it an offer only ever appeared silently in the bell list, which
+      // read as "notifications aren't going through".
+      //
+      // 'rent_updated' too — the landlord changed this tenant's rent or lease
+      // terms, which is at least as worth interrupting for as a receipt.
+      const TOASTABLE = ['booking', 'payment', 'receipt', 'rent_receipt', 'rent_updated', 'marketing'];
+
+      // DND applies to PROMOTIONAL traffic only. The rest of this list is
+      // transactional — a rent receipt or an overdue notice is exactly what a
+      // tenant wants to see the moment it happens, and silencing those on a
+      // schedule meant for offers would be a regression. The row and unread
+      // count are recorded above either way, so a held-back toast loses nothing.
+      const isPromotional = data.type === 'marketing';
+      if (TOASTABLE.includes(data.type) && !(isPromotional && isDNDActive())) {
         toast.info(data.title || 'New Notification', {
           description: data.body,
           action: {
             label: "দেখুন",
             onClick: () => {
-              const { targetId, peerId, peerName, peerAvatar } = data.data || {};
+              const { targetId, peerId, peerName, peerAvatar, bookingId } = data.data || {};
               switch (data.type) {
                 case 'message':
                 case 'message_new':
@@ -122,6 +135,14 @@ export function NotificationProvider({ children }) {
                 case 'booking':
                   navigate('/tenant-dashboard?tab=bookings', { 
                     state: { highlightId: targetId, autoOpen: true, scrollTo: true } 
+                  });
+                  break;
+                // booking.controller.js sends { bookingId } (not targetId) for
+                // both rent_updated emits — a rent/lease change and being added
+                // to a rent as a member. Both belong on the bookings tab.
+                case 'rent_updated':
+                  navigate('/tenant-dashboard?tab=bookings', {
+                    state: { highlightId: targetId || bookingId, autoOpen: true, scrollTo: true }
                   });
                   break;
                 case 'payment':
@@ -146,15 +167,18 @@ export function NotificationProvider({ children }) {
       }
     };
 
-    const handleConnect = async () => {
-      try {
-        const missed = await chatService.getMissedMessagesCount(lastConnectedTimeRef.current);
-        if (!cancelled && missed > 0) {
-          setUnreadCount((prev) => prev + missed);
-          loadNotifications();
-        }
-        lastConnectedTimeRef.current = new Date().toISOString();
-      } catch { /* silent */ }
+    const handleConnect = () => {
+      // Refetch unconditionally on reconnect. ANY notification delivered while
+      // the socket was down was missed, not just chat messages — this used to
+      // call chatService.getMissedMessagesCount() and refetch only when that
+      // was > 0, so an admin offer (or a rent update) sent during a reconnect
+      // window stayed invisible until a full remount.
+      //
+      // loadNotifications() reads both the list and the unread count from the
+      // server, so it is the authoritative catch-up; the optimistic
+      // setUnreadCount() that used to run here was overwritten by it anyway.
+      if (cancelled) return;
+      loadNotifications();
     };
 
     if (socket) {
@@ -172,7 +196,10 @@ export function NotificationProvider({ children }) {
         socket.off('connect', handleConnect);
       }
     };
-  }, [isAuthed, loadNotifications]);
+    // isDNDActive is a dependency because the toast gate above reads it; it only
+    // changes when the user edits their DND schedule, so the listener churn is
+    // negligible.
+  }, [isAuthed, loadNotifications, isDNDActive]);
 
   const markAsRead = async (id) => {
     setItems((prev) => prev.map((x) => x.id === id ? { ...x, read: true } : x));

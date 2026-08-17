@@ -1,0 +1,737 @@
+{
+  "metroThanas": {
+    "chattogram": [
+      { "en": "Kotwali", "bn": "কোতোয়ালী" },
+      { "en": "Panchlaish", "bn": "পাঁচলাইশ" },
+      { "en": "Double Mooring", "bn": "ডবলমুরিং" },
+      { "en": "Pahartali", "bn": "পাহাড়তলী" },
+      { "en": "Halishahar", "bn": "হালিশহর" },
+      { "en": "Bandar", "bn": "বন্দর" },
+      { "en": "Patenga", "bn": "পতেঙ্গা" },
+      { "en": "Chandgaon", "bn": "চান্দগাঁও" },
+      { "en": "Bakalia", "bn": "বাকলিয়া" },
+      { "en": "Khulshi", "bn": "খুলশী" },
+      { "en": "Bayezid Bostami", "bn": "বায়েজিদ বোস্তামী" },
+      { "en": "Akbarshah", "bn": "আকবরশাহ" },
+      { "en": "Chawkbazar", "bn": "চকবাজার" },
+      { "en": "EPZ", "bn": "ইপিজেড" },
+      { "en": "Karnaphuli", "bn": "কর্ণফুলী" },
+      { "en": "Sadarghat", "bn": "সদরঘাট" }
+    ],
+    "bandarban": [],
+    "brahmanbaria": [],
+    "chandpur": [],
+    "comilla": [],
+    "coxs_bazar": [],
+    "feni": [],
+    "khagrachari": [],
+    "lakshmipur": [],
+    "noakhali": [],
+    "rangamati": []
+  },
+  "areas": {
+    "chattogram": {
+      "Kotwali": [
+        { "en": "Anderkilla", "bn": "আন্দরকিল্লা" },
+        { "en": "Laldighi", "bn": "লালদিঘী" },
+        { "en": "Jamalkhan", "bn": "জামালখান" },
+        { "en": "Enayet Bazar", "bn": "এনায়েত বাজার" },
+        { "en": "Momin Road", "bn": "মোমিন রোড" },
+        { "en": "Nandan Kanan", "bn": "নন্দনকানন" },
+        { "en": "Rahmatganj", "bn": "রহমতগঞ্জ" },
+        { "en": "Kazir Dewri", "bn": "কাজীর দেউড়ি" },
+        { "en": "Askar Dighir Par", "bn": "আসকার দিঘীর পাড়" },
+        { "en": "Hazari Lane", "bn": "হাজারী লেন" },
+        { "en": "Reazuddin Bazar", "bn": "রিয়াজউদ্দিন বাজার" },
+        { "en": "Sirajuddowla Road", "bn": "সিরাজউদ্দৌলা রোড" },
+        { "en": "Khatunganj", "bn": "খাতুনগঞ্জ" },
+        { "en": "Asadganj", "bn": "আছদগঞ্জ" },
+        { "en": "New Market", "bn": "নিউ মার্কেট" },
+        { "en": "Dampara", "bn": "দামপাড়া" },
+        { "en": "Ghat Farhadbeg", "bn": "ঘাট ফরহাদবেগ" }
+      ],
+      "Panchlaish": [
+        { "en": "Nasirabad", "bn": "নাসিরাবাদ" },
+        { "en": "Mehedibag", "bn": "মেহেদীবাগ" },
+        { "en": "O.R. Nizam Road", "bn": "ও.আর. নিজাম রোড" },
+        { "en": "Probartak Circle", "bn": "প্রবর্তক মোড়" },
+        { "en": "Sugandha R/A", "bn": "সুগন্ধা আবাসিক এলাকা" },
+        { "en": "Hillview R/A", "bn": "হিলভিউ আবাসিক এলাকা" },
+        { "en": "Katalganj", "bn": "কাতালগঞ্জ" },
+        { "en": "Chatteshwari Road", "bn": "চট্টেশ্বরী রোড" },
+        { "en": "Panchlaish R/A", "bn": "পাঁচলাইশ আবাসিক এলাকা" },
+        { "en": "Shulakbahar", "bn": "শুলকবহর" },
+        { "en": "Muradpur", "bn": "মুরাদপুর" },
+        { "en": "Sholoshahar", "bn": "ষোলশহর" },
+        { "en": "Hamzarbag", "bn": "হামজারবাগ" },
+        { "en": "2 No Gate", "bn": "২ নম্বর গেট" }
+      ],
+      "Double Mooring": [
+        { "en": "Agrabad", "bn": "আগ্রাবাদ" },
+        { "en": "Dewanhat", "bn": "দেওয়ানহাট" },
+        { "en": "Barik Building", "bn": "বারিক বিল্ডিং" },
+        { "en": "Chowmuhani", "bn": "চৌমুহনী" },
+        { "en": "Halishahar Road", "bn": "হালিশহর রোড" },
+        { "en": "CDA R/A", "bn": "সিডিএ আবাসিক এলাকা" },
+        { "en": "Agrabad Access Road", "bn": "আগ্রাবাদ এক্সেস রোড" },
+        { "en": "Choto Pool", "bn": "ছোট পুল" },
+        { "en": "Boro Pool", "bn": "বড় পুল" },
+        { "en": "Pathantooly", "bn": "পাঠানটুলী" },
+        { "en": "Askarabad", "bn": "আসকারাবাদ" },
+        { "en": "Sheikh Mujib Road", "bn": "শেখ মুজিব রোড" },
+        { "en": "Dhaniala Para", "bn": "ধনিয়ালাপাড়া" },
+        { "en": "Badamtali", "bn": "বাদামতলী" }
+      ],
+      "Pahartali": [
+        { "en": "Sarai Para", "bn": "সরাইপাড়া" },
+        { "en": "Ambagan", "bn": "আমবাগান" },
+        { "en": "Wireless Mor", "bn": "ওয়্যারলেস মোড়" },
+        { "en": "Pahartali Bazar", "bn": "পাহাড়তলী বাজার" },
+        { "en": "Alanker Mor", "bn": "অলংকার মোড়" },
+        { "en": "Segun Bagan", "bn": "সেগুনবাগান" },
+        { "en": "Foy's Lake", "bn": "ফয়েজ লেক" },
+        { "en": "Sagorika Road", "bn": "সাগরিকা রোড" },
+        { "en": "Bou Bazar", "bn": "বউবাজার" }
+      ],
+      "Halishahar": [
+        { "en": "Halishahar Housing Estate", "bn": "হালিশহর হাউজিং এস্টেট" },
+        { "en": "A Block", "bn": "এ ব্লক" },
+        { "en": "B Block", "bn": "বি ব্লক" },
+        { "en": "C Block", "bn": "সি ব্লক" },
+        { "en": "D Block", "bn": "ডি ব্লক" },
+        { "en": "E Block", "bn": "ই ব্লক" },
+        { "en": "G Block", "bn": "জি ব্লক" },
+        { "en": "H Block", "bn": "এইচ ব্লক" },
+        { "en": "I Block", "bn": "আই ব্লক" },
+        { "en": "K Block", "bn": "কে ব্লক" },
+        { "en": "L Block", "bn": "এল ব্লক" },
+        { "en": "Moddhom Halishahar", "bn": "মধ্যম হালিশহর" },
+        { "en": "Uttar Halishahar", "bn": "উত্তর হালিশহর" },
+        { "en": "Anandabazar", "bn": "আনন্দবাজার" },
+        { "en": "Ramzan Ali Hat", "bn": "রমজান আলী হাট" },
+        { "en": "Port Connecting Road", "bn": "পোর্ট কানেক্টিং রোড" }
+      ],
+      "Bandar": [
+        { "en": "Nimtala", "bn": "নিমতলা" },
+        { "en": "Fakirhat", "bn": "ফকিরহাট" },
+        { "en": "Salt Gola", "bn": "সল্টগোলা" },
+        { "en": "Majhirghat", "bn": "মাঝিরঘাট" },
+        { "en": "Port Colony", "bn": "বন্দর কলোনী" },
+        { "en": "Custom Mor", "bn": "কাস্টম মোড়" }
+      ],
+      "Patenga": [
+        { "en": "Patenga Sea Beach", "bn": "পতেঙ্গা সমুদ্র সৈকত" },
+        { "en": "Steel Mill Bazar", "bn": "স্টিল মিল বাজার" },
+        { "en": "Katgor", "bn": "কাটগড়" },
+        { "en": "Naval Academy", "bn": "নেভাল একাডেমি" },
+        { "en": "Airport Road", "bn": "এয়ারপোর্ট রোড" },
+        { "en": "Cement Crossing", "bn": "সিমেন্ট ক্রসিং" },
+        { "en": "Uttar Patenga", "bn": "উত্তর পতেঙ্গা" },
+        { "en": "Dakshin Patenga", "bn": "দক্ষিণ পতেঙ্গা" },
+        { "en": "15 No Ghat", "bn": "১৫ নম্বর ঘাট" }
+      ],
+      "Chandgaon": [
+        { "en": "Chandgaon R/A", "bn": "চান্দগাঁও আবাসিক এলাকা" },
+        { "en": "Bahaddarhat", "bn": "বহদ্দারহাট" },
+        { "en": "Kalurghat", "bn": "কালুরঘাট" },
+        { "en": "Kalurghat Industrial Area", "bn": "কালুরঘাট শিল্প এলাকা" },
+        { "en": "Mohara", "bn": "মোহরা" },
+        { "en": "Kaptai Rastar Matha", "bn": "কাপ্তাই রাস্তার মাথা" },
+        { "en": "Hamidchar", "bn": "হামিদচর" },
+        { "en": "Faridar Para", "bn": "ফরিদার পাড়া" }
+      ],
+      "Bakalia": [
+        { "en": "Chaktai", "bn": "চাক্তাই" },
+        { "en": "Rajakhali", "bn": "রাজাখালী" },
+        { "en": "Rahattarpul", "bn": "রাহাত্তারপুল" },
+        { "en": "Kalamia Bazar", "bn": "কালামিয়া বাজার" },
+        { "en": "DC Road", "bn": "ডিসি রোড" },
+        { "en": "Shahid Nagar", "bn": "শহীদনগর" },
+        { "en": "Bakalia Access Road", "bn": "বাকলিয়া এক্সেস রোড" },
+        { "en": "Purba Bakalia", "bn": "পূর্ব বাকলিয়া" },
+        { "en": "Paschim Bakalia", "bn": "পশ্চিম বাকলিয়া" },
+        { "en": "Dakshin Bakalia", "bn": "দক্ষিণ বাকলিয়া" }
+      ],
+      "Khulshi": [
+        { "en": "South Khulshi", "bn": "দক্ষিণ খুলশী" },
+        { "en": "North Khulshi", "bn": "উত্তর খুলশী" },
+        { "en": "Zakir Hossain Road", "bn": "জাকির হোসেন রোড" },
+        { "en": "Lalkhan Bazar", "bn": "লালখান বাজার" },
+        { "en": "Golpahar", "bn": "গোলপাহাড়" },
+        { "en": "Jhautala", "bn": "ঝাউতলা" },
+        { "en": "Tiger Pass", "bn": "টাইগারপাস" },
+        { "en": "GEC Circle", "bn": "জি.ই.সি. মোড়" },
+        { "en": "Wasa Mor", "bn": "ওয়াসা মোড়" },
+        { "en": "Matijharna", "bn": "মতিঝর্ণা" }
+      ],
+      "Bayezid Bostami": [
+        { "en": "Oxygen Mor", "bn": "অক্সিজেন মোড়" },
+        { "en": "Bayezid Bostami Road", "bn": "বায়েজিদ বোস্তামী রোড" },
+        { "en": "Nasirabad Housing Society", "bn": "নাসিরাবাদ হাউজিং সোসাইটি" },
+        { "en": "Shershah Colony", "bn": "শেরশাহ কলোনী" },
+        { "en": "Amin Jute Mills", "bn": "আমিন জুট মিল" },
+        { "en": "Kulgaon", "bn": "কুলগাঁও" },
+        { "en": "Arefin Nagar", "bn": "আরেফিন নগর" },
+        { "en": "Baluchara", "bn": "বালুছড়া" },
+        { "en": "Rouphabad", "bn": "রউফাবাদ" },
+        { "en": "Jalalabad", "bn": "জালালাবাদ" },
+        { "en": "Nasirabad Industrial Area", "bn": "নাসিরাবাদ শিল্প এলাকা" },
+        { "en": "Rubi Gate", "bn": "রুবি গেট" }
+      ],
+      "Akbarshah": [
+        { "en": "Colonel Hat", "bn": "কর্নেলহাট" },
+        { "en": "A K Khan Mor", "bn": "এ কে খান মোড়" },
+        { "en": "Firozshah Colony", "bn": "ফিরোজশাহ কলোনী" },
+        { "en": "Uttar Kattali", "bn": "উত্তর কাট্টলী" },
+        { "en": "Bissho Colony", "bn": "বিশ্ব কলোনী" },
+        { "en": "Ishan Mistrir Hat", "bn": "ঈশান মিস্ত্রীর হাট" }
+      ],
+      "Chawkbazar": [
+        { "en": "Chawkbazar", "bn": "চকবাজার" },
+        { "en": "Kapasgola", "bn": "কাপাসগোলা" },
+        { "en": "Chandanpura", "bn": "চন্দনপুরা" },
+        { "en": "Dewan Bazar", "bn": "দেওয়ান বাজার" },
+        { "en": "Gulzar Mor", "bn": "গুলজার মোড়" },
+        { "en": "Badurtala", "bn": "বাদুড়তলা" },
+        { "en": "College Road", "bn": "কলেজ রোড" }
+      ],
+      "EPZ": [
+        { "en": "CEPZ", "bn": "সিইপিজেড" },
+        { "en": "Bandar Tila", "bn": "বন্দরটিলা" },
+        { "en": "Free Port", "bn": "ফ্রি পোর্ট" },
+        { "en": "Akmol Ali Road", "bn": "আকমল আলী রোড" },
+        { "en": "Dakshin Halishahar", "bn": "দক্ষিণ হালিশহর" },
+        { "en": "EPZ Mor", "bn": "ইপিজেড মোড়" }
+      ],
+      "Karnaphuli": [
+        { "en": "Moijjartek", "bn": "মইজ্জারটেক" },
+        { "en": "Shikalbaha", "bn": "শিকলবাহা" },
+        { "en": "Char Patharghata", "bn": "চর পাথরঘাটা" },
+        { "en": "Char Lakkhya", "bn": "চর লক্ষ্যা" },
+        { "en": "Bara Uthan", "bn": "বড় উঠান" },
+        { "en": "Julda", "bn": "জুলধা" },
+        { "en": "Kalarpol", "bn": "কলারপোল" }
+      ],
+      "Sadarghat": [
+        { "en": "Sadarghat", "bn": "সদরঘাট" },
+        { "en": "Kadamtali", "bn": "কদমতলী" },
+        { "en": "Station Road", "bn": "স্টেশন রোড" },
+        { "en": "Battali", "bn": "বটতলী" },
+        { "en": "Ice Factory Road", "bn": "আইস ফ্যাক্টরি রোড" },
+        { "en": "Pathorghata", "bn": "পাথরঘাটা" },
+        { "en": "Firingi Bazar", "bn": "ফিরিঙ্গী বাজার" }
+      ],
+      "Hathazari": [
+        { "en": "Hathazari Bazar", "bn": "হাটহাজারী বাজার" },
+        { "en": "Chowdhury Hat", "bn": "চৌধুরী হাট" },
+        { "en": "Fatehabad", "bn": "ফতেয়াবাদ" },
+        { "en": "Amanbazar", "bn": "আমান বাজার" },
+        { "en": "Katirhat", "bn": "কাটিরহাট" },
+        { "en": "Mirzapur", "bn": "মির্জাপুর" },
+        { "en": "Bibirhat", "bn": "বিবিরহাট" },
+        { "en": "Madunaghat", "bn": "মদুনাঘাট" },
+        { "en": "Chittagong University", "bn": "চট্টগ্রাম বিশ্ববিদ্যালয়" }
+      ],
+      "Sitakunda": [
+        { "en": "Sitakunda Bazar", "bn": "সীতাকুণ্ড বাজার" },
+        { "en": "Bhatiary", "bn": "ভাটিয়ারী" },
+        { "en": "Fouzdarhat", "bn": "ফৌজদারহাট" },
+        { "en": "Kumira", "bn": "কুমিরা" },
+        { "en": "Barabkunda", "bn": "বাড়বকুণ্ড" },
+        { "en": "Salimpur", "bn": "সলিমপুর" },
+        { "en": "Baraiyadhala", "bn": "বারৈয়াঢালা" },
+        { "en": "Sonaichhari", "bn": "সোনাইছড়ি" },
+        { "en": "Bansbaria", "bn": "বাঁশবাড়িয়া" }
+      ],
+      "Patiya": [
+        { "en": "Patiya Bazar", "bn": "পটিয়া বাজার" },
+        { "en": "Indrapul", "bn": "ইন্দ্রপুল" },
+        { "en": "Dhalghat", "bn": "ধলঘাট" },
+        { "en": "Kolagaon", "bn": "কোলাগাঁও" },
+        { "en": "Kachuai", "bn": "কচুয়াই" },
+        { "en": "Habilasdwip", "bn": "হাবিলাসদ্বীপ" }
+      ],
+      "Anwara": [
+        { "en": "Chatari Chowmuhani", "bn": "চাতরী চৌমুহনী" },
+        { "en": "Korean EPZ", "bn": "কোরিয়ান ইপিজেড" },
+        { "en": "Barashat", "bn": "বারশত" },
+        { "en": "Barakhain", "bn": "বরখাইন" },
+        { "en": "Raipur", "bn": "রায়পুর" },
+        { "en": "Paroikora", "bn": "পরৈকোড়া" }
+      ],
+      "Raozan": [
+        { "en": "Munsirghat", "bn": "মুন্সিরঘাট" },
+        { "en": "Gohira", "bn": "গহিরা" },
+        { "en": "Noapara", "bn": "নোয়াপাড়া" },
+        { "en": "Kundeshwari", "bn": "কুন্ডেশ্বরী" },
+        { "en": "Fatepur", "bn": "ফতেপুর" }
+      ],
+      "Fatikchhari": [
+        { "en": "Nazirhat", "bn": "নাজিরহাট" },
+        { "en": "Bhujpur", "bn": "ভূজপুর" },
+        { "en": "Heyako", "bn": "হেঁয়াকো" },
+        { "en": "Narayanhat", "bn": "নারায়ণহাট" },
+        { "en": "Fatikchhari Bazar", "bn": "ফটিকছড়ি বাজার" }
+      ],
+      "Mirsharai": [
+        { "en": "Mirsharai Bazar", "bn": "মীরসরাই বাজার" },
+        { "en": "Baroiyarhat", "bn": "বারইয়ারহাট" },
+        { "en": "Jorwarganj", "bn": "জোরারগঞ্জ" },
+        { "en": "Abu Torab", "bn": "আবুতোরাব" },
+        { "en": "Korerhat", "bn": "করেরহাট" },
+        { "en": "Mithanala", "bn": "মিঠানালা" }
+      ],
+      "Boalkhali": [
+        { "en": "Gomdandi", "bn": "গোমদণ্ডী" },
+        { "en": "Kanungopara", "bn": "কানুনগোপাড়া" },
+        { "en": "Sakpura", "bn": "সাকপুরা" },
+        { "en": "Kadurkhil", "bn": "কধুরখীল" },
+        { "en": "Charandwip", "bn": "চরণদ্বীপ" }
+      ],
+      "Chandanaish": [
+        { "en": "Gachhbaria", "bn": "গাছবাড়িয়া" },
+        { "en": "Dohazari", "bn": "দোহাজারী" },
+        { "en": "Barma", "bn": "বরমা" },
+        { "en": "Bailtali", "bn": "বৈলতলী" },
+        { "en": "Hashimpur", "bn": "হাশিমপুর" },
+        { "en": "Kanchan Nagar", "bn": "কাঞ্চননগর" }
+      ],
+      "Satkania": [
+        { "en": "Keranihat", "bn": "কেরানীহাট" },
+        { "en": "Satkania Bazar", "bn": "সাতকানিয়া বাজার" },
+        { "en": "Bazalia", "bn": "বাজালিয়া" },
+        { "en": "Amilaish", "bn": "আমিলাইষ" },
+        { "en": "Nalua", "bn": "নলুয়া" }
+      ],
+      "Lohagara": [
+        { "en": "Amirabad", "bn": "আমিরাবাদ" },
+        { "en": "Chunti", "bn": "চুনতি" },
+        { "en": "Padua", "bn": "পদুয়া" },
+        { "en": "Adhunagar", "bn": "আধুনগর" },
+        { "en": "Kalauzan", "bn": "কলাউজান" },
+        { "en": "Char Amba", "bn": "চরম্বা" }
+      ],
+      "Banshkhali": [
+        { "en": "Jaldi", "bn": "জলদী" },
+        { "en": "Gunagari", "bn": "গুণাগরী" },
+        { "en": "Chambal", "bn": "চাম্বল" },
+        { "en": "Sadhanpur", "bn": "সাধনপুর" },
+        { "en": "Sheelkup", "bn": "শীলকূপ" },
+        { "en": "Puichhari", "bn": "পুঁইছড়ি" }
+      ],
+      "Sandwip": [
+        { "en": "Enam Nahar", "bn": "এনাম নাহার" },
+        { "en": "Guptachhara Ghat", "bn": "গুপ্তছড়া ঘাট" },
+        { "en": "Haramia", "bn": "হারামিয়া" },
+        { "en": "Maitbhanga", "bn": "মাইটভাঙ্গা" },
+        { "en": "Kalapania", "bn": "কালাপানিয়া" }
+      ]
+    },
+    "coxs_bazar": {
+      "Cox's Bazar Sadar": [
+        { "en": "Kolatoli", "bn": "কলাতলী" },
+        { "en": "Laboni Point", "bn": "লাবণী পয়েন্ট" },
+        { "en": "Sugandha Beach", "bn": "সুগন্ধা বীচ" },
+        { "en": "Hotel Motel Zone", "bn": "হোটেল মোটেল জোন" },
+        { "en": "Baharchhara", "bn": "বাহারছড়া" },
+        { "en": "Jhilongjha", "bn": "ঝিলংজা" },
+        { "en": "Link Road", "bn": "লিংক রোড" },
+        { "en": "Nunia Chhara", "bn": "নুনিয়াছড়া" },
+        { "en": "Tekpara", "bn": "টেকপাড়া" },
+        { "en": "Bazar Ghata", "bn": "বাজারঘাটা" },
+        { "en": "Boro Bazar", "bn": "বড় বাজার" },
+        { "en": "Kutubdia Para", "bn": "কুতুবদিয়া পাড়া" },
+        { "en": "Samiti Para", "bn": "সমিতি পাড়া" },
+        { "en": "Tarabaniar Chhara", "bn": "তারাবনিয়ার ছড়া" },
+        { "en": "Khurushkul", "bn": "খুরুশকুল" },
+        { "en": "Chowfaldandi", "bn": "চৌফলদণ্ডী" },
+        { "en": "PMKhali", "bn": "পিএমখালী" }
+      ],
+      "Teknaf": [
+        { "en": "Teknaf Bazar", "bn": "টেকনাফ বাজার" },
+        { "en": "Shahpori Dwip", "bn": "শাহপরীর দ্বীপ" },
+        { "en": "Saint Martin's Island", "bn": "সেন্ট মার্টিন" },
+        { "en": "Hnila", "bn": "হ্নীলা" },
+        { "en": "Whykong", "bn": "হোয়াইক্যং" },
+        { "en": "Sabrang", "bn": "সাবরাং" },
+        { "en": "Baharchhara", "bn": "বাহারছড়া" }
+      ],
+      "Ukhia": [
+        { "en": "Kotbazar", "bn": "কোটবাজার" },
+        { "en": "Rajapalong", "bn": "রাজাপালং" },
+        { "en": "Kutupalong", "bn": "কুতুপালং" },
+        { "en": "Balukhali", "bn": "বালুখালী" },
+        { "en": "Palongkhali", "bn": "পালংখালী" },
+        { "en": "Inani", "bn": "ইনানী" },
+        { "en": "Jaliapalong", "bn": "জালিয়াপালং" },
+        { "en": "Haldia Palong", "bn": "হলদিয়াপালং" }
+      ],
+      "Chakaria": [
+        { "en": "Chiringa", "bn": "চিরিংগা" },
+        { "en": "Badarkhali", "bn": "বদরখালী" },
+        { "en": "Dulahazara", "bn": "ডুলাহাজারা" },
+        { "en": "Malumghat", "bn": "মালুমঘাট" },
+        { "en": "Harbang", "bn": "হারবাং" },
+        { "en": "Khutakhali", "bn": "খুটাখালী" },
+        { "en": "Fasiakhali", "bn": "ফাঁসিয়াখালী" }
+      ],
+      "Ramu": [
+        { "en": "Ramu Bazar", "bn": "রামু বাজার" },
+        { "en": "Fatekharkul", "bn": "ফতেখাঁরকুল" },
+        { "en": "Chakmarkul", "bn": "চাকমারকুল" },
+        { "en": "Garjania", "bn": "গর্জনিয়া" },
+        { "en": "Kachhapia", "bn": "কচ্ছপিয়া" },
+        { "en": "Rajarkul", "bn": "রাজারকুল" }
+      ],
+      "Maheshkhali": [
+        { "en": "Gorakghata", "bn": "গোরকঘাটা" },
+        { "en": "Boro Maheshkhali", "bn": "বড় মহেশখালী" },
+        { "en": "Choto Maheshkhali", "bn": "ছোট মহেশখালী" },
+        { "en": "Matarbari", "bn": "মাতারবাড়ী" },
+        { "en": "Kalarmarchhara", "bn": "কালারমারছড়া" },
+        { "en": "Hoanak", "bn": "হোয়ানক" },
+        { "en": "Shaplapur", "bn": "শাপলাপুর" },
+        { "en": "Dhalghata", "bn": "ধলঘাটা" }
+      ],
+      "Pekua": [
+        { "en": "Pekua Bazar", "bn": "পেকুয়া বাজার" },
+        { "en": "Magnama", "bn": "মগনামা" },
+        { "en": "Ujantia", "bn": "উজানটিয়া" },
+        { "en": "Barabakia", "bn": "বারবাকিয়া" },
+        { "en": "Rajakhali", "bn": "রাজাখালী" },
+        { "en": "Taitong", "bn": "টৈটং" },
+        { "en": "Shilkhali", "bn": "শীলখালী" }
+      ],
+      "Kutubdia": [
+        { "en": "Boro Ghop", "bn": "বড়ঘোপ" },
+        { "en": "Dhurung", "bn": "ধুরুং" },
+        { "en": "Uttar Dhurung", "bn": "উত্তর ধুরুং" },
+        { "en": "Ali Akbar Dail", "bn": "আলী আকবর ডেইল" },
+        { "en": "Lemsikhali", "bn": "লেমসিখালী" },
+        { "en": "Kaiyarbil", "bn": "কৈয়ারবিল" }
+      ]
+    },
+    "comilla": {
+      "Comilla Adarsha Sadar": [
+        { "en": "Kandirpar", "bn": "কান্দিরপাড়" },
+        { "en": "Jhawtala", "bn": "ঝাউতলা" },
+        { "en": "Race Course", "bn": "রেসকোর্স" },
+        { "en": "Badurtala", "bn": "বাদুড়তলা" },
+        { "en": "Thakurpara", "bn": "ঠাকুরপাড়া" },
+        { "en": "Ashrafpur", "bn": "আশ্রাফপুর" },
+        { "en": "Dharmapur", "bn": "ধর্মপুর" },
+        { "en": "Shasongacha", "bn": "শাসনগাছা" },
+        { "en": "Chotora", "bn": "ছোটরা" },
+        { "en": "Tomsom Bridge", "bn": "টমছম ব্রিজ" },
+        { "en": "Monoharpur", "bn": "মনোহরপুর" },
+        { "en": "Nazrul Avenue", "bn": "নজরুল এভিনিউ" },
+        { "en": "Bagichagaon", "bn": "বাগিচাগাঁও" },
+        { "en": "Nanuar Dighir Par", "bn": "নানুয়ার দিঘীর পাড়" },
+        { "en": "Mogholtuli", "bn": "মোগলটুলী" },
+        { "en": "Suzanagar", "bn": "সুজানগর" },
+        { "en": "Ranir Bazar", "bn": "রাণীর বাজার" },
+        { "en": "Chawk Bazar", "bn": "চকবাজার" }
+      ],
+      "Comilla Sadar Dakshin": [
+        { "en": "Kotbari", "bn": "কোটবাড়ী" },
+        { "en": "Shalbon", "bn": "শালবন" },
+        { "en": "Bishnupur", "bn": "বিষ্ণুপুর" },
+        { "en": "Paduar Bazar", "bn": "পদুয়ার বাজার" },
+        { "en": "Chowara", "bn": "চৌয়ারা" },
+        { "en": "Bijoypur", "bn": "বিজয়পুর" },
+        { "en": "Barapara", "bn": "বারপাড়া" }
+      ],
+      "Chauddagram": [
+        { "en": "Chauddagram Bazar", "bn": "চৌদ্দগ্রাম বাজার" },
+        { "en": "Miabazar", "bn": "মিয়াবাজার" },
+        { "en": "Batisa", "bn": "বাতিসা" },
+        { "en": "Munshirhat", "bn": "মুন্সিরহাট" },
+        { "en": "Kashinagar", "bn": "কাশিনগর" }
+      ],
+      "Laksam": [
+        { "en": "Daultganj", "bn": "দৌলতগঞ্জ" },
+        { "en": "Laksam Junction", "bn": "লাকসাম জংশন" },
+        { "en": "Laksam Bazar", "bn": "লাকসাম বাজার" }
+      ],
+      "Chandina": [
+        { "en": "Chandina Bazar", "bn": "চান্দিনা বাজার" },
+        { "en": "Madhaiya", "bn": "মাধাইয়া" }
+      ]
+    },
+    "feni": {
+      "Feni Sadar": [
+        { "en": "Trunk Road", "bn": "ট্রাংক রোড" },
+        { "en": "Mizan Road", "bn": "মিজান রোড" },
+        { "en": "S.S.K Road", "bn": "এস.এস.কে রোড" },
+        { "en": "Birinchi", "bn": "বিরিঞ্চি" },
+        { "en": "Sultanpur", "bn": "সুলতানপুর" },
+        { "en": "Mohipal", "bn": "মহিপাল" },
+        { "en": "Rampur", "bn": "রামপুর" },
+        { "en": "Ukilpara", "bn": "উকিল পাড়া" },
+        { "en": "Master Para", "bn": "মাস্টার পাড়া" },
+        { "en": "Pathan Bari Road", "bn": "পাঠান বাড়ি রোড" },
+        { "en": "College Road", "bn": "কলেজ রোড" },
+        { "en": "Lalpol", "bn": "লালপোল" },
+        { "en": "Fazilpur", "bn": "ফাজিলপুর" },
+        { "en": "Bijoy Singh", "bn": "বিজয় সিংহ" }
+      ],
+      "Chhagalnaiya": [
+        { "en": "Chhagalnaiya Bazar", "bn": "ছাগলনাইয়া বাজার" },
+        { "en": "Mohamaya", "bn": "মহামায়া" },
+        { "en": "Radhanagar", "bn": "রাধানগর" },
+        { "en": "Shuvapur", "bn": "শুভপুর" }
+      ],
+      "Dagonbhuiyan": [
+        { "en": "Dagonbhuiyan Bazar", "bn": "দাগনভূঞা বাজার" },
+        { "en": "Sindurpur", "bn": "সিন্দুরপুর" }
+      ],
+      "Sonagazi": [
+        { "en": "Sonagazi Bazar", "bn": "সোনাগাজী বাজার" },
+        { "en": "Muhuri Project", "bn": "মুহুরী প্রজেক্ট" }
+      ],
+      "Parshuram": [
+        { "en": "Parshuram Bazar", "bn": "পরশুরাম বাজার" },
+        { "en": "Bilonia", "bn": "বিলোনিয়া" }
+      ],
+      "Fulgazi": [
+        { "en": "Fulgazi Bazar", "bn": "ফুলগাজী বাজার" }
+      ]
+    },
+    "noakhali": {
+      "Noakhali Sadar": [
+        { "en": "Maijdee Court", "bn": "মাইজদী কোর্ট" },
+        { "en": "Maijdee Bazar", "bn": "মাইজদী বাজার" },
+        { "en": "Datterhat", "bn": "দত্তেরহাট" },
+        { "en": "Sonapur", "bn": "সোনাপুর" },
+        { "en": "Lakshmipur Road", "bn": "লক্ষ্মীপুর রোড" },
+        { "en": "Town Hall Mor", "bn": "টাউন হল মোড়" },
+        { "en": "Poura Bazar", "bn": "পৌর বাজার" }
+      ],
+      "Begumganj": [
+        { "en": "Chowmuhani", "bn": "চৌমুহনী" },
+        { "en": "Begumganj Bazar", "bn": "বেগমগঞ্জ বাজার" },
+        { "en": "Karimpur", "bn": "করিমপুর" },
+        { "en": "Ekhlaspur", "bn": "একলাশপুর" }
+      ],
+      "Companiganj": [
+        { "en": "Basurhat", "bn": "বসুরহাট" },
+        { "en": "Char Fakira", "bn": "চর ফকিরা" }
+      ],
+      "Sonaimuri": [
+        { "en": "Sonaimuri Bazar", "bn": "সোনাইমুড়ী বাজার" },
+        { "en": "Amishapara", "bn": "আমিশাপাড়া" }
+      ],
+      "Chatkhil": [
+        { "en": "Chatkhil Bazar", "bn": "চাটখিল বাজার" },
+        { "en": "Khilpara", "bn": "খিলপাড়া" }
+      ],
+      "Senbagh": [
+        { "en": "Senbagh Bazar", "bn": "সেনবাগ বাজার" },
+        { "en": "Chhatarpaia", "bn": "ছাতারপাইয়া" }
+      ],
+      "Hatiya": [
+        { "en": "Oshkhali", "bn": "ওছখালী" },
+        { "en": "Nalchira Ghat", "bn": "নলচিরা ঘাট" },
+        { "en": "Tomoroddi", "bn": "তমরদ্দি" }
+      ],
+      "Kabirhat": [
+        { "en": "Kabirhat Bazar", "bn": "কবিরহাট বাজার" }
+      ],
+      "Subarnachar": [
+        { "en": "Char Jabbar", "bn": "চর জব্বার" }
+      ]
+    },
+    "brahmanbaria": {
+      "Brahmanbaria Sadar": [
+        { "en": "T.A. Road", "bn": "টি.এ. রোড" },
+        { "en": "Kaotoli", "bn": "কাউতলী" },
+        { "en": "Kandipara", "bn": "কান্দিপাড়া" },
+        { "en": "Munshefpara", "bn": "মুন্সেফপাড়া" },
+        { "en": "Medda", "bn": "মেড্ডা" },
+        { "en": "Shimrail Kandi", "bn": "শিমরাইলকান্দি" },
+        { "en": "Paikpara", "bn": "পাইকপাড়া" },
+        { "en": "Ghatura", "bn": "ঘাটুরা" },
+        { "en": "Bhadughar", "bn": "ভাদুঘর" },
+        { "en": "Bishwa Road Mor", "bn": "বিশ্বরোড মোড়" },
+        { "en": "Kalibari", "bn": "কালীবাড়ি" }
+      ],
+      "Ashuganj": [
+        { "en": "Ashuganj Bazar", "bn": "আশুগঞ্জ বাজার" },
+        { "en": "Ashuganj Power Plant", "bn": "আশুগঞ্জ বিদ্যুৎকেন্দ্র" },
+        { "en": "Sonarampur", "bn": "সোনারামপুর" }
+      ],
+      "Akhaura": [
+        { "en": "Akhaura Bazar", "bn": "আখাউড়া বাজার" },
+        { "en": "Akhaura Land Port", "bn": "আখাউড়া স্থলবন্দর" },
+        { "en": "Akhaura Railway Junction", "bn": "আখাউড়া রেলওয়ে জংশন" },
+        { "en": "Gangasagar", "bn": "গঙ্গাসাগর" }
+      ],
+      "Nabinagar": [
+        { "en": "Nabinagar Bazar", "bn": "নবীনগর বাজার" }
+      ],
+      "Sarail": [
+        { "en": "Sarail Bazar", "bn": "সরাইল বাজার" },
+        { "en": "Shahbazpur", "bn": "শাহবাজপুর" }
+      ],
+      "Kasba": [
+        { "en": "Kasba Bazar", "bn": "কসবা বাজার" },
+        { "en": "Kuti", "bn": "কুটি" }
+      ],
+      "Bancharampur": [
+        { "en": "Bancharampur Bazar", "bn": "বাঞ্ছারামপুর বাজার" }
+      ]
+    },
+    "chandpur": {
+      "Chandpur Sadar": [
+        { "en": "Kalibari", "bn": "কালীবাড়ি" },
+        { "en": "Puran Bazar", "bn": "পুরান বাজার" },
+        { "en": "Notun Bazar", "bn": "নতুন বাজার" },
+        { "en": "Boro Station", "bn": "বড় স্টেশন" },
+        { "en": "Mission Road", "bn": "মিশন রোড" },
+        { "en": "Baburhat", "bn": "বাবুরহাট" },
+        { "en": "Professor Para", "bn": "প্রফেসর পাড়া" },
+        { "en": "Launch Ghat", "bn": "লঞ্চঘাট" }
+      ],
+      "Hajiganj": [
+        { "en": "Hajiganj Bazar", "bn": "হাজীগঞ্জ বাজার" },
+        { "en": "Balakhal", "bn": "বলাখাল" }
+      ],
+      "Faridganj": [
+        { "en": "Faridganj Bazar", "bn": "ফরিদগঞ্জ বাজার" },
+        { "en": "Rupsa", "bn": "রূপসা" }
+      ],
+      "Matlab Dakshin": [
+        { "en": "Matlab Bazar", "bn": "মতলব বাজার" }
+      ],
+      "Matlab Uttar": [
+        { "en": "Chhengarchar", "bn": "ছেংগারচর" }
+      ],
+      "Shahrasti": [
+        { "en": "Thakur Bazar", "bn": "ঠাকুর বাজার" }
+      ],
+      "Kachua": [
+        { "en": "Kachua Bazar", "bn": "কচুয়া বাজার" }
+      ]
+    },
+    "lakshmipur": {
+      "Lakshmipur Sadar": [
+        { "en": "Uttar Tematha", "bn": "উত্তর তেমুহনী" },
+        { "en": "Dakshin Tematha", "bn": "দক্ষিণ তেমুহনী" },
+        { "en": "Lakshmipur Bazar", "bn": "লক্ষ্মীপুর বাজার" },
+        { "en": "Jhumur", "bn": "ঝুমুর" },
+        { "en": "Dalal Bazar", "bn": "দালাল বাজার" },
+        { "en": "Mandari", "bn": "মান্দারী" },
+        { "en": "Chandraganj", "bn": "চন্দ্রগঞ্জ" },
+        { "en": "Poddar Bazar", "bn": "পোদ্দার বাজার" },
+        { "en": "Bhabaniganj", "bn": "ভবানীগঞ্জ" }
+      ],
+      "Raipur": [
+        { "en": "Raipur Bazar", "bn": "রায়পুর বাজার" }
+      ],
+      "Ramganj": [
+        { "en": "Ramganj Bazar", "bn": "রামগঞ্জ বাজার" },
+        { "en": "Panpara", "bn": "পানপাড়া" }
+      ],
+      "Ramgati": [
+        { "en": "Alexander", "bn": "আলেকজান্ডার" }
+      ],
+      "Kamalnagar": [
+        { "en": "Hajirhat", "bn": "হাজিরহাট" }
+      ]
+    },
+    "bandarban": {
+      "Bandarban Sadar": [
+        { "en": "Balaghata", "bn": "বালাঘাটা" },
+        { "en": "Kalaghata", "bn": "কালাঘাটা" },
+        { "en": "Ujani Para", "bn": "উজানী পাড়া" },
+        { "en": "Madhyam Para", "bn": "মধ্যম পাড়া" },
+        { "en": "Meghla", "bn": "মেঘলা" },
+        { "en": "Nilachal", "bn": "নীলাচল" },
+        { "en": "Chimbuk Road", "bn": "চিম্বুক রোড" },
+        { "en": "Bandarban Bazar", "bn": "বান্দরবান বাজার" }
+      ],
+      "Lama": [
+        { "en": "Lama Bazar", "bn": "লামা বাজার" },
+        { "en": "Fasyakhali", "bn": "ফাঁসিয়াখালী" },
+        { "en": "Gazalia", "bn": "গজালিয়া" }
+      ],
+      "Ruma": [
+        { "en": "Ruma Bazar", "bn": "রুমা বাজার" }
+      ],
+      "Thanchi": [
+        { "en": "Thanchi Bazar", "bn": "থানচি বাজার" }
+      ],
+      "Naikhongchhari": [
+        { "en": "Naikhongchhari Bazar", "bn": "নাইক্ষ্যংছড়ি বাজার" },
+        { "en": "Ghumdhum", "bn": "ঘুমধুম" }
+      ],
+      "Alikadam": [
+        { "en": "Alikadam Bazar", "bn": "আলীকদম বাজার" }
+      ],
+      "Rowangchhari": [
+        { "en": "Rowangchhari Bazar", "bn": "রোয়াংছড়ি বাজার" }
+      ]
+    },
+    "khagrachari": {
+      "Khagrachhari Sadar": [
+        { "en": "Narikel Bagan", "bn": "নারিকেল বাগান" },
+        { "en": "Milanpur", "bn": "মিলনপুর" },
+        { "en": "Shalbagan", "bn": "শালবাগান" },
+        { "en": "Mohajan Para", "bn": "মহাজন পাড়া" },
+        { "en": "Khagrapur", "bn": "খাগড়াপুর" },
+        { "en": "Swanirvar", "bn": "স্বনির্ভর" },
+        { "en": "Golabari", "bn": "গোলাবাড়ী" },
+        { "en": "Chengi Square", "bn": "চেঙ্গী স্কয়ার" }
+      ],
+      "Ramgarh": [
+        { "en": "Ramgarh Bazar", "bn": "রামগড় বাজার" }
+      ],
+      "Matiranga": [
+        { "en": "Matiranga Bazar", "bn": "মাটিরাঙ্গা বাজার" },
+        { "en": "Taindong", "bn": "তাইন্দং" }
+      ],
+      "Dighinala": [
+        { "en": "Dighinala Bazar", "bn": "দীঘিনালা বাজার" }
+      ],
+      "Panchhari": [
+        { "en": "Panchhari Bazar", "bn": "পানছড়ি বাজার" }
+      ]
+    },
+    "rangamati": {
+      "Rangamati Sadar": [
+        { "en": "Reserve Bazar", "bn": "রিজার্ভ বাজার" },
+        { "en": "Banarupa", "bn": "বনরূপা" },
+        { "en": "Tabalchhari", "bn": "তবলছড়ি" },
+        { "en": "Kalyanpur", "bn": "কল্যাণপুর" },
+        { "en": "Rajbari", "bn": "রাজবাড়ী" },
+        { "en": "Asambasti", "bn": "আসামবস্তি" },
+        { "en": "Kathaltoli", "bn": "কাঁঠালতলী" },
+        { "en": "Vedvedi", "bn": "ভেদভেদী" },
+        { "en": "College Gate", "bn": "কলেজ গেট" }
+      ],
+      "Kaptai": [
+        { "en": "Kaptai Bazar", "bn": "কাপ্তাই বাজার" },
+        { "en": "Chandraghona", "bn": "চন্দ্রঘোনা" },
+        { "en": "Baraichhari", "bn": "বড়ইছড়ি" },
+        { "en": "New Bazar", "bn": "নতুন বাজার" }
+      ],
+      "Kaukhali": [
+        { "en": "Betbunia", "bn": "বেতবুনিয়া" },
+        { "en": "Kaukhali Bazar", "bn": "কাউখালী বাজার" }
+      ],
+      "Baghaichhari": [
+        { "en": "Marishya", "bn": "মারিশ্যা" },
+        { "en": "Sajek", "bn": "সাজেক" }
+      ],
+      "Naniarchar": [
+        { "en": "Naniarchar Bazar", "bn": "নানিয়ারচর বাজার" }
+      ],
+      "Langadu": [
+        { "en": "Langadu Bazar", "bn": "লংগদু বাজার" }
+      ],
+      "Rajasthali": [
+        { "en": "Rajasthali Bazar", "bn": "রাজস্থলী বাজার" }
+      ]
+    }
+  }
+}

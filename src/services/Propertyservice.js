@@ -150,6 +150,7 @@ export function propertyLocationHaystack(prop) {
   return [
     prop.location,
     prop.area,
+    prop.thana,
     prop.district,
     prop.division,
     prop.gpsAddress,

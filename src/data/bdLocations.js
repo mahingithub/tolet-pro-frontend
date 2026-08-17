@@ -18,6 +18,8 @@
  * the modal shows FIRST; this index fills in every other area of the country.
  */
 
+import { DISTRICTS_BY_DIVISION, THANAS_BY_DISTRICT } from './bdGeo.js';
+
 const BN_DIGITS = '০১২৩৪৫৬৭৮৯';
 const bnNum = (n) => String(n).replace(/[0-9]/g, (d) => BN_DIGITS[Number(d)]);
 
@@ -905,6 +907,29 @@ const ALL_OTHER_UPAZILAS = [
   A('Companiganj', 'কোম্পানীগঞ্জ', 'Sylhet', 'সিলেট', 'thana'),
 ];
 
+// ─── EVERY THANA IN THE COUNTRY (from the generated dataset) ─────────────────
+// The hand-maintained lists above predate bdGeo and cover thanas unevenly, so a
+// tenant searching a thana outside the metros got no suggestion even though a
+// host can now list there. Derived from the same 613-thana dataset the Add
+// Property picker uses, which keeps the two sides in step: anything listable is
+// searchable. bdGeo is already in the main bundle, so this costs no download.
+//
+// Areas (6700 rows) are deliberately left out — they live in the code-split
+// bdAreas chunk, and the modal's free-text "search anywhere" row already covers
+// a tenant typing a para name directly.
+const GENERATED_THANAS = (() => {
+  const out = [];
+  for (const districts of Object.values(DISTRICTS_BY_DIVISION)) {
+    for (const district of districts) {
+      for (const thana of THANAS_BY_DISTRICT[district.id] || []) {
+        // Parent is the district, matching how the modal renders "Thana, Parent".
+        out.push(A(thana.en, thana.bn, district.en, district.bn, 'thana'));
+      }
+    }
+  }
+  return out;
+})();
+
 const RAW = [
   ...ALL_OTHER_UPAZILAS,
   ...DHAKA_AREAS,
@@ -914,13 +939,79 @@ const RAW = [
   ...BANDARBAN_AREAS,
   ...SYLHET_AREAS,
   ...OTHER_METRO_AREAS,
+  ...GENERATED_THANAS,
   ...DISTRICTS,
   ...DIVISIONS,
 ];
 
+// Drop entries the hand-written lists and the generated one both describe, so a
+// query does not return the same thana twice. Earlier sources win, since they
+// carry the curated parent labels.
+const DEDUPED = (() => {
+  // Names are compared with punctuation and spacing stripped, so the curated
+  // "Teknaf, Coxsbazar" and the generated "Teknaf, Cox's Bazar" collapse to one
+  // row instead of offering the same place twice.
+  const loose = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\u0980-\u09FF]+/g, '');
+
+  // The curated lists and the generated one also disagree on some district
+  // spellings ("Netrakona" vs "Netrokona"), which would survive the dedupe as
+  // two rows for one thana. Rewrite every parent to the district label bdGeo
+  // uses so the comparison — and the row the user reads — is consistent.
+  const canonicalDistrict = new Map();
+  for (const districts of Object.values(DISTRICTS_BY_DIVISION)) {
+    for (const d of districts) {
+      canonicalDistrict.set(loose(d.en), d);
+      canonicalDistrict.set(loose(d.bn), d);
+    }
+  }
+
+  // "Netrakona" vs "Netrokona", "Bogra" vs "Bogura": one-character romanisation
+  // drift that an exact key misses. Falling back to a distance-1 match keeps
+  // those from surviving as a second row for the same thana. Runs once, over 64
+  // districts, at module load.
+  const within1 = (a, b) => {
+    if (Math.abs(a.length - b.length) > 1) return false;
+    let i = 0;
+    let j = 0;
+    let edits = 0;
+    while (i < a.length && j < b.length) {
+      if (a[i] === b[j]) { i += 1; j += 1; continue; }
+      if (++edits > 1) return false;
+      if (a.length === b.length) { i += 1; j += 1; }
+      else if (a.length > b.length) i += 1;
+      else j += 1;
+    }
+    return edits + (a.length - i) + (b.length - j) <= 1;
+  };
+  const resolveDistrict = (parent) => {
+    const key = loose(parent);
+    if (!key) return null;
+    const exact = canonicalDistrict.get(key);
+    if (exact) return exact;
+    for (const [candidate, d] of canonicalDistrict) {
+      if (candidate.length >= 5 && within1(candidate, key)) return d;
+    }
+    return null;
+  };
+
+  const seen = new Set();
+  const out = [];
+  for (const raw of RAW) {
+    const district = raw.type === 'division' ? null : resolveDistrict(raw.parent);
+    const e = district
+      ? { ...raw, parent: district.en, parentBn: district.bn }
+      : raw;
+    const key = `${e.type}|${loose(e.en)}|${loose(e.parent)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(e);
+  }
+  return out;
+})();
+
 // Precompute a lowercased search blob per entry (matching is done against this
 // once, not rebuilt per keystroke).
-export const BD_LOCATIONS = RAW.map((e, i) => ({
+export const BD_LOCATIONS = DEDUPED.map((e, i) => ({
   ...e,
   _id: `geo-${i}`,
   _enl: e.en.toLowerCase(),

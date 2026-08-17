@@ -2,6 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── GLOBAL LAYOUT OFFSETS ────────────────────────────────────────────────
+   --app-banner-h : how many pixels the global AppDownloadBanner currently
+   intrudes into the top of the viewport. AppDownloadBanner writes the live
+   value onto <html> (see the publisher effect in that component) and resets it
+   to 0px whenever it isn't on screen; this declaration is the fallback so
+   `calc(var(--app-banner-h) + …)` resolves before the banner mounts, after the
+   user dismisses it, and inside the installed app where it never renders.
+
+   Only `position: fixed` UI anchored to a hardcoded top offset needs this —
+   everything in normal document flow is pushed down by the banner for free.
+
+   Z-INDEX BANDS (keep new UI inside them):
+     z-0…z-40   in-flow page content and sticky page headers
+     z-[45]     the AppDownloadBanner strip
+     z-50+      fixed overlays — modals, drawers, sheets, full-screen dialogs
+   A fixed overlay below z-50 will be painted over by the banner.
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  --app-banner-h: 0px;
+}
+
 /* Smooth property card entry animation */
 @keyframes fadeSlideIn {
   from {
@@ -784,7 +805,11 @@ div.driver-popover {
   padding: 24px !important;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
   color: #fff !important;
-  min-width: 320px !important;
+  /* min-width was a flat 320px, which on a 320-360px phone forced the card
+     wider than the viewport once its 24px padding was added — the popover then
+     sat half off-screen. Clamp both ends to the viewport instead. */
+  min-width: min(320px, calc(100vw - 32px)) !important;
+  max-width: min(420px, calc(100vw - 32px)) !important;
 }
 
 div.driver-popover-title {
@@ -795,10 +820,49 @@ div.driver-popover-title {
   margin-bottom: 8px !important;
 }
 
+/* Sized up from 0.9rem/1.5. A large share of our landlords are older, reading
+   Bangla on a phone held at arm's length, and the old body copy was smaller
+   than the surrounding app. Bangla glyphs also carry more detail below the
+   baseline than Latin ones, so the looser line-height is doing real work. */
 div.driver-popover-description {
-  color: rgba(255, 255, 255, 0.7) !important;
-  font-size: 0.9rem !important;
-  line-height: 1.5 !important;
+  color: rgba(255, 255, 255, 0.82) !important;
+  font-size: 1rem !important;
+  line-height: 1.65 !important;
+}
+
+/* ── Step copy ────────────────────────────────────────────────────────────
+   Every tour step is built by TourContext's `step()` helper as two blocks:
+   what this is for, then the one thing to do about it. driver.js assigns the
+   description with innerHTML, which is what allows the structure.
+
+   Splitting them out matters for comprehension: a single grey paragraph makes
+   the reader hunt for the instruction, and the people who most need the tour
+   are the least likely to hunt. The action row is the only thing they have to
+   act on, so it is the only thing that gets emphasis. */
+.driver-popover-description .tp-tour-body {
+  display: block;
+}
+
+.driver-popover-description .tp-tour-do {
+  display: block;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 0.75rem;
+  border-left: 3px solid #ff004c;
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.driver-popover-description .tp-tour-do-label {
+  display: block;
+  margin-bottom: 2px;
+  color: #ff85a1;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 button.driver-popover-close-btn {

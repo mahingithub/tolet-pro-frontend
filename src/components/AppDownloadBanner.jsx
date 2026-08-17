@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Download, Star, Share, PlusSquare, Info, MonitorDown, MousePointerClick } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import {
@@ -66,6 +66,12 @@ const AppDownloadBanner = () => {
   const { platform, triggerDownload, installed } = useAppInstall();
   const [dismissed, setDismissed] = useState(true); // default hidden until we check
   const [guide, setGuide] = useState(null); // null | 'ios' | 'mac' | 'chromium' | 'unsupported'
+  // Unanimated wrapper around both strips, used purely for measurement. The
+  // strips themselves run a slide-in transform on mount, which getBoundingClientRect
+  // bakes into the result — measuring the wrapper's own border box instead keeps
+  // the published height honest while that animation plays. Its height is
+  // whichever strip is live at the current breakpoint (the other is display:none).
+  const stripWrapRef = useRef(null);
 
   useEffect(() => {
     // Previously dismissed, or already running as the app? Stay hidden.
@@ -90,6 +96,58 @@ const AppDownloadBanner = () => {
       setGuide(null);
     }
   }, [installed]);
+
+  // ── PUBLISH THE BANNER'S VISIBLE HEIGHT AS `--app-banner-h` ───────────────
+  // The banner lives in NORMAL DOCUMENT FLOW, so ordinary page content is
+  // pushed down for free and needs nothing from us. This variable exists for
+  // the one case flow can't solve: `position: fixed` UI anchored to a hardcoded
+  // top offset (e.g. the Navbar's mobile search panel at `top: 56px`, which
+  // assumes the navbar is flush against the viewport top). Those elements must
+  // use
+  //     top: calc(var(--app-banner-h) + <their own offset>)
+  // to stay glued to the right place.
+  //
+  // The value is the banner's *currently visible* intrusion into the viewport,
+  // not its intrinsic height: full height at scroll 0, shrinking to 0px as the
+  // banner scrolls away. That's exactly the offset a `sticky top-0` navbar has
+  // at any scroll position, so consumers stay correct all the way down the page
+  // instead of only at the top. Always 0px when the banner isn't on screen, so
+  // `calc()` consumers degrade to their original value.
+  useEffect(() => {
+    const root = document.documentElement;
+    const reset = () => root.style.setProperty('--app-banner-h', '0px');
+    if (dismissed) { reset(); return reset; }
+
+    let frame = 0;
+    const publish = () => {
+      frame = 0;
+      const wrap = stripWrapRef.current;
+      if (!wrap) { reset(); return; }
+      const { height, bottom } = wrap.getBoundingClientRect();
+      // Clamp: `bottom` goes negative once scrolled past, and can exceed the
+      // banner's own height during iOS rubber-band over-scroll.
+      root.style.setProperty('--app-banner-h', `${Math.round(Math.max(0, Math.min(bottom, height)))}px`);
+    };
+    // rAF-coalesced so a scroll burst costs one layout read per frame.
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(publish); };
+
+    publish();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    // Catches the breakpoint swap between the two strips (44px desktop vs the
+    // taller mobile row) and any reflow of the banner's own content, e.g. a
+    // language change making the text wrap.
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(schedule) : null;
+    if (stripWrapRef.current) observer?.observe(stripWrapRef.current);
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      observer?.disconnect();
+      reset();
+    };
+  }, [dismissed]);
 
   if (dismissed && !guide) return null;
 
@@ -232,8 +290,16 @@ const AppDownloadBanner = () => {
       {/* ─── BANNER UI ─── */}
       {!dismissed && (
         <>
-          {/* ─── MOBILE banner (above sticky Navbar) ─── */}
-          <div className="md:hidden w-full relative z-[61] overflow-hidden bg-[#0d0d14] motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-500">
+        {/* Measurement wrapper — an unstyled block whose only job is to give the
+            --app-banner-h publisher a border box that the strips' slide-in
+            transform can't distort. Deliberately carries no classes, so it adds
+            nothing to layout and creates no stacking context. */}
+        <div ref={stripWrapRef}>
+          {/* ─── MOBILE banner ───
+              z-[45] — NOT higher. See the layering note above the desktop
+              strip; this value must stay below the z-50+ overlay band. */}
+          <div
+            className="md:hidden w-full relative z-[45] overflow-hidden bg-[#0d0d14] motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-500">
             {/* Ambient brand bloom + lit bottom hairline */}
             <div className="absolute -top-10 right-10 w-40 h-40 bg-[#ba0036]/25 blur-[48px] rounded-full pointer-events-none" />
             <div className="absolute -bottom-12 -left-6 w-32 h-32 bg-blue-600/10 blur-[40px] rounded-full pointer-events-none" />
@@ -287,8 +353,29 @@ const AppDownloadBanner = () => {
             </div>
           </div>
 
-          {/* ─── DESKTOP banner (glass top strip) ─── */}
-          <div className="hidden md:block w-full relative z-[61] overflow-hidden bg-[#0d0d14] motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-500">
+          {/* ─── DESKTOP banner (glass top strip) ───
+              ── WHY z-[45] AND NOT HIGHER ──────────────────────────────────
+              This strip is `position: relative` in normal document flow, so
+              NOTHING in flow can overlap it — page content is pushed down and
+              a `sticky top-0` navbar only pins itself after the banner has
+              scrolled off. Its z-index therefore only ever competes with
+              `position: fixed` overlays, and those must always win: a modal,
+              drawer or full-screen dialog covering the viewport has to cover
+              the banner too.
+
+              It used to be z-[61], which beat the entire z-50…z-60 overlay
+              band and left the banner painting over the top ~44-60px of every
+              one of them — most visibly the map view's floating search bar
+              (PropertyListing's map dialog is `fixed inset-0 z-[60]`).
+
+              LAYERING CONTRACT — keep this strip below the overlay band:
+                z-0…z-40   in-flow page content and sticky page headers
+                z-[45]     ← this banner
+                z-50+      fixed overlays: modals, drawers, sheets, dialogs
+              Fixed UI that instead wants to sit *below* the banner should be
+              `sticky` (so flow handles it) or offset by var(--app-banner-h). */}
+          <div
+            className="hidden md:block w-full relative z-[45] overflow-hidden bg-[#0d0d14] motion-safe:animate-in motion-safe:slide-in-from-top-2 motion-safe:fade-in motion-safe:duration-500">
             {/* Ambient blooms + lit bottom hairline */}
             <div className="absolute -top-16 left-1/3 w-72 h-40 bg-[#ba0036]/20 blur-[64px] rounded-full pointer-events-none" />
             <div className="absolute -top-10 right-1/4 w-48 h-32 bg-blue-600/10 blur-[56px] rounded-full pointer-events-none" />
@@ -343,9 +430,10 @@ const AppDownloadBanner = () => {
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Sheen keyframes (scoped, tiny) */}
-          <style>{`@keyframes banner-sheen { 0% { transform: translateX(-100%);} 60%,100% { transform: translateX(100%);} }`}</style>
+        {/* Sheen keyframes (scoped, tiny) */}
+        <style>{`@keyframes banner-sheen { 0% { transform: translateX(-100%);} 60%,100% { transform: translateX(100%);} }`}</style>
         </>
       )}
     </>

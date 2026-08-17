@@ -853,9 +853,19 @@ useEffect(() => {
         </div>
       </header>
 
-      {/* MOBILE SEARCH PANEL */}
+      {/* MOBILE SEARCH PANEL
+          `fixed`, so flow can't keep it attached to the header — it has to be
+          told where the header's bottom edge is. That is 56px (the mobile row
+          height) PLUS however much of the global AppDownloadBanner is still on
+          screen, because the banner is in flow above this sticky header and
+          pushes it down. --app-banner-h tracks exactly that as the page scrolls
+          (full banner height at the top, 0px once it has scrolled away, and 0px
+          when there is no banner at all), so the panel stays flush at every
+          scroll position instead of overlapping the navbar. */}
       {isMobileSearchOpen && (
-        <div className="md:hidden fixed top-[56px] inset-x-0 z-[55] bg-white/85 backdrop-blur-xl backdrop-saturate-[180%] border-b border-white/70 shadow-[0_8px_30px_rgba(15,23,42,0.10)] px-4 py-3 animate-[slideDown_0.2s_ease]">
+        <div
+          style={{ top: 'calc(var(--app-banner-h, 0px) + 56px)' }}
+          className="md:hidden fixed inset-x-0 z-[55] bg-white/85 backdrop-blur-xl backdrop-saturate-[180%] border-b border-white/70 shadow-[0_8px_30px_rgba(15,23,42,0.10)] px-4 py-3 animate-[slideDown_0.2s_ease]">
           <div className="flex items-center gap-2" ref={mobileNavLocRef}>
             <div className="flex-1 flex items-center gap-2 bg-gradient-to-br from-white via-slate-50/80 to-white backdrop-blur-md border border-slate-200/80 rounded-full px-4 py-2.5 relative shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(15,23,42,0.04),0_4px_14px_rgba(15,23,42,0.08)]">
               <MapPin size={14} className="text-[#ba0036] shrink-0" />

@@ -1,0 +1,978 @@
+{
+  "THANAS_BY_DISTRICT": {
+    "dhaka": [
+      "Dhanmondi",
+      "Gulshan",
+      "Banani",
+      "Baridhara",
+      "Mohammadpur",
+      "Adabar",
+      "Mirpur",
+      "Pallabi",
+      "Kafrul",
+      "Sher-e-Bangla Nagar",
+      "Darus Salam",
+      "Shah Ali",
+      "Uttara West",
+      "Uttara East",
+      "Dakshinkhan",
+      "Uttarkhan",
+      "Turag",
+      "Khilkhet",
+      "Vatara",
+      "Badda",
+      "Tejgaon",
+      "Tejgaon I/A",
+      "Hazaribagh",
+      "Kalabagan",
+      "New Market",
+      "Ramna",
+      "Shahbagh",
+      "Kotwali",
+      "Sutrapur",
+      "Gendaria",
+      "Wari",
+      "Lalbagh",
+      "Chawkbazar",
+      "Kamrangirchar",
+      "Khilgaon",
+      "Sabujbagh",
+      "Mugda",
+      "Motijheel",
+      "Paltan",
+      "Shahjahanpur",
+      "Jatrabari",
+      "Demra",
+      "Shyampur",
+      "Kadamtali",
+      "Cantonment",
+      "Bhashantek",
+      "Savar",
+      "Ashulia",
+      "Keraniganj",
+      "Dhamrai",
+      "Nawabganj",
+      "Dohar"
+    ],
+    "gazipur": [
+      "Gazipur Sadar",
+      "Tongi",
+      "Kaliakair",
+      "Kapasia",
+      "Sreepur",
+      "Kaliganj"
+    ],
+    "narayanganj": [
+      "Narayanganj Sadar",
+      "Fatullah",
+      "Siddhirganj",
+      "Bandar",
+      "Sonargaon",
+      "Rupganj",
+      "Araihazar"
+    ],
+    "chattogram": [
+      "Kotwali",
+      "Panchlaish",
+      "Pahartali",
+      "Double Mooring",
+      "Halishahar",
+      "Chandgaon",
+      "Bayezid Bostami",
+      "Khulshi",
+      "Bakalia",
+      "Patenga",
+      "EPZ",
+      "Akbarshah",
+      "Chawkbazar"
+    ],
+    "coxs_bazar": [
+      "Cox's Bazar Sadar",
+      "Teknaf",
+      "Ukhia",
+      "Chakaria",
+      "Maheshkhali",
+      "Ramu"
+    ],
+    "sylhet": [
+      "Sylhet Sadar",
+      "Beanibazar",
+      "Golapganj",
+      "Jaintiapur",
+      "Companiganj",
+      "Kanaighat",
+      "Zakiganj",
+      "Bishwanath"
+    ],
+    "rajshahi": [
+      "Boalia",
+      "Rajpara",
+      "Motihar",
+      "Shah Makhdum",
+      "Paba",
+      "Godagari"
+    ],
+    "khulna": [
+      "Khulna Sadar",
+      "Sonadanga",
+      "Khalishpur",
+      "Daulatpur",
+      "Khan Jahan Ali",
+      "Rupsha"
+    ],
+    "barishal": [
+      "Barishal Sadar",
+      "Bakerganj",
+      "Babuganj",
+      "Banaripara",
+      "Gournadi",
+      "Hizla",
+      "Mehendiganj",
+      "Muladi",
+      "Wazirpur",
+      "Agailjhara"
+    ],
+    "bhola": [
+      "Bhola Sadar",
+      "Borhanuddin",
+      "Charfasson",
+      "Daulatkhan",
+      "Lalmohan",
+      "Manpura",
+      "Tazumuddin"
+    ],
+    "rangpur": [
+      "Rangpur Sadar",
+      "Badarganj",
+      "Gangachara",
+      "Kaunia",
+      "Mithapukur",
+      "Pirgachha",
+      "Pirganj",
+      "Taraganj"
+    ],
+    "mymensingh": [
+      "Mymensingh Sadar",
+      "Trishal",
+      "Bhaluka",
+      "Muktagachha",
+      "Gouripur",
+      "Fulbaria",
+      "Gafargaon",
+      "Phulpur"
+    ]
+  },
+  "AREAS_BY_THANA": {
+    "dhaka": {
+      "Dhanmondi": [
+        "Dhanmondi 1",
+        "Dhanmondi 2",
+        "Dhanmondi 3",
+        "Dhanmondi 4",
+        "Dhanmondi 5",
+        "Dhanmondi 6",
+        "Dhanmondi 7",
+        "Dhanmondi 8",
+        "Dhanmondi 9A",
+        "Dhanmondi 10",
+        "Dhanmondi 11",
+        "Dhanmondi 12",
+        "Dhanmondi 13",
+        "Dhanmondi 14",
+        "Dhanmondi 15",
+        "Dhanmondi 27",
+        "Dhanmondi 32",
+        "Jigatola",
+        "Sukrabad",
+        "Shankar",
+        "West Dhanmondi"
+      ],
+      "Gulshan": [
+        "Gulshan 1",
+        "Gulshan 2",
+        "Niketan",
+        "Gulshan Avenue",
+        "Gulshan Circle 1",
+        "Gulshan Circle 2"
+      ],
+      "Banani": [
+        "Banani",
+        "Banani DOHS",
+        "Mohakhali",
+        "Mohakhali DOHS",
+        "Banani Chairmanbari",
+        "Kakoli"
+      ],
+      "Baridhara": [
+        "Baridhara DOHS",
+        "Baridhara J Block",
+        "Baridhara K Block",
+        "Baridhara Diplomatic Zone",
+        "Notun Bazar"
+      ],
+      "Mohammadpur": [
+        "Mohammadpur",
+        "Lalmatia",
+        "Shyamoli",
+        "Tajmahal Road",
+        "Nurjahan Road",
+        "Asad Avenue",
+        "Iqbal Road",
+        "Mohammadia Housing",
+        "Katasur",
+        "Bosila",
+        "Ring Road",
+        "Town Hall",
+        "Shekhertek",
+        "Chand Udyan"
+      ],
+      "Adabar": [
+        "Adabar",
+        "Sunibir Housing",
+        "Baitul Aman Housing",
+        "Shyamoli Housing",
+        "Mohammadpur Bera"
+      ],
+      "Mirpur": [
+        "Mirpur 1",
+        "Mirpur 2",
+        "Mirpur 6",
+        "Mirpur 7",
+        "Mirpur 10",
+        "Mirpur 11",
+        "Mirpur 12",
+        "Mirpur 13",
+        "Mirpur 14",
+        "Mirpur DOHS",
+        "Kazipara",
+        "Shewrapara",
+        "Senpara Parbata",
+        "Monipur"
+      ],
+      "Pallabi": [
+        "Pallabi",
+        "Mirpur 11",
+        "Mirpur 12",
+        "Kalshi",
+        "Duaripara",
+        "Baunia"
+      ],
+      "Kafrul": [
+        "Kafrul",
+        "Mirpur 13",
+        "Mirpur 14",
+        "Ibrahimpur",
+        "Kachukhet",
+        "West Kafrul"
+      ],
+      "Sher-e-Bangla Nagar": [
+        "Agargaon",
+        "Sher-e-Bangla Nagar",
+        "Taltola",
+        "East Sher-e-Bangla Nagar"
+      ],
+      "Darus Salam": [
+        "Darus Salam",
+        "Gabtoli",
+        "Technical",
+        "Ahmed Nagar",
+        "Mirpur 1"
+      ],
+      "Shah Ali": [
+        "Shah Ali",
+        "Mirpur 1",
+        "Rupnagar",
+        "Pirerbag",
+        "Gudaraghat"
+      ],
+      "Uttara West": [
+        "Uttara Sector 11",
+        "Uttara Sector 12",
+        "Uttara Sector 13",
+        "Uttara Sector 14",
+        "Uttara Sector 16",
+        "Uttara Sector 17",
+        "Uttara Sector 18"
+      ],
+      "Uttara East": [
+        "Uttara Sector 1",
+        "Uttara Sector 3",
+        "Uttara Sector 4",
+        "Uttara Sector 5",
+        "Uttara Sector 6",
+        "Uttara Sector 7",
+        "Uttara Sector 9",
+        "Uttara Sector 10",
+        "Jasimuddin"
+      ],
+      "Dakshinkhan": [
+        "Dakshinkhan",
+        "Ashkona",
+        "Faydabad",
+        "Kawla",
+        "Gawair"
+      ],
+      "Uttarkhan": [
+        "Uttarkhan",
+        "Mausaid",
+        "Chamurkhan",
+        "Bawnia"
+      ],
+      "Turag": [
+        "Turag",
+        "Diabari",
+        "Ranavola",
+        "Kamarpara",
+        "Dhour"
+      ],
+      "Khilkhet": [
+        "Khilkhet",
+        "Nikunja 1",
+        "Nikunja 2",
+        "Namapara",
+        "Tanpara"
+      ],
+      "Vatara": [
+        "Bashundhara R/A",
+        "Vatara",
+        "Notun Bazar",
+        "Jagannathpur",
+        "Solmaid",
+        "Kuril"
+      ],
+      "Badda": [
+        "Badda",
+        "Merul Badda",
+        "North Badda",
+        "Middle Badda",
+        "South Badda",
+        "Shahjadpur",
+        "Gulshan Link Road",
+        "Beraid"
+      ],
+      "Tejgaon": [
+        "Tejgaon",
+        "Farmgate",
+        "Karwan Bazar",
+        "Nakhalpara",
+        "Tejturi Bazar",
+        "Indira Road"
+      ],
+      "Tejgaon I/A": [
+        "Tejgaon Industrial Area",
+        "Nabisco",
+        "Love Road",
+        "Gulshan Link"
+      ],
+      "Hazaribagh": [
+        "Hazaribagh",
+        "Rayer Bazar",
+        "Zafrabad",
+        "Beribadh",
+        "Ganaktuli"
+      ],
+      "Kalabagan": [
+        "Kalabagan",
+        "Lake Circus",
+        "First Lane",
+        "Second Lane",
+        "Mirpur Road"
+      ],
+      "New Market": [
+        "New Market",
+        "Nilkhet",
+        "Azimpur",
+        "Hatirpool",
+        "Elephant Road",
+        "Katabon",
+        "Green Road"
+      ],
+      "Ramna": [
+        "Shantinagar",
+        "Eskaton",
+        "Bailey Road",
+        "Magbazar",
+        "Kakrail",
+        "Bangla Motor",
+        "Minto Road"
+      ],
+      "Shahbagh": [
+        "Shahbagh",
+        "Paribagh",
+        "Bakshibazar",
+        "Hatirpool",
+        "Nilkhet"
+      ],
+      "Kotwali": [
+        "Sadarghat",
+        "Babubazar",
+        "Islampur",
+        "Patuatuli",
+        "Shakhari Bazar"
+      ],
+      "Sutrapur": [
+        "Sutrapur",
+        "Tikatuli",
+        "Dholaikhal",
+        "Faridabad",
+        "Narinda"
+      ],
+      "Gendaria": [
+        "Gendaria",
+        "Dhupkhola",
+        "Distillery Road",
+        "Dayaganj"
+      ],
+      "Wari": [
+        "Wari",
+        "Rankin Street",
+        "Hatkhola",
+        "Joykali Mandir",
+        "Baniyanagar"
+      ],
+      "Lalbagh": [
+        "Lalbagh",
+        "Nawabganj",
+        "Shahid Nagar",
+        "Posta",
+        "Chawk Circular Road"
+      ],
+      "Chawkbazar": [
+        "Chawkbazar",
+        "Bakshibazar",
+        "Urdu Road",
+        "Champatoli",
+        "Begum Bazar"
+      ],
+      "Kamrangirchar": [
+        "Kamrangirchar",
+        "Ashrafabad",
+        "Bosila",
+        "Char Kamrangir",
+        "Hujurpara"
+      ],
+      "Khilgaon": [
+        "Khilgaon",
+        "Malibagh",
+        "Mouchak",
+        "Taltola",
+        "Goran",
+        "Tilpapara",
+        "Nandipara",
+        "Chowdhurypara"
+      ],
+      "Sabujbagh": [
+        "Bashabo",
+        "Madartek",
+        "Sabujbagh",
+        "Kadamtala",
+        "South Bashabo"
+      ],
+      "Mugda": [
+        "Mugda",
+        "Mugdapara",
+        "Maniknagar",
+        "Manda",
+        "Golapbagh"
+      ],
+      "Motijheel": [
+        "Motijheel",
+        "Arambagh",
+        "Fakirapool",
+        "Kamalapur",
+        "Dilkusha",
+        "Toyenbee Road"
+      ],
+      "Paltan": [
+        "Purana Paltan",
+        "Naya Paltan",
+        "Bijoynagar",
+        "Segunbagicha",
+        "Topkhana Road"
+      ],
+      "Shahjahanpur": [
+        "Shahjahanpur",
+        "Shantibagh",
+        "Razarbagh",
+        "North Shahjahanpur"
+      ],
+      "Jatrabari": [
+        "Jatrabari",
+        "Kazla",
+        "Dholaipar",
+        "Shanir Akhra",
+        "Mridha Bari",
+        "Kutubkhali"
+      ],
+      "Demra": [
+        "Demra",
+        "Matuail",
+        "Sarulia",
+        "Dogair",
+        "Konapara",
+        "Staff Quarter"
+      ],
+      "Shyampur": [
+        "Shyampur",
+        "Jurain",
+        "Postogola",
+        "Dolaipar",
+        "Mir Hajirbag"
+      ],
+      "Kadamtali": [
+        "Kadamtali",
+        "Dhania",
+        "Raysaheb Bazar",
+        "Mir Hazaribagh",
+        "Shyampur Bazar"
+      ],
+      "Cantonment": [
+        "Cantonment",
+        "Manikdi",
+        "Matikata",
+        "MES",
+        "Ibrahimpur",
+        "Balughat"
+      ],
+      "Bhashantek": [
+        "Bhashantek",
+        "Damalkot",
+        "Mirpur Cantonment",
+        "Kalshi"
+      ],
+      "Savar": [
+        "Savar Bazar",
+        "Hemayetpur",
+        "Amin Bazar",
+        "Bank Town",
+        "Radio Colony",
+        "Dattapara",
+        "Jahangirnagar University",
+        "Nabinagar",
+        "Gakulnagar",
+        "Anandapur",
+        "Majidpur",
+        "Savar DOHS",
+        "Enam Medical"
+      ],
+      "Ashulia": [
+        "Ashulia",
+        "Bypail",
+        "Zirabo",
+        "Jamgora",
+        "Narsinghapur",
+        "Sreepur",
+        "Kathgora",
+        "Dendabor"
+      ],
+      "Keraniganj": [
+        "Aganagar",
+        "Jinzira",
+        "Kalindi",
+        "Shubhadya",
+        "Tegharia",
+        "Konda",
+        "Basta",
+        "Rohitpur"
+      ],
+      "Dhamrai": [
+        "Dhamrai",
+        "Sombhag",
+        "Jadabpur",
+        "Balia",
+        "Kushura"
+      ],
+      "Nawabganj": [
+        "Nawabganj",
+        "Agla",
+        "Kalakopa",
+        "Bandura",
+        "Sholla"
+      ],
+      "Dohar": [
+        "Dohar",
+        "Joypara",
+        "Muksudpur",
+        "Nayabari"
+      ]
+    },
+    "chattogram": {
+      "Kotwali": [
+        "Kotwali",
+        "Anderkilla",
+        "Jamalkhan",
+        "Laldighi",
+        "Court Building",
+        "Riazuddin Bazar"
+      ],
+      "Panchlaish": [
+        "Panchlaish",
+        "Nasirabad",
+        "Mehedibag",
+        "Probartak",
+        "O.R. Nizam Road",
+        "Hillview"
+      ],
+      "Pahartali": [
+        "Pahartali",
+        "Foy's Lake",
+        "Akbarshah",
+        "Sarail",
+        "Khulshi Hills"
+      ],
+      "Double Mooring": [
+        "Agrabad",
+        "Double Mooring",
+        "Dewanhat",
+        "Barik Building",
+        "Chowmuhani"
+      ],
+      "Halishahar": [
+        "Halishahar",
+        "Boropol",
+        "Artillery",
+        "Block A",
+        "Block G",
+        "Ananda Bazar"
+      ],
+      "Chandgaon": [
+        "Chandgaon",
+        "Bahaddarhat",
+        "Kapasgola",
+        "Mohra",
+        "Khaja Road"
+      ],
+      "Bayezid Bostami": [
+        "Bayezid",
+        "Nasirabad Industrial",
+        "Oxygen",
+        "Sholoshahar",
+        "Amin Colony"
+      ],
+      "Khulshi": [
+        "Khulshi",
+        "South Khulshi",
+        "North Khulshi",
+        "Jakir Hossain Road",
+        "Lalkhan Bazar"
+      ],
+      "Bakalia": [
+        "Bakalia",
+        "Chaktai",
+        "Rajakhali",
+        "Bou Bazar",
+        "DC Road"
+      ],
+      "Patenga": [
+        "Patenga",
+        "EPZ",
+        "Steel Mill",
+        "Airport Road",
+        "Sea Beach"
+      ],
+      "EPZ": [
+        "EPZ",
+        "Free Port",
+        "Bandartila",
+        "Steel Mill Bazar"
+      ],
+      "Akbarshah": [
+        "Akbarshah",
+        "Kornelhat",
+        "A K Khan",
+        "Firingi Bazar"
+      ],
+      "Chawkbazar": [
+        "Chawkbazar",
+        "Gulzar",
+        "Kapasgola",
+        "College Road",
+        "Didar Market"
+      ]
+    }
+  },
+  "AREAS_BY_DISTRICT": {
+    "dhaka": [
+      "Gulshan 1",
+      "Gulshan 2",
+      "Banani",
+      "Baridhara",
+      "Bashundhara R/A",
+      "Niketan",
+      "Dhanmondi 1",
+      "Dhanmondi 2",
+      "Dhanmondi 3",
+      "Dhanmondi 4",
+      "Dhanmondi 5",
+      "Dhanmondi 6",
+      "Dhanmondi 7",
+      "Dhanmondi 8",
+      "Dhanmondi 9A",
+      "Dhanmondi 10",
+      "Dhanmondi 11",
+      "Dhanmondi 12",
+      "Dhanmondi 13",
+      "Dhanmondi 14",
+      "Dhanmondi 15",
+      "Dhanmondi 27",
+      "Dhanmondi 32",
+      "Uttara Sector 1",
+      "Uttara Sector 3",
+      "Uttara Sector 4",
+      "Uttara Sector 6",
+      "Uttara Sector 7",
+      "Uttara Sector 9",
+      "Uttara Sector 10",
+      "Uttara Sector 11",
+      "Uttara Sector 12",
+      "Uttara Sector 13",
+      "Uttara Sector 14",
+      "Uttara Sector 18",
+      "Mirpur 1",
+      "Mirpur 2",
+      "Mirpur 6",
+      "Mirpur 10",
+      "Mirpur 11",
+      "Mirpur 12",
+      "Mirpur 13",
+      "Mirpur 14",
+      "Mirpur DOHS",
+      "Pallabi",
+      "Kazipara",
+      "Shewrapara",
+      "Mohammadpur",
+      "Lalmatia",
+      "Shyamoli",
+      "Adabar",
+      "Rayer Bazar",
+      "Hazaribagh",
+      "Rampura",
+      "Banasree",
+      "Aftab Nagar",
+      "Khilgaon",
+      "Malibagh",
+      "Mouchak",
+      "Badda",
+      "Merul Badda",
+      "North Badda",
+      "Bashabo",
+      "Mugda",
+      "Maniknagar",
+      "Tejgaon",
+      "Farmgate",
+      "Karwan Bazar",
+      "Mohakhali",
+      "Mohakhali DOHS",
+      "Motijheel",
+      "Paltan",
+      "Segunbagicha",
+      "Bailey Road",
+      "Eskaton",
+      "Shantinagar",
+      "Wari",
+      "Old Dhaka",
+      "Lalbagh",
+      "Azimpur",
+      "Nilkhet",
+      "Jigatola",
+      "Cantonment",
+      "Khilkhet",
+      "Nikunja 1",
+      "Nikunja 2",
+      "Bashabo",
+      "Demra",
+      "Savar",
+      "Ashulia",
+      "Keraniganj",
+      "Dhamrai",
+      "Nawabganj",
+      "Dohar",
+      "Hemayetpur",
+      "Dattapara"
+    ],
+    "gazipur": [
+      "Gazipur Sadar",
+      "Tongi",
+      "Joydebpur",
+      "Konabari",
+      "Board Bazar",
+      "Chowrasta"
+    ],
+    "narayanganj": [
+      "Narayanganj Sadar",
+      "Fatullah",
+      "Siddhirganj",
+      "Bandar",
+      "Sonargaon",
+      "Rupganj"
+    ],
+    "chattogram": [
+      "Agrabad",
+      "Nasirabad",
+      "Khulshi",
+      "Panchlaish",
+      "GEC Circle",
+      "Halishahar",
+      "Chawkbazar",
+      "Kotwali",
+      "Pahartali",
+      "Bayezid",
+      "Akbar Shah",
+      "Patenga",
+      "Foy's Lake",
+      "Chandgaon",
+      "Bakalia",
+      "EPZ",
+      "Lalkhan Bazar",
+      "CDA Avenue"
+    ],
+    "coxs_bazar": [
+      "Cox's Bazar Sadar",
+      "Kolatoli",
+      "Sugandha Beach",
+      "Laboni",
+      "Inani",
+      "Teknaf"
+    ],
+    "sylhet": [
+      "Zindabazar",
+      "Amberkhana",
+      "Subhanighat",
+      "Shahjalal Uposhohor",
+      "Mejortila",
+      "Lamabazar",
+      "Tilagor",
+      "Chowhatta"
+    ],
+    "rajshahi": [
+      "Shaheb Bazar",
+      "Boalia",
+      "Motihar",
+      "Rajpara",
+      "Padma Residential",
+      "Binodpur",
+      "Kazla"
+    ],
+    "khulna": [
+      "Sonadanga",
+      "Khalishpur",
+      "Daulatpur",
+      "Boyra",
+      "Nirala",
+      "Shibbari",
+      "Doulatpur"
+    ],
+    "barishal": [
+      "Barishal Sadar",
+      "Bandar Road",
+      "Nathullabad",
+      "Kashipur",
+      "Notullabad"
+    ],
+    "rangpur": [
+      "Rangpur Sadar",
+      "Modern Mor",
+      "Jahaj Company More",
+      "Dhap",
+      "Lalbag",
+      "Shapla Chattar"
+    ],
+    "mymensingh": [
+      "Mymensingh Sadar",
+      "Charpara",
+      "Maskanda",
+      "Notun Bazar",
+      "Ganginar Par",
+      "Brahmapalli"
+    ]
+  },
+  "THANA_BN": {
+    "dhaka": {
+      "Savar": "সাভার",
+      "Ashulia": "আশুলিয়া",
+      "Keraniganj": "কেরানীগঞ্জ",
+      "Dhamrai": "ধামরাই",
+      "Nawabganj": "নবাবগঞ্জ",
+      "Dohar": "দোহার"
+    },
+    "bhola": {
+      "Bhola Sadar": "ভোলা সদর",
+      "Borhanuddin": "বোরহানউদ্দিন",
+      "Charfasson": "চরফ্যাশন",
+      "Daulatkhan": "দৌলতখান",
+      "Lalmohan": "লালমোহন",
+      "Manpura": "মনপুরা",
+      "Tazumuddin": "তজুমদ্দিন"
+    }
+  },
+  "AREA_BN": {
+    "dhaka": {
+      "Savar": {
+        "Savar Bazar": "সাভার বাজার",
+        "Hemayetpur": "হেমায়েতপুর",
+        "Amin Bazar": "আমিন বাজার",
+        "Bank Town": "ব্যাংক টাউন",
+        "Radio Colony": "রেডিও কলোনি",
+        "Dattapara": "দত্তপাড়া",
+        "Jahangirnagar University": "জাহাঙ্গীরনগর বিশ্ববিদ্যালয়",
+        "Nabinagar": "নবীনগর",
+        "Gakulnagar": "গোকুলনগর",
+        "Anandapur": "আনন্দপুর",
+        "Majidpur": "মজিদপুর",
+        "Savar DOHS": "সাভার ডিওএইচএস",
+        "Enam Medical": "এনাম মেডিকেল"
+      }
+    }
+  },
+  "UNIONS_BY_THANA": {
+    "bhola": {
+      "Lalmohan": [
+        {
+          "no": 1,
+          "en": "Badarpur",
+          "bn": "বদরপুর"
+        },
+        {
+          "no": 2,
+          "en": "Kalma",
+          "bn": "কালমা"
+        },
+        {
+          "no": 3,
+          "en": "Dhali Gournagar",
+          "bn": "ধলী গৌরনগর"
+        },
+        {
+          "no": 4,
+          "en": "Char Bhuta",
+          "bn": "চর ভূতা"
+        },
+        {
+          "no": 5,
+          "en": "Lalmohan",
+          "bn": "লালমোহন"
+        },
+        {
+          "no": 6,
+          "en": "Farajganj",
+          "bn": "ফরাজগঞ্জ"
+        },
+        {
+          "no": 7,
+          "en": "Paschim Char Umed",
+          "bn": "পশ্চিম চর উমেদ"
+        },
+        {
+          "no": 8,
+          "en": "Ramagonj",
+          "bn": "রমাগঞ্জ"
+        },
+        {
+          "no": 9,
+          "en": "Lord Hardinge",
+          "bn": "লর্ড হার্ডিঞ্জ"
+        }
+      ]
+    }
+  }
+}

@@ -43,6 +43,23 @@ const DEVICE_KEEP_KEYS = new Set([
   'welcome:login:hidden', // WelcomeRobotOverlay — "never show the login welcome again"
 ]);
 
+// Same idea as DEVICE_KEEP_KEYS, but for families of keys whose full name isn't
+// known up front because it carries an account id.
+//
+// `tolet_pro::tours_completed::<userId>` is the guided-tour record, and it is
+// the reason this list exists. It is already scoped per account — user B's
+// bucket is a different key from user A's, so B still gets their own tour on a
+// shared browser — which means there is nothing to purge here for privacy, and
+// deleting it on logout was an outright bug: every single logout reset the
+// record, so the tour restarted from step 1 on the user's next login, forever.
+// A "show this once" flag is worthless if it doesn't outlive a logout.
+const DEVICE_KEEP_PREFIXES = [
+  'tolet_pro::tours_completed', // TourContext — which guided tours are done
+];
+
+const isDeviceLevelKey = (k) =>
+  DEVICE_KEEP_KEYS.has(k) || DEVICE_KEEP_PREFIXES.some((p) => k.startsWith(p));
+
 const ADMIN_ROLES = ['support_agent', 'moderator', 'super_admin'];
 export const isAdminRole = (role) => ADMIN_ROLES.includes(role);
 
@@ -108,15 +125,16 @@ export function purgeLegacySessionExpiry() {
 }
 
 // 🧹 Wipe EVERY account-scoped key from localStorage, preserving only the
-// device-level prefs in DEVICE_KEEP_KEYS. Used on logout ("all data deleted"),
-// and when a DIFFERENT account signs in so account B can never inherit account
-// A's cached dashboard / chat / profile data on the same browser.
+// device-level prefs in DEVICE_KEEP_KEYS / DEVICE_KEEP_PREFIXES. Used on logout
+// ("all data deleted"), and when a DIFFERENT account signs in so account B can
+// never inherit account A's cached dashboard / chat / profile data on the same
+// browser.
 export function clearAllAppData() {
   try {
     const toRemove = [];
     for (let i = 0; i < localStorage.length; i += 1) {
       const k = localStorage.key(i);
-      if (k && !DEVICE_KEEP_KEYS.has(k)) toRemove.push(k);
+      if (k && !isDeviceLevelKey(k)) toRemove.push(k);
     }
     toRemove.forEach((k) => { try { localStorage.removeItem(k); } catch { /* ignore */ } });
   } catch { /* ignore */ }

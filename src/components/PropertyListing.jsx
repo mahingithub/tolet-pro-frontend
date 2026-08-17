@@ -1384,6 +1384,9 @@ const PropertyListing = () => {
 			}
 			if ((prop.sqft || 0) > maxSqft) return false;
 			if (selectedFurnish && prop.furnishing !== selectedFurnish) return false;
+			// `prop.rating` is the LANDLORD's average review score, not a rating of
+			// the house — the API overwrites it per card from Review docs with
+			// revieweeRole 'landlord'. Hence the "Landlord Rating" filter label.
 			if (minRating > 0 && (prop.rating || 0) < minRating) return false;
 			if (selectedFloor && selectedFloor !== (t.anyFloor || "Any Floor")) {
 				const fl = Number(prop.floor) || 0;
@@ -1909,7 +1912,7 @@ const PropertyListing = () => {
 							)}
 						</FilterSection>
 
-						<FilterSection title={t.filterRating || "Property Rating"}>
+						<FilterSection title={t.filterRating || "Landlord Rating"}>
 							<div className="flex flex-col gap-3">
 								{[
 									{ val: 4, label: t.star4Above || "4.0 & Above" },
