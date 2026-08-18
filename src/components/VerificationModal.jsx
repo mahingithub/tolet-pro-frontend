@@ -9,21 +9,35 @@
  *   <VerificationModal role="tenant"   ... />   ← default
  *   <VerificationModal role="landlord" ... />   ← host flow
  *
- * TENANT trust score items collected here (max 80 pts in modal):
- *   • professionType  → gates professionProof scoring  (30 pts)
- *   • photo           → profile photo                  (20 pts)
- *   • nidFront+Back   → NID                            (30 pts)
- *   • professionProof → profession proof doc            (30 pts)
- *   (phone 20 pts is already captured at signup — not re-asked)
+ * TENANT items collected here (weights mirror computeTenantTrust):
+ *   • photo           → profile photo                  (15 pts, instant)
+ *   • professionType  → profession                     (10 pts, instant)
+ *   • nidFront+Back   → NID                            (30 pts, AFTER review)
+ *   (phone 15 · workPlace 10 · familySize 5 · emergency 15 live in the
+ *    Profile tab, not here — they arrive via `baseScore`)
  *
- * LANDLORD trust score items collected here (max 70 pts in modal):
- *   • photo             → selfie verification          (20 pts)
- *   • nidFront+Back     → NID                          (25 pts)
- *   • preferredTenants  → landlord preferences          (5 pts)
- *   • communication     → landlord preferences          (5 pts)
- *   • serviceCharge     → landlord preferences          (5 pts)
- *   • houseRules        → landlord preferences         (10 pts)
- *   (phone 20 pts + avatar 10 pts already captured elsewhere)
+ * LANDLORD items collected here (weights mirror computeLandlordTrust):
+ *   • photo             → selfie verification          (20 pts, instant)
+ *   • preferredTenants  → landlord preferences          (5 pts, instant)
+ *   • communication     → landlord preferences          (5 pts, instant)
+ *   • serviceCharge     → landlord preferences          (5 pts, instant)
+ *   • houseRules        → landlord preferences         (10 pts, instant)
+ *   • nidFront+Back     → NID                          (25 pts, AFTER review)
+ *   (phone 20 + avatar 10 arrive via `baseScore`)
+ *
+ * ── THE "100% vs 30/100" TRAP ───────────────────────────────────────────
+ * NID points are the only admin-gated items in either formula. Uploading a
+ * document is therefore NOT the same as earning its points, and any meter
+ * that counts uploads as progress will happily show 100% next to a 30/100
+ * trust ring — which is exactly the contradiction users reported.
+ *
+ * So this wizard never conflates the two. It tracks three numbers:
+ *   credited  — points the server has already awarded (baseScore + instant)
+ *   pending   — points attached but awaiting admin review (NID)
+ *   projected — credited + pending, i.e. the score after approval
+ * The gauge shows `credited`; `pending` gets its own explicit "after review"
+ * pill. See computeVerificationProgress() in TenantDashboard.jsx for the
+ * matching split on the dashboard side.
  *
  * Backwards-compat:
  *   Default export = VerificationModal
@@ -33,14 +47,14 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  MapPin, FileText, Home,
+  MapPin, FileText,
   X, ChevronLeft, ChevronRight, Check, CheckCircle2,
   Sparkles, Briefcase, GraduationCap, Store, Users,
-  Building2, Phone, IdCard, ShieldCheck,
+  IdCard, ShieldCheck,
   ImagePlus, Loader2, AlertCircle, Trash2,
-  ArrowRight, Lock, Award, Zap, Fingerprint,
+  Lock, Fingerprint,
   Edit3, Camera, MessageSquare, DollarSign, ScrollText,
-  UserCog, HandHeart,
+  UserCog, HandHeart, Clock, TrendingUp,
 } from 'lucide-react';
 import NIDCameraCapture from './NIDCameraCapture';
 
@@ -50,24 +64,30 @@ import NIDCameraCapture from './NIDCameraCapture';
 const MAX_BYTES   = 5 * 1024 * 1024;
 const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
 
-// ── Tenant trust-score weights (mirrors backend computeTenantTrust) ──────
-// phone(20) is NOT in the modal — already captured at signup.
+// ── Trust-score weights ─────────────────────────────────────────────────
+// These MUST match tolet-pro-backend/utils/trustScore.js. They previously
+// didn't (photo was advertised as 30 and NID as 50), so the wizard promised
+// points the server never granted. `gated: true` marks the items an admin
+// has to approve before they count.
+//
+// Tenant — computeTenantTrust(): phone 15 · photo 15 · nid 30 ·
+//   professionType 10 · workPlace 10 · familySize 5 · emergency 15
 const TENANT_POINTS = {
-  photo:           30,
-  nidFront:        25, // 50 total for nid, split visually
-  nidBack:         25,
+  photo:            15,
+  profession:       10,
+  nid:              30,   // gated on verification.status === 'verified'
 };
 
-// ── Landlord trust-score weights (mirrors backend computeLandlordTrust) ──
-// phone(20) + avatar(10) are NOT in the modal.
+// Landlord — computeLandlordTrust(): phone 20 · avatar 10 · selfie 20 ·
+//   nid 25 · preferredTenants 5 · communication 5 · serviceCharge 5 ·
+//   houseRules 10
 const LANDLORD_POINTS = {
   photo:            20,
-  nidFront:         12, // 25 total for nid, split visually
-  nidBack:          13,
   preferredTenants:  5,
   communication:     5,
   serviceCharge:     5,
   houseRules:       10,
+  nid:              25,   // gated on verification.status === 'verified'
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -185,25 +205,20 @@ const Chip = ({ active, onClick, icon: Icon, children }) => (
 );
 
 // ── Trust Score Gauge ───────────────────────────────────────────────────
-const TrustScoreGauge = ({ score, isBn }) => {
-  const tier =
-    score >= 90 ? 'platinum' :
-    score >= 70 ? 'gold'     :
-    score >= 40 ? 'silver'   : 'bronze';
-  const tierLabel = {
-    platinum: isBn ? 'প্ল্যাটিনাম' : 'Platinum',
-    gold:     isBn ? 'গোল্ড'       : 'Gold',
-    silver:   isBn ? 'সিলভার'      : 'Silver',
-    bronze:   isBn ? 'ব্রোঞ্জ'      : 'Bronze',
-  }[tier];
-
+// Two concentric arcs, because two different things are true at once:
+//   • solid arc  = `score`, points already credited
+//   • ghost arc  = `pending`, points attached but awaiting admin review
+// Drawing the pending slice as a distinct, dimmer arc is what stops the
+// gauge from implying that an upload has already earned its points.
+const TrustScoreGauge = ({ score, pending = 0, isBn }) => {
   const R = 22;
   const C = 2 * Math.PI * R;
-  const offset = C - (score / 100) * C;
+  const clamped     = Math.max(0, Math.min(100, score));
+  const pendingSpan = Math.max(0, Math.min(100 - clamped, pending));
 
   return (
-    <div className="relative w-16 h-16 flex items-center justify-center">
-      <svg width="64" height="64" className="-rotate-90">
+    <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
+      <svg width="64" height="64" className="-rotate-90" aria-hidden="true">
         <defs>
           <linearGradient id="trustGrad" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%"   stopColor="#ba0036" />
@@ -212,17 +227,28 @@ const TrustScoreGauge = ({ score, isBn }) => {
           </linearGradient>
         </defs>
         <circle cx="32" cy="32" r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
+        {/* Pending arc sits behind, offset to start where the solid arc ends */}
+        {pendingSpan > 0 && (
+          <motion.circle
+            cx="32" cy="32" r={R} fill="none"
+            stroke="rgba(255,255,255,0.28)" strokeWidth="4" strokeLinecap="round"
+            strokeDasharray={C}
+            initial={false}
+            animate={{ strokeDashoffset: C - ((clamped + pendingSpan) / 100) * C }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+          />
+        )}
         <motion.circle
           cx="32" cy="32" r={R} fill="none"
           stroke="url(#trustGrad)" strokeWidth="4" strokeLinecap="round"
           strokeDasharray={C}
           initial={false}
-          animate={{ strokeDashoffset: offset }}
+          animate={{ strokeDashoffset: C - (clamped / 100) * C }}
           transition={{ duration: 0.6, ease: 'easeOut' }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="text-[15px] font-black text-white leading-none tabular-nums">{score}</div>
+        <div className="text-[15px] font-black text-white leading-none tabular-nums">{clamped}</div>
         <div className="text-[7px] font-black text-white/40 uppercase tracking-widest mt-0.5">
           {isBn ? 'ট্রাস্ট' : 'Trust'}
         </div>
@@ -621,10 +647,14 @@ const TenantReview = ({ data, isBn }) => (
       muted={!data.photo} />
 
     <SummaryRow icon={IdCard} labelBn="NID" labelEn="NID" isBn={isBn}
-      value={(data.nidFront && data.nidBack)
-        ? (isBn ? 'যোগ করা হয়েছে' : 'Added')
-        : (isBn ? 'পরে যোগ করব' : 'Add later')}
-      muted={!(data.nidFront && data.nidBack)} />
+      value={data.nidVerified
+        ? (isBn ? 'ভেরিফাইড' : 'Verified')
+        : data.nidPending
+          ? (isBn ? 'রিভিউতে আছে' : 'In review')
+          : (data.nidFront && data.nidBack)
+            ? (isBn ? 'যোগ করা হয়েছে' : 'Added')
+            : (isBn ? 'পরে যোগ করব' : 'Add later')}
+      muted={!(data.nidFront && data.nidBack) && !data.nidVerified && !data.nidPending} />
   </div>
 );
 
@@ -650,10 +680,14 @@ const HostReview = ({ data, isBn }) => (
       value={data.photo ? (isBn ? 'যোগ করা হয়েছে' : 'Added') : (isBn ? 'যোগ করা হয়নি' : 'Not added')}
       muted={!data.photo} />
     <SummaryRow icon={IdCard} labelBn="NID" labelEn="NID" isBn={isBn}
-      value={(data.nidFront && data.nidBack) || data.nidVerified
-        ? (isBn ? 'যোগ করা হয়েছে' : 'Added')
-        : (isBn ? 'আবশ্যক' : 'Required')}
-      muted={!(data.nidFront && data.nidBack) && !data.nidVerified} />
+      value={data.nidVerified
+        ? (isBn ? 'ভেরিফাইড' : 'Verified')
+        : data.nidPending
+          ? (isBn ? 'রিভিউতে আছে' : 'In review')
+          : (data.nidFront && data.nidBack)
+            ? (isBn ? 'যোগ করা হয়েছে' : 'Added')
+            : (isBn ? 'আবশ্যক' : 'Required')}
+      muted={!(data.nidFront && data.nidBack) && !data.nidVerified && !data.nidPending} />
   </div>
 );
 
@@ -762,10 +796,14 @@ const OnboardingReview = ({ data, isBn }) => (
           value={data.photo ? (isBn ? 'যোগ করা হয়েছে' : 'Added') : (isBn ? 'যোগ করা হয়নি' : 'Not added')}
           muted={!data.photo} />
         <SummaryRow icon={IdCard} labelBn="NID" labelEn="NID" isBn={isBn}
-          value={(data.nidFront && data.nidBack) || data.nidVerified
-            ? (isBn ? 'যোগ করা হয়েছে' : 'Added')
-            : (isBn ? 'আবশ্যক' : 'Required')}
-          muted={!(data.nidFront && data.nidBack) && !data.nidVerified} />
+          value={data.nidVerified
+            ? (isBn ? 'ভেরিফাইড' : 'Verified')
+            : data.nidPending
+              ? (isBn ? 'রিভিউতে আছে' : 'In review')
+              : (data.nidFront && data.nidBack)
+                ? (isBn ? 'যোগ করা হয়েছে' : 'Added')
+                : (isBn ? 'আবশ্যক' : 'Required')}
+          muted={!(data.nidFront && data.nidBack) && !data.nidVerified && !data.nidPending} />
       </>
     )}
   </div>
@@ -783,11 +821,20 @@ const VerificationModal = ({
   role         = 'tenant',
   language     = 'বাংলা',
   initialData  = null,
+  // Points the server has ALREADY credited for items this wizard doesn't
+  // collect (phone, avatar, workplace, family size, emergency contact).
+  // Without it the header gauge would restart at 0 every time and contradict
+  // the dashboard's ring. Callers pass the sum of their done-but-not-here
+  // breakdown items.
+  baseScore    = 0,
 }) => {
   const isBn        = language === 'বাংলা';
   const isLandlord  = role === 'landlord';
   const isOnboarding = role === 'landlord_onboarding';
-  const POINTS      = isLandlord ? LANDLORD_POINTS : TENANT_POINTS;
+  // Onboarding is a landlord flow, so it scores on the landlord weights
+  // (selfie 20 / NID 25). It previously fell through to the tenant table and
+  // quoted "+30 Trust" for an NID worth 25 to a host.
+  const POINTS      = (isLandlord || isOnboarding) ? LANDLORD_POINTS : TENANT_POINTS;
   const BASE_STEPS  = isOnboarding ? LANDLORD_ONBOARDING_STEPS : (isLandlord ? LANDLORD_STEPS  : TENANT_STEPS);
 
   // ─── State (only trust-scoring fields) ─────────────────────────────
@@ -852,15 +899,22 @@ const VerificationModal = ({
           profession: initialData.professionType || '',
         };
       }
-      if (initialData.nidVerified) {
-        seed.nidVerified = true;
-      }
+      // Two DIFFERENT facts, deliberately not merged:
+      //   nidVerified — an admin approved it. Points are credited.
+      //   nidPending  — it's uploaded and queued. Points are NOT credited,
+      //                 but we must not ask for it again either.
+      // Callers used to pass `nidVerified: status === 'verified' || !!nidFront`,
+      // which collapsed the two and handed out points for a bare upload.
+      if (initialData.nidVerified) seed.nidVerified = true;
+      if (initialData.nidPending)  seed.nidPending  = true;
     }
 
     // Skip already-completed steps
     const filtered = BASE_STEPS.filter((step) => {
       if (step.key === 'review') return true;
-      if (step.key === 'nid') return !seed.nidVerified && !(isOnboarding && seed.isTenantVerified);
+      // Skip the NID step when it's approved OR already in the queue — asking
+      // for a document we're currently reviewing is the definition of nagging.
+      if (step.key === 'nid') return !seed.nidVerified && !seed.nidPending && !(isOnboarding && seed.isTenantVerified);
       if (step.key === 'photo' && isOnboarding && seed.isTenantVerified) return false;
       if (step.key === 'profession'       && seed.profession)                            return false;
       if (step.key === 'preferredTenants'  && (seed.preferredTenants || []).length > 0)   return false;
@@ -878,21 +932,36 @@ const VerificationModal = ({
   }, [open, role]);
 
   // ─── Live trust score ──────────────────────────────────────────────
-  const liveScore = useMemo(() => {
-    let s = 0;
+  // Three numbers, never collapsed into one:
+  //   credited  — awarded the moment this is saved
+  //   pending   — attached, but an admin has to approve it first (NID only)
+  //   projected — what the score becomes once review passes
+  // `nidVerified` means an admin already approved it, so those points are
+  // credited rather than pending.
+  const score = useMemo(() => {
+    let credited = Math.max(0, baseScore);
+    let pending  = 0;
+
+    if (data.photo)                                                credited += POINTS.photo;
     if (isLandlord) {
-      if (data.photo)                                              s += POINTS.photo;
-      if (data.nidFront || data.nidVerified)                       s += POINTS.nidFront + POINTS.nidBack; // Assuming NID points total
-      if ((data.preferredTenants || []).length > 0)                 s += POINTS.preferredTenants;
-      if ((data.communication || []).length > 0)                    s += POINTS.communication;
-      if (data.serviceCharge !== '' && data.serviceCharge != null)  s += POINTS.serviceCharge;
-      if ((data.houseRules || []).length > 0)                       s += POINTS.houseRules;
-    } else {
-      if (data.photo)                                              s += POINTS.photo;
-      if (data.nidFront || data.nidVerified)                       s += POINTS.nidFront + POINTS.nidBack;
+      if ((data.preferredTenants || []).length > 0)                 credited += POINTS.preferredTenants;
+      if ((data.communication || []).length > 0)                    credited += POINTS.communication;
+      if (data.serviceCharge !== '' && data.serviceCharge != null)  credited += POINTS.serviceCharge;
+      if ((data.houseRules || []).length > 0)                       credited += POINTS.houseRules;
+    } else if (!isOnboarding) {
+      if (data.profession)                                          credited += POINTS.profession;
     }
-    return Math.min(100, s);
-  }, [data, isLandlord, POINTS]);
+
+    if (data.nidVerified)                                           credited += POINTS.nid;
+    else if (data.nidPending || (data.nidFront && data.nidBack))     pending  += POINTS.nid;
+
+    credited = Math.min(100, credited);
+    return {
+      credited,
+      pending:   Math.min(100 - credited, pending),
+      projected: Math.min(100, credited + pending),
+    };
+  }, [data, isLandlord, isOnboarding, POINTS, baseScore]);
 
   // ─── Step validity ─────────────────────────────────────────────────
   const isStepValid = useCallback(() => {
@@ -911,7 +980,7 @@ const VerificationModal = ({
       case 'serviceCharge':    return data.serviceCharge !== '' && data.serviceCharge != null;
       // Shared
       case 'photo':            return !!data.photo;
-      case 'nid':              return data.nidVerified || (isLandlord || isOnboarding
+      case 'nid':              return data.nidVerified || data.nidPending || (isLandlord || isOnboarding
                                   ? !!(data.nidFront && data.nidBack)
                                   : true); // optional for tenant
       case 'review':           return true;
@@ -932,7 +1001,7 @@ const VerificationModal = ({
         (s.key === 'communication'    && (data.communication || []).length > 0) ||
         (s.key === 'houseRules'       && (data.houseRules || []).length > 0) ||
         (s.key === 'serviceCharge'    && data.serviceCharge !== '' && data.serviceCharge != null) ||
-        (s.key === 'nid'              && (data.nidVerified || !!(data.nidFront && data.nidBack)));
+        (s.key === 'nid'              && (data.nidVerified || data.nidPending || !!(data.nidFront && data.nidBack)));
     });
     return map;
   }, [activeSteps, data]);
@@ -960,6 +1029,34 @@ const VerificationModal = ({
   };
 
   const goBack = () => { setError(''); if (stepIdx > 0) setStepIdx((i) => i - 1); };
+
+  // ─── Dialog behaviour ──────────────────────────────────────────────
+  // Escape closes (unless a submit is in flight — losing uploads to a stray
+  // keypress is worse than the extra click), and the page behind is locked so
+  // scrolling inside the wizard can't scroll the dashboard underneath it.
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape' && !submitting) {
+        e.stopPropagation();
+        onClose?.();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+
+    const { overflow, paddingRight } = document.body.style;
+    // Compensate for the vanishing scrollbar so the layout doesn't jump.
+    const gap = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = 'hidden';
+    if (gap > 0) document.body.style.paddingRight = `${gap}px`;
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = overflow;
+      document.body.style.paddingRight = paddingRight;
+    };
+  }, [open, submitting, onClose]);
 
   // ─── File handling ─────────────────────────────────────────────────
   const nidFrontInputRef      = useRef(null);
@@ -1015,7 +1112,8 @@ const VerificationModal = ({
             photo:            data.photo,
             nidFront:         data.nidFront,
             nidBack:          data.nidBack,
-            liveScore,
+            // Preview only — the server recomputes from utils/trustScore.js.
+            liveScore:        score.credited,
           };
       } else {
         payload = {
@@ -1024,7 +1122,8 @@ const VerificationModal = ({
             photo:           data.photo,
             nidFront:        data.nidFront,
             nidBack:         data.nidBack,
-            liveScore,
+            // Preview only — the server recomputes from utils/trustScore.js.
+            liveScore:       score.credited,
           };
       }
       await onSubmit?.(payload);
@@ -1035,9 +1134,13 @@ const VerificationModal = ({
     }
   };
 
-  const current  = activeSteps[stepIdx];
-  const isReview = current?.key === 'review';
-  const TOTAL    = activeSteps.length;
+  const current     = activeSteps[stepIdx];
+  const isReview    = current?.key === 'review';
+  const TOTAL       = activeSteps.length;
+  // "Attached" covers both a fresh capture in this session and a document
+  // already sitting in the review queue from a previous one.
+  const nidAttached = !!(data.nidFront && data.nidBack) || !!data.nidPending;
+  const nidStepIdx  = activeSteps.findIndex((s) => s.key === 'nid');
 
   if (!open || !current) return null;
 
@@ -1082,7 +1185,7 @@ const VerificationModal = ({
         {/* ─── Header ─── */}
         <div className="relative px-5 sm:px-7 py-5 border-b border-white/[0.04] flex items-center justify-between gap-4 shrink-0">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <TrustScoreGauge score={liveScore} isBn={isBn} />
+            <TrustScoreGauge score={score.credited} pending={score.pending} isBn={isBn} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h2 className="text-[15px] sm:text-base font-black text-white tracking-tight">
@@ -1090,9 +1193,19 @@ const VerificationModal = ({
                 </h2>
                 <Fingerprint size={12} className="text-[#ff4d6d]" />
               </div>
-              <p className="text-[11px] font-bold text-white/40 mt-0.5 truncate">
-                {headerSubtitle}
-              </p>
+              {/* The pending pill is the whole point: it says out loud why the
+                  gauge hasn't jumped, so an attached NID never reads as
+                  "already earned". */}
+              {score.pending > 0 ? (
+                <p className="text-[11px] font-bold text-white/50 mt-0.5 truncate">
+                  <span className="text-white/80 tabular-nums">+{score.pending}</span>{' '}
+                  {isBn ? 'রিভিউ পাস হলে যোগ হবে' : 'once review passes'}
+                </p>
+              ) : (
+                <p className="text-[11px] font-bold text-white/40 mt-0.5 truncate">
+                  {headerSubtitle}
+                </p>
+              )}
             </div>
           </div>
           <button
@@ -1166,16 +1279,16 @@ const VerificationModal = ({
                 icon={IdCard}
                 titleBn="NID যাচাই" titleEn="NID verification"
                 hintBn={
-                  isLandlord
-                    ? 'মালিকদের জন্য NID আবশ্যক। (+২৫ ট্রাস্ট)'
-                    : 'এখন না দিলেও চলবে — পরে চাইব। (+৩০ ট্রাস্ট)'
+                  isLandlord || isOnboarding
+                    ? `মালিকদের জন্য NID আবশ্যক। অ্যাডমিন অনুমোদনের পরে +${POINTS.nid} ট্রাস্ট।`
+                    : `ছবি তুলুন বা ফাইল আপলোড করুন — দুটোই চলবে। অনুমোদনের পরে +${POINTS.nid} ট্রাস্ট।`
                 }
                 hintEn={
-                  isLandlord
-                    ? 'NID is required for hosts. (+25 Trust)'
-                    : "Skip for now if you'd prefer. We'll ask later. (+30 Trust)"
+                  isLandlord || isOnboarding
+                    ? `NID is required for hosts. Worth +${POINTS.nid} Trust once an admin approves it.`
+                    : `Snap a photo or upload a file — either works. Worth +${POINTS.nid} Trust once approved.`
                 }
-                optional={!isLandlord} isBn={isBn}
+                optional={!isLandlord && !isOnboarding} isBn={isBn}
               >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <NIDCameraCapture
@@ -1193,13 +1306,28 @@ const VerificationModal = ({
                     labelEn="NID — Back"
                   />
                 </div>
-                <div className="mt-4 p-3.5 rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/10 flex gap-2.5 items-start">
-                  <Lock size={14} className="text-emerald-400 shrink-0 mt-0.5" />
-                  <p className="text-[11px] font-bold text-emerald-300/70 leading-relaxed">
-                    {isBn
-                      ? 'আপনার NID-এর ছবি কখনই public দেখানো হয় না। শুধু অ্যাডমিন review-এর জন্য।'
-                      : 'Your NID images are never shown publicly — admin review only.'}
-                  </p>
+                {/* Two notes, deliberately separate. Privacy answers "who sees
+                    this?", the timeline answers "what happens after I submit?".
+                    Users abandon KYC when the second question goes unanswered. */}
+                <div className="mt-4 space-y-2">
+                  <div className="p-3.5 rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/10 flex gap-2.5 items-start">
+                    <Lock size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                    <p className="text-[11px] font-bold text-emerald-300/70 leading-relaxed">
+                      {isBn
+                        ? 'আপনার NID-এর ছবি কখনই public দেখানো হয় না — শুধু অ্যাডমিন রিভিউয়ের জন্য, এনক্রিপ্টেড স্টোরেজে থাকে।'
+                        : 'Your NID images are never shown publicly — admin review only, kept in private encrypted storage.'}
+                    </p>
+                  </div>
+                  {(data.nidFront && data.nidBack) && !data.nidVerified && (
+                    <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.07] flex gap-2.5 items-start">
+                      <Clock size={14} className="text-white/40 shrink-0 mt-0.5" />
+                      <p className="text-[11px] font-bold text-white/50 leading-relaxed">
+                        {isBn
+                          ? `জমা দেওয়ার পরে সাধারণত ২৪ ঘণ্টার মধ্যে রিভিউ হয়। পাস হলে +${POINTS.nid} ট্রাস্ট যোগ হবে — তার আগে নয়।`
+                          : `Review usually finishes within 24 hours. The +${POINTS.nid} Trust lands when it passes — not before.`}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </StepFrame>
             )}
@@ -1235,22 +1363,80 @@ const VerificationModal = ({
                   </div>
                 )}
 
-                {/* Trust booster nudge — only for tenants missing NID */}
-                {!data.nidFront && !isLandlord && !isOnboarding && (
+                {/* ── What happens next / cost of skipping ──────────────────
+                    Two mutually exclusive states, and neither one nags:
+
+                    (a) NID attached → a plain timeline. The user has done
+                        their part, so the only job left is to set expectations
+                        about review, which is what prevents the "why is my
+                        score still 30?" confusion after submitting.
+
+                    (b) NID skipped → state the exact cost as a number and
+                        offer a one-tap jump back. Naming the price beats
+                        repeating the ask later: the decision gets made here,
+                        with the trade-off visible, and we don't have to
+                        interrupt them again on the dashboard. */}
+                {nidAttached && !data.nidVerified && (
+                  <div className="mt-5 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07]">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Clock size={13} className="text-white/40" />
+                      <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">
+                        {isBn ? 'এরপর যা হবে' : 'What happens next'}
+                      </p>
+                    </div>
+                    <ol className="space-y-2.5">
+                      {[
+                        {
+                          bn: 'আপনার ডকুমেন্ট রিভিউ কিউতে যাবে',
+                          en: 'Your documents enter the review queue',
+                        },
+                        {
+                          bn: 'অ্যাডমিন যাচাই করবে — সাধারণত ২৪ ঘণ্টার মধ্যে',
+                          en: 'An admin checks them — usually within 24 hours',
+                        },
+                        {
+                          bn: `পাস হলে ট্রাস্ট স্কোর ${score.credited} → ${score.projected} হবে`,
+                          en: `On approval your Trust Score goes ${score.credited} → ${score.projected}`,
+                        },
+                      ].map((row, i) => (
+                        <li key={i} className="flex items-start gap-2.5">
+                          <span className="w-4 h-4 rounded-full bg-white/[0.07] border border-white/[0.1] text-[9px] font-black text-white/50 flex items-center justify-center shrink-0 mt-0.5 tabular-nums">
+                            {i + 1}
+                          </span>
+                          <p className="text-[11px] font-bold text-white/55 leading-relaxed">
+                            {isBn ? row.bn : row.en}
+                          </p>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+
+                {!nidAttached && !data.nidVerified && !isLandlord && !isOnboarding && nidStepIdx >= 0 && (
                   <div className="mt-5 p-4 rounded-2xl bg-gradient-to-br from-emerald-500/[0.06] to-[#ff4d6d]/[0.04] border border-emerald-500/10">
                     <div className="flex items-start gap-3">
                       <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/15 flex items-center justify-center shrink-0">
-                        <Award size={16} className="text-emerald-400" />
+                        <TrendingUp size={16} className="text-emerald-400" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-[12px] font-black text-emerald-300 mb-0.5">
-                          {isBn ? 'NID যোগ করলে ট্রাস্ট স্কোর বাড়বে' : 'Add NID to boost Trust Score'}
-                        </p>
-                        <p className="text-[11px] font-bold text-emerald-400/50 leading-relaxed">
                           {isBn
-                            ? 'ভেরিফায়েড টেনেন্টদের বাড়িওয়ালারা ৩x বেশি দ্রুত response দেন।'
-                            : 'Verified tenants get a 3x faster response from landlords.'}
+                            ? `NID ছাড়া আপনি ${score.credited}/১০০-এ থামছেন`
+                            : `Without NID you finish at ${score.credited}/100`}
                         </p>
+                        <p className="text-[11px] font-bold text-emerald-400/60 leading-relaxed">
+                          {isBn
+                            ? `NID দিলে ${score.credited + POINTS.nid}/১০০ — বাড়িওয়ালারা ভেরিফায়েড প্রোফাইলে আগে সাড়া দেন। এখনই দিতে হবে না, তবে এক মিনিটেই হয়ে যায়।`
+                            : `With NID you reach ${score.credited + POINTS.nid}/100 — landlords reply to verified profiles first. Not required now, but it takes about a minute.`}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => { setError(''); setStepIdx(nidStepIdx); }}
+                          className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/25 text-emerald-300 transition-colors text-[10px] font-black uppercase tracking-widest"
+                        >
+                          <IdCard size={12} />
+                          {isBn ? 'এখনই যোগ করি' : 'Add it now'}
+                        </button>
                       </div>
                     </div>
                   </div>

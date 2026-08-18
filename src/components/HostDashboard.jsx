@@ -961,25 +961,65 @@ const HostDashboard = () => {
     return 'unverified';
   })();
 
+  // ╔══════════════════════════════════════════════════════════════════════╗
+  // ║  landlordTrustScore — mirrors backend utils/trustScore.js →           ║
+  // ║  computeLandlordTrust. Keep the weights and the gate in step.         ║
+  // ║                                                                       ║
+  // ║  It used to read `verificationStatus.faceVerified` / `.nidUploaded`,  ║
+  // ║  which are PRESENCE flags (`isVerified || hasNid`). That handed over  ║
+  // ║  the full 25 NID points the moment a file was uploaded, while the     ║
+  // ║  server withholds them until an admin approves — so the landlord saw  ║
+  // ║  an inflated score that silently dropped on the next refresh. The     ║
+  // ║  tenant dashboard had the mirror-image bug (a 100% bar over a 30/100  ║
+  // ║  ring); see buildVerificationItems() in TenantDashboard.jsx.          ║
+  // ║                                                                       ║
+  // ║  Same two-flag model as the tenant side:                              ║
+  // ║    supplied — the landlord has handed it over                         ║
+  // ║    done     — the server has actually credited the points             ║
+  // ╚══════════════════════════════════════════════════════════════════════╝
   const landlordTrustScore = (() => {
     const lp = landlordProfile || {};
-    const v  = verificationStatus || {};
+    const vLandlord = authUser?.landlordProfile?.verification || {};
+    const vTenant   = authUser?.tenantProfile?.verification   || {};
+    // Identity KYC is shared across roles, so either block can satisfy it.
+    const adminApproved = vLandlord.status === 'verified' || vTenant.status === 'verified';
+    const rejected      = vLandlord.status === 'rejected' || vTenant.status === 'rejected';
+    // Both sides required — a lone front image is not a usable NID.
+    const nidSupplied = (!!(vLandlord.nidFront && vLandlord.nidBack)
+                      || !!(vTenant.nidFront   && vTenant.nidBack)) && !rejected;
+
     const items = [
-        { key: 'phone', labelEn: 'Phone OTP verified', labelBn: 'ফোন OTP ভেরিফাইড', pts: 20, done: !!userData?.phone },
-        { key: 'avatar', labelEn: 'Profile picture', labelBn: 'প্রোফাইল ছবি', pts: 10, done: !!userData?.avatar },
-        { key: 'preferences', labelEn: 'Tenant preferences', labelBn: 'ভাড়াটিয়ার পছন্দ', pts: 5, done: (lp.preferredTenants || []).length > 0 },
-        { key: 'comm', labelEn: 'Communication channels', labelBn: 'যোগাযোগ মাধ্যম', pts: 5, done: (lp.communication || []).length > 0 },
-        { key: 'charge', labelEn: 'Service charge', labelBn: 'সার্ভিস চার্জ', pts: 5, done: lp.serviceCharge !== '' && lp.serviceCharge != null },
-        { key: 'rules', labelEn: 'House rules', labelBn: 'বাড়ির নিয়ম', pts: 10, done: (lp.houseRules || []).length > 0 },
-        { key: 'photo', labelEn: 'Selfie verification', labelBn: 'সেলফি ভেরিফিকেশন', pts: 20, done: !!v.faceVerified },
-        { key: 'nid', labelEn: 'NID uploaded', labelBn: 'NID আপলোড', pts: 25, done: !!v.nidUploaded },
-    ];
-    const score = items.filter(i => i.done).reduce((sum, i) => sum + i.pts, 0);
+      { key: 'phone',       pts: 20, gated: false, supplied: !!userData?.phone,
+        labelEn: 'Phone OTP verified',    labelBn: 'ফোন OTP ভেরিফাইড' },
+      { key: 'avatar',      pts: 10, gated: false, supplied: !!userData?.avatar,
+        labelEn: 'Profile picture',       labelBn: 'প্রোফাইল ছবি' },
+      { key: 'preferences', pts: 5,  gated: false, supplied: (lp.preferredTenants || []).length > 0,
+        labelEn: 'Tenant preferences',    labelBn: 'ভাড়াটিয়ার পছন্দ' },
+      { key: 'comm',        pts: 5,  gated: false, supplied: (lp.communication || []).length > 0,
+        labelEn: 'Communication channels', labelBn: 'যোগাযোগ মাধ্যম' },
+      { key: 'charge',      pts: 5,  gated: false, supplied: lp.serviceCharge !== '' && lp.serviceCharge != null,
+        labelEn: 'Service charge',        labelBn: 'সার্ভিস চার্জ' },
+      { key: 'rules',       pts: 10, gated: false, supplied: (lp.houseRules || []).length > 0,
+        labelEn: 'House rules',           labelBn: 'বাড়ির নিয়ম' },
+      { key: 'photo',       pts: 20, gated: false, supplied: !!vLandlord.photo || !!vTenant.photo,
+        labelEn: 'Selfie verification',   labelBn: 'সেলফি ভেরিফিকেশন' },
+      { key: 'nid',         pts: 25, gated: true,  supplied: nidSupplied,
+        labelEn: 'NID verified',          labelBn: 'NID ভেরিফাইড' },
+    ].map((i) => ({ ...i, done: i.gated ? adminApproved && i.supplied : i.supplied }));
+
+    const score = items.reduce((sum, i) => (i.done ? sum + i.pts : sum), 0);
     let tier = 'bronze';
     if (score >= 90)      tier = 'platinum';
     else if (score >= 70) tier = 'gold';
     else if (score >= 40) tier = 'silver';
-    return { score, tier, breakdown: items };
+    return {
+      score,
+      tier,
+      breakdown: items,
+      // Attached but not yet credited — drives the "in review" row + the
+      // wizard's pending pill.
+      pending: items.reduce((sum, i) => (i.supplied && !i.done ? sum + i.pts : sum), 0),
+    };
   })();
 
   const [verifModalOpen, setVerifModalOpen] = useState(false);
@@ -3910,9 +3950,20 @@ const HostDashboard = () => {
               language={language}
               initialData={{
                 professionType: authUser?.tenantProfile?.professionType || '',
-                nidVerified: authUser?.tenantProfile?.verification?.status === 'verified'
-                  || !!authUser?.tenantProfile?.verification?.nidFront,
+                // nidVerified means APPROVED — points credited. It previously
+                // also returned true for a bare `nidFront` upload, which both
+                // skipped the step and credited points the server hadn't given.
+                nidVerified: authUser?.tenantProfile?.verification?.status === 'verified',
+                // Uploaded and queued: skip the step, but count it as pending.
+                nidPending: authUser?.tenantProfile?.verification?.status !== 'verified'
+                  && !!(authUser?.tenantProfile?.verification?.nidFront
+                     && authUser?.tenantProfile?.verification?.nidBack)
+                  && authUser?.tenantProfile?.verification?.status !== 'rejected',
               }}
+              baseScore={landlordTrustScore.breakdown.reduce(
+                (sum, i) => (i.done && !['photo', 'nid'].includes(i.key) ? sum + i.pts : sum),
+                0
+              )}
             />
           </div>
         )}
@@ -6866,19 +6917,37 @@ const TrustGauge = ({ score, tier, breakdown, language }) => {
         </div>
       </div>
 
-      {/* Breakdown list */}
+      {/* Breakdown list — three states, matching TenantDashboard's gauge.
+          The amber "in review" row is what tells a landlord their NID upload
+          landed but is still queued, instead of looking indistinguishable from
+          never having sent it. */}
       <div className="relative z-10 space-y-2">
-        {breakdown.map((b) => (
-          <div key={b.key} className="flex items-center justify-between text-[11px] font-bold">
-            <span className={`flex items-center gap-2 ${b.done ? 'text-gray-700' : 'text-gray-400'}`}>
-              <span className={`w-4 h-4 rounded-full flex items-center justify-center ${b.done ? 'bg-green-500 text-white shadow-[0_0_0_3px_rgba(34,197,94,0.12)]' : 'bg-gray-100'}`}>
-                {b.done ? <Check size={10} /> : null}
+        {breakdown.map((b) => {
+          const inReview = !b.done && b.supplied;
+          return (
+            <div key={b.key} className="flex items-center justify-between gap-2 text-[11px] font-bold">
+              <span className={`flex items-center gap-2 min-w-0 ${b.done ? 'text-gray-700' : inReview ? 'text-amber-700' : 'text-gray-400'}`}>
+                <span className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                  b.done
+                    ? 'bg-green-500 text-white shadow-[0_0_0_3px_rgba(34,197,94,0.12)]'
+                    : inReview
+                      ? 'bg-amber-500 text-white shadow-[0_0_0_3px_rgba(245,158,11,0.12)]'
+                      : 'bg-gray-100'
+                }`}>
+                  {b.done ? <Check size={10} /> : inReview ? <Hourglass size={9} /> : null}
+                </span>
+                <span className="truncate">{language === 'বাংলা' ? b.labelBn : b.labelEn}</span>
               </span>
-              {language === 'বাংলা' ? b.labelBn : b.labelEn}
-            </span>
-            <span className={`tabular-nums ${b.done ? 'text-green-600' : 'text-gray-300'}`}>+{b.pts}</span>
-          </div>
-        ))}
+              {inReview ? (
+                <span className="text-[9px] font-black uppercase tracking-widest text-amber-600 shrink-0 whitespace-nowrap">
+                  {language === 'বাংলা' ? 'রিভিউতে' : 'In review'}
+                </span>
+              ) : (
+                <span className={`tabular-nums shrink-0 ${b.done ? 'text-green-600' : 'text-gray-300'}`}>+{b.pts}</span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -6889,8 +6958,13 @@ const TrustGauge = ({ score, tier, breakdown, language }) => {
 // ║  knock out fastest to raise their Trust Score.                       ║
 // ╚══════════════════════════════════════════════════════════════════════╝
 const QuickWinsCard = ({ breakdown, language, onJump }) => {
-  // Suggest the 3 highest-value unfilled items.
-  const top = [...breakdown].filter((b) => !b.done).sort((a, b) => b.pts - a.pts).slice(0, 3);
+  // Suggest the 3 highest-value items the landlord can still ACT on. Items
+  // already sitting in the review queue are not actionable — asking for them
+  // again just makes the user redo work.
+  const top = [...breakdown]
+    .filter((b) => !(b.supplied ?? b.done))
+    .sort((a, b) => b.pts - a.pts)
+    .slice(0, 3);
   if (top.length === 0) {
     return (
       <div className="bg-gradient-to-br from-emerald-50 via-green-50 to-white rounded-[2rem] border border-emerald-100 shadow-[0_4px_20px_rgba(16,185,129,0.08)] p-6 md:p-8">

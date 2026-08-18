@@ -130,50 +130,107 @@ const DEFAULT_TENANT_PROFILE = {
 };
 
 // ╔════════════════════════════════════════════════════════════════════════╗
-// ║  countVerificationSteps — used by the profile tab + overview nudge.    ║
-// ║  Single source of truth for "how done are the *required* docs?".      ║
+// ║  VERIFICATION_ITEMS — ONE table, two views.                            ║
+// ║                                                                        ║
+// ║  This replaces the two rival meters that used to live here:            ║
+// ║    countVerificationSteps() counted 2 uploaded files and reported a    ║
+// ║    percentage; computeTrustScore() weighed 7 items out of 100 and      ║
+// ║    withheld NID's points until an admin approved them. Both were       ║
+// ║    "right", so a tenant who had uploaded a photo and both NID sides    ║
+// ║    saw a 100% progress bar sitting directly above a 30/100 trust ring  ║
+// ║    — and no explanation for the gap. Worse, a REJECTED submission      ║
+// ║    still showed 100%, because file presence never looked at status.    ║
+// ║                                                                        ║
+// ║  Fix: derive everything from one list, and keep two distinct flags per ║
+// ║  item instead of collapsing them into one:                             ║
+// ║                                                                        ║
+// ║    supplied — the user has done their part                             ║
+// ║    done     — the server has actually CREDITED the points              ║
+// ║                                                                        ║
+// ║  They differ only for `gated` items (NID), which need admin approval.  ║
+// ║  `done` is a verbatim mirror of backend utils/trustScore.js →          ║
+// ║  computeTenantTrust, so the ring never drifts from the server. Change  ║
+// ║  one, change the other.                                                ║
 // ╚════════════════════════════════════════════════════════════════════════╝
-const countVerificationSteps = (p) => {
-  if (!p?.verification) return { done: 0, total: 2 };
-  const v = p.verification;
-  const total = 2;
-  let done = 0;
-  if (v.photo) done += 1;
-  if (v.nidFront && v.nidBack) done += 1;
-  return { done, total };
+const isFilledValue = (val) => (Array.isArray(val) ? val.length > 0 : val !== '' && val != null);
+
+const buildVerificationItems = (p) => {
+  const v = p?.verification || {};
+  const adminApproved = v.status === 'verified';
+  // A rejected NID is NOT supplied — the user has to act again, so counting it
+  // as progress is exactly the lie that produced "100% + rejected banner".
+  const nidUsable = !!(v.nidFront && v.nidBack) && v.status !== 'rejected';
+
+  return [
+    { key: 'phone',      pts: 15, gated: false, supplied: !!p?.phone,
+      labelEn: 'Phone OTP verified', labelBn: 'ফোন OTP ভেরিফাইড',
+      actionEn: 'Verify your phone',  actionBn: 'ফোন ভেরিফাই করুন',   where: 'profile' },
+    { key: 'photo',      pts: 15, gated: false, supplied: !!v.photo,
+      labelEn: 'Profile photo',       labelBn: 'প্রোফাইল ছবি',
+      actionEn: 'Add a profile photo', actionBn: 'প্রোফাইল ছবি দিন',   where: 'wizard' },
+    { key: 'nid',        pts: 30, gated: true,  supplied: nidUsable,
+      labelEn: 'NID verified',        labelBn: 'NID ভেরিফাইড',
+      actionEn: 'Add your NID',       actionBn: 'NID যোগ করুন',       where: 'wizard' },
+    { key: 'profession', pts: 10, gated: false, supplied: isFilledValue(p?.professionType),
+      labelEn: 'Profession added',    labelBn: 'পেশা যুক্ত',
+      actionEn: 'Pick your profession', actionBn: 'পেশা বাছাই করুন',  where: 'wizard' },
+    { key: 'workPlace',  pts: 10, gated: false, supplied: isFilledValue(p?.workPlace),
+      labelEn: 'Workplace added',     labelBn: 'প্রতিষ্ঠান যুক্ত',
+      actionEn: 'Add your workplace', actionBn: 'প্রতিষ্ঠান যোগ করুন', where: 'profile' },
+    { key: 'family',     pts: 5,  gated: false, supplied: isFilledValue(p?.familySize),
+      labelEn: 'Family size added',   labelBn: 'সদস্য সংখ্যা যুক্ত',
+      actionEn: 'Add family size',    actionBn: 'সদস্য সংখ্যা দিন',    where: 'profile' },
+    { key: 'emergency',  pts: 15, gated: false, supplied: !!(p?.emergencyContact && p.emergencyContact.phone),
+      labelEn: 'Emergency phone',     labelBn: 'জরুরি ফোন',
+      actionEn: 'Add an emergency contact', actionBn: 'জরুরি নম্বর দিন', where: 'profile' },
+  ].map((i) => ({ ...i, done: i.gated ? adminApproved && i.supplied : i.supplied }));
 };
 
-const computeVerificationPct = (p) => {
-  const { done, total } = countVerificationSteps(p);
-  return Math.round((done / total) * 100);
-};
+const TRUST_TIER = (score) =>
+  score >= 90 ? 'platinum' : score >= 70 ? 'gold' : score >= 40 ? 'silver' : 'bronze';
 
-// ╔════════════════════════════════════════════════════════════════════════╗
-// ║  TRUST SCORE — gamified 0-100 score visible to both tenant + landlord. ║
-// ║  Kept intentionally simple: 4 items, easy to reach 100 without filling ║
-// ║  20+ fields. Profession proof auto-passes for "Other" so a tenant who  ║
-// ║  doesn't fit the predefined buckets isn't penalised.                   ║
-// ╚════════════════════════════════════════════════════════════════════════╝
+// ── View 1: the trust ring. Credited points only — what landlords see. ────
 const computeTrustScore = (p) => {
   if (!p) return { score: 0, tier: 'bronze', breakdown: [] };
-  const v = p.verification || {};
-  const isFilled = (v) => Array.isArray(v) ? v.length > 0 : v !== '' && v != null;
-  const adminApproved = v.status === 'verified';
-  const items = [
-    { key: 'phone',      labelEn: 'Phone OTP verified', labelBn: 'ফোন OTP ভেরিফাইড', pts: 15, done: !!p.phone },
-    { key: 'photo',      labelEn: 'Profile photo',      labelBn: 'প্রোফাইল ছবি',     pts: 15, done: !!v.photo },
-    { key: 'nid',        labelEn: 'NID verified',       labelBn: 'NID ভেরিফাইড',     pts: 30, done: adminApproved && !!(v.nidFront && v.nidBack) },
-    { key: 'profession', labelEn: 'Profession added',   labelBn: 'পেশা যুক্ত',        pts: 10, done: isFilled(p.professionType) },
-    { key: 'workPlace',  labelEn: 'Workplace added',    labelBn: 'প্রতিষ্ঠান যুক্ত',       pts: 10, done: isFilled(p.workPlace) },
-    { key: 'family',     labelEn: 'Family size added',  labelBn: 'সদস্য সংখ্যা যুক্ত',     pts: 5,  done: isFilled(p.familySize) },
-    { key: 'emergency',  labelEn: 'Emergency phone',    labelBn: 'জরুরি ফোন',         pts: 15, done: !!(p.emergencyContact && p.emergencyContact.phone) },
-  ];
-  const score = items.filter((i) => i.done).reduce((sum, i) => sum + i.pts, 0);
-  let tier = 'bronze';
-  if (score >= 90) tier = 'platinum';
-  else if (score >= 70) tier = 'gold';
-  else if (score >= 40) tier = 'silver';
-  return { score, tier, breakdown: items };
+  const breakdown = buildVerificationItems(p);
+  const score = breakdown.reduce((sum, i) => (i.done ? sum + i.pts : sum), 0);
+  return { score, tier: TRUST_TIER(score), breakdown };
+};
+
+// ── View 2: the overview banner. Splits the same points three ways so the
+//    bar can show "you're done, we're checking" without ever claiming the
+//    points have landed. earned + pending + remaining === 100.
+const computeVerificationProgress = (p) => {
+  const items = buildVerificationItems(p);
+  const status = p?.verification?.status || 'unverified';
+
+  const earned  = items.reduce((s, i) => (i.done ? s + i.pts : s), 0);
+  const pending = items.reduce((s, i) => (i.supplied && !i.done ? s + i.pts : s), 0);
+  const total   = items.reduce((s, i) => s + i.pts, 0) || 100;
+
+  // Highest-value outstanding items first — the banner surfaces exactly one
+  // of these as its CTA rather than listing every gap.
+  const next = items.filter((i) => !i.supplied).sort((a, b) => b.pts - a.pts);
+
+  return {
+    items,
+    earned,
+    pending,
+    remaining: Math.max(0, total - earned - pending),
+    // What the bar fills to: everything the user has actually handed over.
+    pct:       Math.round(((earned + pending) / total) * 100),
+    // What's already banked, drawn as the solid segment.
+    earnedPct: Math.round((earned / total) * 100),
+    next,
+    nextItem:  next[0] || null,
+    suppliedCount: items.filter((i) => i.supplied).length,
+    totalCount:    items.length,
+    status,
+    isVerified: status === 'verified',
+    // "In review" is only meaningful when something is actually waiting.
+    inReview:   status === 'pending' && pending > 0,
+    isRejected: status === 'rejected',
+  };
 };
 
 // ╔════════════════════════════════════════════════════════════════════════╗
@@ -928,9 +985,18 @@ const TenantDashboard = () => {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileToast, setProfileToast] = useState(null);
 
-  const verifPct = computeVerificationPct(tenantProfile);
-  const { done: verifDone, total: verifTotal } = countVerificationSteps(tenantProfile);
+  // Both of these read the SAME item table (buildVerificationItems), so the
+  // banner and the ring can no longer contradict each other.
+  const verifProgress = computeVerificationProgress(tenantProfile);
   const trustScore = computeTrustScore(tenantProfile);
+  // Points already credited for items the wizard does NOT collect. Passed to
+  // VerificationModal so its header gauge continues from the real score
+  // instead of restarting at zero.
+  const WIZARD_KEYS = ['photo', 'nid', 'profession'];
+  const verifBaseScore = trustScore.breakdown.reduce(
+    (sum, i) => (i.done && !WIZARD_KEYS.includes(i.key) ? sum + i.pts : sum),
+    0
+  );
   const isVerified = tenantProfile?.verification?.status === 'verified';
   const verifPending = tenantProfile?.verification?.status === 'pending';
   // Rejected verifications get a dedicated banner so the user knows why
@@ -1349,13 +1415,35 @@ const TenantDashboard = () => {
   const [hideBecomeLandlord, setHideBecomeLandlord] = useState(
     () => localStorage.getItem('hideBecomeLandlord') === 'true'
   );
-  const [hideVerificationBanner, setHideVerificationBanner] = useState(
-    () => localStorage.getItem('hideVerificationBanner') === 'true'
-  );
+  // ── Verification nudge: SNOOZE, not a permanent kill ──────────────────────
+  // The old behaviour wrote hideVerificationBanner=true forever, so one stray
+  // tap on the X meant the user never saw the prompt again — the flow quietly
+  // gave up on them. A dated snooze respects "not now" (the banner really does
+  // disappear, no re-prompt on the next page load) while still letting us ask
+  // again later. Asking once a week beats nagging every session, and beats
+  // never asking again.
+  const VERIF_SNOOZE_DAYS = 7;
+  const readVerifSnooze = () => {
+    // Migrate the legacy boolean key: treat an old permanent dismiss as a
+    // snooze that starts now rather than silently un-hiding the banner.
+    if (localStorage.getItem('hideVerificationBanner') === 'true') {
+      const until = Date.now() + VERIF_SNOOZE_DAYS * 864e5;
+      localStorage.removeItem('hideVerificationBanner');
+      localStorage.setItem('verifBannerSnoozeUntil', String(until));
+      return until;
+    }
+    return Number(localStorage.getItem('verifBannerSnoozeUntil') || 0);
+  };
+  const [verifSnoozeUntil, setVerifSnoozeUntil] = useState(readVerifSnooze);
+  const hideVerificationBanner = Date.now() < verifSnoozeUntil;
 
   const dismissUpcomingTours = () => { setHideUpcomingTours(true); localStorage.setItem('hideUpcomingTours', 'true'); };
   const dismissBecomeLandlord = () => { setHideBecomeLandlord(true); localStorage.setItem('hideBecomeLandlord', 'true'); };
-  const dismissVerificationBanner = () => { setHideVerificationBanner(true); localStorage.setItem('hideVerificationBanner', 'true'); };
+  const dismissVerificationBanner = () => {
+    const until = Date.now() + VERIF_SNOOZE_DAYS * 864e5;
+    setVerifSnoozeUntil(until);
+    localStorage.setItem('verifBannerSnoozeUntil', String(until));
+  };
 
   // Auto-open the verification wizard when the user lands here with
   // `?openVerify=1` — currently fired by the Navbar's "Switch to Host"
@@ -2309,20 +2397,30 @@ const handleWizardSubmit = async (payload) => {
               </div>
             )}
 
-            {/* ── VERIFICATION BANNER — futuristic rebuild ───────────────
+            {/* ── VERIFICATION BANNER ─────────────────────────────────────
                 Dark glassy card with a holographic red→indigo accent
                 gradient, a "breathing" shield icon ringed by two animated
-                pulse rings, a shimmering progress bar, and a CTA that
+                pulse rings, a two-segment progress bar, and a CTA that
                 stacks UNDER the copy on mobile so the headline never
-                gets squashed into a 3-line column. The same component
-                covers three states:
-                  - not started / in progress (default)
-                  - submitted for review (`verifPending`)
-                  - verified (`isVerified`) — flips to a green success row */}
-            {hideVerificationBanner ? null : !isVerified ? (
+                gets squashed into a 3-line column.
+
+                States: in progress (default) · submitted for review
+                (`verifProgress.inReview`) · verified (green success row).
+
+                Suppressed entirely when `verifRejected`, because the
+                rejection banner directly above already owns that state and
+                carries its own retry button. Rendering both stacked two
+                conflicting messages — "your documents were declined" on top
+                of a near-full progress bar — which is what made the flow
+                feel broken. */}
+            {hideVerificationBanner || verifRejected ? null : !isVerified ? (
               <div className="mb-5 md:mb-7 relative overflow-hidden rounded-[1.5rem] md:rounded-[2rem] p-[1px] bg-gradient-to-br from-[#ba0036]/40 via-rose-400/20 to-indigo-500/30 shadow-[0_20px_60px_-20px_rgba(186,0,54,0.35)]">
+                {/* Snoozes for a week — see dismissVerificationBanner. Labelled
+                    "not now" so the affordance matches the behaviour. */}
                 <button
                   onClick={dismissVerificationBanner}
+                  title={language === 'বাংলা' ? 'এখন নয় — এক সপ্তাহ পরে দেখান' : 'Not now — remind me in a week'}
+                  aria-label={language === 'বাংলা' ? 'এখন নয় — এক সপ্তাহ পরে দেখান' : 'Not now — remind me in a week'}
                   className="absolute top-5 right-5 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors z-30"
                 >
                   <X size={16} strokeWidth={2.5} />
@@ -2388,39 +2486,105 @@ const handleWizardSubmit = async (payload) => {
                           {language === 'বাংলা' ? 'এআই' : 'AI'}-secured
                         </span>
                       </div>
+                      {/* Headline names the ONE thing left to do rather than
+                          repeating a generic "verify your account". A specific
+                          ask converts better and reads as help, not nagging. */}
                       <h3 className="text-lg md:text-2xl font-black tracking-tight leading-tight">
-                        {verifPending
+                        {verifProgress.inReview && !verifProgress.nextItem
                           ? (language === 'বাংলা' ? 'রিভিউয়ের জন্য সাবমিট হয়েছে' : 'Submitted for review')
-                          : (language === 'বাংলা' ? 'আপনার অ্যাকাউন্ট ভেরিফাই করুন' : 'Verify your account')}
+                          : verifProgress.nextItem
+                            ? (language === 'বাংলা' ? verifProgress.nextItem.actionBn : verifProgress.nextItem.actionEn)
+                            : (language === 'বাংলা' ? 'আপনার অ্যাকাউন্ট ভেরিফাই করুন' : 'Verify your account')}
                       </h3>
                       <p className="mt-1.5 text-[12px] md:text-sm font-bold text-white/65 leading-snug max-w-prose">
-                        {verifPending
-                          ? (language === 'বাংলা' ? 'আমরা আপনার ডকুমেন্ট যাচাই করছি। সাধারণত ২৪ ঘণ্টার মধ্যে শেষ হয়।' : 'We\u2019re reviewing your documents. Usually done within 24 hours.')
-                          : (language === 'বাংলা' ? 'ভেরিফাইড ভাড়াটিয়ারা বাড়িওয়ালার কাছ থেকে দ্রুত অ্যাপ্রুভাল পান।' : 'Verified tenants get faster landlord approvals.')}
+                        {verifProgress.inReview && !verifProgress.nextItem
+                          ? (language === 'বাংলা'
+                              ? `আমরা আপনার ডকুমেন্ট যাচাই করছি। সাধারণত ২৪ ঘণ্টার মধ্যে শেষ হয় — পাস হলে +${verifProgress.pending} ট্রাস্ট যোগ হবে।`
+                              : `We're reviewing your documents. Usually done within 24 hours — approval adds +${verifProgress.pending} Trust.`)
+                          : verifProgress.nextItem
+                            ? (language === 'বাংলা'
+                                ? `প্রায় এক মিনিটের কাজ, ট্রাস্ট স্কোরে +${verifProgress.nextItem.pts}। ভেরিফাইড ভাড়াটিয়ারা বাড়িওয়ালার কাছ থেকে দ্রুত সাড়া পান।`
+                                : `About a minute's work, +${verifProgress.nextItem.pts} Trust. Verified tenants hear back from landlords sooner.`)
+                            : (language === 'বাংলা' ? 'ভেরিফাইড ভাড়াটিয়ারা বাড়িওয়ালার কাছ থেকে দ্রুত অ্যাপ্রুভাল পান।' : 'Verified tenants get faster landlord approvals.')}
                       </p>
                     </div>
                   </div>
 
-                  {/* PROGRESS + CTA — full-width on mobile, side-by-side
-                      on md+. The progress bar carries a moving "shimmer"
-                      sweep so it feels alive even when stuck at 0%. */}
+                  {/* PROGRESS + CTA — full-width on mobile, side-by-side on md+.
+                      The bar has TWO segments and that is the whole point:
+
+                        solid  → verifProgress.earnedPct   (points banked)
+                        ghost  → verifProgress.pending     (submitted, in review)
+
+                      The number beside it is the trust score, the same value
+                      the ring on the Profile tab shows. Previously this read a
+                      separate upload-completion percentage, which is how a
+                      100% bar ended up sitting above a 30/100 ring. One
+                      number, one meaning, and the legend underneath spells out
+                      where the rest of the points are. */}
                   <div className="relative z-10 mt-5 md:mt-6 flex flex-col md:flex-row md:items-center gap-3 md:gap-5">
-                    <div className="flex-1 flex items-center gap-3">
-                      <div className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden relative">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3">
                         <div
-                          className="h-full rounded-full bg-gradient-to-r from-[#ff4d6d] via-[#ba0036] to-[#ff4d6d] transition-[width] duration-700 shadow-[0_0_12px_rgba(255,77,109,0.6)]"
-                          style={{ width: `${Math.max(verifPct, 4)}%` }}
-                        />
-                        {/* Shimmer sweep */}
-                        <div
-                          className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/40 to-transparent"
-                          style={{ animation: 'tolet-shimmer 2.4s linear infinite' }}
-                        />
+                          className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden relative"
+                          role="progressbar"
+                          aria-valuenow={verifProgress.earned}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-label={language === 'বাংলা' ? 'ট্রাস্ট স্কোর' : 'Trust score'}
+                        >
+                          {/* Pending sits underneath and spans earned+pending,
+                              so the solid segment paints over its start. */}
+                          {verifProgress.pending > 0 && (
+                            <div
+                              className="absolute inset-y-0 left-0 rounded-full bg-white/25 transition-[width] duration-700"
+                              style={{ width: `${verifProgress.pct}%` }}
+                            />
+                          )}
+                          <div
+                            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#ff4d6d] via-[#ba0036] to-[#ff4d6d] transition-[width] duration-700 shadow-[0_0_12px_rgba(255,77,109,0.6)]"
+                            style={{ width: `${Math.max(verifProgress.earnedPct, 3)}%` }}
+                          />
+                          <div
+                            className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                            style={{ animation: 'tolet-shimmer 2.4s linear infinite' }}
+                          />
+                        </div>
+                        <span className="text-xs font-black text-white tabular-nums shrink-0">
+                          {verifProgress.earned}<span className="text-white/40">/100</span>
+                        </span>
                       </div>
-                      <span className="text-xs font-black text-white tabular-nums shrink-0">{verifPct}%</span>
+
+                      {/* Legend — the bridge between the bar and the ring. */}
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white/60">
+                          <span className="w-2 h-2 rounded-full bg-[#ff4d6d]" />
+                          {language === 'বাংলা' ? `${verifProgress.earned} পয়েন্ট পেয়েছেন` : `${verifProgress.earned} earned`}
+                        </span>
+                        {verifProgress.pending > 0 && (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white/60">
+                            <span className="w-2 h-2 rounded-full bg-white/40" />
+                            {language === 'বাংলা' ? `${verifProgress.pending} রিভিউতে` : `${verifProgress.pending} in review`}
+                          </span>
+                        )}
+                        {verifProgress.remaining > 0 && (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white/40">
+                            <span className="w-2 h-2 rounded-full bg-white/15" />
+                            {language === 'বাংলা' ? `${verifProgress.remaining} বাকি` : `${verifProgress.remaining} to go`}
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    {/* CTA routes to wherever the next item actually lives —
+                        the wizard for documents, the Profile tab for typed
+                        fields. The old version always dropped the user on the
+                        Profile tab and left them to find the control
+                        themselves. */}
                     <button
-                      onClick={() => setActiveTab('profile')}
+                      onClick={() => {
+                        if (verifProgress.nextItem?.where === 'profile') setActiveTab('profile');
+                        else setVerifModalOpen(true);
+                      }}
                       className="group w-full md:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-[#ff4d6d] via-[#ba0036] to-[#90002a] text-white font-black text-xs md:text-sm shadow-[0_12px_30px_-8px_rgba(255,77,109,0.55)] hover:shadow-[0_18px_40px_-8px_rgba(255,77,109,0.7)] hover:-translate-y-0.5 active:translate-y-0 transition-all whitespace-nowrap relative overflow-hidden"
                     >
                       <span
@@ -2429,9 +2593,11 @@ const handleWizardSubmit = async (payload) => {
                       />
                       <ScanFace size={15} strokeWidth={2.5} className="relative z-10" />
                       <span className="relative z-10">
-                        {verifPending
-                          ? (language === 'বাংলা' ? 'ডকুমেন্ট দেখুন' : 'Review documents')
-                          : (language === 'বাংলা' ? 'ভেরিফাই করুন' : 'Get verified')}
+                        {verifProgress.nextItem
+                          ? (language === 'বাংলা' ? `যোগ করুন · +${verifProgress.nextItem.pts}` : `Add it · +${verifProgress.nextItem.pts}`)
+                          : verifProgress.inReview
+                            ? (language === 'বাংলা' ? 'ডকুমেন্ট দেখুন' : 'Review documents')
+                            : (language === 'বাংলা' ? 'ভেরিফাই করুন' : 'Get verified')}
                       </span>
                       <ArrowRight size={14} className="relative z-10 group-hover:translate-x-0.5 transition-transform" />
                     </button>
@@ -3188,7 +3354,19 @@ const handleWizardSubmit = async (payload) => {
         onClose={() => setVerifModalOpen(false)}
         onSubmit={handleWizardSubmit}
         language={language}
-        initialData={tenantProfile}
+        initialData={{
+          ...tenantProfile,
+          // Derived from the shared item table so the wizard agrees with the
+          // banner and the ring. `nidPending` keeps the wizard from re-asking
+          // for a document that's already in the review queue, without
+          // pretending its points have been credited.
+          nidVerified: !!trustScore.breakdown.find((i) => i.key === 'nid')?.done,
+          nidPending: (() => {
+            const nid = trustScore.breakdown.find((i) => i.key === 'nid');
+            return !!nid && nid.supplied && !nid.done;
+          })(),
+        }}
+        baseScore={verifBaseScore}
       />
 
       <VerificationModal
@@ -3562,19 +3740,40 @@ const TrustGauge = ({ score, tier, breakdown, language }) => {
         </div>
       </div>
 
-      {/* Breakdown list */}
+      {/* Breakdown list — THREE states per row, not two.
+          done              → green tick, points counted
+          supplied && !done → amber clock, "in review" (NID awaiting admin)
+          neither           → grey, still outstanding
+          The middle state is what was missing. Without it, an uploaded NID
+          looked identical to one never submitted, so users assumed the upload
+          had failed and re-sent it. */}
       <div className="relative z-10 space-y-2">
-        {breakdown.map((b) => (
-          <div key={b.key} className="flex items-center justify-between text-[11px] font-bold">
-            <span className={`flex items-center gap-2 ${b.done ? 'text-gray-700' : 'text-gray-400'}`}>
-              <span className={`w-4 h-4 rounded-full flex items-center justify-center ${b.done ? 'bg-green-500 text-white shadow-[0_0_0_3px_rgba(34,197,94,0.12)]' : 'bg-gray-100'}`}>
-                {b.done ? <Check size={10} /> : null}
+        {breakdown.map((b) => {
+          const inReview = !b.done && b.supplied;
+          return (
+            <div key={b.key} className="flex items-center justify-between gap-2 text-[11px] font-bold">
+              <span className={`flex items-center gap-2 min-w-0 ${b.done ? 'text-gray-700' : inReview ? 'text-amber-700' : 'text-gray-400'}`}>
+                <span className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                  b.done
+                    ? 'bg-green-500 text-white shadow-[0_0_0_3px_rgba(34,197,94,0.12)]'
+                    : inReview
+                      ? 'bg-amber-500 text-white shadow-[0_0_0_3px_rgba(245,158,11,0.12)]'
+                      : 'bg-gray-100'
+                }`}>
+                  {b.done ? <Check size={10} /> : inReview ? <Hourglass size={9} /> : null}
+                </span>
+                <span className="truncate">{language === 'বাংলা' ? b.labelBn : b.labelEn}</span>
               </span>
-              {language === 'বাংলা' ? b.labelBn : b.labelEn}
-            </span>
-            <span className={`tabular-nums ${b.done ? 'text-green-600' : 'text-gray-300'}`}>+{b.pts}</span>
-          </div>
-        ))}
+              {inReview ? (
+                <span className="text-[9px] font-black uppercase tracking-widest text-amber-600 shrink-0 whitespace-nowrap">
+                  {language === 'বাংলা' ? 'রিভিউতে' : 'In review'}
+                </span>
+              ) : (
+                <span className={`tabular-nums shrink-0 ${b.done ? 'text-green-600' : 'text-gray-300'}`}>+{b.pts}</span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -3585,8 +3784,14 @@ const TrustGauge = ({ score, tier, breakdown, language }) => {
 // ║  knock out fastest to raise their Trust Score.                       ║
 // ╚══════════════════════════════════════════════════════════════════════╝
 const QuickWinsCard = ({ breakdown, language, onJump }) => {
-  // Suggest the 3 highest-value unfilled items.
-  const top = [...breakdown].filter((b) => !b.done).sort((a, b) => b.pts - a.pts).slice(0, 3);
+  // Suggest the 3 highest-value items the user can still ACT on.
+  // Filtering on `supplied` rather than `done` matters: an NID sitting in the
+  // review queue isn't done, but telling someone to upload it again is bad
+  // advice — they'd be redoing work and wondering why it didn't stick.
+  const top = [...breakdown]
+    .filter((b) => !(b.supplied ?? b.done))
+    .sort((a, b) => b.pts - a.pts)
+    .slice(0, 3);
   if (top.length === 0) {
     return (
       <div className="bg-gradient-to-br from-emerald-50 via-green-50 to-white rounded-[2rem] border border-emerald-100 shadow-[0_4px_20px_rgba(16,185,129,0.08)] p-6 md:p-8">

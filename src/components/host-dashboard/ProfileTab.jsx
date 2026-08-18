@@ -86,25 +86,49 @@ const TrustGauge = ({ score, tier, breakdown, language }) => {
         </div>
       </div>
 
+      {/* Three states per row — kept identical to the gauges in
+          HostDashboard.jsx and TenantDashboard.jsx. `supplied && !done` means
+          an admin still has to approve it, which is the only reason a row can
+          be both filled-in and uncredited. */}
       <div className="relative z-10 space-y-2">
-        {breakdown.map((b) => (
-          <div key={b.key} className="flex items-center justify-between text-[11px] font-bold">
-            <span className={`flex items-center gap-2 ${b.done ? 'text-gray-700' : 'text-gray-400'}`}>
-              <span className={`w-4 h-4 rounded-full flex items-center justify-center ${b.done ? 'bg-green-500 text-white shadow-[0_0_0_3px_rgba(34,197,94,0.12)]' : 'bg-gray-100'}`}>
-                {b.done ? <Check size={10} /> : null}
+        {breakdown.map((b) => {
+          const inReview = !b.done && b.supplied;
+          return (
+            <div key={b.key} className="flex items-center justify-between gap-2 text-[11px] font-bold">
+              <span className={`flex items-center gap-2 min-w-0 ${b.done ? 'text-gray-700' : inReview ? 'text-amber-700' : 'text-gray-400'}`}>
+                <span className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                  b.done
+                    ? 'bg-green-500 text-white shadow-[0_0_0_3px_rgba(34,197,94,0.12)]'
+                    : inReview
+                      ? 'bg-amber-500 text-white shadow-[0_0_0_3px_rgba(245,158,11,0.12)]'
+                      : 'bg-gray-100'
+                }`}>
+                  {b.done ? <Check size={10} /> : inReview ? <Hourglass size={9} /> : null}
+                </span>
+                <span className="truncate">{language === 'বাংলা' ? b.labelBn : b.labelEn}</span>
               </span>
-              {language === 'বাংলা' ? b.labelBn : b.labelEn}
-            </span>
-            <span className={`tabular-nums ${b.done ? 'text-green-600' : 'text-gray-300'}`}>+{b.pts}</span>
-          </div>
-        ))}
+              {inReview ? (
+                <span className="text-[9px] font-black uppercase tracking-widest text-amber-600 shrink-0 whitespace-nowrap">
+                  {language === 'বাংলা' ? 'রিভিউতে' : 'In review'}
+                </span>
+              ) : (
+                <span className={`tabular-nums shrink-0 ${b.done ? 'text-green-600' : 'text-gray-300'}`}>+{b.pts}</span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 };
 
 const QuickWinsCard = ({ breakdown, language, onJump }) => {
-  const top = [...breakdown].filter((b) => !b.done).sort((a, b) => b.pts - a.pts).slice(0, 3);
+  // `supplied` (not `done`) so items awaiting admin review aren't re-suggested.
+  // Falls back to `done` for breakdowns that don't carry the flag.
+  const top = [...breakdown]
+    .filter((b) => !(b.supplied ?? b.done))
+    .sort((a, b) => b.pts - a.pts)
+    .slice(0, 3);
   if (top.length === 0) {
     return (
       <div className="bg-gradient-to-br from-emerald-50 via-green-50 to-white rounded-[2rem] border border-emerald-100 shadow-[0_4px_20px_rgba(16,185,129,0.08)] p-6 md:p-8">

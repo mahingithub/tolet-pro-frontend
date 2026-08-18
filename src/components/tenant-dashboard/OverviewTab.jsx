@@ -1,4 +1,24 @@
 import React from 'react';
+/**
+ * ⚠️ NOT MOUNTED — STALE COPY.
+ *
+ * TenantDashboard.jsx imports this file but never renders <OverviewTab />; the
+ * overview markup that actually ships is still inline in TenantDashboard.jsx.
+ * This is an extraction that was started and never finished.
+ *
+ * Because of that, the verification banner below is OUT OF DATE. It still takes
+ * a `verifPct` prop computed from the deleted countVerificationSteps() helper,
+ * which counted uploaded files only — that's what used to render a 100%
+ * progress bar above a 30/100 trust ring, and kept showing 100% even after a
+ * rejection.
+ *
+ * Before wiring this component up, port the current banner from
+ * TenantDashboard.jsx: it takes `verifProgress` (see
+ * computeVerificationProgress there), draws earned vs in-review as two
+ * segments, suppresses itself when `verifRejected`, and routes its CTA by
+ * `verifProgress.nextItem.where`. Do not ship the version below as-is.
+ */
+
 import { Link } from 'react-router-dom';
 import { KeyRound, X, Heart, MessageCircle, DollarSign, Wallet, MessageSquare, Wrench, Bell, ChevronRight, ShieldAlert, RefreshCw, Home, ArrowRight, Shield, ScanFace, BadgeCheck, Calendar, MapPin, Clock, Receipt, Search, Trash2 } from 'lucide-react';
 import RentProofCard from '../payments/TenantRentPay'; // Assuming this is correct
