@@ -204,7 +204,7 @@ html.dark .text-purple-600, html.dark .text-purple-700 { color: #c4b5fd !importa
 
 /* Coloured -100/-200 tint borders → subtle neutral so chips don't glow on dark. */
 html.dark .border-blue-100,   html.dark .border-blue-200,
-html.dark .border-indigo-100, html.dark .border-indigo-200,
+html.dark .border-indigo-100, html.dark .border-indigo-100\/70, html.dark .border-indigo-200,
 html.dark .border-violet-100, html.dark .border-violet-200 { border-color: var(--tp-border) !important; }
 
 /* ── Form controls ────────────────────────────────────────────────────── */
@@ -318,7 +318,7 @@ html.dark .text-pink-600, html.dark .text-pink-700, html.dark .text-fuchsia-600 
 
 /* purple / violet */
 html.dark .bg-purple-50, html.dark .bg-purple-100, html.dark .bg-violet-50, html.dark .bg-violet-100,
-html.dark .bg-violet-50\/80, html.dark .bg-indigo-50\/80 { background-color: rgba(168, 85, 247, 0.17) !important; }
+html.dark .bg-violet-50\/80, html.dark .bg-indigo-50\/80, html.dark .bg-indigo-50\/70 { background-color: rgba(168, 85, 247, 0.17) !important; }
 html.dark .text-purple-600, html.dark .text-purple-700,
 html.dark .text-violet-600, html.dark .text-violet-700 { color: #c4b5fd !important; }
 
@@ -377,7 +377,7 @@ html.dark .from-blue-50, html.dark .from-blue-50\/80, html.dark .from-blue-100,
 html.dark .from-indigo-50, html.dark .from-violet-50 { --tw-gradient-from: rgba(99, 102, 241, 0.18) var(--tw-gradient-from-position) !important; }
 html.dark .to-blue-50, html.dark .to-indigo-50, html.dark .to-indigo-50\/40,
 html.dark .to-indigo-50\/60, html.dark .to-indigo-50\/80, html.dark .to-indigo-100\/50,
-html.dark .to-purple-50, html.dark .to-purple-100\/60, html.dark .to-pink-50 { --tw-gradient-to: rgba(99, 102, 241, 0.18) var(--tw-gradient-to-position) !important; }
+html.dark .to-purple-50, html.dark .to-purple-100\/60, html.dark .to-pink-50, html.dark .to-violet-50 { --tw-gradient-to: rgba(99, 102, 241, 0.18) var(--tw-gradient-to-position) !important; }
 
 /* Low-opacity white gradient stops (chat scroll vignette etc.) → dark. */
 html.dark .to-white\/30, html.dark .to-white\/40, html.dark .to-white\/50,

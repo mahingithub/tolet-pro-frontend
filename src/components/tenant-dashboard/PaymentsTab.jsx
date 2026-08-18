@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Wallet, FileText, Calendar, ArrowRight, ShieldCheck, CheckCircle2, Lock, Receipt, X, CheckCheck, Hourglass, Search, Filter, ChevronDown, Clock, CreditCard, Home, MapPin, KeyRound
 } from 'lucide-react';
@@ -43,6 +43,7 @@ const PaymentsTab = ({
   const monthNamesEn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const monthNamesBn = ['জানু','ফেব','মার্চ','এপ্রিল','মে','জুন','জুল','আগ','সেপ্ট','অক্টো','নভে','ডিসে'];
   const monthNames = language === 'বাংলা' ? monthNamesBn : monthNamesEn;
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const now = new Date();
   const thisMonthKey = `${payYear}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
@@ -197,22 +198,7 @@ const PaymentsTab = ({
   const bn = language === 'বাংলা';
   const receiptsThisYear = paymentReceipts.filter((r) => r.monthKey?.startsWith(`${payYear}-`)).length;
 
-  // ── Page hero header — big title + subtitle + a receipt glyph. ──
-  const paymentsHeader = (
-    <div className="relative overflow-hidden rounded-2xl md:rounded-[1.75rem] bg-white border border-gray-100 shadow-[0_4px_20px_rgba(15,23,42,0.04)] px-4 py-3.5 md:px-7 md:py-6">
-      <div className="absolute -top-10 -right-8 w-40 h-40 rounded-full bg-indigo-100/50 blur-3xl pointer-events-none" />
-      <div className="relative flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <h2 className="text-lg md:text-3xl font-black text-gray-900 tracking-tight">{bn ? 'পেমেন্ট ও রিসিট' : 'Payments & Receipts'}</h2>
-          <p className="text-[11px] md:text-sm font-bold text-gray-400 mt-0.5 md:mt-1">{bn ? 'আপনার সব পেমেন্ট ও রিসিট এক জায়গায়' : 'All your payments and receipts in one place'}</p>
-        </div>
-        <div className="relative shrink-0 hidden sm:flex items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100">
-          <Receipt size={30} className="text-indigo-500" />
-          <span className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg ring-4 ring-white"><CheckCircle2 size={15} /></span>
-        </div>
-      </div>
-    </div>
-  );
+  // ── Page hero header — removed per user request ──
 
   // ── Payment Summary — compact purple KPI card (Paid / Outstanding /
   //    Next Due). Replaces the old full-width blue banner and sits
@@ -276,16 +262,11 @@ const PaymentsTab = ({
     </div>
   );
 
-  // ── Row 2 — booking card (left, wider) + Payment Summary (right).
-  //    With no active lease the summary spans the full width. ────────
-  const bookingSummaryRow = (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-5 items-start">
-      {leaseBanner && <div className="lg:col-span-3">{leaseBanner}</div>}
-      {/* No bookings → the summary spans the whole width and lays its
-          KPIs out horizontally so it never looks empty. */}
-      <div className={leaseBanner ? 'lg:col-span-2' : 'lg:col-span-5'}>{renderSummaryCard(!leaseBanner)}</div>
+  const bookingSummaryRow = leaseBanner ? (
+    <div className="w-full">
+      {leaseBanner}
     </div>
-  );
+  ) : null;
 
   // ── Trust footer — reassures the tenant their data is safe. ──────
   const securityFooter = (
@@ -299,11 +280,47 @@ const PaymentsTab = ({
     </div>
   );
 
+  // ── Floating Payment Summary Tab ──
+  const floatingSummaryTab = (
+    <>
+      {!summaryOpen && (
+        <button
+          onClick={() => setSummaryOpen(true)}
+          className="fixed right-0 top-[60%] -translate-y-1/2 z-[60] rounded-l-2xl overflow-hidden bg-white border border-r-0 border-gray-100 shadow-[0_12px_32px_-8px_rgba(15,23,42,0.4)] active:scale-95 transition"
+          aria-label={bn ? 'পেমেন্ট সামারি খুলুন' : 'Open Payment Summary'}
+        >
+          <span className="flex flex-col items-center gap-1 bg-gradient-to-b from-[#ba0036] to-[#d4004a] text-white px-2.5 py-3">
+            <Calendar size={17} />
+            <span className="text-[9px] font-black uppercase tracking-wide leading-none text-center">
+              {bn ? 'সামারি' : 'SUMMARY'}
+            </span>
+          </span>
+          <span className="block px-2 py-2 text-center text-[10.5px] font-black text-[#ba0036]">
+            {bn ? 'দেখুন' : 'VIEW'}
+          </span>
+        </button>
+      )}
+
+      {summaryOpen && (
+        <div className="fixed inset-0 z-[100] flex justify-end bg-black/40 backdrop-blur-[2px] animate-in fade-in">
+          {/* Close backdrop area */}
+          <div className="absolute inset-0" onClick={() => setSummaryOpen(false)} />
+          {/* Side panel */}
+          <div className="relative w-full max-w-sm h-full flex flex-col justify-center p-4 md:p-6 animate-in slide-in-from-right duration-300">
+             <div className="relative w-full h-[85vh] max-h-[600px] flex flex-col">
+               <button onClick={() => setSummaryOpen(false)} className="absolute -top-3 -left-3 z-10 w-8 h-8 bg-white text-gray-600 rounded-full flex items-center justify-center shadow-lg border border-gray-100 hover:scale-105 active:scale-95 transition-all"><X size={16}/></button>
+               {renderSummaryCard(false)}
+             </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   // empty state — no receipts at all (still show any booking banner)
   if (paymentReceipts.length === 0) {
     return (
       <div className="animate-in fade-in duration-500 space-y-4 md:space-y-5">
-        {paymentsHeader}
         {rentPaySection}
         {leaseBanner}
         <div className="text-center py-24 bg-white/40 backdrop-blur-md rounded-[3rem] border border-white shadow-sm flex flex-col items-center">
@@ -320,16 +337,13 @@ const PaymentsTab = ({
           </p>
         </div>
         {securityFooter}
+        {floatingSummaryTab}
       </div>
     );
   }
 
   return (
     <div className="animate-in fade-in duration-500 space-y-4 md:space-y-5">
-
-      {/* ─── PAGE HEADER — title + subtitle + receipt glyph ─── */}
-      {paymentsHeader}
-
       {/* ─── ROW 1: Pay Your Rent / payment status (full width) ─── */}
       {rentPaySection}
 
@@ -492,7 +506,7 @@ const PaymentsTab = ({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 md:gap-4 lg:gap-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3 lg:gap-4">
           {filtered.map(r => {
             const isFull = r.status === 'full' || r.balance <= 0;
             const { date: rDate, time: rTime } = fmtReceiptDateTime(r, language);
@@ -501,7 +515,7 @@ const PaymentsTab = ({
                 id={`receipt-${r.id}`}
                 key={r.id}
                 onClick={() => { setActiveReceipt(r); markReceiptRead(r.id); }}
-                className={`text-left bg-white/80 backdrop-blur-xl p-3 md:p-6 rounded-2xl md:rounded-[2rem] border shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.99] relative overflow-hidden ${
+                className={`text-left bg-white/80 backdrop-blur-xl p-2.5 md:p-4 rounded-xl md:rounded-2xl border shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.99] relative overflow-hidden ${
                   !r.read ? 'border-[#ba0036]/30 ring-2 ring-[#ba0036]/10' : 'border-gray-100'
                 }`}
               >
@@ -541,7 +555,7 @@ const PaymentsTab = ({
                 </div>
 
                 {/* Body — price block */}
-                <div className={`relative z-10 rounded-xl md:rounded-2xl p-2.5 md:p-4 mb-2.5 md:mb-3 border ${
+                <div className={`relative z-10 rounded-xl md:rounded-2xl p-2.5 md:p-3 lg:p-4 mb-2.5 md:mb-3 border ${
                   isFull
                     ? 'bg-gradient-to-br from-blue-50/80 to-indigo-50/60 border-blue-100/60'
                     : 'bg-gradient-to-br from-amber-50/80 to-orange-50/60 border-amber-100/60'
@@ -558,15 +572,15 @@ const PaymentsTab = ({
                         : (language === 'বাংলা' ? 'আংশিক' : 'PARTIAL')}
                     </span>
                   </div>
-                  <p className={`text-lg md:text-[2rem] font-black flex items-center gap-2 leading-none tabular-nums tracking-tight ${
+                  <p className={`text-lg md:text-2xl lg:text-xl xl:text-2xl font-black flex items-center gap-1.5 leading-none tabular-nums tracking-tight ${
                     isFull
                       ? 'bg-gradient-to-br from-blue-600 to-indigo-700 bg-clip-text text-transparent'
                       : 'bg-gradient-to-br from-amber-600 to-orange-600 bg-clip-text text-transparent'
                   }`}>
-                    ৳ {(r.totalPaid || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}
-                    {isFull && <CheckCheck className="hidden md:block w-[22px] h-[22px] text-blue-600 shrink-0" strokeWidth={3} />}
+                    ৳{(r.totalPaid || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}
+                    {isFull && <CheckCheck className="hidden lg:block w-[18px] h-[18px] text-blue-600 shrink-0" strokeWidth={3} />}
                   </p>
-                  <div className="flex flex-col gap-0.5 md:flex-row md:items-center md:justify-between mt-1.5 md:mt-2.5 text-[10px] md:text-[11px] font-bold text-gray-500">
+                  <div className="flex flex-col gap-0.5 mt-1.5 md:mt-2 text-[10px] md:text-[11px] font-bold text-gray-500">
                     <span className="truncate">{language === 'বাংলা' ? 'মোট বকেয়া' : 'Total Due'}: ৳{(r.totalDue || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}</span>
                     <span className={`shrink-0 ${r.balance > 0 ? 'text-[#ba0036]' : 'text-green-600'}`}>
                       {language === 'বাংলা' ? 'বাকি' : 'Balance'}: {r.balance > 0 ? `৳${r.balance.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}` : '✓'}
@@ -591,6 +605,7 @@ const PaymentsTab = ({
 
       {/* ─── SECURITY / TRUST FOOTER ─── */}
       {securityFooter}
+      {floatingSummaryTab}
     </div>
   );
 };

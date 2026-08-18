@@ -128,10 +128,10 @@ export default function TenantRentPay({ booking, submissions = [], onSubmitted }
                 buttons below so the tenant can record an offline payment. */}
             {methods.length > 0 && (
               <>
-                {/* MOBILE — chip selector + the single selected account card */}
-                <div className="md:hidden">
+                {/* Unified Tab selector for all screens */}
+                <div className="flex flex-col gap-2.5">
                   {methods.length > 1 && (
-                    <div className="flex items-center gap-2 flex-wrap mb-3">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {methods.map((m) => {
                         const meta = METHOD_META[m.type] || METHOD_META.bank;
                         const Icon = meta.icon;
@@ -140,34 +140,26 @@ export default function TenantRentPay({ booking, submissions = [], onSubmitted }
                           <button
                             key={m.id}
                             onClick={() => setSelectedId(m.id)}
-                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-black transition-all active:scale-95 ${active ? `${meta.tint} ring-2 ${meta.ring} border-transparent` : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
+                            className={`relative inline-flex items-center gap-1.5 px-3 md:px-3.5 py-2 rounded-xl text-[11px] font-black transition-all active:scale-95 ${
+                              active 
+                                ? `${meta.tint} ring-2 ${meta.ring} border-transparent shadow-sm` 
+                                : 'bg-gray-50 dark:bg-gray-800/50 border-transparent text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'
+                            }`}
                           >
-                            <Icon size={13} /> {meta.label}
-                            {m.isDefault && <BadgeCheck size={12} className="text-amber-500" />}
+                            <Icon size={14} className={active ? '' : 'opacity-70'} /> 
+                            {meta.label}
+                            {m.isDefault && <BadgeCheck size={12} className={active ? 'text-amber-500' : 'text-gray-400'} />}
                           </button>
                         );
                       })}
                     </div>
                   )}
-                  {selected && <AccountDetails method={selected} bn={bn} language={language} onZoomQr={setQrZoom} />}
-                </div>
-
-                {/* DESKTOP — every method shown side-by-side, each with its own
-                    chip label + account card */}
-                <div className={`hidden md:grid gap-4 ${methods.length > 1 ? 'md:grid-cols-2' : 'md:grid-cols-1'}`}>
-                  {methods.map((m) => {
-                    const meta = METHOD_META[m.type] || METHOD_META.bank;
-                    const Icon = meta.icon;
-                    return (
-                      <div key={m.id} className="space-y-2">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-black ${meta.tint}`}>
-                          <Icon size={13} /> {meta.label}
-                          {m.isDefault && <BadgeCheck size={12} className="text-amber-500" />}
-                        </span>
-                        <AccountDetails method={m} bn={bn} language={language} onZoomQr={setQrZoom} />
-                      </div>
-                    );
-                  })}
+                  {/* Single selected card with fade/slide animation */}
+                  {selected && (
+                    <div key={selected.id} className="animate-in fade-in slide-in-from-right-4 duration-300 fill-mode-both">
+                      <AccountDetails method={selected} bn={bn} language={language} onZoomQr={setQrZoom} />
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -265,15 +257,15 @@ function AccountDetails({ method, bn, language, onZoomQr }) {
   const meta = METHOD_META[method.type] || METHOD_META.bank;
   const Icon = meta.icon;
   return (
-    <div className={`rounded-2xl border p-4 ${meta.tint}`}>
-      <div className="flex items-center gap-2 mb-1">
-        <div className="w-9 h-9 rounded-xl bg-white/70 flex items-center justify-center shrink-0"><Icon size={18} /></div>
-        <div>
-          <p className="text-sm font-black">{meta.label}{method.type === 'bank' && method.bankName ? ` • ${method.bankName}` : ''}</p>
-          {method.type === 'bank' && method.branchName && <p className="text-[10px] font-bold opacity-70">{method.branchName}</p>}
+    <div className={`rounded-xl md:rounded-2xl border p-3 md:p-3.5 ${meta.tint}`}>
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-lg bg-white/70 flex items-center justify-center shrink-0 shadow-sm"><Icon size={16} /></div>
+        <div className="min-w-0">
+          <p className="text-sm md:text-base font-black leading-none">{meta.label}{method.type === 'bank' && method.bankName ? ` • ${method.bankName}` : ''}</p>
+          {method.type === 'bank' && method.branchName && <p className="text-[10px] font-bold opacity-70 mt-0.5 truncate">{method.branchName}</p>}
         </div>
       </div>
-      <div className="bg-white/70 rounded-xl px-3 mt-2 divide-y divide-gray-100">
+      <div className="bg-white/80 rounded-xl px-3 mt-3 divide-y divide-black/5 shadow-sm">
         <CopyRow label={bn ? 'অ্যাকাউন্ট নাম' : 'Account Name'} value={method.accountHolderName} language={language} />
         <CopyRow label={method.type === 'bank' ? (bn ? 'অ্যাকাউন্ট নম্বর' : 'Account Number') : (bn ? 'মোবাইল নম্বর' : 'Mobile Number')} value={method.accountNumber} language={language} big />
       </div>
