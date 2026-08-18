@@ -280,37 +280,158 @@ const PaymentsTab = ({
     </div>
   );
 
-  // ── Floating Payment Summary Tab ──
+  // ── Floating Payment Summary Tab (violet/indigo theme) ──
   const floatingSummaryTab = (
     <>
       {!summaryOpen && (
         <button
           onClick={() => setSummaryOpen(true)}
-          className="fixed right-0 top-[60%] -translate-y-1/2 z-[60] rounded-l-2xl overflow-hidden bg-white border border-r-0 border-gray-100 shadow-[0_12px_32px_-8px_rgba(15,23,42,0.4)] active:scale-95 transition"
+          className="fixed right-0 top-1/2 -translate-y-1/2 z-[60] rounded-l-2xl overflow-hidden shadow-[0_8px_30px_-4px_rgba(79,70,229,0.5)] active:scale-95 transition-all hover:shadow-[0_12px_40px_-4px_rgba(79,70,229,0.7)] group"
           aria-label={bn ? 'পেমেন্ট সামারি খুলুন' : 'Open Payment Summary'}
         >
-          <span className="flex flex-col items-center gap-1 bg-gradient-to-b from-[#ba0036] to-[#d4004a] text-white px-2.5 py-3">
-            <Calendar size={17} />
-            <span className="text-[9px] font-black uppercase tracking-wide leading-none text-center">
+          <span className="flex flex-col items-center gap-1.5 bg-gradient-to-b from-violet-600 via-indigo-600 to-violet-700 text-white px-2.5 py-3 relative overflow-hidden">
+            {/* Animated glow pulse */}
+            <span className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <Wallet size={16} className="relative z-10" />
+            <span className="relative z-10 text-[8px] font-black uppercase tracking-[0.14em] leading-none text-center">
               {bn ? 'সামারি' : 'SUMMARY'}
             </span>
           </span>
-          <span className="block px-2 py-2 text-center text-[10.5px] font-black text-[#ba0036]">
-            {bn ? 'দেখুন' : 'VIEW'}
+          <span className="block px-2 py-1.5 text-center text-[10px] font-black text-indigo-600 bg-white/95 backdrop-blur-sm">
+            ৳{paidThisYear.toLocaleString(bn ? 'bn-BD' : 'en-IN')}
           </span>
         </button>
       )}
 
       {summaryOpen && (
-        <div className="fixed inset-0 z-[100] flex justify-end bg-black/40 backdrop-blur-[2px] animate-in fade-in">
-          {/* Close backdrop area */}
+        <div className="fixed inset-0 z-[100] flex justify-end bg-black/50 backdrop-blur-[3px] animate-in fade-in duration-200">
           <div className="absolute inset-0" onClick={() => setSummaryOpen(false)} />
-          {/* Side panel */}
-          <div className="relative w-full max-w-sm h-full flex flex-col justify-center p-4 md:p-6 animate-in slide-in-from-right duration-300">
-             <div className="relative w-full h-[85vh] max-h-[600px] flex flex-col">
-               <button onClick={() => setSummaryOpen(false)} className="absolute -top-3 -left-3 z-10 w-8 h-8 bg-white text-gray-600 rounded-full flex items-center justify-center shadow-lg border border-gray-100 hover:scale-105 active:scale-95 transition-all"><X size={16}/></button>
-               {renderSummaryCard(false)}
-             </div>
+          {/* Side panel — responsive width */}
+          <div className="relative w-full max-w-[22rem] sm:max-w-sm h-full flex flex-col animate-in slide-in-from-right duration-300">
+            {/* Gradient background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-indigo-600 to-violet-700" />
+            {/* Decorative orbs */}
+            <div className="absolute -top-20 -right-20 w-60 h-60 rounded-full bg-white/8 blur-3xl pointer-events-none" />
+            <div className="absolute bottom-20 -left-10 w-40 h-40 rounded-full bg-indigo-400/15 blur-3xl pointer-events-none" />
+
+            {/* Header */}
+            <div className="relative flex items-center justify-between px-5 pt-5 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-white">{bn ? 'পেমেন্ট সামারি' : 'Payment Summary'}</h3>
+                <p className="text-[10px] font-bold text-white/50 mt-0.5">{payYear}</p>
+              </div>
+              <button
+                onClick={() => setSummaryOpen(false)}
+                className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all active:scale-90"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Scrollable content */}
+            <div className="relative flex-1 overflow-y-auto px-5 pb-5 space-y-4 scrollbar-hide">
+              {/* KPI Cards */}
+              <div className="space-y-2.5">
+                {summaryKpis.map((k, i) => (
+                  <div
+                    key={k.label}
+                    className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-xl p-3 hover:bg-white/15 transition-colors"
+                    style={{ animationDelay: `${i * 80}ms` }}
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                      <k.Icon size={18} className="text-white/80" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/50">{k.label}</p>
+                      <p className={`font-black tabular-nums leading-tight mt-0.5 ${k.small ? 'text-sm truncate' : 'text-lg'} text-white ${k.valueClass}`}>{k.value}</p>
+                      <p className="text-[10px] font-bold text-white/40 mt-0.5">{k.sub}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Open Receipt button */}
+              {nextDue && (
+                <button
+                  onClick={() => { setActiveReceipt(nextDue); markReceiptRead(nextDue.id); setSummaryOpen(false); }}
+                  className="w-full inline-flex items-center justify-center gap-1.5 bg-white text-indigo-700 py-2.5 rounded-xl text-[11px] font-black active:scale-95 transition-all shadow-lg hover:shadow-xl"
+                >
+                  {bn ? 'রিসিট দেখুন' : 'Open receipt'} <ArrowRight size={12} />
+                </button>
+              )}
+
+              {/* Divider */}
+              {activeLeases.length > 0 && (
+                <>
+                  <div className="flex items-center gap-3">
+                    <div className="h-px flex-1 bg-white/10" />
+                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/30">
+                      {bn ? 'বুকিং' : 'Bookings'}
+                    </span>
+                    <div className="h-px flex-1 bg-white/10" />
+                  </div>
+
+                  {/* Your Bookings inside the panel */}
+                  <div className="space-y-2.5">
+                    {activeLeases.map((b) => {
+                      const fresh = isFreshBooking(b);
+                      return (
+                        <div
+                          key={b.id || b._id}
+                          className="relative bg-white/10 backdrop-blur-sm rounded-xl p-3 hover:bg-white/15 transition-colors"
+                        >
+                          {fresh && (
+                            <span className="absolute top-2 right-2 inline-flex items-center gap-1 bg-white/20 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-widest">
+                              <span className="w-1 h-1 bg-emerald-400 rounded-full animate-pulse" />
+                              {bn ? 'নতুন' : 'New'}
+                            </span>
+                          )}
+                          <div className="flex items-center gap-2.5 mb-2">
+                            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                              <Home size={14} className="text-white/80" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-black text-white truncate">{b.property || (bn ? 'আপনার ভাড়া' : 'Your rental')}</p>
+                              {b.location && <p className="text-[10px] font-bold text-white/40 truncate flex items-center gap-1"><MapPin size={8} /> {b.location}</p>}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5 text-center">
+                            <div className="bg-white/10 rounded-lg p-1.5">
+                              <p className="text-[7px] font-black text-white/40 uppercase tracking-widest">{bn ? 'ভাড়া' : 'Rent'}</p>
+                              <p className="text-[11px] font-black text-white tabular-nums">৳{(Number(b.monthlyRent) || 0).toLocaleString('en-IN')}</p>
+                            </div>
+                            <div className="bg-white/10 rounded-lg p-1.5">
+                              <p className="text-[7px] font-black text-white/40 uppercase tracking-widest">{bn ? 'অ্যাডভান্স' : 'Advance'}</p>
+                              <p className="text-[11px] font-black text-white tabular-nums">৳{(Number(b.advancePayment) || 0).toLocaleString('en-IN')}</p>
+                            </div>
+                            <div className="bg-white/10 rounded-lg p-1.5">
+                              <p className="text-[7px] font-black text-white/40 uppercase tracking-widest">{bn ? 'মেথড' : 'Method'}</p>
+                              <p className="text-[10px] font-black text-white truncate">{b.paymentMethod || '—'}</p>
+                            </div>
+                          </div>
+                          {b.leaseStart && (
+                            <p className="text-[10px] font-bold text-white/40 mt-2 flex items-center gap-1">
+                              <Calendar size={10} />
+                              {b.leaseEnd
+                                ? `${fmtLeaseDate(b.leaseStart)} – ${fmtLeaseDate(b.leaseEnd)}`
+                                : `${fmtLeaseDate(b.leaseStart)} – ${bn ? 'চলমান' : 'ongoing'}`}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* Security badge */}
+              <div className="flex items-center gap-2.5 bg-white/5 rounded-xl p-3 mt-2">
+                <ShieldCheck size={16} className="text-white/30 shrink-0" />
+                <p className="text-[10px] font-bold text-white/30">
+                  {bn ? 'আপনার সব পেমেন্ট এনক্রিপ্টেড ও সুরক্ষিত' : 'All payments encrypted & secure'}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -506,7 +627,7 @@ const PaymentsTab = ({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3 lg:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 md:gap-3 lg:gap-4">
           {filtered.map(r => {
             const isFull = r.status === 'full' || r.balance <= 0;
             const { date: rDate, time: rTime } = fmtReceiptDateTime(r, language);
