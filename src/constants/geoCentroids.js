@@ -96,9 +96,36 @@ function jitterFromId(seed) {
 const norm = (v) => String(v || '').toLowerCase().trim();
 
 /**
- * Resolve an approximate { lat, lng, approximate:true } for a listing that has
- * no precise GPS. Priority: known area/thana → known district → division →
- * Dhaka (last resort). Returns null only when given nothing at all.
+ * How specific the resolved centroid actually is. Callers that only need a pin
+ * on a cluster map can ignore this, but anything that makes a factual CLAIM
+ * about the surroundings must check it: an `area` match is a real neighbourhood
+ * and its surroundings are genuinely the listing's surroundings, whereas a
+ * `division` match can be 100 km away and says nothing useful.
+ *
+ * Ordered loosest-last.
+ */
+export const PRECISION = {
+	EXACT: 'exact',       // the listing's own GPS
+	AREA: 'area',         // matched a known area/thana centroid (~1-2 km)
+	DISTRICT: 'district', // matched a district centroid (~10-20 km)
+	DIVISION: 'division', // matched only a division centroid (can be 100 km+)
+	NONE: 'none',         // nothing matched; Dhaka as a last resort
+};
+
+/** Precision levels close enough to describe a listing's actual surroundings. */
+export const USABLE_FOR_SURROUNDINGS = new Set([PRECISION.EXACT, PRECISION.AREA, PRECISION.DISTRICT]);
+
+/**
+ * Resolve an approximate coordinate for a listing that has no precise GPS.
+ * Priority: known area/thana → known district → division → Dhaka (last resort).
+ * Returns null only when given nothing at all.
+ *
+ * @returns {{lat:number, lng:number, approximate:true, precision:string,
+ *            centroid:{lat:number,lng:number}}}
+ *   `lat`/`lng` carry the deterministic jitter, for spreading pins on a map.
+ *   `centroid` is the UN-jittered centre — use that for anything cacheable or
+ *   analytical, since jitter would scatter identical areas across different
+ *   cache cells for no benefit.
  */
 export function resolveApproxCoords(property) {
 	if (!property) return null;
@@ -108,43 +135,54 @@ export function resolveApproxCoords(property) {
 		.join(' ');
 
 	let base = null;
+	let precision = PRECISION.NONE;
 
 	// 1) Area / thana (substring match so "dhanmondi 9a" → "dhanmondi").
 	if (haystack) {
 		for (const key of Object.keys(AREA_CENTROIDS)) {
-			if (haystack.includes(key)) { base = AREA_CENTROIDS[key]; break; }
+			if (haystack.includes(key)) { base = AREA_CENTROIDS[key]; precision = PRECISION.AREA; break; }
 		}
 	}
 
 	// 2) District (exact-ish).
 	if (!base) {
 		const d = norm(property.district);
-		if (d) base = DISTRICT_CENTROIDS[d] || AREA_CENTROIDS[d] || DIVISION_CENTROIDS[d] || null;
+		if (d) {
+			base = DISTRICT_CENTROIDS[d] || AREA_CENTROIDS[d] || null;
+			if (base) precision = PRECISION.DISTRICT;
+			else if (DIVISION_CENTROIDS[d]) { base = DIVISION_CENTROIDS[d]; precision = PRECISION.DIVISION; }
+		}
 	}
 
 	// 3) Division.
 	if (!base) {
 		const div = norm(property.division);
-		if (div) base = DIVISION_CENTROIDS[div] || null;
+		if (div && DIVISION_CENTROIDS[div]) { base = DIVISION_CENTROIDS[div]; precision = PRECISION.DIVISION; }
 	}
 
 	// 4) Last resort: centre of Dhaka so the pin is at least visible.
-	if (!base) base = DIVISION_CENTROIDS.dhaka;
+	if (!base) { base = DIVISION_CENTROIDS.dhaka; precision = PRECISION.NONE; }
 
 	const { jx, jy } = jitterFromId(property.id || property._id || haystack);
-	return { lat: base.lat + jy, lng: base.lng + jx, approximate: true };
+	return {
+		lat: base.lat + jy,
+		lng: base.lng + jx,
+		approximate: true,
+		precision,
+		centroid: { lat: base.lat, lng: base.lng },
+	};
 }
 
 /**
  * Effective map coordinate for a listing: its real GPS when present, otherwise
- * the approximate fallback. Returns { lat, lng, approximate } or null.
+ * the approximate fallback. Returns { lat, lng, approximate, precision } or null.
  */
 export function effectiveCoords(property) {
 	if (!property) return null;
 	const lat = Number(property.lat);
 	const lng = Number(property.lng);
 	if (property.lat != null && property.lng != null && Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0)) {
-		return { lat, lng, approximate: false };
+		return { lat, lng, approximate: false, precision: PRECISION.EXACT, centroid: { lat, lng } };
 	}
 	return resolveApproxCoords(property);
 }

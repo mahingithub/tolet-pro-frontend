@@ -13,7 +13,8 @@ import {
   Star, Play, Award, Calendar, Clock, Send,
   Shield, BadgeCheck, Home, Users, MessageCircle, Sparkles,
   Building, Building2, ShoppingBag, Briefcase, Store, Layers, Globe,
-  Eye, FileText, Video, ShowerHead, Sofa, Utensils, Camera, Loader2, Info
+  Eye, FileText, Video, ShowerHead, Sofa, Utensils, Camera, Loader2, Info,
+  AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -29,6 +30,11 @@ import { fetchNearbyPlaces, readCachedNearby } from '../services/nearbyService.j
 // Same field config the Add-Property wizard + dashboard editor use, so the
 // details we RENDER here always match the fields a host can ENTER.
 import { getDynamicFields, hasBedsBaths } from '../constants/propertyFields';
+// Listings created without the optional GPS step carry gps 0,0. These resolve
+// the listing's own area name to an approximate centroid so the map lands in the
+// right neighbourhood instead of a hardcoded one, and report how specific that
+// match was so we only describe surroundings we can honestly claim.
+import { resolveApproxCoords, USABLE_FOR_SURROUNDINGS } from '../constants/geoCentroids';
 import { toast } from 'sonner';
 
 // ╔══════════════════════════════════════════════════════════════════════════╗
@@ -219,6 +225,7 @@ const LOCAL_TRANSLATIONS = {
     photoTour: 'Photo tour', rooms: 'Rooms', allPhotos: 'All Photos',
     photo: 'photo', photos: 'photos',
     openInGoogleMaps: 'Open in Google Maps',
+    approxLocation: 'Approximate area only — the host has not pinned the exact address. Nearby places are measured from the centre of this area.',
     whatsNearby: "What's nearby", loadingNearby: 'Loading nearby places',
     howItWorks: 'How it works',
     safetyTips: 'Safety Tips',
@@ -256,6 +263,7 @@ const LOCAL_TRANSLATIONS = {
     photoTour: 'ছবি ট্যুর', rooms: 'কক্ষ', allPhotos: 'সব ছবি',
     photo: 'ছবি', photos: 'ছবি',
     openInGoogleMaps: 'গুগল ম্যাপে দেখুন',
+    approxLocation: 'এটি শুধু এলাকার আনুমানিক অবস্থান — বাড়িওয়ালা সঠিক ঠিকানা ম্যাপে দেননি। আশেপাশের দূরত্ব এলাকার কেন্দ্র থেকে মাপা।',
     whatsNearby: 'আশেপাশে কী আছে', loadingNearby: 'আশেপাশের তথ্য আসছে',
     howItWorks: 'কিভাবে কাজ করে',
     safetyTips: 'নিরাপত্তা টিপস',
@@ -293,6 +301,7 @@ const LOCAL_TRANSLATIONS = {
     photoTour: 'جولة الصور', rooms: 'الغرف', allPhotos: 'كل الصور',
     photo: 'صورة', photos: 'صور',
     openInGoogleMaps: 'فتح في خرائط جوجل',
+    approxLocation: 'موقع تقريبي للمنطقة فقط — لم يحدد المالك العنوان الدقيق. المسافات محسوبة من مركز المنطقة.',
     whatsNearby: 'ما هو قريب', loadingNearby: 'جارٍ تحميل الأماكن القريبة',
     howItWorks: 'كيف يعمل',
     safetyTips: 'نصائح السلامة',
@@ -2205,8 +2214,44 @@ const PropertyDetails = () => {
   const hasRealCoords =
     Number.isFinite(parsedLat) && Number.isFinite(parsedLng) &&
     !(parsedLat === 0 && parsedLng === 0);
-  const mapLat = hasRealCoords ? parsedLat : 23.7925;
-  const mapLng = hasRealCoords ? parsedLng : 90.4078;
+
+  // ── Listings with no GPS at all ──
+  // The "use my location" step in Add Property is optional, so a large share of
+  // live listings carry gps 0,0. This used to fall back to a hardcoded
+  // 23.7925/90.4078 — which is Gulshan. The result was that a listing in
+  // "Dhanmondi 9A" rendered a map of Banani with a pin on it, confidently
+  // pointing at the wrong side of the city, and the nearby grid was skipped
+  // entirely so every row showed "—".
+  //
+  // Resolving the listing's own area name to a centroid fixes both: the map
+  // shows the right neighbourhood, and (when the match is specific enough) the
+  // surroundings we describe are genuinely that listing's surroundings. The
+  // `approximate` flag drives a visible caveat in the UI — we show the area, we
+  // don't pretend to know the building.
+  const approx = useMemo(
+    () => (hasRealCoords || !property ? null : resolveApproxCoords(property)),
+    [hasRealCoords, property]
+  );
+
+  const mapLat = hasRealCoords ? parsedLat : (approx?.lat ?? 23.7925);
+  const mapLng = hasRealCoords ? parsedLng : (approx?.lng ?? 90.4078);
+  const isApproxLocation = !hasRealCoords && Boolean(approx);
+
+  // Coordinates used for the POI lookup. Deliberately NOT the jittered pair:
+  // jitter exists to stop map pins stacking, and feeding it here would scatter
+  // every listing in one area across different ~110 m cache cells for no gain.
+  //
+  // We only look up surroundings when the location is specific enough to be
+  // truthful about. An area or district match is fine — Dhanmondi's hospitals
+  // really are near a Dhanmondi listing. A division-level or unmatched guess is
+  // not: it can be 100 km out, and presenting Chattogram city's schools as
+  // "nearby" for a listing in rural Feni would be worse than showing nothing.
+  const nearbyCoords = hasRealCoords
+    ? { lat: parsedLat, lng: parsedLng }
+    : (approx && USABLE_FOR_SURROUNDINGS.has(approx.precision) ? approx.centroid : null);
+  const canLookupNearby = Boolean(nearbyCoords);
+  const nearbyLat = nearbyCoords?.lat ?? 0;
+  const nearbyLng = nearbyCoords?.lng ?? 0;
 
   // ── "WHAT'S NEARBY" ───────────────────────────────────────────────────────
   // Raw rows from the API, kept separate from their rendered form so switching
@@ -2220,22 +2265,18 @@ const PropertyDetails = () => {
   );
 
   useEffect(() => {
-    if (!hasRealCoords) {
-      // Distinguish "coordinates not known yet" from "this listing has none".
-      // While the property is still loading we leave the state null so the grid
-      // shimmers; once it has resolved without usable coordinates we settle on
-      // empty rows (—), because otherwise the shimmer would never end.
-      //
-      // Note we deliberately do NOT fall back to the map's Dhaka centre here.
-      // Plenty of older listings carry gps 0,0, and centring on Dhaka would
-      // present downtown Dhaka's hospitals and schools as if they were next
-      // door to a property that could be anywhere in the country.
+    if (!canLookupNearby) {
+      // Distinguish "coordinates not known yet" from "we can't place this
+      // listing well enough to describe its surroundings". While the property is
+      // still loading we leave the state null so the grid shimmers; once it has
+      // resolved without a usable location we settle on empty rows (—), because
+      // otherwise the shimmer would never end.
       if (!loadingProperty) setNearbyRaw([]);
       return undefined;
     }
 
     // Cached (including from a previous visit) → render immediately.
-    const cached = readCachedNearby(mapLat, mapLng);
+    const cached = readCachedNearby(nearbyLat, nearbyLng);
     if (cached) { setNearbyRaw(cached); return undefined; }
 
     // Nothing cached for these coordinates. Clear first so navigating from one
@@ -2243,13 +2284,15 @@ const PropertyDetails = () => {
     setNearbyRaw(null);
 
     const controller = new AbortController();
-    fetchNearbyPlaces(mapLat, mapLng, { signal: controller.signal })
+    fetchNearbyPlaces(nearbyLat, nearbyLng, { signal: controller.signal })
       .then((places) => { if (!controller.signal.aborted) setNearbyRaw(places); })
       .catch(() => { /* aborted, or already logged by the service */ });
 
     // Abort on unmount so navigating away doesn't leave a request hanging.
+    // The service keeps the shared lookup running and caches the result, so
+    // remounting reads it back synchronously instead of refetching.
     return () => controller.abort();
-  }, [hasRealCoords, mapLat, mapLng, loadingProperty]);
+  }, [canLookupNearby, nearbyLat, nearbyLng, loadingProperty]);
 
   // Display rows, re-derived on language change only.
   const nearbyPlaces = useMemo(
@@ -2629,6 +2672,15 @@ const PropertyDetails = () => {
                 style={{ border: '1px solid rgba(15,23,42,0.08)' }}>
                 <PropertyLocationMap lat={mapLat} lng={mapLng} title={property.title} langKey={langKey} />
               </div>
+              {/* The host skipped the optional GPS step, so this pin is the
+                  area's centre, not the building. Say so plainly — an unlabelled
+                  pin on a map reads as an exact address. */}
+              {isApproxLocation && (
+                <p className="mt-2 flex items-start gap-1.5 text-[11px] font-bold text-amber-700">
+                  <AlertCircle size={12} className="mt-[2px] shrink-0" />
+                  <span>{lt('approxLocation')}</span>
+                </p>
+              )}
               <a
                 href={`https://www.google.com/maps/search/?api=1&query=${mapLat},${mapLng}`}
                 target="_blank" rel="noopener noreferrer"

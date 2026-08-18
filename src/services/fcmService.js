@@ -41,9 +41,49 @@ let _messaging = null;
 let _onMessageBound = false;
 let _swRegistrationPromise = null;
 
+// ─── HARD-BLOCKED STATE ────────────────────────────────────────────────────
+// Some failures are configuration, not bad luck, and retrying them is pure
+// noise: the request cannot succeed until somebody changes a setting in the
+// Google Cloud console. The clearest example is an API key restricted to a set
+// of HTTP referrers that does not include the domain we're actually served from
+// — Firebase Installations then answers every single call with:
+//
+//   403 PERMISSION_DENIED: Requests from referer https://www.example.com/ are blocked
+//
+// Because enableCallNotifications() runs on login, on the first user gesture,
+// and disableCallNotifications() on logout, that produced the same unactionable
+// error three or four times per page load. We now latch it, print ONE message
+// that names the actual fix, and short-circuit every later attempt.
+let _blocked = null; // null = fine so far, otherwise a human-readable reason
+
+const looksLikeReferrerBlock = (err) => {
+  const msg = `${err?.message || ''} ${err?.code || ''}`;
+  return /PERMISSION_DENIED|are blocked|api-key-not-valid|requests-to-this-api|403/i.test(msg);
+};
+
+function latchBlocked(err) {
+  if (_blocked) return;
+  const origin = typeof window !== 'undefined' ? window.location.origin : '(unknown origin)';
+  _blocked = err?.message || 'permission denied';
+  console.warn(
+    `[fcm] Push notifications are disabled for ${origin}: this origin is not allowed to use the Firebase Web API key.\n` +
+    `      Nothing in the app can fix this — the key's restrictions have to be updated:\n` +
+    `      Google Cloud console → APIs & Services → Credentials → the "Browser key" for project ` +
+    `"${firebaseConfig.projectId || '<projectId>'}" → Website restrictions → add ${origin}/*\n` +
+    `      Also confirm "Firebase Installations API" and "FCM Registration API" are among the key's allowed APIs.\n` +
+    `      Original error: ${_blocked}`
+  );
+}
+
+/** True when push is structurally unavailable on this origin. */
+export function isPushBlocked() {
+  return Boolean(_blocked);
+}
+
 // Get (or lazily create) a Messaging instance, but only if the browser
 // supports it (e.g. not old iOS, not some in-app webviews).
 async function getMessagingSafe() {
+  if (_blocked) return null;
   try {
     if (!(await isSupported())) return null;
     if (!firebaseConfig.apiKey || !VAPID_KEY) {
@@ -54,7 +94,26 @@ async function getMessagingSafe() {
     if (!_messaging) _messaging = getMessaging(app);
     return _messaging;
   } catch (err) {
+    if (looksLikeReferrerBlock(err)) { latchBlocked(err); return null; }
     console.warn('[fcm] messaging unavailable:', err?.message);
+    return null;
+  }
+}
+
+/**
+ * getToken() wrapper that classifies the failure instead of shrugging at it.
+ * Returns null on any failure; a configuration failure additionally latches the
+ * blocked state so we stop asking.
+ */
+async function requestFcmToken(messaging, swReg) {
+  try {
+    return await getToken(messaging, {
+      vapidKey: VAPID_KEY,
+      ...(swReg ? { serviceWorkerRegistration: swReg } : {}),
+    });
+  } catch (err) {
+    if (looksLikeReferrerBlock(err)) latchBlocked(err);
+    else console.warn('[fcm] token request failed:', err?.message);
     return null;
   }
 }
@@ -123,17 +182,15 @@ export async function enableCallNotifications({ prompt = true } = {}) {
     const messaging = await getMessagingSafe();
     if (!messaging) return null;
 
-    const token = await getToken(messaging, {
-      vapidKey: VAPID_KEY,
-      serviceWorkerRegistration: swReg,
-    });
+    const token = await requestFcmToken(messaging, swReg);
     if (!token) return null;
 
     await postToBackend('/register-device', { token, platform: 'web' });
     bindForegroundHandler(messaging);
     return token;
   } catch (err) {
-    console.warn('[fcm] enableCallNotifications failed:', err?.message);
+    if (looksLikeReferrerBlock(err)) latchBlocked(err);
+    else console.warn('[fcm] enableCallNotifications failed:', err?.message);
     return null;
   }
 }
@@ -190,16 +247,15 @@ export async function disableCallNotifications() {
     const messaging = await getMessagingSafe();
     if (!messaging) return;
     const swReg = await getCallServiceWorkerRegistration();
-    const token = await getToken(messaging, {
-      vapidKey: VAPID_KEY,
-      serviceWorkerRegistration: swReg || undefined,
-    }).catch(() => null);
+    const token = await requestFcmToken(messaging, swReg || undefined);
     if (token) await postToBackend('/unregister-device', { token });
   } catch { /* ignore */ }
 }
 
 export function enableCallNotificationsOnNextUserGesture() {
   if (typeof window === 'undefined' || typeof Notification === 'undefined') return () => {};
+  // Don't attach gesture listeners just to fail on a key this origin can't use.
+  if (_blocked) return () => {};
   if (Notification.permission !== 'default') {
     enableCallNotifications({ prompt: false }).catch(() => {});
     return () => {};
@@ -232,4 +288,5 @@ export default {
   enableCallNotificationsOnNextUserGesture,
   disableCallNotifications,
   setCallNotificationPref,
+  isPushBlocked,
 };
