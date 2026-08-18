@@ -803,7 +803,7 @@ const LoginPage = () => {
                         onChange={handlePhoneChange}
                         onBlur={() => setPhoneTouched(true)}
                         maxLength={10}
-                        placeholder="1712345678"
+                        placeholder={mode === MODES.SIGNUP ? 'ex- whatsapp number' : 'ex - your number'}
                         inputMode="numeric"
                         autoComplete="tel-national"
                         aria-invalid={phoneError ? 'true' : 'false'}
@@ -825,21 +825,14 @@ const LoginPage = () => {
                           <span>{phoneError}</span>
                         </div>
                       ) : (
-                        <div className="flex flex-col gap-0.5">
-                          {mode === MODES.SIGNUP && (
-                            <span>
-                              {L(
-                                'Type the 10 digits after +880 (skip the first 0). We text your code here.',
-                                '+৮৮০ এর পরের ১০টি সংখ্যা লিখুন (শুরুর ০ বাদ দিন)। এই নম্বরেই এসএমএসে কোড যাবে।'
-                              )}
-                            </span>
-                          )}
-                          <span className={mode === MODES.SIGNUP ? "text-[10px] text-gray-400" : ""}>
-                            {mode === MODES.SIGNUP
-                              ? 'ex- whatsapp number'
-                              : 'ex - your number'}
+                        mode === MODES.SIGNUP ? (
+                          <span>
+                            {L(
+                              'Type the 10 digits after +880 (skip the first 0). We text your code here.',
+                              '+৮৮০ এর পরের ১০টি সংখ্যা লিখুন (শুরুর ০ বাদ দিন)। এই নম্বরেই এসএমএসে কোড যাবে।'
+                            )}
                           </span>
-                        </div>
+                        ) : null
                       )}
                     </div>
                   </div>
