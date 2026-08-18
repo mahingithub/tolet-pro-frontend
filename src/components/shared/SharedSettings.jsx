@@ -802,22 +802,14 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
       </div>
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-1 sm:px-2 lg:px-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight bg-gradient-to-br from-[#ba0036] via-[#e11d48] to-[#ff4d6d] bg-clip-text text-transparent [-webkit-text-fill-color:transparent]">
-              {bn ? 'সেটিংস' : 'Settings'}
-            </h1>
-            <p className="text-sm font-bold text-gray-500 mb-2 mt-1">
-              {bn ? 'অ্যাপ, ভাড়াটিয়া ও বাড়িওয়ালা — সব সেটিং এক জায়গায়।' : 'App, tenant and landlord preferences in one place.'}
-            </p>
-          </div>
-          {saving && (
-            <span className="inline-flex items-center gap-2 text-[11px] font-black text-[#ba0036] mt-1 shrink-0 bg-rose-50 px-3 py-1.5 rounded-full ring-1 ring-[#ba0036]/15">
+        {saving && (
+          <div className="absolute top-0 right-4 sm:right-6 lg:right-8 z-50">
+            <span className="inline-flex items-center gap-2 text-[11px] font-black text-[#ba0036] shrink-0 bg-rose-50 px-3 py-1.5 rounded-full ring-1 ring-[#ba0036]/15 shadow-sm">
               <span className="w-1.5 h-1.5 rounded-full bg-[#ba0036] animate-ping" />
               {bn ? 'সেভ হচ্ছে…' : 'Saving…'}
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
         <SettingsScope
           icon={Globe}

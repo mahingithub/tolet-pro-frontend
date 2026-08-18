@@ -55,6 +55,7 @@ import Smartalertspage from './Smartalertspage';
 import SmartAlertsPopup from './SmartAlertsPopup';
 import { buildRentAlerts, buildLeaseAlerts, buildInquiryAlerts } from '../utils/rentAlerts';
 import { loadSeenMap, isInquiryUnread, markInquirySeen } from '../utils/inquiryUnread';
+import { INQUIRY_BUCKETS, countInquiryBuckets } from '../utils/inquiryStatus';
 import Aiinsightspage from './Aiinsightspage';
 import MediaLightbox from './MediaLightbox';
 import { jsPDF } from 'jspdf';
@@ -3361,19 +3362,13 @@ const HostDashboard = () => {
       ? (language === 'বাংলা' ? 'সাম্প্রতিক লিস্টিং' : 'Recent Listings') 
       : (language === 'বাংলা' ? 'আপনার প্রপার্টিসমূহ' : 'Your Properties');
 
-  const displayedInquiries = inquiries.filter(i => {
-    const matchesSearch = i.user.toLowerCase().includes(searchQuery.toLowerCase()) || i.propTitle.toLowerCase().includes(searchQuery.toLowerCase());
-    const s = i.status || 'sent'; // pipeline uses 'sent', 'delivered', 'viewed', 'replied'
-    
-    // Any status in the active pipeline that isn't terminal is considered "pending" for the landlord's queue.
-    const isPending = ['new', 'pending', 'sent', 'delivered', 'viewed', 'replied'].includes(s);
-    
-    if (inquiryTab === 'pending') return isPending && matchesSearch;
-    if (inquiryTab === 'accepted') return ['accepted', 'visit_scheduled'].includes(s) && matchesSearch;
-    if (inquiryTab === 'rejected') return s === 'rejected' && matchesSearch;
-    if (inquiryTab === 'rented') return ['rented', 'final_booking'].includes(s) && matchesSearch;
-    return false;
-  });
+  // NOTE: inquiry tab filtering lives in InquiriesTab.jsx and routes through the
+  // shared bucket map in utils/inquiryStatus.js. A second, unused copy of that
+  // filter used to sit here; keeping two rulebooks is exactly how the dashboard
+  // KPI ended up counting 4 inquiries while the tabs could only render 3.
+  // Counts for the landlord's queue — same rulebook the Inquiries tab uses, so
+  // the sidebar badge and the Pending tab can never show different numbers.
+  const inquiryCounts = countInquiryBuckets(inquiries);
 
   // ── BACK BUTTON → close the top overlay, don't leave the page ─────────────
   // Each open overlay owns one history entry, so hardware Back (Android),
@@ -3708,9 +3703,13 @@ const HostDashboard = () => {
                 <item.icon size={16} className={isActive ? 'text-[#ba0036]' : locked ? 'text-amber-500' : 'text-gray-400'} />
                 <span className="flex-1 tracking-wide flex justify-between items-center">
                    {item.label}
-                   {item.id === 'inquiries' && inquiries.filter(i => i.status === 'sent').length > 0 && (
-                     <span className="bg-[#ba0036] text-white text-[9px] px-1.5 py-0.5 rounded-full font-black">
-                       {inquiries.filter(i => i.status === 'sent').length}
+                   {/* Badge = the landlord's action queue (the Pending tab's count).
+                       It counted only 'sent' before, so an inquiry that had merely
+                       been opened ('viewed') silently dropped off the badge while
+                       still awaiting a decision. */}
+                   {item.id === 'inquiries' && inquiryCounts.pending > 0 && (
+                     <span className="bg-[#ba0036] text-white text-[9px] px-1.5 py-0.5 rounded-full font-black tabular-nums">
+                       {inquiryCounts.pending}
                      </span>
                    )}
                    {item.id === 'payments' && (pendingRentCount > 0 || (!hasActivePaymentMethod && !paymentMethodsLoading)) && (
@@ -4116,7 +4115,10 @@ const HostDashboard = () => {
                 {
                   icon: MessageSquare, bg: 'bg-gradient-to-br from-violet-50 to-purple-100/60', iconColor: 'text-violet-600',
                   label: language === 'বাংলা' ? 'যোগাযোগ' : 'INQUIRIES',
-                  value: inquiries.length, shadow: 'shadow-[0_4px_20px_rgba(124,58,237,0.08)]',
+                  // Total across all four tabs. countInquiryBuckets() guarantees
+                  // pending + accepted + rented + rejected === total, so this number
+                  // always equals the sum of the tab counts in the Inquiries tab.
+                  value: inquiryCounts.total, shadow: 'shadow-[0_4px_20px_rgba(124,58,237,0.08)]',
                   indicator: 'bg-violet-500',
                   // Turn the box red the moment a new inquiry / reply the host hasn't opened arrives.
                   unread: inquiries.some((inq) => isInquiryUnread(inq, 'host', inqSeen)),
@@ -4128,7 +4130,16 @@ const HostDashboard = () => {
                   ? () => { setPropertyFilter('all'); setActiveTab('properties'); }
                   : i === 1
                     ? () => { setPropertyFilter('active'); setActiveTab('properties'); }
-                    : () => setActiveTab('inquiries');
+                    : () => {
+                        // Land on a tab that actually has something in it. Tapping
+                        // "4 INQUIRIES" used to drop the landlord on whatever tab was
+                        // last active — usually an empty Pending — which read as
+                        // "the dashboard is lying to me". Pending wins when there's
+                        // work waiting; otherwise fall to the first non-empty bucket.
+                        const target = INQUIRY_BUCKETS.find((b) => inquiryCounts[b] > 0);
+                        if (target) setInquiryTab(target);
+                        setActiveTab('inquiries');
+                      };
                 return (
                 <div key={i} onClick={onCardClick} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(); } }} className={`p-3 md:px-7 md:py-6 rounded-2xl md:rounded-[1.5rem] ${stat.shadow} flex flex-col items-center justify-center md:flex-row md:items-center md:justify-between md:gap-3 group hover:scale-[1.02] hover:shadow-[0_12px_35px_rgba(0,0,0,0.10)] active:scale-95 transition-all duration-300 cursor-pointer relative overflow-hidden ${stat.unread ? 'bg-gradient-to-br from-red-50 to-rose-50 border border-[#ba0036]/30 ring-2 ring-[#ba0036]/40' : 'bg-white border border-white/80'}`}>
                   {/* New-inquiry pulse dot — makes the red box unmistakable. */}

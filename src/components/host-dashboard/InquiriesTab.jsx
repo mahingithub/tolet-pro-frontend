@@ -2,6 +2,10 @@ import React from 'react';
 import { Search, RefreshCw, MessageSquare, MapPin, Calendar, Clock, Smile, Trash2, CheckCircle2, XCircle, ArrowRight, Hourglass, BadgeCheck, Lock, Sparkles, ChevronDown, Send, Check, Phone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { updateInquiryStatus } from '../../services/inquiryService.js';
+import {
+  INQUIRY_BUCKETS, inquiryBucket, isInBucket, countInquiryBuckets,
+  inquiryBucketLabel, inquiryBucketHint, inquiryStageLabel,
+} from '../../utils/inquiryStatus.js';
 
 export default function InquiriesTab({
   activeTab, t, language, inquiries, setInquiries, inquiryTab, setInquiryTab,
@@ -11,13 +15,26 @@ export default function InquiriesTab({
   inqSeen, setInqSeen, openChatPanel, handleCallUser, openTenantProfile, showToast,
   isInquiryUnread, openModal
 }) {
-  const displayedInquiries = inquiries.filter(i => {
-    if (inquiryTab === 'pending') return i.status === 'new' || !i.status;
-    if (inquiryTab === 'accepted') return i.status === 'accepted';
-    if (inquiryTab === 'rejected') return i.status === 'rejected';
-    if (inquiryTab === 'rented') return i.status === 'rented';
-    return true;
-  });
+  // Bucket every inquiry through the shared map (utils/inquiryStatus.js) so the
+  // tabs, the chip counts, the sidebar summary and the dashboard KPI all read
+  // from ONE rulebook. The old inline filter tested `status === 'new'`, a label
+  // the backend never writes (its default is 'sent'), so brand-new inquiries
+  // matched no tab: the dashboard counted 4 while the tabs could only show 3.
+  const displayedInquiries = inquiries.filter(i => isInBucket(i, inquiryTab));
+
+  // Live per-bucket counts for the chips. Because inquiryBucket() is total,
+  // pending + accepted + rented + rejected === total === the dashboard's number.
+  const bucketCounts = countInquiryBuckets(inquiries);
+
+  // Per-bucket chip colour, kept next to the buckets themselves rather than
+  // spread across four near-identical ternaries. Unchanged from before, so the
+  // tabs look exactly as the landlord already knows them.
+  const CHIP_ACTIVE = {
+    pending:  'bg-[#ba0036] text-white',
+    accepted: 'bg-green-600 text-white',
+    rented:   'bg-blue-600 text-white',
+    rejected: 'bg-red-600 text-white',
+  };
 
   return (
 <div className="w-full animate-in fade-in zoom-in-95 duration-500">
@@ -56,21 +73,34 @@ export default function InquiriesTab({
                   </div>
                 </div>
 
-                {/* Inquiry Summary — sidebar-only detail; hidden on mobile/tablet where 10-15 inquiries make it noise (per request) */}
+                {/* Inquiry Summary — sidebar-only detail; hidden on mobile/tablet where 10-15 inquiries make it noise (per request).
+                    Every row is a live filter button and every count comes from the
+                    shared bucket map, so this panel can no longer disagree with the
+                    tabs beside it (it used to count 'sent' as "New" while the Pending
+                    tab looked for 'new', hiding the row from both). All four rows sum
+                    to the Total line, which equals the dashboard's INQUIRIES card. */}
                 <div className="hidden xl:block bg-white rounded-[2rem] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none">
                   <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4">{language === 'বাংলা' ? 'ইনকোয়ারি সামারি' : 'Inquiry Summary'}</h4>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center text-sm font-bold text-gray-700">
-                      <span>{language === 'বাংলা' ? 'নতুন' : 'New'}</span>
-                      <span className="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg text-xs">{inquiries.filter(i => i.status === 'sent').length}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm font-bold text-gray-700">
-                      <span>{language === 'বাংলা' ? 'একসেপ্টেড' : 'Accepted'}</span>
-                      <span className="bg-green-50 text-green-600 px-2.5 py-1 rounded-lg text-xs">{inquiries.filter(i => ['accepted', 'visit_scheduled'].includes(i.status)).length}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm font-bold text-gray-700">
-                      <span>{language === 'বাংলা' ? 'রিজেক্টেড' : 'Rejected'}</span>
-                      <span className="bg-red-50 text-[#ba0036] px-2.5 py-1 rounded-lg text-xs">{inquiries.filter(i => i.status === 'rejected').length}</span>
+                  <div className="space-y-1.5">
+                    {[
+                      { bucket: 'pending',  badge: 'bg-blue-50 text-blue-600' },
+                      { bucket: 'accepted', badge: 'bg-green-50 text-green-600' },
+                      { bucket: 'rented',   badge: 'bg-indigo-50 text-indigo-600' },
+                      { bucket: 'rejected', badge: 'bg-red-50 text-[#ba0036]' },
+                    ].map(({ bucket, badge }) => (
+                      <button
+                        key={bucket}
+                        onClick={() => setInquiryTab(bucket)}
+                        aria-pressed={inquiryTab === bucket}
+                        className={`w-full flex justify-between items-center text-sm font-bold text-left px-2.5 py-2 -mx-2.5 rounded-xl transition-colors ${inquiryTab === bucket ? 'bg-gray-50 text-gray-900' : 'text-gray-700 hover:bg-gray-50/70'}`}
+                      >
+                        <span>{inquiryBucketLabel(bucket, language)}</span>
+                        <span className={`${badge} px-2.5 py-1 rounded-lg text-xs tabular-nums`}>{bucketCounts[bucket]}</span>
+                      </button>
+                    ))}
+                    <div className="flex justify-between items-center text-sm font-black text-gray-900 pt-3 mt-1.5 border-t border-gray-100 px-2.5">
+                      <span>{language === 'বাংলা' ? 'মোট' : 'Total'}</span>
+                      <span className="bg-gray-100 text-gray-900 px-2.5 py-1 rounded-lg text-xs tabular-nums">{bucketCounts.total}</span>
                     </div>
                   </div>
                 </div>
@@ -84,32 +114,95 @@ export default function InquiriesTab({
                      <h3 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
                        {t?.newInquiries || (language === 'বাংলা' ? 'যোগাযোগ সমূহ' : 'Inquiries')}
                      </h3>
-                     <div className="flex gap-2">
-                       <button onClick={() => setInquiryTab('pending')} className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${inquiryTab === 'pending' ? 'bg-[#ba0036] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{language === 'বাংলা' ? 'পেন্ডিং' : 'Pending'}</button>
-                       <button onClick={() => setInquiryTab('accepted')} className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${inquiryTab === 'accepted' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{language === 'বাংলা' ? 'একসেপ্টেড' : 'Accepted'}</button>
-                       <button onClick={() => setInquiryTab('rented')} className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${inquiryTab === 'rented' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{language === 'বাংলা' ? 'ভাড়া হয়েছে' : 'Rented'}</button>
-                       <button onClick={() => setInquiryTab('rejected')} className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${inquiryTab === 'rejected' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{language === 'বাংলা' ? 'রিজেক্টেড' : 'Rejected'}</button>
+                     {/* Every tab carries its own live count, so the landlord sees the
+                         whole pipeline at a glance and an empty tab is never a
+                         surprise — they can tell instantly which tab holds the rest. */}
+                     <div className="flex flex-wrap gap-2">
+                       {INQUIRY_BUCKETS.map((bucket) => {
+                         const isActive = inquiryTab === bucket;
+                         const count = bucketCounts[bucket];
+                         return (
+                           <button
+                             key={bucket}
+                             onClick={() => setInquiryTab(bucket)}
+                             aria-pressed={isActive}
+                             className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all flex items-center gap-1.5 ${isActive ? CHIP_ACTIVE[bucket] : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                           >
+                             {inquiryBucketLabel(bucket, language)}
+                             <span className={`min-w-[1.25rem] px-1 py-0.5 rounded-full text-[10px] leading-none font-black tabular-nums ${isActive ? 'bg-white/25 text-white' : count > 0 ? 'bg-white text-gray-700' : 'bg-gray-200/70 text-gray-400'}`}>
+                               {count}
+                             </span>
+                           </button>
+                         );
+                       })}
                      </div>
                    </div>
-                   <span className="bg-[#ba0036]/10 text-[#ba0036] px-5 py-2.5 rounded-full font-black text-[11px] tracking-wide border border-[#ba0036]/10">
-                     {displayedInquiries.length} {inquiryTab === 'pending' ? (language === 'বাংলা' ? 'পেন্ডিং' : 'Pending') : inquiryTab === 'accepted' ? (language === 'বাংলা' ? 'একসেপ্টেড' : 'Accepted') : inquiryTab === 'rented' ? (language === 'বাংলা' ? 'ভাড়া হয়েছে' : 'Rented') : (language === 'বাংলা' ? 'রিজেক্টেড' : 'Rejected')}
+                   {/* Total reconciles with the dashboard's INQUIRIES card — the four
+                       tab counts above always add up to exactly this number. */}
+                   <span className="bg-[#ba0036]/10 text-[#ba0036] px-5 py-2.5 rounded-full font-black text-[11px] tracking-wide border border-[#ba0036]/10 shrink-0 tabular-nums">
+                     {bucketCounts.total} {language === 'বাংলা' ? 'মোট যোগাযোগ' : bucketCounts.total === 1 ? 'Total Inquiry' : 'Total Inquiries'}
                    </span>
                 </div>
 
+                {/* Plain-language explanation of the tab the landlord is looking at. */}
+                <p className="text-[11px] md:text-xs font-bold text-gray-500 leading-relaxed -mt-3 mb-5 shrink-0">
+                  {inquiryBucketHint(inquiryTab, language)}
+                </p>
+
                 <div className="flex-1 xl:overflow-y-auto custom-scrollbar xl:pr-4 pb-10 space-y-6">
                   {displayedInquiries.length === 0 ? (
-                     <div className="text-center py-24 bg-white rounded-[2rem] shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none">
+                     <div className="text-center py-16 md:py-20 bg-white rounded-[2rem] shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none px-6">
                        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-5">
                          <Search className="text-gray-300" size={32} />
                        </div>
-                       <h3 className="text-lg font-black text-gray-900">{t?.noInquiriesFound || (language === 'বাংলা' ? 'কোনো যোগাযোগ পাওয়া যায়নি।' : 'No inquiries found.')}</h3>
+                       <h3 className="text-lg font-black text-gray-900">
+                         {language === 'বাংলা'
+                           ? `${inquiryBucketLabel(inquiryTab, language)} তালিকায় কিছু নেই।`
+                           : `No ${inquiryBucketLabel(inquiryTab, language).toLowerCase()} inquiries.`}
+                       </h3>
+                       {/* An empty tab used to be a dead end. Now it says exactly where
+                           the landlord's other inquiries are and takes them there in
+                           one tap — no hunting through four tabs. */}
+                       {bucketCounts.total > 0 ? (
+                         <>
+                           <p className="text-xs font-bold text-gray-500 mt-2">
+                             {language === 'বাংলা'
+                               ? `আপনার ${bucketCounts.total} টি যোগাযোগ অন্য ট্যাবে আছে:`
+                               : `Your ${bucketCounts.total} ${bucketCounts.total === 1 ? 'inquiry is' : 'inquiries are'} in other tabs:`}
+                           </p>
+                           <div className="flex flex-wrap justify-center gap-2 mt-4">
+                             {INQUIRY_BUCKETS.filter((b) => b !== inquiryTab && bucketCounts[b] > 0).map((b) => (
+                               <button
+                                 key={b}
+                                 onClick={() => setInquiryTab(b)}
+                                 className="px-3.5 py-2 rounded-full bg-gray-50 hover:bg-gray-100 text-gray-700 text-[11px] font-black transition-all flex items-center gap-1.5 border border-gray-100"
+                               >
+                                 {inquiryBucketLabel(b, language)}
+                                 <span className="bg-white text-gray-700 min-w-[1.25rem] px-1 py-0.5 rounded-full text-[10px] leading-none tabular-nums">{bucketCounts[b]}</span>
+                                 <ArrowRight size={12} />
+                               </button>
+                             ))}
+                           </div>
+                         </>
+                       ) : (
+                         <p className="text-xs font-bold text-gray-500 mt-2 max-w-xs mx-auto leading-relaxed">
+                           {language === 'বাংলা'
+                             ? 'এখনো কোনো যোগাযোগ আসেনি। ভাড়াটিয়া আপনার প্রপার্টিতে অনুরোধ পাঠালে এখানে দেখতে পাবেন।'
+                             : "No inquiries yet. When a tenant requests one of your properties, it'll show up here."}
+                         </p>
+                       )}
                      </div>
                   ) : (
                     displayedInquiries.map((inquiry) => {
                       const isExpanded = expandedHostInquiryId === inquiry.id;
+                      // Derive the row's stage from the row itself, not from the active
+                      // tab. They agree today (the list is already bucket-filtered), but
+                      // reading the row means an optimistic status flip can never leave a
+                      // card showing another bucket's actions for a render.
+                      const bucket = inquiryBucket(inquiry);
                       // Conversation stays locked until the host Accepts. Pending inquiries
                       // are review-only: the host reads the request + profile, then decides.
-                      const conversationLocked = inquiryTab === 'pending';
+                      const conversationLocked = bucket === 'pending';
                       // Highlight until opened — a new inquiry or a fresh tenant reply the host hasn't seen.
                       const unread = isInquiryUnread(inquiry, 'host', inqSeen);
                       const openInquiry = () => {
@@ -148,11 +241,19 @@ export default function InquiriesTab({
                               ) : (
                                 <h4 className="text-sm md:text-base font-black text-gray-900 truncate leading-tight">{inquiry.user}</h4>
                               )}
-                              {inquiryTab === 'pending' && (
-                                <span className="shrink-0 bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest">
-                                  {t?.new || (language === 'বাংলা' ? 'নতুন' : 'New')}
-                                </span>
-                              )}
+                              {/* Accurate per-row stage. This used to be a hardcoded
+                                  "New" on every Pending row — it stayed there after
+                                  the landlord had opened the inquiry, so it told them
+                                  nothing. Now it reflects the real status. */}
+                              {(() => {
+                                const stage = inquiryStageLabel(inquiry, language);
+                                if (!stage) return null;
+                                return (
+                                  <span className={`shrink-0 ${stage.tone} px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest`}>
+                                    {stage.text}
+                                  </span>
+                                );
+                              })()}
                             </div>
                             <p className="text-[10px] md:text-[11px] font-bold text-gray-400 truncate">
                               <span className="text-[#ba0036] font-black">{inquiry.propTitle}</span>
@@ -281,14 +382,14 @@ export default function InquiriesTab({
                               {!conversationLocked && (
                               <>
                               <div className="grid grid-cols-2 gap-3">
-                                {inquiryTab === 'accepted' ? (
+                                {bucket === 'accepted' ? (
                                   <button
                                     onClick={() => openConvertInquiry(inquiry)}
                                     className="col-span-2 w-full py-3.5 md:py-4 rounded-2xl font-black text-[12px] md:text-[13px] shadow-[0_8px_20px_rgba(34,197,94,0.25)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 bg-gradient-to-br from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white"
                                   >
                                     <Sparkles size={16} /> {language === 'বাংলা' ? 'বুকিং এ রূপান্তর করুন' : 'Convert to Booking'}
                                   </button>
-                                ) : inquiryTab === 'rented' ? (
+                                ) : bucket === 'rented' ? (
                                   <button
                                     onClick={() => {
                                       setInquiries(prev => prev.map(i => i.id === inquiry.id ? { ...i, status: 'accepted' } : i));

@@ -98,6 +98,7 @@ html.dark body { background-color: var(--tp-bg); color: var(--tp-text); }
 html.dark .bg-white { background-color: var(--tp-surface) !important; }
 
 html.dark .bg-gray-50,
+html.dark .bg-gray-50\/50,
 html.dark .bg-slate-50,
 html.dark .bg-neutral-50,
 html.dark .bg-zinc-50,
@@ -118,9 +119,11 @@ html.dark .bg-\[\#f1f5f9\] { background-color: var(--tp-surface-2) !important; }
 
 /* Interactive hover backgrounds — higher specificity so they still win. */
 html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-gray-50\/50:hover,
 html.dark .hover\:bg-gray-100:hover,
 html.dark .hover\:bg-gray-200:hover,
 html.dark .hover\:bg-slate-100:hover,
+html.dark .hover\:bg-slate-50\/50:hover,
 html.dark .hover\:bg-slate-200:hover { background-color: var(--tp-surface-3) !important; }
 
 html.dark .hover\:bg-white:hover,
@@ -176,9 +179,11 @@ html.dark .bg-red-50,  html.dark .bg-red-100 { background-color: rgba(244, 63, 9
 html.dark .text-red-500, html.dark .text-red-600, html.dark .text-red-700 { color: #fb7185 !important; }
 
 html.dark .bg-emerald-50, html.dark .bg-emerald-100,
-html.dark .bg-green-50,   html.dark .bg-green-100 { background-color: rgba(16, 185, 129, 0.16) !important; }
+html.dark .bg-emerald-50\/50, html.dark .bg-emerald-100\/50,
+html.dark .bg-green-50,   html.dark .bg-green-100,
+html.dark .bg-green-50\/50,   html.dark .bg-green-100\/50 { background-color: rgba(16, 185, 129, 0.16) !important; }
 html.dark .text-emerald-600, html.dark .text-emerald-700, html.dark .text-emerald-800,
-html.dark .text-green-600,   html.dark .text-green-700 { color: #34d399 !important; }
+html.dark .text-green-600, html.dark .text-green-700, html.dark .text-green-800 { color: #34d399 !important; }
 
 html.dark .bg-amber-50, html.dark .bg-amber-100,
 html.dark .bg-yellow-50, html.dark .bg-yellow-100 { background-color: rgba(245, 158, 11, 0.16) !important; }

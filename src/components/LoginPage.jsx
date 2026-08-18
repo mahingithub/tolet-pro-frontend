@@ -814,25 +814,34 @@ const LoginPage = () => {
                     </div>
                     {/* One slot for both the hint and the reason it's rejected,
                         so the field never jumps as the message swaps. */}
-                    <p
+                    <div
                       id="auth-phone-help"
-                      className={`mt-1 ml-1 text-[11px] font-semibold flex items-start gap-1 ${phoneError ? 'text-red-600' : 'text-gray-500'}`}
+                      className={`mt-1 ml-1 text-[11px] font-semibold flex flex-col items-start gap-1 ${phoneError ? 'text-red-600' : 'text-gray-500'}`}
                       aria-live="polite"
                     >
                       {phoneError ? (
-                        <>
+                        <div className="flex items-start gap-1">
                           <AlertCircle size={12} className="mt-[1px] shrink-0" />
                           <span>{phoneError}</span>
-                        </>
+                        </div>
                       ) : (
-                        <span>
-                          {L(
-                            'Type the 10 digits after +880 (skip the first 0). We text your code here.',
-                            '+৮৮০ এর পরের ১০টি সংখ্যা লিখুন (শুরুর ০ বাদ দিন)। এই নম্বরেই এসএমএসে কোড যাবে।',
+                        <div className="flex flex-col gap-0.5">
+                          {mode === MODES.SIGNUP && (
+                            <span>
+                              {L(
+                                'Type the 10 digits after +880 (skip the first 0). We text your code here.',
+                                '+৮৮০ এর পরের ১০টি সংখ্যা লিখুন (শুরুর ০ বাদ দিন)। এই নম্বরেই এসএমএসে কোড যাবে।'
+                              )}
+                            </span>
                           )}
-                        </span>
+                          <span className={mode === MODES.SIGNUP ? "text-[10px] text-gray-400" : ""}>
+                            {mode === MODES.SIGNUP
+                              ? 'ex- whatsapp number'
+                              : 'ex - your number'}
+                          </span>
+                        </div>
                       )}
-                    </p>
+                    </div>
                   </div>
 
                   {mode !== MODES.FORGOT && (
