@@ -337,19 +337,30 @@ const WalletSummary = ({ go, me, language }) => {
 
       {/* Desktop: summary detail flows into two columns; mobile stays stacked. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-      {/* ── This Month + Living Cost ─────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3">
-        <Card className="p-4">
-          <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">{isBn ? 'এ মাসের খরচ' : 'This Month'}</p>
-          <p className="text-xl font-black text-gray-900 tracking-tight mt-1.5">{taka(ws.thisMonthSpending, language)}</p>
-          <p className="text-[11px] font-semibold text-gray-400 mt-0.5">{isBn ? 'আপনার ভাগ' : 'Your share'}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">{isBn ? 'মোট খরচ' : 'Living Cost'}</p>
-          <p className="text-xl font-black text-gray-900 tracking-tight mt-1.5">{taka(ws.totalLivingCost, language)}</p>
-          <p className="text-[11px] font-semibold text-gray-400 mt-0.5">{isBn ? 'বাসার মোট' : 'Household'}</p>
-        </Card>
-      </div>
+        <div className="space-y-4">
+          {/* ── This Month + Living Cost ─────────────────────────────────── */}
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="p-4">
+              <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">{isBn ? 'এ মাসের খরচ' : 'This Month'}</p>
+              <p className="text-xl font-black text-gray-900 tracking-tight mt-1.5">{taka(ws.thisMonthSpending, language)}</p>
+              <p className="text-[11px] font-semibold text-gray-400 mt-0.5">{isBn ? 'আপনার ভাগ' : 'Your share'}</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">{isBn ? 'মোট খরচ' : 'Living Cost'}</p>
+              <p className="text-xl font-black text-gray-900 tracking-tight mt-1.5">{taka(ws.totalLivingCost, language)}</p>
+              <p className="text-[11px] font-semibold text-gray-400 mt-0.5">{isBn ? 'বাসার মোট' : 'Household'}</p>
+            </Card>
+          </div>
+
+          {/* ── More (Report / Activity / Reminders) ─────────────────────── */}
+          <Card className="px-4 py-1.5">
+            <div className="divide-y divide-gray-50">
+              <MoreRow icon={PieChart} tint="bg-violet-50" text="text-violet-600" label={isBn ? 'মাসিক রিপোর্ট' : 'Monthly Report'} onClick={() => go('report')} />
+              <MoreRow icon={Activity} tint="bg-blue-50" text="text-blue-600" label={isBn ? 'একটিভিটি টাইমলাইন' : 'Activity Timeline'} onClick={() => go('activity')} />
+              <MoreRow icon={BellRing} tint="bg-rose-50" text="text-red-600" label={isBn ? 'স্মার্ট রিমাইন্ডার' : 'Smart Reminders'} badge={reminders.length} onClick={() => go('reminders')} />
+            </div>
+          </Card>
+        </div>
 
       {/* ── Household / Roommates ────────────────────────────────────── */}
       {connected ? (
@@ -460,14 +471,6 @@ const WalletSummary = ({ go, me, language }) => {
         </Card>
       )}
 
-      {/* ── More (Report / Activity / Reminders) ─────────────────────── */}
-      <Card className="px-4 py-1.5">
-        <div className="divide-y divide-gray-50">
-          <MoreRow icon={PieChart} tint="bg-violet-50" text="text-violet-600" label={isBn ? 'মাসিক রিপোর্ট' : 'Monthly Report'} onClick={() => go('report')} />
-          <MoreRow icon={Activity} tint="bg-blue-50" text="text-blue-600" label={isBn ? 'একটিভিটি টাইমলাইন' : 'Activity Timeline'} onClick={() => go('activity')} />
-          <MoreRow icon={BellRing} tint="bg-rose-50" text="text-red-600" label={isBn ? 'স্মার্ট রিমাইন্ডার' : 'Smart Reminders'} badge={reminders.length} onClick={() => go('reminders')} />
-        </div>
-      </Card>
       </div>
 
       <AddRoommateSheet open={addOpen} onClose={() => setAddOpen(false)} isBn={isBn} onAdd={addRoommate} />

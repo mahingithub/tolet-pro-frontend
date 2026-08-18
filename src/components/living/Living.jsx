@@ -306,7 +306,7 @@ const Living = () => {
             the module content scrolls. Hidden on Overview (which IS the summary,
             so a rail there just duplicates it); shown on the focused modules
             where a persistent wallet snapshot genuinely helps. */}
-        {module !== 'overview' && (
+        {module !== 'overview' && module !== 'meals' && (
           <aside className="hidden xl:block w-72 shrink-0 xl:sticky xl:top-4 pb-12">
             <FeaturedRail go={go} me={me} language={language} />
           </aside>

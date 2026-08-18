@@ -135,66 +135,6 @@ const PaymentsTab = ({
     </div>
   ) : null;
 
-  const leaseBanner = activeLeases.length > 0 ? (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 px-1">
-        <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center"><KeyRound size={14} /></div>
-        <h3 className="text-sm font-black text-gray-800">{language === 'বাংলা' ? 'আপনার বুকিং / লিজ' : 'Your Bookings'}</h3>
-        <span className="text-[10px] font-black text-gray-400 tabular-nums">{activeLeases.length}</span>
-      </div>
-      {/* One box per booking. A single booking fills the column; 2+
-          tile into a 2-up grid so they read as distinct boxes. */}
-      <div className={`grid gap-3 ${activeLeases.length > 1 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
-        {activeLeases.map((b) => {
-          const fresh = isFreshBooking(b);
-          return (
-            <div key={b.id || b._id} className={`relative bg-white rounded-2xl p-4 border shadow-sm transition-all ${fresh ? 'border-indigo-200 ring-2 ring-indigo-100' : 'border-gray-100'}`}>
-              {fresh && (
-                <span className="absolute top-3 right-3 inline-flex items-center gap-1 bg-indigo-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest shadow-md">
-                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />{language === 'বাংলা' ? 'নতুন' : 'New'}
-                </span>
-              )}
-              <div className="flex items-center gap-2.5 mb-2.5">
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0"><Home size={16} /></div>
-                <div className="min-w-0">
-                  <p className="text-sm font-black text-gray-900 truncate">{b.property || (language === 'বাংলা' ? 'আপনার ভাড়া' : 'Your rental')}</p>
-                  {b.location && <p className="text-[10px] font-bold text-gray-400 truncate flex items-center gap-1"><MapPin size={9} /> {b.location}</p>}
-                </div>
-              </div>
-              <p className="text-[11px] font-bold text-indigo-700 bg-indigo-50/70 rounded-lg px-2.5 py-1.5 mb-3">
-                {language === 'বাংলা' ? 'আপনার হোস্ট একটি বুকিং তৈরি করেছেন।' : 'Your host created a booking for you.'}
-              </p>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="bg-gray-50 rounded-xl p-2">
-                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ভাড়া' : 'Rent'}</p>
-                  <p className="text-xs font-black text-gray-900 tabular-nums">৳{(Number(b.monthlyRent) || 0).toLocaleString('en-IN')}</p>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-2">
-                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'অ্যাডভান্স' : 'Advance'}</p>
-                  <p className="text-xs font-black text-gray-900 tabular-nums">৳{(Number(b.advancePayment) || 0).toLocaleString('en-IN')}</p>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-2">
-                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'মেথড' : 'Method'}</p>
-                  <p className="text-[10px] font-black text-gray-900 truncate">{b.paymentMethod || '—'}</p>
-                </div>
-              </div>
-              {/* No end date = ongoing tenancy — show the move-in date instead
-                  of hiding the line entirely. */}
-              {b.leaseStart && (
-                <p className="text-[10px] font-bold text-gray-400 mt-2.5 flex items-center gap-1.5">
-                  <Calendar size={11} />
-                  {b.leaseEnd
-                    ? `${fmtLeaseDate(b.leaseStart)} – ${fmtLeaseDate(b.leaseEnd)}`
-                    : `${fmtLeaseDate(b.leaseStart)} – ${language === 'বাংলা' ? 'চলমান' : 'ongoing'}`}
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  ) : null;
-
   const bn = language === 'বাংলা';
   const receiptsThisYear = paymentReceipts.filter((r) => r.monthKey?.startsWith(`${payYear}-`)).length;
 
@@ -262,11 +202,6 @@ const PaymentsTab = ({
     </div>
   );
 
-  const bookingSummaryRow = leaseBanner ? (
-    <div className="w-full">
-      {leaseBanner}
-    </div>
-  ) : null;
 
   // ── Trust footer — reassures the tenant their data is safe. ──────
   const securityFooter = (
@@ -443,7 +378,6 @@ const PaymentsTab = ({
     return (
       <div className="animate-in fade-in duration-500 space-y-4 md:space-y-5">
         {rentPaySection}
-        {leaseBanner}
         <div className="text-center py-24 bg-white/40 backdrop-blur-md rounded-[3rem] border border-white shadow-sm flex flex-col items-center">
           <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4">
             <Receipt className="text-blue-400" size={36} />
@@ -467,9 +401,6 @@ const PaymentsTab = ({
     <div className="animate-in fade-in duration-500 space-y-4 md:space-y-5">
       {/* ─── ROW 1: Pay Your Rent / payment status (full width) ─── */}
       {rentPaySection}
-
-      {/* ─── ROW 2: Your Booking (left) + Payment Summary (right) ─── */}
-      {bookingSummaryRow}
 
       {/* ─── PAYMENT HISTORY CARD — the month navigator + search now
           live in one clean white card (was scattered on the page). ─── */}

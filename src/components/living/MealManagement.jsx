@@ -391,8 +391,8 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
         ))}
       </div>
 
-      {/* two columns on tablet/desktop → half the scroll; phones keep a single column */}
-      <div className="md:grid md:grid-cols-2 md:gap-4 md:items-start space-y-4 md:space-y-0">
+      {/* two/three columns on tablet/desktop → less scroll; phones keep single column */}
+      <div className="md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-4 md:items-start space-y-4 md:space-y-0">
       <div className="space-y-4 min-w-0">
       {/* mess summary */}
       <div id="mm-summary" className="scroll-mt-24">
@@ -465,21 +465,21 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
           <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-3 flex items-center gap-1.5">
             <Wallet size={15} className="text-[#ba0036]" /> {isBn ? 'আমার হিসাব' : 'My Accounts'}
           </h3>
-          <div className="grid grid-cols-4 gap-2">
-            <div className="text-center rounded-2xl bg-gray-50 border border-gray-100 py-3">
-              <p className="text-[16px] font-black text-gray-900">{num(mine.meals, language)}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="text-center rounded-2xl bg-gray-50 border border-gray-100 py-3 px-2">
+              <p className="text-[16px] font-black text-gray-900 truncate">{num(mine.meals, language)}</p>
               <p className="text-[9.5px] font-bold text-gray-400 mt-0.5">{isBn ? 'আমার মিল' : 'Meals'}</p>
             </div>
-            <div className="text-center rounded-2xl bg-gray-50 border border-gray-100 py-3">
-              <p className="text-[16px] font-black text-emerald-600">{taka(mine.deposit, language)}</p>
+            <div className="text-center rounded-2xl bg-gray-50 border border-gray-100 py-3 px-2">
+              <p className="text-[16px] font-black text-emerald-600 truncate">{taka(mine.deposit, language)}</p>
               <p className="text-[9.5px] font-bold text-gray-400 mt-0.5">{isBn ? 'আমার জমা' : 'Deposit'}</p>
             </div>
-            <div className="text-center rounded-2xl bg-gray-50 border border-gray-100 py-3">
-              <p className="text-[16px] font-black text-gray-900">{taka(mine.mealCost, language)}</p>
+            <div className="text-center rounded-2xl bg-gray-50 border border-gray-100 py-3 px-2">
+              <p className="text-[16px] font-black text-gray-900 truncate">{taka(mine.mealCost, language)}</p>
               <p className="text-[9.5px] font-bold text-gray-400 mt-0.5">{isBn ? 'মিল খরচ' : 'Meal cost'}</p>
             </div>
-            <div className="text-center rounded-2xl bg-gray-50 border border-gray-100 py-3">
-              <p className={cx('text-[16px] font-black', mine.balance >= 0 ? 'text-emerald-600' : 'text-red-600')}>{takaSigned(mine.balance, language)}</p>
+            <div className="text-center rounded-2xl bg-gray-50 border border-gray-100 py-3 px-2">
+              <p className={cx('text-[16px] font-black truncate', mine.balance >= 0 ? 'text-emerald-600' : 'text-red-600')}>{takaSigned(mine.balance, language)}</p>
               <p className="text-[9.5px] font-bold text-gray-400 mt-0.5">{isBn ? 'ব্যালেন্স' : 'Balance'}</p>
             </div>
           </div>
@@ -542,63 +542,6 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       </Card>
       </div>
 
-      {/* daily meal editor */}
-      <div id="mm-log" className="scroll-mt-24">
-      <Card className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[14px] font-black text-gray-900 tracking-tight flex items-center gap-1.5">
-            <ChefHat size={15} className="text-gray-400" /> {isBn ? 'মিল লগ' : 'Log meals'}
-          </h3>
-          <div className="flex items-center gap-1">
-            <button onClick={() => setDayOffset((o) => o + 1)} className="p-1.5 rounded-lg bg-gray-50 border border-gray-100 text-gray-500 active:scale-90 transition" aria-label="previous day">
-              <ChevronLeft size={16} />
-            </button>
-            <span className="text-[11px] font-black text-gray-600 min-w-[64px] text-center">
-              {dayOffset === 0 ? (isBn ? 'আজ' : 'Today') : dateLabel(iso, language)}
-            </span>
-            <button onClick={() => setDayOffset((o) => Math.max(0, o - 1))} disabled={dayOffset === 0} className="p-1.5 rounded-lg bg-gray-50 border border-gray-100 text-gray-500 active:scale-90 transition disabled:opacity-40" aria-label="next day">
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-        <div className="space-y-2.5">
-          {roommates.map((r) => {
-            const m = getMeal(r.id);
-            const total = (m.breakfast || 0) + (m.lunch || 0) + (m.dinner || 0);
-            return (
-              <div key={r.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
-                <div className="flex items-start gap-2 mb-2.5">
-                  <Avatar roommate={r} size={28} />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[13px] font-black text-gray-800 flex-1">{r.isMe ? (isBn ? 'আপনি' : 'You') : r.name}</span>
-                    {(m.editedBy || m.createdBy) && (
-                      <p className="text-[9px] font-bold text-gray-400 truncate mt-0.5">
-                        {m.editedBy ? (isBn ? 'এডিট করেছেন ' : 'Edited by ') : (isBn ? 'যুক্ত করেছেন ' : 'Added by ')}
-                        {roommateById(roommates, m.editedBy || m.createdBy).name}
-                      </p>
-                    )}
-                  </div>
-                  <span className="text-[11px] font-black text-gray-400 mt-1">{num(total, language)} {isBn ? 'মিল' : 'meals'}</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {MEALS.map((meal) => {
-                    const MIcon = meal.icon;
-                    return (
-                      <div key={meal.key} className="flex flex-col items-center gap-1.5 bg-white rounded-xl py-2 border border-gray-100">
-                        <span className="flex items-center gap-1 text-[10px] font-black text-gray-500">
-                          <MIcon size={12} /> {isBn ? meal.bn : meal.en}
-                        </span>
-                        <Stepper value={m[meal.key] || 0} onChange={(v) => setMeal(iso, r.id, meal.key, v)} />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-      </div>
 
       {/* deposits list */}
       <div id="mm-deposits" className="scroll-mt-24">
@@ -667,6 +610,68 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
           </div>
         )}
       </Card>
+      </div>
+      </div>
+      
+      {/* right column */}
+      <div className="space-y-4 min-w-0">
+      {/* daily meal editor */}
+      <div id="mm-log" className="scroll-mt-24">
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-[14px] font-black text-gray-900 tracking-tight flex items-center gap-1.5">
+            <ChefHat size={15} className="text-gray-400" /> {isBn ? 'মিল লগ' : 'Log meals'}
+          </h3>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setDayOffset((o) => o + 1)} className="p-1.5 rounded-lg bg-gray-50 border border-gray-100 text-gray-500 active:scale-90 transition" aria-label="previous day">
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-[11px] font-black text-gray-600 min-w-[64px] text-center">
+              {dayOffset === 0 ? (isBn ? 'আজ' : 'Today') : dateLabel(iso, language)}
+            </span>
+            <button onClick={() => setDayOffset((o) => Math.max(0, o - 1))} disabled={dayOffset === 0} className="p-1.5 rounded-lg bg-gray-50 border border-gray-100 text-gray-500 active:scale-90 transition disabled:opacity-40" aria-label="next day">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+        <div className="space-y-2.5">
+          {roommates.map((r) => {
+            const m = getMeal(r.id);
+            const total = (m.breakfast || 0) + (m.lunch || 0) + (m.dinner || 0);
+            return (
+              <div key={r.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
+                <div className="flex items-start gap-2 mb-2.5">
+                  <Avatar roommate={r} size={28} />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[13px] font-black text-gray-800 flex-1">{r.isMe ? (isBn ? 'আপনি' : 'You') : r.name}</span>
+                    {(m.editedBy || m.createdBy) && (
+                      <p className="text-[9px] font-bold text-gray-400 truncate mt-0.5">
+                        {m.editedBy ? (isBn ? 'এডিট করেছেন ' : 'Edited by ') : (isBn ? 'যুক্ত করেছেন ' : 'Added by ')}
+                        {roommateById(roommates, m.editedBy || m.createdBy).name}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-[11px] font-black text-gray-400 mt-1">{num(total, language)} {isBn ? 'মিল' : 'meals'}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {MEALS.map((meal) => {
+                    const MIcon = meal.icon;
+                    return (
+                      <div key={meal.key} className="flex flex-col items-center gap-1.5 bg-white rounded-xl py-2 border border-gray-100">
+                        <span className="flex items-center gap-1 text-[10px] font-black text-gray-500">
+                          <MIcon size={12} /> {isBn ? meal.bn : meal.en}
+                        </span>
+                        <Stepper value={m[meal.key] || 0} onChange={(v) => setMeal(iso, r.id, meal.key, v)} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+      </div>
       </div>
       </div>
       </div>
