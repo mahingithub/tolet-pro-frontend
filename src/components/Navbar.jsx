@@ -620,23 +620,23 @@ useEffect(() => {
           {/* `ml-auto` has to come back whenever the search above is not in
               flow — including when it is not rendered at all on the listing
               route — or this cluster collapses left against the logo. */}
-          <div className={`hidden md:flex items-center gap-4 text-sm font-bold text-gray-700 ${(showNavSearch && (isScrolled || compactHeader)) ? '' : 'ml-auto'}`}>
+          <div className={`hidden md:flex items-center gap-5 lg:gap-6 text-sm font-bold text-gray-700 ${(showNavSearch && (isScrolled || compactHeader)) ? '' : 'ml-auto'}`}>
 
             {/* ── Marketing links ── */}
-            <nav className="hidden lg:flex items-center gap-4">
+            <nav className="hidden lg:flex items-center gap-5 lg:gap-6">
               <Link to="/how-it-works" className="hover:text-[#ba0036] transition-colors">{t?.navHowItWorks || 'How it works'}</Link>
-              <div className="w-px h-4 bg-gray-300"></div>
+              <div className="w-px h-6 bg-slate-300/80"></div>
               <Link to="/how-it-works#pricing" className="hover:text-[#ba0036] transition-colors">{t?.navPricing || 'Pricing'}</Link>
-              <div className="w-px h-4 bg-gray-300"></div>
+              <div className="w-px h-6 bg-slate-300/80"></div>
               <Link to="/support" className="hover:text-[#ba0036] transition-colors">{t?.navHelp || 'Help'}</Link>
-              <div className="w-px h-4 bg-gray-300"></div>
+              <div className="w-px h-6 bg-slate-300/80"></div>
             </nav>
 
             {/* Desktop notification bell with unread badge + dropdown. */}
             {isAuthed && (
               <>
                 <NotificationBell isAuthed={isAuthed} />
-                <div className="w-px h-4 bg-gray-300"></div>
+                <div className="w-px h-6 bg-slate-300/80"></div>
               </>
             )}
 
@@ -666,7 +666,7 @@ useEffect(() => {
               </button>
             )}
 
-            <div className="hidden lg:block w-px h-4 bg-gray-300"></div>
+            <div className="hidden lg:block w-px h-6 bg-slate-300/80"></div>
 
             <div className="relative" ref={langRef}>
               <div onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="flex items-center gap-2 cursor-pointer hover:text-[#ba0036] transition-colors">
@@ -685,7 +685,7 @@ useEffect(() => {
               )}
             </div>
 
-            <div className="hidden lg:block w-px h-4 bg-gray-300"></div>
+            <div className="hidden lg:block w-px h-6 bg-slate-300/80"></div>
 
             <div className="relative" ref={profileRef}>
               {isLoggedIn ? (

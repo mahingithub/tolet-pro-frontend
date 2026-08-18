@@ -475,6 +475,14 @@ const HeroSection = () => {
   const setActiveMode = usePropertyStore((s) => s.setActiveMode);
   const searchType    = activeMode === 'sale' ? 'buy' : activeMode;
   const setSearchType = (mode) => setActiveMode(mode === 'buy' ? 'sale' : mode);
+  
+  // Delay video visibility by 2.5s to hide the initial YouTube UI flash (play button, title)
+  const [isVideoLoaded,  setIsVideoLoaded]  = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsVideoLoaded(true), 2500);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [location,       setLocation]       = useState('');
   const [selectedType,   setSelectedType]   = useState(residentialTypes[0]);
   const [selectedBudget, setSelectedBudget] = useState(budgetRanges[0]);
@@ -672,19 +680,16 @@ const HeroSection = () => {
         {/* 1. HERO SECTION                                                */}
         {/* ═══════════════════════════════════════════════════════════════ */}
         <section className="w-full max-w-[1400px] mx-auto px-4 md:px-6 pt-4">
-          <div className="relative w-full h-[240px] md:h-[300px] lg:h-[380px] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-sm flex flex-col justify-center items-center text-center">
+          <div className="relative w-full h-[240px] md:h-[300px] lg:h-[380px] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-sm flex flex-col justify-center items-center text-center bg-slate-900">
             <iframe
-              src={`https://www.youtube-nocookie.com/embed/${HERO_YOUTUBE_ID}?autoplay=1&mute=1&loop=1&playlist=${HERO_YOUTUBE_ID}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&cc_load_policy=0&disablekb=1&fs=0&start=1`}
+              src={`https://www.youtube.com/embed/${HERO_YOUTUBE_ID}?autoplay=1&mute=1&loop=1&playlist=${HERO_YOUTUBE_ID}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&cc_load_policy=0&disablekb=1&fs=0`}
               title="YouTube background"
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              className="absolute inset-0 w-full h-full pointer-events-none scale-[1.7] md:scale-[1.5]"
+              allowFullScreen
+              className={`absolute inset-0 w-full h-full pointer-events-none scale-[1.7] md:scale-[1.5] transition-opacity duration-1000 ease-in-out ${isVideoLoaded ? 'opacity-100' : 'opacity-0'}`}
             ></iframe>
-            {/* Full overlay that blocks YouTube UI — the gradient gives a cinematic look
-                while a second layer uses backdrop-blur to smear away the center
-                play/pause/skip buttons YouTube insists on rendering. */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/30 z-10" />
-            <div className="absolute inset-0 backdrop-blur-[2px] z-10" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent z-10 pointer-events-none" />
             <div className="relative z-20 px-4 -mt-12 md:-mt-20 md:hidden">
               <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1] mb-3 drop-shadow-2xl">
                 {t?.heroTitle1 || 'Find Your Next'} <br className="md:hidden" /> {t?.heroTitle2 || 'Perfect Home'}
