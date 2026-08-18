@@ -674,7 +674,6 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       </div>
       </div>
       </div>
-      </div>
 
       {/* floating side tab (chat-bot style launcher) → weekly breakdown popup */}
       {!weeklyOpen && (
