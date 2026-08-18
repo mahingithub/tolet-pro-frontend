@@ -620,20 +620,24 @@ useEffect(() => {
           {/* `ml-auto` has to come back whenever the search above is not in
               flow — including when it is not rendered at all on the listing
               route — or this cluster collapses left against the logo. */}
-          <div className={`hidden md:flex items-stretch self-stretch text-sm font-bold text-gray-700 ${(showNavSearch && (isScrolled || compactHeader)) ? '' : 'ml-auto'}`}>
+          <div className={`hidden md:flex items-center gap-4 text-sm font-bold text-gray-700 h-full ${(showNavSearch && (isScrolled || compactHeader)) ? '' : 'ml-auto'}`}>
 
             {/* ── Marketing links ── */}
-            <nav className="hidden lg:flex items-stretch">
-              <Link to="/how-it-works" className="flex items-center px-4 lg:px-5 border-l border-gray-200 hover:bg-gray-50 transition-colors">{t?.navHowItWorks || 'How it works'}</Link>
-              <Link to="/how-it-works#pricing" className="flex items-center px-4 lg:px-5 border-l border-gray-200 hover:bg-gray-50 transition-colors">{t?.navPricing || 'Pricing'}</Link>
-              <Link to="/support" className="flex items-center px-4 lg:px-5 border-l border-gray-200 hover:bg-gray-50 transition-colors">{t?.navHelp || 'Help'}</Link>
+            <nav className="hidden lg:flex items-center gap-4 h-full">
+              <Link to="/how-it-works" className="hover:text-[#ba0036] transition-colors">{t?.navHowItWorks || 'How it works'}</Link>
+              <div className="w-px h-full bg-gray-200"></div>
+              <Link to="/how-it-works#pricing" className="hover:text-[#ba0036] transition-colors">{t?.navPricing || 'Pricing'}</Link>
+              <div className="w-px h-full bg-gray-200"></div>
+              <Link to="/support" className="hover:text-[#ba0036] transition-colors">{t?.navHelp || 'Help'}</Link>
+              <div className="w-px h-full bg-gray-200"></div>
             </nav>
 
             {/* Desktop notification bell with unread badge + dropdown. */}
             {isAuthed && (
-              <div className="flex items-center px-4 lg:px-5 border-l border-gray-200">
+              <>
                 <NotificationBell isAuthed={isAuthed} />
-              </div>
+                <div className="w-px h-full bg-gray-200"></div>
+              </>
             )}
 
             {/* Primary header CTA — role-aware.
@@ -642,35 +646,35 @@ useEffect(() => {
                   to them than a "Post Property" button.
                 • Guest / LANDLORD → "Post Property" listing CTA (guests go to
                   landlord signup; landlords go straight to the listing form). */}
-            <div className="flex items-center px-4 lg:px-5 border-l border-gray-200">
-              {isLoggedIn && userRole === 'tenant' ? (
-                <button
-                  onClick={() => navigate('/living')}
-                  className="group flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[#ba0036] bg-white text-[#ba0036] hover:bg-[#ba0036] hover:text-white font-bold text-xs lg:text-sm shadow-sm hover:shadow transition-all active:scale-95 whitespace-nowrap"
-                >
-                  <Wallet size={16} />
-                  {t?.menuRoommateWallet || 'Roommate Wallet'}
-                  <span className="rounded-full bg-[#ba0036]/10 text-[#ba0036] group-hover:bg-white/25 group-hover:text-white px-1.5 py-0.5 text-[9px] font-extrabold leading-none tracking-wider transition-colors">LIVING</span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => (isLoggedIn ? handleProtected('/list-property') : navigate('/login?mode=signup&role=landlord'))}
-                  className="group flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[#ba0036] bg-white text-[#ba0036] hover:bg-[#ba0036] hover:text-white font-bold text-xs lg:text-sm shadow-sm hover:shadow transition-all active:scale-95 whitespace-nowrap"
-                >
-                  <PlusCircle size={16} />
-                  {t?.listProperty || 'Post Property'}
-                  <span className="rounded-full bg-[#ba0036]/10 text-[#ba0036] group-hover:bg-white/25 group-hover:text-white px-1.5 py-0.5 text-[9px] font-extrabold leading-none tracking-wider transition-colors">FREE</span>
-                </button>
-              )}
-            </div>
+            {isLoggedIn && userRole === 'tenant' ? (
+              <button
+                onClick={() => navigate('/living')}
+                className="group flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[#ba0036] bg-white text-[#ba0036] hover:bg-[#ba0036] hover:text-white font-bold text-xs lg:text-sm shadow-sm hover:shadow transition-all active:scale-95 whitespace-nowrap"
+              >
+                <Wallet size={16} />
+                {t?.menuRoommateWallet || 'Roommate Wallet'}
+                <span className="rounded-full bg-[#ba0036]/10 text-[#ba0036] group-hover:bg-white/25 group-hover:text-white px-1.5 py-0.5 text-[9px] font-extrabold leading-none tracking-wider transition-colors">LIVING</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => (isLoggedIn ? handleProtected('/list-property') : navigate('/login?mode=signup&role=landlord'))}
+                className="group flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[#ba0036] bg-white text-[#ba0036] hover:bg-[#ba0036] hover:text-white font-bold text-xs lg:text-sm shadow-sm hover:shadow transition-all active:scale-95 whitespace-nowrap"
+              >
+                <PlusCircle size={16} />
+                {t?.listProperty || 'Post Property'}
+                <span className="rounded-full bg-[#ba0036]/10 text-[#ba0036] group-hover:bg-white/25 group-hover:text-white px-1.5 py-0.5 text-[9px] font-extrabold leading-none tracking-wider transition-colors">FREE</span>
+              </button>
+            )}
 
-            <div className="relative flex items-center px-4 lg:px-5 border-l border-gray-200" ref={langRef}>
-              <div onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="flex items-center gap-2 cursor-pointer hover:text-[#ba0036] transition-colors h-full">
+            <div className="hidden lg:block w-px h-full bg-gray-200"></div>
+
+            <div className="relative h-full flex items-center" ref={langRef}>
+              <div onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="flex items-center gap-2 cursor-pointer hover:text-[#ba0036] transition-colors">
                 <Globe size={16} /> <span>{language}</span>
                 <ChevronDown size={14} className={`transition-transform duration-300 ${isLangMenuOpen ? 'rotate-180' : ''}`} />
               </div>
               {isLangMenuOpen && (
-                <div className="absolute top-full right-0 mt-0 w-40 bg-white/95 backdrop-blur-3xl border border-white shadow-[0_20px_40px_rgba(0,0,0,0.1)] rounded-b-2xl p-2 z-[70]">
+                <div className="absolute top-full right-0 mt-2 w-40 bg-white/95 backdrop-blur-3xl border border-white shadow-[0_20px_40px_rgba(0,0,0,0.1)] rounded-2xl p-2 z-[70]">
                   {languages.map(lang => (
                     <div key={lang.code} onClick={() => { if (setLanguage) setLanguage(lang.name); setIsLangMenuOpen(false); }}
                       className={`px-4 py-3 cursor-pointer rounded-xl text-sm font-bold flex items-center justify-between transition-all ${language === lang.name ? 'bg-red-50 text-[#ba0036]' : 'hover:bg-gray-50 text-gray-600'}`}>
@@ -681,7 +685,9 @@ useEffect(() => {
               )}
             </div>
 
-            <div className="relative flex items-center px-4 lg:px-5 pl-4 lg:pl-5 border-l border-gray-200" ref={profileRef}>
+            <div className="hidden lg:block w-px h-full bg-gray-200"></div>
+
+            <div className="relative" ref={profileRef}>
               {isLoggedIn ? (
                 <>
                   <div onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}

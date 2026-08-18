@@ -444,6 +444,125 @@ const PopularAreasAccordion = ({
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// HERO BACKGROUND VIDEO — a YouTube loop with none of YouTube's own UI
+// ─────────────────────────────────────────────────────────────────────────────
+// A plain `?autoplay=1&controls=0` embed still paints player chrome over the
+// frame, which is what the old backdrop-blur layer was trying to smear away:
+//   • the big centre play button, while the first frame loads (and forever, if
+//     the browser refuses autoplay),
+//   • the play/pause + replay flash on every `loop=1` restart, because the
+//     parameter re-cues the video rather than rewinding it,
+//   • the end screen with suggested videos when the clip runs out.
+// Driving the player through the IFrame API removes all three: a poster covers
+// the frame until the player reports PLAYING, and the clip is rewound just
+// before it ends so the player never reaches a stopped state.
+let ytApiPromise = null;
+const loadYouTubeApi = () => {
+  if (window.YT?.Player) return Promise.resolve(window.YT);
+  if (ytApiPromise) return ytApiPromise;
+  ytApiPromise = new Promise((resolve) => {
+    const prevReady = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { prevReady?.(); resolve(window.YT); };
+    const script = document.createElement('script');
+    script.src   = 'https://www.youtube.com/iframe_api';
+    script.async = true;
+    document.head.appendChild(script);
+  });
+  return ytApiPromise;
+};
+
+// The player is sized to a true 16:9 cover box so the video fills the frame
+// with no letterbox bars, and so the iframe's edges (where the player would put
+// its title/branding row) fall outside the parent's crop.
+const HERO_VIDEO_CSS = `
+.hero-video-shell { container-type: size; }
+.hero-video-shell iframe {
+  position:absolute; top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  border:0; pointer-events:none;
+  width:100%; height:100%;                     /* fallback: no container units */
+  width: max(100cqw, calc(100cqh * 16 / 9));
+  height:max(100cqh, calc(100cqw * 9 / 16));
+}
+`;
+
+const HeroBackgroundVideo = ({ videoId }) => {
+  const mountRef = useRef(null);
+  const playerRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  useEffect(() => {
+    if (!videoId || !mountRef.current) return;
+    // Respect reduced-motion: keep the still poster, never start the loop.
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+
+    let cancelled = false;
+    let loopTimer = null;
+    // The API swaps this node out for its iframe, so it must be a throwaway
+    // child rather than the React-owned wrapper (StrictMode mounts twice).
+    const host = document.createElement('div');
+    mountRef.current.appendChild(host);
+
+    loadYouTubeApi().then((YT) => {
+      if (cancelled) return;
+      playerRef.current = new YT.Player(host, {
+        videoId,
+        host: 'https://www.youtube-nocookie.com',
+        playerVars: {
+          autoplay: 1, mute: 1, controls: 0, disablekb: 1, fs: 0,
+          rel: 0, modestbranding: 1, playsinline: 1,
+          iv_load_policy: 3, cc_load_policy: 0,
+          origin: window.location.origin,
+        },
+        events: {
+          onReady: (e) => {
+            e.target.getIframe()?.setAttribute('title', 'To-Let Pro background video');
+            e.target.mute();          // required, or autoplay is refused
+            e.target.playVideo();
+            loopTimer = setInterval(() => {
+              const p = playerRef.current;
+              if (!p?.getDuration) return;
+              const duration = p.getDuration();
+              if (duration > 0 && duration - p.getCurrentTime() < 0.4) p.seekTo(0, true);
+            }, 250);
+          },
+          onStateChange: (e) => {
+            if (e.data === YT.PlayerState.PLAYING) setIsPlaying(true);
+            // -1 (unstarted) / 2 (paused) are the states that paint a centre
+            // button, so the poster comes back over them.
+            else if (e.data === -1 || e.data === YT.PlayerState.PAUSED) setIsPlaying(false);
+            if (e.data === YT.PlayerState.ENDED) { e.target.seekTo(0, true); e.target.playVideo(); }
+          },
+        },
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      if (loopTimer) clearInterval(loopTimer);
+      playerRef.current?.destroy?.();
+      playerRef.current = null;
+      host.remove();
+    };
+  }, [videoId]);
+
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: HERO_VIDEO_CSS }} />
+      <div ref={mountRef} className="hero-video-shell absolute inset-0 overflow-hidden" aria-hidden="true" />
+      {/* Poster = the clip's own thumbnail, so the hand-off is seamless. */}
+      <img
+        src={`https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`}
+        alt=""
+        aria-hidden="true"
+        onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`; }}
+        className={`absolute inset-0 w-full h-full object-cover z-[5] pointer-events-none transition-opacity duration-700 ${isPlaying ? 'opacity-0' : 'opacity-100'}`}
+      />
+    </>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 const HeroSection = () => {
@@ -475,14 +594,6 @@ const HeroSection = () => {
   const setActiveMode = usePropertyStore((s) => s.setActiveMode);
   const searchType    = activeMode === 'sale' ? 'buy' : activeMode;
   const setSearchType = (mode) => setActiveMode(mode === 'buy' ? 'sale' : mode);
-  
-  // Delay video visibility by 2.5s to hide the initial YouTube UI flash (play button, title)
-  const [isVideoLoaded,  setIsVideoLoaded]  = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setIsVideoLoaded(true), 2500);
-    return () => clearTimeout(timer);
-  }, []);
-
   const [location,       setLocation]       = useState('');
   const [selectedType,   setSelectedType]   = useState(residentialTypes[0]);
   const [selectedBudget, setSelectedBudget] = useState(budgetRanges[0]);
@@ -680,24 +791,12 @@ const HeroSection = () => {
         {/* 1. HERO SECTION                                                */}
         {/* ═══════════════════════════════════════════════════════════════ */}
         <section className="w-full max-w-[1400px] mx-auto px-4 md:px-6 pt-4">
-          <div className="relative w-full h-[240px] md:h-[300px] lg:h-[380px] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-sm flex flex-col justify-center items-center text-center bg-slate-900">
-            <iframe
-              src={`https://www.youtube.com/embed/${HERO_YOUTUBE_ID}?autoplay=1&mute=1&loop=1&playlist=${HERO_YOUTUBE_ID}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&cc_load_policy=0&disablekb=1&fs=0`}
-              title="YouTube background"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="absolute inset-0 w-full h-full pointer-events-none scale-[1.7] md:scale-[1.5]"
-            ></iframe>
-            
-            {/* Dark gradient for text readability */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent z-10 pointer-events-none" />
-
-            {/* Solid curtain to hide YouTube's initial UI flash without triggering autoplay blocking */}
-            <div 
-              className={`absolute inset-0 bg-slate-900 z-15 pointer-events-none transition-opacity duration-1000 ease-in-out ${isVideoLoaded ? 'opacity-0' : 'opacity-100'}`} 
-            />
-
+          <div className="relative w-full h-[240px] md:h-[300px] lg:h-[380px] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-sm flex flex-col justify-center items-center text-center">
+            <HeroBackgroundVideo videoId={HERO_YOUTUBE_ID} />
+            {/* Cinematic gradient for headline contrast. The blur layer that used
+                to sit here only existed to smudge YouTube's centre buttons —
+                HeroBackgroundVideo keeps them off screen, so the video stays sharp. */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/30 z-10" />
             <div className="relative z-20 px-4 -mt-12 md:-mt-20 md:hidden">
               <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1] mb-3 drop-shadow-2xl">
                 {t?.heroTitle1 || 'Find Your Next'} <br className="md:hidden" /> {t?.heroTitle2 || 'Perfect Home'}
