@@ -687,9 +687,17 @@ const HeroSection = () => {
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
-              className={`absolute inset-0 w-full h-full pointer-events-none scale-[1.7] md:scale-[1.5] transition-opacity duration-1000 ease-in-out ${isVideoLoaded ? 'opacity-100' : 'opacity-0'}`}
+              className="absolute inset-0 w-full h-full pointer-events-none scale-[1.7] md:scale-[1.5]"
             ></iframe>
+            
+            {/* Dark gradient for text readability */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent z-10 pointer-events-none" />
+
+            {/* Solid curtain to hide YouTube's initial UI flash without triggering autoplay blocking */}
+            <div 
+              className={`absolute inset-0 bg-slate-900 z-15 pointer-events-none transition-opacity duration-1000 ease-in-out ${isVideoLoaded ? 'opacity-0' : 'opacity-100'}`} 
+            />
+
             <div className="relative z-20 px-4 -mt-12 md:-mt-20 md:hidden">
               <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1] mb-3 drop-shadow-2xl">
                 {t?.heroTitle1 || 'Find Your Next'} <br className="md:hidden" /> {t?.heroTitle2 || 'Perfect Home'}
