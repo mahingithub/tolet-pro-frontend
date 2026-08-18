@@ -778,14 +778,21 @@ useEffect(() => {
                   )}
                 </>
               ) : (
-                <div className="flex items-center">
-                  <button
-                    onClick={() => navigate('/login?mode=login')}
-                    className="p-2 rounded-full border border-gray-200 text-gray-700 hover:text-[#ba0036] hover:border-[#ba0036] hover:bg-red-50 transition-colors shadow-sm active:scale-95"
-                    aria-label="Login or Signup"
+                <div className="flex items-center gap-2 lg:gap-2.5">
+                  {/* Log in — classic outlined (secondary) button */}
+                  <Link
+                    to="/login?mode=login"
+                    className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:border-[#ba0036] hover:text-[#ba0036] font-bold text-xs lg:text-sm shadow-sm hover:shadow transition-all active:scale-95 whitespace-nowrap"
                   >
-                    <User size={18} />
-                  </button>
+                    {t?.navLogIn || 'Log in'}
+                  </Link>
+                  {/* Sign up — classic solid (primary) button */}
+                  <Link
+                    to="/login?mode=signup"
+                    className="px-4 py-2 rounded-lg bg-[#ba0036] text-white border border-[#ba0036] hover:bg-[#a0002d] hover:border-[#a0002d] font-bold text-xs lg:text-sm shadow-[0_2px_8px_rgba(186,0,54,0.25)] transition-all active:scale-95 whitespace-nowrap"
+                  >
+                    {t?.navSignUp || 'Sign up'}
+                  </Link>
                 </div>
               )}
             </div>
