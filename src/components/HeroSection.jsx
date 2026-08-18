@@ -16,14 +16,14 @@ import { useAppInstall, requestInstallGuide } from '../hooks/useAppInstall';
 // CONTEXT DATA
 // ─────────────────────────────────────────────────────────────────────────────
 const popularCities = [
-  { id: 'dhaka',      name: 'Dhaka',      desc: 'Central Hub',       image: '/image/Divition/Dhaka.png?v=4' },
-  { id: 'chittagong', name: 'Chattogram', desc: 'Port City',         image: '/image/Divition/Chattogram.png?v=4' },
-  { id: 'sylhet',     name: 'Sylhet',     desc: 'Tea Gardens',       image: '/image/Divition/Sylhet.png?v=4' },
-  { id: 'rajshahi',   name: 'Rajshahi',   desc: 'Silk City',         image: '/image/Divition/Rajshahi.png?v=4' },
-  { id: 'khulna',     name: 'Khulna',     desc: 'Mangrove Forest',   image: '/image/Divition/Khulna.png?v=4' },
-  { id: 'barishal',   name: 'Barishal',   desc: 'City of Rivers',    image: '/image/Divition/Barishal.png?v=4' },
-  { id: 'rangpur',    name: 'Rangpur',    desc: 'Northern Hub',      image: '/image/Divition/Rangpur.png?v=4' },
-  { id: 'mymensingh', name: 'Mymensingh', desc: 'Heritage City',     image: '/image/Divition/Mymensingh.png?v=4' },
+  { id: 'dhaka',      name: 'Dhaka',      desc: 'Central Hub',       image: 'https://plain-apac-prod-public.komododecks.com/202608/18/xs3IhCS66cnf6leMmt0u/image.png' },
+  { id: 'chittagong', name: 'Chattogram', desc: 'Port City',         image: 'https://i.im.ge/QMnLFsh/Chattogram.png' },
+  { id: 'sylhet',     name: 'Sylhet',     desc: 'Tea Gardens',       image: 'https://i.im.ge/QMnLOyM/Sylhet.png' },
+  { id: 'rajshahi',   name: 'Rajshahi',   desc: 'Silk City',         image: 'https://plain-apac-prod-public.komododecks.com/202608/18/ygUnhLv9FwTfajuH6AJ4/image.png' },
+  { id: 'khulna',     name: 'Khulna',     desc: 'Mangrove Forest',   image: 'https://i.im.ge/QMnLaoq/Khulna.png' },
+  { id: 'barishal',   name: 'Barishal',   desc: 'City of Rivers',    image: 'https://i.im.ge/QMnLr48/Barishal.png' },
+  { id: 'rangpur',    name: 'Rangpur',    desc: 'Northern Hub',      image: 'https://i.im.ge/QMnLqWC/Rangpur.png' },
+  { id: 'mymensingh', name: 'Mymensingh', desc: 'Heritage City',     image: 'https://i.im.ge/QMnLdj4/Mymensingh.png' },
 ];
 
 const dhakaFinest = [

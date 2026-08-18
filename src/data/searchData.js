@@ -23,28 +23,28 @@
 // Used by the mobile "Explore Divisions" strip and the Navbar drawer.
 export const DIVISIONS = [
   { id: 'dhaka',      name: 'Dhaka',      tagline: 'Capital',     hot: true,
-    image: '/image/Divition/Dhaka.png?v=5',
+    image: 'https://plain-apac-prod-public.komododecks.com/202608/18/xs3IhCS66cnf6leMmt0u/image.png',
     districts: ['Dhaka','Faridpur','Gazipur','Gopalganj','Kishoreganj','Madaripur','Manikganj','Munshiganj','Narayanganj','Narsingdi','Rajbari','Shariatpur','Tangail'] },
   { id: 'chittagong', name: 'Chattogram', tagline: 'Port City',
-    image: '/image/Divition/Chattogram.png?v=5',
+    image: 'https://i.im.ge/QMnLFsh/Chattogram.png',
     districts: ['Chattogram','Bandarban','Brahmanbaria','Chandpur','Comilla',"Cox's Bazar",'Feni','Khagrachari','Lakshmipur','Noakhali','Rangamati'] },
   { id: 'sylhet',     name: 'Sylhet',     tagline: 'Tea Gardens',
-    image: '/image/Divition/Sylhet.png?v=5',
+    image: 'https://i.im.ge/QMnLOyM/Sylhet.png',
     districts: ['Sylhet','Habiganj','Moulvibazar','Sunamganj'] },
   { id: 'rajshahi',   name: 'Rajshahi',   tagline: 'Silk City',
-    image: '/image/Divition/Rajshahi.png?v=5',
+    image: 'https://plain-apac-prod-public.komododecks.com/202608/18/ygUnhLv9FwTfajuH6AJ4/image.png',
     districts: ['Rajshahi','Bogura','Chapainawabganj','Joypurhat','Naogaon','Natore','Pabna','Sirajganj'] },
   { id: 'khulna',     name: 'Khulna',     tagline: 'Mangrove',
-    image: '/image/Divition/Khulna.png?v=5',
+    image: 'https://i.im.ge/QMnLaoq/Khulna.png',
     districts: ['Khulna','Bagerhat','Chuadanga','Jashore','Jhenaidah','Kushtia','Magura','Meherpur','Narail','Satkhira'] },
   { id: 'barishal',   name: 'Barishal',   tagline: 'Rivers',
-    image: '/image/Divition/Barishal.png?v=5',
+    image: 'https://i.im.ge/QMnLr48/Barishal.png',
     districts: ['Barishal','Barguna','Bhola','Jhalokati','Patuakhali','Pirojpur'] },
   { id: 'rangpur',    name: 'Rangpur',    tagline: 'North',
-    image: '/image/Divition/Rangpur.png?v=5',
+    image: 'https://i.im.ge/QMnLqWC/Rangpur.png',
     districts: ['Rangpur','Dinajpur','Gaibandha','Kurigram','Lalmonirhat','Nilphamari','Panchagarh','Thakurgaon'] },
   { id: 'mymensingh', name: 'Mymensingh', tagline: 'Heritage',
-    image: '/image/Divition/Mymensingh.png?v=5',
+    image: 'https://i.im.ge/QMnLdj4/Mymensingh.png',
     districts: ['Mymensingh','Jamalpur','Netrokona','Sherpur'] },
 ];
 
@@ -102,25 +102,25 @@ export const POPULAR_AREAS = [
 ];
 
 export const POPULAR_AREA_IMAGES = {
-  Dhanmondi: '/image/populer-area/Dhanmondi.png?v=3',
-  Gulshan: '/image/populer-area/Gulshan.png?v=3',
-  Banani: '/image/populer-area/Banani.png?v=3',
-  Uttara: '/image/populer-area/Uttara.png?v=3',
-  Bashundhara: '/image/populer-area/Bashundhara.png?v=3',
-  Mirpur: '/image/populer-area/Mirpur.png?v=3',
-  Mohammadpur: '/image/populer-area/Mohammadpur.png?v=3',
-  'Purbachal New Town': '/image/populer-area/Purbachal.png?v=3'
+  Dhanmondi: 'https://plain-apac-prod-public.komododecks.com/202608/18/Br7xNji4mfelSXwY3pAt/image.png',
+  Gulshan: 'https://plain-apac-prod-public.komododecks.com/202608/18/535e8gtI6uQ2ooIxBEi0/image.png',
+  Banani: 'https://plain-apac-prod-public.komododecks.com/202608/18/JE5dp75KS16cpTG71Nyy/image.png',
+  Uttara: 'https://plain-apac-prod-public.komododecks.com/202608/18/sz8ux9VcTn8ne8SPlbwK/image.png',
+  Bashundhara: 'https://plain-apac-prod-public.komododecks.com/202608/18/0xJ4r0ha7lqF0gnXeksK/image.png',
+  Mirpur: 'https://plain-apac-prod-public.komododecks.com/202608/18/4V6lDwkuWbu1pJ8zejqZ/image.png',
+  Mohammadpur: 'https://plain-apac-prod-public.komododecks.com/202608/18/Icz78SEEkvX2OQ6drbXY/image.png',
+  'Purbachal New Town': 'https://plain-apac-prod-public.komododecks.com/202608/18/4w02Nua0jvfCseDz8rrx/image.png'
 };
 
 export const POPULAR_AREA_IMAGES_DESKTOP = {
-  Dhanmondi: '/image/populer-area/desktop/DhanmondiD.png?v=2',
-  Gulshan: '/image/populer-area/desktop/GulshanD.png?v=2',
-  Banani: '/image/populer-area/desktop/BananiD.png?v=2',
-  Uttara: '/image/populer-area/desktop/UttaraD.png?v=2',
-  Bashundhara: '/image/populer-area/desktop/BashundharaD.png?v=2',
-  Mirpur: '/image/populer-area/desktop/MirpurD.png?v=2',
-  Mohammadpur: '/image/populer-area/desktop/MohammadpurD.png?v=2',
-  'Purbachal New Town': '/image/populer-area/desktop/PurbachalD.png?v=2'
+  Dhanmondi: 'https://plain-apac-prod-public.komododecks.com/202608/18/F3fcQdEP4QeLgqEED4iH/image.png',
+  Gulshan: 'https://plain-apac-prod-public.komododecks.com/202608/18/PWjIXVYmz5fUGjQdbV2d/image.png',
+  Banani: 'https://plain-apac-prod-public.komododecks.com/202608/18/RDrJikiHHN4O5kazNbFf/image.png',
+  Uttara: 'https://plain-apac-prod-public.komododecks.com/202608/18/i1KCTXSRFfTL4yfsBtXv/image.png',
+  Bashundhara: 'https://plain-apac-prod-public.komododecks.com/202608/18/xfNZQofUNfTHZPeEfU89/image.png',
+  Mirpur: 'https://plain-apac-prod-public.komododecks.com/202608/18/UBLtCFfzSLZ8Gw6sOklr/image.png',
+  Mohammadpur: 'https://plain-apac-prod-public.komododecks.com/202608/18/BU2kXfUu5xpftfk5FiO7/image.png',
+  'Purbachal New Town': 'https://plain-apac-prod-public.komododecks.com/202608/18/Etupu0wlMSdNoR6RuXFa/image.png'
 };
 
 export const POPULAR_AREA_TAGLINES = {
