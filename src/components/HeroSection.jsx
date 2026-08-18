@@ -674,7 +674,7 @@ const HeroSection = () => {
         <section className="w-full max-w-[1400px] mx-auto px-4 md:px-6 pt-4">
           <div className="relative w-full h-[240px] md:h-[300px] lg:h-[380px] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-sm flex flex-col justify-center items-center text-center">
             <iframe
-              src={`https://www.youtube.com/embed/${HERO_YOUTUBE_ID}?autoplay=1&mute=1&loop=1&playlist=${HERO_YOUTUBE_ID}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1`}
+              src={`https://www.youtube.com/embed/${HERO_YOUTUBE_ID}?autoplay=1&mute=1&loop=1&playlist=${HERO_YOUTUBE_ID}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1&cc_load_policy=0&iv_load_policy=3&disablekb=1&fs=0`}
               title="YouTube background"
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -682,13 +682,49 @@ const HeroSection = () => {
               className="absolute inset-0 w-full h-full pointer-events-none scale-[1.35] md:scale-[1.15]"
             ></iframe>
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-            <div className="relative z-20 px-4 -mt-12 md:-mt-20">
-              <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1] mb-3 drop-shadow-2xl">
-                {t?.heroTitle1 || 'Find Your Next'} <br className="md:hidden" /> {t?.heroTitle2 || 'Perfect Home'}
+            <div className="relative z-20 px-4 -mt-12 md:-mt-20 w-full max-w-5xl">
+              {/* Mobile Text (Hidden on Desktop) */}
+              <h1 className="md:hidden text-3xl font-black text-white tracking-tight leading-[1.1] mb-3 drop-shadow-2xl">
+                {t?.heroTitle1 || 'Find Your Next'} <br /> {t?.heroTitle2 || 'Perfect Home'}
               </h1>
-              <p className="text-[12px] md:text-base font-bold text-slate-100 max-w-xl mx-auto drop-shadow-md hidden md:block">
+              <p className="md:hidden text-[12px] font-bold text-slate-100 max-w-xl mx-auto drop-shadow-md">
                 {t?.heroSubtext || 'Discover premium apartments, duplexes, and commercial spaces across Bangladesh.'}
               </p>
+
+              {/* Desktop Trust Badges (Hidden on Mobile) */}
+              <div className="hidden md:flex flex-row justify-center items-stretch divide-x divide-white/20 bg-[#0f172a]/70 backdrop-blur-md px-6 py-4 rounded-[1.5rem] border border-white/10 shadow-2xl mx-auto w-fit">
+                
+                <div className="flex items-center gap-3 px-6">
+                  <div className="bg-emerald-500/20 p-2.5 rounded-xl border border-emerald-500/20">
+                    <ShieldCheck className="text-emerald-400 w-5 h-5" />
+                  </div>
+                  <div className="text-left flex flex-col justify-center">
+                    <span className="text-white font-bold text-sm tracking-wide leading-tight">Verified Hosts</span>
+                    <span className="text-slate-300 text-[11px] font-medium leading-tight mt-0.5">100% Trusted</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 px-6">
+                  <div className="bg-blue-500/20 p-2.5 rounded-xl border border-blue-500/20">
+                    <Zap className="text-blue-400 w-5 h-5" />
+                  </div>
+                  <div className="text-left flex flex-col justify-center">
+                    <span className="text-white font-bold text-sm tracking-wide leading-tight">Instant Booking</span>
+                    <span className="text-slate-300 text-[11px] font-medium leading-tight mt-0.5">Book in seconds</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 px-6">
+                  <div className="bg-amber-500/20 p-2.5 rounded-xl border border-amber-500/20">
+                    <HeadphonesIcon className="text-amber-400 w-5 h-5" />
+                  </div>
+                  <div className="text-left flex flex-col justify-center">
+                    <span className="text-white font-bold text-sm tracking-wide leading-tight">24/7 Support</span>
+                    <span className="text-slate-300 text-[11px] font-medium leading-tight mt-0.5">Always here for you</span>
+                  </div>
+                </div>
+
+              </div>
             </div>
           </div>
         </section>
