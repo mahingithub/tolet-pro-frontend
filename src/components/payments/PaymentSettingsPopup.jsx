@@ -56,7 +56,17 @@ export default function PaymentSettingsPopup({ hasPaymentMethod, hasBookings, lo
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+    // `role="dialog"` + `data-tour-blocker` are what keep the guided tour from
+    // opening behind this popup — see BLOCKING_UI in context/TourContext.jsx.
+    // Both bookings and payment methods arrive from async fetches, so this can
+    // pop open a beat AFTER the tour has already checked for a clear screen.
+    <div
+      className="fixed inset-0 z-[120] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={bn ? 'পেমেন্ট সেটিংস সম্পূর্ণ করুন' : 'Complete your payment settings'}
+      data-tour-blocker
+    >
       <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={snooze} />
       <div className="bg-white rounded-[2rem] w-full max-w-sm relative z-10 overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-300">
         {/* Accent header */}

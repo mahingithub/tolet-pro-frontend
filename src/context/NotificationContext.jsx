@@ -154,8 +154,16 @@ export function NotificationProvider({ children }) {
                     state: { highlightId: targetId, autoOpen: true, scrollTo: true } 
                   });
                   break;
+                // Admin offers carry their own destination (the plan page by
+                // default) in data.path / data.url.
+                case 'marketing':
+                  navigate(data.data?.path || data.data?.url || '/subscription');
+                  break;
                 default:
-                  navigate('/notifications');
+                  // '/notifications' is NOT a registered route — App.jsx's
+                  // catch-all silently redirects unknown paths to '/', so this
+                  // used to make a tapped toast look like it did nothing.
+                  navigate(data.data?.path || data.data?.url || '/');
               }
               // Mark read optimistically when clicked from toast
               setItems((prev) => prev.map((x) => x.id === data.id ? { ...x, read: true } : x));

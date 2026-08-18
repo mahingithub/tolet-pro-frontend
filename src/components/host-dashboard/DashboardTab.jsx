@@ -206,8 +206,13 @@ export default function DashboardTab({
         })() : null}
       </div>
 
-      {/* ১. Stats Bento Grid */}
-      <div className="grid grid-cols-3 gap-3 md:gap-5">
+      {/* ১. Stats Bento Grid
+          NOTE: the `data-tour` anchors on this block, Quick Actions and the
+          Shared Ledger card below are steps 2–4 of the host dashboard tour.
+          They were missing here while the live markup (still inline in
+          HostDashboard.jsx) carried them, so wiring this component in would
+          have silently pruned three steps. Keep them in sync. */}
+      <div data-tour="host-stats-grid" className="grid grid-cols-3 gap-3 md:gap-5">
         {[
           {
             icon: Building, bg: 'bg-gradient-to-br from-red-50 to-rose-100/60', iconColor: 'text-[#ba0036]',
@@ -266,7 +271,7 @@ export default function DashboardTab({
       </div>
 
       {/* ১.২ দ্রুত অ্যাকশন — ৪ টাইল, সহজ ও কেন্দ্রস্থ। */}
-      <div className="bg-white dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800/60 rounded-2xl md:rounded-[1.5rem] p-4 md:p-5 shadow-[0_4px_25px_rgba(0,0,0,0.02)] dark:shadow-none">
+      <div data-tour="host-quick-actions" className="bg-white dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800/60 rounded-2xl md:rounded-[1.5rem] p-4 md:p-5 shadow-[0_4px_25px_rgba(0,0,0,0.02)] dark:shadow-none">
         <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white mb-4">
           {language === 'বাংলা' ? 'দ্রুত অ্যাকশন' : 'Quick Actions'}
         </h3>
@@ -303,6 +308,7 @@ export default function DashboardTab({
         const collectedPct = sm.expectedTotal > 0 ? Math.min(100, Math.round((sm.collectedTotal / sm.expectedTotal) * 100)) : 0;
         return (
           <div
+            data-tour="host-shared-ledger"
             onClick={() => setActiveTab('rent')}
             className="group relative w-full cursor-pointer bg-white rounded-[1.5rem] p-5 md:p-7 border border-gray-100 shadow-[0_4px_25px_rgba(0,0,0,0.04)] hover:shadow-[0_15px_45px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 overflow-hidden"
           >

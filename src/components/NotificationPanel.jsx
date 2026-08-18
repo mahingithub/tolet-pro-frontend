@@ -198,7 +198,7 @@ export default function NotificationPanel({ onClose }) {
           // where the review appears.
           const myId = user?.id || user?._id;
           if (myId) navigate(isLandlord ? `/landlord/${myId}` : `/tenant/${myId}`);
-          else navigate('/notifications');
+          else navigate('/');
           break;
         }
 
@@ -219,14 +219,33 @@ export default function NotificationPanel({ onClose }) {
           }
           break;
 
+        case 'rent_updated':
+          navigate(isLandlord ? '/host-dashboard?tab=rent' : '/tenant-dashboard?tab=bookings', {
+            state: {
+              highlightId: targetId || (n.data && n.data.bookingId),
+              autoOpen: true,
+              scrollTo: true,
+            },
+          });
+          break;
+
+        case 'marketing':
+          // Admin offers carry their own destination (the plan page by default).
+          navigate((n.data && (n.data.path || n.data.url)) || '/subscription');
+          break;
+
         case 'system':
           // Admin-facing system events (e.g. user reports) carry a path.
           if (n.data && n.data.path) navigate(n.data.path);
-          else navigate('/notifications');
+          else navigate('/');
           break;
 
         default:
-          navigate('/notifications');
+          // NOTE: '/notifications' is NOT a registered route — App.jsx ends with
+          // a catch-all that silently redirects unknown paths to '/'. Falling
+          // back to it made a tapped notification look like it did nothing, so
+          // prefer a destination supplied by the notification itself.
+          navigate((n.data && (n.data.path || n.data.url)) || '/');
           break;
       }
     }

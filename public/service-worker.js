@@ -249,27 +249,70 @@ self.addEventListener('notificationclick', function(event) {
     urlToOpen = `/messages?${params.toString()}`;
   } else if (data.kind === 'missed_call') {
     urlToOpen = `/messages?userId=${data.callerId || ''}`;
-  } else if (data.url) {
-    urlToOpen = data.url;
+  } else if (data.url || (data.data && data.data.url) || (data.data && data.data.path)) {
+    // The push handler assigns the WHOLE payload to notification.data, so a
+    // deep link may sit at the envelope root (web-push senders) or one level
+    // down inside `data` (senders that shape their payload for FCM, whose data
+    // dict is the only part FCM forwards). Accept both — reading only the root
+    // is why server-sent links were being ignored and every tap fell back to
+    // '/'.
+    urlToOpen = data.url || data.data.url || data.data.path;
   }
+
+  var isCallClick = data.type === 'incoming_call' || data.kind === 'incoming_call';
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
-      for (let i = 0; i < windowClients.length; i++) {
-        let client = windowClients[i];
-        if (client.url.includes(urlToOpen) && 'focus' in client) {
-          // Send message to active client if it's an incoming call
-          if (data.type === 'incoming_call' || data.kind === 'incoming_call') {
-            client.postMessage({
-              type: 'ANSWER_CALL',
-              payload: data
-            });
-          }
-          return client.focus();
+      // Resolve against the SW origin so we can compare real paths rather than
+      // substrings. The old check was `client.url.includes(urlToOpen)`, and with
+      // urlToOpen === '/' that is true for EVERY url — so any open tab
+      // "matched", the click just re-focused whatever was already on screen,
+      // and openWindow was never reached. That is the "clicking does nothing"
+      // symptom.
+      var target;
+      try {
+        target = new URL(urlToOpen, self.location.origin);
+      } catch (e) {
+        target = new URL('/', self.location.origin);
+      }
+
+      var sameOrigin = [];
+      for (var i = 0; i < windowClients.length; i++) {
+        var c = windowClients[i];
+        var u = null;
+        try { u = new URL(c.url); } catch (e) { u = null; }
+        if (!u || u.origin !== target.origin) continue;
+        sameOrigin.push(c);
+
+        // Already on the destination route — just focus it.
+        if (u.pathname === target.pathname && 'focus' in c) {
+          if (isCallClick) c.postMessage({ type: 'ANSWER_CALL', payload: data });
+          return c.focus();
         }
       }
+
+      // An app tab is open but on a different route: navigate it in place
+      // instead of spawning a duplicate window.
+      if (sameOrigin.length > 0) {
+        var client = sameOrigin[0];
+        if (isCallClick) client.postMessage({ type: 'ANSWER_CALL', payload: data });
+        if ('navigate' in client) {
+          return client.navigate(target.href)
+            .then(function(navigated) {
+              var c2 = navigated || client;
+              return c2 && 'focus' in c2 ? c2.focus() : undefined;
+            })
+            .catch(function() {
+              // navigate() rejects for uncontrolled clients — fall back to
+              // opening a window so the tap still goes somewhere.
+              return clients.openWindow ? clients.openWindow(target.href) : undefined;
+            });
+        }
+        return 'focus' in client ? client.focus() : undefined;
+      }
+
       if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
+        return clients.openWindow(target.href);
       }
     })
   );

@@ -301,7 +301,13 @@ const translations = {
     searchWithin: "Search within",
 
     // Property Card & Details
+    // `properties` is the RESIDENTIAL noun ("5 homes in All Cities"). The two
+    // keys after it are the same slot for the other listing intents — in Bangla
+    // the residential word is "বাড়িসমূহ" (houses), which reads plainly wrong
+    // over a list of shops and offices. See `unitNoun` in PropertyListing.jsx.
     properties: "Properties",
+    propertiesCommercial: "Commercial Spaces",
+    propertiesForSale: "Properties for Sale",
     verified: "VERIFIED",
     monthlyRentText: "Monthly Rent",
     inquireBtn: "INQUIRE",
@@ -1063,7 +1069,11 @@ const translations = {
     clearFilters: "ফিল্টার মুছুন",
 
     // Property Card & Details
+    // আবাসিক / বাণিজ্যিক / ক্রয় — প্রতিটি ইনটেন্টের জন্য আলাদা শব্দ, নইলে
+    // দোকান-অফিসের তালিকার ওপরেও "বাড়িসমূহ" লেখা থাকে।
     properties: "বাড়িসমূহ",
+    propertiesCommercial: "বাণিজ্যিক স্থান",
+    propertiesForSale: "বিক্রয়ের প্রপার্টি",
     verified: "ভেরিফাইড",
     monthlyRentText: "মাসিক ভাড়া",
     inquireBtn: "যোগাযোগ করুন",

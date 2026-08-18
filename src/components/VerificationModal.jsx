@@ -1053,6 +1053,12 @@ const VerificationModal = ({
     <div
       className="fixed inset-0 z-[100] flex items-stretch sm:items-center sm:justify-center p-0 sm:p-6"
       onClick={(e) => { if (e.target === e.currentTarget && !submitting) onClose?.(); }}
+      // Holds the guided tour off while the wizard is open — see BLOCKING_UI in
+      // context/TourContext.jsx.
+      role="dialog"
+      aria-modal="true"
+      aria-label={isBn ? 'পরিচয় যাচাইকরণ' : 'Identity verification'}
+      data-tour-blocker
     >
       <div className="absolute inset-0 bg-[#0a0a14]/85 backdrop-blur-xl" />
       <div

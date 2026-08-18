@@ -197,7 +197,15 @@ const FreeProTrialModal = ({ open, onSkip, onUnlocked, reason = 'entry' }) => {
   ];
 
   return (
-    <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-tp-fade-in">
+    // `data-tour-blocker` holds the guided tour off while this is up — see
+    // BLOCKING_UI in context/TourContext.jsx.
+    <div
+      className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-tp-fade-in"
+      role="dialog"
+      aria-modal="true"
+      aria-label={isBn ? 'ফ্রি প্রো ট্রায়াল' : 'Free Pro trial'}
+      data-tour-blocker
+    >
       <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto bg-white rounded-[1.75rem] shadow-[0_40px_90px_-30px_rgba(0,0,0,0.55)] animate-tp-modal-in">
 
         {/* ── HEADER — gold band, shared by every step ── */}

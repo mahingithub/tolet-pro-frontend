@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   Bot, X, Video, Sparkles, ArrowRight,
   MapPin, MessageCircle, BadgeCheck, PlusCircle, LayoutDashboard,
@@ -57,23 +58,70 @@ const hideLoginWelcomeForever = () => {
 // "Welcome") থেকে আসে, role অনুযায়ী `GET /ai-guides/welcome?audience=...`।
 // শুধুমাত্র signup ওয়েলকামে দেখাই; login ওয়েলকাম হালকা রাখা হয়।
 
+/* ═══════════════════════════════════════════════════════════════
+   🕰️ সময়-সচেতন শুভেচ্ছা / TIME-OF-DAY GREETING
+   ─────────────────────────────────────────────────────────────
+   Every label below is picked from the DEVICE clock (`getHours()`),
+   so it follows whatever timezone the user is actually in.
+
+   The old version had a single bucket for everything before noon,
+   so someone opening the app at 04:30 was told "শুভ সকাল" (good
+   morning) — hours before সকাল begins. Bangla divides the day much
+   more finely than English does (রাত → ভোর → সকাল → দুপুর → বিকাল
+   → সন্ধ্যা → রাত), so each language gets its own labels instead of
+   a word-for-word translation of one set: 16:00 is বিকাল in Bangla
+   but still "afternoon" in English, and 04:30 is ভোর / "early
+   morning" in both.
+
+   `from` is the first hour (inclusive) the bucket covers, and the
+   list is in ascending order, so the LAST bucket the current hour
+   has reached is the right one.
+═══════════════════════════════════════════════════════════════ */
+const DAY_PARTS = [
+  { from: 0,  emoji: '🌙', bn: 'শুভ রাত্রি',  en: 'Late night' },
+  { from: 4,  emoji: '🌄', bn: 'শুভ ভোর',     en: 'Early morning' },
+  { from: 6,  emoji: '🌅', bn: 'শুভ সকাল',    en: 'Good morning' },
+  { from: 12, emoji: '☀️', bn: 'শুভ দুপুর',   en: 'Good afternoon' },
+  { from: 16, emoji: '🌇', bn: 'শুভ বিকাল',   en: 'Good afternoon' },
+  { from: 18, emoji: '🌆', bn: 'শুভ সন্ধ্যা', en: 'Good evening' },
+  { from: 21, emoji: '🌙', bn: 'শুভ রাত্রি',  en: 'Good night' },
+];
+
+const timeGreeting = (isBn, now = new Date()) => {
+  const hour = now.getHours();
+  let part = DAY_PARTS[0];
+  for (const candidate of DAY_PARTS) {
+    if (hour >= candidate.from) part = candidate;
+  }
+  return { emoji: part.emoji, label: isBn ? part.bn : part.en };
+};
+
+// Every string in this overlay is a { bn, en } pair read through the `L`
+// helper in the component, so the card follows the global language toggle
+// instead of being Bangla-only.
 const ROLE_COPY = {
   tenant: {
-    question: 'কীভাবে সহজে বাসা খুঁজে পাবেন এবং ভাড়া নেবেন?',
-    videoLabel: 'নির্দেশিকা ভিডিও দেখুন',
+    question: {
+      bn: 'কীভাবে সহজে বাসা খুঁজে পাবেন এবং ভাড়া নেবেন?',
+      en: 'How do you find a place and rent it, the easy way?',
+    },
+    videoLabel: { bn: 'নির্দেশিকা ভিডিও দেখুন', en: 'Watch the guide video' },
     chips: [
-      { icon: MapPin, label: 'নিয়ার মি সার্চ' },
-      { icon: MessageCircle, label: 'সরাসরি চ্যাট' },
-      { icon: BadgeCheck, label: 'ভেরিফায়েড লিস্টিং' },
+      { icon: MapPin,        bn: 'নিয়ার মি সার্চ',      en: 'Near-me search' },
+      { icon: MessageCircle, bn: 'সরাসরি চ্যাট',        en: 'Direct chat' },
+      { icon: BadgeCheck,    bn: 'ভেরিফায়েড লিস্টিং',  en: 'Verified listings' },
     ],
   },
   landlord: {
-    question: 'কীভাবে খুব সহজেই বাসা ভাড়া দেবেন এবং ম্যানেজ করবেন?',
-    videoLabel: 'হোস্ট গাইড ভিডিও দেখুন',
+    question: {
+      bn: 'কীভাবে খুব সহজেই বাসা ভাড়া দেবেন এবং ম্যানেজ করবেন?',
+      en: 'How do you rent out your property and manage it, the easy way?',
+    },
+    videoLabel: { bn: 'হোস্ট গাইড ভিডিও দেখুন', en: 'Watch the host guide' },
     chips: [
-      { icon: PlusCircle, label: 'ফ্রি প্রপার্টি লিস্টিং' },
-      { icon: LayoutDashboard, label: 'স্মার্ট ড্যাশবোর্ড' },
-      { icon: MessageCircle, label: 'ভাড়াটিয়ার সাথে চ্যাট' },
+      { icon: PlusCircle,      bn: 'ফ্রি প্রপার্টি লিস্টিং',   en: 'Free listings' },
+      { icon: LayoutDashboard, bn: 'স্মার্ট ড্যাশবোর্ড',       en: 'Smart dashboard' },
+      { icon: MessageCircle,   bn: 'ভাড়াটিয়ার সাথে চ্যাট',   en: 'Chat with tenants' },
     ],
   },
 };
@@ -81,17 +129,23 @@ const ROLE_COPY = {
 // login "welcome back" কার্ডের কনটেন্ট — signup থেকে আলাদা, হালকা ও দ্রুত।
 const LOGIN_COPY = {
   tenant: {
-    tagline: 'নতুন ভেরিফায়েড লিস্টিং আর মেসেজ আপনার জন্য অপেক্ষা করছে।',
+    tagline: {
+      bn: 'নতুন ভেরিফায়েড লিস্টিং আর মেসেজ আপনার জন্য অপেক্ষা করছে।',
+      en: 'New verified listings and messages are waiting for you.',
+    },
     chips: [
-      { icon: MapPin, label: 'নিয়ার মি সার্চ' },
-      { icon: MessageCircle, label: 'নতুন মেসেজ' },
+      { icon: MapPin,        bn: 'নিয়ার মি সার্চ', en: 'Near-me search' },
+      { icon: MessageCircle, bn: 'নতুন মেসেজ',      en: 'New messages' },
     ],
   },
   landlord: {
-    tagline: 'আপনার প্রপার্টি আর ভাড়াটিয়ার আপডেট এক ঝলকে দেখে নিন।',
+    tagline: {
+      bn: 'আপনার প্রপার্টি আর ভাড়াটিয়ার আপডেট এক ঝলকে দেখে নিন।',
+      en: 'Catch up on your properties and tenants at a glance.',
+    },
     chips: [
-      { icon: LayoutDashboard, label: 'ড্যাশবোর্ড' },
-      { icon: MessageCircle, label: 'নতুন মেসেজ' },
+      { icon: LayoutDashboard, bn: 'ড্যাশবোর্ড', en: 'Dashboard' },
+      { icon: MessageCircle,   bn: 'নতুন মেসেজ',  en: 'New messages' },
     ],
   },
 };
@@ -111,6 +165,12 @@ const LOGIN_COPY = {
 const WelcomeRobotOverlay = () => {
   const { user, isAdmin, activeRole } = useAuth();
   const location = useLocation();
+  // Global language toggle (Navbar / dashboard header). Falls back to Bangla
+  // only if the provider is somehow missing, which keeps the old behaviour.
+  const { language } = useLanguage() || {};
+  const isBn = language !== 'English';
+  // Picks the right half of a { bn, en } copy pair.
+  const L = (pair) => (isBn ? pair?.bn : pair?.en) ?? pair?.bn ?? '';
 
   const [phase, setPhase] = useState('hidden');   // 'hidden' | 'open' | 'minimized'
   const [showOptions, setShowOptions] = useState(false);
@@ -240,18 +300,19 @@ const WelcomeRobotOverlay = () => {
   const isTenant = effectiveRole !== 'landlord';
   const copy = isTenant ? ROLE_COPY.tenant : ROLE_COPY.landlord;
   const loginCopy = isTenant ? LOGIN_COPY.tenant : LOGIN_COPY.landlord;
+  // Resolved once here so the typewriter effect below depends on a plain
+  // string; keying it off `copy.question` (an object) would restart the
+  // animation on every render.
+  const question = L(copy.question);
+  const videoLabel = L(copy.videoLabel);
   const firstName = (eventInfo?.name || user?.name || '').trim().split(/\s+/)[0] || '';
   const avatarInitial = (firstName || 'T').charAt(0).toUpperCase();
   const isSignup = eventInfo?.type === 'signup';
 
   // সময়-সচেতন শুভেচ্ছা — login "welcome back" ব্যানারকে আরও ব্যক্তিগত করে তোলে।
-  const greeting = (() => {
-    const h = new Date().getHours();
-    if (h < 12) return { emoji: '🌅', label: 'শুভ সকাল' };
-    if (h < 16) return { emoji: '☀️', label: 'শুভ দুপুর' };
-    if (h < 19) return { emoji: '🌇', label: 'শুভ বিকাল' };
-    return { emoji: '🌙', label: 'শুভ সন্ধ্যা' };
-  })();
+  // Resolved on every render (the card is short-lived, so there is nothing to
+  // memoise) against the device clock — see DAY_PARTS above.
+  const greeting = timeGreeting(isBn);
 
   /* ── অ্যাডমিন-কনফিগার করা welcome ভিডিও fetch (শুধু signup-এ) ──
      signup ছাড়া fetch করি না — login ওয়েলকাম হালকা রাখতে ও প্রতি
@@ -286,7 +347,7 @@ const WelcomeRobotOverlay = () => {
       setTyped('');
       return undefined;
     }
-    const full = copy.question;
+    const full = question;
     let i = 0;
     const id = setInterval(() => {
       i += 1;
@@ -294,7 +355,7 @@ const WelcomeRobotOverlay = () => {
       if (i >= full.length) clearInterval(id);
     }, 24);
     return () => clearInterval(id);
-  }, [showOptions, copy.question, eventInfo]);
+  }, [showOptions, question, eventInfo]);
 
   /* ── অ্যাডমিন গার্ড (রেন্ডার লেভেলে) ─────────────────────── */
   // অ্যাডমিন ইউজার বা /admin রুটে এই ওভারলে কখনোই রেন্ডার হবে না।
@@ -327,7 +388,7 @@ const WelcomeRobotOverlay = () => {
               animate={{ opacity: 1, y: 0 }}
               onClick={handleBackdrop}
               className="absolute top-5 right-5 z-[100000] p-3 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md shadow-lg transition-all"
-              aria-label="বন্ধ করুন"
+              aria-label={L({ bn: 'বন্ধ করুন', en: 'Close' })}
             >
               <X size={22} />
             </motion.button>
@@ -373,14 +434,17 @@ const WelcomeRobotOverlay = () => {
                   <div className="pointer-events-none absolute -bottom-20 -right-16 w-52 h-52 rounded-full bg-rose-400/20 blur-[70px]" />
 
                   <div className="relative inline-flex items-center gap-1.5 mb-2 px-3.5 py-1.5 rounded-full bg-[#ba0036]/15 border border-[#ff4d6d]/30 text-[#ff8aa0] text-[11px] font-bold">
-                    <Sparkles size={12} /> অ্যাকাউন্ট তৈরি সম্পন্ন
+                    <Sparkles size={12} /> {L({ bn: 'অ্যাকাউন্ট তৈরি সম্পন্ন', en: 'Account created' })}
                   </div>
 
                   <h3 className="relative text-3xl font-black text-white tracking-tight">
-                    স্বাগতম{firstName ? `, ${firstName}` : ''}!
+                    {L({ bn: 'স্বাগতম', en: 'Welcome' })}{firstName ? `, ${firstName}` : ''}!
                   </h3>
                   <p className="relative mt-1 text-[12px] font-semibold text-rose-200/60">
-                    TO-LET PRO–তে আপনার যাত্রা শুরু হলো
+                    {L({
+                      bn: 'TO-LET PRO–তে আপনার যাত্রা শুরু হলো',
+                      en: 'Your journey on TO-LET PRO starts here',
+                    })}
                   </p>
 
                   <AnimatePresence>
@@ -392,13 +456,16 @@ const WelcomeRobotOverlay = () => {
                       >
                         <p className="min-h-[40px] text-[13px] font-bold text-slate-300 leading-relaxed px-1">
                           {typed}
-                          {typed.length < copy.question.length && (
+                          {typed.length < question.length && (
                             <span className="inline-block w-[2px] h-[1em] align-[-2px] ml-[2px] bg-[#ff4d6d] animate-pulse" />
                           )}
                         </p>
 
                         <div className="flex flex-wrap justify-center gap-2">
-                          {copy.chips.map(({ icon: Icon, label }, i) => (
+                          {copy.chips.map((chip, i) => {
+                            const { icon: Icon } = chip;
+                            const label = L(chip);
+                            return (
                             <motion.span
                               key={label}
                               initial={{ opacity: 0, y: 8 }}
@@ -409,7 +476,8 @@ const WelcomeRobotOverlay = () => {
                               <Icon size={12} className="text-[#ff4d6d]" />
                               {label}
                             </motion.span>
-                          ))}
+                            );
+                          })}
                         </div>
 
                         {welcomeGuides.length > 0 && (
@@ -421,13 +489,13 @@ const WelcomeRobotOverlay = () => {
                                   setActiveVideo({
                                     isOpen: true,
                                     url: guide.videoUrl,
-                                    title: guide.title || copy.videoLabel,
+                                    title: guide.title || videoLabel,
                                   })
                                 }
                                 className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-[1.2rem] bg-white/[0.07] border border-white/15 text-white font-bold text-[13px] hover:bg-white/[0.13] transition-all shrink-0"
                               >
                                 <Video size={16} />
-                                {guide.suggestionText || copy.videoLabel}
+                                {guide.suggestionText || videoLabel}
                               </button>
                             ))}
                           </div>
@@ -437,7 +505,7 @@ const WelcomeRobotOverlay = () => {
                           onClick={dismissToAssistant}
                           className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-[1.2rem] bg-gradient-to-r from-[#ba0036] to-[#ff2d55] text-white font-bold text-[14px] shadow-[0_12px_30px_rgba(186,0,54,0.45)] hover:shadow-[0_16px_40px_rgba(186,0,54,0.6)] hover:-translate-y-0.5 transition-all"
                         >
-                          ঠিক আছে, শুরু করি! <ArrowRight size={16} />
+                          {L({ bn: 'ঠিক আছে, শুরু করি!', en: "Great, let's start!" })} <ArrowRight size={16} />
                         </button>
                       </motion.div>
                     )}
@@ -494,9 +562,11 @@ const WelcomeRobotOverlay = () => {
                       </motion.span>
                     </motion.div>
                     <div className="min-w-0">
-                      <p className="text-white/75 text-[12.5px] font-bold">আবার স্বাগতম,</p>
+                      <p className="text-white/75 text-[12.5px] font-bold">
+                        {L({ bn: 'আবার স্বাগতম,', en: 'Welcome back,' })}
+                      </p>
                       <h3 className="text-white text-[26px] leading-tight font-black tracking-tight truncate">
-                        {firstName || 'বন্ধু'}!
+                        {firstName || L({ bn: 'বন্ধু', en: 'friend' })}!
                       </h3>
                     </div>
                   </div>
@@ -505,20 +575,24 @@ const WelcomeRobotOverlay = () => {
                 {/* ── বডি (হেডারের ওপর গোলাকারভাবে ওভারল্যাপ করে) ── */}
                 <div className="relative -mt-6 rounded-t-[1.75rem] bg-white px-6 pt-5 pb-6">
                   <p className="text-[13.5px] font-medium text-slate-600 leading-relaxed text-center">
-                    {loginCopy.tagline}
+                    {L(loginCopy.tagline)}
                   </p>
 
                   {/* কুইক চিপস */}
                   <div className="mt-4 flex flex-wrap justify-center gap-2">
-                    {loginCopy.chips.map(({ icon: Icon, label }) => (
-                      <span
-                        key={label}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-50 border border-rose-100 text-[12px] font-bold text-[#ba0036]"
-                      >
-                        <Icon size={13} />
-                        {label}
-                      </span>
-                    ))}
+                    {loginCopy.chips.map((chip) => {
+                      const { icon: Icon } = chip;
+                      const label = L(chip);
+                      return (
+                        <span
+                          key={label}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-50 border border-rose-100 text-[12px] font-bold text-[#ba0036]"
+                        >
+                          <Icon size={13} />
+                          {label}
+                        </span>
+                      );
+                    })}
                   </div>
 
                   {/* প্রাইমারি CTA */}
@@ -526,7 +600,7 @@ const WelcomeRobotOverlay = () => {
                     onClick={() => closeLogin(false)}
                     className="mt-5 w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-[#ba0036] to-[#ff2d55] text-white font-black text-[14.5px] shadow-[0_14px_30px_-6px_rgba(186,0,54,0.6)] hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-6px_rgba(186,0,54,0.7)] active:translate-y-0 transition-all"
                   >
-                    চলুন, শুরু করি <ArrowRight size={17} />
+                    {L({ bn: 'চলুন, শুরু করি', en: "Let's go" })} <ArrowRight size={17} />
                   </button>
 
                   {/* "আর দেখাবেন না" — চিরতরে বন্ধ */}
@@ -534,7 +608,7 @@ const WelcomeRobotOverlay = () => {
                     onClick={() => closeLogin(true)}
                     className="mt-3 w-full text-center text-[12.5px] font-semibold text-slate-400 hover:text-[#ba0036] transition-colors"
                   >
-                    আর দেখাবেন না
+                    {L({ bn: 'আর দেখাবেন না', en: "Don't show this again" })}
                   </button>
                 </div>
               </motion.div>
@@ -578,7 +652,7 @@ const WelcomeRobotOverlay = () => {
                 transition={{ delay: 0.75 }}
                 className="absolute right-full top-1/2 -translate-y-1/2 mr-3 whitespace-nowrap px-3.5 py-1.5 rounded-full bg-slate-900/95 border border-white/15 text-white text-[11px] font-bold shadow-lg"
               >
-                আমি এখানেই থাকবো! 👋
+                {L({ bn: 'আমি এখানেই থাকবো!', en: "I'll be right here!" })} 👋
               </motion.div>
             </div>
           </motion.div>

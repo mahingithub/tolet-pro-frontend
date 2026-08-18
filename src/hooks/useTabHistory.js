@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { isOnBackGuardEntry } from './useBackGuard';
 
 /**
@@ -56,6 +56,10 @@ import { isOnBackGuardEntry } from './useBackGuard';
 export default function useTabHistory({ tabs, defaultTab, param = 'tab' }) {
   const location = useLocation();
   const navigate = useNavigate();
+  // 'PUSH' | 'REPLACE' | 'POP' for the navigation that produced the current
+  // location. The trail below cannot be maintained without it: a replace must
+  // overwrite the entry we are standing on, a push must append after it.
+  const navType = useNavigationType();
 
   // `tabs` is usually an inline array literal, so compare by content rather
   // than by reference or every callback below would be rebuilt each render.
@@ -93,47 +97,110 @@ export default function useTabHistory({ tabs, defaultTab, param = 'tab' }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlTab, stateTab, activeTab]);
 
-  // Which tab lives at each history depth. React Router stamps a monotonic
-  // `idx` on every entry, so this is a reliable map of the entries we created
-  // — entries from other pages simply stay `undefined` and never false-match.
-  const stackRef = useRef([]);
+  /* ── TRAIL: which tab lives at each history entry we created ──────────────
+     This used to be an array indexed by `window.history.state.idx`, which is
+     NOT safe here. useBackGuard pushes its throwaway overlay entry with a raw
+     `window.history.pushState({ ...base })`, so the new entry inherits the
+     `idx` of the one beneath it AND React Router's own in-memory index never
+     learns the push happened. Two different entries then claim one index, and
+     the `navigate(-1)` shortcut in setActiveTab could fire against an entry
+     that was never ours — walking the user clean out of the dashboard.
+
+     `location.key` is the identity that actually holds: React Router mints one
+     per entry, stores it in history state and restores it on Back/Forward. So
+     keep an ordered trail of the entries this hook has seen plus a cursor at
+     the current one, and only ever trust what the trail itself recorded.
+
+     Guard entries need no special handling on the way in: a raw pushState
+     clones the state beneath it, so the guard entry carries the SAME key and
+     URL as the real entry it shadows and produces no location change at all.
+     The one exception is setActiveTab replacing a guard entry — see the flag
+     below. */
+  const trailRef = useRef([]);
+  const cursorRef = useRef(-1);
+  // Set by setActiveTab just before it takes over an overlay's throwaway entry
+  // with a `replace`. React Router reports that as REPLACE, but for the BROWSER
+  // it is a new entry (the overlay's raw push is invisible to the router), so
+  // the trail has to record it as a push or it would under-count by one and
+  // misidentify everything beneath it.
+  const consumedGuardEntryRef = useRef(false);
+
   useEffect(() => {
-    // `idx` comes from history state, which survives reloads and can be
-    // restored as a non-integer (or missing) after a session restore or a
-    // cross-origin bounce. Truncating with a bad value throws
-    // `RangeError: Invalid array length`, so normalise before using it.
-    const rawIdx = window.history.state?.idx;
-    const idx = Number.isInteger(rawIdx) && rawIdx >= 0 ? rawIdx : 0;
-    stackRef.current.length = idx + 1; // a push invalidates the forward entries
-    stackRef.current[idx] = activeTab;
-  }, [activeTab, location.key]);
+    const trail = trailRef.current;
+    const seen = trail.findIndex((entry) => entry.key === location.key);
+
+    if (seen >= 0) {
+      // Back / Forward onto an entry we already know. Refresh the tab it holds
+      // (a replace on it may have changed that) and move the cursor.
+      trail[seen].tab = activeTab;
+      cursorRef.current = seen;
+      return;
+    }
+
+    const tookOverGuardEntry = consumedGuardEntryRef.current;
+    consumedGuardEntryRef.current = false;
+
+    if (navType === 'REPLACE' && !tookOverGuardEntry && cursorRef.current >= 0) {
+      trail[cursorRef.current] = { key: location.key, tab: activeTab };
+      return;
+    }
+
+    if (navType === 'POP' && !tookOverGuardEntry) {
+      // Popped onto an entry we never recorded — a reload, a session restore,
+      // or Forward after this page unmounted and wiped the trail. We know
+      // nothing about what sits beneath us, so start over rather than guess.
+      trail.length = 0;
+      trail.push({ key: location.key, tab: activeTab });
+      cursorRef.current = 0;
+      return;
+    }
+
+    trail.length = cursorRef.current + 1; // a push invalidates the forward entries
+    trail.push({ key: location.key, tab: activeTab });
+    cursorRef.current = trail.length - 1;
+  }, [activeTab, location.key, navType]);
 
   const setActiveTab = useCallback(
     (next) => {
       if (!isValid(next) || next === activeTab) return;
 
       // Navigating straight out of an open overlay — tapping a nav item in the
-      // mobile drawer is the everyday case. Take over the throwaway entry that
-      // overlay pushed instead of stacking on top of it, or it would sit in the
-      // middle of the stack and make one Back press look like a no-op.
+      // profile drawer is the everyday case, on desktop as much as on a phone.
+      // REPLACE the throwaway entry that overlay pushed instead of stacking on
+      // top of it: it is the entry we are standing on, so replacing it turns it
+      // into this tab's entry and the page underneath stays exactly one Back
+      // press away.
+      //
+      // It has to be ONE synchronous navigation. The previous version fired a
+      // raw `window.history.back()` and then a `navigate()` from a
+      // `setTimeout(…, 0)`, and that raced useBackGuard's cleanup: the same
+      // click also closes the drawer, and because a history traversal is
+      // applied asynchronously the guard still saw its own token on
+      // `history.state` and fired a SECOND `history.back()`. Two pops from one
+      // click dropped the user two entries below the dashboard — the public
+      // home page — while the queued navigate() fired from an already-unmounted
+      // component and did nothing. That is the "I tapped Tenants & Rent and
+      // landed on the homepage" bug.
+      //
+      // Replacing also clears the guard token from `history.state`, so the
+      // cleanup's own `history.state?.[GUARD_KEY] === token` test correctly
+      // reads false and it stands down instead of popping.
       if (isOnBackGuardEntry()) {
-        // Pop the throwaway drawer entry natively, then push the new tab entry 
-        // to React Router so that the previous state is preserved in history.
-        window.history.back();
-        setTimeout(() => {
-          navigate(urlForTab(next));
-        }, 0);
+        consumedGuardEntryRef.current = true;
+        navigate(urlForTab(next), { replace: true });
         return;
       }
 
-      const rawIdx = window.history.state?.idx;
-      const idx = Number.isInteger(rawIdx) && rawIdx >= 0 ? rawIdx : 0;
       // Returning to the entry right below us is a Back, not a new page. This
       // is what keeps Dashboard ⇄ Bookings ping-ponging 1 entry deep forever.
-      if (idx > 0 && stackRef.current[idx - 1] === next) {
+      // Trusted only for an entry the trail actually recorded, so it can never
+      // reach past the tabs we own and leave the dashboard.
+      const cursor = cursorRef.current;
+      if (cursor > 0 && trailRef.current[cursor - 1]?.tab === next) {
         navigate(-1);
         return;
       }
+
       navigate(urlForTab(next));
     },
     [activeTab, isValid, navigate, urlForTab],

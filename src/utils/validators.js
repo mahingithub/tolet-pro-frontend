@@ -10,16 +10,79 @@
  * machine (pristine → editing → invalid/valid → fixing).
  */
 
+/**
+ * Reduce anything a BD user might realistically type into the bare 10-digit
+ * national part of a mobile number. All of these become `1712345678`:
+ *   `+8801712345678` · `8801712345678` · `01712345678` · `1712345678`
+ *   `+880 1712-345678` (spaces / hyphens are stripped)
+ */
+export function toBdNationalPhone(v) {
+  let digits = String(v || '').replace(/\D/g, '');
+  if (digits.startsWith('880')) digits = digits.slice(3);
+  // A national part always begins with 1, so stripping leading zeros can
+  // never eat a meaningful digit.
+  return digits.replace(/^0+/, '');
+}
+
+/**
+ * A real Bangladeshi mobile number: 11 digits starting `01`, where the
+ * operator digit is 3-9 — 013/017 Grameenphone, 014/019 Banglalink,
+ * 015 Teletalk, 016 Airtel, 018 Robi. Written against the 10-digit national
+ * part, so `1[3-9]` + 8 digits.
+ *
+ * This is deliberately STRICTER than the backend, which only checks generic
+ * E.164 (`+` then 8-15 digits). Junk like `1234567890` satisfies the server
+ * and burns a real SMS send, so the genuine BD-shape check has to happen here.
+ */
+export const BD_MOBILE_NATIONAL_RE = /^1[3-9]\d{8}$/;
+
+export function isBdMobile(v) {
+  return BD_MOBILE_NATIONAL_RE.test(toBdNationalPhone(v));
+}
+
+/**
+ * Password rules, mirrored 1:1 from the backend
+ * (tolet-pro-backend/validators/auth.validators.js → passwordSchema):
+ * 8-128 chars, at least one ASCII letter, at least one ASCII digit.
+ *
+ * Both regexes are ASCII-only and unicode-flag-free on the server too, so
+ * Bengali letters and Bengali numerals (০-৯) do NOT satisfy them — the UI has
+ * to say so out loud. There is no uppercase or symbol rule; inventing one here
+ * would reject passwords the server accepts.
+ */
+export function passwordChecks(v) {
+  const s = String(v || '');
+  return {
+    minLength: s.length >= 8 && s.length <= 128,
+    letter: /[A-Za-z]/.test(s),
+    digit: /\d/.test(s),
+  };
+}
+
+export function isStrongEnoughPassword(v) {
+  const c = passwordChecks(v);
+  return c.minLength && c.letter && c.digit;
+}
+
 export const validators = {
-  // Bangladesh phone — E.164 format expected. Accepts spaces, hyphens for
-  // input forgiveness; we strip non-digits before testing.
-  phone: (v) => {
-    const cleaned = String(v || '').replace(/[^\d+]/g, '');
+  // Bangladesh mobile number. Accepts the number with or without the
+  // +880 / 880 / leading-0 prefix; see isBdMobile above for the exact rule.
+  phone: (v) => ({
+    ok: isBdMobile(v),
+    msg: {
+      bn: 'বৈধ বাংলাদেশি মোবাইল নম্বর দিন, যেমন ০১৭১২৩৪৫৬৭৮',
+      en: 'Enter a valid Bangladeshi mobile number, e.g. 01712345678',
+    },
+  }),
+
+  // Account password — matches the backend rules exactly.
+  password: (v) => {
+    const c = passwordChecks(v);
     return {
-      ok: /^\+?880\d{10}$/.test(cleaned),
+      ok: c.minLength && c.letter && c.digit,
       msg: {
-        bn: 'বৈধ বাংলাদেশী মোবাইল নাম্বার দিন (+880…)',
-        en: 'Enter a valid Bangladesh mobile number (+880…)',
+        bn: 'পাসওয়ার্ডে অন্তত ৮টি অক্ষর, একটি ইংরেজি অক্ষর ও একটি সংখ্যা থাকতে হবে',
+        en: 'Password needs at least 8 characters, one English letter and one number',
       },
     };
   },

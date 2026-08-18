@@ -4,6 +4,7 @@ import useGoBack from '../hooks/useGoBack';
 import {
   User, Phone, Lock, ArrowLeft, Loader2, CheckCircle2,
   Home, ShieldCheck, Building2, MessageCircle, ChevronRight,
+  Check, AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
@@ -13,20 +14,106 @@ import {
   forgotPassword,
   resetPassword,
 } from '../services/authService.js';
+import {
+  toBdNationalPhone,
+  BD_MOBILE_NATIONAL_RE,
+  passwordChecks,
+} from '../utils/validators.js';
 
 const RESEND_COOLDOWN_S = 30;
 
 /**
- * Strip the leading 0 a BD user often types, so `01742...` becomes `1742...`
- * and the resulting E.164 is `+8801742...`. Also drop anything non-numeric.
+ * Reduce whatever the user typed or pasted to the 10-digit national part that
+ * sits after the `+880` prefix shown in the field. Handles the leading 0 a BD
+ * user habitually types (`01742…` → `1742…`) and a full pasted number
+ * (`+8801742…` → `1742…`), which the old digits-only version mangled into
+ * `8801742345`.
  */
 function normalizePhoneInput(raw) {
-  return raw.replace(/\D/g, '').replace(/^0+/, '');
+  return toBdNationalPhone(raw);
 }
 
 function toE164(localPart) {
   return `+880${localPart}`;
 }
+
+/**
+ * Why this exists: the backend only enforces generic E.164 (`+` then 8-15
+ * digits), so `1234567890` used to sail straight through to the OTP screen —
+ * an SMS was requested for a number that cannot exist, the rate-limit quota
+ * was spent, and the user sat waiting for a code that would never arrive.
+ * We now block that here and say exactly what is wrong.
+ *
+ * Returns null when the number is a valid BD mobile, otherwise { en, bn }.
+ */
+function phoneProblem(local) {
+  if (!local) {
+    return { en: 'Enter your mobile number.', bn: 'আপনার মোবাইল নম্বর দিন।' };
+  }
+  if (local.length < 10) {
+    return {
+      en: `Too short — ${10 - local.length} more digit${10 - local.length > 1 ? 's' : ''} to go. Example: 1712345678`,
+      bn: `আরও ${10 - local.length}টি সংখ্যা বাকি। যেমন: ১৭১২৩৪৫৬৭৮`,
+    };
+  }
+  if (!BD_MOBILE_NATIONAL_RE.test(local)) {
+    return {
+      en: 'This is not a Bangladeshi mobile number. After +880 it must start with 13, 14, 15, 16, 17, 18 or 19.',
+      bn: 'এটি বাংলাদেশি মোবাইল নম্বর নয়। +৮৮০ এর পরে নম্বরটি ১৩, ১৪, ১৫, ১৬, ১৭, ১৮ বা ১৯ দিয়ে শুরু হতে হবে।',
+    };
+  }
+  return null;
+}
+
+/**
+ * The password rules as a live checklist rather than one line of prose.
+ * Previously the hint said "at least 8 characters, with letters and numbers"
+ * while the input only enforced minLength=8 — so `abcdefgh` submitted fine and
+ * the user's first hint about the missing digit was a Bangla server error after
+ * the round trip. Each rule now ticks green the moment it is satisfied.
+ *
+ * The rules mirror the backend exactly: 8-128 chars, one ASCII letter, one
+ * ASCII digit. We say "English letter / number" out loud because the server's
+ * regexes are ASCII-only, so Bengali script and Bengali numerals don't count.
+ */
+const PasswordRules = ({ checks, isBn }) => {
+  const rules = [
+    {
+      ok: checks.minLength,
+      label: isBn ? '৮ বা তার বেশি অক্ষর' : '8 characters or more',
+    },
+    {
+      ok: checks.letter,
+      label: isBn ? 'অন্তত একটি ইংরেজি অক্ষর (a-z)' : 'At least one English letter (a-z)',
+    },
+    {
+      ok: checks.digit,
+      label: isBn ? 'অন্তত একটি সংখ্যা (0-9)' : 'At least one number (0-9)',
+    },
+  ];
+
+  return (
+    <ul className="mt-2 ml-1 space-y-1" aria-live="polite">
+      {rules.map(({ ok, label }) => (
+        <li
+          key={label}
+          className={`flex items-center gap-1.5 text-[11px] font-semibold transition-colors ${ok ? 'text-emerald-600' : 'text-gray-500'}`}
+        >
+          <span
+            className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 transition-colors ${ok ? 'bg-emerald-100' : 'bg-gray-200'}`}
+            aria-hidden="true"
+          >
+            {ok
+              ? <Check size={9} strokeWidth={4} className="text-emerald-600" />
+              : <span className="w-1 h-1 rounded-full bg-gray-400" />}
+          </span>
+          <span className="sr-only">{ok ? (isBn ? 'পূরণ হয়েছে:' : 'Met:') : (isBn ? 'বাকি আছে:' : 'Not met:')}</span>
+          {label}
+        </li>
+      ))}
+    </ul>
+  );
+};
 
 const MODES = {
   LOGIN: 'login',
@@ -131,6 +218,23 @@ const LoginPage = () => {
   const [newPassword, setNewPassword] = useState('');
   const [resendIn, setResendIn] = useState(0);
 
+  // Field-level feedback. We only surface a phone error once the user has left
+  // the field or pressed submit, so we're not nagging them at the 3rd digit.
+  // The password checklist, by contrast, is visible from the start — the rules
+  // should be known before you invent a password, not after it's rejected.
+  const [phoneTouched, setPhoneTouched] = useState(false);
+
+  const phoneIssue = phoneProblem(formData.phone);
+  const phoneError = phoneTouched && phoneIssue ? L(phoneIssue.en, phoneIssue.bn) : '';
+
+  // Signup and reset must satisfy the backend's password rules; login must not
+  // (a legacy account whose password predates those rules would be locked out
+  // of our own gate before the request ever left the browser).
+  const signupPwChecks = passwordChecks(formData.password);
+  const signupPwOk = signupPwChecks.minLength && signupPwChecks.letter && signupPwChecks.digit;
+  const resetPwChecks = passwordChecks(newPassword);
+  const resetPwOk = resetPwChecks.minLength && resetPwChecks.letter && resetPwChecks.digit;
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -159,6 +263,20 @@ const LoginPage = () => {
   const handlePhoneChange = (e) =>
     setFormData((d) => ({ ...d, phone: normalizePhoneInput(e.target.value).slice(0, 10) }));
 
+  /**
+   * Hard gate in front of every request that sends an SMS or attempts a login.
+   * Marks the field touched so the inline reason appears, mirrors it into the
+   * banner, and returns false to abort the submit.
+   */
+  const blockOnBadPhone = () => {
+    if (!phoneIssue) return false;
+    setPhoneTouched(true);
+    setInfoMsg('');
+    setRoleMismatch(null);
+    setErrorMsg(L(phoneIssue.en, phoneIssue.bn));
+    return true;
+  };
+
   // Changing the tenant/landlord tab clears a previous wrong-side error so the
   // stale "You are not a landlord." message doesn't sit above the other tab.
   const selectRole = (r) => {
@@ -176,11 +294,21 @@ const LoginPage = () => {
     setOtp(['', '', '', '', '', '']);
     setFormData({ name: '', phone: '', password: '' });
     setNewPassword('');
+    setPhoneTouched(false);
   };
 
   // ─── LOGIN flow (no OTP) ──────────────────────────────────────────────────
   const submitLogin = async (e) => {
     e.preventDefault();
+    if (blockOnBadPhone()) return;
+    // Login only needs a non-empty password. We deliberately do NOT apply the
+    // signup strength rules here — an older account whose password predates
+    // them would be locked out by our own gate before the request went out.
+    if (!formData.password) {
+      setInfoMsg('');
+      setErrorMsg(L('Enter your password.', 'আপনার পাসওয়ার্ড দিন।'));
+      return;
+    }
     setIsLoading(true); setErrorMsg(''); setInfoMsg(''); setRoleMismatch(null);
     try {
       const loggedInUser = await login({ phone: toE164(formData.phone), password: formData.password }, role);
@@ -206,7 +334,7 @@ const LoginPage = () => {
         setRoleMismatch(otherSide);
         return;
       }
-      handleError(err, 'লগইন ব্যর্থ হয়েছে।', 'Login failed.');
+      handleError(err, 'লগইন করা যায়নি। নম্বর ও পাসওয়ার্ড দেখে নিন।', 'Could not log in. Check your number and password.');
     } finally {
       setIsLoading(false);
     }
@@ -215,6 +343,25 @@ const LoginPage = () => {
   // ─── SIGNUP flow (with OTP) ───────────────────────────────────────────────
   const submitSignupStart = async (e) => {
     e.preventDefault();
+    // Every gate runs BEFORE the network call, so an unusable number or a
+    // password the server would reject can never advance us to the OTP screen.
+    if (formData.name.trim().length < 2) {
+      setInfoMsg('');
+      setErrorMsg(L(
+        'Enter your full name (at least 2 characters).',
+        'আপনার পুরো নাম লিখুন (অন্তত ২ অক্ষর)।',
+      ));
+      return;
+    }
+    if (blockOnBadPhone()) return;
+    if (!signupPwOk) {
+      setInfoMsg('');
+      setErrorMsg(L(
+        'Please meet all the password requirements listed below.',
+        'নিচে দেখানো পাসওয়ার্ডের সব শর্ত পূরণ করুন।',
+      ));
+      return;
+    }
     setIsLoading(true); setErrorMsg(''); setInfoMsg('');
     try {
       // Backend validates input, ensures no existing verified account, stores
@@ -229,7 +376,7 @@ const LoginPage = () => {
       setStep(STEPS.OTP);
       setResendIn(RESEND_COOLDOWN_S);
     } catch (err) {
-      handleError(err, 'সাইনআপ শুরু করা যায়নি।', 'Failed to start signup.');
+      handleError(err, 'সাইন আপ শুরু করা যায়নি। আবার চেষ্টা করুন।', 'Could not start signup. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -253,7 +400,7 @@ const LoginPage = () => {
       );
       goToNextOrDashboard(role);
     } catch (err) {
-      handleError(err, 'অ্যাকাউন্ট তৈরি করা যায়নি।', 'Failed to create account.');
+      handleError(err, 'অ্যাকাউন্ট তৈরি করা যায়নি। কোডটি দেখে আবার দিন।', 'Could not create your account. Check the code and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -262,6 +409,7 @@ const LoginPage = () => {
   // ─── FORGOT-PASSWORD flow (with OTP) ──────────────────────────────────────
   const submitForgotStart = async (e) => {
     e.preventDefault();
+    if (blockOnBadPhone()) return;
     setIsLoading(true); setErrorMsg(''); setInfoMsg('');
     try {
       // Constant 202 response — never reveals whether the account exists.
@@ -269,7 +417,7 @@ const LoginPage = () => {
       setStep(STEPS.OTP);
       setResendIn(RESEND_COOLDOWN_S);
     } catch (err) {
-      handleError(err, 'OTP পাঠানো যায়নি।', 'Failed to send OTP.');
+      handleError(err, 'কোড পাঠানো যায়নি। আবার চেষ্টা করুন।', 'Could not send the code. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -278,6 +426,14 @@ const LoginPage = () => {
   // Forgot flow verifies the OTP AND sets the new password in one backend call.
   const submitReset = async (e) => {
     e.preventDefault();
+    if (!resetPwOk) {
+      setInfoMsg('');
+      setErrorMsg(L(
+        'Please meet all the password requirements listed below.',
+        'নিচে দেখানো পাসওয়ার্ডের সব শর্ত পূরণ করুন।',
+      ));
+      return;
+    }
     setIsLoading(true); setErrorMsg(''); setInfoMsg('');
     try {
       await resetPassword({
@@ -286,9 +442,11 @@ const LoginPage = () => {
         newPassword,
       });
       switchMode(MODES.LOGIN);
-      setInfoMsg(isBn ? 'পাসওয়ার্ড পরিবর্তন সফল। এবার লগইন করুন।' : 'Password changed successfully. Please log in.');
+      setInfoMsg(isBn
+        ? 'পাসওয়ার্ড বদলে গেছে। এখন নতুন পাসওয়ার্ড দিয়ে লগইন করুন।'
+        : 'Your password is changed. Log in with the new one.');
     } catch (err) {
-      handleError(err, 'পাসওয়ার্ড পরিবর্তন ব্যর্থ।', 'Failed to change password.');
+      handleError(err, 'পাসওয়ার্ড বদলানো যায়নি। কোডটি দেখে আবার চেষ্টা করুন।', 'Could not change the password. Check the code and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -312,9 +470,9 @@ const LoginPage = () => {
       }
       setOtp(['', '', '', '', '', '']);
       setResendIn(RESEND_COOLDOWN_S);
-      setInfoMsg(isBn ? 'নতুন OTP পাঠানো হয়েছে।' : 'New OTP sent.');
+      setInfoMsg(isBn ? 'নতুন কোড পাঠানো হয়েছে।' : 'A new code is on its way.');
     } catch (err) {
-      handleError(err, 'OTP পাঠানো যায়নি।', 'Failed to send OTP.');
+      handleError(err, 'কোড পাঠানো যায়নি। একটু পরে আবার চেষ্টা করুন।', 'Could not send the code. Please try again in a moment.');
     } finally {
       setIsLoading(false);
     }
@@ -348,18 +506,18 @@ const LoginPage = () => {
 
   // ─── Render ──────────────────────────────────────────────────────────────
   const formTitle =
-    mode === MODES.SIGNUP ? L('Create your account', 'অ্যাকাউন্ট তৈরি করুন')
-      : mode === MODES.FORGOT ? L('Reset password', 'পাসওয়ার্ড রিসেট করুন')
+    mode === MODES.SIGNUP ? L('Create your account', 'নতুন অ্যাকাউন্ট খুলুন')
+      : mode === MODES.FORGOT ? L('Set a new password', 'নতুন পাসওয়ার্ড দিন')
       : L('Welcome back', 'আবার স্বাগতম');
   const formSub =
-    mode === MODES.SIGNUP ? L('Join TO-LET PRO today', 'আজই TO-LET PRO-তে যোগ দিন')
-      : mode === MODES.FORGOT ? L("Enter your phone — we'll send an OTP", 'ফোন নম্বর দিন — আমরা একটি OTP পাঠাবো')
-      : L('Sign in to continue', 'চালিয়ে যেতে সাইন ইন করুন');
+    mode === MODES.SIGNUP ? L('It only takes a minute', 'মাত্র এক মিনিটের কাজ')
+      : mode === MODES.FORGOT ? L("Give us your number and we'll text you a code", 'আপনার নম্বর দিন, আমরা এসএমএসে একটি কোড পাঠাবো')
+      : L('Log in to your account', 'আপনার অ্যাকাউন্টে লগইন করুন');
 
   const trustChips = [
-    { icon: ShieldCheck, label: L('Verified hosts', 'যাচাইকৃত বাড়িওয়ালা') },
-    { icon: Building2, label: L('Real listings', 'আসল লিস্টিং') },
-    { icon: MessageCircle, label: L('Chat & calls', 'চ্যাট ও কল') },
+    { icon: ShieldCheck, label: L('Verified landlords', 'যাচাই করা বাড়িওয়ালা') },
+    { icon: Building2, label: L('No fake ads', 'ভুয়া বিজ্ঞাপন নেই') },
+    { icon: MessageCircle, label: L('Chat or call directly', 'সরাসরি চ্যাট ও কল') },
   ];
 
   // Reusable language pill (top-right of the form column on every layout).
@@ -409,11 +567,11 @@ const LoginPage = () => {
               </div>
               <h3 className="text-xl font-black tracking-tight">
                 {mode === MODES.SIGNUP
-                  ? L('How do you want to sign up?', 'কীভাবে সাইন আপ করতে চান?')
-                  : L('How do you want to log in?', 'কীভাবে লগইন করতে চান?')}
+                  ? L('Are you a tenant or a landlord?', 'আপনি ভাড়াটিয়া, না বাড়িওয়ালা?')
+                  : L('Log in as a tenant or a landlord?', 'ভাড়াটিয়া, না বাড়িওয়ালা হিসেবে লগইন করবেন?')}
               </h3>
               <p className="text-white/80 text-sm mt-1">
-                {L('Choose your role to continue', 'চালিয়ে যেতে আপনার ভূমিকা বেছে নিন')}
+                {L('Pick one to continue', 'একটি বেছে নিন')}
               </p>
             </div>
 
@@ -479,19 +637,19 @@ const LoginPage = () => {
           <div>
             <div className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm text-white text-[11px] font-bold uppercase tracking-widest py-1.5 px-3 rounded-full ring-1 ring-white/20 mb-5">
               <ShieldCheck size={13} />
-              {L('Trusted home rentals', 'বিশ্বস্ত বাসা ভাড়া')}
+              {L('Rent without the worry', 'নিশ্চিন্তে বাসা ভাড়া')}
             </div>
             <h1 className="text-4xl xl:text-[2.9rem] font-black leading-[1.1] tracking-tight mb-4">
               {isBn ? (
-                <>পছন্দের বাসা খুঁজুন,<br /><span className="text-[#FFC2D1]">সহজেই।</span></>
+                <>পছন্দের বাসা খুঁজুন,<br /><span className="text-[#FFC2D1]">ঝামেলা ছাড়াই।</span></>
               ) : (
-                <>Find your next home,<br /><span className="text-[#FFC2D1]">the easy way.</span></>
+                <>Find the right home,<br /><span className="text-[#FFC2D1]">without the hassle.</span></>
               )}
             </h1>
             <p className="text-white/75 text-base max-w-md leading-relaxed mb-8">
               {L(
-                'Browse verified apartments, sublets and commercial spaces across Bangladesh — chat and call owners directly.',
-                'বাংলাদেশজুড়ে যাচাইকৃত ফ্ল্যাট, সাবলেট ও কমার্শিয়াল স্পেস দেখুন — মালিকের সাথে সরাসরি চ্যাট ও কল করুন।',
+                'Flats, sublets, shops and offices from all over Bangladesh. Every listing is checked, and you talk to the owner yourself.',
+                'বাংলাদেশের সব জায়গার ফ্ল্যাট, সাবলেট, দোকান ও অফিস এক জায়গায়। প্রতিটি বিজ্ঞাপন যাচাই করা, আর মালিকের সাথে আপনি নিজেই কথা বলবেন।',
               )}
             </p>
 
@@ -534,7 +692,7 @@ const LoginPage = () => {
                 TO-LET <span className="text-brandRed">PRO</span>
               </h1>
               <p className="text-xs font-semibold text-gray-500 mt-0.5">
-                {L('Trusted home rentals in Bangladesh', 'বাংলাদেশের বিশ্বস্ত বাসা ভাড়ার ঠিকানা')}
+                {L('Home rentals across Bangladesh', 'বাংলাদেশজুড়ে বাসা ভাড়ার ঠিকানা')}
               </p>
             </div>
 
@@ -589,7 +747,12 @@ const LoginPage = () => {
                   </div>
                 )}
 
+                {/* noValidate: our own checks are the single source of truth so
+                    every message is in the user's chosen language. The browser's
+                    native bubbles ignore the language toggle and would fire
+                    before our handlers could explain the real problem. */}
                 <form
+                  noValidate
                   className="space-y-3.5"
                   onSubmit={
                     mode === MODES.LOGIN ? submitLogin :
@@ -621,23 +784,55 @@ const LoginPage = () => {
                   )}
 
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-700 mb-1 ml-1 uppercase tracking-wider">
-                      {L('WhatsApp Number', 'হোয়াটসঅ্যাপ নম্বর')}
+                    <label htmlFor="auth-phone" className="block text-[11px] font-bold text-gray-700 mb-1 ml-1 uppercase tracking-wider">
+                      {L('Mobile number', 'মোবাইল নম্বর')}
                     </label>
-                    <div className="relative flex items-center bg-gray-50 border border-gray-200 rounded-xl focus-within:bg-white focus-within:border-brandRed focus-within:ring-2 focus-within:ring-brandRed/20 transition-all overflow-hidden">
-                      <div className="pl-3.5 pr-2.5 text-gray-400"><Phone size={16} /></div>
+                    <div
+                      className={`relative flex items-center bg-gray-50 border rounded-xl transition-all overflow-hidden ${
+                        phoneError
+                          ? 'border-red-400 ring-2 ring-red-100'
+                          : 'border-gray-200 focus-within:bg-white focus-within:border-brandRed focus-within:ring-2 focus-within:ring-brandRed/20'
+                      }`}
+                    >
+                      <div className={`pl-3.5 pr-2.5 ${phoneError ? 'text-red-400' : 'text-gray-400'}`}><Phone size={16} /></div>
                       <div className="px-1.5 py-3 border-l border-gray-300 text-gray-600 font-bold text-sm">+880</div>
                       <input
+                        id="auth-phone"
                         type="tel"
                         value={formData.phone}
                         onChange={handlePhoneChange}
+                        onBlur={() => setPhoneTouched(true)}
                         maxLength={10}
-                        placeholder="1XXXXXXXXX"
+                        placeholder="1712345678"
                         inputMode="numeric"
+                        autoComplete="tel-national"
+                        aria-invalid={phoneError ? 'true' : 'false'}
+                        aria-describedby="auth-phone-help"
                         className="w-full bg-transparent py-3 pl-2 pr-4 text-sm font-bold text-gray-900 outline-none tracking-wide"
                         required
                       />
                     </div>
+                    {/* One slot for both the hint and the reason it's rejected,
+                        so the field never jumps as the message swaps. */}
+                    <p
+                      id="auth-phone-help"
+                      className={`mt-1 ml-1 text-[11px] font-semibold flex items-start gap-1 ${phoneError ? 'text-red-600' : 'text-gray-500'}`}
+                      aria-live="polite"
+                    >
+                      {phoneError ? (
+                        <>
+                          <AlertCircle size={12} className="mt-[1px] shrink-0" />
+                          <span>{phoneError}</span>
+                        </>
+                      ) : (
+                        <span>
+                          {L(
+                            'Type the 10 digits after +880 (skip the first 0). We text your code here.',
+                            '+৮৮০ এর পরের ১০টি সংখ্যা লিখুন (শুরুর ০ বাদ দিন)। এই নম্বরেই এসএমএসে কোড যাবে।',
+                          )}
+                        </span>
+                      )}
+                    </p>
                   </div>
 
                   {mode !== MODES.FORGOT && (
@@ -665,28 +860,37 @@ const LoginPage = () => {
                           value={formData.password}
                           onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                           placeholder="••••••••"
+                          autoComplete={mode === MODES.SIGNUP ? 'new-password' : 'current-password'}
                           className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-900 focus:bg-white focus:border-brandRed focus:ring-2 focus:ring-brandRed/20 transition-all outline-none tracking-widest"
                           required
                           minLength={mode === MODES.SIGNUP ? 8 : 1}
+                          maxLength={mode === MODES.SIGNUP ? 128 : undefined}
                         />
                       </div>
                       {mode === MODES.SIGNUP && (
-                        <p className="text-[10px] text-gray-500 mt-1 ml-1">
-                          {L('At least 8 characters, with letters and numbers.', 'কমপক্ষে ৮ অক্ষর — অক্ষর ও সংখ্যা থাকতে হবে।')}
-                        </p>
+                        <>
+                          <p className="text-[11px] font-semibold text-gray-600 mt-2 ml-1">
+                            {L('Your password must have:', 'আপনার পাসওয়ার্ডে থাকতে হবে:')}
+                          </p>
+                          <PasswordRules checks={signupPwChecks} isBn={isBn} />
+                        </>
                       )}
                     </div>
                   )}
 
+                  {/* Deliberately NOT disabled on invalid input. A dead button
+                      tells the user nothing; letting the click through means
+                      the submit handler can name the exact problem. The
+                      handlers gate the request, so nothing invalid is sent. */}
                   <button
                     type="submit"
-                    disabled={isLoading || formData.phone.length < 10}
+                    disabled={isLoading}
                     className="w-full mt-4 flex items-center justify-center gap-2 bg-brandRed text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_6px_15px_rgba(186,0,54,0.2)] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_rgba(186,0,54,0.3)] active:translate-y-0 transition-all disabled:opacity-70"
                   >
                     {isLoading ? <Loader2 className="animate-spin" size={18} />
                       : mode === MODES.LOGIN ? L('Log in', 'লগইন করুন')
-                      : mode === MODES.SIGNUP ? L('Send OTP & sign up', 'OTP পাঠিয়ে সাইন আপ')
-                      : L('Send OTP', 'OTP পাঠান')}
+                      : mode === MODES.SIGNUP ? L('Send verification code', 'যাচাই কোড পাঠান')
+                      : L('Send code', 'কোড পাঠান')}
                   </button>
                 </form>
 
@@ -699,7 +903,7 @@ const LoginPage = () => {
                   )}
                   {mode === MODES.SIGNUP && (
                     <p className="text-xs sm:text-sm font-semibold text-gray-500">
-                      {L('Already have an account?', 'অ্যাকাউন্ট আছে?')}
+                      {L('Already have an account?', 'আগে থেকেই অ্যাকাউন্ট আছে?')}
                       <button onClick={() => switchMode(MODES.LOGIN)} className="text-brandRed font-black ml-1.5 hover:underline">{L('Log in', 'লগইন করুন')}</button>
                     </p>
                   )}
@@ -714,7 +918,7 @@ const LoginPage = () => {
                 {/* Trust line — true to the product (every account is OTP-verified) */}
                 <div className="mt-6 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-gray-400">
                   <ShieldCheck size={13} className="text-gray-400" />
-                  {L('Protected by OTP verification', 'OTP যাচাইয়ের মাধ্যমে সুরক্ষিত')}
+                  {L('Every number is verified by SMS', 'প্রতিটি নম্বর এসএমএসে যাচাই করা হয়')}
                 </div>
               </>
             )}
@@ -729,15 +933,15 @@ const LoginPage = () => {
                 </div>
                 <h2 className="text-xl font-black text-gray-900 mb-1">
                   {mode === MODES.FORGOT
-                    ? L('Reset your password', 'পাসওয়ার্ড রিসেট করুন')
+                    ? L('Set a new password', 'নতুন পাসওয়ার্ড দিন')
                     : L('Verify your number', 'নম্বর যাচাই করুন')}
                 </h2>
                 <p className="text-sm text-gray-500 mb-6">
-                  {L('Enter the 6-digit OTP sent to', '৬-সংখ্যার OTP দিন যা পাঠানো হয়েছে')} <br />
+                  {L('We sent a 6-digit code by SMS to', 'এই নম্বরে এসএমএসে ৬ সংখ্যার একটি কোড পাঠানো হয়েছে')} <br />
                   <span className="font-bold text-gray-800">+880 {formData.phone}</span>
                 </p>
 
-                <form onSubmit={mode === MODES.FORGOT ? submitReset : submitSignupOtp} className="flex flex-col items-center">
+                <form noValidate onSubmit={mode === MODES.FORGOT ? submitReset : submitSignupOtp} className="flex flex-col items-center">
                   <div className="flex justify-center gap-3 sm:gap-4 mb-4" onPaste={handleOtpPaste}>
                     {otp.map((digit, index) => (
                       <input
@@ -770,14 +974,17 @@ const LoginPage = () => {
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
                           placeholder="••••••••"
+                          autoComplete="new-password"
                           className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-900 focus:bg-white focus:border-brandRed focus:ring-2 focus:ring-brandRed/20 transition-all outline-none tracking-widest"
                           required
                           minLength={8}
+                          maxLength={128}
                         />
                       </div>
-                      <p className="text-[10px] text-gray-500 mt-1 ml-1">
-                        {L('At least 8 characters, with letters and numbers.', 'কমপক্ষে ৮ অক্ষর — অক্ষর ও সংখ্যা থাকতে হবে।')}
+                      <p className="text-[11px] font-semibold text-gray-600 mt-2 ml-1">
+                        {L('Your new password must have:', 'নতুন পাসওয়ার্ডে থাকতে হবে:')}
                       </p>
+                      <PasswordRules checks={resetPwChecks} isBn={isBn} />
                     </div>
                   )}
 
@@ -788,21 +995,20 @@ const LoginPage = () => {
                     className="mb-4 text-xs font-bold text-gray-500 hover:text-brandRed transition-colors disabled:opacity-50"
                   >
                     {resendIn > 0
-                      ? L(`Resend OTP in ${resendIn}s`, `আবার OTP পাঠান ${resendIn}s পরে`)
-                      : L('Resend OTP', 'আবার OTP পাঠান')}
+                      ? L(`You can ask for a new code in ${resendIn}s`, `${resendIn} সেকেন্ড পরে আবার কোড চাইতে পারবেন`)
+                      : L("Didn't get the code? Send it again", 'কোড পাননি? আবার পাঠান')}
                   </button>
 
+                  {/* The six boxes make an incomplete code self-evident, so
+                      gating on that is fair. The password is NOT gated here —
+                      submitReset names the unmet rule instead. */}
                   <button
                     type="submit"
-                    disabled={
-                      isLoading
-                      || otp.join('').length < 6
-                      || (mode === MODES.FORGOT && newPassword.length < 8)
-                    }
+                    disabled={isLoading || otp.join('').length < 6}
                     className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_6px_15px_rgba(0,0,0,0.15)] hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-70"
                   >
                     {isLoading ? <Loader2 className="animate-spin" size={18} />
-                      : mode === MODES.FORGOT ? L('Reset password', 'পাসওয়ার্ড রিসেট করুন')
+                      : mode === MODES.FORGOT ? L('Save new password', 'নতুন পাসওয়ার্ড সেভ করুন')
                       : <><CheckCircle2 size={18} /> {L('Verify', 'যাচাই করুন')}</>}
                   </button>
 
@@ -811,7 +1017,7 @@ const LoginPage = () => {
                     onClick={() => { setStep(STEPS.FORM); setOtp(['', '', '', '', '', '']); setNewPassword(''); setErrorMsg(''); }}
                     className="mt-4 text-sm font-bold text-gray-400 hover:text-brandRed transition-colors"
                   >
-                    ← {L('Change number', 'নম্বর পরিবর্তন করুন')}
+                    ← {L('Use a different number', 'অন্য নম্বর দিন')}
                   </button>
                 </form>
               </div>

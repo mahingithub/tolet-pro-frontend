@@ -193,7 +193,16 @@ const AppDownloadBanner = () => {
     <>
       {/* ─── GUIDE MODAL (APPLE / CHROMIUM / UNSUPPORTED) ─── */}
       {guide && (
-        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 bg-black/50 backdrop-blur-md motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+        // `data-tour-blocker` keeps the guided tour from opening behind the
+        // install instructions — see BLOCKING_UI in context/TourContext.jsx.
+        // Only this dialog is a blocker; the in-flow banner strips are not.
+        <div
+          className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 bg-black/50 backdrop-blur-md motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t?.installAppGuideTitle || 'How to install the app'}
+          data-tour-blocker
+        >
           <div className="w-full max-w-[360px] rounded-[32px] p-6 relative overflow-hidden motion-safe:animate-in motion-safe:slide-in-from-bottom-8 md:motion-safe:slide-in-from-bottom-0 md:motion-safe:zoom-in-95 motion-safe:duration-300
                           bg-white/85 dark:bg-[#12121c]/85 backdrop-blur-3xl
                           border border-white/40 dark:border-white/10

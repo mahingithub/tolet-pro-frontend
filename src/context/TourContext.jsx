@@ -188,7 +188,25 @@ const BLOCKING_UI = [
 
 // Only *visible* blockers count. A dialog left in the DOM in a hidden state
 // would otherwise hold every tour off forever.
-const blockingUi = () => visibleAnchor(BLOCKING_UI);
+//
+// And an overlay the RUNNING tour is itself pointing into is not in the way —
+// it is the step. The host dashboard tour opens the logo's "where to?" modal
+// (a real role="dialog") to explain the two options inside it, so without this
+// the tour would treat its own step as a popup barging in and shut itself down.
+// driver.js marks whatever it is highlighting with `.driver-active-element`,
+// which is the one dependable signal for "this overlay belongs to the tour".
+// Before anything is driving there is no active element, so the pre-flight
+// gates below behave exactly as they always did.
+const blockingUi = () => {
+  const active = document.querySelector('.driver-active-element');
+  for (const el of document.querySelectorAll(BLOCKING_UI)) {
+    const rects = el.getClientRects();
+    if (!rects.length || rects[0].width <= 0 || rects[0].height <= 0) continue;
+    if (active && el.contains(active)) continue;
+    return el;
+  }
+  return null;
+};
 
 // Generous on purpose. The welcome popup a tour usually queues behind can hold
 // a guide VIDEO, so "the user is still reading" is easily a minute. The wait is
@@ -199,6 +217,12 @@ const CLEAR_SCREEN_TIMEOUT_MS = 45000;
 const CLEAR_RECHECK_MS = 1500;         // shorter re-check after the anchor wait
 const OPENING_BEAT_MS = 400;           // so the tour reads as "after" the popup
 const START_SETTLE_MS = 150;           // let a same-commit navigate() land first
+const BLOCKER_WATCH_MS = 200;          // how often a RUNNING tour re-checks
+// A tour that opens a modal itself needs the watch held across the gap between
+// "the modal is on screen" and "driver.js has moved onto the step inside it",
+// or its own reveal would read as a popup interrupting. Comfortably longer than
+// the 400ms reveal delays the tours use.
+const REVEAL_HOLD_MS = 1200;
 
 const waitForClearScreen = (shouldAbort, timeout = CLEAR_SCREEN_TIMEOUT_MS) =>
   new Promise((resolve) => {
@@ -221,6 +245,31 @@ const waitForClearScreen = (shouldAbort, timeout = CLEAR_SCREEN_TIMEOUT_MS) =>
       }
     }, 150);
   });
+
+/* Every check above happens BEFORE driver.js is told to drive, and that is not
+   enough. Some popups cannot open until their data arrives: SmartAlertsPopup
+   only appears once the bookings fetch resolves and yields an urgent alert,
+   PaymentSettingsPopup once bookings prove a tenant exists. The pre-flight gate
+   costs about half a second, so any network round-trip slower than that lands
+   the popup ON TOP of a tour that had already, correctly, seen a clear screen —
+   the reported "tour is on step 2 of 19 behind the rent-overdue popup".
+
+   So the gate keeps watching for as long as the tour is running. The instant a
+   blocker shows up the tour gets out of the way, and because it stands down
+   rather than finishing, the retry puts it back on offer once the user has
+   dealt with the popup. Polling rather than a MutationObserver on purpose: a
+   popup can also become visible through a pure CSS/class change that mutates
+   nothing inside the subtree we would be observing. */
+const watchForBlocker = (isHeld, onBlocked) => {
+  const timer = window.setInterval(() => {
+    if (isHeld()) return;
+    if (blockingUi()) {
+      window.clearInterval(timer);
+      onBlocked();
+    }
+  }, BLOCKER_WATCH_MS);
+  return () => window.clearInterval(timer);
+};
 
 /* ══════════════════════════════════════════════════════════════════════════
    4. SHARED DRIVER.JS CONFIG
@@ -525,7 +574,17 @@ export const TourProvider = ({ children }) => {
 
         // Handed to step callbacks so they can drive the very instance they
         // belong to. Populated before drive(), so every handler sees it.
-        const box = { driver: null };
+        //
+        // `holdBlockerWatch` is the escape hatch for a tour that opens UI on
+        // purpose: call it right before dispatching the reveal and the running
+        // blocker watch below looks away until driver.js has caught up.
+        let watchHeldUntil = 0;
+        const box = {
+          driver: null,
+          holdBlockerWatch: (ms = REVEAL_HOLD_MS) => {
+            watchHeldUntil = Date.now() + ms;
+          },
+        };
         const steps = pruneSteps(buildSteps(box) || []);
         if (!steps.length) return standDown('blocked');
 
@@ -534,6 +593,11 @@ export const TourProvider = ({ children }) => {
         // anything (provider unmount, a race) still burned its one-and-only
         // chance to run.
         let shown = false;
+        // Flipped when a popup turned up mid-tour and we bowed out. The tour was
+        // NOT completed, so it must not be recorded as seen and must be offered
+        // again once the screen is free.
+        let yieldedToPopup = false;
+        let stopBlockerWatch = null;
 
         const driverObj = driver({
           ...TOUR_BASE_CONFIG,
@@ -549,6 +613,8 @@ export const TourProvider = ({ children }) => {
             shown = true;
           },
           onDestroyed: () => {
+            stopBlockerWatch?.();
+            stopBlockerWatch = null;
             // Let the tour put the page back the way it found it (Living closes
             // any sheet it opened) before we touch shared state.
             try {
@@ -556,7 +622,10 @@ export const TourProvider = ({ children }) => {
             } catch (err) {
               console.error(`Tour "${tourId}" cleanup failed:`, err);
             }
-            if (shown && !unmountingRef.current) markTourDone(tourId);
+            // `yieldedToPopup` matters here: by the time a popup interrupts, a
+            // step HAS painted, so the `shown` test alone would retire a tour
+            // the user never got to finish.
+            if (shown && !yieldedToPopup && !unmountingRef.current) markTourDone(tourId);
             // Everything below is guarded on identity: only the instance that is
             // actually live may release the lock or clear the shared state. A
             // stale instance being cleaned up must never disturb the tour that
@@ -565,9 +634,15 @@ export const TourProvider = ({ children }) => {
             liveDriverRef.current = null;
             lockRef.current = null;
             setActiveTour(null);
-            // Destroyed without ever painting a step — the one chance to run
-            // was not used, so let the auto-start effects offer it again.
-            if (!shown && !unmountingRef.current) setRetryTick((n) => n + 1);
+            // Destroyed without ever painting a step, or stood aside for a
+            // popup — either way the one chance to run was not used, so let the
+            // auto-start effects offer it again. The per-tour attempt cap keeps
+            // a popup nobody ever closes from re-arming this forever, and the
+            // pre-flight `waitForClearScreen` means the retry waits rather than
+            // spins.
+            if ((!shown || yieldedToPopup) && !unmountingRef.current) {
+              setRetryTick((n) => n + 1);
+            }
           },
         });
 
@@ -587,6 +662,17 @@ export const TourProvider = ({ children }) => {
         handedOff = true;
         setActiveTour(tourId);
         driverObj.drive();
+
+        // The gate stays on duty for as long as the tour runs — see
+        // watchForBlocker. Armed AFTER drive() so the first poll can already see
+        // driver.js's own popover and active element.
+        stopBlockerWatch = watchForBlocker(
+          () => Date.now() < watchHeldUntil,
+          () => {
+            yieldedToPopup = true;
+            driverObj.destroy(); // → onDestroyed above stands the tour down
+          },
+        );
       } catch (error) {
         console.error(`Failed to start the "${tourId}" tour:`, error);
         setActiveTour(null);
@@ -728,8 +814,16 @@ export const TourProvider = ({ children }) => {
           // Ask the app to open a piece of UI, then advance. No guessed delay
           // for the anchor itself — the step we move TO carries the tour-wide
           // `waitForElement`, so driver.js holds it until the anchor lands.
-          const emit = (type, detail) =>
+          //
+          // The hold is what keeps the running blocker watch from mistaking our
+          // own reveal for a popup interrupting: the logo's "where to?" modal is
+          // a real role="dialog", and for the few hundred ms between it opening
+          // and driver.js highlighting the option inside it there is nothing in
+          // the DOM to tell the two cases apart.
+          const emit = (type, detail) => {
+            box.holdBlockerWatch?.();
             window.dispatchEvent(detail === undefined ? new Event(type) : new CustomEvent(type, { detail }));
+          };
           const actThenNext = (type, detail, delay = 250) => {
             emit(type, detail);
             window.setTimeout(() => box.driver?.moveNext(), delay);
@@ -795,6 +889,28 @@ export const TourProvider = ({ children }) => {
               body: [
                 'This starts a short form for a new listing. You can save it half-finished and come back — nothing goes public until you publish it.',
                 'এটি নতুন বিজ্ঞাপনের একটি ছোট ফর্ম শুরু করে। অর্ধেক করে রেখে পরে ফিরে আসতে পারবেন — প্রকাশ না করা পর্যন্ত কিছুই কেউ দেখবে না।',
+              ],
+            }),
+            // The phone equivalent of the step above. The header's "List
+            // Property" button is `hidden sm:inline-flex`, so on a phone it gets
+            // pruned and the raised "+ List" button in the bottom rail is the
+            // only way in — it previously had no anchor and no step, so a mobile
+            // landlord was never shown how to start a listing from the rail.
+            //
+            // Resolving to null while the header button is visible keeps the two
+            // from BOTH appearing in the 640–767px band, where the header button
+            // has already come back but the rail has not gone away yet.
+            step({
+              element: () =>
+                (visibleAnchor('[data-tour="host-header-add-property"]')
+                  ? null
+                  : visibleAnchor('[data-tour="mobile-nav-list"]')),
+              side: 'top',
+              align: 'center',
+              title: ['Putting up a new property', 'নতুন প্রপার্টি দিতে চাইলে'],
+              body: [
+                'The red + button at the bottom of the screen starts a short form for a new listing. You can save it half-finished and come back — nothing goes public until you publish it.',
+                'পর্দার নিচের লাল + বাটনটি নতুন বিজ্ঞাপনের একটি ছোট ফর্ম শুরু করে। অর্ধেক করে রেখে পরে ফিরে আসতে পারবেন — প্রকাশ না করা পর্যন্ত কিছুই কেউ দেখবে না।',
               ],
             }),
             step({
@@ -1208,7 +1324,12 @@ export const TourProvider = ({ children }) => {
             visibleAnchor(`[data-tour="living-desktop-nav"] [data-tour="living-tab-${id}"]`);
           const tabSide = () => (window.innerWidth < 1024 ? 'bottom' : 'right');
 
-          const emit = (type, detail) => window.dispatchEvent(new CustomEvent(type, { detail }));
+          // Held for the same reason as the host tour's emit — a sheet this tour
+          // opens itself must not read as a popup barging in.
+          const emit = (type, detail) => {
+            box.holdBlockerWatch?.();
+            window.dispatchEvent(new CustomEvent(type, { detail }));
+          };
           const actThenNext = (type, detail, delay = 0) => {
             emit(type, detail);
             window.setTimeout(() => box.driver?.moveNext(), delay);

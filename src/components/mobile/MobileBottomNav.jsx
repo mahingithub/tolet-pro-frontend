@@ -227,6 +227,11 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
               <>
                 <button
                   onClick={() => navigate('/list-property')}
+                  // Tour anchor: on a phone the header's "List Property" button
+                  // is hidden (`hidden sm:inline-flex`), so this FAB is the only
+                  // way a landlord starts a listing — and the host dashboard
+                  // tour had no step for it at all. See TourContext.jsx.
+                  data-tour="mobile-nav-list"
                   className="absolute -top-5 w-14 h-14 rounded-2xl bg-gradient-to-br from-[#ba0036] via-[#d4143a] to-[#ff4d6d] text-white flex items-center justify-center shadow-[0_12px_30px_-8px_rgba(186,0,54,0.55)] active:scale-95 transition-transform ring-4 ring-white"
                   aria-label="List a property"
                 >

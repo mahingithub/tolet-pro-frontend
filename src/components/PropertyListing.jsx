@@ -1460,6 +1460,18 @@ const PropertyListing = () => {
 	const isMapMode = viewMode === "map";
 	const resultCountLabel = isPropertiesLoading ? "..." : filteredProperties.length;
 
+	// The noun in "All Cities · Showing 5 ___" and in the desktop <h1>. It has to
+	// follow the আবাসিক / বাণিজ্যিক intent tabs: a single shared key meant both
+	// filters printed "বাড়িসমূহ" (houses), which is simply the wrong word over a
+	// list of shops, offices and showrooms. `t.properties` stays the residential
+	// wording so nothing else that uses it changes.
+	const unitNoun =
+		selectedIntent === "commercial"
+			? (t.propertiesCommercial || "Commercial Spaces")
+			: selectedIntent === "sale"
+				? (t.propertiesForSale || "Properties for Sale")
+				: (t.properties || "Properties");
+
 	// ── CONFIG-DRIVEN FILTER PANEL (intent-aware) ──────────────────────────────
 	// The whole Filter_Panel is derived from the active intent's config plus a
 	// pure section-visibility resolver. `selectedType` is only meaningful when
@@ -1497,7 +1509,7 @@ const PropertyListing = () => {
                             {searchArea ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision}
                         </span>
 						<span className="text-gray-500 font-bold text-sm">
-							{t.showing || "Showing"} <strong className="text-gray-900">{resultCountLabel}</strong> {t.properties || "properties"}
+							{t.showing || "Showing"} <strong className="text-gray-900">{resultCountLabel}</strong> {unitNoun}
 						</span>
 					</div>
 					<button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="text-sm font-black text-gray-900 hover:text-[#ba0036] transition-colors flex items-center gap-2 uppercase tracking-wide border-b-2 border-gray-900 hover:border-[#ba0036] pb-0.5">
@@ -1594,7 +1606,7 @@ const PropertyListing = () => {
 				{/* Row 3: Results count + location context */}
 				<div className="flex items-center justify-between px-3 py-1.5 bg-gray-50/80">
 					<span className="text-[11px] font-bold text-gray-500">
-						<strong className="text-gray-900">{resultCountLabel}</strong> {t.properties || "প্রপার্টি"} · {searchArea ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision}
+						<strong className="text-gray-900">{resultCountLabel}</strong> {unitNoun} · {searchArea ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision}
 					</span>
 					{searchArea && (
 						<button onClick={() => setSearchArea("")} className="text-[10px] font-black text-brandRed active:scale-95 transition-transform">
@@ -1964,7 +1976,7 @@ const PropertyListing = () => {
 								)}
 							</p>
 							<h1 className="text-3xl font-black text-gray-900 tracking-tight">
-								{searchArea && searchArea !== (t.nearMe || "Nearby Location") ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision} {t.properties || "Properties"}
+								{searchArea && searchArea !== (t.nearMe || "Nearby Location") ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision} {unitNoun}
 							</h1>
 						</div>
 						<div className="flex items-center gap-3">
