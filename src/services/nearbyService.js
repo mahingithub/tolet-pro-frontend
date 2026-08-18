@@ -38,11 +38,38 @@ const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 // `pending`, so this only guards against the network itself stalling.
 const REQUEST_TIMEOUT_MS = 12000;
 
-// When the server says the cell is still warming, come back for it. The upstream
-// fetch is already running server-side, so these retries are cheap and usually
-// land on a filled cache.
-const PENDING_RETRIES = 2;
-const PENDING_RETRY_DELAY_MS = 2500;
+// ─── HOW LONG WE KEEP ASKING ─────────────────────────────────────────────────
+//
+// This used to be 2 retries at a flat 2.5 s, which gave a total budget of about
+// 32 s (3 × the server's own 9 s deadline + 2 gaps). That was far too short, and
+// the section's headline bug was the direct result: the client stopped asking
+// while the answer was still on its way, then never asked again for the rest of
+// the page's life. The grid sat on "—" indefinitely even though the backend had
+// the real data cached seconds later.
+//
+// Measured backend worst case for a cold cell (all timings observed live):
+//   • fastest healthy Overpass mirror answers the 8-statement query in 15-25 s
+//   • when the good mirrors fail, the race still waits on the hung ones for the
+//     full 22 s mirror timeout, then the server waits before retrying once
+//   • so a bad-luck cold cell can legitimately need 45-65 s
+//
+// 90 s therefore covers the realistic worst case with room to spare. The cost of
+// waiting is near zero: each poll is a ~600 byte GET, and while the cell is cold
+// the SERVER blocks for up to 9 s per call, so the polls are self-spacing — the
+// whole 90 s window is roughly 8 requests, not hundreds.
+const POLL_BUDGET_MS = 90000;
+
+// Gap between polls, on top of however long the server took to answer. Grows so
+// a genuinely dead upstream is asked about less and less often.
+const POLL_GAP_START_MS = 1500;
+const POLL_GAP_MAX_MS = 8000;
+const POLL_GAP_GROWTH = 1.35;
+
+// A single failed poll (network blip, 502 from the host, our own 12 s timeout)
+// is not fatal — the loop keeps going inside the budget. Only this many
+// consecutive hard failures gives up, which is what distinguishes "the backend
+// is down" from "one request lost".
+const MAX_CONSECUTIVE_ERRORS = 3;
 
 /** Same ~110 m grid the backend uses, so both caches agree on what a "place" is. */
 const cellKey = (lat, lng) => `${(Math.round(lat * 1000) / 1000).toFixed(3)},${(Math.round(lng * 1000) / 1000).toFixed(3)}`;
@@ -132,26 +159,15 @@ function pruneStoredCells(ls) {
 
 // ─── NETWORK ─────────────────────────────────────────────────────────────────
 
-const sleep = (ms, signal) =>
-  new Promise((resolve, reject) => {
-    const t = setTimeout(resolve, ms);
-    if (signal) {
-      signal.addEventListener(
-        'abort',
-        () => { clearTimeout(t); reject(new DOMException('Aborted', 'AbortError')); },
-        { once: true },
-      );
-    }
-  });
+const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
-async function requestNearby(lat, lng, signal) {
+async function requestNearby(lat, lng) {
   const url = `${API}/geo/nearby?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`;
 
-  // Compose the caller's signal with our own timeout so either can cancel.
+  // Only our own timeout can cancel this. The caller's signal deliberately does
+  // NOT reach the wire — see fetchNearbyPlaces for why.
   const timeoutCtrl = new AbortController();
   const timer = setTimeout(() => timeoutCtrl.abort(), REQUEST_TIMEOUT_MS);
-  const onOuterAbort = () => timeoutCtrl.abort();
-  signal?.addEventListener('abort', onOuterAbort, { once: true });
 
   try {
     const res = await fetch(url, {
@@ -167,8 +183,70 @@ async function requestNearby(lat, lng, signal) {
     };
   } finally {
     clearTimeout(timer);
-    signal?.removeEventListener('abort', onOuterAbort);
   }
+}
+
+/** A filled row is one that actually carries a distance. */
+const isFilled = (places) => places.length > 0 && places.some((p) => p.distKm != null);
+
+/**
+ * Poll the backend until the cell is filled or the budget runs out.
+ *
+ * Runs detached from any caller: whoever started it may navigate away, but the
+ * work continues and lands in the cache, so the next reader gets it for free.
+ */
+async function pollUntilFilled(key, lat, lng) {
+  const deadline = Date.now() + POLL_BUDGET_MS;
+  let gap = POLL_GAP_START_MS;
+  let errors = 0;
+  let lastPlaces = [];
+
+  while (Date.now() < deadline) {
+    try {
+      const { places, pending } = await requestNearby(lat, lng);
+      errors = 0;
+      lastPlaces = places;
+
+      if (isFilled(places)) {
+        writeCache(key, places);
+        return places;
+      }
+
+      // Not filled. `pending` means the server is still working upstream, so
+      // keep waiting. A non-pending empty answer means the server is confident
+      // there is genuinely nothing within its radius — stop and show "—".
+      if (!pending) return places;
+    } catch (err) {
+      errors += 1;
+      if (errors >= MAX_CONSECUTIVE_ERRORS) {
+        console.warn(`[nearby] giving up after ${errors} failed attempts:`, err.message);
+        return lastPlaces;
+      }
+    }
+
+    if (Date.now() + gap >= deadline) break;
+    await sleep(gap);
+    gap = Math.min(Math.round(gap * POLL_GAP_GROWTH), POLL_GAP_MAX_MS);
+  }
+
+  // Budget exhausted. Hand back whatever shape we last saw so the grid renders
+  // "—" rather than collapsing, and don't cache it — a later visit retries.
+  return lastPlaces;
+}
+
+/** Rejects when `signal` aborts; resolves never. Cleans its own listener up. */
+function abortSignalAsRejection(signal) {
+  let detach = () => {};
+  const promise = new Promise((_resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+    const onAbort = () => reject(new DOMException('Aborted', 'AbortError'));
+    signal.addEventListener('abort', onAbort, { once: true });
+    detach = () => signal.removeEventListener('abort', onAbort);
+  });
+  return { promise, detach };
 }
 
 /**
@@ -178,55 +256,47 @@ async function requestNearby(lat, lng, signal) {
  * decorative and must never take the property page down with it. An explicit
  * abort by the caller does propagate, so React effects can bail cleanly.
  *
+ * ── On aborts and the shared job ──
+ * The polling job is deliberately NOT wired to the caller's signal. It used to
+ * be, and that was a real bug: the single-flight map hands the SAME promise to
+ * every caller for a cell, so the first caller's cleanup — a React effect
+ * re-running, or StrictMode's double-invoke in development — aborted the fetch
+ * out from under everyone else, and the later subscribers received a rejected
+ * promise for a request they never cancelled. The grid then shimmered forever.
+ *
+ * Now an abort only detaches THAT caller. The job keeps running and writes to
+ * the cache, so the work is never wasted and a remount reads it synchronously.
+ *
  * @param {number} lat
  * @param {number} lng
  * @param {{ signal?: AbortSignal }} [opts]
  * @returns {Promise<Array<{key: string, name: string, nameBn: string, distKm: number|null}>>}
  */
-export async function fetchNearbyPlaces(lat, lng, { signal } = {}) {
-  if (!isUsableLatLng(lat, lng)) return [];
+export function fetchNearbyPlaces(lat, lng, { signal } = {}) {
+  if (!isUsableLatLng(lat, lng)) return Promise.resolve([]);
 
   const key = cellKey(lat, lng);
 
   const cached = readCachedNearby(lat, lng);
-  if (cached) return cached;
+  if (cached) return Promise.resolve(cached);
 
-  if (inflight.has(key)) return inflight.get(key);
+  let job = inflight.get(key);
+  if (!job) {
+    job = pollUntilFilled(key, lat, lng)
+      .catch((err) => {
+        console.warn('[nearby] lookup failed:', err?.message || err);
+        return [];
+      })
+      .finally(() => { inflight.delete(key); });
+    inflight.set(key, job);
+  }
 
-  const job = (async () => {
-    try {
-      for (let attempt = 0; attempt <= PENDING_RETRIES; attempt += 1) {
-        const { places, pending } = await requestNearby(lat, lng, signal);
+  if (!signal) return job;
 
-        // A filled result — cache it and we're done.
-        if (places.length && places.some((p) => p.distKm != null)) {
-          writeCache(key, places);
-          return places;
-        }
-
-        // Server is still warming this cell upstream. Wait and ask again.
-        if (pending && attempt < PENDING_RETRIES) {
-          await sleep(PENDING_RETRY_DELAY_MS, signal);
-          continue;
-        }
-
-        // Genuinely nothing nearby (or upstream is down). Return the empty
-        // category rows so the grid renders "—" instead of collapsing, but
-        // don't cache it — we want a real answer next time.
-        return places;
-      }
-      return [];
-    } catch (err) {
-      if (err?.name === 'AbortError') throw err;
-      console.warn('[nearby] lookup failed:', err.message);
-      return [];
-    } finally {
-      inflight.delete(key);
-    }
-  })();
-
-  inflight.set(key, job);
-  return job;
+  // Race the shared job against this caller's abort. Whichever settles first
+  // wins for this caller only; the job itself is untouched either way.
+  const { promise: aborted, detach } = abortSignalAsRejection(signal);
+  return Promise.race([job, aborted]).finally(detach);
 }
 
 export default { fetchNearbyPlaces, readCachedNearby };
