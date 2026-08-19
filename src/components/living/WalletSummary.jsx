@@ -331,19 +331,7 @@ const WalletSummary = ({ go, me, language }) => {
         </div>
       </div>
 
-      {/* ── Quick actions (hidden on desktop to avoid duplicating Featured Rail) ── */}
-      <div className="grid grid-cols-4 gap-2.5 xl:hidden">
-        {QUICK.map((q) => (
-          <button
-            key={q.id}
-            onClick={() => go(q.module, q.intent)}
-            className="flex flex-col items-center gap-2 bg-white rounded-2xl border border-gray-100 p-3 shadow-[0_8px_22px_-16px_rgba(15,23,42,0.3)] active:scale-95 transition"
-          >
-            <IconBadge icon={q.icon} tint={q.tint} text={q.text} size={40} iconSize={18} />
-            <span className="text-[10px] font-black text-gray-700 leading-tight text-center">{isBn ? q.bn : q.en}</span>
-          </button>
-        ))}
-      </div>
+
 
       {/* Desktop: summary detail flows into two columns; mobile stays stacked. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">

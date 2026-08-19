@@ -319,7 +319,7 @@ const AppLayout = () => {
 			<WelcomeRobotOverlay />
 			<GlobalToaster />
 			{!shouldHideAIAssistant && <GlobalAIAssistant />}
-			<MobileBottomNav hideOnRoutes={['/login', '/list-property', '/properties/']} />
+			<MobileBottomNav hideOnRoutes={['/login', '/list-property', '/properties/', '/living']} />
 			<FeedbackButton />
 		</div>
 	);

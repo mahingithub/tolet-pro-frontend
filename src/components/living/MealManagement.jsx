@@ -592,8 +592,6 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
 </React.Fragment>
       ) : (
         <React.Fragment>
-      {isDesktopLayout ? (
-        <React.Fragment>
       {/* daily meal editor */}
       <div id="mm-log" className="scroll-mt-24">
       <Card className="p-4">
@@ -652,52 +650,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       </Card>
       </div>
 </React.Fragment>
-      ) : (
-        <React.Fragment>
-
-
-      {/* deposits list */}
-      <div id="mm-deposits" className="scroll-mt-24">
-      <Card className="p-4">
-        <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-1 flex items-center gap-1.5">
-          <PiggyBank size={15} className="text-emerald-600" /> {isBn ? 'জমার হিস্ট্রি' : 'Deposits'}
-          <span className="text-[9.5px] font-bold text-gray-400 ml-auto">{periodLabel}</span>
-        </h3>
-        {monthDeposits.length === 0 ? (
-          <EmptyState icon={HandCoins} title={isBn ? 'কোনো জমা নেই' : 'No deposits yet'} subtitle={isBn ? 'মেস ফান্ডে টাকা জমা দিন' : 'Add money to the meal fund'} />
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {monthDeposits.map((d) => {
-              const who = roommateById(roommates, d.roommateId);
-              return (
-                <div key={d.id} className="flex items-center gap-3 py-2.5">
-                  <Avatar roommate={who} size={32} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[12.5px] font-bold text-gray-800 truncate">{who.isMe ? (isBn ? 'আপনি' : 'You') : who.name}</p>
-                    <p className="text-[11px] font-medium text-gray-400 truncate">{d.note || (isBn ? 'জমা' : 'Deposit')} · {dateLabel(d.date, language)}</p>
-                    {d.createdBy && d.createdBy !== d.roommateId && (
-                      <p className="text-[9px] font-bold text-gray-400 truncate mt-0.5">
-                        {isBn ? 'যুক্ত করেছেন ' : 'Added by '}{roommateById(roommates, d.createdBy).name}
-                      </p>
-                    )}
-                  </div>
-                  <span className="text-[13px] font-black text-emerald-600 shrink-0">+{taka(d.amount, language)}</span>
-                  <button onClick={() => setPendingDelete({ kind: 'deposit', id: d.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-      </div>
-</React.Fragment>
       )}
-</React.Fragment>
-      )}
-
-
       </div>
       
       {/* right column */}
@@ -804,8 +757,6 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       </div>
 </React.Fragment>
       )}
-
-
       {/* bazar list */}
       <div id="mm-bazar" className="scroll-mt-24">
       <Card className="p-4">

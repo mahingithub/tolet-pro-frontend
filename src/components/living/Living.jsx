@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useGoBack from '../../hooks/useGoBack';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
 import { ArrowLeft, Wallet, BellRing } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
@@ -145,6 +145,22 @@ const Living = () => {
   const reminders = useMemo(() => buildReminders(state, ME), [state]);
   const back = useGoBack('/tenant-dashboard');
 
+  const [isNavVisible, setIsNavVisible] = useState(true);
+  const { scrollY } = useScroll();
+
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    if (window.innerWidth >= 1024) {
+      if (!isNavVisible) setIsNavVisible(true);
+      return;
+    }
+    const previous = scrollY.getPrevious() || 0;
+    if (latest > previous && latest > 60) {
+      setIsNavVisible(false); // scrolling down -> hide
+    } else if (latest < previous) {
+      setIsNavVisible(true); // scrolling up -> show
+    }
+  });
+
   const ActiveModule = MODULE_COMPONENTS[module] || WalletSummary;
 
   return (
@@ -162,7 +178,10 @@ const Living = () => {
       />
 
       {/* ── Header (full width) ─────────────────────────────────────── */}
-      <header data-tour="living-header" className="w-full bg-white/95 backdrop-blur-2xl sticky top-0 z-[60] border-b border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)]">
+      <header data-tour="living-header" className={cx(
+        "w-full bg-white/95 backdrop-blur-2xl sticky top-0 z-[60] border-b border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] transition-transform duration-300 ease-in-out",
+        !isNavVisible && "-translate-y-full"
+      )}>
         <div className="w-full max-w-[1400px] xl:max-w-[1600px] mx-auto px-4 h-[56px] md:h-[64px] flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <button
@@ -202,7 +221,6 @@ const Living = () => {
               )}
             </button>
 
-            {/* Profile — reachable straight from the Living tab (mobile + desktop). */}
             <button
               data-tour="living-profile"
               onClick={() => navigate('/tenant-dashboard?tab=profile')}
@@ -228,7 +246,10 @@ const Living = () => {
       {/* ── Body: desktop nav + content + featured rail · mobile pills + content ── */}
       <div className="w-full max-w-[1400px] xl:max-w-[1600px] mx-auto px-4 relative z-10 mt-3 lg:flex lg:gap-6 lg:items-start">
         {/* MOBILE: sticky segmented tab bar (5 primary modules) */}
-        <div className="lg:hidden sticky top-[56px] z-50 -mx-4 px-4 pt-1 pb-1.5 bg-[#eaeff5]/95 backdrop-blur-xl border-b border-gray-200/50">
+        <div className={cx(
+          "lg:hidden sticky z-50 -mx-4 px-4 pt-1 pb-1.5 bg-[#eaeff5]/95 backdrop-blur-xl border-b border-gray-200/50 transition-[top] duration-300 ease-in-out",
+          isNavVisible ? "top-[56px] md:top-[64px]" : "top-0"
+        )}>
           <div data-tour="living-mobile-nav" className="flex items-center gap-1 p-1 rounded-2xl bg-white/70 border border-white/80 shadow-[0_6px_20px_-14px_rgba(15,23,42,0.3)]">
             {NAV_MODULES.map((m) => {
               const Icon = m.icon;
