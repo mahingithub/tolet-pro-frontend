@@ -162,8 +162,8 @@ const Living = () => {
       />
 
       {/* ── Header (full width) ─────────────────────────────────────── */}
-      <div className="w-full max-w-6xl xl:max-w-7xl mx-auto z-40 relative px-4">
-        <header data-tour="living-header" className="mt-4 bg-white/60 backdrop-blur-3xl border border-white/80 rounded-[2rem] px-3.5 py-3 flex items-center justify-between gap-3 shadow-[0_8px_30px_rgb(0,0,0,0.05)]">
+      <header data-tour="living-header" className="w-full bg-white/95 backdrop-blur-2xl sticky top-0 z-[60] border-b border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)]">
+        <div className="w-full max-w-[1400px] xl:max-w-[1600px] mx-auto px-4 h-[56px] md:h-[64px] flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <button
               onClick={back}
@@ -222,13 +222,13 @@ const Living = () => {
               </span>
             </button>
           </div>
-        </header>
-      </div>
+        </div>
+      </header>
 
       {/* ── Body: desktop nav + content + featured rail · mobile pills + content ── */}
-      <div className="w-full max-w-6xl xl:max-w-7xl mx-auto px-4 relative z-10 mt-3 lg:flex lg:gap-6 lg:items-start">
+      <div className="w-full max-w-[1400px] xl:max-w-[1600px] mx-auto px-4 relative z-10 mt-3 lg:flex lg:gap-6 lg:items-start">
         {/* MOBILE: sticky segmented tab bar (5 primary modules) */}
-        <div className="lg:hidden sticky top-0 z-30 -mx-4 px-4 pt-1 pb-1.5 bg-[#eaeff5]/85 backdrop-blur-xl">
+        <div className="lg:hidden sticky top-[56px] z-50 -mx-4 px-4 pt-1 pb-1.5 bg-[#eaeff5]/95 backdrop-blur-xl border-b border-gray-200/50">
           <div data-tour="living-mobile-nav" className="flex items-center gap-1 p-1 rounded-2xl bg-white/70 border border-white/80 shadow-[0_6px_20px_-14px_rgba(15,23,42,0.3)]">
             {NAV_MODULES.map((m) => {
               const Icon = m.icon;
@@ -253,10 +253,10 @@ const Living = () => {
         </div>
 
         {/* DESKTOP: vertical sidebar nav (all modules) */}
-        <aside className="hidden lg:block w-60 shrink-0 lg:sticky lg:top-4">
+        <aside className="hidden lg:block w-60 shrink-0 lg:sticky lg:top-[80px]">
           {/* Solid bg (no backdrop-blur): this rail is sticky, so blurring its
               backdrop every scroll frame was a desktop-jank source. */}
-          <nav data-tour="living-desktop-nav" className="bg-white/95 border border-white/80 rounded-3xl p-2 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.35)] space-y-1">
+          <nav data-tour="living-desktop-nav" className="bg-white/95 border border-white/80 rounded-3xl p-2 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.35)] space-y-1 lg:h-[calc(100vh-100px)] overflow-y-auto scrollbar-hide">
             {MODULES.map((m) => {
               const Icon = m.icon;
               const active = module === m.id;
@@ -307,7 +307,7 @@ const Living = () => {
             so a rail there just duplicates it); shown on the focused modules
             where a persistent wallet snapshot genuinely helps. */}
         {module !== 'overview' && module !== 'meals' && (
-          <aside className="hidden xl:block w-72 shrink-0 xl:sticky xl:top-4 pb-12">
+          <aside className="hidden xl:block w-72 shrink-0 xl:sticky xl:top-[80px] pb-12">
             <FeaturedRail go={go} me={me} language={language} />
           </aside>
         )}

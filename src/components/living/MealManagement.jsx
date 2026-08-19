@@ -465,7 +465,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
           <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-3 flex items-center gap-1.5">
             <Wallet size={15} className="text-[#ba0036]" /> {isBn ? 'আমার হিসাব' : 'My Accounts'}
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <div className="text-center rounded-2xl bg-gray-50 border border-gray-100 py-3 px-2">
               <p className="text-[16px] font-black text-gray-900 truncate">{num(mine.meals, language)}</p>
               <p className="text-[9.5px] font-bold text-gray-400 mt-0.5">{isBn ? 'আমার মিল' : 'Meals'}</p>
@@ -580,37 +580,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       </Card>
       </div>
 
-      {/* bazar list */}
-      <div id="mm-bazar" className="scroll-mt-24">
-      <Card className="p-4">
-        <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-1 flex items-center gap-1.5">
-          <ShoppingBasket size={15} className="text-amber-600" /> {isBn ? 'বাজারের হিস্ট্রি' : 'Bazar'}
-          <span className="text-[9.5px] font-bold text-gray-400 ml-auto">{periodLabel}</span>
-        </h3>
-        {monthBazar.length === 0 ? (
-          <EmptyState icon={ShoppingBasket} title={isBn ? 'কোনো বাজার নেই' : 'No bazar yet'} subtitle={isBn ? 'মিলের বাজার যোগ করুন' : 'Add the meal groceries'} />
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {monthBazar.map((g) => {
-              const payer = roommateById(roommates, g.paidBy);
-              return (
-                <div key={g.id} className="flex items-center gap-3 py-2.5">
-                  <IconBadge icon={ShoppingBasket} tint="bg-amber-50" text="text-amber-600" size={32} iconSize={15} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[12.5px] font-bold text-gray-800 truncate">{g.note || (isBn ? 'বাজার' : 'Bazar')}</p>
-                    <p className="text-[11px] font-medium text-gray-400 truncate">{payer.isMe ? (isBn ? 'আপনি' : 'You') : payer.name} · {dateLabel(g.date, language)}</p>
-                  </div>
-                  <span className="text-[13px] font-black text-gray-900 shrink-0">{taka(g.amount, language)}</span>
-                  <button onClick={() => setPendingDelete({ kind: 'grocery', id: g.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-      </div>
+
       </div>
       
       {/* right column */}
@@ -672,8 +642,42 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
         </div>
       </Card>
       </div>
+
+
+      {/* bazar list */}
+      <div id="mm-bazar" className="scroll-mt-24">
+      <Card className="p-4">
+        <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-1 flex items-center gap-1.5">
+          <ShoppingBasket size={15} className="text-amber-600" /> {isBn ? 'বাজারের হিস্ট্রি' : 'Bazar'}
+          <span className="text-[9.5px] font-bold text-gray-400 ml-auto">{periodLabel}</span>
+        </h3>
+        {monthBazar.length === 0 ? (
+          <EmptyState icon={ShoppingBasket} title={isBn ? 'কোনো বাজার নেই' : 'No bazar yet'} subtitle={isBn ? 'মিলের বাজার যোগ করুন' : 'Add the meal groceries'} />
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {monthBazar.map((g) => {
+              const payer = roommateById(roommates, g.paidBy);
+              return (
+                <div key={g.id} className="flex items-center gap-3 py-2.5">
+                  <IconBadge icon={ShoppingBasket} tint="bg-amber-50" text="text-amber-600" size={32} iconSize={15} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12.5px] font-bold text-gray-800 truncate">{g.note || (isBn ? 'বাজার' : 'Bazar')}</p>
+                    <p className="text-[11px] font-medium text-gray-400 truncate">{payer.isMe ? (isBn ? 'আপনি' : 'You') : payer.name} · {dateLabel(g.date, language)}</p>
+                  </div>
+                  <span className="text-[13px] font-black text-gray-900 shrink-0">{taka(g.amount, language)}</span>
+                  <button onClick={() => setPendingDelete({ kind: 'grocery', id: g.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
       </div>
       </div>
+      </div>
+
 
       {/* floating side tab (chat-bot style launcher) → weekly breakdown popup */}
       {!weeklyOpen && (
