@@ -46,6 +46,7 @@ import {
 // the feed is empty and we show an empty-state card.
 import { propertyService, subscribeUserProperties, propertyLocationHaystack } from '../../services/Propertyservice';
 import LocationSearchModal from '../shared/LocationSearchModal';
+import YouTubeBackground from '../shared/YouTubeBackground';
 import { locationQueryMatches } from '../../data/locationAliases';
 
 /**
@@ -1148,15 +1149,9 @@ const MobileHome = () => {
       {/* ───────── MARKETING BANNER ───────── */}
       <div className="px-4 pt-3">
         <div className="relative overflow-hidden rounded-3xl aspect-[16/10] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.25)]">
-          <iframe
-            src={`https://www.youtube.com/embed/${HERO_YOUTUBE_ID}?autoplay=1&mute=1&loop=1&playlist=${HERO_YOUTUBE_ID}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1`}
-            title="YouTube background"
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            className="absolute inset-0 w-full h-full pointer-events-none scale-[1.35]"
-          ></iframe>
-          <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/30 to-black/55" />
+          <YouTubeBackground videoId={HERO_YOUTUBE_ID} title="To-Let Pro banner video" />
+          {/* z-10 keeps the scrim above the poster (z-5) as well as the video. */}
+          <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/10 via-black/30 to-black/55" />
           
         </div>
       </div>

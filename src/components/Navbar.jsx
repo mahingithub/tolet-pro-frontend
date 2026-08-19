@@ -620,25 +620,19 @@ useEffect(() => {
           {/* `ml-auto` has to come back whenever the search above is not in
               flow — including when it is not rendered at all on the listing
               route — or this cluster collapses left against the logo. */}
-          <div className={`hidden md:flex items-center gap-4 text-sm font-bold text-gray-700 h-full ${(showNavSearch && (isScrolled || compactHeader)) ? '' : 'ml-auto'}`}>
+          <div className={`hidden md:flex items-center gap-3 text-sm font-bold text-gray-700 ${(showNavSearch && (isScrolled || compactHeader)) ? '' : 'ml-auto'}`}>
 
-            {/* ── Marketing links ── */}
-            <nav className="hidden lg:flex items-center gap-4 h-full">
-              <Link to="/how-it-works" className="hover:text-[#ba0036] transition-colors">{t?.navHowItWorks || 'How it works'}</Link>
-              <div className="w-px h-full bg-gray-200"></div>
-              <Link to="/how-it-works#pricing" className="hover:text-[#ba0036] transition-colors">{t?.navPricing || 'Pricing'}</Link>
-              <div className="w-px h-full bg-gray-200"></div>
-              <Link to="/support" className="hover:text-[#ba0036] transition-colors">{t?.navHelp || 'Help'}</Link>
-              <div className="w-px h-full bg-gray-200"></div>
-            </nav>
+            {/* ── Guest marketing links (HousingAnywhere-style) ── */}
+            {!isLoggedIn && (
+              <nav className="hidden lg:flex items-center gap-6 mr-1">
+                <Link to="/how-it-works" className="hover:text-[#ba0036] transition-colors">{t?.navHowItWorks || 'How it works'}</Link>
+                <Link to="/how-it-works#pricing" className="hover:text-[#ba0036] transition-colors">{t?.navPricing || 'Pricing'}</Link>
+                <Link to="/support" className="hover:text-[#ba0036] transition-colors">{t?.navHelp || 'Help'}</Link>
+              </nav>
+            )}
 
             {/* Desktop notification bell with unread badge + dropdown. */}
-            {isAuthed && (
-              <>
-                <NotificationBell isAuthed={isAuthed} />
-                <div className="w-px h-full bg-gray-200"></div>
-              </>
-            )}
+            {isAuthed && <NotificationBell isAuthed={isAuthed} />}
 
             {/* Primary header CTA — role-aware.
                 • Logged-in TENANT → "Roommate Wallet" (→ /living). Tenants list
@@ -666,15 +660,13 @@ useEffect(() => {
               </button>
             )}
 
-            <div className="hidden lg:block w-px h-full bg-gray-200"></div>
-
-            <div className="relative h-full flex items-center" ref={langRef}>
+            <div className="relative" ref={langRef}>
               <div onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="flex items-center gap-2 cursor-pointer hover:text-[#ba0036] transition-colors">
                 <Globe size={16} /> <span>{language}</span>
                 <ChevronDown size={14} className={`transition-transform duration-300 ${isLangMenuOpen ? 'rotate-180' : ''}`} />
               </div>
               {isLangMenuOpen && (
-                <div className="absolute top-full right-0 mt-2 w-40 bg-white/95 backdrop-blur-3xl border border-white shadow-[0_20px_40px_rgba(0,0,0,0.1)] rounded-2xl p-2 z-[70]">
+                <div className="absolute top-full right-0 mt-4 w-40 bg-white/95 backdrop-blur-3xl border border-white shadow-[0_20px_40px_rgba(0,0,0,0.1)] rounded-2xl p-2 z-[70]">
                   {languages.map(lang => (
                     <div key={lang.code} onClick={() => { if (setLanguage) setLanguage(lang.name); setIsLangMenuOpen(false); }}
                       className={`px-4 py-3 cursor-pointer rounded-xl text-sm font-bold flex items-center justify-between transition-all ${language === lang.name ? 'bg-red-50 text-[#ba0036]' : 'hover:bg-gray-50 text-gray-600'}`}>
@@ -685,9 +677,7 @@ useEffect(() => {
               )}
             </div>
 
-            <div className="hidden lg:block w-px h-full bg-gray-200"></div>
-
-            <div className="relative" ref={profileRef}>
+            <div className="relative pl-2 border-l border-gray-200" ref={profileRef}>
               {isLoggedIn ? (
                 <>
                   <div onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}

@@ -10,6 +10,7 @@ import usePropertyStore from '../store/usePropertyStore';
 import { SALE_INTENT_ENABLED } from '../constants/listingIntents';
 import { DIVISIONS, POPULAR_AREAS, POPULAR_AREA_IMAGES, POPULAR_AREA_IMAGES_DESKTOP, POPULAR_AREA_TAGLINES, POPULAR_AREA_SUBZONES, buildSearchUrl } from '../data/searchData';
 import LocationSearchModal from './shared/LocationSearchModal';
+import YouTubeBackground from './shared/YouTubeBackground';
 import { useAppInstall, requestInstallGuide } from '../hooks/useAppInstall';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -444,125 +445,6 @@ const PopularAreasAccordion = ({
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HERO BACKGROUND VIDEO — a YouTube loop with none of YouTube's own UI
-// ─────────────────────────────────────────────────────────────────────────────
-// A plain `?autoplay=1&controls=0` embed still paints player chrome over the
-// frame, which is what the old backdrop-blur layer was trying to smear away:
-//   • the big centre play button, while the first frame loads (and forever, if
-//     the browser refuses autoplay),
-//   • the play/pause + replay flash on every `loop=1` restart, because the
-//     parameter re-cues the video rather than rewinding it,
-//   • the end screen with suggested videos when the clip runs out.
-// Driving the player through the IFrame API removes all three: a poster covers
-// the frame until the player reports PLAYING, and the clip is rewound just
-// before it ends so the player never reaches a stopped state.
-let ytApiPromise = null;
-const loadYouTubeApi = () => {
-  if (window.YT?.Player) return Promise.resolve(window.YT);
-  if (ytApiPromise) return ytApiPromise;
-  ytApiPromise = new Promise((resolve) => {
-    const prevReady = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => { prevReady?.(); resolve(window.YT); };
-    const script = document.createElement('script');
-    script.src   = 'https://www.youtube.com/iframe_api';
-    script.async = true;
-    document.head.appendChild(script);
-  });
-  return ytApiPromise;
-};
-
-// The player is sized to a true 16:9 cover box so the video fills the frame
-// with no letterbox bars, and so the iframe's edges (where the player would put
-// its title/branding row) fall outside the parent's crop.
-const HERO_VIDEO_CSS = `
-.hero-video-shell { container-type: size; }
-.hero-video-shell iframe {
-  position:absolute; top:50%; left:50%;
-  transform:translate(-50%,-50%);
-  border:0; pointer-events:none;
-  width:100%; height:100%;                     /* fallback: no container units */
-  width: max(100cqw, calc(100cqh * 16 / 9));
-  height:max(100cqh, calc(100cqw * 9 / 16));
-}
-`;
-
-const HeroBackgroundVideo = ({ videoId }) => {
-  const mountRef = useRef(null);
-  const playerRef = useRef(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  useEffect(() => {
-    if (!videoId || !mountRef.current) return;
-    // Respect reduced-motion: keep the still poster, never start the loop.
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-
-    let cancelled = false;
-    let loopTimer = null;
-    // The API swaps this node out for its iframe, so it must be a throwaway
-    // child rather than the React-owned wrapper (StrictMode mounts twice).
-    const host = document.createElement('div');
-    mountRef.current.appendChild(host);
-
-    loadYouTubeApi().then((YT) => {
-      if (cancelled) return;
-      playerRef.current = new YT.Player(host, {
-        videoId,
-        host: 'https://www.youtube-nocookie.com',
-        playerVars: {
-          autoplay: 1, mute: 1, controls: 0, disablekb: 1, fs: 0,
-          rel: 0, modestbranding: 1, playsinline: 1,
-          iv_load_policy: 3, cc_load_policy: 0,
-          origin: window.location.origin,
-        },
-        events: {
-          onReady: (e) => {
-            e.target.getIframe()?.setAttribute('title', 'To-Let Pro background video');
-            e.target.mute();          // required, or autoplay is refused
-            e.target.playVideo();
-            loopTimer = setInterval(() => {
-              const p = playerRef.current;
-              if (!p?.getDuration) return;
-              const duration = p.getDuration();
-              if (duration > 0 && duration - p.getCurrentTime() < 0.4) p.seekTo(0, true);
-            }, 250);
-          },
-          onStateChange: (e) => {
-            if (e.data === YT.PlayerState.PLAYING) setIsPlaying(true);
-            // -1 (unstarted) / 2 (paused) are the states that paint a centre
-            // button, so the poster comes back over them.
-            else if (e.data === -1 || e.data === YT.PlayerState.PAUSED) setIsPlaying(false);
-            if (e.data === YT.PlayerState.ENDED) { e.target.seekTo(0, true); e.target.playVideo(); }
-          },
-        },
-      });
-    });
-
-    return () => {
-      cancelled = true;
-      if (loopTimer) clearInterval(loopTimer);
-      playerRef.current?.destroy?.();
-      playerRef.current = null;
-      host.remove();
-    };
-  }, [videoId]);
-
-  return (
-    <>
-      <style dangerouslySetInnerHTML={{ __html: HERO_VIDEO_CSS }} />
-      <div ref={mountRef} className="hero-video-shell absolute inset-0 overflow-hidden" aria-hidden="true" />
-      {/* Poster = the clip's own thumbnail, so the hand-off is seamless. */}
-      <img
-        src={`https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`}
-        alt=""
-        aria-hidden="true"
-        onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`; }}
-        className={`absolute inset-0 w-full h-full object-cover z-[5] pointer-events-none transition-opacity duration-700 ${isPlaying ? 'opacity-0' : 'opacity-100'}`}
-      />
-    </>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
 // COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 const HeroSection = () => {
@@ -792,10 +674,11 @@ const HeroSection = () => {
         {/* ═══════════════════════════════════════════════════════════════ */}
         <section className="w-full max-w-[1400px] mx-auto px-4 md:px-6 pt-4">
           <div className="relative w-full h-[240px] md:h-[300px] lg:h-[380px] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-sm flex flex-col justify-center items-center text-center">
-            <HeroBackgroundVideo videoId={HERO_YOUTUBE_ID} />
-            {/* Cinematic gradient for headline contrast. The blur layer that used
-                to sit here only existed to smudge YouTube's centre buttons —
-                HeroBackgroundVideo keeps them off screen, so the video stays sharp. */}
+            <YouTubeBackground videoId={HERO_YOUTUBE_ID} title="To-Let Pro hero video" />
+            {/* Cinematic gradient for headline contrast, layered above the
+                poster's z-5. The blur layer that used to sit here only existed to
+                smudge YouTube's centre buttons — YouTubeBackground handles those
+                now, so the video stays sharp. */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/30 z-10" />
             <div className="relative z-20 px-4 -mt-12 md:-mt-20 md:hidden">
               <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1] mb-3 drop-shadow-2xl">
@@ -1032,31 +915,31 @@ const HeroSection = () => {
 
           {/* ── Trust badges ── */}
           <div className="flex items-stretch justify-center gap-3 md:gap-4 mt-5 md:mt-6 flex-wrap relative z-10">
-            <div className="flex items-center gap-3 px-4 py-3 bg-[#13192b] rounded-2xl border border-slate-700/50 hover:border-emerald-500/50 cursor-pointer transition-all duration-200 group min-w-[140px] md:min-w-[170px]">
-              <div className="w-8 h-8 rounded-lg bg-emerald-900/40 flex items-center justify-center shrink-0 group-hover:bg-emerald-900/60 transition-colors">
-                <ShieldCheck size={16} className="text-emerald-400" />
+            <div className="flex items-center gap-3 px-5 py-3.5 md:px-6 md:py-4 bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.12)] border border-white/70 hover:border-emerald-300 hover:bg-emerald-50/90 hover:shadow-[0_6px_28px_rgba(16,185,129,0.2)] cursor-pointer transition-all duration-200 group min-w-[140px] md:min-w-[170px]">
+              <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0 group-hover:bg-emerald-200 transition-colors">
+                <ShieldCheck size={18} className="text-emerald-600" />
               </div>
               <div className="flex flex-col">
-                <span className="text-xs font-black text-white whitespace-nowrap leading-tight">{t?.verifiedHosts || 'Verified Hosts'}</span>
-                <span className="text-[10px] font-medium text-slate-400 whitespace-nowrap">100% Trusted</span>
+                <span className="text-xs md:text-sm font-black text-slate-800 whitespace-nowrap leading-tight">{t?.verifiedHosts || 'Verified Hosts'}</span>
+                <span className="text-[10px] md:text-[11px] font-semibold text-slate-500 whitespace-nowrap">100% Trusted</span>
               </div>
             </div>
-            <div className="flex items-center gap-3 px-4 py-3 bg-[#13192b] rounded-2xl border border-slate-700/50 hover:border-blue-500/50 cursor-pointer transition-all duration-200 group min-w-[140px] md:min-w-[170px]">
-              <div className="w-8 h-8 rounded-lg bg-blue-900/40 flex items-center justify-center shrink-0 group-hover:bg-blue-900/60 transition-colors">
-                <Zap size={16} className="text-blue-400" />
+            <div className="flex items-center gap-3 px-5 py-3.5 md:px-6 md:py-4 bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.12)] border border-white/70 hover:border-blue-300 hover:bg-blue-50/90 hover:shadow-[0_6px_28px_rgba(59,130,246,0.2)] cursor-pointer transition-all duration-200 group min-w-[140px] md:min-w-[170px]">
+              <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0 group-hover:bg-blue-200 transition-colors">
+                <Zap size={18} className="text-blue-600" />
               </div>
               <div className="flex flex-col">
-                <span className="text-xs font-black text-white whitespace-nowrap leading-tight">{t?.instantBooking || 'Instant Booking'}</span>
-                <span className="text-[10px] font-medium text-slate-400 whitespace-nowrap">Book in seconds</span>
+                <span className="text-xs md:text-sm font-black text-slate-800 whitespace-nowrap leading-tight">{t?.instantBooking || 'Instant Booking'}</span>
+                <span className="text-[10px] md:text-[11px] font-semibold text-slate-500 whitespace-nowrap">Book in seconds</span>
               </div>
             </div>
-            <div className="flex items-center gap-3 px-4 py-3 bg-[#13192b] rounded-2xl border border-slate-700/50 hover:border-amber-500/50 cursor-pointer transition-all duration-200 group min-w-[140px] md:min-w-[170px]">
-              <div className="w-8 h-8 rounded-lg bg-amber-900/40 flex items-center justify-center shrink-0 group-hover:bg-amber-900/60 transition-colors">
-                <HeadphonesIcon size={16} className="text-amber-400" />
+            <div className="flex items-center gap-3 px-5 py-3.5 md:px-6 md:py-4 bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.12)] border border-white/70 hover:border-amber-300 hover:bg-amber-50/90 hover:shadow-[0_6px_28px_rgba(245,158,11,0.2)] cursor-pointer transition-all duration-200 group min-w-[140px] md:min-w-[170px]">
+              <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0 group-hover:bg-amber-200 transition-colors">
+                <HeadphonesIcon size={18} className="text-amber-600" />
               </div>
               <div className="flex flex-col">
-                <span className="text-xs font-black text-white whitespace-nowrap leading-tight">{t?.support247 || '24/7 Support'}</span>
-                <span className="text-[10px] font-medium text-slate-400 whitespace-nowrap">Always here for you</span>
+                <span className="text-xs md:text-sm font-black text-slate-800 whitespace-nowrap leading-tight">{t?.support247 || '24/7 Support'}</span>
+                <span className="text-[10px] md:text-[11px] font-semibold text-slate-500 whitespace-nowrap">Always here for you</span>
               </div>
             </div>
           </div>
