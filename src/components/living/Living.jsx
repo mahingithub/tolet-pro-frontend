@@ -223,7 +223,7 @@ const Living = () => {
 
             <button
               data-tour="living-profile"
-              onClick={() => navigate('/tenant-dashboard?tab=profile')}
+              onClick={() => navigate('/tenant-dashboard')}
               className="rounded-full border border-white/80 shadow-sm active:scale-90 transition"
               aria-label={isBn ? 'প্রোফাইল' : 'Profile'}
             >
