@@ -274,6 +274,16 @@ const WalletSummary = ({ go, me, language }) => {
     return () => window.removeEventListener('tour:action', handleTourAction);
   }, []);
 
+  const moreCard = (
+    <Card className="px-4 py-1.5">
+      <div className="divide-y divide-gray-50">
+        <MoreRow icon={PieChart} tint="bg-violet-50" text="text-violet-600" label={isBn ? "মাসিক রিপোর্ট" : "Monthly Report"} onClick={() => go("report")} />
+        <MoreRow icon={Activity} tint="bg-blue-50" text="text-blue-600" label={isBn ? "একটিভিটি টাইমলাইন" : "Activity Timeline"} onClick={() => go("activity")} />
+        <MoreRow icon={BellRing} tint="bg-rose-50" text="text-red-600" label={isBn ? "স্মার্ট রিমাইন্ডার" : "Smart Reminders"} badge={reminders.length} onClick={() => go("reminders")} />
+      </div>
+    </Card>
+  );
+
   const copyCode = async () => {
     try {
       await navigator.clipboard.writeText(inviteCode);
@@ -321,8 +331,8 @@ const WalletSummary = ({ go, me, language }) => {
         </div>
       </div>
 
-      {/* ── Quick actions ───────────────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-2.5">
+      {/* ── Quick actions (hidden on desktop to avoid duplicating Featured Rail) ── */}
+      <div className="grid grid-cols-4 gap-2.5 xl:hidden">
         {QUICK.map((q) => (
           <button
             key={q.id}
@@ -353,13 +363,9 @@ const WalletSummary = ({ go, me, language }) => {
           </div>
 
           {/* ── More (Report / Activity / Reminders) ─────────────────────── */}
-          <Card className="px-4 py-1.5">
-            <div className="divide-y divide-gray-50">
-              <MoreRow icon={PieChart} tint="bg-violet-50" text="text-violet-600" label={isBn ? 'মাসিক রিপোর্ট' : 'Monthly Report'} onClick={() => go('report')} />
-              <MoreRow icon={Activity} tint="bg-blue-50" text="text-blue-600" label={isBn ? 'একটিভিটি টাইমলাইন' : 'Activity Timeline'} onClick={() => go('activity')} />
-              <MoreRow icon={BellRing} tint="bg-rose-50" text="text-red-600" label={isBn ? 'স্মার্ট রিমাইন্ডার' : 'Smart Reminders'} badge={reminders.length} onClick={() => go('reminders')} />
-            </div>
-          </Card>
+          <div className="hidden lg:block">
+            {moreCard}
+          </div>
         </div>
 
       {/* ── Household / Roommates ────────────────────────────────────── */}
@@ -471,6 +477,11 @@ const WalletSummary = ({ go, me, language }) => {
         </Card>
       )}
 
+      </div>
+
+      {/* ── More (Report / Activity / Reminders) for Mobile/Tablet ── */}
+      <div className="block lg:hidden mt-4">
+        {moreCard}
       </div>
 
       <AddRoommateSheet open={addOpen} onClose={() => setAddOpen(false)} isBn={isBn} onAdd={addRoommate} />

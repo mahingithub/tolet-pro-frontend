@@ -148,7 +148,7 @@ const Living = () => {
   const ActiveModule = MODULE_COMPONENTS[module] || WalletSummary;
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#eaeff5] font-sans relative overflow-x-hidden text-gray-900 selection:bg-[#ba0036] selection:text-white">
+    <div className="flex flex-col min-h-screen bg-[#eaeff5] font-sans relative text-gray-900 selection:bg-[#ba0036] selection:text-white">
       {/* Decorative orbs. Promoted to their own GPU layer (translateZ + will-change)
           so the browser re-composites instead of repainting the huge blur on every
           scroll frame — this is what made desktop scrolling feel janky. */}
@@ -256,7 +256,7 @@ const Living = () => {
         <aside className="hidden lg:block w-60 shrink-0 lg:sticky lg:top-[80px]">
           {/* Solid bg (no backdrop-blur): this rail is sticky, so blurring its
               backdrop every scroll frame was a desktop-jank source. */}
-          <nav data-tour="living-desktop-nav" className="bg-white/95 border border-white/80 rounded-3xl p-2 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.35)] space-y-1 lg:h-[calc(100vh-100px)] overflow-y-auto scrollbar-hide">
+          <nav data-tour="living-desktop-nav" className="bg-white/95 border border-white/80 rounded-3xl p-2 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.35)] space-y-1 max-h-[calc(100vh-100px)] overflow-y-auto scrollbar-hide">
             {MODULES.map((m) => {
               const Icon = m.icon;
               const active = module === m.id;
@@ -307,7 +307,7 @@ const Living = () => {
             so a rail there just duplicates it); shown on the focused modules
             where a persistent wallet snapshot genuinely helps. */}
         {module !== 'overview' && module !== 'meals' && (
-          <aside className="hidden xl:block w-72 shrink-0 xl:sticky xl:top-[80px] pb-12">
+          <aside className="hidden xl:block w-72 shrink-0 xl:sticky xl:top-[80px] max-h-[calc(100vh-100px)] overflow-y-auto scrollbar-hide pb-12">
             <FeaturedRail go={go} me={me} language={language} />
           </aside>
         )}
