@@ -278,9 +278,15 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
   const [rateOpen, setRateOpen] = useState(false);
   const [historyOpenFor, setHistoryOpenFor] = useState(null); // roommate ID
   const [pendingDelete, setPendingDelete] = useState(null);
-  const [isMobileLayout, setIsMobileLayout] = useState(window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isTablet, setIsTablet] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
   useEffect(() => {
-    const handleResize = () => setIsMobileLayout(window.innerWidth < 768);
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+      setIsTablet(window.innerWidth >= 768 && window.innerWidth < 1024);
+      setIsDesktop(window.innerWidth >= 1024);
+    };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -413,8 +419,8 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       </div>
 
       {/* two/three columns on tablet/desktop → less scroll; phones keep single column */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 xl:gap-6 items-start">
-        {/* left column */}
+      <div className="md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-4 md:items-start space-y-4 md:space-y-0">
+        {/* COL 1 */}
         <div className="space-y-4 min-w-0">
       {/* mess summary */}
       <div id="mm-summary" className="scroll-mt-24">
@@ -523,6 +529,8 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
         </Card>
       )}
  
+          {(isMobile || isTablet) && (
+            <>
       {/* everyone's account (manager table) */}
       <div id="mm-accounts" className="scroll-mt-24">
       <Card className="p-4">
@@ -563,8 +571,10 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       </Card>
       </div>
 
-          {isMobileLayout ? (
-            <React.Fragment>
+            </>
+          )}
+          {isMobile && (
+            <>
       {/* daily meal editor */}
       <div id="mm-log" className="scroll-mt-24">
       <Card className="p-4">
@@ -623,9 +633,6 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       </Card>
       </div>
 
-            </React.Fragment>
-          ) : (
-            <React.Fragment>
       {/* deposits list */}
       <div id="mm-deposits" className="scroll-mt-24">
       <Card className="p-4">
@@ -732,13 +739,55 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       </Card>
       </div>
 
-            </React.Fragment>
+            </>
           )}
         </div>
-        {/* right column */}
-        <div className="space-y-4 min-w-0">
-          {isMobileLayout ? (
-            <React.Fragment>
+
+        {/* COL 2 (Tablet & Desktop) */}
+        {!isMobile && (
+          <div className="space-y-4 min-w-0">
+            {isDesktop && (
+              <>
+      {/* everyone's account (manager table) */}
+      <div id="mm-accounts" className="scroll-mt-24">
+      <Card className="p-4">
+        <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-2 flex items-center gap-1.5">
+          <UtensilsCrossed size={15} className="text-gray-400" /> {isBn ? 'সবার হিসাব' : "Everyone's account"}
+        </h3>
+        <div className="grid grid-cols-[1.5fr_0.7fr_1fr_1.05fr] gap-2 px-1 pb-2 text-[10px] font-black uppercase tracking-wider text-gray-400">
+          <span>{isBn ? 'নাম' : 'Name'}</span>
+          <span className="text-right">{isBn ? 'মিল' : 'Meals'}</span>
+          <span className="text-right">{isBn ? 'জমা' : 'Deposit'}</span>
+          <span className="text-right">{isBn ? 'ব্যালেন্স' : 'Balance'}</span>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {summary.perMember.map((p) => (
+            <button key={p.id} onClick={() => setHistoryOpenFor(p.id)} className="w-full grid grid-cols-[1.5fr_0.7fr_1fr_1.05fr] gap-2 items-center py-2.5 active:bg-gray-50 transition text-left">
+              <div className="flex items-center gap-2 min-w-0">
+                <Avatar roommate={p} size={28} />
+                <div className="min-w-0">
+                  <span className="text-[12.5px] font-bold text-gray-800 truncate block">{p.isMe ? (isBn ? 'আপনি' : 'You') : p.name}</span>
+                  {/* the "why" behind the balance: carry-over and this month's charge */}
+                  <span className="text-[9px] font-bold text-gray-400 truncate block">
+                    {isBn ? 'আগের' : 'Prev'} {takaSigned(p.opening, language)} · {isBn ? 'খরচ' : 'Cost'} −{taka(p.mealCost, language)}
+                  </span>
+                </div>
+              </div>
+              <span className="text-right text-[12.5px] font-black text-gray-900 tabular-nums">{num(p.meals, language)}</span>
+              <span className="text-right text-[12.5px] font-bold text-gray-600 tabular-nums">{taka(p.deposit, language)}</span>
+              <span className={cx('text-right text-[12.5px] font-black tabular-nums', p.balance >= 0 ? 'text-emerald-600' : 'text-red-600')}>{takaSigned(p.balance, language)}</span>
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] font-semibold text-gray-400 mt-2 leading-relaxed flex items-start gap-1.5">
+          <Info size={12} className="shrink-0 mt-0.5" />
+          {isBn
+            ? 'ব্যালেন্সে আগের মাসের পাওনা/দেনা যোগ করা আছে — মাস বদলালেও টাকা হারায় না।'
+            : "Balance includes each member's carry-over from previous months — money never disappears when the month changes."}
+        </p>
+      </Card>
+      </div>
+
       {/* deposits list */}
       <div id="mm-deposits" className="scroll-mt-24">
       <Card className="p-4">
@@ -845,9 +894,116 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       </Card>
       </div>
 
-            </React.Fragment>
-          ) : (
-            <React.Fragment>
+              </>
+            )}
+            {isTablet && (
+              <>
+      {/* deposits list */}
+      <div id="mm-deposits" className="scroll-mt-24">
+      <Card className="p-4">
+        <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-1 flex items-center gap-1.5">
+          <PiggyBank size={15} className="text-emerald-600" /> {isBn ? 'জমার হিস্ট্রি' : 'Deposits'}
+          <span className="text-[9.5px] font-bold text-gray-400 ml-auto">{periodLabel}</span>
+        </h3>
+        {monthDeposits.length === 0 ? (
+          <EmptyState icon={HandCoins} title={isBn ? 'কোনো জমা নেই' : 'No deposits yet'} subtitle={isBn ? 'মেস ফান্ডে টাকা জমা দিন' : 'Add money to the meal fund'} />
+        ) : (
+          <>
+            <div className="divide-y divide-gray-50">
+            {displayedDeposits.map((d) => {
+              const who = roommateById(roommates, d.roommateId);
+              return (
+                <div key={d.id} className="flex items-center gap-3 py-2.5">
+                  <Avatar roommate={who} size={32} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12.5px] font-bold text-gray-800 truncate">{who.isMe ? (isBn ? 'আপনি' : 'You') : who.name}</p>
+                    <p className="text-[11px] font-medium text-gray-400 truncate">{d.note || (isBn ? 'জমা' : 'Deposit')} · {dateLabel(d.date, language)}</p>
+                    {d.createdBy && d.createdBy !== d.roommateId && (
+                      <p className="text-[9px] font-bold text-gray-400 truncate mt-0.5">
+                        {isBn ? 'যুক্ত করেছেন ' : 'Added by '}{roommateById(roommates, d.createdBy).name}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-[13px] font-black text-emerald-600 shrink-0">+{taka(d.amount, language)}</span>
+                  <button onClick={() => setPendingDelete({ kind: 'deposit', id: d.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          {monthDeposits.length > 4 && (
+            <button
+              onClick={() => setShowAllDeposits(!showAllDeposits)}
+              className="w-full mt-2 py-2 text-[12px] font-bold text-[#ba0036] hover:bg-[#ba0036]/5 rounded-xl transition"
+            >
+              {showAllDeposits ? (isBn ? 'কম দেখুন' : 'Show less') : (isBn ? 'আরও দেখুন' : 'See more')}
+            </button>
+          )}
+          </>
+        )}
+      </Card>
+      </div>
+
+      {/* bazar list */}
+      <div id="mm-bazar" className="scroll-mt-24">
+      <Card className="p-4">
+        <h3 className="text-[14px] font-black text-gray-900 tracking-tight mb-2 flex items-center justify-between gap-1.5">
+          <span className="flex items-center gap-1.5"><ShoppingBasket size={15} className="text-amber-600" /> {isBn ? 'বাজারের হিস্ট্রি' : 'Bazar'}</span>
+          <span className="text-[9.5px] font-bold text-gray-400">{periodLabel}</span>
+        </h3>
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-2 mb-3 border-b border-gray-50">
+          <button
+            onClick={() => setBazarWeekFilter(null)}
+            className={`px-2.5 py-1 rounded-lg text-[10px] font-black whitespace-nowrap transition-colors ${bazarWeekFilter === null ? 'bg-[#ba0036] text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+          >
+            {isBn ? 'সব' : 'All'}
+          </button>
+          {weeks.map((w) => (
+            <button
+              key={w.index}
+              onClick={() => setBazarWeekFilter(w.index)}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-black whitespace-nowrap transition-colors ${bazarWeekFilter === w.index ? 'bg-[#ba0036] text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+            >
+              {isBn ? `সপ্তাহ ${num(w.index, language)}` : `W${w.index}`}
+            </button>
+          ))}
+        </div>
+        {filteredBazar.length === 0 ? (
+          <EmptyState icon={ShoppingBasket} title={isBn ? 'কোনো বাজার নেই' : 'No bazar yet'} subtitle={isBn ? 'মিলের বাজার যোগ করুন' : 'Add the meal groceries'} />
+        ) : (
+          <>
+            <div className="divide-y divide-gray-50">
+            {displayedBazar.map((g) => {
+              const payer = roommateById(roommates, g.paidBy);
+              return (
+                <div key={g.id} className="flex items-center gap-3 py-2.5">
+                  <IconBadge icon={ShoppingBasket} tint="bg-amber-50" text="text-amber-600" size={32} iconSize={15} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12.5px] font-bold text-gray-800 truncate">{g.note || (isBn ? 'বাজার' : 'Bazar')}</p>
+                    <p className="text-[11px] font-medium text-gray-400 truncate">{payer.isMe ? (isBn ? 'আপনি' : 'You') : payer.name} · {dateLabel(g.date, language)}</p>
+                  </div>
+                  <span className="text-[13px] font-black text-gray-900 shrink-0">{taka(g.amount, language)}</span>
+                  <button onClick={() => setPendingDelete({ kind: 'grocery', id: g.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          {filteredBazar.length > 4 && (
+            <button
+              onClick={() => setShowAllBazar(!showAllBazar)}
+              className="w-full mt-2 py-2 text-[12px] font-bold text-[#ba0036] hover:bg-[#ba0036]/5 rounded-xl transition"
+            >
+              {showAllBazar ? (isBn ? 'কম দেখুন' : 'Show less') : (isBn ? 'আরও দেখুন' : 'See more')}
+            </button>
+          )}
+          </>
+        )}
+      </Card>
+      </div>
+
       {/* daily meal editor */}
       <div id="mm-log" className="scroll-mt-24">
       <Card className="p-4">
@@ -906,9 +1062,74 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       </Card>
       </div>
 
-            </React.Fragment>
-          )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* COL 3 (Desktop Only) */}
+        {isDesktop && (
+          <div className="space-y-4 min-w-0">
+      {/* daily meal editor */}
+      <div id="mm-log" className="scroll-mt-24">
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-[14px] font-black text-gray-900 tracking-tight flex items-center gap-1.5">
+            <ChefHat size={15} className="text-gray-400" /> {isBn ? 'মিল লগ' : 'Log meals'}
+          </h3>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setDayOffset((o) => o + 1)} className="p-1.5 rounded-lg bg-gray-50 border border-gray-100 text-gray-500 active:scale-90 transition" aria-label="previous day">
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-[11px] font-black text-gray-600 min-w-[64px] text-center">
+              {dayOffset === 0 ? (isBn ? 'আজ' : 'Today') : dateLabel(iso, language)}
+            </span>
+            <button onClick={() => setDayOffset((o) => Math.max(0, o - 1))} disabled={dayOffset === 0} className="p-1.5 rounded-lg bg-gray-50 border border-gray-100 text-gray-500 active:scale-90 transition disabled:opacity-40" aria-label="next day">
+              <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
+        <div className="space-y-2.5">
+          {roommates.map((r) => {
+            const m = getMeal(r.id);
+            const total = (m.breakfast || 0) + (m.lunch || 0) + (m.dinner || 0);
+            return (
+              <div key={r.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
+                <div className="flex items-start gap-2 mb-2.5">
+                  <Avatar roommate={r} size={28} />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[13px] font-black text-gray-800 flex-1">{r.isMe ? (isBn ? 'আপনি' : 'You') : r.name}</span>
+                    {(m.editedBy || m.createdBy) && (
+                      <p className="text-[9px] font-bold text-gray-400 truncate mt-0.5">
+                        {m.editedBy ? (isBn ? 'এডিট করেছেন ' : 'Edited by ') : (isBn ? 'যুক্ত করেছেন ' : 'Added by ')}
+                        {roommateById(roommates, m.editedBy || m.createdBy).name}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-[11px] font-black text-gray-400 mt-1">{num(total, language)} {isBn ? 'মিল' : 'meals'}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {MEALS.map((meal) => {
+                    const MIcon = meal.icon;
+                    return (
+                      <div key={meal.key} className="flex flex-col items-center gap-1.5 bg-white rounded-xl py-2 border border-gray-100">
+                        <span className="flex items-center gap-1 text-[10px] font-black text-gray-500">
+                          <MIcon size={12} /> {isBn ? meal.bn : meal.en}
+                        </span>
+                        <Stepper value={m[meal.key] || 0} onChange={(v) => setMeal(iso, r.id, meal.key, v)} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+      </div>
+
+          </div>
+        )}
       </div>
       <DepositSheet open={depositOpen} onClose={() => setDepositOpen(false)} roommates={roommates} onSave={addDeposit} />
       <GrocerySheet open={bazarOpen} onClose={() => setBazarOpen(false)} roommates={roommates} onSave={addGrocery} />
