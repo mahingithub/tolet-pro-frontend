@@ -272,6 +272,8 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
   const [dayOffset, setDayOffset] = useState(0);
   const [depositOpen, setDepositOpen] = useState(false);
   const [bazarOpen, setBazarOpen] = useState(false);
+  const [showAllDeposits, setShowAllDeposits] = useState(false);
+  const [showAllBazar, setShowAllBazar] = useState(false);
   const [rateOpen, setRateOpen] = useState(false);
   const [historyOpenFor, setHistoryOpenFor] = useState(null); // roommate ID
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -326,15 +328,18 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
 
   // Deposit/bazar history scoped to the selected month (newest first).
   const monthDeposits = useMemo(
-    () => [...(deposits || [])].filter((d) => inDateRange(d.date, summary.range)).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8),
+    () => [...(deposits || [])].filter((d) => inDateRange(d.date, summary.range)).sort((a, b) => new Date(b.date) - new Date(a.date)),
     [deposits, summary.range]
   );
   const monthBazar = useMemo(
-    () => [...(groceries || [])].filter((g) => inDateRange(g.date, summary.range)).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8),
+    () => [...(groceries || [])].filter((g) => inDateRange(g.date, summary.range)).sort((a, b) => new Date(b.date) - new Date(a.date)),
     [groceries, summary.range]
   );
 
   const periodLabel = monthLabel(summary.range.start, language);
+  
+  const displayedDeposits = showAllDeposits ? monthDeposits : monthDeposits.slice(0, 4);
+  const displayedBazar = showAllBazar ? monthBazar : monthBazar.slice(0, 4);
   const weekRangeLabel = (w) =>
     `${num(w.start.getDate(), language)}–${num(w.end.getDate(), language)} ${w.start.toLocaleDateString(isBn ? 'bn-BD' : 'en-GB', { month: 'short' })}`;
 
@@ -563,8 +568,9 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
         {monthDeposits.length === 0 ? (
           <EmptyState icon={HandCoins} title={isBn ? 'কোনো জমা নেই' : 'No deposits yet'} subtitle={isBn ? 'মেস ফান্ডে টাকা জমা দিন' : 'Add money to the meal fund'} />
         ) : (
-          <div className="divide-y divide-gray-50">
-            {monthDeposits.map((d) => {
+          <>
+            <div className="divide-y divide-gray-50">
+            {displayedDeposits.map((d) => {
               const who = roommateById(roommates, d.roommateId);
               return (
                 <div key={d.id} className="flex items-center gap-3 py-2.5">
@@ -586,6 +592,15 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
               );
             })}
           </div>
+          {monthDeposits.length > 4 && (
+            <button
+              onClick={() => setShowAllDeposits(!showAllDeposits)}
+              className="w-full mt-2 py-2 text-[12px] font-bold text-[#ba0036] hover:bg-[#ba0036]/5 rounded-xl transition"
+            >
+              {showAllDeposits ? (isBn ? 'কম দেখুন' : 'Show less') : (isBn ? 'আরও দেখুন' : 'See more')}
+            </button>
+          )}
+          </>
         )}
       </Card>
       </div>
@@ -729,8 +744,9 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
         {monthDeposits.length === 0 ? (
           <EmptyState icon={HandCoins} title={isBn ? 'কোনো জমা নেই' : 'No deposits yet'} subtitle={isBn ? 'মেস ফান্ডে টাকা জমা দিন' : 'Add money to the meal fund'} />
         ) : (
-          <div className="divide-y divide-gray-50">
-            {monthDeposits.map((d) => {
+          <>
+            <div className="divide-y divide-gray-50">
+            {displayedDeposits.map((d) => {
               const who = roommateById(roommates, d.roommateId);
               return (
                 <div key={d.id} className="flex items-center gap-3 py-2.5">
@@ -752,6 +768,15 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
               );
             })}
           </div>
+          {monthDeposits.length > 4 && (
+            <button
+              onClick={() => setShowAllDeposits(!showAllDeposits)}
+              className="w-full mt-2 py-2 text-[12px] font-bold text-[#ba0036] hover:bg-[#ba0036]/5 rounded-xl transition"
+            >
+              {showAllDeposits ? (isBn ? 'কম দেখুন' : 'Show less') : (isBn ? 'আরও দেখুন' : 'See more')}
+            </button>
+          )}
+          </>
         )}
       </Card>
       </div>
@@ -767,8 +792,9 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
         {monthBazar.length === 0 ? (
           <EmptyState icon={ShoppingBasket} title={isBn ? 'কোনো বাজার নেই' : 'No bazar yet'} subtitle={isBn ? 'মিলের বাজার যোগ করুন' : 'Add the meal groceries'} />
         ) : (
-          <div className="divide-y divide-gray-50">
-            {monthBazar.map((g) => {
+          <>
+            <div className="divide-y divide-gray-50">
+            {displayedBazar.map((g) => {
               const payer = roommateById(roommates, g.paidBy);
               return (
                 <div key={g.id} className="flex items-center gap-3 py-2.5">
@@ -785,6 +811,15 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
               );
             })}
           </div>
+          {monthBazar.length > 4 && (
+            <button
+              onClick={() => setShowAllBazar(!showAllBazar)}
+              className="w-full mt-2 py-2 text-[12px] font-bold text-[#ba0036] hover:bg-[#ba0036]/5 rounded-xl transition"
+            >
+              {showAllBazar ? (isBn ? 'কম দেখুন' : 'Show less') : (isBn ? 'আরও দেখুন' : 'See more')}
+            </button>
+          )}
+          </>
         )}
       </Card>
       </div>

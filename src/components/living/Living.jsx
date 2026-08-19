@@ -274,10 +274,10 @@ const Living = () => {
         </div>
 
         {/* DESKTOP: vertical sidebar nav (all modules) */}
-        <aside className="hidden lg:block w-60 shrink-0 lg:sticky lg:top-[80px]">
+        <aside className="hidden lg:flex flex-col w-60 shrink-0 lg:sticky lg:top-[80px] lg:h-[calc(100vh-96px)]">
           {/* Solid bg (no backdrop-blur): this rail is sticky, so blurring its
               backdrop every scroll frame was a desktop-jank source. */}
-          <nav data-tour="living-desktop-nav" className="bg-white/95 border border-white/80 rounded-3xl p-2 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.35)] space-y-1 max-h-[calc(100vh-100px)] overflow-y-auto scrollbar-hide">
+          <nav data-tour="living-desktop-nav" className="bg-[#1a1f2e] border border-[#2d3748] rounded-3xl p-2 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.5)] space-y-1 flex-1 overflow-y-auto scrollbar-hide">
             {MODULES.map((m) => {
               const Icon = m.icon;
               const active = module === m.id;
@@ -288,10 +288,10 @@ const Living = () => {
                   data-tour={`living-tab-${m.id}`}
                   onClick={() => go(m.id)}
                   className={cx(
-                    'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-[13px] font-black tracking-tight transition-all active:scale-[0.98]',
+                    'w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl text-[13px] font-black tracking-tight transition-all active:scale-[0.98]',
                     active
                       ? 'bg-[#ba0036] text-white shadow-[0_10px_22px_-10px_rgba(186,0,54,0.6)]'
-                      : 'text-gray-600 hover:bg-white hover:text-gray-900'
+                      : 'text-gray-300 hover:bg-white/10 hover:text-white'
                   )}
                   aria-current={active ? 'page' : undefined}
                 >
