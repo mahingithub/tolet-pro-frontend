@@ -729,7 +729,7 @@ export default function BookingsTab(props) {
 
                     The search box and the pills that act on it always sit
                     together, directly above the results they produce. */}
-                <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:-mx-4 lg:-mx-2 px-3 sm:px-4 lg:px-2 pt-2 pb-3 mb-2 lg:pt-1">
+                <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:-mx-4 lg:-mx-3 px-3 sm:px-4 lg:px-6 pt-2 pb-3 mb-2 lg:pt-1">
                   {/* Line 1 — who/what + the primary action. Search joins this
                       line from the sm breakpoint up. */}
                   <div className="flex items-center gap-2">
