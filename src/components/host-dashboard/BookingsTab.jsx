@@ -196,29 +196,31 @@ export default function BookingsTab(props) {
                   {/* 3-dot actions menu — top-right of the card, next to the profile
                       photo/name. stopPropagation keeps opening it from toggling the row; 
                       it opens downward so it doesn't get clipped. */}
-                  <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      type="button"
-                      onClick={() => setActiveDropdownId(activeDropdownId === booking.id ? null : booking.id)}
-                      className="p-1.5 rounded-lg bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"
-                      title={language === 'বাংলা' ? 'আরও অ্যাকশন' : 'More actions'}
-                    >
-                      <MoreVertical size={16}/>
-                    </button>
-                    {activeDropdownId === booking.id && (
-                      <div className="absolute right-0 top-full mt-2 w-52 bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[50] animate-in fade-in zoom-in-95 origin-top-right border border-gray-100">
-                        {/* Tenant change — the outgoing tenant left, so hand
-                            this unit to the next one. Carries the whole unit
-                            over; the host only edits name + phone. */}
-                        <button onClick={() => openTenantChangeLease(booking)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-700 transition-colors text-left"><RefreshCw size={14}/> {isBn ? 'নতুন ভাড়াটিয়া · নতুন লিজ' : 'New Tenant · New Lease'}</button>
-                        <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
-                        <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
-                        <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
-                        <div className="h-px w-full bg-gray-100 my-1"></div>
-                        <button onClick={() => { setActiveDropdownId(null); setConfirmDeleteBookingId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
-                      </div>
-                    )}
-                  </div>
+                  {isExpanded && (
+                    <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveDropdownId(activeDropdownId === booking.id ? null : booking.id)}
+                        className="p-1.5 rounded-lg bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"
+                        title={language === 'বাংলা' ? 'আরও অ্যাকশন' : 'More actions'}
+                      >
+                        <MoreVertical size={16}/>
+                      </button>
+                      {activeDropdownId === booking.id && (
+                        <div className="absolute right-0 top-full mt-2 w-52 bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[50] animate-in fade-in zoom-in-95 origin-top-right border border-gray-100">
+                          {/* Tenant change — the outgoing tenant left, so hand
+                              this unit to the next one. Carries the whole unit
+                              over; the host only edits name + phone. */}
+                          <button onClick={() => openTenantChangeLease(booking)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-700 transition-colors text-left"><RefreshCw size={14}/> {isBn ? 'নতুন ভাড়াটিয়া · নতুন লিজ' : 'New Tenant · New Lease'}</button>
+                          <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
+                          <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
+                          <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
+                          <div className="h-px w-full bg-gray-100 my-1"></div>
+                          <button onClick={() => { setActiveDropdownId(null); setConfirmDeleteBookingId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="shrink-0 p-1.5 rounded-lg bg-gray-50 text-gray-400">
                     {isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
                   </div>
@@ -712,7 +714,7 @@ export default function BookingsTab(props) {
               </aside>
 
               {/* ── RIGHT MAIN — main IS the scroll container; sticky toolbar pins inside it ── */}
-              <main className="lg:col-span-8 w-full lg:h-full lg:overflow-y-auto custom-scrollbar pb-24 lg:pr-3 min-w-0">
+              <main className="lg:col-span-8 w-full lg:h-full lg:overflow-y-auto custom-scrollbar pb-24 lg:pb-4 lg:pr-3 min-w-0">
 
                 {/* Sticky toolbar — three layouts, one set of controls.
                     Because <main> is the scroll container this bar pins to the
@@ -727,7 +729,7 @@ export default function BookingsTab(props) {
 
                     The search box and the pills that act on it always sit
                     together, directly above the results they produce. */}
-                <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:-mx-4 lg:mx-0 px-3 sm:px-4 lg:px-0 pt-2 pb-3 mb-2 lg:pt-1">
+                <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:-mx-4 lg:-mx-2 px-3 sm:px-4 lg:px-2 pt-2 pb-3 mb-2 lg:pt-1">
                   {/* Line 1 — who/what + the primary action. Search joins this
                       line from the sm breakpoint up. */}
                   <div className="flex items-center gap-2">

@@ -152,15 +152,15 @@ export default function RentTab(props) {
             const extraMembers = Math.max(0, rentMembers.length - 1);
 
             return (
-              <div id={`rent-${booking.id}`} key={booking.id} className={`bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
+              <div id={`rent-${booking.id}`} key={booking.id} className={`bg-white rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
 
                 {/* ── Compact row — always visible. Click-to-toggle suppressed in forceOpen mode. ── */}
                 <button
                   type="button"
                   onClick={forceOpen ? undefined : () => setExpandedRentId(isExpanded ? null : booking.id)}
-                  className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-3 text-left transition-colors ${forceOpen ? 'cursor-default' : 'hover:bg-gray-50/50'}`}
+                  className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-3 py-2 sm:py-2.5 text-left transition-colors ${forceOpen ? 'cursor-default' : 'hover:bg-gray-50/50'}`}
                 >
-                  <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-black text-[11px] sm:text-xs shrink-0 ${theme.avatar} overflow-hidden`}>
+                  <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center text-white font-black text-[10px] sm:text-[11px] shrink-0 ${theme.avatar} overflow-hidden`}>
                     {displayAvatar ? (
                       <img src={displayAvatar} alt={displayTenant} className="w-full h-full object-cover" />
                     ) : (
@@ -169,7 +169,7 @@ export default function RentTab(props) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 mb-0.5">
-                      <h4 className="text-[13px] sm:text-sm font-black text-gray-900 truncate">{displayTenant}</h4>
+                      <h4 className="text-xs sm:text-[13px] font-black text-gray-900 truncate">{displayTenant}</h4>
                       {extraMembers > 0 && (
                         <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-gray-100 text-gray-600 border border-gray-200 shrink-0 tabular-nums" title={language === 'বাংলা' ? 'আরও সদস্য' : 'more members'}>+{extraMembers}</span>
                       )}
@@ -227,24 +227,24 @@ export default function RentTab(props) {
                     </div>
                   </div>
                   {!forceOpen && (
-                    <div className="shrink-0 p-1.5 rounded-lg bg-gray-50 text-gray-400">
-                      {isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                    <div className="shrink-0 p-1 rounded-lg bg-gray-50 text-gray-400">
+                      {isExpanded ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}
                     </div>
                   )}
                 </button>
 
                 {/* ── Expanded body — ledger panel + 12-month matrix ───── */}
                 {isExpanded && (
-                  <div className="border-t border-gray-100 bg-gray-50/40 px-3 sm:px-4 py-4 animate-in slide-in-from-top-2 fade-in duration-300">
+                  <div className="border-t border-gray-100 bg-gray-50/40 px-3 sm:px-4 py-3 animate-in slide-in-from-top-2 fade-in duration-300">
 
                     {/* Every rent card — flat / single-room / hostel — uses the
                         SAME classic ledger layout so Rent Collection looks
                         uniform. Per-seat management stays on the Bookings tab. */}
 
                     {/* This-month ledger panel — totals + progress + edit */}
-                    <div className="bg-white rounded-2xl p-3.5 border border-gray-100">
-                      <div className="flex items-center justify-between mb-2.5 gap-2">
-                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest truncate">
+                    <div className="bg-white rounded-xl p-3 border border-gray-100">
+                      <div className="flex items-center justify-between mb-2 gap-2">
+                        <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest truncate">
                           {language === 'বাংলা' ? 'এই মাস' : 'This Month'} · {monthFullLabel(sm.key, language)}
                         </p>
                         {monthInLease && (
@@ -277,21 +277,21 @@ export default function RentTab(props) {
                     </div>
 
                     {/* Year stepper (inline) — lets the host browse other years */}
-                    <div className="mt-3 flex items-center justify-between gap-2">
+                    <div className="mt-2.5 flex items-center justify-between gap-2">
                       <div className="flex bg-white p-1 rounded-xl shadow-[0_1px_4px_rgba(0,0,0,0.03)] items-center gap-0.5">
-                        <button onClick={() => setLedgerYear(y => y - 1)} className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50" aria-label="Prev year">
-                          <ArrowLeft size={12} />
+                        <button onClick={() => setLedgerYear(y => y - 1)} className="p-1 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50" aria-label="Prev year">
+                          <ArrowLeft size={10} />
                         </button>
-                        <span className="px-2 text-[11px] font-black text-gray-900 tabular-nums">{ledgerYear}</span>
-                        <button onClick={() => setLedgerYear(y => y + 1)} className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50" aria-label="Next year">
-                          <ArrowRight size={12} />
+                        <span className="px-1.5 text-[10px] font-black text-gray-900 tabular-nums">{ledgerYear}</span>
+                        <button onClick={() => setLedgerYear(y => y + 1)} className="p-1 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50" aria-label="Next year">
+                          <ArrowRight size={10} />
                         </button>
                       </div>
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest tabular-nums">{paidThisYear}/{monthsThisYearInLease || 12} {language === 'বাংলা' ? 'মাস' : 'months'}</span>
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest tabular-nums">{paidThisYear}/{monthsThisYearInLease || 12} {language === 'বাংলা' ? 'মাস' : 'months'}</span>
                     </div>
 
                     {/* 12-month rent grid — the headline feature */}
-                    <div className="mt-2 bg-white p-2.5 rounded-2xl border border-gray-100">
+                    <div className="mt-1.5 bg-white p-2 rounded-xl border border-gray-100">
                       <div className="grid grid-cols-12 gap-1">
                         {yearMonths.map(k => {
                           const inLease = leaseMonths.includes(k);
@@ -324,20 +324,20 @@ export default function RentTab(props) {
                               title={tooltip}
                               disabled={!inLease}
                               onClick={(e) => { e.stopPropagation(); inLease && openMarkPaid(booking, k); }}
-                              className={`relative aspect-square rounded-lg text-[8px] sm:text-[9px] font-black uppercase tracking-tight transition-all flex flex-col items-center justify-center ${colorClass} ${isCurrent ? 'ring-2 ring-offset-1 ring-gray-900' : ''}`}
+                              className={`relative aspect-square rounded-md text-[7px] sm:text-[8px] font-black uppercase tracking-tight transition-all flex flex-col items-center justify-center ${colorClass} ${isCurrent ? 'ring-[1.5px] ring-offset-[1px] ring-gray-900' : ''}`}
                             >
                               <span className="leading-none">{(language === 'বাংলা' ? MONTH_NAMES_BN_SHORT : MONTH_NAMES_EN_SHORT)[parseMonthKey(k).month - 1]}</span>
-                              {cellStatus === 'paid' && <CheckCheck size={9} className="mt-0.5" strokeWidth={3} />}
-                              {cellStatus === 'partial' && <Hourglass size={8} className="mt-0.5" strokeWidth={3} />}
-                              {cellStatus === 'due-marked' && <AlertCircle size={8} className="mt-0.5" strokeWidth={3} />}
+                              {cellStatus === 'paid' && <CheckCheck size={8} className="mt-0.5" strokeWidth={3} />}
+                              {cellStatus === 'partial' && <Hourglass size={7} className="mt-0.5" strokeWidth={3} />}
+                              {cellStatus === 'due-marked' && <AlertCircle size={7} className="mt-0.5" strokeWidth={3} />}
                             </button>
                           );
                         })}
                       </div>
                       {nextDue && status !== 'completed' && (
-                        <div className="mt-2.5 flex items-center justify-end">
-                          <p className={`text-[9px] font-black tracking-wide whitespace-nowrap shrink-0 px-2 py-1 rounded-lg ${nextDue.daysFromNow < 0 ? 'bg-red-50 text-red-600' : nextDue.daysFromNow <= (booking.reminderLeadDays || 3) ? 'bg-orange-50 text-orange-600' : 'bg-gray-100 text-gray-600'}`}>
-                            <Clock size={10} className="inline -mt-0.5 mr-1" />
+                        <div className="mt-2 flex items-center justify-end">
+                          <p className={`text-[8px] font-black tracking-wide whitespace-nowrap shrink-0 px-1.5 py-0.5 rounded-md ${nextDue.daysFromNow < 0 ? 'bg-red-50 text-red-600' : nextDue.daysFromNow <= (booking.reminderLeadDays || 3) ? 'bg-orange-50 text-orange-600' : 'bg-gray-100 text-gray-600'}`}>
+                            <Clock size={8} className="inline -mt-0.5 mr-1" />
                             {nextDue.daysFromNow < 0
                               ? `${Math.abs(nextDue.daysFromNow)}d ${language === 'বাংলা' ? 'দেরি' : 'late'} · ${monthShortLabel(nextDue.key, language)}`
                               : nextDue.daysFromNow === 0
@@ -349,50 +349,50 @@ export default function RentTab(props) {
                     </div>
 
                     {/* Action row — payment-focused */}
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-1.5">
-                      <div className="flex items-center gap-1.5">
+                    <div className="mt-2.5 flex flex-nowrap items-center justify-between gap-1.5 overflow-x-auto no-scrollbar pb-1 -mb-1">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           onClick={() => {
                             const k = nextDue?.key || monthKey(todayDate.getFullYear(), todayDate.getMonth() + 1);
                             openMarkPaid(booking, k);
                           }}
-                          className="px-2.5 py-2 bg-green-50 hover:bg-green-100 text-green-700 transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1"
+                          className="px-2 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 transition-all rounded-lg text-[9px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1 shrink-0"
                         >
-                          <CheckCircle2 size={12} /> {language === 'বাংলা' ? 'পেইড মার্ক' : 'Mark Paid'}
+                          <CheckCircle2 size={10} className="shrink-0"/> {language === 'বাংলা' ? 'পেইড মার্ক' : 'Mark Paid'}
                         </button>
                         {nextDue && nextDue.daysFromNow <= (booking.reminderLeadDays || 3) && (
-                          <button onClick={() => sendRentReminder(booking, nextDue.key)} className="px-2.5 py-2 bg-orange-50 text-orange-700 hover:bg-orange-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1">
-                            <BellRing size={12}/> {language === 'বাংলা' ? 'রিমাইন্ডার' : 'Remind'}
+                          <button onClick={() => sendRentReminder(booking, nextDue.key)} className="px-2 py-1.5 bg-orange-50 text-orange-700 hover:bg-orange-100 transition-all rounded-lg text-[9px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1 shrink-0">
+                            <BellRing size={10} className="shrink-0"/> {language === 'বাংলা' ? 'রিমাইন্ডার' : 'Remind'}
                           </button>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         {/* Profile — opens the tenant's trust card (/tenant/:id). */}
                         <button
                           onClick={() => openTenantProfile(resolveTenantUserId(booking), { name: booking.tenant, avatar: booking.tenantAvatar })}
-                          className="px-2.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1"
+                          className="px-2 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all rounded-lg text-[9px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1 shrink-0"
                           title={language === 'বাংলা' ? 'টেন্যান্ট প্রোফাইল' : 'Tenant profile'}
                         >
-                          <UserCircle size={12}/> {language === 'বাংলা' ? 'প্রোফাইল' : 'Profile'}
+                          <UserCircle size={10} className="shrink-0"/> {language === 'বাংলা' ? 'প্রোফাইল' : 'Profile'}
                         </button>
                         <button
                           onClick={() => openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-rent', peerUserId: resolveTenantUserId(booking), peerName: booking.tenant, peerAvatar: booking.tenantAvatar, tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property })}
-                          className="px-3 py-2 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 shadow-md flex items-center gap-1.5"
+                          className="px-2 py-1.5 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-lg text-[9px] font-black uppercase tracking-widest active:scale-95 shadow-md flex items-center gap-1.5 shrink-0"
                         >
-                          <MessageCircle size={12}/> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
+                          <MessageCircle size={10} className="shrink-0"/> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
                         </button>
                       </div>
                     </div>
 
                     {/* Per-month ledger detail rows — collapsible secondary view */}
-                    <details className="mt-3 group">
-                      <summary className="cursor-pointer list-none flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100/60 transition-colors">
-                        <ChevronDown size={12} className="text-gray-400 group-open:rotate-180 transition-transform"/>
-                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                    <details className="mt-2.5 group">
+                      <summary className="cursor-pointer list-none flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-gray-100/60 transition-colors">
+                        <ChevronDown size={10} className="text-gray-400 group-open:rotate-180 transition-transform"/>
+                        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">
                           {language === 'বাংলা' ? `${ledgerYear} সালের বিবরণ` : `${ledgerYear} Ledger Details`}
                         </span>
                       </summary>
-                      <div className="mt-2 space-y-1">
+                      <div className="mt-1.5 space-y-1">
                         {yearMonths.filter(k => leaseMonths.includes(k)).map(k => {
                           const cellStatus = getRentStatus(booking, k, todayDate);
                           const entry = booking.ledger?.[k];
