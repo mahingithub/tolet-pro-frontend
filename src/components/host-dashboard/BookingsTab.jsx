@@ -737,7 +737,7 @@ export default function BookingsTab(props) {
                     {/* Search absorbs the slack, so it's the one thing that
                         shrinks when the desktop row gets tight — the pills and
                         the action keep their full size. */}
-                    <div className="hidden sm:block flex-1 min-w-0 lg:max-w-[220px] 2xl:max-w-[300px]">{searchField}</div>
+                    <div className="hidden sm:block flex-1 min-w-0">{searchField}</div>
                     {/* Desktop: pills sit inline, between search and the action. */}
                     <div className="hidden lg:flex items-center gap-1.5 shrink-0">{filterPills}</div>
                     {addTenantButton}

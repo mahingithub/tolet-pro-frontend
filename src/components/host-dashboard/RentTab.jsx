@@ -599,7 +599,7 @@ export default function RentTab(props) {
                     {/* Search input — grows to fill the rest of the row. Same
                         field treatment as the Add Tenant tab (clear button,
                         brand focus ring) so the two toolbars feel like one. */}
-                    <div className="relative flex-1 min-w-0 xl:max-w-[220px]">
+                    <div className="relative flex-1 min-w-0">
                       <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                       <input
                         type="search"
