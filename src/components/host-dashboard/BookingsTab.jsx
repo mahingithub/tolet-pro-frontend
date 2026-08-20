@@ -102,9 +102,7 @@ export default function BookingsTab(props) {
             // NOT a tenant — the tenants are the per-seat rent boxes inside. Other
             // formats keep the tenant name as the card title.
             const hostelBooking = isHostelBooking(booking);
-            const roomLabelTxt = booking.roomNumber ? `${language === 'বাংলা' ? 'রুম' : 'Room'} ${booking.roomNumber}` : '';
-            const cardTitle = hostelBooking ? [booking.property, roomLabelTxt].filter(Boolean).join(' · ') : booking.tenant;
-            const cardSubLead = hostelBooking ? (booking.floorNumber ? `${language === 'বাংলা' ? 'ফ্লোর' : 'Floor'} ${booking.floorNumber}` : tenantsLabel) : booking.property;
+            const cardTitle = hostelBooking ? booking.property : booking.tenant;
             const cardAvatarText = hostelBooking ? ((booking.property || 'H').trim()[0] || 'H').toUpperCase() : booking.tenantInit;
             const stageAvatar = stage !== 'active' ? 'bg-gradient-to-br from-gray-400 to-gray-500'
                               : endingSoon ? 'bg-gradient-to-br from-amber-500 to-orange-500'
@@ -132,13 +130,20 @@ export default function BookingsTab(props) {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <h4 className="text-[13px] sm:text-sm font-black text-gray-900 truncate">{cardTitle}</h4>
-                      {booking.dealType === 'commercial' && (
-                        <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border border-violet-200 bg-violet-50 text-violet-700 shrink-0">
-                          🏢 {language === 'বাংলা' ? 'কমার্শিয়াল' : 'Commercial'}
+                    <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                      <h4 className="text-[13px] sm:text-sm font-black text-gray-900 truncate max-w-[130px] sm:max-w-[200px]">{cardTitle}</h4>
+                      {booking.floorNumber && (
+                        <span className="px-1.5 py-0.5 rounded-md text-[8px] sm:text-[9px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 border border-indigo-200 shrink-0 inline-flex items-center gap-0.5">
+                          {language === 'বাংলা' ? 'ফ্লোর' : 'Floor'} {booking.floorNumber}
                         </span>
                       )}
+                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 inline-flex items-center gap-0.5 ${booking.dealType === 'commercial' ? 'bg-violet-50 text-violet-700 border-violet-200' : hostelBooking ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                        {booking.dealType === 'commercial'
+                          ? (<>🏢<span> {language === 'বাংলা' ? 'কমার্শিয়াল' : 'Commercial'}</span></>)
+                          : hostelBooking
+                            ? (<>🛏️<span> {language === 'বাংলা' ? 'হোস্টেল' : 'Hostel'}</span></>)
+                            : (<>🏠<span> {language === 'বাংলা' ? 'আবাসিক' : 'Residential'}</span></>)}
+                      </span>
                       <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 ${stageBadge(stage, endingSoon)}`}>
                         {stageLabel(stage, language)}
                       </span>
@@ -151,7 +156,14 @@ export default function BookingsTab(props) {
                       )}
                     </div>
                     <p className="text-[10px] font-bold text-gray-500 truncate">
-                      {cardSubLead} <span className="mx-0.5 text-gray-300">·</span> <span className="tabular-nums">{formatBDT(monthlyTotal)}</span>
+                      <span className="text-emerald-600 font-black">{hostelBooking ? tenantsLabel : booking.property}</span>
+                      {booking.roomNumber && (
+                        <>
+                          <span className="mx-1 text-gray-300">·</span>
+                          {language === 'বাংলা' ? 'রুম' : 'Room'} {booking.roomNumber}
+                        </>
+                      )}
+                      <span className="mx-0.5 text-gray-300">·</span> <span className="tabular-nums">{formatBDT(monthlyTotal)}</span>
                       {next && (
                         <>
                           <span className="mx-0.5 text-gray-300">·</span>
@@ -182,39 +194,34 @@ export default function BookingsTab(props) {
                     )}
                   </div>
                   {/* 3-dot actions menu — top-right of the card, next to the profile
-                      photo/name. Shown when the lease is expanded. stopPropagation
-                      keeps opening it from toggling the row; it opens downward into
-                      the (tall) body so the card's overflow never clips it. */}
-                  {isExpanded && (
-                    <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={() => setActiveDropdownId(activeDropdownId === booking.id ? null : booking.id)}
-                        className="p-1.5 rounded-lg bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"
-                        title={language === 'বাংলা' ? 'আরও অ্যাকশন' : 'More actions'}
-                      >
-                        <MoreVertical size={16}/>
-                      </button>
-                      {activeDropdownId === booking.id && (
-                        <div className="absolute right-0 top-full mt-2 w-52 bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[50] animate-in fade-in zoom-in-95 origin-top-right border border-gray-100">
-                          {/* Tenant change — the outgoing tenant left, so hand
-                              this unit to the next one. Carries the whole unit
-                              over; the host only edits name + phone. */}
-                          <button onClick={() => openTenantChangeLease(booking)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-700 transition-colors text-left"><RefreshCw size={14}/> {isBn ? 'নতুন ভাড়াটিয়া · নতুন লিজ' : 'New Tenant · New Lease'}</button>
-                          <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
-                          <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
-                          <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
-                          <div className="h-px w-full bg-gray-100 my-1"></div>
-                          <button onClick={() => { setActiveDropdownId(null); setConfirmDeleteBookingId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {!forceOpen && (
-                    <div className="shrink-0 p-1.5 rounded-lg bg-gray-50 text-gray-400">
-                      {isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
-                    </div>
-                  )}
+                      photo/name. stopPropagation keeps opening it from toggling the row; 
+                      it opens downward so it doesn't get clipped. */}
+                  <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveDropdownId(activeDropdownId === booking.id ? null : booking.id)}
+                      className="p-1.5 rounded-lg bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"
+                      title={language === 'বাংলা' ? 'আরও অ্যাকশন' : 'More actions'}
+                    >
+                      <MoreVertical size={16}/>
+                    </button>
+                    {activeDropdownId === booking.id && (
+                      <div className="absolute right-0 top-full mt-2 w-52 bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[50] animate-in fade-in zoom-in-95 origin-top-right border border-gray-100">
+                        {/* Tenant change — the outgoing tenant left, so hand
+                            this unit to the next one. Carries the whole unit
+                            over; the host only edits name + phone. */}
+                        <button onClick={() => openTenantChangeLease(booking)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-700 transition-colors text-left"><RefreshCw size={14}/> {isBn ? 'নতুন ভাড়াটিয়া · নতুন লিজ' : 'New Tenant · New Lease'}</button>
+                        <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
+                        <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
+                        <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
+                        <div className="h-px w-full bg-gray-100 my-1"></div>
+                        <button onClick={() => { setActiveDropdownId(null); setConfirmDeleteBookingId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="shrink-0 p-1.5 rounded-lg bg-gray-50 text-gray-400">
+                    {isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                  </div>
                 </div>
 
                 {/* Expanded body — full agreement details */}
@@ -444,8 +451,9 @@ export default function BookingsTab(props) {
                     {/* Auto-reminder + actions row — stays on ONE line on every
                         device. Never wraps (that's what pushed the ⋮ menu onto its
                         own line before); on phones the labels + padding shrink so
-                        the whole row keeps its position instead of reflowing. */}
-                    <div className="mt-3 flex flex-nowrap items-center justify-between gap-1 sm:gap-1.5">
+                        the whole row keeps its position instead of reflowing. 
+                        Added overflow-x-auto so they don't squish. */}
+                    <div className="mt-3 flex flex-nowrap items-center justify-between gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar pb-1 -mb-1">
                       <button
                         onClick={() => toggleAutoReminder(booking.id)}
                         className={`shrink-0 px-1.5 sm:px-2.5 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest transition-all flex items-center gap-1 ${booking.autoReminder ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
@@ -553,7 +561,7 @@ export default function BookingsTab(props) {
               type="button"
               onClick={() => isPremium ? openBlankLease() : setActiveModal('premium_gate')}
               aria-label={isBn ? 'নতুন ভাড়াটিয়া যোগ করুন' : 'Add a new tenant'}
-              className="group relative overflow-hidden flex-1 sm:flex-none sm:shrink-0 min-w-0 px-3 sm:px-3.5 py-2.5 rounded-xl bg-gradient-to-br from-[#ba0036] via-[#d1003d] to-[#ff004c] text-white shadow-[0_5px_16px_rgba(186,0,54,0.32)] hover:shadow-[0_9px_24px_rgba(186,0,54,0.42)] active:scale-[0.97] transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ba0036]/40 focus-visible:ring-offset-2 xl:ml-auto"
+              className="group relative overflow-hidden flex-1 sm:flex-none sm:shrink-0 min-w-0 px-3 sm:px-3.5 py-2.5 rounded-xl bg-gradient-to-br from-[#ba0036] via-[#d1003d] to-[#ff004c] text-white shadow-[0_5px_16px_rgba(186,0,54,0.32)] hover:shadow-[0_9px_24px_rgba(186,0,54,0.42)] active:scale-[0.97] transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ba0036]/40 focus-visible:ring-offset-2 lg:ml-auto"
             >
               {/* Soft top-light sheen on hover — depth without a colour change. */}
               <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -579,10 +587,10 @@ export default function BookingsTab(props) {
           return (
           <div className="w-full animate-in fade-in zoom-in-95 duration-500">
 
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 lg:gap-6 xl:h-[calc(100vh-140px)] overflow-visible xl:overflow-hidden">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:h-[calc(100vh-140px)] overflow-visible lg:overflow-hidden">
 
               {/* ── LEFT RAIL — full Financial Overview ALWAYS visible (mobile + desktop) ── */}
-              <aside className="xl:col-span-4 w-full flex flex-col gap-3 xl:gap-5 xl:h-full xl:overflow-y-auto custom-scrollbar xl:pt-1 xl:pb-4 xl:pr-1">
+              <aside className="lg:col-span-4 w-full flex flex-col gap-3 lg:gap-5 lg:h-full lg:overflow-y-auto custom-scrollbar lg:pt-1 lg:pb-4 lg:pr-1">
 
                 {/* Financial Overview — always visible, but SLIM on mobile.
                     The card used to run ~340px tall on a phone (big title, four
@@ -590,10 +598,10 @@ export default function BookingsTab(props) {
                     list below the fold. On mobile it now reads as one compact
                     block: revenue + deposits side by side, then a single inline
                     row of counts. Desktop (xl) keeps the roomy hero treatment. */}
-                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl xl:rounded-[2rem] p-3.5 xl:p-7 text-white shadow-[0_6px_20px_rgba(0,0,0,0.15)] xl:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
+                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl lg:rounded-[2rem] p-3.5 lg:p-7 text-white shadow-[0_6px_20px_rgba(0,0,0,0.15)] lg:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-10 translate-x-10"></div>
-                  <div className="flex items-center justify-between gap-2 mb-2.5 xl:mb-1 relative z-10">
-                    <h3 className="text-[13px] xl:text-2xl font-black truncate">{isBn ? 'ফাইন্যান্সিয়াল ওভারভিউ' : 'Financial Overview'}</h3>
+                  <div className="flex items-center justify-between gap-2 mb-2.5 lg:mb-1 relative z-10">
+                    <h3 className="text-[13px] lg:text-2xl font-black truncate">{isBn ? 'ফাইন্যান্সিয়াল ওভারভিউ' : 'Financial Overview'}</h3>
                     {isPremium ? (
                       <div className="bg-[#ba0036] text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md shrink-0">
                          <Crown size={10} /> PRO
@@ -606,36 +614,36 @@ export default function BookingsTab(props) {
                   </div>
                   {/* Subtitle is desktop-only — on a phone the card title plus
                       the KPI labels already say what this is. */}
-                  <p className="hidden xl:block text-white/50 text-[10px] font-bold uppercase tracking-widest mb-7 relative z-10">
+                  <p className="hidden lg:block text-white/50 text-[10px] font-bold uppercase tracking-widest mb-7 relative z-10">
                     {isBn ? 'লিজ পোর্টফোলিও সারাংশ' : 'Lease Portfolio Snapshot'}
                   </p>
-                  <div className="space-y-2.5 xl:space-y-6 relative z-10">
+                  <div className="space-y-2.5 lg:space-y-6 relative z-10">
                     {/* Revenue + Security Deposits side by side at every width.
                         min-w-0 + break-words keep the currency figures inside
                         narrow phone columns. */}
-                    <div className="grid grid-cols-2 gap-2 xl:gap-3 items-stretch">
+                    <div className="grid grid-cols-2 gap-2 lg:gap-3 items-stretch">
                       <div className="min-w-0">
-                        <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">{isBn ? 'মাসিক আয়' : 'Monthly Revenue'}</p>
-                        <p className="text-xl sm:text-2xl xl:text-4xl font-black text-white tracking-tight tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalMonthlyRevenue)}</p>
-                        <p className="text-[8px] xl:text-[9px] font-bold text-white/50 mt-1 leading-tight">{isBn ? 'চলমান লিজ (ভাড়া + সার্ভিস)' : 'live leases (rent + service)'}</p>
+                        <p className="text-white/50 text-[8px] lg:text-[9px] font-black uppercase tracking-widest mb-0.5 lg:mb-1 leading-tight">{isBn ? 'মাসিক আয়' : 'Monthly Revenue'}</p>
+                        <p className="text-xl sm:text-2xl lg:text-4xl font-black text-white tracking-tight tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalMonthlyRevenue)}</p>
+                        <p className="text-[8px] lg:text-[9px] font-bold text-white/50 mt-1 leading-tight">{isBn ? 'চলমান লিজ (ভাড়া + সার্ভিস)' : 'live leases (rent + service)'}</p>
                       </div>
-                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2 xl:p-3 min-w-0">
-                        <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">{isBn ? 'সিকিউরিটি ডিপোজিট' : 'Security Deposits'}</p>
-                        <p className="text-base sm:text-lg xl:text-2xl font-black text-white tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalSecurityDeposits)}</p>
-                        <p className="text-[8px] xl:text-[9px] font-bold text-white/50 mt-1 leading-tight">{isBn ? 'লিজ শেষে রিটার্নযোগ্য' : 'returnable at lease end'}</p>
+                      <div className="bg-white/5 rounded-xl lg:rounded-2xl p-2 lg:p-3 min-w-0">
+                        <p className="text-white/50 text-[8px] lg:text-[9px] font-black uppercase tracking-widest mb-0.5 lg:mb-1 leading-tight">{isBn ? 'সিকিউরিটি ডিপোজিট' : 'Security Deposits'}</p>
+                        <p className="text-base sm:text-lg lg:text-2xl font-black text-white tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalSecurityDeposits)}</p>
+                        <p className="text-[8px] lg:text-[9px] font-bold text-white/50 mt-1 leading-tight">{isBn ? 'লিজ শেষে রিটার্নযোগ্য' : 'returnable at lease end'}</p>
                       </div>
                     </div>
                     {/* Stage counts — Active / Done only (Draft + Notice are gone;
                         a unit is either rented or it isn't). "Ending soon" rides
                         along as an amber chip since it's a nudge, not a stage. */}
-                    <div className="grid grid-cols-2 gap-2 xl:gap-3">
-                      <div className="bg-white/5 rounded-xl xl:rounded-2xl px-2.5 py-2 xl:p-3 flex items-center justify-between gap-2 xl:flex-col xl:items-start">
-                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest xl:mb-1">{stageLabel('active', language)}</p>
-                        <p className="text-lg xl:text-2xl font-black text-green-400 tabular-nums leading-none">{leaseSummary.activeCount}</p>
+                    <div className="grid grid-cols-2 gap-2 lg:gap-3">
+                      <div className="bg-white/5 rounded-xl lg:rounded-2xl px-2.5 py-2 lg:p-3 flex items-center justify-between gap-2 lg:flex-col lg:items-start">
+                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest lg:mb-1">{stageLabel('active', language)}</p>
+                        <p className="text-lg lg:text-2xl font-black text-green-400 tabular-nums leading-none">{leaseSummary.activeCount}</p>
                       </div>
-                      <div className="bg-white/5 rounded-xl xl:rounded-2xl px-2.5 py-2 xl:p-3 flex items-center justify-between gap-2 xl:flex-col xl:items-start">
-                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest xl:mb-1">{stageLabel('done', language)}</p>
-                        <p className="text-lg xl:text-2xl font-black text-white/70 tabular-nums leading-none">{leaseSummary.doneCount}</p>
+                      <div className="bg-white/5 rounded-xl lg:rounded-2xl px-2.5 py-2 lg:p-3 flex items-center justify-between gap-2 lg:flex-col lg:items-start">
+                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest lg:mb-1">{stageLabel('done', language)}</p>
+                        <p className="text-lg lg:text-2xl font-black text-white/70 tabular-nums leading-none">{leaseSummary.doneCount}</p>
                       </div>
                     </div>
                     {leaseSummary.endingSoonCount > 0 && (
@@ -658,12 +666,12 @@ export default function BookingsTab(props) {
                     (iPad); the stacked rail would push the lease list too far
                     down on those widths, and the same stage counts are already
                     reachable via the toolbar filter pills. Shown from xl up. */}
-                <div className="hidden xl:block bg-white rounded-2xl xl:rounded-[2rem] p-4 xl:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none shrink-0">
-                  <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3 xl:mb-4 flex items-center gap-2">
+                <div className="hidden lg:block bg-white rounded-2xl lg:rounded-[2rem] p-4 lg:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none shrink-0">
+                  <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3 lg:mb-4 flex items-center gap-2">
                     <Activity size={14} className="text-gray-400" />
                     {language === 'বাংলা' ? 'লিজ স্ট্যাটাস ফ্লো' : 'Lease Status Flow'}
                   </h4>
-                  <div className="space-y-2 xl:space-y-3">
+                  <div className="space-y-2 lg:space-y-3">
                     {[
                       { stage: 'active', count: leaseSummary.activeCount, dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700', hint: isBn ? 'ভাড়াটিয়া আছেন' : 'unit is rented' },
                       { stage: 'done',   count: leaseSummary.doneCount,   dot: 'bg-gray-400',  bg: 'bg-gray-100', text: 'text-gray-600',  hint: isBn ? 'শেষ · নতুন লিজ দেওয়া যাবে' : 'ended · ready to re-let' },
@@ -688,7 +696,7 @@ export default function BookingsTab(props) {
 
                 <button
                   onClick={() => setActiveTab('rent')}
-                  className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 rounded-2xl xl:rounded-[2rem] p-4 xl:p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center justify-between gap-3 transition-colors shrink-0 group"
+                  className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 rounded-2xl lg:rounded-[2rem] p-4 lg:p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center justify-between gap-3 transition-colors shrink-0 group"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
@@ -704,7 +712,7 @@ export default function BookingsTab(props) {
               </aside>
 
               {/* ── RIGHT MAIN — main IS the scroll container; sticky toolbar pins inside it ── */}
-              <main className="xl:col-span-8 w-full xl:h-full xl:overflow-y-auto custom-scrollbar pb-24 xl:pr-3 min-w-0">
+              <main className="lg:col-span-8 w-full lg:h-full lg:overflow-y-auto custom-scrollbar pb-24 lg:pr-3 min-w-0">
 
                 {/* Sticky toolbar — three layouts, one set of controls.
                     Because <main> is the scroll container this bar pins to the
@@ -719,7 +727,7 @@ export default function BookingsTab(props) {
 
                     The search box and the pills that act on it always sit
                     together, directly above the results they produce. */}
-                <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:-mx-4 xl:mx-0 px-3 sm:px-4 xl:px-0 pt-2 pb-3 mb-2 xl:pt-1">
+                <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:-mx-4 lg:mx-0 px-3 sm:px-4 lg:px-0 pt-2 pb-3 mb-2 lg:pt-1">
                   {/* Line 1 — who/what + the primary action. Search joins this
                       line from the sm breakpoint up. */}
                   <div className="flex items-center gap-2">
@@ -727,9 +735,9 @@ export default function BookingsTab(props) {
                     {/* Search absorbs the slack, so it's the one thing that
                         shrinks when the desktop row gets tight — the pills and
                         the action keep their full size. */}
-                    <div className="hidden sm:block flex-1 min-w-0 xl:max-w-[220px] 2xl:max-w-[300px]">{searchField}</div>
+                    <div className="hidden sm:block flex-1 min-w-0 lg:max-w-[220px] 2xl:max-w-[300px]">{searchField}</div>
                     {/* Desktop: pills sit inline, between search and the action. */}
-                    <div className="hidden xl:flex items-center gap-1.5 shrink-0">{filterPills}</div>
+                    <div className="hidden lg:flex items-center gap-1.5 shrink-0">{filterPills}</div>
                     {addTenantButton}
                   </div>
                   {/* Line 2 — mobile-only search, given the full width so a long
@@ -737,7 +745,7 @@ export default function BookingsTab(props) {
                   <div className="mt-2 sm:hidden">{searchField}</div>
                   {/* Line 3 — filter pills (below desktop). Horizontal scroll
                       keeps them on one line on the narrowest phones. */}
-                  <div className="flex xl:hidden items-center gap-1.5 mt-2 overflow-x-auto no-scrollbar">{filterPills}</div>
+                  <div className="flex lg:hidden items-center gap-1.5 mt-2 overflow-x-auto no-scrollbar">{filterPills}</div>
                 </div>
 
                 {/* List — flat sequence of compact rows. Sticky toolbar above
@@ -746,7 +754,7 @@ export default function BookingsTab(props) {
                     static layout instead of accordion friction. */}
                 {(() => {
                   const AUTO_EXPAND_THRESHOLD = 5;
-                  const forceOpen = filtered.length > 0 && filtered.length <= AUTO_EXPAND_THRESHOLD;
+                  const forceOpen = false;
                   if (filtered.length === 0) {
                     // Empty state carries the primary action. A host with no
                     // bookings yet used to land on a dead card that only told

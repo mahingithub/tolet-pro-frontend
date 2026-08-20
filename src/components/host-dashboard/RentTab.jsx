@@ -178,11 +178,13 @@ export default function RentTab(props) {
                           {language === 'বাংলা' ? 'ফ্লোর' : 'Floor'} {booking.floorNumber}
                         </span>
                       )}
-                      {/* Residential / Commercial property badge */}
-                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 inline-flex items-center gap-0.5 ${booking.dealType === 'commercial' ? 'bg-violet-50 text-violet-700 border-violet-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                      {/* Residential / Commercial / Hostel property badge */}
+                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 inline-flex items-center gap-0.5 ${booking.dealType === 'commercial' ? 'bg-violet-50 text-violet-700 border-violet-200' : booking.propertyType === 'hostel' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
                         {booking.dealType === 'commercial'
                           ? (<>🏢<span> {language === 'বাংলা' ? 'কমার্শিয়াল' : 'Commercial'}</span></>)
-                          : (<>🏠<span> {language === 'বাংলা' ? 'আবাসিক' : 'Residential'}</span></>)}
+                          : booking.propertyType === 'hostel'
+                            ? (<>🛏️<span> {language === 'বাংলা' ? 'হোস্টেল' : 'Hostel'}</span></>)
+                            : (<>🏠<span> {language === 'বাংলা' ? 'আবাসিক' : 'Residential'}</span></>)}
                       </span>
                       <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 inline-flex items-center gap-0.5 ${theme.cls}`}>
                         {theme.icon} <span className="hidden sm:inline">{theme.label}</span>
