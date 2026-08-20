@@ -11,14 +11,13 @@
 // chosen service passed along as context. When a real services API lands,
 // swap the onSelect handler for the matching endpoint — the grid + i18n stay.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import useGoBack from '../hooks/useGoBack';
 import { useLanguage } from '../context/LanguageContext';
 import {
   ArrowLeft, ChevronRight, Sparkles, GraduationCap, Wifi, Zap, Flame,
-  Droplets, Wrench, ShieldCheck, Truck, Shirt, Bug, Utensils, LifeBuoy,
+  Droplets, Wrench, ShieldCheck, Truck, Shirt, Bug, Utensils, LifeBuoy, X
 } from 'lucide-react';
 
 // Each service: stable id, bilingual label + one-line description, an icon,
@@ -43,16 +42,18 @@ const ServicesPage = () => {
   const goBack = useGoBack('/tenant-dashboard');
   const { language } = useLanguage();
   const bn = language === 'বাংলা';
+  
+  const [selectedSvc, setSelectedSvc] = useState(null);
 
-  // No services backend yet → confirm the pick and route into the existing
-  // support/request flow so the tenant can actually describe what they need.
   const onSelect = (svc) => {
-    const label = bn ? svc.bn : svc.en;
-    toast.success(
-      bn ? `${label} সার্ভিসের অনুরোধ নেওয়া হচ্ছে…` : `Requesting ${label} service…`,
-    );
-    navigate('/support', { state: { source: 'services', service: svc.id, serviceLabel: label } });
+    setSelectedSvc(svc);
+    // Track interest in backend
+    import('../services/sellInterestService').then(({ recordSellInterest }) => {
+      recordSellInterest({ source: `service_${svc.id}`, kind: 'service' }).catch(console.error);
+    });
   };
+
+  const closeModal = () => setSelectedSvc(null);
 
   return (
     <div className="min-h-screen bg-[#eaeff5] font-sans text-gray-900 selection:bg-[#ba0036] selection:text-white">
@@ -132,6 +133,40 @@ const ServicesPage = () => {
           </button>
         </div>
       </div>
+
+      {/* Coming Soon Modal */}
+      {selectedSvc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={closeModal} />
+          <div className="relative bg-white rounded-[2rem] p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 fade-in duration-200">
+            <button 
+              onClick={closeModal}
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+            >
+              <X size={16} strokeWidth={2.5} />
+            </button>
+            <div className="flex flex-col items-center text-center">
+              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center border mb-5 ${selectedSvc.tint}`}>
+                <selectedSvc.Icon size={28} strokeWidth={2.5} />
+              </div>
+              <h2 className="text-xl md:text-2xl font-black text-gray-900 mb-2">
+                {bn ? 'শীঘ্রই আসছে!' : 'Coming Soon!'}
+              </h2>
+              <p className="text-xs md:text-sm font-bold text-gray-500 mb-6 leading-relaxed">
+                {bn 
+                  ? `আমরা বর্তমানে ${selectedSvc.bn} সার্ভিসটির জন্য প্রোভাইডারদের সাথে যুক্ত হচ্ছি। আপনার আগ্রহের জন্য ধন্যবাদ!` 
+                  : `We are currently onboarding providers for ${selectedSvc.en}. Thank you for your interest!`}
+              </p>
+              <button 
+                onClick={closeModal}
+                className="w-full py-3 md:py-3.5 rounded-xl bg-gray-900 text-white text-xs md:text-[13px] font-black uppercase tracking-widest hover:bg-[#ba0036] transition-colors active:scale-95 shadow-lg"
+              >
+                {bn ? 'ধন্যবাদ' : 'Thank You'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
