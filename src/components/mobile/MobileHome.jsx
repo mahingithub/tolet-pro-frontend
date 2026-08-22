@@ -1169,12 +1169,12 @@ const MobileHome = () => {
                   onClick={() => setSearchType(typ.id)}
                   className={`flex-1 py-2 text-[12px] font-black uppercase tracking-wider rounded-full transition-all ${
                     active
-                      ? `bg-slate-900 shadow-[0_4px_12px_rgba(0,0,0,0.15)] ${
-                          typ.id === 'rent' ? 'text-emerald-400' :
-                          typ.id === 'commercial' ? 'text-amber-400' :
-                          'text-blue-400'
+                      ? `bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] ${
+                          typ.id === 'rent' ? 'text-emerald-600' :
+                          typ.id === 'commercial' ? 'text-amber-600' :
+                          'text-blue-600'
                         }`
-                      : 'text-gray-600 hover:text-gray-900'
+                      : 'text-gray-500 hover:text-gray-900'
                   }`}
                 >
                   {t[typ.labelKey]}

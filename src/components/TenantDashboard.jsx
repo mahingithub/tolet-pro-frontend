@@ -2161,13 +2161,13 @@ const handleWizardSubmit = async (payload) => {
                   // Turn the box red when the landlord has responded to an inquiry the tenant hasn't opened.
                   unread: (myInquiries || []).some((inq) => isInquiryUnread(inq, 'tenant', inqSeen)),
                 },
-                {
+                ...(myBookings.length > 0 ? [{
                   id: 'payments', icon: DollarSign, iconBg: 'bg-violet-100', iconColor: 'text-violet-600', bar: 'bg-violet-500',
                   label: language === 'বাংলা' ? 'পেমেন্ট' : 'Payments',
                   sub: language === 'বাংলা' ? 'মোট পেমেন্ট' : 'Total payments made',
                   value: paymentReceipts.length, badge: unreadReceiptsCount > 0 ? unreadReceiptsCount : null,
                   onClick: () => setActiveTab('payments'),
-                },
+                }] : []),
               ].map((stat) => (
                 <button
                   key={stat.id}
@@ -2202,7 +2202,9 @@ const handleWizardSubmit = async (payload) => {
 
               {/* Due Amount — dark accent tile (mockup's 4th card). Amount is
                   live from the tenant's active-lease ledger; turns emerald and
-                  reads "All clear" when nothing is owed. */}
+                  reads "All clear" when nothing is owed.
+                  Hidden until the tenant connects to a landlord/property. */}
+              {myBookings.length > 0 && (
               <button
                 onClick={() => setActiveTab('payments')}
                 className="relative text-left p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] border border-white/10 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.4)] flex items-center justify-between gap-2 hover:-translate-y-0.5 transition-all duration-300 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-[#3a0011]"
@@ -2226,6 +2228,7 @@ const handleWizardSubmit = async (payload) => {
                   <div className={`h-1 rounded-full w-7 md:w-9 mt-2 ${totalDueAmount > 0 ? 'bg-amber-400' : 'bg-emerald-400'}`} />
                 </div>
               </button>
+              )}
             </div>
 
             {/* ── NAV CARDS — Messages · Services · Smart Alerts ──────────

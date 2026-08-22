@@ -707,7 +707,7 @@ const HeroSection = () => {
                 <button
                   key={tab.id}
                   onClick={() => setSearchType(tab.id)}
-                  className={`flex-1 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all duration-200 ${searchType === tab.id ? `bg-slate-900 shadow-[0_4px_12px_rgba(0,0,0,0.15)] ${tab.id === 'rent' ? 'text-emerald-400' : tab.id === 'commercial' ? 'text-amber-400' : 'text-blue-400'}` : 'text-slate-600 hover:text-slate-900'}`}
+                  className={`flex-1 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all duration-200 ${searchType === tab.id ? `bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] ${tab.id === 'rent' ? 'text-emerald-600' : tab.id === 'commercial' ? 'text-amber-600' : 'text-blue-600'}` : 'text-slate-600 hover:text-slate-900'}`}
                 >
                   {tab.label}
                 </button>
@@ -793,7 +793,7 @@ const HeroSection = () => {
                     <button
                       key={tab.id}
                       onClick={() => setSearchType(tab.id)}
-                      className={`px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all duration-200 ${searchType === tab.id ? `bg-slate-900 shadow-[0_4px_12px_rgba(0,0,0,0.15)] ${tab.id === 'rent' ? 'text-emerald-400' : tab.id === 'commercial' ? 'text-amber-400' : 'text-blue-400'}` : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}
+                      className={`px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all duration-200 ${searchType === tab.id ? `bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] ${tab.id === 'rent' ? 'text-emerald-600' : tab.id === 'commercial' ? 'text-amber-600' : 'text-blue-600'}` : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}
                     >
                       {tab.label}
                     </button>
