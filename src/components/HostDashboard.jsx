@@ -3775,6 +3775,22 @@ const HostDashboard = () => {
               </button>
              )
           })}
+          
+          {/* Added Static Links */}
+          <div className="pt-2 mt-2 border-t border-gray-100 flex flex-col gap-1">
+            <Link to="/how-it-works" onClick={() => setIsProfileDrawerOpen(false)} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer font-bold text-xs text-left text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-all duration-300">
+              <HelpCircle size={16} className="text-gray-400" />
+              <span className="flex-1 tracking-wide">{language === 'বাংলা' ? 'কীভাবে কাজ করে' : 'How it Works'}</span>
+            </Link>
+            <Link to="/terms" onClick={() => setIsProfileDrawerOpen(false)} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer font-bold text-xs text-left text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-all duration-300">
+              <FileText size={16} className="text-gray-400" />
+              <span className="flex-1 tracking-wide">{language === 'বাংলা' ? 'শর্তাবলী' : 'Terms & Policies'}</span>
+            </Link>
+            <button onClick={handleSwitchRole} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer font-bold text-xs text-left text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-all duration-300">
+              <RefreshCw size={16} className="text-gray-400" />
+              <span className="flex-1 tracking-wide">{language === 'বাংলা' ? 'ভাড়াটিয়া হিসেবে ব্যবহার করুন' : 'Switch to Tenant'}</span>
+            </button>
+          </div>
         </nav>
 
         <div className="p-5 border-t border-gray-100 bg-gray-50/50 flex flex-col gap-3 mt-auto">

@@ -73,7 +73,12 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   const profileTarget = (() => {
     if (!isAuthenticated) return { id: 'profile', label: 'Profile', icon: User, action: 'drawer' };
     if (isAdmin)           return { id: 'profile', label: 'Profile', icon: User, to: '/admin' };
-    if (isLandlord)        return { id: 'profile', label: 'Profile', icon: User, to: '/host-dashboard?tab=settings' };
+    if (isLandlord) {
+      if (location.pathname.startsWith('/host-dashboard')) {
+        return { id: 'profile', label: 'Profile', icon: User, action: 'host-drawer' };
+      }
+      return { id: 'profile', label: 'Profile', icon: User, to: '/host-dashboard?tab=dashboard' };
+    }
     // default to tenant
     return { id: 'profile', label: 'Profile', icon: User, to: '/tenant-dashboard' };
   })();
@@ -84,7 +89,7 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   ];
 
   const isActive = (item) => {
-    if (item.action === 'drawer' && !item.to) return false;
+    if ((item.action === 'drawer' || item.action === 'host-drawer') && !item.to) return false;
 
     // Split any ?tab= off the target so we can compare pathname + tab
     // (landlord Home → dashboard overview, Profile → dashboard settings).
@@ -121,6 +126,11 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
       // Tell <Navbar> to open its slide-out drawer. See the matching
       // `open-mobile-menu` listener in Navbar.jsx.
       window.dispatchEvent(new CustomEvent('open-mobile-menu'));
+      return;
+    }
+    if (item.action === 'host-drawer') {
+      // Tell <HostDashboard> to open its right-side drawer.
+      window.dispatchEvent(new CustomEvent('open-host-drawer'));
       return;
     }
     if (item.tab) {
