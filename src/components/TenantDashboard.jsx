@@ -2002,9 +2002,15 @@ const handleWizardSubmit = async (payload) => {
       {isProfileDrawerOpen && <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[60] animate-in fade-in" onClick={() => setIsProfileDrawerOpen(false)}></div>}
       <div className={`fixed top-0 right-0 h-full w-full max-w-[280px] bg-[#fdfdfd] shadow-2xl z-[70] transform transition-transform duration-500 ease-in-out flex flex-col border-l border-gray-100 ${isProfileDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         {/* Profile preview at top — tap goes to profile tab */}
-        <div className="p-5 pb-3 flex flex-col gap-4 relative">
-          <button onClick={() => setIsProfileDrawerOpen(false)} className="absolute top-5 right-5 p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors z-10"><X size={18} /></button>
-          <div onClick={() => { setActiveTab('profile'); setIsProfileDrawerOpen(false); }} className="flex items-center gap-3 bg-gray-50 hover:bg-[#ba0036]/5 p-3 pr-8 rounded-2xl border border-gray-100 mt-2 cursor-pointer transition-all group">
+        <button 
+          onClick={() => setIsProfileDrawerOpen(false)} 
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white text-gray-500 hover:text-[#ba0036] hover:bg-red-50 border border-gray-100 rounded-full shadow-sm hover:shadow-md transition-all duration-300 z-20"
+        >
+          <X size={16} strokeWidth={2.5} />
+        </button>
+        
+        <div className="p-5 pt-14 pb-3 flex flex-col gap-4 relative">
+          <div onClick={() => { setActiveTab('profile'); setIsProfileDrawerOpen(false); }} className="flex items-center gap-3 bg-gray-50 hover:bg-[#ba0036]/5 p-3 rounded-2xl border border-gray-100 cursor-pointer transition-all group">
             <div className="relative shrink-0">
               <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg border border-blue-100 group-hover:scale-105 transition-transform overflow-hidden">
                 {authUser?.avatar ? (

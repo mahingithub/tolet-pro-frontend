@@ -29,19 +29,41 @@ export default function BookingsTab(props) {
     getLeaseSummary, computeLeaseStage, isLeaseEndingSoon, leaseDaysLeft, openTenantChangeLease,
     isOpenEndedLease, leaseMonthsRunning,
     formatBDT, daysUntilNextDue, computeBookingProgress,
-    isHostelBooking, formatDate, stageLabel
+    isHostelBooking, formatDate, stageLabel,
+    landlordProfile, setLandlordProfile, currentBuildingId, setCurrentBuildingId
   } = props;
 
           const isBn = language === 'বাংলা';
+          const [showBuildingForm, setShowBuildingForm] = useState(false);
+          const [newBuilding, setNewBuilding] = useState({ name: '', location: '', type: 'flat' });
           const todayDate = today;
           const leaseSummary = getLeaseSummary(bookings, todayDate);
+          
+          const getPrefillBuilding = () => {
+            if (landlordProfile?.buildingMode === 'single' && landlordProfile.buildings?.length > 0) {
+              return landlordProfile.buildings[0];
+            }
+            if (landlordProfile?.buildingMode === 'multi' && currentBuildingId) {
+              return landlordProfile.buildings?.find(b => b.id === currentBuildingId);
+            }
+            return null;
+          };
+
           const matchesSearch = (b) => b.tenant.toLowerCase().includes(searchQuery.toLowerCase()) || b.property.toLowerCase().includes(searchQuery.toLowerCase());
           // Only 'active' and 'done' are real stages now. `leaseStageFilter` is
           // shared with the Documents tab (which reuses the same state for its
           // own pills), so anything we don't recognise falls back to "All"
           // rather than silently rendering an empty list.
           const stageFilter = (leaseStageFilter === 'active' || leaseStageFilter === 'done') ? leaseStageFilter : 'all';
-          const searchMatched = bookings.filter(matchesSearch);
+          
+          let searchMatched = bookings.filter(matchesSearch);
+          if (landlordProfile?.buildingMode === 'multi' && currentBuildingId) {
+            const bldg = landlordProfile.buildings?.find(b => b.id === currentBuildingId);
+            if (bldg) {
+              searchMatched = searchMatched.filter(b => b.property === bldg.name);
+            }
+          }
+
           const filtered = searchMatched.filter(b => {
             const stage = computeLeaseStage(b, todayDate);
             return stageFilter === 'all' || stage === stageFilter;
@@ -561,7 +583,7 @@ export default function BookingsTab(props) {
           const addTenantButton = (
             <button
               type="button"
-              onClick={() => isPremium ? openBlankLease() : setActiveModal('premium_gate')}
+              onClick={() => isPremium ? openBlankLease(getPrefillBuilding()) : setActiveModal('premium_gate')}
               aria-label={isBn ? 'নতুন ভাড়াটিয়া যোগ করুন' : 'Add a new tenant'}
               className="group relative overflow-hidden flex-1 sm:flex-none sm:shrink-0 min-w-0 px-3 sm:px-3.5 py-2.5 rounded-xl bg-gradient-to-br from-[#ba0036] via-[#d1003d] to-[#ff004c] text-white shadow-[0_5px_16px_rgba(186,0,54,0.32)] hover:shadow-[0_9px_24px_rgba(186,0,54,0.42)] active:scale-[0.97] transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ba0036]/40 focus-visible:ring-offset-2 lg:ml-auto"
             >
@@ -585,6 +607,90 @@ export default function BookingsTab(props) {
               <span className="text-gray-400 tabular-nums">{filtered.length}</span>
             </span>
           );
+
+          if (!landlordProfile?.buildingMode) {
+            return (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+                <div className="bg-white rounded-3xl p-6 md:p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95">
+                  <div className="text-center mb-6">
+                    <h2 className="text-xl md:text-2xl font-black text-gray-900 mb-2">{isBn ? 'আপনার কয়টা বাসা/বিল্ডিং আছে?' : 'How many houses/buildings do you have?'}</h2>
+                    <p className="text-sm font-bold text-gray-500">{isBn ? 'পরে যেকোনো সময় পাল্টাতে পারবেন' : 'You can change this anytime later'}</p>
+                  </div>
+                  <div className="space-y-4">
+                    <button 
+                      onClick={() => setLandlordProfile({...landlordProfile, buildingMode: 'single'})}
+                      className="w-full flex items-center gap-4 p-5 rounded-2xl border-2 border-gray-100 hover:border-[#ba0036] hover:bg-red-50 text-left group transition-all"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-red-100 text-[#ba0036] flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                        <Home size={24} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black text-gray-900 group-hover:text-[#ba0036] transition-colors">{isBn ? 'একটা বাসা' : 'One house'}</h3>
+                        <p className="text-xs font-bold text-gray-500">{isBn ? 'একটা বিল্ডিং ম্যানেজ করছি' : 'I am managing one building'}</p>
+                      </div>
+                    </button>
+                    <button 
+                      onClick={() => {
+                        // If they switch to multi and have a single building already, we keep it. Otherwise they just go to multi dashboard.
+                        setLandlordProfile({...landlordProfile, buildingMode: 'multi'})
+                      }}
+                      className="w-full flex items-center gap-4 p-5 rounded-2xl border-2 border-gray-100 hover:border-blue-600 hover:bg-blue-50 text-left group transition-all"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                        <Building2 size={24} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black text-gray-900 group-hover:text-blue-600 transition-colors">{isBn ? 'একাধিক বাসা' : 'Multiple houses'}</h3>
+                        <p className="text-xs font-bold text-gray-500">{isBn ? 'একাধিক বিল্ডিং ম্যানেজ করছি' : 'I am managing multiple buildings'}</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (landlordProfile?.buildingMode === 'single' && (!landlordProfile.buildings || landlordProfile.buildings.length === 0)) {
+            return (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+                <div className="bg-white rounded-3xl p-6 md:p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95">
+                  <div className="text-center mb-6">
+                    <h2 className="text-xl font-black text-gray-900 mb-2">{isBn ? 'বাসার তথ্য দিন' : 'Enter House Details'}</h2>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1.5">{isBn ? 'বাসার নাম' : 'House Name'}</label>
+                      <input type="text" value={newBuilding.name} onChange={(e) => setNewBuilding({...newBuilding, name: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#ba0036]/20 focus:border-[#ba0036]" placeholder={isBn ? 'যেমন: স্কাই ভিউ টাওয়ার' : 'e.g. Sky View Tower'} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1.5">{isBn ? 'ঠিকানা / লোকেশন' : 'Location'}</label>
+                      <input type="text" value={newBuilding.location} onChange={(e) => setNewBuilding({...newBuilding, location: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#ba0036]/20 focus:border-[#ba0036]" placeholder={isBn ? 'যেমন: মিরপুর ১০' : 'e.g. Mirpur 10'} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1.5">{isBn ? 'ধরন' : 'Type'}</label>
+                      <select value={newBuilding.type} onChange={(e) => setNewBuilding({...newBuilding, type: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#ba0036]/20 focus:border-[#ba0036]">
+                        <option value="flat">{isBn ? 'ফ্ল্যাট / এপার্টমেন্ট' : 'Flat / Apartment'}</option>
+                        <option value="hostel">{isBn ? 'হোস্টেল' : 'Hostel'}</option>
+                        <option value="room">{isBn ? 'সিঙ্গেল রুম' : 'Single Room'}</option>
+                      </select>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        if(!newBuilding.name || !newBuilding.location) return;
+                        setLandlordProfile({
+                          ...landlordProfile, 
+                          buildings: [{ ...newBuilding, id: 'bldg_' + Date.now(), createdAt: new Date().toISOString() }]
+                        });
+                      }}
+                      className="w-full bg-[#ba0036] hover:bg-[#a0002f] text-white font-black py-3.5 rounded-xl shadow-lg hover:shadow-xl transition-all"
+                    >
+                      {isBn ? 'সেভ করুন' : 'Save Details'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          }
 
           return (
           <div className="w-full animate-in fade-in zoom-in-95 duration-500">
@@ -713,9 +819,89 @@ export default function BookingsTab(props) {
                 </button>
               </aside>
 
-              {/* ── RIGHT MAIN — main IS the scroll container; sticky toolbar pins inside it ── */}
+              {/* ── RIGHT MAIN ── */}
               <main className="lg:col-span-8 w-full lg:h-full lg:overflow-y-auto custom-scrollbar pb-24 lg:pb-4 lg:pr-3 min-w-0">
-
+                {landlordProfile?.buildingMode === 'multi' && !currentBuildingId ? (
+                  <div className="w-full">
+                    {/* BUILDINGS OVERVIEW */}
+                    <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:-mx-4 lg:-mx-3 px-3 sm:px-4 lg:px-6 pt-2 pb-3 mb-2 lg:pt-1">
+                      <div className="flex items-center justify-between">
+                        <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
+                          <Building2 size={12} className="text-[#ba0036]"/>
+                          <span className="hidden sm:inline">{isBn ? 'আপনার বিল্ডিংসমূহ' : 'Your Buildings'}</span>
+                          <span className="text-gray-400 tabular-nums">{landlordProfile.buildings?.length || 0}</span>
+                        </span>
+                        <button 
+                          onClick={() => setShowBuildingForm(true)}
+                          className="shrink-0 inline-flex items-center justify-center gap-1.5 bg-[#ba0036] hover:bg-[#a0002f] text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all shadow-[0_4px_12px_rgba(186,0,54,0.25)] hover:shadow-[0_6px_16px_rgba(186,0,54,0.35)] active:scale-95"
+                        >
+                          <Plus size={14} strokeWidth={3} className="shrink-0"/> <span className="hidden sm:inline">{isBn ? 'নতুন বিল্ডিং' : 'Add Building'}</span><span className="sm:hidden">{isBn ? 'যোগ করুন' : 'Add'}</span>
+                        </button>
+                      </div>
+                    </div>
+                    {showBuildingForm && (
+                      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4 animate-in slide-in-from-top-2">
+                        <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-3">{isBn ? 'নতুন বিল্ডিং যোগ করুন' : 'Add New Building'}</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <input type="text" value={newBuilding.name} onChange={(e) => setNewBuilding({...newBuilding, name: e.target.value})} placeholder={isBn ? 'বাসার নাম' : 'House Name'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold" />
+                          <input type="text" value={newBuilding.location} onChange={(e) => setNewBuilding({...newBuilding, location: e.target.value})} placeholder={isBn ? 'ঠিকানা' : 'Location'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold" />
+                          <select value={newBuilding.type} onChange={(e) => setNewBuilding({...newBuilding, type: e.target.value})} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold">
+                            <option value="flat">Flat / Apartment</option>
+                            <option value="hostel">Hostel</option>
+                            <option value="room">Single Room</option>
+                          </select>
+                        </div>
+                        <div className="flex justify-end gap-2 mt-3">
+                          <button onClick={() => setShowBuildingForm(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100">{isBn ? 'বাতিল' : 'Cancel'}</button>
+                          <button onClick={() => {
+                            if(!newBuilding.name) return;
+                            setLandlordProfile({ ...landlordProfile, buildings: [...(landlordProfile.buildings||[]), { ...newBuilding, id: 'bldg_' + Date.now(), createdAt: new Date().toISOString() }] });
+                            setShowBuildingForm(false);
+                            setNewBuilding({ name: '', location: '', type: 'flat' });
+                          }} className="px-4 py-2 rounded-xl text-xs font-black bg-[#ba0036] text-white hover:bg-[#a0002f]">{isBn ? 'যোগ করুন' : 'Save'}</button>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-3">
+                      {(landlordProfile.buildings || []).map(bldg => {
+                         const bldgBookings = bookings.filter(b => b.property === bldg.name);
+                         return (
+                           <div key={bldg.id} onClick={() => setCurrentBuildingId(bldg.id)} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-5 flex items-center justify-between cursor-pointer hover:shadow-md transition-all group">
+                             <div className="flex items-center gap-4">
+                               <div className="w-12 h-12 rounded-full bg-red-50 text-[#ba0036] flex items-center justify-center shrink-0">
+                                 {bldg.type === 'hostel' ? <Users size={20}/> : <Home size={20}/>}
+                               </div>
+                               <div>
+                                 <h4 className="text-sm sm:text-base font-black text-gray-900 group-hover:text-[#ba0036] transition-colors">{bldg.name}</h4>
+                                 <p className="text-xs font-bold text-gray-500 mt-0.5 flex items-center gap-1"><MapPin size={10} className="text-gray-400"/> {bldg.location}</p>
+                               </div>
+                             </div>
+                             <div className="flex flex-col items-end">
+                               <span className="px-2 py-1 rounded-lg bg-green-50 text-green-700 text-[10px] font-black uppercase tracking-wider tabular-nums">{bldgBookings.length} {isBn ? 'ভাড়াটিয়া' : 'Tenants'}</span>
+                               <ArrowRight size={14} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-1 transition-all mt-2"/>
+                             </div>
+                           </div>
+                         );
+                      })}
+                      {(!landlordProfile.buildings || landlordProfile.buildings.length === 0) && !showBuildingForm && (
+                        <div className="text-center py-12 px-5 bg-white rounded-2xl shadow-sm">
+                          <Building2 className="text-gray-300 mx-auto mb-3" size={32} />
+                          <h3 className="text-sm font-black text-gray-900">{isBn ? 'কোনো বিল্ডিং নেই' : 'No buildings yet'}</h3>
+                          <p className="text-xs font-bold text-gray-500 mt-1">{isBn ? 'উপরের বাটনে ক্লিক করে প্রথম বিল্ডিং যোগ করুন' : 'Click the button above to add your first building'}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full">
+                    {/* TENANTS VIEW (Current normal view, optionally with Back button) */}
+                    {landlordProfile?.buildingMode === 'multi' && currentBuildingId && (
+                      <div className="mb-2">
+                        <button onClick={() => setCurrentBuildingId(null)} className="flex items-center gap-1 text-[10px] font-black text-gray-500 hover:text-[#ba0036] transition-colors uppercase tracking-widest bg-white/50 px-3 py-1.5 rounded-lg w-fit">
+                          <ChevronLeft size={12}/> {isBn ? 'সব বিল্ডিং-এ ফিরে যান' : 'Back to Buildings'}
+                        </button>
+                      </div>
+                    )}
                 {/* Sticky toolbar — three layouts, one set of controls.
                     Because <main> is the scroll container this bar pins to the
                     top of the list as the host scrolls, on every device.
@@ -784,7 +970,7 @@ export default function BookingsTab(props) {
                               step looks identical wherever the host meets it. */}
                           <button
                             type="button"
-                            onClick={() => isPremium ? openBlankLease() : setActiveModal('premium_gate')}
+                            onClick={() => isPremium ? openBlankLease(getPrefillBuilding()) : setActiveModal('premium_gate')}
                             aria-label={isBn ? 'নতুন ভাড়াটিয়া যোগ করুন' : 'Add a new tenant'}
                             className="group relative overflow-hidden w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-br from-[#ba0036] via-[#d1003d] to-[#ff004c] text-white shadow-[0_8px_24px_rgba(186,0,54,0.3)] hover:shadow-[0_12px_32px_rgba(186,0,54,0.4)] active:scale-[0.97] transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ba0036]/40 focus-visible:ring-offset-2"
                           >
@@ -836,6 +1022,8 @@ export default function BookingsTab(props) {
                     </div>
                   );
                 })()}
+                  </div>
+                )}
               </main>
 
             </div>

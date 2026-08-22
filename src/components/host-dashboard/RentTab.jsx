@@ -31,17 +31,27 @@ export default function RentTab(props) {
     rentUnitsOf, getMonthCollectionSummary, enumerateLeaseMonths, getRentStatus, monthKey,
     monthFullLabel, monthShortLabel, getDueDate, parseMonthKey, formatBDT, formatDate,
     computeBookingStatus, daysUntilNextDue, computeLeaseStage, isOpenEndedLease,
-    sendRentReminder, openTenantProfile, openChatPanel, setActiveModal, exportRentCsv, isPremium
+    sendRentReminder, openTenantProfile, openChatPanel, setActiveModal, exportRentCsv, isPremium,
+    landlordProfile, setLandlordProfile, currentBuildingId
   } = props;
 
   const [showAllOverdue, setShowAllOverdue] = useState(false);
 
           const todayDate = today;
+          
+          let baseBookings = bookings;
+          if (landlordProfile?.buildingMode === 'multi' && currentBuildingId) {
+            const bldg = landlordProfile.buildings?.find(b => b.id === currentBuildingId);
+            if (bldg) {
+              baseBookings = bookings.filter(b => b.property === bldg.name);
+            }
+          }
+
           // Rent Collection counts one unit per occupant: expand each booking
           // into its active members (each carrying their split share + own
           // ledger), so the KPI hero + overdue list are per person and match the
           // per-roommate cards below.
-          const rentUnits = bookings.flatMap(rentUnitsOf);
+          const rentUnits = baseBookings.flatMap(rentUnitsOf);
           const sm = getMonthCollectionSummary(rentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
           const collectedPct = sm.expectedTotal > 0 ? Math.min(100, Math.round((sm.collectedTotal / sm.expectedTotal) * 100)) : 0;
           const yearMonths = Array.from({ length: 12 }, (_, i) => monthKey(ledgerYear, i + 1));
@@ -78,8 +88,8 @@ export default function RentTab(props) {
           // Base list for the year: overlaps the picked year, not cancelled, and
           // — for the current/future year — not an already-ended (expired) lease.
           // Ended tenants therefore drop off the live Rent Collection view, but
-          // stay visible when the host reviews a past year they were active in.
-          const yearBookings = bookings.filter(b => {
+          // For the CSV export, we only want rows relevant to the year being viewed
+          const yearBookings = baseBookings.filter(b => {
             if (b.status === 'cancelled') return false;
             if (!leaseTouchesYear(b, ledgerYear)) return false;
             if (!viewingPastYear && computeLeaseStage(b, today) === 'done') return false;

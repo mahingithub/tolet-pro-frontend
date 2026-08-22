@@ -770,6 +770,7 @@ const HostDashboard = () => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
+  const [currentBuildingId, setCurrentBuildingId] = useState(null);
   // Booking delete confirmation — stores the booking id pending confirmation
   const [confirmDeleteBookingId, setConfirmDeleteBookingId] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
@@ -810,6 +811,8 @@ const HostDashboard = () => {
     communication:    [],
     serviceCharge:    '',
     houseRules:       [],
+    buildingMode:     null,
+    buildings:        [],
   };
 
   const [landlordProfile, setLandlordProfile] = useState(() => {
@@ -3027,7 +3030,7 @@ const HostDashboard = () => {
   };
 
   // Open create_lease standalone (no inquiry pre-fill).
-  const openBlankLease = () => {
+  const openBlankLease = (prefillBuilding = null) => {
     // Starts today, runs ONGOING — the tenancy has no expiry until the host
     // either types a term or hands the unit to the next tenant. Only the tenant
     // and the rent are left to fill in.
@@ -3036,9 +3039,9 @@ const HostDashboard = () => {
       inquiryId: null,
       inquirerUserId: null,
       replacesBookingId: null,
-      propertyId: properties[0]?.id || '',
-      property: properties[0]?.title || '',
-      location: properties[0]?.location || '',
+      propertyId: prefillBuilding ? prefillBuilding.id : (properties[0]?.id || ''),
+      property: prefillBuilding ? prefillBuilding.name : (properties[0]?.title || ''),
+      location: prefillBuilding ? prefillBuilding.location : (properties[0]?.location || ''),
       tenant: '',
       tenantPhone: '',
       leaseStart: startIso,
@@ -3694,9 +3697,15 @@ const HostDashboard = () => {
       {isProfileDrawerOpen && <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[60] animate-in fade-in" onClick={() => setIsProfileDrawerOpen(false)}></div>}
       
       <div className={`fixed top-0 right-0 h-full w-full max-w-[280px] bg-[#fdfdfd] shadow-2xl z-[70] transform transition-transform duration-500 ease-in-out flex flex-col border-l border-gray-100 ${isProfileDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="p-5 pb-3 flex flex-col gap-4 relative">
-          <button onClick={() => setIsProfileDrawerOpen(false)} className="absolute top-5 right-5 p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors z-10"><X size={18} /></button>
-          <div onClick={() => { setActiveTab('profile'); setIsProfileDrawerOpen(false); }} className="flex items-center gap-3 bg-gray-50 hover:bg-[#ba0036]/5 p-3 pr-8 rounded-2xl border border-gray-100 mt-2 cursor-pointer transition-all group">
+        <button 
+          onClick={() => setIsProfileDrawerOpen(false)} 
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white text-gray-500 hover:text-[#ba0036] hover:bg-red-50 border border-gray-100 rounded-full shadow-sm hover:shadow-md transition-all duration-300 z-20"
+        >
+          <X size={16} strokeWidth={2.5} />
+        </button>
+        
+        <div className="p-5 pt-14 pb-3 flex flex-col gap-4 relative">
+          <div onClick={() => { setActiveTab('profile'); setIsProfileDrawerOpen(false); }} className="flex items-center gap-3 bg-gray-50 hover:bg-[#ba0036]/5 p-3 rounded-2xl border border-gray-100 cursor-pointer transition-all group">
             <div className="relative shrink-0">
               {userData.avatar ? (
                 <img src={userData.avatar} alt={userData.fullName} className="w-10 h-10 rounded-full object-cover group-hover:scale-105 transition-transform" />
@@ -3717,10 +3726,16 @@ const HostDashboard = () => {
         </div>
 
         <div className="px-5 pb-2">
-          <Link to="/list-property" data-tour="add-property-button" className="w-full relative group overflow-hidden bg-gray-900 text-white py-3 rounded-xl font-black text-xs shadow-md flex items-center justify-center gap-2 hover:shadow-[0_10px_20px_rgba(186,0,54,0.3)] hover:bg-[#ba0036] transition-all duration-500">
-            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out"></div>
-            <Plus size={16} className="relative z-10" /> <span className="relative z-10">{t?.newListing || (language === 'বাংলা' ? 'নতুন লিস্টিং যোগ করুন' : 'Add New Listing')}</span>
-          </Link>
+          {Array.isArray(authRoles) && authRoles.includes('tenant') ? (
+            <button onClick={handleSwitchRole} className="w-full relative group overflow-hidden bg-gray-900 text-white py-3 rounded-xl font-black text-xs shadow-md flex items-center justify-center gap-2 hover:shadow-[0_10px_20px_rgba(186,0,54,0.3)] hover:bg-[#ba0036] transition-all duration-500">
+              <RefreshCw size={16} className="relative z-10" /> <span className="relative z-10">{language === 'বাংলা' ? 'ভাড়াটিয়া হিসেবে ব্যবহার করুন' : 'Switch to Tenant'}</span>
+            </button>
+          ) : (
+            <Link to="/list-property" data-tour="add-property-button" className="w-full relative group overflow-hidden bg-gray-900 text-white py-3 rounded-xl font-black text-xs shadow-md flex items-center justify-center gap-2 hover:shadow-[0_10px_20px_rgba(186,0,54,0.3)] hover:bg-[#ba0036] transition-all duration-500">
+              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out"></div>
+              <Plus size={16} className="relative z-10" /> <span className="relative z-10">{t?.newListing || (language === 'বাংলা' ? 'নতুন লিস্টিং যোগ করুন' : '+ New Listing')}</span>
+            </Link>
+          )}
         </div>
 
         <nav className="flex-1 px-3 space-y-1 overflow-y-auto custom-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -3786,10 +3801,6 @@ const HostDashboard = () => {
               <FileText size={16} className="text-gray-400" />
               <span className="flex-1 tracking-wide">{language === 'বাংলা' ? 'শর্তাবলী' : 'Terms & Policies'}</span>
             </Link>
-            <button onClick={handleSwitchRole} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer font-bold text-xs text-left text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-all duration-300">
-              <RefreshCw size={16} className="text-gray-400" />
-              <span className="flex-1 tracking-wide">{language === 'বাংলা' ? 'ভাড়াটিয়া হিসেবে ব্যবহার করুন' : 'Switch to Tenant'}</span>
-            </button>
           </div>
         </nav>
 
@@ -4677,6 +4688,10 @@ const HostDashboard = () => {
             isHostelBooking={isHostelBooking}
             formatDate={formatDate}
             stageLabel={stageLabel}
+            landlordProfile={landlordProfile}
+            setLandlordProfile={setLandlordProfile}
+            currentBuildingId={currentBuildingId}
+            setCurrentBuildingId={setCurrentBuildingId}
           />
         )}
         {/* ─────────────────────────────────────────────────────────────────
@@ -4735,6 +4750,9 @@ const HostDashboard = () => {
             setActiveModal={setActiveModal}
             exportRentCsv={exportRentCsv}
             isPremium={isPremium}
+            landlordProfile={landlordProfile}
+            setLandlordProfile={setLandlordProfile}
+            currentBuildingId={currentBuildingId}
           />
         )}
         {/* 🔴 PROPERTIES GRID (Only for 'properties' tab) */}
