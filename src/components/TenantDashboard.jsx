@@ -2145,7 +2145,7 @@ const handleWizardSubmit = async (payload) => {
                 2-up on phones, 4-up on desktop. Each tile is a tap-target that
                 drills into the matching tab. The Due Amount tile carries a
                 dark accent so an outstanding balance is impossible to miss. */}
-            <div className="mb-4 md:mb-6 grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            <div className={`mb-4 md:mb-6 grid grid-cols-2 gap-3 md:gap-4 ${myBookings.length > 0 ? 'lg:grid-cols-4' : 'lg:grid-cols-2'}`}>
               {[
                 {
                   id: 'saved', icon: Heart, iconBg: 'bg-rose-100', iconColor: 'text-[#ba0036]', bar: 'bg-[#ba0036]',

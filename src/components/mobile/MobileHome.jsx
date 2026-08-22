@@ -272,7 +272,7 @@ const SafeImg = ({ src, alt = '', className = '', showIconOnError = true }) => {
  * don't contain homes — their districts do.
  */
 const DivisionsStrip = ({ onPick, t }) => (
-  <div className="pt-8 mt-2">
+  <div className="pt-5 mt-2">
     <div className="flex items-center justify-between px-4 mb-2.5">
       <div>
         <h3 className="text-[16px] font-black text-gray-900 tracking-tight">

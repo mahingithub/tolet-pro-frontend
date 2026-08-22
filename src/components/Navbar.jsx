@@ -485,7 +485,7 @@ useEffect(() => {
           add between the navbar and the routed page. */}
       <header className={`flex flex-col w-full bg-white/95 backdrop-blur-2xl font-sans sticky top-0 z-[60] transition-all duration-300 ease-in-out ${isScrolled ? 'shadow-[0_4px_24px_rgba(0,0,0,0.10)] border-b border-gray-100/80' : 'border-b border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)]'} ${isMobileMenuOpen ? 'md:opacity-100 max-md:opacity-0 max-md:pointer-events-none' : ''}`}>
 
-        <div className={`w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 flex items-center gap-2.5 md:gap-4 h-[56px] md:h-[64px] transition-all duration-300 ease-in-out ${isScrolled ? 'md:-mt-[64px] md:opacity-0 md:pointer-events-none' : 'mt-0 opacity-100'}`}>
+        <div className={`w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 flex items-center gap-2.5 md:gap-4 h-[56px] md:h-[64px] transition-all duration-300 ease-in-out mt-0 opacity-100`}>
 
           <a
             href="/"
