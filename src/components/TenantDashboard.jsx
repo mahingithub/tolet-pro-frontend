@@ -1826,8 +1826,8 @@ const handleWizardSubmit = async (payload) => {
       />
 
       {/* --- TOP HEADER — floating glass card identical to HostDashboard --- */}
-      <div className="w-full max-w-[1600px] mx-auto z-40 relative">
-        <header className="mx-4 md:mx-8 mt-4 bg-white/60 backdrop-blur-3xl border border-white/80 rounded-[2rem] px-4 md:px-8 py-3.5 flex items-center justify-between shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+      <div className="w-full max-w-[1600px] mx-auto z-[50] sticky top-0 pt-2 md:pt-4 px-2 md:px-4">
+        <header className="bg-white/70 backdrop-blur-3xl border border-white/80 rounded-[2rem] px-4 md:px-8 py-3.5 flex items-center justify-between shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
         {/* 🟢 GLOBAL LOGO — exact same block used in Navbar.jsx so the dashboard
             visually matches every other page. */}
         <button
@@ -2237,30 +2237,43 @@ const handleWizardSubmit = async (payload) => {
             <div className="mb-4 md:mb-6 grid grid-cols-3 gap-2.5 md:gap-4">
               {[
                 {
+                  id: 'messages',
                   label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',
                   sub: language === 'বাংলা' ? 'আপনার চ্যাট দেখুন' : 'View your chats',
                   Icon: MessageSquare, iconBg: 'bg-blue-50 border-blue-100', iconColor: 'text-blue-600',
                   onClick: () => navigate('/messages'),
+                  extraClass: 'hidden md:flex',
                 },
                 {
+                  id: 'payments-mobile',
+                  label: language === 'বাংলা' ? 'পেমেন্ট' : 'Payments',
+                  sub: language === 'বাংলা' ? 'পেমেন্ট ও রিসিট' : 'Payments & receipts',
+                  Icon: DollarSign, iconBg: 'bg-violet-50 border-violet-100', iconColor: 'text-violet-600',
+                  badge: unreadReceiptsCount > 0 ? unreadReceiptsCount : null,
+                  onClick: () => setActiveTab('payments'),
+                  extraClass: 'flex md:hidden',
+                },
+                {
+                  id: 'services',
                   label: language === 'বাংলা' ? 'সার্ভিস' : 'Services',
                   sub: language === 'বাংলা' ? 'সার্ভিস রিকোয়েস্ট করুন' : 'Raise or track a service',
                   Icon: Wrench, iconBg: 'bg-gray-100 border-gray-200', iconColor: 'text-gray-600',
                   onClick: () => navigate('/services'),
                 },
                 {
+                  id: 'alerts',
                   label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts',
                   sub: language === 'বাংলা' ? 'নোটিফিকেশন ম্যানেজ করুন' : 'Manage notifications',
                   Icon: Bell, iconBg: 'bg-amber-50 border-amber-100', iconColor: 'text-amber-600',
                   badge: tenantAlertCount > 0 ? tenantAlertCount : null,
                   onClick: () => setActiveTab('alerts'),
                 },
-              ].map(({ label, sub, Icon, iconBg, iconColor, badge, onClick }) => (
+              ].map(({ id, label, sub, Icon, iconBg, iconColor, badge, onClick, extraClass }) => (
                 <button
-                  key={label}
+                  key={id || label}
                   type="button"
                   onClick={onClick}
-                  className="group flex flex-col items-center text-center gap-2 p-3 md:flex-row md:text-left md:items-center md:gap-3 md:p-4 rounded-2xl bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300"
+                  className={`group ${extraClass || 'flex'} flex-col items-center text-center gap-2 p-3 md:flex-row md:text-left md:items-center md:gap-3 md:p-4 rounded-2xl bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300`}
                 >
                   <span className={`relative w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 ${iconBg} ${iconColor} group-hover:scale-105 transition-transform`}>
                     <Icon size={19} strokeWidth={2.4} />

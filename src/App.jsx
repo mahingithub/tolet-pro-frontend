@@ -216,7 +216,7 @@ const AppLayout = () => {
 			<GlobalCallSocket />
 			<AppDownloadBanner />
 			{!shouldHideNavbar && (
-				<div className={isPropertyListingRoute ? "hidden lg:block" : ""}>
+				<div className={`sticky top-0 z-[60] ${isPropertyListingRoute ? "hidden lg:block" : ""}`}>
 					<Navbar />
 				</div>
 			)}
