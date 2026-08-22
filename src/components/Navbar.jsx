@@ -485,7 +485,7 @@ useEffect(() => {
           add between the navbar and the routed page. */}
       <header className={`flex flex-col w-full bg-white/95 backdrop-blur-2xl font-sans sticky top-0 z-[60] transition-all duration-300 ease-in-out ${isScrolled ? 'shadow-[0_4px_24px_rgba(0,0,0,0.10)] border-b border-gray-100/80' : 'border-b border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)]'} ${isMobileMenuOpen ? 'md:opacity-100 max-md:opacity-0 max-md:pointer-events-none' : ''}`}>
 
-        <div className={`w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 flex items-center gap-2.5 md:gap-4 h-[56px] md:h-[64px] transition-all duration-300 ease-in-out mt-0 opacity-100`}>
+        <div className={`relative z-10 w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 flex items-center gap-2.5 md:gap-4 h-[56px] md:h-[64px] transition-all duration-300 ease-in-out mt-0 opacity-100`}>
 
           <a
             href="/"
@@ -826,8 +826,8 @@ useEffect(() => {
         </div>
 
         {/* Desktop district bar — Hover cut off issue fixed with overflow-visible */}
-        <div className={`hidden md:block border-t border-gray-100 bg-[#f8f9fa]/90 backdrop-blur-xl transition-all duration-300 max-h-[38px] opacity-100 overflow-visible`}>
-          <div className="w-full max-w-[1400px] mx-auto px-4 lg:px-6 h-[38px] flex items-center justify-between">
+        <div className={`hidden md:block bg-[#f8f9fa]/90 backdrop-blur-xl transition-all duration-300 overflow-visible ${isScrolled ? 'max-h-0 opacity-0 pointer-events-none border-transparent' : 'max-h-[38px] opacity-100 border-t border-gray-100'}`}>
+          <div className={`w-full max-w-[1400px] mx-auto px-4 lg:px-6 flex items-center justify-between transition-all duration-300 ${isScrolled ? 'h-0' : 'h-[38px]'}`}>
             
             {/* OYO এর মতো সমানভাবে স্পেস নেওয়ার জন্য ম্যাপ করা আইটেমগুলোকে সরাসরি justify-between কন্টেইনারে রাখা হয়েছে */}
             {currentData.map((division, divIndex) => (
