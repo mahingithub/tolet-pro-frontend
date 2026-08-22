@@ -4222,20 +4222,21 @@ const HostDashboard = () => {
             {/* ১.২ দ্রুত অ্যাকশন — ৪ টাইল, সহজ ও কেন্দ্রস্থ। */}
             <div data-tour="host-quick-actions" className="bg-white dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800/60 rounded-2xl md:rounded-[1.5rem] p-4 md:p-5 shadow-[0_4px_25px_rgba(0,0,0,0.02)] dark:shadow-none">
               <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white mb-4">
-                {language === 'বাংলা' ? 'দ্রুত অ্যাকশন' : 'Quick Actions'}
+                {language === 'বাংলা' ? 'জরুরী কাজ' : 'Quick Actions'}
               </h3>
               <div className="grid grid-cols-4 gap-[clamp(0.375rem,2vw,1rem)] items-stretch">
                 {[
-                  { label: language === 'বাংলা' ? 'ভাড়াটিয়া যোগ করুন' : 'Add Tenant',       Icon: Calendar,      iconColor: 'text-gray-500 dark:text-gray-400',     onClick: () => setActiveTab('bookings') },
-                  { label: language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent', Icon: Wallet,        iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('rent') },
-                  { label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => navigate('/messages') },
-                  { label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts', Icon: BellRing,      iconColor: 'text-gray-500 dark:text-gray-400',   onClick: () => setActiveTab('smartAlerts') },
-                ].map(({ label, Icon, iconColor, onClick }) => (
+                  { label: language === 'বাংলা' ? 'ভাড়াটিয়া যোগ করুন' : 'Add Tenant',       Icon: Calendar,      iconColor: 'text-gray-500 dark:text-gray-400',     onClick: () => setActiveTab('bookings'), showOn: 'all' },
+                  { label: language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent', Icon: Wallet,        iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('rent'), showOn: 'all' },
+                  { label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => navigate('/messages'), showOn: 'desktop' },
+                  { label: language === 'বাংলা' ? 'পেমেন্ট সেটিংস' : 'Payment Settings', Icon: CreditCard, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('payments'), showOn: 'mobile' },
+                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">স্মার্ট<br />অ্যালার্ট</span><span className="hidden md:block">স্মার্ট অ্যালার্ট</span></> : <><span className="md:hidden block leading-tight">Smart<br />Alerts</span><span className="hidden md:block">Smart Alerts</span></>, Icon: BellRing,      iconColor: 'text-gray-500 dark:text-gray-400',   onClick: () => setActiveTab('smartAlerts'), showOn: 'all' },
+                ].map(({ label, Icon, iconColor, onClick, showOn }) => (
                   <button
                     key={label}
                     type="button"
                     onClick={onClick}
-                    className="group min-w-0 w-full overflow-hidden flex flex-col items-center justify-start gap-[clamp(0.375rem,2vw,0.75rem)] px-[clamp(0.25rem,1.5vw,1.25rem)] py-[clamp(0.625rem,2.5vw,1.25rem)] rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300"
+                    className={`group min-w-0 w-full overflow-hidden flex-col items-center justify-start gap-[clamp(0.375rem,2vw,0.75rem)] px-[clamp(0.25rem,1.5vw,1.25rem)] py-[clamp(0.625rem,2.5vw,1.25rem)] rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300 ${showOn === 'mobile' ? 'flex md:hidden' : showOn === 'desktop' ? 'hidden md:flex' : 'flex'}`}
                   >
                     <Icon strokeWidth={2.2} className={`shrink-0 w-[clamp(20px,5.5vw,26px)] h-[clamp(20px,5.5vw,26px)] ${iconColor} group-hover:scale-110 transition-transform duration-300`} />
                     <span className="w-full block text-[clamp(9px,2.6vw,0.875rem)] font-bold text-gray-700 dark:text-gray-300 text-center leading-snug break-words hyphens-auto">
@@ -4267,7 +4268,7 @@ const HostDashboard = () => {
                         <Wallet size={18} className="text-emerald-600" />
                       </div>
                       <div className="min-w-0">
-                        <h3 className="text-base md:text-xl font-black text-gray-900 leading-tight">
+                        <h3 className="text-base md:text-xl font-black text-gray-900 dark:text-white leading-tight">
                           {language === 'বাংলা' ? 'ভাড়া লেজার ওভারভিউ' : 'Shared Ledger Overview'}
                         </h3>
                         <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">
@@ -4275,7 +4276,7 @@ const HostDashboard = () => {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 text-[10px] md:text-[11px] font-black text-[#ba0036] uppercase tracking-widest group-hover:translate-x-0.5 transition-transform">
+                    <div className="flex items-center gap-1 text-[10px] md:text-[11px] font-black text-[#ba0036] dark:text-rose-400 uppercase tracking-widest group-hover:translate-x-0.5 transition-transform">
                       {language === 'বাংলা' ? 'লেজার দেখুন' : 'Open Ledger'}
                       <ArrowUpRight size={14} />
                     </div>
@@ -4287,40 +4288,40 @@ const HostDashboard = () => {
                       <span className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest">
                         {language === 'বাংলা' ? 'কালেকশন রেট' : 'Collection Rate'}
                       </span>
-                      <span className="text-xs md:text-sm font-black text-[#ba0036] tabular-nums">{collectedPct}%</span>
+                      <span className="text-xs md:text-sm font-black text-[#ba0036] dark:text-rose-400 tabular-nums">{collectedPct}%</span>
                     </div>
-                    <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-gradient-to-r from-[#ba0036] to-[#ff004c] transition-all duration-700" style={{ width: `${collectedPct}%` }} />
+                    <div className="h-2 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-gradient-to-r from-[#ba0036] to-[#ff004c] dark:from-rose-500 dark:to-rose-400 transition-all duration-700" style={{ width: `${collectedPct}%` }} />
                     </div>
                   </div>
 
                   {/* 4-KPI strip — same vocabulary as the Rent Collection tab */}
                   <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="bg-transparent border border-emerald-100/80 rounded-2xl p-3 md:p-4">
-                      <p className="text-[8px] md:text-[9px] font-black text-emerald-700 uppercase tracking-widest">{language === 'বাংলা' ? 'আদায়' : 'Collected'}</p>
-                      <p className="text-lg md:text-2xl font-black text-emerald-700 tabular-nums mt-1 leading-none">{formatBDT(sm.collectedTotal)}</p>
-                      <p className="text-[8px] md:text-[9px] font-bold text-emerald-700/70 mt-1.5 inline-flex items-center gap-1">
+                    <div className="bg-transparent border border-emerald-100/80 dark:border-emerald-800/50 rounded-2xl p-3 md:p-4">
+                      <p className="text-[8px] md:text-[9px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">{language === 'বাংলা' ? 'আদায়' : 'Collected'}</p>
+                      <p className="text-lg md:text-2xl font-black text-emerald-700 dark:text-emerald-400 tabular-nums mt-1 leading-none">{formatBDT(sm.collectedTotal)}</p>
+                      <p className="text-[8px] md:text-[9px] font-bold text-emerald-700/70 dark:text-emerald-400/70 mt-1.5 inline-flex items-center gap-1">
                         <CheckCircle2 size={10} strokeWidth={3}/> {sm.paidCount} {language === 'বাংলা' ? 'ক্লিয়ার্ড' : 'cleared'}
                       </p>
                     </div>
-                    <div className="bg-transparent border border-rose-100/80 rounded-2xl p-3 md:p-4">
-                      <p className="text-[8px] md:text-[9px] font-black text-rose-700 uppercase tracking-widest">{language === 'বাংলা' ? 'বকেয়া' : 'Outstanding'}</p>
-                      <p className="text-lg md:text-2xl font-black text-rose-700 tabular-nums mt-1 leading-none">{formatBDT(sm.outstandingTotal)}</p>
-                      <p className="text-[8px] md:text-[9px] font-bold text-rose-700/70 mt-1.5 inline-flex items-center gap-1">
+                    <div className="bg-transparent border border-rose-100/80 dark:border-rose-800/50 rounded-2xl p-3 md:p-4">
+                      <p className="text-[8px] md:text-[9px] font-black text-rose-700 dark:text-rose-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বকেয়া' : 'Outstanding'}</p>
+                      <p className="text-lg md:text-2xl font-black text-rose-700 dark:text-rose-400 tabular-nums mt-1 leading-none">{formatBDT(sm.outstandingTotal)}</p>
+                      <p className="text-[8px] md:text-[9px] font-bold text-rose-700/70 dark:text-rose-400/70 mt-1.5 inline-flex items-center gap-1">
                         <AlertCircle size={10} strokeWidth={3}/> {sm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'unpaid'}
                       </p>
                     </div>
-                    <div className="bg-transparent border border-amber-100/80 rounded-2xl p-3 md:p-4">
-                      <p className="text-[8px] md:text-[9px] font-black text-amber-700 uppercase tracking-widest">{language === 'বাংলা' ? 'আংশিক' : 'Partial'}</p>
-                      <p className="text-lg md:text-2xl font-black text-amber-700 tabular-nums mt-1 leading-none">{sm.partialCount}</p>
-                      <p className="text-[8px] md:text-[9px] font-bold text-amber-700/70 mt-1.5 inline-flex items-center gap-1">
+                    <div className="bg-transparent border border-amber-100/80 dark:border-amber-800/50 rounded-2xl p-3 md:p-4">
+                      <p className="text-[8px] md:text-[9px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest">{language === 'বাংলা' ? 'আংশিক' : 'Partial'}</p>
+                      <p className="text-lg md:text-2xl font-black text-amber-700 dark:text-amber-400 tabular-nums mt-1 leading-none">{sm.partialCount}</p>
+                      <p className="text-[8px] md:text-[9px] font-bold text-amber-700/70 dark:text-amber-400/70 mt-1.5 inline-flex items-center gap-1">
                         <Hourglass size={10} strokeWidth={3}/> {language === 'বাংলা' ? 'আংশিক পেমেন্ট' : 'partially paid'}
                       </p>
                     </div>
-                    <div className="bg-transparent border border-blue-100/80 rounded-2xl p-3 md:p-4">
-                      <p className="text-[8px] md:text-[9px] font-black text-blue-700 uppercase tracking-widest">{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}</p>
-                      <p className="text-lg md:text-2xl font-black text-blue-700 tabular-nums mt-1 leading-none">{formatBDT(sm.expectedTotal)}</p>
-                      <p className="text-[8px] md:text-[9px] font-bold text-blue-700/70 mt-1.5 inline-flex items-center gap-1">
+                    <div className="bg-transparent border border-blue-100/80 dark:border-blue-800/50 rounded-2xl p-3 md:p-4">
+                      <p className="text-[8px] md:text-[9px] font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest">{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}</p>
+                      <p className="text-lg md:text-2xl font-black text-blue-700 dark:text-blue-400 tabular-nums mt-1 leading-none">{formatBDT(sm.expectedTotal)}</p>
+                      <p className="text-[8px] md:text-[9px] font-bold text-blue-700/70 dark:text-blue-400/70 mt-1.5 inline-flex items-center gap-1">
                         <Calendar size={10} strokeWidth={3}/> {sm.totalDueCount} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}
                       </p>
                     </div>
