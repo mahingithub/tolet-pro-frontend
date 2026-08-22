@@ -707,7 +707,7 @@ const HeroSection = () => {
                 <button
                   key={tab.id}
                   onClick={() => setSearchType(tab.id)}
-                  className={`flex-1 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all duration-200 ${searchType === tab.id ? 'bg-[#ba0036] text-white shadow-[0_4px_12px_rgba(186,0,54,0.3)]' : 'text-slate-600 hover:text-slate-900'}`}
+                  className={`flex-1 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all duration-200 ${searchType === tab.id ? `bg-slate-900 shadow-[0_4px_12px_rgba(0,0,0,0.15)] ${tab.id === 'rent' ? 'text-emerald-400' : tab.id === 'commercial' ? 'text-amber-400' : 'text-blue-400'}` : 'text-slate-600 hover:text-slate-900'}`}
                 >
                   {tab.label}
                 </button>
@@ -718,7 +718,7 @@ const HeroSection = () => {
               <div className="relative w-full" data-tour="location">
                 <div className="w-full flex items-center px-3 py-3 bg-white/45 backdrop-blur-md rounded-2xl border border-white/55 ring-1 ring-inset ring-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_4px_14px_rgba(15,23,42,0.08)]">
                   <div className="mr-2.5 shrink-0">
-                    <MapPin size={16} className="text-slate-500" />
+                    <MapPin size={16} className="text-[#ba0036]" />
                   </div>
                   <button
                     type="button"
@@ -751,7 +751,7 @@ const HeroSection = () => {
                   className="flex-1 flex flex-col items-start px-3 py-2.5 bg-white/45 hover:bg-white/60 backdrop-blur-md rounded-2xl border border-white/55 ring-1 ring-inset ring-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_4px_14px_rgba(15,23,42,0.08)] transition-colors cursor-pointer min-w-0 text-left"
                 >
                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 flex items-center gap-1">
-                    <HomeIcon size={10} className="text-slate-400" /> {t?.typeLabel || 'Type'}
+                    <HomeIcon size={10} className="text-emerald-500" /> {t?.typeLabel || 'Type'}
                   </span>
                   <span className="font-bold text-xs text-slate-900 w-full truncate leading-snug">{selectedType.label[langKey]}</span>
                 </button>
@@ -762,7 +762,7 @@ const HeroSection = () => {
                   className="flex-1 flex flex-col items-start px-3 py-2.5 bg-white/45 hover:bg-white/60 backdrop-blur-md rounded-2xl border border-white/55 ring-1 ring-inset ring-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_4px_14px_rgba(15,23,42,0.08)] transition-colors cursor-pointer min-w-0 text-left"
                 >
                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 flex items-center gap-1">
-                    <Wallet size={10} className="text-slate-400" /> {t?.budgetLabel || 'Budget'}
+                    <Wallet size={10} className="text-amber-500" /> {t?.budgetLabel || 'Budget'}
                   </span>
                   <span className="font-bold text-xs text-slate-900 w-full truncate leading-snug">
                     {customMin && customMax ? `${customMin / 1000}k–${customMax / 1000}k` : selectedBudget.label[langKey]}
@@ -777,7 +777,7 @@ const HeroSection = () => {
               data-tour="search-button"
               className="w-full mt-3 bg-[#ba0036] hover:bg-[#a0002d] text-white py-3.5 rounded-full font-black text-sm uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 shadow-[0_8px_24px_rgba(186,0,54,0.35)] border-none"
             >
-              <Search size={15} /> {t?.searchProperties || 'Search Properties'}
+              <Search size={15} /> {t?.searchBtn || (language === 'বাংলা' ? 'খুঁজুন' : 'Search')}
             </button>
           </div>
 
@@ -793,7 +793,7 @@ const HeroSection = () => {
                     <button
                       key={tab.id}
                       onClick={() => setSearchType(tab.id)}
-                      className={`px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all duration-200 ${searchType === tab.id ? 'bg-[#ba0036] text-white shadow-[0_4px_12px_rgba(186,0,54,0.3)]' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}
+                      className={`px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all duration-200 ${searchType === tab.id ? `bg-slate-900 shadow-[0_4px_12px_rgba(0,0,0,0.15)] ${tab.id === 'rent' ? 'text-emerald-400' : tab.id === 'commercial' ? 'text-amber-400' : 'text-blue-400'}` : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}
                     >
                       {tab.label}
                     </button>
@@ -805,7 +805,7 @@ const HeroSection = () => {
                 <div className="flex flex-row flex-1 divide-x-2 divide-slate-50">
 
                   <div className="flex-[1.7] flex items-center px-3 lg:px-4 w-full relative group min-w-0 hover:bg-slate-50/60 rounded-l-full transition-colors" data-tour="location">
-                  <div className="mr-3 shrink-0"><MapPin size={20} className="text-slate-400" /></div>
+                  <div className="mr-3 shrink-0"><MapPin size={20} className="text-[#ba0036]" /></div>
                   <button
                     type="button"
                     onClick={() => setIsLocationModalOpen(true)}
@@ -834,7 +834,15 @@ const HeroSection = () => {
                   ref={typeRef}
                   onClick={() => setIsTypeOpen(!isTypeOpen)}
                 >
-                  <div className="mr-3 shrink-0"><HomeIcon size={20} className="text-slate-400" /></div>
+                  <div className="mr-3 shrink-0">
+                    {searchType === 'commercial' ? (
+                      <Building size={20} className="text-amber-500" />
+                    ) : searchType === 'buy' ? (
+                      <Wallet size={20} className="text-blue-600" />
+                    ) : (
+                      <HomeIcon size={20} className="text-emerald-600" />
+                    )}
+                  </div>
                   <div className="flex flex-col flex-1 text-left min-w-0">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5 cursor-pointer">{t?.typeLabel || 'Type'}</label>
                     <div className="flex justify-between items-center w-full">
@@ -864,7 +872,7 @@ const HeroSection = () => {
                   ref={budgetRef}
                   onClick={e => { if (!e.target.closest('.custom-budget-inputs')) setIsBudgetOpen(!isBudgetOpen); }}
                 >
-                  <div className="mr-3 shrink-0"><Wallet size={20} className="text-slate-400" /></div>
+                  <div className="mr-3 shrink-0"><Wallet size={20} className="text-amber-500" /></div>
                   <div className="flex flex-col flex-1 text-left min-w-0">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5 cursor-pointer">{t?.budgetLabel || 'Budget'}</label>
                     <div className="flex justify-between items-center w-full">

@@ -52,6 +52,8 @@ import TrustSafety from "./components/legal/TrustSafety";
 import FeedbackButton from "./components/FeedbackButton";
 import GlobalCallUI from "./components/GlobalCallUI";
 
+import ThemeWidget from "./components/shared/ThemeWidget";
+
 // --- Admin panel ---
 // The admin panel is now a SEPARATE React app (see ../tolet-pro-admin),
 // hosted on its own subdomain with its own dedicated auth. It is no longer
@@ -315,6 +317,7 @@ const AppLayout = () => {
 				<Route path="*" element={<Navigate to="/" replace />} />
 			</Routes>
 
+			<ThemeWidget />
 			<GlobalCallUI />
 			<WelcomeRobotOverlay />
 			<GlobalToaster />

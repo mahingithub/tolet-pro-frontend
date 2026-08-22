@@ -2103,7 +2103,7 @@ const handleWizardSubmit = async (payload) => {
         {activeTab === 'overview' && (
           <>
             {/* ── CONNECT TO LANDLORD — join a rent/seat by invite code ──── */}
-            <div className="mb-5 md:mb-7 rounded-2xl p-4 bg-slate-50/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5">
+            <div className="mb-5 md:mb-7 rounded-2xl p-4 bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-[#ba0036]/10 text-[#ba0036] flex items-center justify-center shrink-0"><KeyRound size={18} /></div>
                 <div className="min-w-0">
@@ -2172,7 +2172,7 @@ const handleWizardSubmit = async (payload) => {
                 <button
                   key={stat.id}
                   onClick={stat.onClick}
-                  className={`relative text-left p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] flex items-center justify-between gap-2 hover:-translate-y-0.5 transition-all duration-300 overflow-hidden ${stat.unread ? 'bg-rose-50/50' : 'bg-slate-50/80'}`}
+                  className={`relative text-left backdrop-blur-sm p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] shadow-[0_4px_20px_rgba(15,23,42,0.04)] flex items-center justify-between gap-2 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)] transition-all duration-300 overflow-hidden ${stat.unread ? 'bg-gradient-to-br from-red-50 to-rose-50 border border-[#ba0036]/30 ring-2 ring-[#ba0036]/40' : 'bg-white/90 border border-white'}`}
                 >
                   {stat.badge ? (
                     <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 bg-[#ba0036] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10">
@@ -2205,23 +2205,25 @@ const handleWizardSubmit = async (payload) => {
                   reads "All clear" when nothing is owed. */}
               <button
                 onClick={() => setActiveTab('payments')}
-                className="relative text-left p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] flex items-center justify-between gap-2 hover:-translate-y-0.5 transition-all duration-300 overflow-hidden bg-slate-50/80"
+                className="relative text-left p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] border border-white/10 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.4)] flex items-center justify-between gap-2 hover:-translate-y-0.5 transition-all duration-300 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-[#3a0011]"
               >
+                <div className="absolute -bottom-10 -right-8 w-32 h-32 rounded-full blur-3xl pointer-events-none bg-amber-500/10" />
+                {/* Left: icon + label */}
                 <div className="relative min-w-0 flex-1">
-                  <div className={`w-9 h-9 md:w-11 md:h-11 rounded-xl md:rounded-2xl flex items-center justify-center shadow-sm mb-2.5 md:mb-3 ${totalDueAmount > 0 ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                  <div className={`w-9 h-9 md:w-11 md:h-11 rounded-xl md:rounded-2xl flex items-center justify-center shadow-sm mb-2.5 md:mb-3 ${totalDueAmount > 0 ? 'bg-amber-400/15 text-amber-300' : 'bg-emerald-400/15 text-emerald-300'}`}>
                     <Wallet size={17} className="md:w-[20px] md:h-[20px]" strokeWidth={2.4} />
                   </div>
-                  <p className="text-[11px] md:text-sm font-black text-gray-800 leading-tight">{language === 'বাংলা' ? 'বকেয়া' : 'Due Amount'}</p>
-                  <p className="hidden md:block text-[11px] font-bold text-gray-400 leading-tight mt-0.5 truncate">{language === 'বাংলা' ? 'মোট বকেয়া পরিমাণ' : 'Total amount due'}</p>
+                  <p className="text-[11px] md:text-sm font-black text-white leading-tight">{language === 'বাংলা' ? 'বকেয়া' : 'Due Amount'}</p>
+                  <p className="hidden md:block text-[11px] font-bold text-white/50 leading-tight mt-0.5 truncate">{language === 'বাংলা' ? 'মোট বকেয়া পরিমাণ' : 'Total amount due'}</p>
                 </div>
                 {/* Right: amount + accent bar */}
                 <div className="relative shrink-0 flex flex-col items-end">
-                  <h3 className={`text-lg md:text-[1.6rem] font-black leading-none tabular-nums tracking-tight ${totalDueAmount > 0 ? 'text-gray-900' : 'text-emerald-600'}`}>
+                  <h3 className={`text-lg md:text-[1.6rem] font-black leading-none tabular-nums tracking-tight ${totalDueAmount > 0 ? 'text-white' : 'text-emerald-300'}`}>
                     {totalDueAmount > 0
                       ? `৳${totalDueAmount.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}`
                       : (language === 'বাংলা' ? 'ক্লিয়ার' : 'All clear')}
                   </h3>
-                  <div className={`h-1 rounded-full w-7 md:w-9 mt-2 ${totalDueAmount > 0 ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                  <div className={`h-1 rounded-full w-7 md:w-9 mt-2 ${totalDueAmount > 0 ? 'bg-amber-400' : 'bg-emerald-400'}`} />
                 </div>
               </button>
             </div>
@@ -2255,7 +2257,7 @@ const handleWizardSubmit = async (payload) => {
                   key={label}
                   type="button"
                   onClick={onClick}
-                  className="group flex flex-col items-center text-center gap-2 p-3 md:flex-row md:text-left md:items-center md:gap-3 md:p-4 rounded-2xl bg-slate-50/80 hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300"
+                  className="group flex flex-col items-center text-center gap-2 p-3 md:flex-row md:text-left md:items-center md:gap-3 md:p-4 rounded-2xl bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300"
                 >
                   <span className={`relative w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 ${iconBg} ${iconColor} group-hover:scale-105 transition-transform`}>
                     <Icon size={19} strokeWidth={2.4} />
@@ -2412,7 +2414,7 @@ const handleWizardSubmit = async (payload) => {
                 of a near-full progress bar — which is what made the flow
                 feel broken. */}
             {hideVerificationBanner || verifRejected ? null : !isVerified ? (
-              <div className="mb-5 md:mb-7 relative overflow-hidden rounded-[1.5rem] md:rounded-[2rem] p-[1px] bg-gradient-to-br from-[#ba0036]/20 to-indigo-500/20">
+              <div className="mb-5 md:mb-7 relative overflow-hidden rounded-[1.5rem] md:rounded-[2rem] p-[1px] bg-gradient-to-br from-[#ba0036]/40 via-rose-400/20 to-indigo-500/30 shadow-[0_20px_60px_-20px_rgba(186,0,54,0.35)]">
                 {/* Snoozes for a week — see dismissVerificationBanner. Labelled
                     "not now" so the affordance matches the behaviour. */}
                 <button

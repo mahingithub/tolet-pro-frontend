@@ -1169,7 +1169,11 @@ const MobileHome = () => {
                   onClick={() => setSearchType(typ.id)}
                   className={`flex-1 py-2 text-[12px] font-black uppercase tracking-wider rounded-full transition-all ${
                     active
-                      ? 'bg-slate-900 text-white shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
+                      ? `bg-slate-900 shadow-[0_4px_12px_rgba(0,0,0,0.15)] ${
+                          typ.id === 'rent' ? 'text-emerald-400' :
+                          typ.id === 'commercial' ? 'text-amber-400' :
+                          'text-blue-400'
+                        }`
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
@@ -1184,7 +1188,7 @@ const MobileHome = () => {
           <div className="relative mb-2" data-tour="location">
             <div className="w-full flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2.5">
               <span className="flex items-center justify-center shrink-0">
-                <MapPin size={18} strokeWidth={2.5} className="text-gray-500" />
+                <MapPin size={18} strokeWidth={2.5} className="text-[#ba0036]" />
               </span>
               <button
                 type="button"
@@ -1219,11 +1223,11 @@ const MobileHome = () => {
             >
               <span className="flex items-center justify-center shrink-0">
                 {searchType === 'commercial' ? (
-                  <Building2 size={16} strokeWidth={2.5} className="text-gray-500" />
+                  <Building2 size={16} strokeWidth={2.5} className="text-amber-500" />
                 ) : searchType === 'buy' ? (
-                  <Wallet size={16} strokeWidth={2.5} className="text-gray-500" />
+                  <Wallet size={16} strokeWidth={2.5} className="text-blue-600" />
                 ) : (
-                  <HomeIcon size={16} strokeWidth={2.5} className="text-gray-500" />
+                  <HomeIcon size={16} strokeWidth={2.5} className="text-emerald-600" />
                 )}
               </span>
               <span className="flex-1 min-w-0 ml-1">
@@ -1243,7 +1247,7 @@ const MobileHome = () => {
               className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2.5 active:scale-[0.99] transition-transform text-left"
             >
               <span className="flex items-center justify-center shrink-0">
-                <Wallet size={16} strokeWidth={2.5} className="text-gray-500" />
+                <Wallet size={16} strokeWidth={2.5} className="text-amber-500" />
               </span>
               <span className="flex-1 min-w-0 ml-1">
                 <span className="block text-[9px] font-black text-gray-500 uppercase tracking-widest leading-tight">
@@ -1264,7 +1268,7 @@ const MobileHome = () => {
             className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#ba0036] to-[#d4143a] text-white font-black uppercase tracking-widest text-[13px] py-3.5 rounded-2xl shadow-[0_10px_28px_-10px_rgba(186,0,54,0.6)] hover:scale-[1.02] hover:shadow-[0_14px_32px_-10px_rgba(186,0,54,0.7)] active:scale-[0.96] active:shadow-sm transition-all duration-300"
           >
             <Search size={16} strokeWidth={2.5} />
-            {t.mobSearchProperties}
+            {t?.searchBtn || (language === 'বাংলা' ? 'খুঁজুন' : 'Search')}
           </button>
         </div>
       </div>
