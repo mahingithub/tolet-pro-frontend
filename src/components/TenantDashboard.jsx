@@ -1367,8 +1367,8 @@ const TenantDashboard = () => {
       // Server refused — keep the local copy but tell the user so they
       // know the public trust card hasn't refreshed yet.
       showProfileToast(language === 'বাংলা'
-        ? 'লোকালি সেভ হয়েছে — সার্ভার সিঙ্ক হয়নি।'
-        : 'Saved locally — server sync pending.');
+        ? 'ফোনে সেভ হয়েছে — সার্ভারে আপডেট হয়নি।'
+        : 'Saved locally — pending server update.');
     }
   };
 
@@ -2772,8 +2772,8 @@ const handleWizardSubmit = async (payload) => {
                 } catch (err) {
                   console.warn('[ProfileSection.onUpdate] backend sync failed:', err?.message || err);
                   showProfileToast(language === 'বাংলা'
-                    ? 'লোকালি সেভ — সার্ভার সিঙ্ক পরে হবে'
-                    : 'Saved locally — server sync pending');
+                    ? 'ফোনে সেভ হয়েছে — সার্ভারে পরে আপডেট হবে'
+                    : 'Saved locally — pending server update');
                 }
               }}
               onAvatarUpload={async (file, _source, onProgress) => {

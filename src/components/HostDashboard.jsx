@@ -4582,7 +4582,7 @@ const HostDashboard = () => {
                 phone. Tighter padding + a smaller label keeps a comfortable tap
                 target while handing those pixels back to the list below.
                 Desktop (sm+) keeps the roomy original. */}
-            <div className="flex items-stretch gap-1 p-1 sm:gap-1.5 sm:p-1.5 rounded-xl sm:rounded-2xl bg-white shadow-[0_2px_12px_rgba(0,0,0,0.05)] border border-gray-100">
+            <div className="flex items-stretch gap-1 p-1 sm:gap-1.5 sm:p-1.5 rounded-xl sm:rounded-2xl bg-white dark:bg-gray-900/40 shadow-[0_2px_12px_rgba(0,0,0,0.05)] dark:shadow-none border border-gray-100 dark:border-gray-800/60">
               {[
                 { id: 'bookings', label: language === 'বাংলা' ? 'ভাড়াটিয়া যোগ করুন' : 'Add Tenant', Icon: Calendar },
                 { id: 'rent', label: language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent Collection', Icon: Wallet },
@@ -4593,7 +4593,7 @@ const HostDashboard = () => {
                     key={id}
                     type="button"
                     onClick={() => setActiveTab(id)}
-                    className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2.5 sm:py-4 rounded-lg sm:rounded-xl text-xs sm:text-base font-black tracking-tight transition-all duration-300 ${on ? 'bg-gradient-to-r from-[#ba0036] to-[#ff004c] text-white shadow-[0_6px_16px_rgba(186,0,54,0.3)]' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
+                    className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2.5 sm:py-4 rounded-lg sm:rounded-xl text-xs sm:text-base font-black tracking-tight transition-all duration-300 ${on ? 'bg-gray-900 text-white dark:bg-gray-700 dark:text-white shadow-md' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'}`}
                   >
                     <Icon size={14} className="shrink-0 sm:hidden" />
                     <span className="truncate">{label}</span>

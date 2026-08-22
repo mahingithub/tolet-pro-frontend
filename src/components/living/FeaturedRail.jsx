@@ -130,8 +130,8 @@ const FeaturedRail = ({ go, me, language }) => {
             </>
           ) : (
             <>
-              <p className="text-[12px] font-black text-gray-900">{isBn ? 'রুমমেট কানেক্ট করুন' : 'Connect roommates'}</p>
-              <p className="text-[10.5px] font-semibold text-gray-500">{isBn ? 'এক ওয়ালেট, সবার ফোনে' : 'One shared wallet, all phones'}</p>
+              <p className="text-[12px] font-black text-gray-900">{isBn ? 'রুম তৈরি বা জয়েন করুন' : 'Create or join a room'}</p>
+              <p className="text-[10.5px] font-semibold text-gray-500">{isBn ? 'একই হিসাব, সবার ফোনে' : 'One shared wallet for everyone'}</p>
             </>
           )}
         </div>

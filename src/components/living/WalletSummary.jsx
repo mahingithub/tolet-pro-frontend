@@ -102,8 +102,8 @@ const ConnectSheet = ({ open, onClose, isBn }) => {
     <Sheet
       open={open}
       onClose={onClose}
-      title={isBn ? 'রুমমেট কানেক্ট করুন' : 'Connect Roommates'}
-      subtitle={isBn ? 'একটি শেয়ার্ড ওয়ালেট সবার ফোনে' : 'One shared wallet across everyone’s phones'}
+      title={isBn ? 'রুম তৈরি বা জয়েন করুন' : 'Create or Join Room'}
+      subtitle={isBn ? 'একই হিসাব, সবার ফোনে দেখা যাবে' : 'One shared wallet for everyone'}
       footer={
         <PrimaryButton className="w-full" disabled={busy || (mode === 'join' && !code.trim())} onClick={submit}>
           {mode === 'create' ? <Users size={17} /> : <LogIn size={17} />}
@@ -200,8 +200,8 @@ const LeaveHouseholdSheet = ({ open, onClose, isBn, onConfirm }) => {
           <AlertTriangle size={15} className="text-red-600 shrink-0 mt-0.5" />
           <p className="text-[11.5px] font-semibold text-red-700 leading-relaxed">
             {isBn
-              ? 'আপনি এই শেয়ার্ড ওয়ালেট থেকে বেরিয়ে যাবেন। এই ডিভাইসে সিঙ্ক করা ডেটা আর দেখা যাবে না — তবে ইনভাইট কোড দিয়ে আবার জয়েন করতে পারবেন।'
-              : "You'll disconnect from this shared wallet. Its synced data won't show on this device anymore — but you can re-join anytime with the invite code."}
+              ? 'আপনি এই শেয়ার্ড ওয়ালেট থেকে বেরিয়ে যাবেন। আপনার ফোনে এই শেয়ার করা হিসাব আর দেখা যাবে না — তবে ইনভাইট কোড দিয়ে আবার জয়েন করতে পারবেন।'
+              : "You'll disconnect from this shared wallet. The shared data won't show on this device anymore — but you can re-join anytime with the invite code."}
           </p>
         </div>
         <Field label={isBn ? 'লগইন পাসওয়ার্ড' : 'Login password'}>
@@ -457,8 +457,8 @@ const WalletSummary = ({ go, me, language }) => {
           <button data-tour="living-connect-roommates" onClick={() => setConnectOpen(true)} className="w-full flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#ba0036]/[0.07] to-transparent border border-[#ba0036]/15 px-3.5 py-3 active:scale-[0.99] transition">
             <IconBadge icon={Users} tint="bg-[#ba0036]/10" text="text-[#ba0036]" size={40} iconSize={18} />
             <div className="flex-1 text-left min-w-0">
-              <p className="text-[13px] font-black text-gray-900">{isBn ? 'রুমমেট কানেক্ট করুন' : 'Connect your roommates'}</p>
-              <p className="text-[11px] font-semibold text-gray-500">{isBn ? 'এক ওয়ালেট, সবার ফোনে সিঙ্ক' : 'One shared wallet, synced across phones'}</p>
+              <p className="text-[13px] font-black text-gray-900">{isBn ? 'রুম তৈরি বা জয়েন করুন' : 'Create or join a room'}</p>
+              <p className="text-[11px] font-semibold text-gray-500">{isBn ? 'একই হিসাব, সবার ফোনে দেখা যাবে' : 'One shared wallet for everyone'}</p>
             </div>
             <ChevronRight size={18} className="text-[#ba0036] shrink-0" />
           </button>

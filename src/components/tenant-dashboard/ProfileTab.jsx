@@ -65,8 +65,8 @@ const ProfileTab = ({
                 } catch (err) {
                   console.warn('[ProfileSection.onUpdate] backend sync failed:', err?.message || err);
                   showProfileToast(language === 'বাংলা'
-                    ? 'লোকালি সেভ — সার্ভার সিঙ্ক পরে হবে'
-                    : 'Saved locally — server sync pending');
+                    ? 'ফোনে সেভ হয়েছে — সার্ভারে পরে আপডেট হবে'
+                    : 'Saved locally — pending server update');
                 }
               }}
               onAvatarUpload={async (file, _source, onProgress) => {
