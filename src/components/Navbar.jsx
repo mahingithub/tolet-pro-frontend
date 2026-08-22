@@ -680,7 +680,7 @@ useEffect(() => {
             <div className="relative pl-2 border-l border-gray-200" ref={profileRef}>
               {isLoggedIn ? (
                 <>
-                  <div onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                  <div onClick={() => navigate(userRole === 'landlord' ? '/host-dashboard' : '/tenant-dashboard')}
                     data-tour="navbar-profile"
                     className="flex items-center gap-3 cursor-pointer p-1.5 pr-4 bg-white hover:bg-gray-50 rounded-full border border-gray-200 shadow-sm transition-all">
                     <div className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-white text-xs font-black ${userRole === 'landlord' ? 'bg-[#ba0036]' : 'bg-blue-500'}`}>
@@ -700,72 +700,7 @@ useEffect(() => {
                       )}
                     </div>
                     <span className="text-sm font-black text-gray-800">{(userName || '').split(' ')[0] || 'My Account'}</span>
-                    <ChevronDown size={14} className={`text-gray-400 transition-transform duration-300 ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
                   </div>
-
-                  {isProfileMenuOpen && (
-                    <div className="absolute top-full right-0 mt-3 w-64 bg-white/95 backdrop-blur-3xl border border-white shadow-[0_30px_60px_rgba(0,0,0,0.12)] rounded-[2rem] p-2 z-[70] overflow-hidden">
-                      <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 rounded-t-[1.5rem] mb-2">
-                        <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${userRole === 'landlord' ? 'text-[#ba0036]' : 'text-blue-500'}`}>
-                          {userRole === 'landlord' ? (t?.menuHostPortal || 'Landlord Portal') : (t?.menuTenantPortal || 'Tenant Portal')}
-                        </p>
-                        <p className="text-sm font-bold text-gray-900">{userName}</p>
-                        <p className="text-xs text-gray-400">{userEmail}</p>
-                      </div>
-
-                      {userRole === 'landlord' ? (
-                        <>
-                          <Link to="/host-dashboard" data-tour="host-dashboard-link" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-red-50 hover:text-[#ba0036] rounded-xl transition-colors"><LayoutDashboard size={17} /> {t?.menuHostDashboard || 'Host Dashboard'}</Link>
-                          <button onClick={() => handleProtected('/list-property')} className="w-full flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-red-50 hover:text-[#ba0036] rounded-xl transition-colors text-left"><PlusCircle size={17} /> {t?.menuAddProperty || 'Add Property'}</button>
-                          {/* Direct Messages shortcut — the chat previously
-                              required dashboard → messages, two hops on desktop. */}
-                          <Link to="/messages" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-red-50 hover:text-[#ba0036] rounded-xl transition-colors"><MessageSquare size={17} /> {t?.menuTenantMessages || 'Tenant Messages'}</Link>
-                        </>
-                      ) : (
-                        <>
-                          <Link to="/tenant-dashboard" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><LayoutDashboard size={17} /> {t?.menuTenantDashboard || 'Tenant Dashboard'}</Link>
-                          <Link to="/living" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-[#ba0036]/5 hover:text-[#ba0036] rounded-xl transition-colors"><Wallet size={17} /> {t?.menuRoommateWallet || 'Roommate Wallet'}</Link>
-                          <Link to="/tenant-dashboard?tab=saved" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><Heart size={17} /> {t?.menuSavedProperties || 'Saved Properties'}</Link>
-                          <Link to="/tenant-dashboard?tab=applications" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors"><MessageSquare size={17} /> {t?.menuMyInquiries || 'My Inquiries'}</Link>
-                        </>
-                      )}
-
-                      <Link to="/smart-alerts" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-amber-50 hover:text-amber-600 rounded-xl transition-colors"><Bell size={17} /> {t?.menuMyAlerts || 'Smart Alerts'}</Link>
-
-                      <Link to={userRole === 'landlord' ? '/host-dashboard?tab=settings' : '/tenant-dashboard?tab=settings'} onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors"><SettingsIcon size={17} /> {t?.menuSettings || 'Settings'}</Link>
-
-                      <Link to="/how-it-works" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors mt-1 border-t border-gray-50"><BookOpen size={17} /> {t?.navHowItWorks || 'How it Works'}</Link>
-                      <Link to="/support" onClick={closeAll} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors"><LifeBuoy size={17} /> {t?.menuHelpSupport || 'Help & Support'}</Link>
-
-                      <button onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-5 py-3 text-sm font-black text-red-500 hover:bg-red-50 rounded-xl transition-colors text-left mt-1 border-t border-gray-50">
-                        <LogOut size={17} /> {t?.menuLogOut || 'Log Out'}
-                      </button>
-
-                      {(hasBothRoles || !ownsLandlord) && (
-                        <div className="px-3 py-3 bg-gray-900 mt-2 rounded-[1.2rem]">
-                          {hasBothRoles ? (
-                            /* Mode pill — genuine tenant⇄host toggle, shown only
-                               once BOTH roles are unlocked. Wired to
-                               AuthContext.setActiveRole so the switch survives
-                               reloads and is mirrored across tabs. */
-                            <button onClick={handleSwitchRole}
-                              className="w-full flex items-center justify-center gap-2 text-[10px] font-black text-white uppercase tracking-widest py-1 hover:scale-105 transition-transform">
-                              <RefreshCw size={13} /> {userRole === 'tenant' ? (t?.menuSwitchToHost || 'Switch to Host') : (t?.menuSwitchToTenant || 'Switch to Tenant')}
-                            </button>
-                          ) : (
-                            /* Tenant who hasn't become a host yet — invite them
-                               to become a landlord. Routes through the same
-                               verification gate handleSwitchRole enforces. */
-                            <button onClick={handleSwitchRole}
-                              className="w-full flex items-center justify-center gap-2 text-[11px] font-black text-white py-1 hover:scale-105 transition-transform">
-                              <Building2 size={13} /> {t.menuBecomeLandlord || 'I want to be a landlord'}
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </>
               ) : (
                 <div className="flex items-center gap-2 lg:gap-2.5">

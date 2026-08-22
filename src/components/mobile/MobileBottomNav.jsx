@@ -71,14 +71,11 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   // Profile target depends on who's logged in. Falls back to "open drawer"
   // for guests so they can pick Login / Sign Up.
   const profileTarget = (() => {
-    const base = { id: 'profile', label: 'Profile', icon: User, action: 'drawer' };
-    if (!isAuthenticated) return base;
-    if (isAdmin)           return { ...base, to: '/admin' };
-    // Landlord Home already points at the dashboard overview, so send Profile
-    // to the dashboard's Settings tab to keep the two tabs distinct.
-    if (isLandlord)        return { ...base, to: '/host-dashboard?tab=settings' };
+    if (!isAuthenticated) return { id: 'profile', label: 'Profile', icon: User, action: 'drawer' };
+    if (isAdmin)           return { id: 'profile', label: 'Profile', icon: User, to: '/admin' };
+    if (isLandlord)        return { id: 'profile', label: 'Profile', icon: User, to: '/host-dashboard?tab=settings' };
     // default to tenant
-    return { ...base, to: '/tenant-dashboard' };
+    return { id: 'profile', label: 'Profile', icon: User, to: '/tenant-dashboard' };
   })();
 
   const RIGHT = [

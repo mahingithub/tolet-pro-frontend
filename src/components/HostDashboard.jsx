@@ -692,7 +692,20 @@ const HostDashboard = () => {
   // For links that live inside an overlay (drawer entries, the logo popup) —
   // consumes the overlay's back-guard entry instead of pushing past it.
   const overlayNavigate = useOverlayNavigate();
-  const { user: authUser, logout: authLogout, updateMe: authUpdateMe, submitVerification: authSubmitVerification } = useAuth();
+  const { user: authUser, logout: authLogout, updateMe: authUpdateMe, submitVerification: authSubmitVerification, roles: authRoles, setActiveRole: authSetActiveRole, addRole: authAddRole } = useAuth();
+
+  const handleSwitchRole = async () => {
+    try {
+      const target = 'tenant';
+      const owns = Array.isArray(authRoles) && authRoles.includes(target);
+      if (!owns) await authAddRole?.(target);
+      await authSetActiveRole?.(target);
+      setIsProfileDrawerOpen(false);
+      navigate('/tenant-dashboard');
+    } catch (err) {
+      console.error(err);
+    }
+  };
   
   // 🟢 CORE STATES
   // The active tab lives in the URL (`?tab=`), not in component state, so the

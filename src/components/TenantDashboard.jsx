@@ -21,7 +21,7 @@ import useDeepLinkHighlight from '../hooks/useDeepLinkHighlight';
 import useTabHistory from '../hooks/useTabHistory';
 import useBackGuard, { useOverlayNavigate } from '../hooks/useBackGuard';
 import {
-  Building2, Search, Bell, Globe, LayoutDashboard, Heart,
+  Building2, Search, Bell, Globe, LayoutDashboard, Heart, BookOpen,
   MessageSquare, MessageCircle, Settings, HelpCircle,
   ArrowRight, Trash2, MapPin, Receipt, CheckCheck, Download,
   CreditCard, Hourglass, X, UserCircle, BadgeCheck, ShieldAlert,
@@ -610,6 +610,11 @@ const TenantDashboard = () => {
     setActiveRole: authSetActiveRole,
     roles: authRoles,
   } = useAuth();
+  const ownsLandlord = Array.isArray(authRoles) && (authRoles.includes('landlord') || authRoles.includes('host'));
+  const ownsTenant = Array.isArray(authRoles) && authRoles.includes('tenant');
+  const hasBothRoles = ownsLandlord && ownsTenant;
+
+  const navigate = useNavigate();
   const location = useLocation();
   
   // 🔴 100% Connected to your Global LanguageContext from Navbar
@@ -1332,6 +1337,21 @@ const TenantDashboard = () => {
     showProfileToast._t = window.setTimeout(() => setProfileToast(null), 2400);
   };
 
+  const handleSwitchRole = async () => {
+    if (!ownsLandlord) {
+      setLandlordOnboardingOpen(true);
+      return;
+    }
+    // Switch to Host
+    try {
+      await authSetActiveRole?.('landlord');
+      setIsProfileDrawerOpen(false);
+      navigate('/host-dashboard');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const beginEditProfile = () => {
     setDraftProfile(tenantProfile);
     setIsEditingProfile(true);
@@ -1778,6 +1798,8 @@ const handleWizardSubmit = async (payload) => {
     // power users who want the legacy /messages inbox.
     { id: 'messages', icon: MessageSquare, label: t.messages || (language === 'বাংলা' ? 'মেসেজ' : 'Messages'), isLink: true, path: '/messages', desktopOnly: true },
     { id: 'settings', icon: Settings, label: t.accountSettings || (language === 'বাংলা' ? 'অ্যাকাউন্ট সেটিংস' : 'Account Settings') },
+    { id: 'how-it-works', icon: BookOpen, label: language === 'বাংলা' ? 'কীভাবে কাজ করে' : 'How it Works', isLink: true, path: '/how-it-works' },
+    { id: 'terms', icon: FileText, label: language === 'বাংলা' ? 'শর্তাবলী' : 'Terms & Policies', isLink: true, path: '/terms' },
     { id: 'support', icon: HelpCircle, label: t.support || (language === 'বাংলা' ? 'হেল্প ও সাপোর্ট' : 'Help & Support'), isLink: true, path: '/support' },
   ];
 
@@ -2043,6 +2065,17 @@ const handleWizardSubmit = async (payload) => {
             "Upgrade to Premium" button was removed per product decision
             (we monetise landlords, not tenants). */}
         <div className="p-5 border-t border-gray-100 bg-gray-50/50 flex flex-col gap-3 mt-auto">
+          <div className="px-1 mb-2">
+            {hasBothRoles ? (
+              <button onClick={handleSwitchRole} className="w-full flex items-center justify-center gap-2 text-[10px] font-black text-white bg-gray-900 rounded-xl py-2.5 hover:scale-[1.02] transition-transform shadow-sm">
+                <RefreshCw size={14} /> {language === 'বাংলা' ? 'বাড়িওয়ালা পোর্টালে যান' : 'Switch to Host'}
+              </button>
+            ) : (
+              <button onClick={handleSwitchRole} className="w-full flex items-center justify-center gap-2 text-[11px] font-black text-white bg-gray-900 rounded-xl py-2.5 hover:scale-[1.02] transition-transform shadow-sm">
+                <Building2 size={14} /> {language === 'বাংলা' ? 'আমি বাড়িওয়ালা হতে চাই' : 'I want to be a landlord'}
+              </button>
+            )}
+          </div>
           <button
             onClick={async () => {
               showProfileToast(language === 'বাংলা' ? 'লগআউট হচ্ছে...' : 'Logging out...');
