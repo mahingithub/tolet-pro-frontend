@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sun, Moon, Monitor, ChevronRight } from 'lucide-react';
+import { Sun, Moon, Monitor } from 'lucide-react';
 import { useSettings } from '../../context/SettingsContext.jsx';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -76,14 +76,7 @@ const ThemeWidget = () => {
           </div>
         )}
         
-        {isOpen && (
-          <button 
-            onClick={() => setIsOpen(false)}
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-          >
-            <ChevronRight size={20} />
-          </button>
-        )}
+
       </div>
 
       {!isOpen && (
