@@ -717,8 +717,8 @@ const HeroSection = () => {
             <div className="flex flex-col gap-2">
               <div className="relative w-full" data-tour="location">
                 <div className="w-full flex items-center px-3 py-3 bg-white/45 backdrop-blur-md rounded-2xl border border-white/55 ring-1 ring-inset ring-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_4px_14px_rgba(15,23,42,0.08)]">
-                  <div className="bg-white p-1.5 rounded-lg shadow-sm mr-2.5 shrink-0">
-                    <MapPin size={16} className="text-crimson-500" />
+                  <div className="mr-2.5 shrink-0">
+                    <MapPin size={16} className="text-slate-500" />
                   </div>
                   <button
                     type="button"
@@ -805,7 +805,7 @@ const HeroSection = () => {
                 <div className="flex flex-row flex-1 divide-x-2 divide-slate-50">
 
                   <div className="flex-[1.7] flex items-center px-3 lg:px-4 w-full relative group min-w-0 hover:bg-slate-50/60 rounded-l-full transition-colors" data-tour="location">
-                  <div className="bg-crimson-50 p-2.5 rounded-2xl mr-3 shrink-0 shadow-sm border border-crimson-100"><MapPin size={18} className="text-crimson-500" /></div>
+                  <div className="mr-3 shrink-0"><MapPin size={20} className="text-slate-400" /></div>
                   <button
                     type="button"
                     onClick={() => setIsLocationModalOpen(true)}
@@ -834,7 +834,7 @@ const HeroSection = () => {
                   ref={typeRef}
                   onClick={() => setIsTypeOpen(!isTypeOpen)}
                 >
-                  <div className="bg-emerald-50 p-2.5 rounded-2xl mr-3 shrink-0 shadow-sm border border-emerald-100"><HomeIcon size={17} className="text-emerald-600" /></div>
+                  <div className="mr-3 shrink-0"><HomeIcon size={20} className="text-slate-400" /></div>
                   <div className="flex flex-col flex-1 text-left min-w-0">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5 cursor-pointer">{t?.typeLabel || 'Type'}</label>
                     <div className="flex justify-between items-center w-full">
@@ -864,7 +864,7 @@ const HeroSection = () => {
                   ref={budgetRef}
                   onClick={e => { if (!e.target.closest('.custom-budget-inputs')) setIsBudgetOpen(!isBudgetOpen); }}
                 >
-                  <div className="bg-amber-50 p-2.5 rounded-2xl mr-3 shrink-0 shadow-sm border border-amber-100"><Wallet size={17} className="text-amber-500" /></div>
+                  <div className="mr-3 shrink-0"><Wallet size={20} className="text-slate-400" /></div>
                   <div className="flex flex-col flex-1 text-left min-w-0">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5 cursor-pointer">{t?.budgetLabel || 'Budget'}</label>
                     <div className="flex justify-between items-center w-full">
@@ -913,36 +913,7 @@ const HeroSection = () => {
           </div>
           </div>
 
-          {/* ── Trust badges ── */}
-          <div className="flex items-stretch justify-center gap-3 md:gap-4 mt-5 md:mt-6 flex-wrap relative z-10">
-            <div className="flex items-center gap-3 px-5 py-3.5 md:px-6 md:py-4 bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.12)] border border-white/70 hover:border-emerald-300 hover:bg-emerald-50/90 hover:shadow-[0_6px_28px_rgba(16,185,129,0.2)] cursor-pointer transition-all duration-200 group min-w-[140px] md:min-w-[170px]">
-              <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0 group-hover:bg-emerald-200 transition-colors">
-                <ShieldCheck size={18} className="text-emerald-600" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs md:text-sm font-black text-slate-800 whitespace-nowrap leading-tight">{t?.verifiedHosts || 'Verified Hosts'}</span>
-                <span className="text-[10px] md:text-[11px] font-semibold text-slate-500 whitespace-nowrap">100% Trusted</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 px-5 py-3.5 md:px-6 md:py-4 bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.12)] border border-white/70 hover:border-blue-300 hover:bg-blue-50/90 hover:shadow-[0_6px_28px_rgba(59,130,246,0.2)] cursor-pointer transition-all duration-200 group min-w-[140px] md:min-w-[170px]">
-              <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0 group-hover:bg-blue-200 transition-colors">
-                <Zap size={18} className="text-blue-600" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs md:text-sm font-black text-slate-800 whitespace-nowrap leading-tight">{t?.instantBooking || 'Instant Booking'}</span>
-                <span className="text-[10px] md:text-[11px] font-semibold text-slate-500 whitespace-nowrap">Book in seconds</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 px-5 py-3.5 md:px-6 md:py-4 bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.12)] border border-white/70 hover:border-amber-300 hover:bg-amber-50/90 hover:shadow-[0_6px_28px_rgba(245,158,11,0.2)] cursor-pointer transition-all duration-200 group min-w-[140px] md:min-w-[170px]">
-              <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0 group-hover:bg-amber-200 transition-colors">
-                <HeadphonesIcon size={18} className="text-amber-600" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs md:text-sm font-black text-slate-800 whitespace-nowrap leading-tight">{t?.support247 || '24/7 Support'}</span>
-                <span className="text-[10px] md:text-[11px] font-semibold text-slate-500 whitespace-nowrap">Always here for you</span>
-              </div>
-            </div>
-          </div>
+
         </section>
 
         {/* ═══════════════════════════════════════════════════════════════ */}
