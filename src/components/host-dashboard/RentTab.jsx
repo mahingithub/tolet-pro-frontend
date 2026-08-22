@@ -36,8 +36,11 @@ export default function RentTab(props) {
   } = props;
 
   const [showAllOverdue, setShowAllOverdue] = useState(false);
+  const [showBuildingForm, setShowBuildingForm] = useState(false);
+  const [newBuilding, setNewBuilding] = useState({ name: '', location: '', type: 'residential' });
 
           const todayDate = today;
+          const isBn = language === 'বাংলা';
           
           let baseBookings = bookings;
           if (landlordProfile?.buildingMode === 'multi' && currentBuildingId) {
@@ -583,9 +586,89 @@ export default function RentTab(props) {
                 </div>
               </aside>
 
-              {/* ── RIGHT MAIN — main IS the scroll container; sticky toolbar pins inside it ── */}
+              {/* ── RIGHT MAIN ── */}
               <main className="xl:col-span-8 w-full xl:h-full xl:overflow-y-auto custom-scrollbar pb-24 xl:pr-3 min-w-0">
-
+                {landlordProfile?.buildingMode === 'multi' && !currentBuildingId ? (
+                  <div className="w-full">
+                    {/* BUILDINGS OVERVIEW */}
+                    <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:-mx-4 lg:-mx-3 px-3 sm:px-4 lg:px-6 pt-2 pb-3 mb-2 lg:pt-1">
+                      <div className="flex items-center justify-between">
+                        <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
+                          <Building2 size={12} className="text-[#ba0036]"/>
+                          <span className="hidden sm:inline">{isBn ? 'আপনার বিল্ডিংসমূহ' : 'Your Buildings'}</span>
+                          <span className="text-gray-400 tabular-nums">{landlordProfile.buildings?.length || 0}</span>
+                        </span>
+                        <button 
+                          onClick={() => setShowBuildingForm(true)}
+                          className="shrink-0 inline-flex items-center justify-center gap-1.5 bg-[#ba0036] hover:bg-[#a0002f] text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all shadow-[0_4px_12px_rgba(186,0,54,0.25)] hover:shadow-[0_6px_16px_rgba(186,0,54,0.35)] active:scale-95"
+                        >
+                          <Plus size={14} strokeWidth={3} className="shrink-0"/> <span className="hidden sm:inline">{isBn ? 'নতুন বিল্ডিং' : 'Add Building'}</span><span className="sm:hidden">{isBn ? 'যোগ করুন' : 'Add'}</span>
+                        </button>
+                      </div>
+                    </div>
+                    {showBuildingForm && (
+                      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4 animate-in slide-in-from-top-2">
+                        <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-3">{isBn ? 'নতুন বিল্ডিং যোগ করুন' : 'Add New Building'}</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <input type="text" value={newBuilding.name} onChange={(e) => setNewBuilding({...newBuilding, name: e.target.value})} placeholder={isBn ? 'বাসার নাম' : 'House Name'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold" />
+                          <input type="text" value={newBuilding.location} onChange={(e) => setNewBuilding({...newBuilding, location: e.target.value})} placeholder={isBn ? 'ঠিকানা' : 'Location'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold" />
+                          <select value={newBuilding.type} onChange={(e) => setNewBuilding({...newBuilding, type: e.target.value})} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold">
+                            <option value="residential">{isBn ? 'Residential (ফ্ল্যাট/বাসা)' : 'Residential'}</option>
+                            <option value="commercial">{isBn ? 'Commercial (অফিস/দোকান)' : 'Commercial'}</option>
+                            <option value="hostel">{isBn ? 'Hostel (হোস্টেল/মেস)' : 'Hostel'}</option>
+                          </select>
+                        </div>
+                        <div className="flex justify-end gap-2 mt-3">
+                          <button onClick={() => setShowBuildingForm(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100">{isBn ? 'বাতিল' : 'Cancel'}</button>
+                          <button onClick={() => {
+                            if(!newBuilding.name) return;
+                            props.setLandlordProfile({ ...landlordProfile, buildings: [...(landlordProfile.buildings||[]), { ...newBuilding, id: 'bldg_' + Date.now(), createdAt: new Date().toISOString() }] });
+                            setShowBuildingForm(false);
+                            setNewBuilding({ name: '', location: '', type: 'residential' });
+                          }} className="px-4 py-2 rounded-xl text-xs font-black bg-[#ba0036] text-white hover:bg-[#a0002f]">{isBn ? 'যোগ করুন' : 'Save'}</button>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-3">
+                      {(landlordProfile.buildings || []).map(bldg => {
+                         const bldgBookings = bookings.filter(b => b.property === bldg.name);
+                         return (
+                           <div key={bldg.id} onClick={() => props.setCurrentBuildingId(bldg.id)} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-5 flex items-center justify-between cursor-pointer hover:shadow-md transition-all group">
+                             <div className="flex items-center gap-4">
+                               <div className="w-12 h-12 rounded-full bg-red-50 text-[#ba0036] flex items-center justify-center shrink-0">
+                                 {bldg.type === 'hostel' ? <Users size={20}/> : <Home size={20}/>}
+                               </div>
+                               <div>
+                                 <h4 className="text-sm sm:text-base font-black text-gray-900 group-hover:text-[#ba0036] transition-colors">{bldg.name}</h4>
+                                 <p className="text-xs font-bold text-gray-500 mt-0.5 flex items-center gap-1"><MapPin size={10} className="text-gray-400"/> {bldg.location}</p>
+                               </div>
+                             </div>
+                             <div className="flex flex-col items-end">
+                               <span className="px-2 py-1 rounded-lg bg-green-50 text-green-700 text-[10px] font-black uppercase tracking-wider tabular-nums">{bldgBookings.length} {isBn ? 'ভাড়াটিয়া' : 'Tenants'}</span>
+                               <ArrowRight size={14} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-1 transition-all mt-2"/>
+                             </div>
+                           </div>
+                         );
+                      })}
+                      {(!landlordProfile.buildings || landlordProfile.buildings.length === 0) && !showBuildingForm && (
+                        <div className="text-center py-12 px-5 bg-white rounded-2xl shadow-sm">
+                          <Building2 className="text-gray-300 mx-auto mb-3" size={32} />
+                          <h3 className="text-sm font-black text-gray-900">{isBn ? 'কোনো বিল্ডিং নেই' : 'No buildings yet'}</h3>
+                          <p className="text-xs font-bold text-gray-500 mt-1">{isBn ? 'উপরের বাটনে ক্লিক করে প্রথম বিল্ডিং যোগ করুন' : 'Click the button above to add your first building'}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full">
+                    {/* TENANTS VIEW (Current normal view, optionally with Back button) */}
+                    {landlordProfile?.buildingMode === 'multi' && currentBuildingId && (
+                      <div className="mb-2">
+                        <button onClick={() => props.setCurrentBuildingId(null)} className="flex items-center gap-1 text-[10px] font-black text-gray-500 hover:text-[#ba0036] transition-colors uppercase tracking-widest bg-white/50 px-3 py-1.5 rounded-lg w-fit">
+                          <ChevronLeft size={12}/> {isBn ? 'সব বিল্ডিং-এ ফিরে যান' : 'Back to Buildings'}
+                        </button>
+                      </div>
+                    )}
                 {/* Sticky toolbar — two rows. Row 1 = controls (title chip, year
                     stepper, search, export); Row 2 = the filter pills, which wrap
                     instead of scrolling sideways on mobile / iPad. */}
@@ -738,6 +821,8 @@ export default function RentTab(props) {
                     </div>
                   );
                 })()}
+                  </div>
+                )}
               </main>
 
             </div>

@@ -3053,11 +3053,11 @@ const HostDashboard = () => {
       // Blank "New Lease" always opens on the RESIDENTIAL form first; the host
       // taps "Commercial Area / Lease" to switch. (Converting a commercial
       // inquiry still opens commercial — that path is context-driven.)
-      dealType: 'residential',
+      dealType: prefillBuilding ? (prefillBuilding.type === 'commercial' ? 'commercial' : 'residential') : 'residential',
       businessName: '',
       licenseNumber: '',
-      leaseTermMonths: properties[0]?.intent === 'commercial' ? '24' : '',
-      category: properties[0]?.intent === 'commercial' ? '' : propTypeToCategory(properties[0]?.type),
+      leaseTermMonths: prefillBuilding ? (prefillBuilding.type === 'commercial' ? '24' : '') : (properties[0]?.intent === 'commercial' ? '24' : ''),
+      category: prefillBuilding ? (prefillBuilding.type === 'hostel' ? 'hostel' : (prefillBuilding.type === 'commercial' ? '' : 'flat')) : (properties[0]?.intent === 'commercial' ? '' : propTypeToCategory(properties[0]?.type)),
       floorNumber: '',
       roomNumber: '',
       manualProperty: false,
@@ -4689,7 +4689,7 @@ const HostDashboard = () => {
             formatDate={formatDate}
             stageLabel={stageLabel}
             landlordProfile={landlordProfile}
-            setLandlordProfile={setLandlordProfile}
+            setLandlordProfile={persistLandlordProfile}
             currentBuildingId={currentBuildingId}
             setCurrentBuildingId={setCurrentBuildingId}
           />
@@ -4751,7 +4751,7 @@ const HostDashboard = () => {
             exportRentCsv={exportRentCsv}
             isPremium={isPremium}
             landlordProfile={landlordProfile}
-            setLandlordProfile={setLandlordProfile}
+            setLandlordProfile={persistLandlordProfile}
             currentBuildingId={currentBuildingId}
           />
         )}

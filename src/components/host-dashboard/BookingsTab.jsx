@@ -35,7 +35,7 @@ export default function BookingsTab(props) {
 
           const isBn = language === 'বাংলা';
           const [showBuildingForm, setShowBuildingForm] = useState(false);
-          const [newBuilding, setNewBuilding] = useState({ name: '', location: '', type: 'flat' });
+          const [newBuilding, setNewBuilding] = useState({ name: '', location: '', type: 'residential' });
           const todayDate = today;
           const leaseSummary = getLeaseSummary(bookings, todayDate);
           
@@ -669,9 +669,9 @@ export default function BookingsTab(props) {
                     <div>
                       <label className="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1.5">{isBn ? 'ধরন' : 'Type'}</label>
                       <select value={newBuilding.type} onChange={(e) => setNewBuilding({...newBuilding, type: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#ba0036]/20 focus:border-[#ba0036]">
-                        <option value="flat">{isBn ? 'ফ্ল্যাট / এপার্টমেন্ট' : 'Flat / Apartment'}</option>
-                        <option value="hostel">{isBn ? 'হোস্টেল' : 'Hostel'}</option>
-                        <option value="room">{isBn ? 'সিঙ্গেল রুম' : 'Single Room'}</option>
+                        <option value="residential">{isBn ? 'Residential (ফ্ল্যাট/বাসা)' : 'Residential'}</option>
+                        <option value="commercial">{isBn ? 'Commercial (অফিস/দোকান)' : 'Commercial'}</option>
+                        <option value="hostel">{isBn ? 'Hostel (হোস্টেল/মেস)' : 'Hostel'}</option>
                       </select>
                     </div>
                     <button 
@@ -846,9 +846,9 @@ export default function BookingsTab(props) {
                           <input type="text" value={newBuilding.name} onChange={(e) => setNewBuilding({...newBuilding, name: e.target.value})} placeholder={isBn ? 'বাসার নাম' : 'House Name'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold" />
                           <input type="text" value={newBuilding.location} onChange={(e) => setNewBuilding({...newBuilding, location: e.target.value})} placeholder={isBn ? 'ঠিকানা' : 'Location'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold" />
                           <select value={newBuilding.type} onChange={(e) => setNewBuilding({...newBuilding, type: e.target.value})} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold">
-                            <option value="flat">Flat / Apartment</option>
-                            <option value="hostel">Hostel</option>
-                            <option value="room">Single Room</option>
+                            <option value="residential">{isBn ? 'Residential (ফ্ল্যাট/বাসা)' : 'Residential'}</option>
+                            <option value="commercial">{isBn ? 'Commercial (অফিস/দোকান)' : 'Commercial'}</option>
+                            <option value="hostel">{isBn ? 'Hostel (হোস্টেল/মেস)' : 'Hostel'}</option>
                           </select>
                         </div>
                         <div className="flex justify-end gap-2 mt-3">
@@ -857,7 +857,7 @@ export default function BookingsTab(props) {
                             if(!newBuilding.name) return;
                             setLandlordProfile({ ...landlordProfile, buildings: [...(landlordProfile.buildings||[]), { ...newBuilding, id: 'bldg_' + Date.now(), createdAt: new Date().toISOString() }] });
                             setShowBuildingForm(false);
-                            setNewBuilding({ name: '', location: '', type: 'flat' });
+                            setNewBuilding({ name: '', location: '', type: 'residential' });
                           }} className="px-4 py-2 rounded-xl text-xs font-black bg-[#ba0036] text-white hover:bg-[#a0002f]">{isBn ? 'যোগ করুন' : 'Save'}</button>
                         </div>
                       </div>
