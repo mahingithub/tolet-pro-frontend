@@ -1169,8 +1169,8 @@ const MobileHome = () => {
                   onClick={() => setSearchType(typ.id)}
                   className={`flex-1 py-2 text-[12px] font-black uppercase tracking-wider rounded-full transition-all ${
                     active
-                      ? 'bg-[#ba0036] text-white shadow-[0_6px_16px_-6px_rgba(186,0,54,0.55)]'
-                      : 'text-gray-600'
+                      ? 'bg-slate-900 text-white shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
+                      : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
                   {t[typ.labelKey]}
@@ -1183,8 +1183,8 @@ const MobileHome = () => {
               (replaces the old inline autocomplete dropdown). */}
           <div className="relative mb-2" data-tour="location">
             <div className="w-full flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2.5">
-              <span className="w-9 h-9 rounded-xl bg-red-50 text-[#ba0036] flex items-center justify-center shrink-0">
-                <MapPin size={16} strokeWidth={2.5} />
+              <span className="flex items-center justify-center shrink-0">
+                <MapPin size={18} strokeWidth={2.5} className="text-gray-500" />
               </span>
               <button
                 type="button"
@@ -1211,20 +1211,19 @@ const MobileHome = () => {
             </div>
           </div>
 
-          {/* Type + Budget row */}
           <div className="grid grid-cols-2 gap-2 mb-3">
             <button
               onClick={() => setTypeOpen(true)}
               data-tour="property-type"
               className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2.5 active:scale-[0.99] transition-transform text-left"
             >
-              <span className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <span className="flex items-center justify-center shrink-0">
                 {searchType === 'commercial' ? (
-                  <Building2 size={15} strokeWidth={2.5} />
+                  <Building2 size={16} strokeWidth={2.5} className="text-gray-500" />
                 ) : searchType === 'buy' ? (
-                  <Wallet size={15} strokeWidth={2.5} />
+                  <Wallet size={16} strokeWidth={2.5} className="text-gray-500" />
                 ) : (
-                  <HomeIcon size={15} strokeWidth={2.5} />
+                  <HomeIcon size={16} strokeWidth={2.5} className="text-gray-500" />
                 )}
               </span>
               <span className="flex-1 min-w-0 ml-1">
@@ -1243,8 +1242,8 @@ const MobileHome = () => {
               data-tour="budget"
               className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2.5 active:scale-[0.99] transition-transform text-left"
             >
-              <span className="w-8 h-8 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
-                <Wallet size={15} strokeWidth={2.5} />
+              <span className="flex items-center justify-center shrink-0">
+                <Wallet size={16} strokeWidth={2.5} className="text-gray-500" />
               </span>
               <span className="flex-1 min-w-0 ml-1">
                 <span className="block text-[9px] font-black text-gray-500 uppercase tracking-widest leading-tight">
