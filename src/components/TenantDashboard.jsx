@@ -614,7 +614,6 @@ const TenantDashboard = () => {
   const ownsTenant = Array.isArray(authRoles) && authRoles.includes('tenant');
   const hasBothRoles = ownsLandlord && ownsTenant;
 
-  const navigate = useNavigate();
   const location = useLocation();
   
   // 🔴 100% Connected to your Global LanguageContext from Navbar
