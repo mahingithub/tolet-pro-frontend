@@ -196,7 +196,7 @@ const PickerSheet = ({ open, title, options, value, onPick, onClose, langKey }) 
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-end md:hidden bg-black/40 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-[80] flex items-end md:hidden bg-black/40 animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
@@ -335,7 +335,7 @@ const DivisionDistrictsSheet = ({ division, onClose, onPickDistrict, t }) => {
   if (!division) return null;
   return (
     <div
-      className="fixed inset-0 z-[85] flex items-end md:hidden bg-black/55 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-[85] flex items-end md:hidden bg-black/55 animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
@@ -348,7 +348,7 @@ const DivisionDistrictsSheet = ({ division, onClose, onPickDistrict, t }) => {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white active:scale-95 transition-transform"
+            className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/20 border border-white/30 flex items-center justify-center text-white active:scale-95 transition-transform"
           >
             <X size={16} strokeWidth={2.5} />
           </button>
@@ -489,7 +489,7 @@ const PopularAreasBento = ({ t, onPickArea, properties = [] }) => {
 
               {/* TOP-CENTER: Logo (100% Match) */}
               <div className="absolute top-3 inset-x-0 flex justify-center pointer-events-none">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-[16px] bg-[#f8fafc]/95 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.1)] border border-white/40">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-[16px] bg-[#f8fafc] shadow-[0_2px_10px_rgba(0,0,0,0.1)] border border-white/40">
                   <div className="bg-[#e11d48] rounded-[6px] flex items-center justify-center w-[20px] h-[20px]">
                     <Building2 size={12} className="text-white" />
                   </div>
@@ -540,7 +540,7 @@ const AreaSubzonesSheet = ({ area, onClose, onPickLocation, t }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[85] flex items-end md:hidden bg-black/55 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-[85] flex items-end md:hidden bg-black/55 animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
@@ -553,7 +553,7 @@ const AreaSubzonesSheet = ({ area, onClose, onPickLocation, t }) => {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white active:scale-95 transition-transform"
+            className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/20 border border-white/30 flex items-center justify-center text-white active:scale-95 transition-transform"
           >
             <X size={16} strokeWidth={2.5} />
           </button>
@@ -615,7 +615,7 @@ const LandlordCTA = ({ t }) => {
         <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-xl" />
         <div className="absolute -bottom-12 -left-6 w-32 h-32 bg-white/10 rounded-full blur-xl" />
         <div className="relative flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/30">
+          <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center shrink-0 border border-white/30">
             <Sparkles size={22} className="text-white" />
           </div>
           <div className="flex-1 min-w-0">
@@ -771,7 +771,7 @@ const PropertyCard = ({ property, t, landlord }) => {
                   <div className="bg-gradient-to-r from-amber-400 to-orange-500 text-white px-2 py-0.5 rounded-full flex items-center gap-1 shadow-md text-[9px] font-black tracking-widest uppercase">
                     <Crown size={10} /> Pro
                   </div>
-                  <div className="bg-white/90 backdrop-blur-md px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm text-[9px] font-black text-amber-600 uppercase tracking-widest">
+                  <div className="bg-white/90 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm text-[9px] font-black text-amber-600 uppercase tracking-widest">
                     <TrendingUp size={10} /> {isBn ? "শীর্ষ অবস্থান" : "Top Position"}
                   </div>
                 </>
@@ -803,7 +803,7 @@ const PropertyCard = ({ property, t, landlord }) => {
             {/* TOP-RIGHT: heart button */}
             <button
               onClick={(e) => { e.stopPropagation(); requireAuth(() => setLiked((v) => !v)); }}
-              className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/85 backdrop-blur-md flex items-center justify-center shadow-md active:scale-90 transition-transform z-10"
+              className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/85 flex items-center justify-center shadow-md active:scale-90 transition-transform z-10"
               aria-label={liked ? 'Unlike' : 'Like'}
             >
               <Heart
@@ -814,7 +814,7 @@ const PropertyCard = ({ property, t, landlord }) => {
             </button>
 
             {/* BOTTOM-LEFT: posted age */}
-            <div className="absolute bottom-3 left-3 inline-flex items-center gap-1 bg-black/55 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-10">
+            <div className="absolute bottom-3 left-3 inline-flex items-center gap-1 bg-black/55 text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-10">
               <Clock size={10} />
               {ageLabel}
             </div>
@@ -921,7 +921,7 @@ const CategoryPromptSheet = ({ open, locationName, onClose, onPickCategory, t })
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-end md:hidden bg-black/55 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-[90] flex items-end md:hidden bg-black/55 animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
@@ -1158,7 +1158,7 @@ const MobileHome = () => {
 
       {/* ───────── SEARCH PANEL (glassmorphism) ───────── */}
       <div className="px-4 -mt-6 relative z-10">
-        <div className="rounded-3xl shadow-[0_20px_50px_-20px_rgba(15,23,42,0.30)] p-3 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 border border-white/70 ring-1 ring-white/40">
+        <div className="rounded-3xl shadow-[0_20px_50px_-20px_rgba(15,23,42,0.30)] p-3 bg-white border border-gray-100">
           {/* Rent / Buy / Commercial pill toggle */}
           <div className="flex items-center bg-gray-100 rounded-full p-1 mb-3" data-tour="mode-switcher">
             {SEARCH_TYPES.map((typ) => {

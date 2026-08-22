@@ -194,7 +194,7 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
       <div className="md:hidden fixed bottom-[64px] inset-x-0 h-6 pointer-events-none bg-gradient-to-t from-white/85 to-transparent z-30" />
 
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-40 h-[64px] bg-white/85 backdrop-blur-xl backdrop-saturate-150 border-t border-white/60 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)]"
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 h-[64px] bg-white border-t border-gray-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)]"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="relative h-full max-w-md mx-auto flex items-center px-1">
