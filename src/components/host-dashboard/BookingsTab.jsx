@@ -951,6 +951,16 @@ export default function BookingsTab(props) {
                         </div>
                       )}
                     </div>
+                    {(!landlordProfile.buildings || landlordProfile.buildings.length <= 1) && (
+                      <div className="mt-4 flex justify-end">
+                        <button onClick={() => {
+                          setLandlordProfile({...landlordProfile, buildingMode: 'single'});
+                          setCurrentBuildingId(null);
+                        }} className="flex items-center gap-1.5 text-[10px] font-black text-gray-500 hover:text-gray-900 transition-colors uppercase tracking-widest bg-white/50 hover:bg-white px-3 py-2 rounded-lg w-fit shadow-sm border border-gray-100">
+                          <Home size={14}/> {isBn ? 'সিঙ্গেল বিল্ডিং মোডে ফিরে যান' : 'Switch to Single Building Mode'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="w-full">

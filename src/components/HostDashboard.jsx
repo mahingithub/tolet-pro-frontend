@@ -928,6 +928,8 @@ const HostDashboard = () => {
         communication:    serverLP.communication    || prev.communication || [],
         serviceCharge:    serverLP.serviceCharge !== undefined ? serverLP.serviceCharge : prev.serviceCharge,
         houseRules:       serverLP.houseRules       || prev.houseRules || [],
+        buildingMode:     serverLP.buildingMode !== undefined ? serverLP.buildingMode : prev.buildingMode,
+        buildings:        serverLP.buildings        || prev.buildings || [],
       };
       return merged;
     });
@@ -1636,6 +1638,39 @@ const HostDashboard = () => {
     const interval = setInterval(hydrate, 30_000);
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
+
+  // ── Auto-recovery for lost building profiles ────────────────────────────
+  // If the user's `landlordProfile.buildings` is empty but they have bookings,
+  // it means they fell victim to the localStorage logout bug before it was fixed.
+  // We can automatically restore their buildings by extracting the unique 
+  // property names from their existing bookings.
+  useEffect(() => {
+    if (bookings.length > 0 && landlordProfile) {
+      if (!landlordProfile.buildings || landlordProfile.buildings.length === 0) {
+        const uniqueProperties = [...new Set(bookings.map(b => b.property).filter(Boolean))];
+        if (uniqueProperties.length > 0) {
+          const recoveredBuildings = uniqueProperties.map((propName, i) => ({
+            id: 'bldg_rec_' + Date.now() + '_' + i,
+            name: propName,
+            location: '', // Empty so they can fill it later if they want
+            type: 'residential',
+            category: 'flat',
+            createdAt: new Date().toISOString()
+          }));
+          
+          const recoveredMode = (landlordProfile.buildingMode === 'multi' || uniqueProperties.length > 1) ? 'multi' : 'single';
+          
+          persistLandlordProfile({
+            ...landlordProfile,
+            buildingMode: recoveredMode,
+            buildings: recoveredBuildings
+          });
+          console.log('[host] Auto-recovered buildings from existing bookings:', recoveredBuildings);
+        }
+      }
+    }
+  }, [bookings.length, landlordProfile?.buildings?.length]);
+
 
   // ── V1 manual rent: load payment methods + pending-verification count ────
   // Payment methods drive the Payment Settings badge, the after-login popup,
