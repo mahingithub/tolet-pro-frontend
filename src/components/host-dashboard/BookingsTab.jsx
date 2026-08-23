@@ -876,13 +876,12 @@ export default function BookingsTab(props) {
                           <input type="text" value={newBuilding.name} onChange={(e) => setNewBuilding({...newBuilding, name: e.target.value})} placeholder={isBn ? 'বাসার নাম' : 'House Name'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold" />
                           <input type="text" value={newBuilding.location} onChange={(e) => setNewBuilding({...newBuilding, location: e.target.value})} placeholder={isBn ? 'ঠিকানা' : 'Location'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold" />
                         </div>
-                        <div className="grid grid-cols-3 gap-2 mb-3">
+                        <div className="grid grid-cols-2 gap-2 mb-3">
                           {[
                             { value: 'residential', label: 'Residential', icon: <Home size={14}/> },
                             { value: 'commercial', label: 'Commercial', icon: <Building2 size={14}/> },
-                            { value: 'hostel', label: 'Hostel', icon: <Users size={14}/> },
                           ].map(opt => (
-                            <button key={opt.value} type="button" onClick={() => setNewBuilding({...newBuilding, type: opt.value, category: opt.value === 'residential' ? 'flat' : (opt.value === 'hostel' ? 'hostel' : '')})}
+                            <button key={opt.value} type="button" onClick={() => setNewBuilding({...newBuilding, type: opt.value, category: opt.value === 'residential' ? 'flat' : ''})}
                               className={`flex items-center justify-center gap-1.5 py-2 rounded-xl border-2 text-[10px] font-black uppercase tracking-wider transition-all ${newBuilding.type === opt.value ? 'border-[#ba0036] bg-red-50 text-[#ba0036]' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
                               {opt.icon} {opt.label}
                             </button>

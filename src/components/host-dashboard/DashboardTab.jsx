@@ -43,7 +43,10 @@ export default function DashboardTab({
   getMonthCollectionSummary,
   today,
   monthFullLabel,
-  formatBDT
+  formatBDT,
+  landlordProfile,
+  currentBuildingId,
+  rentUnitsOf
 }) {
   return (
     <div className="animate-in fade-in zoom-in-95 duration-500 space-y-3 md:space-y-4">
@@ -304,8 +307,25 @@ export default function DashboardTab({
           on that page so the host learns the same vocabulary. */}
       {(() => {
         const todayDate = today;
-        const sm = getMonthCollectionSummary(bookings, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
+        
+        let baseBookings = bookings;
+        if (landlordProfile?.buildingMode === 'multi') {
+          if (currentBuildingId) {
+            const bldg = landlordProfile.buildings?.find(b => b.id === currentBuildingId);
+            baseBookings = bldg ? bookings.filter(b => b.property === bldg.name) : [];
+          } else {
+            const bldgNames = (landlordProfile.buildings || []).map(b => b.name);
+            baseBookings = bookings.filter(b => bldgNames.includes(b.property));
+          }
+        } else if (landlordProfile?.buildingMode === 'single') {
+          const bldgName = landlordProfile.buildings?.[0]?.name;
+          baseBookings = bldgName ? bookings.filter(b => b.property === bldgName) : [];
+        }
+
+        const rentUnits = baseBookings.flatMap(rentUnitsOf);
+        const sm = getMonthCollectionSummary(rentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
         const collectedPct = sm.expectedTotal > 0 ? Math.min(100, Math.round((sm.collectedTotal / sm.expectedTotal) * 100)) : 0;
+        
         return (
           <div
             data-tour="host-shared-ledger"
@@ -332,50 +352,86 @@ export default function DashboardTab({
               </div>
             </div>
 
-            {/* Collection rate progress bar */}
-            <div className="mt-3 md:mt-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[9px] md:text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                  {language === 'বাংলা' ? 'কালেকশন রেট' : 'Collection Rate'}
-                </span>
-                <span className="text-xs md:text-sm font-black text-[#ba0036] dark:text-rose-400 tabular-nums">{collectedPct}%</span>
+            {landlordProfile?.buildingMode === 'multi' && !currentBuildingId ? (
+              <div className="mt-5 space-y-3">
+                {(landlordProfile.buildings || []).map(bldg => {
+                  const bldgBookings = bookings.filter(b => b.property === bldg.name);
+                  const bldgRentUnits = bldgBookings.flatMap(rentUnitsOf);
+                  const bldgSm = getMonthCollectionSummary(bldgRentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
+                  return (
+                    <div key={bldg.id} className="bg-gray-50/80 dark:bg-gray-800/50 rounded-xl p-3.5 border border-gray-100 dark:border-gray-700/50">
+                      <h4 className="text-xs font-black text-gray-900 dark:text-white mb-2 flex items-center justify-between">
+                        <span>{bldg.name}</span>
+                        {bldgSm.overdueCount > 0 && (
+                          <span className="text-[8px] font-black bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 px-1.5 py-0.5 rounded uppercase tracking-wider">{bldgSm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'Overdue'}</span>
+                        )}
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-gray-400 dark:text-gray-500 text-[8px] font-black uppercase tracking-widest mb-0.5">{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}</p>
+                          <p className="text-sm font-black text-gray-900 dark:text-white tabular-nums">{formatBDT(bldgSm.expectedTotal)}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400 dark:text-gray-500 text-[8px] font-black uppercase tracking-widest mb-0.5">{language === 'বাংলা' ? 'আদায়' : 'Collected'}</p>
+                          <p className="text-sm font-black text-emerald-600 dark:text-emerald-400 tabular-nums">{formatBDT(bldgSm.collectedTotal)}</p>
+                        </div>
+                      </div>
+                      <div className="mt-2.5 flex items-center gap-3 border-t border-gray-200 dark:border-gray-700/50 pt-2.5 text-[9px] font-black uppercase tracking-widest">
+                        <span className="text-emerald-600 dark:text-emerald-400">{bldgSm.paidCount} {language === 'বাংলা' ? 'ক্লিয়ার' : 'Cleared'}</span>
+                        <span className="text-orange-500 dark:text-orange-400">{bldgSm.totalDueCount - bldgSm.paidCount} {language === 'বাংলা' ? 'বাকি' : 'Due'}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="h-2 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                <div className="h-full rounded-full bg-gradient-to-r from-[#ba0036] to-[#ff004c] dark:from-rose-500 dark:to-rose-400 transition-all duration-700" style={{ width: `${collectedPct}%` }} />
-              </div>
-            </div>
+            ) : (
+              <>
+                {/* Collection rate progress bar */}
+                <div className="mt-3 md:mt-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[9px] md:text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                      {language === 'বাংলা' ? 'কালেকশন রেট' : 'Collection Rate'}
+                    </span>
+                    <span className="text-xs md:text-sm font-black text-[#ba0036] dark:text-rose-400 tabular-nums">{collectedPct}%</span>
+                  </div>
+                  <div className="h-2 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#ba0036] to-[#ff004c] dark:from-rose-500 dark:to-rose-400 transition-all duration-700" style={{ width: `${collectedPct}%` }} />
+                  </div>
+                </div>
 
-            {/* 4-KPI strip — same vocabulary as the Rent Collection tab */}
-            <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-transparent border border-emerald-100/80 dark:border-emerald-800/50 rounded-2xl p-3 md:p-4">
-                <p className="text-[8px] md:text-[9px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">{language === 'বাংলা' ? 'আদায়' : 'Collected'}</p>
-                <p className="text-lg md:text-2xl font-black text-emerald-700 dark:text-emerald-400 tabular-nums mt-1 leading-none">{formatBDT(sm.collectedTotal)}</p>
-                <p className="text-[8px] md:text-[9px] font-bold text-emerald-700/70 dark:text-emerald-400/70 mt-1.5 inline-flex items-center gap-1">
-                  <CheckCircle2 size={10} strokeWidth={3}/> {sm.paidCount} {language === 'বাংলা' ? 'ক্লিয়ার্ড' : 'cleared'}
-                </p>
-              </div>
-              <div className="bg-transparent border border-rose-100/80 dark:border-rose-800/50 rounded-2xl p-3 md:p-4">
-                <p className="text-[8px] md:text-[9px] font-black text-rose-700 dark:text-rose-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বকেয়া' : 'Outstanding'}</p>
-                <p className="text-lg md:text-2xl font-black text-rose-700 dark:text-rose-400 tabular-nums mt-1 leading-none">{formatBDT(sm.outstandingTotal)}</p>
-                <p className="text-[8px] md:text-[9px] font-bold text-rose-700/70 dark:text-rose-400/70 mt-1.5 inline-flex items-center gap-1">
-                  <AlertCircle size={10} strokeWidth={3}/> {sm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'unpaid'}
-                </p>
-              </div>
-              <div className="bg-transparent border border-amber-100/80 dark:border-amber-800/50 rounded-2xl p-3 md:p-4">
-                <p className="text-[8px] md:text-[9px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest">{language === 'বাংলা' ? 'আংশিক' : 'Partial'}</p>
-                <p className="text-lg md:text-2xl font-black text-amber-700 dark:text-amber-400 tabular-nums mt-1 leading-none">{sm.partialCount}</p>
-                <p className="text-[8px] md:text-[9px] font-bold text-amber-700/70 dark:text-amber-400/70 mt-1.5 inline-flex items-center gap-1">
-                  <Hourglass size={10} strokeWidth={3}/> {language === 'বাংলা' ? 'আংশিক পেমেন্ট' : 'partially paid'}
-                </p>
-              </div>
-              <div className="bg-transparent border border-blue-100/80 dark:border-blue-800/50 rounded-2xl p-3 md:p-4">
-                <p className="text-[8px] md:text-[9px] font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest">{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}</p>
-                <p className="text-lg md:text-2xl font-black text-blue-700 dark:text-blue-400 tabular-nums mt-1 leading-none">{formatBDT(sm.expectedTotal)}</p>
-                <p className="text-[8px] md:text-[9px] font-bold text-blue-700/70 dark:text-blue-400/70 mt-1.5 inline-flex items-center gap-1">
-                  <Calendar size={10} strokeWidth={3}/> {sm.totalDueCount} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}
-                </p>
-              </div>
-            </div>
+                {/* 4-KPI strip — same vocabulary as the Rent Collection tab */}
+                <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="bg-transparent border border-emerald-100/80 dark:border-emerald-800/50 rounded-2xl p-3 md:p-4">
+                    <p className="text-[8px] md:text-[9px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">{language === 'বাংলা' ? 'আদায়' : 'Collected'}</p>
+                    <p className="text-lg md:text-2xl font-black text-emerald-700 dark:text-emerald-400 tabular-nums mt-1 leading-none">{formatBDT(sm.collectedTotal)}</p>
+                    <p className="text-[8px] md:text-[9px] font-bold text-emerald-700/70 dark:text-emerald-400/70 mt-1.5 inline-flex items-center gap-1">
+                      <CheckCircle2 size={10} strokeWidth={3}/> {sm.paidCount} {language === 'বাংলা' ? 'ক্লিয়ার্ড' : 'cleared'}
+                    </p>
+                  </div>
+                  <div className="bg-transparent border border-rose-100/80 dark:border-rose-800/50 rounded-2xl p-3 md:p-4">
+                    <p className="text-[8px] md:text-[9px] font-black text-rose-700 dark:text-rose-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বকেয়া' : 'Outstanding'}</p>
+                    <p className="text-lg md:text-2xl font-black text-rose-700 dark:text-rose-400 tabular-nums mt-1 leading-none">{formatBDT(sm.outstandingTotal)}</p>
+                    <p className="text-[8px] md:text-[9px] font-bold text-rose-700/70 dark:text-rose-400/70 mt-1.5 inline-flex items-center gap-1">
+                      <AlertCircle size={10} strokeWidth={3}/> {sm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'unpaid'}
+                    </p>
+                  </div>
+                  <div className="bg-transparent border border-amber-100/80 dark:border-amber-800/50 rounded-2xl p-3 md:p-4">
+                    <p className="text-[8px] md:text-[9px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest">{language === 'বাংলা' ? 'আংশিক' : 'Partial'}</p>
+                    <p className="text-lg md:text-2xl font-black text-amber-700 dark:text-amber-400 tabular-nums mt-1 leading-none">{sm.partialCount}</p>
+                    <p className="text-[8px] md:text-[9px] font-bold text-amber-700/70 dark:text-amber-400/70 mt-1.5 inline-flex items-center gap-1">
+                      <Hourglass size={10} strokeWidth={3}/> {language === 'বাংলা' ? 'আংশিক পেমেন্ট' : 'partially paid'}
+                    </p>
+                  </div>
+                  <div className="bg-transparent border border-blue-100/80 dark:border-blue-800/50 rounded-2xl p-3 md:p-4">
+                    <p className="text-[8px] md:text-[9px] font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest">{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}</p>
+                    <p className="text-lg md:text-2xl font-black text-blue-700 dark:text-blue-400 tabular-nums mt-1 leading-none">{formatBDT(sm.expectedTotal)}</p>
+                    <p className="text-[8px] md:text-[9px] font-bold text-blue-700/70 dark:text-blue-400/70 mt-1.5 inline-flex items-center gap-1">
+                      <Calendar size={10} strokeWidth={3}/> {sm.totalDueCount} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         );
       })()}

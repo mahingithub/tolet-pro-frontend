@@ -462,21 +462,20 @@ export default function RentTab(props) {
           return (
           <div className="w-full animate-in fade-in zoom-in-95 duration-500">
 
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 lg:gap-6 xl:h-[calc(100vh-140px)] overflow-visible xl:overflow-hidden">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:h-[calc(100vh-140px)] overflow-visible lg:overflow-hidden">
 
               {/* ── LEFT RAIL — full Shared Ledger ALWAYS visible (mobile + desktop) ── */}
-              {!(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) && (
-                <aside className="xl:col-span-4 w-full flex flex-col gap-3 xl:gap-5 xl:h-full xl:overflow-y-auto custom-scrollbar xl:pt-1 xl:pb-4 xl:pr-1">
+              <aside className="lg:col-span-4 w-full flex flex-col gap-3 lg:gap-5 lg:h-full lg:overflow-y-auto custom-scrollbar lg:pt-1 lg:pb-4 lg:pr-1">
 
                 {/* Shared Ledger hero — always visible, SLIM on mobile.
                     On a phone this card used to push the tenant rows well below
                     the fold. The month label now rides on the title line, the
                     "Expected" figure shares its row with the collection rate,
-                    and padding tightens up. Desktop (xl) keeps the tall hero. */}
-                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl xl:rounded-[2rem] p-3.5 xl:p-7 text-white shadow-[0_6px_20px_rgba(0,0,0,0.15)] xl:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
+                    and padding tightens up. Desktop (lg) keeps the tall hero. */}
+                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl lg:rounded-[2rem] p-3.5 lg:p-7 text-white shadow-[0_6px_20px_rgba(0,0,0,0.15)] lg:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-10 translate-x-10"></div>
-                  <div className="flex items-center justify-between gap-2 mb-2.5 xl:mb-1 relative z-10">
-                    <h3 className="text-[13px] xl:text-2xl font-black truncate">{language === 'বাংলা' ? 'শেয়ার্ড লেজার' : 'Shared Ledger'}</h3>
+                  <div className="flex items-center justify-between gap-2 mb-2.5 lg:mb-1 relative z-10">
+                    <h3 className="text-[13px] lg:text-2xl font-black truncate">{language === 'বাংলা' ? 'শেয়ার্ড লেজার' : 'Shared Ledger'}</h3>
                     {isPremium ? (
                       <div className="bg-[#ba0036] text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md shrink-0">
                          <Crown size={10} /> PRO
@@ -616,7 +615,7 @@ export default function RentTab(props) {
                     where the rail stacks on top of the list); shown only in the
                     xl sidebar layout so it doesn't crowd the smaller screens. */}
                 {!(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) && (
-                  <div className="hidden xl:block bg-white rounded-2xl xl:rounded-[2rem] p-4 xl:p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none shrink-0">
+                  <div className="hidden lg:block bg-white rounded-2xl lg:rounded-[2rem] p-4 lg:p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none shrink-0">
                   <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">{language === 'বাংলা' ? 'লেজেন্ড' : 'Legend'}</h4>
                   <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-[10px] font-bold text-gray-600">
                     <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-blue-500 inline-block"></span>{language === 'বাংলা' ? 'পেইড' : 'Paid'}</span>
@@ -629,10 +628,9 @@ export default function RentTab(props) {
                 </div>
                 )}
               </aside>
-              )}
 
               {/* ── RIGHT MAIN ── */}
-              <main className="xl:col-span-8 w-full xl:h-full xl:overflow-y-auto custom-scrollbar pb-24 xl:pr-3 min-w-0">
+              <main className="lg:col-span-8 w-full lg:h-full lg:overflow-y-auto custom-scrollbar pb-24 lg:pr-3 min-w-0">
                 {landlordProfile?.buildingMode === 'multi' && !currentBuildingId ? (
                   <div className="w-full">
                     {/* BUILDINGS OVERVIEW */}
