@@ -331,19 +331,19 @@ const AppLayout = () => {
 function App() {
 	return (
 		<ErrorBoundary>
-			<AuthProvider>
-				<LanguageProvider>
-					<SettingsProvider>
-						<Router>
+			<Router>
+				<AuthProvider>
+					<LanguageProvider>
+						<SettingsProvider>
 							<NotificationProvider>
 								<TourProvider>
 									<AppLayout />
 								</TourProvider>
 							</NotificationProvider>
-						</Router>
-					</SettingsProvider>
-				</LanguageProvider>
-			</AuthProvider>
+						</SettingsProvider>
+					</LanguageProvider>
+				</AuthProvider>
+			</Router>
 		</ErrorBoundary>
 	);
 }

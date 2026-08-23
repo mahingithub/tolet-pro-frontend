@@ -67,28 +67,28 @@ export default function DashboardTab({
                     e.stopPropagation();
                     setHidePaymentPromo(true);
                   }}
-                  className="absolute top-2 md:top-3 right-2 md:right-3 p-1.5 rounded-full bg-emerald-100/50 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:hover:bg-emerald-800/50 text-emerald-700 dark:text-emerald-300 transition-colors z-10"
-                >
-                  <X size={14} strokeWidth={2.5} />
-                </button>
-                <div className="flex flex-row md:items-center justify-between gap-3 md:gap-4 h-full pt-2 md:pt-0">
-                  <div className="flex flex-row items-center gap-3 md:gap-4 flex-1 min-w-0">
-                    <div className="relative w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl md:rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                      <CreditCard size={20} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
-                      <span className="absolute -top-1.5 -right-1.5 w-4 h-4 md:w-5 md:h-5 rounded-full bg-[#ba0036] text-white text-[9px] md:text-[10px] font-black flex items-center justify-center animate-pulse">!</span>
-                    </div>
-                    <div className="flex flex-col gap-1 md:gap-0.5 flex-1 min-w-0 pr-4 md:pr-0">
-                      <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight">
-                        {language === 'বাংলা' ? 'পেমেন্ট সেটিংস সম্পূর্ণ করুন' : 'Complete Payment Settings'}
-                      </h3>
-                      <p className="text-[11px] md:text-xs font-bold text-emerald-700 dark:text-emerald-300/90 leading-relaxed md:truncate">
-                        {language === 'বাংলা'
-                          ? 'পেমেন্ট অ্যাকাউন্ট যোগ করুন যাতে ভাড়াটিয়া সরাসরি ভাড়া পাঠাতে পারে।'
-                          : 'Add your account so tenants can send rent directly to you.'}
-                      </p>
-                    </div>
+                className="absolute top-2 right-2 md:top-1/2 md:-translate-y-1/2 md:right-4 p-1.5 rounded-full bg-emerald-100/50 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:hover:bg-emerald-800/50 text-emerald-700 dark:text-emerald-300 transition-colors z-10"
+              >
+                <X size={14} strokeWidth={2.5} />
+              </button>
+              <div className="flex flex-row md:items-center justify-between gap-3 md:gap-4 h-full pt-2 md:pt-0">
+                <div className="flex flex-row items-center gap-3 md:gap-4 flex-1 min-w-0">
+                  <div className="relative w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl md:rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                    <CreditCard size={20} className="md:w-[24px] md:h-[24px]" strokeWidth={2.2} />
+                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 md:w-5 md:h-5 rounded-full bg-[#ba0036] text-white text-[9px] md:text-[10px] font-black flex items-center justify-center animate-pulse">!</span>
+                  </div>
+                  <div className="flex flex-col gap-1 md:gap-0.5 flex-1 min-w-0 pr-8 md:pr-4">
+                    <h3 className="text-[13px] md:text-base font-black text-gray-900 dark:text-white leading-tight">
+                      {language === 'বাংলা' ? 'পেমেন্ট সেটিংস সম্পূর্ণ করুন' : 'Complete Payment Settings'}
+                    </h3>
+                    <p className="text-[11px] md:text-xs font-bold text-emerald-700 dark:text-emerald-300/90 leading-relaxed md:truncate">
+                      {language === 'বাংলা'
+                        ? 'পেমেন্ট অ্যাকাউন্ট যোগ করুন যাতে ভাড়াটিয়া সরাসরি ভাড়া পাঠাতে পারে।'
+                        : 'Add your account so tenants can send rent directly to you.'}
+                    </p>
                   </div>
                 </div>
+              </div>
               </div>
             )
           ) : (

@@ -15,10 +15,12 @@ import {
 } from '../services/authService.js';
 import { subscribe } from '../services/_storage.js';
 import { isSessionTerminated } from '../utils/fetchInterceptor.js';
+import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
+  const navigate = useNavigate();
   // Boot straight from the cached session. There is no client-side expiry check
   // any more: the server owns session lifetime (see purgeLegacySessionExpiry).
   const [user, setUser] = useState(() => getCurrentUser());
@@ -198,20 +200,17 @@ export const AuthProvider = ({ children }) => {
         // the user re-renders every <RequireAuth> on screen, and a dashboard
         // that suddenly has no user would redirect to /login?next=<dashboard>
         // — a login screen nobody asked for, flashed up for however long the
-        // hard reload below takes to commit. RequireAuth checks this flag and
+        // SPA navigation below takes to commit. RequireAuth checks this flag and
         // holds its redirect instead.
         setLoggingOut(true);
         svcLogout();
         setUser(null);
-        // Hard reload to a clean state so NO stale in-memory data from this
-        // account (dashboard cards, chat threads, etc.) lingers until the next
-        // manual reload — the exact bug where a re-login showed the old data.
-        //
-        // replace(), not assign(): the page they signed out of must not stay in
-        // history, or Back lands on a protected route and bounces to /login.
-        // This is the ONLY navigation logout performs — callers must not add
-        // their own navigate(), which used to race this one.
-        try { window.location.replace('/'); } catch { setLoggingOut(false); }
+        
+        // Navigate directly to the login screen without a full page reload.
+        navigate('/login', { replace: true });
+        
+        // Reset logging out flag after a short delay to allow the navigation to land
+        setTimeout(() => setLoggingOut(false), 100);
       },
       updateMe: async (patch) => {
         const u = await svcUpdateMe(patch);
@@ -239,7 +238,7 @@ export const AuthProvider = ({ children }) => {
       },
       refresh,
     };
-  }, [user, refresh, loggingOut]);
+  }, [user, refresh, loggingOut, navigate]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

@@ -36,6 +36,10 @@ export default function BookingsTab(props) {
           const isBn = language === 'বাংলা';
           const [showBuildingForm, setShowBuildingForm] = useState(false);
           const [newBuilding, setNewBuilding] = useState({ name: '', location: '', type: 'residential', category: 'flat' });
+          const [editingBuildingId, setEditingBuildingId] = useState(null);
+          const [editBuildingData, setEditBuildingData] = useState({ name: '', location: '', type: 'residential' });
+          const [deleteBuildingId, setDeleteBuildingId] = useState(null);
+          const [activeBldgDropdown, setActiveBldgDropdown] = useState(null);
           const todayDate = today;
           
           let baseBookings = bookings;
@@ -900,24 +904,104 @@ export default function BookingsTab(props) {
                     )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {(landlordProfile.buildings || []).map(bldg => {
+                         if (editingBuildingId === bldg.id) {
+                           return (
+                             <div key={bldg.id} className="bg-white rounded-2xl shadow-sm border border-[#ba0036]/20 p-5 mb-4 animate-in fade-in">
+                               <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-3">{isBn ? 'বিল্ডিং এডিট করুন' : 'Edit Building'}</h3>
+                               <div className="grid grid-cols-1 gap-3 mb-3">
+                                 {/* Name disabled because modifying it breaks existing booking relationships */}
+                                 <div>
+                                   <p className="text-[10px] font-bold text-gray-400 mb-1 ml-1">{isBn ? 'বিল্ডিংয়ের নাম পরিবর্তন করা যাবে না কারণ এটি ভাড়াটিয়াদের সাথে যুক্ত আছে।' : 'Name cannot be changed as it is linked to existing tenants.'}</p>
+                                   <input type="text" disabled value={editBuildingData.name} className="bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-500 w-full cursor-not-allowed" />
+                                 </div>
+                                 <input type="text" value={editBuildingData.location} onChange={(e) => setEditBuildingData({...editBuildingData, location: e.target.value})} placeholder={isBn ? 'ঠিকানা' : 'Location'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold w-full" />
+                               </div>
+                               <div className="grid grid-cols-2 gap-2 mb-3">
+                                 {[
+                                   { value: 'residential', label: 'Residential', icon: <Home size={14}/> },
+                                   { value: 'commercial', label: 'Commercial', icon: <Building2 size={14}/> },
+                                 ].map(opt => (
+                                   <button key={opt.value} type="button" onClick={() => setEditBuildingData({...editBuildingData, type: opt.value, category: opt.value === 'residential' ? 'flat' : ''})}
+                                     className={`flex items-center justify-center gap-1.5 py-2 rounded-xl border-2 text-[10px] font-black uppercase tracking-wider transition-all ${editBuildingData.type === opt.value ? 'border-[#ba0036] bg-red-50 text-[#ba0036]' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                                     {opt.icon} {opt.label}
+                                   </button>
+                                 ))}
+                               </div>
+                               <div className="flex justify-end gap-2">
+                                 <button onClick={() => setEditingBuildingId(null)} className="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100">{isBn ? 'বাতিল' : 'Cancel'}</button>
+                                 <button onClick={() => {
+                                   setLandlordProfile({ 
+                                     ...landlordProfile, 
+                                     buildings: landlordProfile.buildings.map(b => b.id === bldg.id ? { ...b, location: editBuildingData.location, type: editBuildingData.type, category: editBuildingData.category } : b)
+                                   });
+                                   setEditingBuildingId(null);
+                                 }} className="px-4 py-2 rounded-xl text-xs font-black bg-[#ba0036] text-white hover:bg-[#a0002f]">{isBn ? 'সেভ করুন' : 'Save Changes'}</button>
+                               </div>
+                             </div>
+                           );
+                         }
+
                          const bldgBookings = bookings.filter(b => b.property === bldg.name);
                          const bldgSummary = getLeaseSummary(bldgBookings, todayDate);
                          const typeLabel = bldg.type === 'residential' ? (isBn ? 'Residential' : 'Residential') : bldg.type === 'commercial' ? (isBn ? 'Commercial' : 'Commercial') : (isBn ? 'Hostel' : 'Hostel');
                          const catLabel = bldg.category ? (bldg.category.charAt(0).toUpperCase() + bldg.category.slice(1)).replace('-', ' ') : '';
                          const typeColor = bldg.type === 'residential' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : bldg.type === 'commercial' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200';
                          const iconBg = bldg.type === 'residential' ? 'bg-emerald-100 text-emerald-600' : bldg.type === 'commercial' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600';
+                         
                          return (
                            <div key={bldg.id} onClick={() => setCurrentBuildingId(bldg.id)} 
-                             className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 cursor-pointer hover:shadow-lg hover:border-gray-200 transition-all group relative overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+                             className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 cursor-pointer hover:shadow-lg hover:border-gray-200 transition-all group relative overflow-visible shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
                              {/* Top accent line */}
                              <div className={`absolute top-0 left-0 right-0 h-1 ${bldg.type === 'residential' ? 'bg-emerald-500' : bldg.type === 'commercial' ? 'bg-blue-500' : 'bg-purple-500'}`}/>
                              <div className="flex items-start justify-between mb-3 pt-1">
                                <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0`}>
                                  {bldg.type === 'hostel' ? <Users size={18}/> : bldg.type === 'commercial' ? <Building2 size={18}/> : <Home size={18}/>}
                                </div>
-                               <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border ${typeColor}`}>{typeLabel}</span>
+                               <div className="flex items-center gap-2 relative">
+                                 <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border ${typeColor}`}>{typeLabel}</span>
+                                 <button
+                                   onClick={(e) => {
+                                     e.stopPropagation();
+                                     setActiveBldgDropdown(activeBldgDropdown === bldg.id ? null : bldg.id);
+                                   }}
+                                   className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors relative z-10"
+                                 >
+                                   <MoreVertical size={16} />
+                                 </button>
+                                 {activeBldgDropdown === bldg.id && (
+                                   <>
+                                     <div 
+                                       className="fixed inset-0 z-20" 
+                                       onClick={(e) => { e.stopPropagation(); setActiveBldgDropdown(null); }}
+                                     />
+                                     <div className="absolute right-0 top-8 w-36 bg-white rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-gray-100 py-1 z-30 animate-in fade-in zoom-in-95 origin-top-right">
+                                       <button
+                                         onClick={(e) => {
+                                           e.stopPropagation();
+                                           setActiveBldgDropdown(null);
+                                           setEditBuildingData({ ...bldg });
+                                           setEditingBuildingId(bldg.id);
+                                         }}
+                                         className="w-full text-left px-4 py-2 text-[11px] font-black text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                       >
+                                         <Edit3 size={12} /> {isBn ? 'এডিট করুন' : 'Edit'}
+                                       </button>
+                                       <button
+                                         onClick={(e) => {
+                                           e.stopPropagation();
+                                           setActiveBldgDropdown(null);
+                                           setDeleteBuildingId(bldg.id);
+                                         }}
+                                         className="w-full text-left px-4 py-2 text-[11px] font-black text-rose-600 hover:bg-rose-50 flex items-center gap-2"
+                                       >
+                                         <Trash2 size={12} /> {isBn ? 'ডিলিট করুন' : 'Delete'}
+                                       </button>
+                                     </div>
+                                   </>
+                                 )}
+                               </div>
                              </div>
-                             <h4 className="text-sm font-black text-gray-900 group-hover:text-[#ba0036] transition-colors mb-1">{bldg.name}</h4>
+                             <h4 className="text-sm font-black text-gray-900 group-hover:text-[#ba0036] transition-colors mb-1 pr-8">{bldg.name}</h4>
                              <p className="text-[11px] font-bold text-gray-400 flex items-center gap-1 mb-3"><MapPin size={10}/> {bldg.location}</p>
                              
                              <div className="grid grid-cols-2 gap-2 mb-3">
@@ -1102,6 +1186,49 @@ export default function BookingsTab(props) {
                   </div>
                 )}
               </main>
+
+              {/* Building Delete Confirmation Modal */}
+              {deleteBuildingId && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                  <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteBuildingId(null)} />
+                  <div className="relative bg-white w-full max-w-sm rounded-[1.5rem] shadow-2xl p-6 sm:p-7 overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div className="flex flex-col items-center text-center">
+                      <div className="w-14 h-14 bg-rose-100 rounded-full flex items-center justify-center mb-4 text-rose-600 shrink-0">
+                        <Trash2 size={24} strokeWidth={2.5}/>
+                      </div>
+                      <h3 className="text-[17px] sm:text-lg font-black text-gray-900 leading-tight mb-2">
+                        {isBn ? 'এই বিল্ডিংটি ডিলিট করতে চান?' : 'Delete this building?'}
+                      </h3>
+                      <p className="text-sm font-bold text-gray-500 mb-6 leading-relaxed">
+                        {isBn 
+                          ? 'বিল্ডিং মুছে ফেললে এটি ড্যাশবোর্ড থেকে সরিয়ে দেওয়া হবে। কিন্তু ভাড়াটিয়াদের লিজ এবং হিস্ট্রি ডিলিট হবে না।'
+                          : 'This will remove the building from your dashboard. Note: Any existing tenants and leases linked to this building will not be deleted.'}
+                      </p>
+                      
+                      <div className="flex flex-col-reverse sm:flex-row items-stretch w-full gap-2.5">
+                        <button
+                          onClick={() => setDeleteBuildingId(null)}
+                          className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-colors active:scale-[0.98]"
+                        >
+                          {isBn ? 'বাতিল' : 'Cancel'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setLandlordProfile({ 
+                              ...landlordProfile, 
+                              buildings: landlordProfile.buildings.filter(b => b.id !== deleteBuildingId) 
+                            });
+                            setDeleteBuildingId(null);
+                          }}
+                          className="w-full bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-colors active:scale-[0.98] shadow-[0_4px_16px_rgba(225,29,72,0.25)]"
+                        >
+                          {isBn ? 'ডিলিট করুন' : 'Delete'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
             </div>
           </div>
