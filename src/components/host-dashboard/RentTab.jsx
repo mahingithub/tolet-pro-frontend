@@ -712,6 +712,13 @@ export default function RentTab(props) {
                         </div>
                       );
                     })()}
+                    {landlordProfile?.buildingMode === 'single' && (
+                      <div className="mb-2 flex justify-end">
+                        <button onClick={() => setLandlordProfile({...landlordProfile, buildingMode: 'multi'})} className="flex items-center gap-1.5 text-[10px] font-black text-[#ba0036] hover:bg-red-50 transition-colors uppercase tracking-widest bg-white px-3 py-1.5 rounded-lg w-fit shadow-sm border border-gray-100">
+                          <Plus size={12}/> {isBn ? 'আরও বিল্ডিং যোগ করুন' : 'Add Another Building'}
+                        </button>
+                      </div>
+                    )}
                 {/* Sticky toolbar — two rows. Row 1 = controls (title chip, year
                     stepper, search, export); Row 2 = the filter pills, which wrap
                     instead of scrolling sideways on mobile / iPad. */}

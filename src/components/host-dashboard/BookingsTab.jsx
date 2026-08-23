@@ -677,13 +677,12 @@ export default function BookingsTab(props) {
                     </div>
                     <div>
                       <label className="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1.5">{isBn ? 'ধরন' : 'Type'}</label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-2 gap-2">
                         {[
                           { value: 'residential', label: isBn ? 'Residential' : 'Residential', icon: <Home size={18}/>, sub: isBn ? 'ফ্ল্যাট/বাসা' : 'Flat/House' },
                           { value: 'commercial', label: isBn ? 'Commercial' : 'Commercial', icon: <Building2 size={18}/>, sub: isBn ? 'অফিস/দোকান' : 'Office/Shop' },
-                          { value: 'hostel', label: isBn ? 'Hostel' : 'Hostel', icon: <Users size={18}/>, sub: isBn ? 'হোস্টেল/মেস' : 'Hostel/Mess' },
                         ].map(opt => (
-                          <button key={opt.value} type="button" onClick={() => setNewBuilding({...newBuilding, type: opt.value, category: opt.value === 'residential' ? 'flat' : (opt.value === 'hostel' ? 'hostel' : '')})}
+                          <button key={opt.value} type="button" onClick={() => setNewBuilding({...newBuilding, type: opt.value, category: opt.value === 'residential' ? 'flat' : ''})}
                             className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-center transition-all ${newBuilding.type === opt.value ? 'border-[#ba0036] bg-red-50 text-[#ba0036]' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
                             {opt.icon}
                             <span className="text-[10px] font-black uppercase tracking-wider">{opt.label}</span>
@@ -960,6 +959,13 @@ export default function BookingsTab(props) {
                       <div className="mb-2">
                         <button onClick={() => setCurrentBuildingId(null)} className="flex items-center gap-1 text-[10px] font-black text-gray-500 hover:text-[#ba0036] transition-colors uppercase tracking-widest bg-white/50 px-3 py-1.5 rounded-lg w-fit">
                           <ChevronLeft size={12}/> {isBn ? 'সব বিল্ডিং-এ ফিরে যান' : 'Back to Buildings'}
+                        </button>
+                      </div>
+                    )}
+                    {landlordProfile?.buildingMode === 'single' && (
+                      <div className="mb-2 flex justify-end">
+                        <button onClick={() => setLandlordProfile({...landlordProfile, buildingMode: 'multi'})} className="flex items-center gap-1.5 text-[10px] font-black text-[#ba0036] hover:bg-red-50 transition-colors uppercase tracking-widest bg-white px-3 py-1.5 rounded-lg w-fit shadow-sm border border-gray-100">
+                          <Plus size={12}/> {isBn ? 'আরও বিল্ডিং যোগ করুন' : 'Add Another Building'}
                         </button>
                       </div>
                     )}
