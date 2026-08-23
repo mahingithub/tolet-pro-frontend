@@ -716,14 +716,9 @@ export default function BookingsTab(props) {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:h-[calc(100vh-140px)] overflow-visible lg:overflow-hidden">
 
               {/* ── LEFT RAIL — full Financial Overview ALWAYS visible (mobile + desktop) ── */}
-              <aside className="lg:col-span-4 w-full flex flex-col gap-3 lg:gap-5 lg:h-full lg:overflow-y-auto custom-scrollbar lg:pt-1 lg:pb-4 lg:pr-1">
-
-                {/* Financial Overview — always visible, but SLIM on mobile.
-                    The card used to run ~340px tall on a phone (big title, four
-                    stage tiles, generous padding) and pushed the actual lease
-                    list below the fold. On mobile it now reads as one compact
-                    block: revenue + deposits side by side, then a single inline
-                    row of counts. Desktop (xl) keeps the roomy hero treatment. */}
+              {!(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) && (
+                <aside className="lg:col-span-4 w-full flex flex-col gap-3 lg:gap-5 lg:h-full lg:overflow-y-auto custom-scrollbar lg:pt-1 lg:pb-4 lg:pr-1">
+                  {/* Financial Overview — always visible, but SLIM on mobile. */}
                 <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl lg:rounded-[2rem] p-3.5 lg:p-7 text-white shadow-[0_6px_20px_rgba(0,0,0,0.15)] lg:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-10 translate-x-10"></div>
                   <div className="flex items-center justify-between gap-2 mb-2.5 lg:mb-1 relative z-10">
@@ -836,9 +831,10 @@ export default function BookingsTab(props) {
                   <ArrowUpRight size={16} className="text-gray-400 dark:text-gray-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                 </button>
               </aside>
+              )}
 
               {/* ── RIGHT MAIN ── */}
-              <main className="lg:col-span-8 w-full lg:h-full lg:overflow-y-auto custom-scrollbar pb-24 lg:pb-4 lg:pr-3 min-w-0">
+              <main className={`${(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) ? 'lg:col-span-12' : 'lg:col-span-8'} w-full lg:h-full lg:overflow-y-auto custom-scrollbar pb-24 lg:pb-4 lg:pr-3 min-w-0`}>
                 {landlordProfile?.buildingMode === 'multi' && !currentBuildingId ? (
                   <div className="w-full">
                     {/* BUILDINGS OVERVIEW */}
@@ -891,6 +887,7 @@ export default function BookingsTab(props) {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {(landlordProfile.buildings || []).map(bldg => {
                          const bldgBookings = bookings.filter(b => b.property === bldg.name);
+                         const bldgSummary = getLeaseSummary(bldgBookings, todayDate);
                          const typeLabel = bldg.type === 'residential' ? (isBn ? 'Residential' : 'Residential') : bldg.type === 'commercial' ? (isBn ? 'Commercial' : 'Commercial') : (isBn ? 'Hostel' : 'Hostel');
                          const catLabel = bldg.category ? (bldg.category.charAt(0).toUpperCase() + bldg.category.slice(1)).replace('-', ' ') : '';
                          const typeColor = bldg.type === 'residential' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : bldg.type === 'commercial' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200';
@@ -908,6 +905,18 @@ export default function BookingsTab(props) {
                              </div>
                              <h4 className="text-sm font-black text-gray-900 group-hover:text-[#ba0036] transition-colors mb-1">{bldg.name}</h4>
                              <p className="text-[11px] font-bold text-gray-400 flex items-center gap-1 mb-3"><MapPin size={10}/> {bldg.location}</p>
+                             
+                             <div className="grid grid-cols-2 gap-2 mb-3">
+                               <div className="bg-gray-50 rounded-xl p-2.5 min-w-0">
+                                 <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-0.5">{isBn ? 'মাসিক আয়' : 'Monthly Rent'}</p>
+                                 <p className="text-xs font-black text-gray-900 tabular-nums leading-none truncate">{formatBDT(bldgSummary.totalMonthlyRevenue)}</p>
+                               </div>
+                               <div className="bg-gray-50 rounded-xl p-2.5 min-w-0">
+                                 <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-0.5">{isBn ? 'সিকিউরিটি' : 'Security'}</p>
+                                 <p className="text-xs font-black text-gray-900 tabular-nums leading-none truncate">{formatBDT(bldgSummary.totalSecurityDeposits)}</p>
+                               </div>
+                             </div>
+
                              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                                <div className="flex items-center gap-2">
                                  {catLabel && <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 text-[9px] font-black uppercase tracking-wider">{catLabel}</span>}
