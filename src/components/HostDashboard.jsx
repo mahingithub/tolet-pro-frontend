@@ -3057,10 +3057,12 @@ const HostDashboard = () => {
       businessName: '',
       licenseNumber: '',
       leaseTermMonths: prefillBuilding ? (prefillBuilding.type === 'commercial' ? '24' : '') : (properties[0]?.intent === 'commercial' ? '24' : ''),
-      category: prefillBuilding ? (prefillBuilding.type === 'hostel' ? 'hostel' : (prefillBuilding.type === 'commercial' ? '' : 'flat')) : (properties[0]?.intent === 'commercial' ? '' : propTypeToCategory(properties[0]?.type)),
+      category: prefillBuilding 
+        ? (prefillBuilding.category || (prefillBuilding.type === 'hostel' ? 'hostel' : (prefillBuilding.type === 'commercial' ? '' : 'flat'))) 
+        : (properties[0]?.intent === 'commercial' ? '' : propTypeToCategory(properties[0]?.type)),
       floorNumber: '',
       roomNumber: '',
-      manualProperty: false,
+      manualProperty: !!prefillBuilding,
       seats: [],
       serviceCharge: String(landlordProfile?.serviceCharge ?? authUser?.landlordProfile?.serviceCharge ?? ''),
       lateFeeAmount: '',
@@ -4753,6 +4755,7 @@ const HostDashboard = () => {
             landlordProfile={landlordProfile}
             setLandlordProfile={persistLandlordProfile}
             currentBuildingId={currentBuildingId}
+            setCurrentBuildingId={setCurrentBuildingId}
           />
         )}
         {/* 🔴 PROPERTIES GRID (Only for 'properties' tab) */}

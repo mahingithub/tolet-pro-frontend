@@ -35,9 +35,24 @@ export default function BookingsTab(props) {
 
           const isBn = language === 'বাংলা';
           const [showBuildingForm, setShowBuildingForm] = useState(false);
-          const [newBuilding, setNewBuilding] = useState({ name: '', location: '', type: 'residential' });
+          const [newBuilding, setNewBuilding] = useState({ name: '', location: '', type: 'residential', category: 'flat' });
           const todayDate = today;
-          const leaseSummary = getLeaseSummary(bookings, todayDate);
+          
+          let baseBookings = bookings;
+          if (landlordProfile?.buildingMode === 'multi') {
+            if (currentBuildingId) {
+              const bldg = landlordProfile.buildings?.find(b => b.id === currentBuildingId);
+              baseBookings = bldg ? bookings.filter(b => b.property === bldg.name) : [];
+            } else {
+              const bldgNames = (landlordProfile.buildings || []).map(b => b.name);
+              baseBookings = bookings.filter(b => bldgNames.includes(b.property));
+            }
+          } else if (landlordProfile?.buildingMode === 'single') {
+            const bldgName = landlordProfile.buildings?.[0]?.name;
+            baseBookings = bldgName ? bookings.filter(b => b.property === bldgName) : [];
+          }
+          
+          const leaseSummary = getLeaseSummary(baseBookings, todayDate);
           
           const getPrefillBuilding = () => {
             if (landlordProfile?.buildingMode === 'single' && landlordProfile.buildings?.length > 0) {
@@ -56,13 +71,7 @@ export default function BookingsTab(props) {
           // rather than silently rendering an empty list.
           const stageFilter = (leaseStageFilter === 'active' || leaseStageFilter === 'done') ? leaseStageFilter : 'all';
           
-          let searchMatched = bookings.filter(matchesSearch);
-          if (landlordProfile?.buildingMode === 'multi' && currentBuildingId) {
-            const bldg = landlordProfile.buildings?.find(b => b.id === currentBuildingId);
-            if (bldg) {
-              searchMatched = searchMatched.filter(b => b.property === bldg.name);
-            }
-          }
+          let searchMatched = baseBookings.filter(matchesSearch);
 
           const filtered = searchMatched.filter(b => {
             const stage = computeLeaseStage(b, todayDate);
@@ -668,12 +677,21 @@ export default function BookingsTab(props) {
                     </div>
                     <div>
                       <label className="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1.5">{isBn ? 'ধরন' : 'Type'}</label>
-                      <select value={newBuilding.type} onChange={(e) => setNewBuilding({...newBuilding, type: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#ba0036]/20 focus:border-[#ba0036]">
-                        <option value="residential">{isBn ? 'Residential (ফ্ল্যাট/বাসা)' : 'Residential'}</option>
-                        <option value="commercial">{isBn ? 'Commercial (অফিস/দোকান)' : 'Commercial'}</option>
-                        <option value="hostel">{isBn ? 'Hostel (হোস্টেল/মেস)' : 'Hostel'}</option>
-                      </select>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { value: 'residential', label: isBn ? 'Residential' : 'Residential', icon: <Home size={18}/>, sub: isBn ? 'ফ্ল্যাট/বাসা' : 'Flat/House' },
+                          { value: 'commercial', label: isBn ? 'Commercial' : 'Commercial', icon: <Building2 size={18}/>, sub: isBn ? 'অফিস/দোকান' : 'Office/Shop' },
+                          { value: 'hostel', label: isBn ? 'Hostel' : 'Hostel', icon: <Users size={18}/>, sub: isBn ? 'হোস্টেল/মেস' : 'Hostel/Mess' },
+                        ].map(opt => (
+                          <button key={opt.value} type="button" onClick={() => setNewBuilding({...newBuilding, type: opt.value, category: opt.value === 'residential' ? 'flat' : (opt.value === 'hostel' ? 'hostel' : '')})}
+                            className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-center transition-all ${newBuilding.type === opt.value ? 'border-[#ba0036] bg-red-50 text-[#ba0036]' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                            {opt.icon}
+                            <span className="text-[10px] font-black uppercase tracking-wider">{opt.label}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
+                    {/* Categories are handled via 'Add Tenant' format selection */}
                     <button 
                       onClick={() => {
                         if(!newBuilding.name || !newBuilding.location) return;
@@ -842,43 +860,62 @@ export default function BookingsTab(props) {
                     {showBuildingForm && (
                       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4 animate-in slide-in-from-top-2">
                         <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-3">{isBn ? 'নতুন বিল্ডিং যোগ করুন' : 'Add New Building'}</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <input type="text" value={newBuilding.name} onChange={(e) => setNewBuilding({...newBuilding, name: e.target.value})} placeholder={isBn ? 'বাসার নাম' : 'House Name'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold" />
-                          <input type="text" value={newBuilding.location} onChange={(e) => setNewBuilding({...newBuilding, location: e.target.value})} placeholder={isBn ? 'ঠিকানা' : 'Location'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold" />
-                          <select value={newBuilding.type} onChange={(e) => setNewBuilding({...newBuilding, type: e.target.value})} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold">
-                            <option value="residential">{isBn ? 'Residential (ফ্ল্যাট/বাসা)' : 'Residential'}</option>
-                            <option value="commercial">{isBn ? 'Commercial (অফিস/দোকান)' : 'Commercial'}</option>
-                            <option value="hostel">{isBn ? 'Hostel (হোস্টেল/মেস)' : 'Hostel'}</option>
-                          </select>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                          <input type="text" value={newBuilding.name} onChange={(e) => setNewBuilding({...newBuilding, name: e.target.value})} placeholder={isBn ? 'বাসার নাম' : 'House Name'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold" />
+                          <input type="text" value={newBuilding.location} onChange={(e) => setNewBuilding({...newBuilding, location: e.target.value})} placeholder={isBn ? 'ঠিকানা' : 'Location'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold" />
                         </div>
-                        <div className="flex justify-end gap-2 mt-3">
+                        <div className="grid grid-cols-3 gap-2 mb-3">
+                          {[
+                            { value: 'residential', label: 'Residential', icon: <Home size={14}/> },
+                            { value: 'commercial', label: 'Commercial', icon: <Building2 size={14}/> },
+                            { value: 'hostel', label: 'Hostel', icon: <Users size={14}/> },
+                          ].map(opt => (
+                            <button key={opt.value} type="button" onClick={() => setNewBuilding({...newBuilding, type: opt.value, category: opt.value === 'residential' ? 'flat' : (opt.value === 'hostel' ? 'hostel' : '')})}
+                              className={`flex items-center justify-center gap-1.5 py-2 rounded-xl border-2 text-[10px] font-black uppercase tracking-wider transition-all ${newBuilding.type === opt.value ? 'border-[#ba0036] bg-red-50 text-[#ba0036]' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                              {opt.icon} {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                        {/* Categories are handled via 'Add Tenant' format selection */}
+                        <div className="flex justify-end gap-2">
                           <button onClick={() => setShowBuildingForm(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100">{isBn ? 'বাতিল' : 'Cancel'}</button>
                           <button onClick={() => {
                             if(!newBuilding.name) return;
                             setLandlordProfile({ ...landlordProfile, buildings: [...(landlordProfile.buildings||[]), { ...newBuilding, id: 'bldg_' + Date.now(), createdAt: new Date().toISOString() }] });
                             setShowBuildingForm(false);
-                            setNewBuilding({ name: '', location: '', type: 'residential' });
+                            setNewBuilding({ name: '', location: '', type: 'residential', category: 'flat' });
                           }} className="px-4 py-2 rounded-xl text-xs font-black bg-[#ba0036] text-white hover:bg-[#a0002f]">{isBn ? 'যোগ করুন' : 'Save'}</button>
                         </div>
                       </div>
                     )}
-                    <div className="flex flex-col gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {(landlordProfile.buildings || []).map(bldg => {
                          const bldgBookings = bookings.filter(b => b.property === bldg.name);
+                         const typeLabel = bldg.type === 'residential' ? (isBn ? 'Residential' : 'Residential') : bldg.type === 'commercial' ? (isBn ? 'Commercial' : 'Commercial') : (isBn ? 'Hostel' : 'Hostel');
+                         const catLabel = bldg.category ? (bldg.category.charAt(0).toUpperCase() + bldg.category.slice(1)).replace('-', ' ') : '';
+                         const typeColor = bldg.type === 'residential' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : bldg.type === 'commercial' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200';
+                         const iconBg = bldg.type === 'residential' ? 'bg-emerald-100 text-emerald-600' : bldg.type === 'commercial' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600';
                          return (
-                           <div key={bldg.id} onClick={() => setCurrentBuildingId(bldg.id)} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-5 flex items-center justify-between cursor-pointer hover:shadow-md transition-all group">
-                             <div className="flex items-center gap-4">
-                               <div className="w-12 h-12 rounded-full bg-red-50 text-[#ba0036] flex items-center justify-center shrink-0">
-                                 {bldg.type === 'hostel' ? <Users size={20}/> : <Home size={20}/>}
+                           <div key={bldg.id} onClick={() => setCurrentBuildingId(bldg.id)} 
+                             className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 cursor-pointer hover:shadow-lg hover:border-gray-200 transition-all group relative overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+                             {/* Top accent line */}
+                             <div className={`absolute top-0 left-0 right-0 h-1 ${bldg.type === 'residential' ? 'bg-emerald-500' : bldg.type === 'commercial' ? 'bg-blue-500' : 'bg-purple-500'}`}/>
+                             <div className="flex items-start justify-between mb-3 pt-1">
+                               <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0`}>
+                                 {bldg.type === 'hostel' ? <Users size={18}/> : bldg.type === 'commercial' ? <Building2 size={18}/> : <Home size={18}/>}
                                </div>
-                               <div>
-                                 <h4 className="text-sm sm:text-base font-black text-gray-900 group-hover:text-[#ba0036] transition-colors">{bldg.name}</h4>
-                                 <p className="text-xs font-bold text-gray-500 mt-0.5 flex items-center gap-1"><MapPin size={10} className="text-gray-400"/> {bldg.location}</p>
-                               </div>
+                               <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border ${typeColor}`}>{typeLabel}</span>
                              </div>
-                             <div className="flex flex-col items-end">
-                               <span className="px-2 py-1 rounded-lg bg-green-50 text-green-700 text-[10px] font-black uppercase tracking-wider tabular-nums">{bldgBookings.length} {isBn ? 'ভাড়াটিয়া' : 'Tenants'}</span>
-                               <ArrowRight size={14} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-1 transition-all mt-2"/>
+                             <h4 className="text-sm font-black text-gray-900 group-hover:text-[#ba0036] transition-colors mb-1">{bldg.name}</h4>
+                             <p className="text-[11px] font-bold text-gray-400 flex items-center gap-1 mb-3"><MapPin size={10}/> {bldg.location}</p>
+                             <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                               <div className="flex items-center gap-2">
+                                 {catLabel && <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 text-[9px] font-black uppercase tracking-wider">{catLabel}</span>}
+                               </div>
+                               <div className="flex items-center gap-2">
+                                 <span className="text-[10px] font-black text-gray-500 tabular-nums">{bldgBookings.length} {isBn ? 'ভাড়াটিয়া' : 'Tenants'}</span>
+                                 <ArrowRight size={12} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-1 transition-all"/>
+                               </div>
                              </div>
                            </div>
                          );
