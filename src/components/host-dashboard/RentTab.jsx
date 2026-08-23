@@ -491,48 +491,84 @@ export default function RentTab(props) {
                     {monthFullLabel(sm.key, language)} · {language === 'বাংলা' ? 'এই মাসের আদায়' : "This Month's Collection"}
                   </p>
                   <div className="space-y-2.5 xl:space-y-6 relative z-10">
-                    {/* Expected — mobile puts the collection rate beside it so the
-                        two headline numbers occupy one row instead of three. */}
-                    <div className="flex items-end justify-between gap-3 xl:block">
-                      <div className="min-w-0">
-                        <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">
-                          <span className="xl:hidden">{monthFullLabel(sm.key, language)} · </span>{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}
-                        </p>
-                        <p className="text-2xl xl:text-4xl font-black text-white tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.expectedTotal)}</p>
+                    {(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) ? (
+                      <div className="space-y-3">
+                        {(landlordProfile.buildings || []).map(bldg => {
+                          const bldgBookings = bookings.filter(b => b.property === bldg.name);
+                          const bldgRentUnits = bldgBookings.flatMap(rentUnitsOf);
+                          const bldgSm = getMonthCollectionSummary(bldgRentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
+                          return (
+                            <div key={bldg.id} className="bg-white/5 rounded-xl p-3">
+                              <h4 className="text-xs font-black text-white mb-2 flex items-center justify-between">
+                                <span>{bldg.name}</span>
+                                {bldgSm.overdueCount > 0 && (
+                                  <span className="text-[8px] font-black bg-rose-500/20 text-rose-200 px-1.5 py-0.5 rounded uppercase tracking-wider">{bldgSm.overdueCount} {isBn ? 'বকেয়া' : 'Overdue'}</span>
+                                )}
+                              </h4>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <p className="text-white/50 text-[8px] font-black uppercase tracking-widest mb-0.5">{isBn ? 'প্রত্যাশিত' : 'Expected'}</p>
+                                  <p className="text-sm font-black text-white tabular-nums">{formatBDT(bldgSm.expectedTotal)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-white/50 text-[8px] font-black uppercase tracking-widest mb-0.5">{isBn ? 'আদায়' : 'Collected'}</p>
+                                  <p className="text-sm font-black text-emerald-400 tabular-nums">{formatBDT(bldgSm.collectedTotal)}</p>
+                                </div>
+                              </div>
+                              <div className="mt-2.5 flex items-center gap-3 border-t border-white/10 pt-2.5 text-[9px] font-black uppercase tracking-widest">
+                                <span className="text-emerald-400">{bldgSm.paidCount} {isBn ? 'ক্লিয়ার' : 'Cleared'}</span>
+                                <span className="text-orange-400">{bldgSm.totalDueCount - bldgSm.paidCount} {isBn ? 'বাকি' : 'Due'}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                      <div className="shrink-0 text-right xl:hidden">
-                        <p className="text-white/50 text-[8px] font-black uppercase tracking-widest leading-tight">{language === 'বাংলা' ? 'রেট' : 'Rate'}</p>
-                        <p className="text-lg font-black text-white tabular-nums leading-none">{collectedPct}%</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 xl:gap-4">
-                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2 xl:p-3 min-w-0">
-                        <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">{language === 'বাংলা' ? 'আদায় হয়েছে' : 'Collected'}</p>
-                        <p className="text-base xl:text-xl font-black text-green-400 tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.collectedTotal)}</p>
-                        <p className="text-[8px] xl:text-[9px] text-white/60 font-bold mt-1 leading-tight">{sm.paidCount}/{sm.totalDueCount} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}</p>
-                      </div>
-                      <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2 xl:p-3 min-w-0">
-                        <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">{language === 'বাংলা' ? 'বাকি' : 'Outstanding'}</p>
-                        <p className="text-base xl:text-xl font-black text-orange-400 tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.outstandingTotal)}</p>
-                        <p className="text-[8px] xl:text-[9px] text-white/60 font-bold mt-1 leading-tight">
-                          <span className={sm.overdueCount > 0 ? 'text-red-300' : 'text-white/60'}>
-                            {sm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'overdue'}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                    <div>
-                      {/* Rate label is desktop-only — mobile already shows the %
-                          next to Expected, so only the bar remains here. */}
-                      <div className="hidden xl:flex items-center justify-between mb-1.5">
-                        <span className="text-white/50 text-[9px] font-black uppercase tracking-widest">{language === 'বাংলা' ? 'কালেকশন রেট' : 'Collection Rate'}</span>
-                        <span className="text-xs font-black text-white tabular-nums">{collectedPct}%</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full bg-gradient-to-r from-green-400 to-emerald-300 transition-all duration-700"
-                             style={{ width: `${collectedPct}%` }} />
-                      </div>
-                    </div>
+                    ) : (
+                      <>
+                        {/* Expected — mobile puts the collection rate beside it so the
+                            two headline numbers occupy one row instead of three. */}
+                        <div className="flex items-end justify-between gap-3 xl:block">
+                          <div className="min-w-0">
+                            <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">
+                              <span className="xl:hidden">{monthFullLabel(sm.key, language)} · </span>{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}
+                            </p>
+                            <p className="text-2xl xl:text-4xl font-black text-white tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.expectedTotal)}</p>
+                          </div>
+                          <div className="shrink-0 text-right xl:hidden">
+                            <p className="text-white/50 text-[8px] font-black uppercase tracking-widest leading-tight">{language === 'বাংলা' ? 'রেট' : 'Rate'}</p>
+                            <p className="text-lg font-black text-white tabular-nums leading-none">{collectedPct}%</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 xl:gap-4">
+                          <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2 xl:p-3 min-w-0">
+                            <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">{language === 'বাংলা' ? 'আদায় হয়েছে' : 'Collected'}</p>
+                            <p className="text-base xl:text-xl font-black text-green-400 tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.collectedTotal)}</p>
+                            <p className="text-[8px] xl:text-[9px] text-white/60 font-bold mt-1 leading-tight">{sm.paidCount}/{sm.totalDueCount} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}</p>
+                          </div>
+                          <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2 xl:p-3 min-w-0">
+                            <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">{language === 'বাংলা' ? 'বাকি' : 'Outstanding'}</p>
+                            <p className="text-base xl:text-xl font-black text-orange-400 tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.outstandingTotal)}</p>
+                            <p className="text-[8px] xl:text-[9px] text-white/60 font-bold mt-1 leading-tight">
+                              <span className={sm.overdueCount > 0 ? 'text-red-300' : 'text-white/60'}>
+                                {sm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'overdue'}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                        <div>
+                          {/* Rate label is desktop-only — mobile already shows the %
+                              next to Expected, so only the bar remains here. */}
+                          <div className="hidden xl:flex items-center justify-between mb-1.5">
+                            <span className="text-white/50 text-[9px] font-black uppercase tracking-widest">{language === 'বাংলা' ? 'কালেকশন রেট' : 'Collection Rate'}</span>
+                            <span className="text-xs font-black text-white tabular-nums">{collectedPct}%</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full bg-gradient-to-r from-green-400 to-emerald-300 transition-all duration-700"
+                                 style={{ width: `${collectedPct}%` }} />
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -596,7 +632,7 @@ export default function RentTab(props) {
               )}
 
               {/* ── RIGHT MAIN ── */}
-              <main className={`${(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) ? 'xl:col-span-12' : 'xl:col-span-8'} w-full xl:h-full xl:overflow-y-auto custom-scrollbar pb-24 xl:pr-3 min-w-0`}>
+              <main className="xl:col-span-8 w-full xl:h-full xl:overflow-y-auto custom-scrollbar pb-24 xl:pr-3 min-w-0">
                 {landlordProfile?.buildingMode === 'multi' && !currentBuildingId ? (
                   <div className="w-full">
                     {/* BUILDINGS OVERVIEW */}
@@ -643,7 +679,9 @@ export default function RentTab(props) {
 
                              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                                <div className="flex items-center gap-2">
-                                 {bldgSm.overdueCount > 0 && <span className="px-2 py-0.5 rounded-md bg-red-50 text-red-600 text-[9px] font-black uppercase tracking-wider tabular-nums">{bldgSm.overdueCount} {isBn ? 'বকেয়া' : 'Overdue'}</span>}
+                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 tabular-nums">{bldgSm.paidCount} {isBn ? 'ক্লিয়ার' : 'Cleared'}</span>
+                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-orange-50 text-orange-600 tabular-nums">{bldgSm.totalDueCount - bldgSm.paidCount} {isBn ? 'বাকি' : 'Due'}</span>
+                                 {bldgSm.overdueCount > 0 && <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[9px] font-black uppercase tracking-widest tabular-nums ml-1">{bldgSm.overdueCount} {isBn ? 'বকেয়া' : 'Overdue'}</span>}
                                </div>
                                <div className="flex items-center gap-2">
                                  <span className="text-[10px] font-black text-gray-500 tabular-nums">{bldgBookings.length} {isBn ? 'ভাড়াটিয়া' : 'Tenants'}</span>
@@ -729,11 +767,8 @@ export default function RentTab(props) {
                       <FileSpreadsheet size={12}/> <span className="hidden sm:inline">{language === 'বাংলা' ? 'এক্সপোর্ট' : 'Export'}</span>
                     </button>
                   </div>
-                  {/* Row 2 — priority filter pills on their own row. They WRAP
-                      onto a second line on small screens so every filter
-                      (Overdue / Partial / Upcoming / Cleared) is visible without
-                      any sideways scrolling. */}
-                  <div className="flex items-center flex-wrap gap-1.5 mt-2">
+                  {/* Row 2 — priority filter pills on their own row. They scroll horizontally on small screens. */}
+                  <div className="flex items-center gap-1.5 mt-2 overflow-x-auto no-scrollbar pb-1">
                     {[
                       { k: 'all',      label: language === 'বাংলা' ? 'সকল' : 'All',        cls: 'bg-gray-900 text-white' },
                       { k: 'overdue',  label: language === 'বাংলা' ? 'বকেয়া' : 'Overdue',  cls: 'bg-rose-600 text-white' },

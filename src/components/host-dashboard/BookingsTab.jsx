@@ -716,9 +716,7 @@ export default function BookingsTab(props) {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:h-[calc(100vh-140px)] overflow-visible lg:overflow-hidden">
 
               {/* ── LEFT RAIL — full Financial Overview ALWAYS visible (mobile + desktop) ── */}
-              {!(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) && (
-                <aside className="lg:col-span-4 w-full flex flex-col gap-3 lg:gap-5 lg:h-full lg:overflow-y-auto custom-scrollbar lg:pt-1 lg:pb-4 lg:pr-1">
-                  {/* Financial Overview — always visible, but SLIM on mobile. */}
+              <aside className="lg:col-span-4 w-full flex flex-col gap-3 lg:gap-5 lg:h-full lg:overflow-y-auto custom-scrollbar lg:pt-1 lg:pb-4 lg:pr-1">
                 <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl lg:rounded-[2rem] p-3.5 lg:p-7 text-white shadow-[0_6px_20px_rgba(0,0,0,0.15)] lg:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-10 translate-x-10"></div>
                   <div className="flex items-center justify-between gap-2 mb-2.5 lg:mb-1 relative z-10">
@@ -733,108 +731,126 @@ export default function BookingsTab(props) {
                       </button>
                     )}
                   </div>
-                  {/* Subtitle is desktop-only — on a phone the card title plus
-                      the KPI labels already say what this is. */}
                   <p className="hidden lg:block text-white/50 text-[10px] font-bold uppercase tracking-widest mb-7 relative z-10">
                     {isBn ? 'লিজ পোর্টফোলিও সারাংশ' : 'Lease Portfolio Snapshot'}
                   </p>
+                  
                   <div className="space-y-2.5 lg:space-y-6 relative z-10">
-                    {/* Revenue + Security Deposits side by side at every width.
-                        min-w-0 + break-words keep the currency figures inside
-                        narrow phone columns. */}
-                    <div className="grid grid-cols-2 gap-2 lg:gap-3 items-stretch">
-                      <div className="min-w-0">
-                        <p className="text-white/50 text-[8px] lg:text-[9px] font-black uppercase tracking-widest mb-0.5 lg:mb-1 leading-tight">{isBn ? 'মাসিক আয়' : 'Monthly Revenue'}</p>
-                        <p className="text-xl sm:text-2xl lg:text-4xl font-black text-white tracking-tight tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalMonthlyRevenue)}</p>
-                        <p className="text-[8px] lg:text-[9px] font-bold text-white/50 mt-1 leading-tight">{isBn ? 'চলমান লিজ (ভাড়া + সার্ভিস)' : 'live leases (rent + service)'}</p>
+                    {(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) ? (
+                      <div className="space-y-3">
+                        {(landlordProfile.buildings || []).map(bldg => {
+                          const bldgBookings = bookings.filter(b => b.property === bldg.name);
+                          const bldgSummary = getLeaseSummary(bldgBookings, todayDate);
+                          return (
+                            <div key={bldg.id} className="bg-white/5 rounded-xl p-3">
+                              <h4 className="text-xs font-black text-white mb-2">{bldg.name} <span className="text-[9px] font-bold text-white/50 bg-white/10 px-1.5 py-0.5 rounded-md ml-1">{bldgBookings.length} {isBn ? 'ভাড়াটিয়া' : 'Tenants'}</span></h4>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <p className="text-white/50 text-[8px] font-black uppercase tracking-widest mb-0.5">{isBn ? 'মাসিক আয়' : 'Monthly Revenue'}</p>
+                                  <p className="text-sm font-black text-white tabular-nums">{formatBDT(bldgSummary.totalMonthlyRevenue)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-white/50 text-[8px] font-black uppercase tracking-widest mb-0.5">{isBn ? 'সিকিউরিটি' : 'Security'}</p>
+                                  <p className="text-sm font-black text-white tabular-nums">{formatBDT(bldgSummary.totalSecurityDeposits)}</p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                      <div className="bg-white/5 rounded-xl lg:rounded-2xl p-2 lg:p-3 min-w-0">
-                        <p className="text-white/50 text-[8px] lg:text-[9px] font-black uppercase tracking-widest mb-0.5 lg:mb-1 leading-tight">{isBn ? 'সিকিউরিটি ডিপোজিট' : 'Security Deposits'}</p>
-                        <p className="text-base sm:text-lg lg:text-2xl font-black text-white tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalSecurityDeposits)}</p>
-                        <p className="text-[8px] lg:text-[9px] font-bold text-white/50 mt-1 leading-tight">{isBn ? 'লিজ শেষে রিটার্নযোগ্য' : 'returnable at lease end'}</p>
-                      </div>
-                    </div>
-                    {/* Stage counts — Active / Done only (Draft + Notice are gone;
-                        a unit is either rented or it isn't). "Ending soon" rides
-                        along as an amber chip since it's a nudge, not a stage. */}
-                    <div className="grid grid-cols-2 gap-2 lg:gap-3">
-                      <div className="bg-white/5 rounded-xl lg:rounded-2xl px-2.5 py-2 lg:p-3 flex items-center justify-between gap-2 lg:flex-col lg:items-start">
-                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest lg:mb-1">{stageLabel('active', language)}</p>
-                        <p className="text-lg lg:text-2xl font-black text-green-400 tabular-nums leading-none">{leaseSummary.activeCount}</p>
-                      </div>
-                      <div className="bg-white/5 rounded-xl lg:rounded-2xl px-2.5 py-2 lg:p-3 flex items-center justify-between gap-2 lg:flex-col lg:items-start">
-                        <p className="text-white/50 text-[9px] font-black uppercase tracking-widest lg:mb-1">{stageLabel('done', language)}</p>
-                        <p className="text-lg lg:text-2xl font-black text-white/70 tabular-nums leading-none">{leaseSummary.doneCount}</p>
-                      </div>
-                    </div>
-                    {leaseSummary.endingSoonCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setLeaseStageFilter('active')}
-                        className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl bg-amber-400/15 border border-amber-300/25 text-left transition-colors hover:bg-amber-400/25"
-                      >
-                        <AlertCircle size={13} className="text-amber-300 shrink-0" />
-                        <span className="text-[10px] font-black text-amber-200 uppercase tracking-wider flex-1 truncate">
-                          {isBn ? '৩০ দিনে শেষ হচ্ছে' : 'Ending within 30 days'}
-                        </span>
-                        <span className="text-[11px] font-black text-amber-100 tabular-nums shrink-0">{leaseSummary.endingSoonCount}</span>
-                      </button>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-2 gap-2 lg:gap-3 items-stretch">
+                          <div className="min-w-0">
+                            <p className="text-white/50 text-[8px] lg:text-[9px] font-black uppercase tracking-widest mb-0.5 lg:mb-1 leading-tight">{isBn ? 'মাসিক আয়' : 'Monthly Revenue'}</p>
+                            <p className="text-xl sm:text-2xl lg:text-4xl font-black text-white tracking-tight tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalMonthlyRevenue)}</p>
+                            <p className="text-[8px] lg:text-[9px] font-bold text-white/50 mt-1 leading-tight">{isBn ? 'চলমান লিজ (ভাড়া + সার্ভিস)' : 'live leases (rent + service)'}</p>
+                          </div>
+                          <div className="bg-white/5 rounded-xl lg:rounded-2xl p-2 lg:p-3 min-w-0">
+                            <p className="text-white/50 text-[8px] lg:text-[9px] font-black uppercase tracking-widest mb-0.5 lg:mb-1 leading-tight">{isBn ? 'সিকিউরিটি ডিপোজিট' : 'Security Deposits'}</p>
+                            <p className="text-base sm:text-lg lg:text-2xl font-black text-white tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalSecurityDeposits)}</p>
+                            <p className="text-[8px] lg:text-[9px] font-bold text-white/50 mt-1 leading-tight">{isBn ? 'লিজ শেষে রিটার্নযোগ্য' : 'returnable at lease end'}</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 lg:gap-3">
+                          <div className="bg-white/5 rounded-xl lg:rounded-2xl px-2.5 py-2 lg:p-3 flex items-center justify-between gap-2 lg:flex-col lg:items-start">
+                            <p className="text-white/50 text-[9px] font-black uppercase tracking-widest lg:mb-1">{stageLabel('active', language)}</p>
+                            <p className="text-lg lg:text-2xl font-black text-green-400 tabular-nums leading-none">{leaseSummary.activeCount}</p>
+                          </div>
+                          <div className="bg-white/5 rounded-xl lg:rounded-2xl px-2.5 py-2 lg:p-3 flex items-center justify-between gap-2 lg:flex-col lg:items-start">
+                            <p className="text-white/50 text-[9px] font-black uppercase tracking-widest lg:mb-1">{stageLabel('done', language)}</p>
+                            <p className="text-lg lg:text-2xl font-black text-white/70 tabular-nums leading-none">{leaseSummary.doneCount}</p>
+                          </div>
+                        </div>
+                        {leaseSummary.endingSoonCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setLeaseStageFilter('active')}
+                            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl bg-amber-400/15 border border-amber-300/25 text-left transition-colors hover:bg-amber-400/25"
+                          >
+                            <AlertCircle size={13} className="text-amber-300 shrink-0" />
+                            <span className="text-[10px] font-black text-amber-200 uppercase tracking-wider flex-1 truncate">
+                              {isBn ? '৩০ দিনে শেষ হচ্ছে' : 'Ending within 30 days'}
+                            </span>
+                            <span className="text-[11px] font-black text-amber-100 tabular-nums shrink-0">{leaseSummary.endingSoonCount}</span>
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
 
-                {/* Lease status flow — desktop only. Hidden on mobile + tablet
-                    (iPad); the stacked rail would push the lease list too far
-                    down on those widths, and the same stage counts are already
-                    reachable via the toolbar filter pills. Shown from xl up. */}
-                <div className="hidden lg:block bg-white rounded-2xl lg:rounded-[2rem] p-4 lg:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none shrink-0">
-                  <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3 lg:mb-4 flex items-center gap-2">
-                    <Activity size={14} className="text-gray-400" />
-                    {language === 'বাংলা' ? 'লিজ স্ট্যাটাস ফ্লো' : 'Lease Status Flow'}
-                  </h4>
-                  <div className="space-y-2 lg:space-y-3">
-                    {[
-                      { stage: 'active', count: leaseSummary.activeCount, dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700', hint: isBn ? 'ভাড়াটিয়া আছেন' : 'unit is rented' },
-                      { stage: 'done',   count: leaseSummary.doneCount,   dot: 'bg-gray-400',  bg: 'bg-gray-100', text: 'text-gray-600',  hint: isBn ? 'শেষ · নতুন লিজ দেওয়া যাবে' : 'ended · ready to re-let' },
-                    ].map(row => (
-                      <button key={row.stage} onClick={() => setLeaseStageFilter(row.stage)} className="w-full flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-gray-50 transition-colors text-left">
-                        <span className={`w-2 h-2 rounded-full ${row.dot}`}></span>
-                        <span className="text-xs font-black text-gray-900 w-20 capitalize">{stageLabel(row.stage, language)}</span>
-                        <span className="text-[10px] font-bold text-gray-500 flex-1 truncate">{row.hint}</span>
-                        <span className={`${row.bg} ${row.text} px-2.5 py-1 rounded-lg text-xs font-black tabular-nums`}>{row.count}</span>
-                      </button>
-                    ))}
-                    {leaseSummary.endingSoonCount > 0 && (
-                      <div className="flex items-center gap-3 p-2 -mx-2 rounded-xl bg-amber-50/60">
-                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                        <span className="text-xs font-black text-gray-900 w-20">{isBn ? 'শেষ হচ্ছে' : 'Ending'}</span>
-                        <span className="text-[10px] font-bold text-gray-500 flex-1 truncate">{isBn ? 'রিনিউয়াল উইন্ডো · শেষ ৩০ দিন' : 'renewal window · last 30 days'}</span>
-                        <span className="bg-amber-100 text-amber-700 px-2.5 py-1 rounded-lg text-xs font-black tabular-nums">{leaseSummary.endingSoonCount}</span>
+                {!(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) && (
+                  <>
+                    <div className="hidden lg:block bg-white rounded-2xl lg:rounded-[2rem] p-4 lg:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none shrink-0">
+                      <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3 lg:mb-4 flex items-center gap-2">
+                        <Activity size={14} className="text-gray-400" />
+                        {language === 'বাংলা' ? 'লিজ স্ট্যাটাস ফ্লো' : 'Lease Status Flow'}
+                      </h4>
+                      <div className="space-y-2 lg:space-y-3">
+                        {[
+                          { stage: 'active', count: leaseSummary.activeCount, dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700', hint: isBn ? 'ভাড়াটিয়া আছেন' : 'unit is rented' },
+                          { stage: 'done',   count: leaseSummary.doneCount,   dot: 'bg-gray-400',  bg: 'bg-gray-100', text: 'text-gray-600',  hint: isBn ? 'শেষ · নতুন লিজ দেওয়া যাবে' : 'ended · ready to re-let' },
+                        ].map(row => (
+                          <button key={row.stage} onClick={() => setLeaseStageFilter(row.stage)} className="w-full flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-gray-50 transition-colors text-left">
+                            <span className={`w-2 h-2 rounded-full ${row.dot}`}></span>
+                            <span className="text-xs font-black text-gray-900 w-20 capitalize">{stageLabel(row.stage, language)}</span>
+                            <span className="text-[10px] font-bold text-gray-500 flex-1 truncate">{row.hint}</span>
+                            <span className={`${row.bg} ${row.text} px-2.5 py-1 rounded-lg text-xs font-black tabular-nums`}>{row.count}</span>
+                          </button>
+                        ))}
+                        {leaseSummary.endingSoonCount > 0 && (
+                          <div className="flex items-center gap-3 p-2 -mx-2 rounded-xl bg-amber-50/60">
+                            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                            <span className="text-xs font-black text-gray-900 w-20">{isBn ? 'শেষ হচ্ছে' : 'Ending'}</span>
+                            <span className="text-[10px] font-bold text-gray-500 flex-1 truncate">{isBn ? 'রিনিউয়াল উইন্ডো · শেষ ৩০ দিন' : 'renewal window · last 30 days'}</span>
+                            <span className="bg-amber-100 text-amber-700 px-2.5 py-1 rounded-lg text-xs font-black tabular-nums">{leaseSummary.endingSoonCount}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
 
-                <button
-                  onClick={() => setActiveTab('rent')}
-                  className="bg-white dark:bg-gray-900/50 hover:bg-gray-50 dark:hover:bg-gray-800 border border-gray-100 dark:border-gray-800/60 rounded-2xl lg:rounded-[2rem] p-4 lg:p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center justify-between gap-3 transition-colors shrink-0 group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-400 shrink-0">
-                      <Wallet size={16} />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-xs font-black text-gray-900 dark:text-white">{language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent Collection'}</p>
-                      <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 leading-tight">{language === 'বাংলা' ? '১২ মাসের লেজার, পেমেন্ট আপডেট' : '12-month ledger, mark paid, reminders'}</p>
-                    </div>
-                  </div>
-                  <ArrowUpRight size={16} className="text-gray-400 dark:text-gray-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                </button>
+                    <button
+                      onClick={() => setActiveTab('rent')}
+                      className="bg-white dark:bg-gray-900/50 hover:bg-gray-50 dark:hover:bg-gray-800 border border-gray-100 dark:border-gray-800/60 rounded-2xl lg:rounded-[2rem] p-4 lg:p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center justify-between gap-3 transition-colors shrink-0 group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-400 shrink-0">
+                          <Wallet size={16} />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-xs font-black text-gray-900 dark:text-white">{language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent Collection'}</p>
+                          <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 leading-tight">{language === 'বাংলা' ? '১২ মাসের লেজার, পেমেন্ট আপডেট' : '12-month ledger, mark paid, reminders'}</p>
+                        </div>
+                      </div>
+                      <ArrowUpRight size={16} className="text-gray-400 dark:text-gray-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                    </button>
+                  </>
+                )}
               </aside>
-              )}
 
               {/* ── RIGHT MAIN ── */}
-              <main className={`${(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) ? 'lg:col-span-12' : 'lg:col-span-8'} w-full lg:h-full lg:overflow-y-auto custom-scrollbar pb-24 lg:pb-4 lg:pr-3 min-w-0`}>
+              <main className="lg:col-span-8 w-full lg:h-full lg:overflow-y-auto custom-scrollbar pb-24 lg:pb-4 lg:pr-3 min-w-0">
                 {landlordProfile?.buildingMode === 'multi' && !currentBuildingId ? (
                   <div className="w-full">
                     {/* BUILDINGS OVERVIEW */}
