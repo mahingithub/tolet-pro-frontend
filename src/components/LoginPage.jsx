@@ -562,9 +562,7 @@ const LoginPage = () => {
             {/* Brand header */}
             <div className="relative bg-gradient-to-br from-[#BA0036] to-[#7A0024] px-6 pt-7 pb-7 text-white text-center overflow-hidden">
               <div className="absolute -top-8 -right-8 w-28 h-28 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-              <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center mx-auto mb-3 ring-1 ring-white/25">
-                <Home size={26} strokeWidth={2.5} className="text-white" />
-              </div>
+              <img src="/icons/logo.svg" alt="To-Let Pro" className="w-14 h-14 mx-auto mb-3 shadow-lg rounded-2xl" />
               <h3 className="text-xl font-black tracking-tight">
                 {mode === MODES.SIGNUP
                   ? L('Are you a tenant or a landlord?', 'আপনি ভাড়াটিয়া, না বাড়িওয়ালা?')
@@ -625,9 +623,7 @@ const LoginPage = () => {
         <div className="relative z-10 flex flex-col justify-between w-full p-10 xl:p-14 text-white">
           {/* Wordmark */}
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/25">
-              <Home size={20} strokeWidth={2.5} className="text-white" />
-            </div>
+            <img src="/icons/logo.svg" alt="To-Let Pro" className="w-10 h-10 shadow-sm rounded-xl" />
             <span className="text-lg font-black tracking-tight">
               TO-LET <span className="text-white/70">PRO</span>
             </span>
@@ -685,9 +681,7 @@ const LoginPage = () => {
           <div className="w-full max-w-sm animate-[floatIn_0.5s_ease-out]">
             {/* Mobile-only brand block (desktop shows the left panel instead) */}
             <div className="lg:hidden flex flex-col items-center text-center mb-7">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#BA0036] to-[#7A0024] flex items-center justify-center shadow-[0_8px_22px_rgba(186,0,54,0.32)] mb-3">
-                <Home size={26} strokeWidth={2.5} className="text-white" />
-              </div>
+              <img src="/icons/logo.svg" alt="To-Let Pro" className="w-16 h-16 mb-3 shadow-lg rounded-2xl" />
               <h1 className="text-lg font-black tracking-tight text-gray-900">
                 TO-LET <span className="text-brandRed">PRO</span>
               </h1>
@@ -808,7 +802,7 @@ const LoginPage = () => {
                         autoComplete="tel-national"
                         aria-invalid={phoneError ? 'true' : 'false'}
                         aria-describedby="auth-phone-help"
-                        className="w-full bg-transparent py-3 pl-2 pr-4 text-sm font-bold text-gray-900 outline-none tracking-wide"
+                        className="flex-1 min-w-0 bg-transparent py-3 pl-2 pr-4 text-sm font-bold text-gray-900 outline-none tracking-wide"
                         required
                       />
                     </div>
@@ -944,7 +938,7 @@ const LoginPage = () => {
                 </p>
 
                 <form noValidate onSubmit={mode === MODES.FORGOT ? submitReset : submitSignupOtp} className="flex flex-col items-center">
-                  <div className="flex justify-center gap-3 sm:gap-4 mb-4" onPaste={handleOtpPaste}>
+                  <div className="flex justify-center gap-2 sm:gap-4 mb-4" onPaste={handleOtpPaste}>
                     {otp.map((digit, index) => (
                       <input
                         key={index}
@@ -956,7 +950,7 @@ const LoginPage = () => {
                         value={digit}
                         onChange={(e) => handleOtpChange(index, e.target.value)}
                         onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                        className="w-12 h-12 sm:w-14 sm:h-14 text-center text-xl font-black text-brandRed bg-gray-50 border-2 border-gray-200 rounded-xl outline-none focus:border-brandRed focus:bg-white transition-all shadow-sm"
+                        className="w-10 h-12 sm:w-14 sm:h-14 text-center text-lg sm:text-xl font-black text-brandRed bg-gray-50 border-2 border-gray-200 rounded-xl outline-none focus:border-brandRed focus:bg-white transition-all shadow-sm"
                       />
                     ))}
                   </div>
