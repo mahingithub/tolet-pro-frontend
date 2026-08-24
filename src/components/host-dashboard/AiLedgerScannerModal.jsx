@@ -403,7 +403,7 @@ export default function AiLedgerScannerModal({
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="bg-white/95 rounded-2xl px-5 py-4 shadow-xl flex flex-col items-center gap-2">
                       <Loader2 size={28} className="text-[#ba0036] animate-spin" />
-                      <p className="text-xs font-black text-gray-900">{isBn ? 'Gemini AI বিশ্লেষণ করছে...' : 'Gemini AI analysing...'}</p>
+                      <p className="text-xs font-black text-gray-900">{isBn ? 'To-Let Pro AI বিশ্লেষণ করছে...' : 'To-Let Pro AI analysing...'}</p>
                       <p className="text-[10px] font-bold text-gray-500">{isBn ? 'এটি ৫–১০ সেকেন্ড নিতে পারে' : 'This may take 5–10 seconds'}</p>
                     </div>
                   </div>
