@@ -2488,8 +2488,15 @@ const HostDashboard = () => {
   // move out) returns the updated booking from the server, so the Bookings and
   // Rent tabs (same `bookings` state) both reflect it immediately.
   const handleBookingUpdated = (updated) => {
-    if (!updated || !updated.id) return;
-    setBookings(prev => prev.map(b => (b.id === updated.id ? updated : b)));
+    if (!updated || (!updated.id && !updated._id)) return;
+    setBookings(prev => {
+      const checkId = updated.id || updated._id;
+      const exists = prev.some(b => b.id === checkId || b._id === checkId);
+      if (exists) return prev.map(b => ((b.id === checkId || b._id === checkId) ? { ...updated, id: checkId } : b));
+      // Map _id to id for consistency
+      const newBooking = { ...updated, id: checkId };
+      return [newBooking, ...prev];
+    });
   };
 
   // Toggle auto-reminder on/off for a booking. The server cron reads this flag,
