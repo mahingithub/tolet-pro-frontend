@@ -221,7 +221,7 @@ export default function AiLedgerScannerModal({
       setTenants(data.tenants || []);
       setStage('review');
     } catch (err) {
-      showToast(isBn ? `স্ক্যান ব্যর্থ: ${err.message}` : `Scan failed: ${err.message}`, 'error');
+      showToast(isBn ? `স্ক্যান ব্যর্থ: ${err.message}` : `Scan failed: ${err.message}`, { type: 'error' });
       setStage('upload');
     }
   }, [imageBase64, mimeType, defaultSettings, isBn, showToast]);
@@ -250,7 +250,7 @@ export default function AiLedgerScannerModal({
   const handleSaveAll = useCallback(async () => {
     const valid = tenants.filter(t => t.name?.trim() && Number(t.monthlyRent) > 0);
     if (valid.length === 0) {
-      showToast(isBn ? 'কমপক্ষে একটি ভাড়াটিয়ার নাম ও ভাড়া দিন।' : 'At least one tenant with name & rent is required.', 'error');
+      showToast(isBn ? 'কমপক্ষে একটি ভাড়াটিয়ার নাম ও ভাড়া দিন।' : 'At least one tenant with name & rent is required.', { type: 'error' });
       return;
     }
     setStage('saving');
@@ -275,7 +275,7 @@ export default function AiLedgerScannerModal({
           : `✅ ${data.created} tenant(s) saved${data.errors > 0 ? `, ${data.errors} failed` : ''}!`,
       );
     } catch (err) {
-      showToast(isBn ? `সেভ ব্যর্থ: ${err.message}` : `Save failed: ${err.message}`, 'error');
+      showToast(isBn ? `সেভ ব্যর্থ: ${err.message}` : `Save failed: ${err.message}`, { type: 'error' });
       setStage('review');
     }
   }, [tenants, isBn, showToast, onBookingsCreated]);
