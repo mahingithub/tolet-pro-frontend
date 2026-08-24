@@ -12,10 +12,12 @@ import {
   Activity, TrendingUp, Crown, Lock, Sparkles, DollarSign, Wallet,
   XCircle, AlertCircle, RefreshCw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, MinusCircle,
   Banknote, ArrowRight, ArrowUpRight, Clock, Smartphone,
-  BellOff, CalendarRange, BarChart3,
+  BellOff, CalendarRange, BarChart3, ScanLine,
   Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Map, Leaf
 } from 'lucide-react';
 import MembersManager from "../MembersManager.jsx";
+import AiLedgerScannerModal from "./AiLedgerScannerModal.jsx";
+
 
 
 export default function BookingsTab(props) {
@@ -41,6 +43,8 @@ export default function BookingsTab(props) {
           const [deleteBuildingId, setDeleteBuildingId] = useState(null);
           const [activeBldgDropdown, setActiveBldgDropdown] = useState(null);
           const [showAllBuildings, setShowAllBuildings] = useState(false);
+          // AI Ledger Scanner modal toggle
+          const [showAiScanner, setShowAiScanner] = useState(false);
           const todayDate = today;
           
           let baseBookings = bookings;
@@ -595,24 +599,44 @@ export default function BookingsTab(props) {
           // Fills the remaining width on a phone, content-width from tablet up,
           // pinned to the right edge on desktop.
           const addTenantButton = (
-            <button
-              type="button"
-              onClick={() => isPremium ? openBlankLease(getPrefillBuilding()) : setActiveModal('premium_gate')}
-              aria-label={isBn ? 'নতুন ভাড়াটিয়া যোগ করুন' : 'Add a new tenant'}
-              className="group relative overflow-hidden flex-1 sm:flex-none sm:shrink-0 min-w-0 px-3 sm:px-3.5 py-2.5 rounded-xl bg-gradient-to-br from-[#ba0036] via-[#d1003d] to-[#ff004c] text-white shadow-[0_5px_16px_rgba(186,0,54,0.32)] hover:shadow-[0_9px_24px_rgba(186,0,54,0.42)] active:scale-[0.97] transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ba0036]/40 focus-visible:ring-offset-2 lg:ml-auto"
-            >
-              {/* Soft top-light sheen on hover — depth without a colour change. */}
-              <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <span className="relative flex items-center justify-center gap-1.5">
-                <span className="w-5 h-5 rounded-lg bg-white/20 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110">
-                  {isPremium ? <Plus size={13} strokeWidth={3.5} /> : <Crown size={12} strokeWidth={3} />}
+            <div className="flex items-center gap-1.5 lg:ml-auto">
+              {/* ── AI Scan: photo of khata → auto-fill all tenants at once ── */}
+              <button
+                type="button"
+                onClick={() => isPremium ? setShowAiScanner(true) : setActiveModal('premium_gate')}
+                aria-label={isBn ? 'খাতা স্ক্যান করে ভাড়াটিয়া যোগ' : 'Scan rent ledger with AI'}
+                title={isBn ? 'খাতার ছবি তুলে সব ভাড়াটিয়া একবারে যোগ করুন' : 'Photo your rent book — AI fills all tenants at once'}
+                className="group relative overflow-hidden shrink-0 px-2.5 sm:px-3 py-2.5 rounded-xl bg-white border border-[#ba0036]/20 text-[#ba0036] hover:bg-[#ba0036]/5 shadow-[0_2px_8px_rgba(186,0,54,0.1)] hover:shadow-[0_4px_14px_rgba(186,0,54,0.2)] active:scale-[0.97] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ba0036]/40"
+              >
+                <span className="relative flex items-center justify-center gap-1.5">
+                  <ScanLine size={13} strokeWidth={2.5} className="shrink-0" />
+                  <span className="text-[11px] font-black uppercase tracking-wider hidden sm:inline">
+                    {isBn ? 'খাতা স্ক্যান' : 'AI Scan'}
+                  </span>
                 </span>
-                <span className="text-[11px] font-black uppercase tracking-wider truncate">
-                  {isBn ? 'ভাড়াটিয়া যোগ' : 'Add Tenant'}
+              </button>
+
+              {/* ── Manual add: blank lease form ── */}
+              <button
+                type="button"
+                onClick={() => isPremium ? openBlankLease(getPrefillBuilding()) : setActiveModal('premium_gate')}
+                aria-label={isBn ? 'নতুন ভাড়াটিয়া যোগ করুন' : 'Add a new tenant'}
+                className="group relative overflow-hidden flex-1 sm:flex-none sm:shrink-0 min-w-0 px-3 sm:px-3.5 py-2.5 rounded-xl bg-gradient-to-br from-[#ba0036] via-[#d1003d] to-[#ff004c] text-white shadow-[0_5px_16px_rgba(186,0,54,0.32)] hover:shadow-[0_9px_24px_rgba(186,0,54,0.42)] active:scale-[0.97] transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ba0036]/40 focus-visible:ring-offset-2"
+              >
+                {/* Soft top-light sheen on hover — depth without a colour change. */}
+                <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <span className="relative flex items-center justify-center gap-1.5">
+                  <span className="w-5 h-5 rounded-lg bg-white/20 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110">
+                    {isPremium ? <Plus size={13} strokeWidth={3.5} /> : <Crown size={12} strokeWidth={3} />}
+                  </span>
+                  <span className="text-[11px] font-black uppercase tracking-wider truncate">
+                    {isBn ? 'ভাড়াটিয়া যোগ' : 'Add Tenant'}
+                  </span>
                 </span>
-              </span>
-            </button>
+              </button>
+            </div>
           );
+
 
           const countChip = (
             <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
@@ -715,6 +739,7 @@ export default function BookingsTab(props) {
           }
 
           return (
+          <>
           <div className="w-full animate-in fade-in zoom-in-95 duration-500">
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:h-[calc(100vh-140px)] overflow-visible lg:overflow-hidden">
@@ -1241,5 +1266,23 @@ export default function BookingsTab(props) {
 
             </div>
           </div>
+
+          {/* ── AI Ledger Scanner modal ─────────────────────────────────────────
+              Renders on top of everything when the host taps "AI Scan". Closed
+              by the modal itself via onClose; new bookings are surfaced through
+              handleBookingUpdated so the list refreshes without a full reload. */}
+          <AiLedgerScannerModal
+            isOpen={showAiScanner}
+            onClose={() => setShowAiScanner(false)}
+            language={language}
+            landlordProfile={landlordProfile}
+            currentBuildingId={currentBuildingId}
+            showToast={showToast}
+            onBookingsCreated={(newBookings) => {
+              newBookings.forEach(b => handleBookingUpdated(b));
+              setShowAiScanner(false);
+            }}
+          />
+          </>
           );
 }
