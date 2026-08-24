@@ -127,7 +127,7 @@ export default function RentTab(props) {
           const bucketTheme = {
             cleared:  { cls: 'bg-emerald-50 text-emerald-700 border-emerald-100', label: language === 'বাংলা' ? 'ক্লিয়ার্ড' : 'CLEARED', icon: <CheckCircle2 size={10} strokeWidth={3}/>, bar: 'bg-emerald-500', avatar: 'bg-gradient-to-br from-emerald-500 to-green-600' },
             partial:  { cls: 'bg-amber-50 text-amber-700 border-amber-100',       label: language === 'বাংলা' ? 'আংশিক' : 'PARTIAL',     icon: <Hourglass size={10} strokeWidth={3}/>,    bar: 'bg-amber-500',   avatar: 'bg-gradient-to-br from-amber-500 to-orange-500' },
-            overdue:  { cls: 'bg-rose-50 text-rose-700 border-rose-100',          label: language === 'বাংলা' ? 'বকেয়া' : 'OVERDUE',     icon: <AlertCircle size={10} strokeWidth={3}/>,  bar: 'bg-rose-500',    avatar: 'bg-gradient-to-br from-rose-500 to-red-600' },
+            overdue:  { cls: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100',          label: language === 'বাংলা' ? 'বকেয়া' : 'OVERDUE',     icon: <AlertCircle size={10} strokeWidth={3}/>,  bar: 'bg-fuchsia-500',    avatar: 'bg-gradient-to-br from-fuchsia-500 to-pink-600' },
             upcoming: { cls: 'bg-orange-50 text-orange-700 border-orange-100',    label: language === 'বাংলা' ? 'আসন্ন' : 'UPCOMING',    icon: <Clock size={10} strokeWidth={3}/>,        bar: 'bg-orange-400',  avatar: 'bg-gradient-to-br from-indigo-500 to-purple-600' },
             none:     { cls: 'bg-gray-100 text-gray-600 border-gray-200',         label: language === 'বাংলা' ? 'লিজের বাইরে' : 'OUTSIDE', icon: <MinusCircle size={10} strokeWidth={3}/>, bar: 'bg-gray-300',    avatar: 'bg-gradient-to-br from-gray-400 to-gray-500' },
           };
@@ -226,12 +226,12 @@ export default function RentTab(props) {
                             : bucket === 'partial'
                               ? <span className="text-amber-600 tabular-nums">{formatBDT(balanceThisMonth)} {language === 'বাংলা' ? 'বাকি' : 'due'}</span>
                               : bucket === 'overdue'
-                                ? <span className="text-rose-600 tabular-nums">{formatBDT(expectedThisMonth)} {language === 'বাংলা' ? 'বকেয়া' : 'overdue'}</span>
+                                ? <span className="text-fuchsia-600 tabular-nums">{formatBDT(expectedThisMonth)} {language === 'বাংলা' ? 'বকেয়া' : 'overdue'}</span>
                                 : <span className="text-gray-600 tabular-nums">{formatBDT(expectedThisMonth)} {language === 'বাংলা' ? 'আসন্ন' : 'upcoming'}</span>}
                           {nextDue && (
                             <>
                               <span className="mx-1 text-gray-300">·</span>
-                              <span className={`${nextDue.daysFromNow < 0 ? 'text-rose-600' : nextDue.daysFromNow <= 3 ? 'text-amber-600' : 'text-gray-500'}`}>
+                              <span className={`${nextDue.daysFromNow < 0 ? 'text-fuchsia-600' : nextDue.daysFromNow <= 3 ? 'text-amber-600' : 'text-gray-500'}`}>
                                 {nextDue.daysFromNow < 0 ? `${Math.abs(nextDue.daysFromNow)}d late` : nextDue.daysFromNow === 0 ? 'today' : `${nextDue.daysFromNow}d`}
                               </span>
                             </>
@@ -287,7 +287,7 @@ export default function RentTab(props) {
                         </div>
                         <div>
                           <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বাকি' : 'Balance'}</p>
-                          <p className={`text-xs sm:text-sm font-black tabular-nums mt-0.5 ${balanceThisMonth > 0 ? 'text-rose-600' : 'text-gray-400'}`}>{formatBDT(balanceThisMonth)}</p>
+                          <p className={`text-xs sm:text-sm font-black tabular-nums mt-0.5 ${balanceThisMonth > 0 ? 'text-fuchsia-600' : 'text-gray-400'}`}>{formatBDT(balanceThisMonth)}</p>
                         </div>
                       </div>
                       <div className="mt-2.5 h-1 w-full bg-gray-100 rounded-full overflow-hidden">
@@ -502,7 +502,7 @@ export default function RentTab(props) {
                               <h4 className="text-xs font-black text-white mb-2 flex items-center justify-between">
                                 <span>{bldg.name}</span>
                                 {bldgSm.overdueCount > 0 && (
-                                  <span className="text-[8px] font-black bg-rose-500/20 text-rose-200 px-1.5 py-0.5 rounded uppercase tracking-wider">{bldgSm.overdueCount} {isBn ? 'বকেয়া' : 'Overdue'}</span>
+                                  <span className="text-[8px] font-black bg-fuchsia-500/20 text-fuchsia-200 px-1.5 py-0.5 rounded uppercase tracking-wider">{bldgSm.overdueCount} {isBn ? 'বকেয়া' : 'Overdue'}</span>
                                 )}
                               </h4>
                               <div className="grid grid-cols-2 gap-2">
@@ -791,7 +791,7 @@ export default function RentTab(props) {
                   <div className="flex items-center gap-1.5 mt-2 overflow-x-auto no-scrollbar pb-1">
                     {[
                       { k: 'all',      label: language === 'বাংলা' ? 'সকল' : 'All',        cls: 'bg-gray-900 text-white' },
-                      { k: 'overdue',  label: language === 'বাংলা' ? 'বকেয়া' : 'Overdue',  cls: 'bg-rose-600 text-white' },
+                      { k: 'overdue',  label: language === 'বাংলা' ? 'বকেয়া' : 'Overdue',  cls: 'bg-fuchsia-600 text-white' },
                       { k: 'partial',  label: language === 'বাংলা' ? 'আংশিক' : 'Partial',  cls: 'bg-amber-500 text-white' },
                       { k: 'upcoming', label: language === 'বাংলা' ? 'আসন্ন' : 'Upcoming', cls: 'bg-orange-500 text-white' },
                       { k: 'cleared',  label: language === 'বাংলা' ? 'ক্লিয়ার্ড' : 'Cleared', cls: 'bg-emerald-600 text-white' },
@@ -860,11 +860,11 @@ export default function RentTab(props) {
                       {rentPriorityFilter === 'all' && attentionRent.length > 0 ? (
                         <>
                           <div className="flex items-center gap-2 mt-1 px-1 pt-1">
-                            <AlertCircle size={12} className="text-rose-600 shrink-0"/>
-                            <span className="text-[10px] font-black text-rose-700 uppercase tracking-widest">
+                            <AlertCircle size={12} className="text-fuchsia-600 shrink-0"/>
+                            <span className="text-[10px] font-black text-fuchsia-700 uppercase tracking-widest">
                               {language === 'বাংলা' ? 'এখনই দরকার' : 'Needs Attention'} · {attentionRent.length}
                             </span>
-                            <div className="flex-1 h-px bg-rose-200/60"/>
+                            <div className="flex-1 h-px bg-fuchsia-200/60"/>
                           </div>
                           {attentionRent.map(b => renderRentRow(b, forceOpen))}
                           {otherRent.length > 0 && (
