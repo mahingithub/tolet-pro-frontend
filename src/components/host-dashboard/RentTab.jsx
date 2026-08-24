@@ -128,7 +128,7 @@ export default function RentTab(props) {
             cleared:  { cls: 'bg-emerald-50 text-emerald-700 border-emerald-100', label: language === 'বাংলা' ? 'ক্লিয়ার্ড' : 'CLEARED', icon: <CheckCircle2 size={10} strokeWidth={3}/>, bar: 'bg-emerald-500', avatar: 'bg-gradient-to-br from-emerald-500 to-green-600' },
             partial:  { cls: 'bg-amber-50 text-amber-700 border-amber-100',       label: language === 'বাংলা' ? 'আংশিক' : 'PARTIAL',     icon: <Hourglass size={10} strokeWidth={3}/>,    bar: 'bg-amber-500',   avatar: 'bg-gradient-to-br from-amber-500 to-orange-500' },
             overdue:  { cls: 'bg-rose-50 text-rose-700 border-rose-100',          label: language === 'বাংলা' ? 'বকেয়া' : 'OVERDUE',     icon: <AlertCircle size={10} strokeWidth={3}/>,  bar: 'bg-rose-500',    avatar: 'bg-gradient-to-br from-rose-500 to-red-600' },
-            upcoming: { cls: 'bg-orange-50 text-orange-700 border-orange-100',    label: language === 'বাংলা' ? 'আসন্ন' : 'UPCOMING',    icon: <Clock size={10} strokeWidth={3}/>,        bar: 'bg-orange-400',  avatar: 'bg-gradient-to-br from-[#ba0036] to-[#ff004c]' },
+            upcoming: { cls: 'bg-orange-50 text-orange-700 border-orange-100',    label: language === 'বাংলা' ? 'আসন্ন' : 'UPCOMING',    icon: <Clock size={10} strokeWidth={3}/>,        bar: 'bg-orange-400',  avatar: 'bg-gradient-to-br from-indigo-500 to-purple-600' },
             none:     { cls: 'bg-gray-100 text-gray-600 border-gray-200',         label: language === 'বাংলা' ? 'লিজের বাইরে' : 'OUTSIDE', icon: <MinusCircle size={10} strokeWidth={3}/>, bar: 'bg-gray-300',    avatar: 'bg-gradient-to-br from-gray-400 to-gray-500' },
           };
 
@@ -199,7 +199,7 @@ export default function RentTab(props) {
                         </span>
                       )}
                       {/* Residential / Commercial / Hostel property badge */}
-                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 inline-flex items-center gap-0.5 ${booking.dealType === 'commercial' ? 'bg-violet-50 text-violet-700 border-violet-200' : booking.propertyType === 'hostel' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 inline-flex items-center gap-0.5 ${booking.dealType === 'commercial' ? 'bg-violet-50 text-violet-700 border-violet-200' : booking.propertyType === 'hostel' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-indigo-50 text-indigo-700 border-blue-200'}`}>
                         {booking.dealType === 'commercial'
                           ? (<>🏢<span> {language === 'বাংলা' ? 'কমার্শিয়াল' : 'Commercial'}</span></>)
                           : booking.propertyType === 'hostel'
@@ -330,7 +330,7 @@ export default function RentTab(props) {
                             : `${monthFullLabel(k, language)} · ${language === 'বাংলা' ? 'লিজের বাইরে' : 'outside lease'}`;
                           // Colour vocabulary — matches the legend + tenant receipts.
                           const colorClass =
-                            cellStatus === 'paid' ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-[0_2px_8px_rgba(59,130,246,0.35)]' :
+                            cellStatus === 'paid' ? 'bg-indigo-500 text-white hover:bg-blue-600 shadow-[0_2px_8px_rgba(59,130,246,0.35)]' :
                             cellStatus === 'partial' ? 'bg-amber-400 text-white hover:bg-amber-500' :
                             cellStatus === 'due-marked' ? 'bg-red-500 text-white hover:bg-red-600' :
                             cellStatus === 'overdue' ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse' :
@@ -390,7 +390,7 @@ export default function RentTab(props) {
                         {/* Profile — opens the tenant's trust card (/tenant/:id). */}
                         <button
                           onClick={() => openTenantProfile(resolveTenantUserId(booking), { name: booking.tenant, avatar: booking.tenantAvatar })}
-                          className="px-2 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all rounded-lg text-[9px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1 shrink-0"
+                          className="px-2 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all rounded-lg text-[9px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1 shrink-0"
                           title={language === 'বাংলা' ? 'টেন্যান্ট প্রোফাইল' : 'Tenant profile'}
                         >
                           <UserCircle size={10} className="shrink-0"/> {language === 'বাংলা' ? 'প্রোফাইল' : 'Profile'}
@@ -418,7 +418,7 @@ export default function RentTab(props) {
                           const entry = booking.ledger?.[k];
                           const due = getDueDate(k, booking.rentDueDay);
                           const dotClass =
-                            cellStatus === 'paid' ? 'bg-blue-500' :
+                            cellStatus === 'paid' ? 'bg-indigo-500' :
                             cellStatus === 'partial' ? 'bg-amber-400' :
                             cellStatus === 'due-marked' ? 'bg-red-500' :
                             cellStatus === 'overdue' ? 'bg-red-500' :
@@ -430,7 +430,7 @@ export default function RentTab(props) {
                               <span className="text-[9px] font-bold text-gray-500 hidden sm:inline w-20 shrink-0 truncate">{formatDate(due?.toISOString(), language)}</span>
                               <span className="text-[10px] font-bold flex-1 truncate">
                                 {cellStatus === 'paid' && (
-                                  <span className="text-blue-700 inline-flex items-center gap-1"><CheckCheck size={10} strokeWidth={3}/> {formatBDT(entry.amount || booking.monthlyRent)}{entry.method ? ` · ${entry.method}` : ''}</span>
+                                  <span className="text-indigo-700 inline-flex items-center gap-1"><CheckCheck size={10} strokeWidth={3}/> {formatBDT(entry.amount || booking.monthlyRent)}{entry.method ? ` · ${entry.method}` : ''}</span>
                                 )}
                                 {cellStatus === 'partial' && (
                                   <span className="text-amber-700 inline-flex items-center gap-1"><Hourglass size={10} strokeWidth={3}/> {language === 'বাংলা' ? 'বাকি' : 'Bal'} {formatBDT(entry.balance)}</span>
@@ -623,7 +623,7 @@ export default function RentTab(props) {
                   <div className="hidden lg:block bg-white rounded-2xl lg:rounded-[2rem] p-4 lg:p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none shrink-0">
                   <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">{language === 'বাংলা' ? 'লেজেন্ড' : 'Legend'}</h4>
                   <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-[10px] font-bold text-gray-600">
-                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-blue-500 inline-block"></span>{language === 'বাংলা' ? 'পেইড' : 'Paid'}</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-indigo-500 inline-block"></span>{language === 'বাংলা' ? 'পেইড' : 'Paid'}</span>
                     <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-amber-400 inline-block"></span>{language === 'বাংলা' ? 'আংশিক' : 'Partial'}</span>
                     <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-red-500 inline-block"></span>{language === 'বাংলা' ? 'বকেয়া' : 'Overdue'}</span>
                     <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-orange-400 inline-block"></span>{language === 'বাংলা' ? 'শীঘ্রই' : 'Due soon'}</span>
@@ -654,12 +654,12 @@ export default function RentTab(props) {
                          const bldgRentUnits = bldgBookings.flatMap(rentUnitsOf);
                          const bldgSm = getMonthCollectionSummary(bldgRentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
                          const typeLabel = bldg.type === 'residential' ? (isBn ? 'Residential' : 'Residential') : bldg.type === 'commercial' ? (isBn ? 'Commercial' : 'Commercial') : (isBn ? 'Hostel' : 'Hostel');
-                         const typeColor = bldg.type === 'residential' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : bldg.type === 'commercial' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200';
+                         const typeColor = bldg.type === 'residential' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : bldg.type === 'commercial' ? 'bg-indigo-50 text-indigo-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200';
                          const iconBg = bldg.type === 'residential' ? 'bg-emerald-100 text-emerald-600' : bldg.type === 'commercial' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600';
                          return (
                            <div key={bldg.id} onClick={() => setCurrentBuildingId(bldg.id)} 
                              className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 cursor-pointer hover:shadow-lg hover:border-gray-200 transition-all group relative overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                             <div className={`absolute top-0 left-0 right-0 h-1 ${bldg.type === 'residential' ? 'bg-emerald-500' : bldg.type === 'commercial' ? 'bg-blue-500' : 'bg-purple-500'}`}/>
+                             <div className={`absolute top-0 left-0 right-0 h-1 ${bldg.type === 'residential' ? 'bg-emerald-500' : bldg.type === 'commercial' ? 'bg-indigo-500' : 'bg-purple-500'}`}/>
                              <div className="flex items-start justify-between mb-3 pt-1">
                                <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0`}>
                                  {bldg.type === 'hostel' ? <Users size={18}/> : bldg.type === 'commercial' ? <Building2 size={18}/> : <Home size={18}/>}

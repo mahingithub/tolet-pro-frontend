@@ -177,7 +177,7 @@ export default function BookingsTab(props) {
                           {language === 'বাংলা' ? 'ফ্লোর' : 'Floor'} {booking.floorNumber}
                         </span>
                       )}
-                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 inline-flex items-center gap-0.5 ${booking.dealType === 'commercial' ? 'bg-violet-50 text-violet-700 border-violet-200' : hostelBooking ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 inline-flex items-center gap-0.5 ${booking.dealType === 'commercial' ? 'bg-violet-50 text-violet-700 border-violet-200' : hostelBooking ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
                         {booking.dealType === 'commercial'
                           ? (<>🏢<span> {language === 'বাংলা' ? 'কমার্শিয়াল' : 'Commercial'}</span></>)
                           : hostelBooking
@@ -252,7 +252,7 @@ export default function BookingsTab(props) {
                               this unit to the next one. Carries the whole unit
                               over; the host only edits name + phone. */}
                           <button onClick={() => openTenantChangeLease(booking)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-700 transition-colors text-left"><RefreshCw size={14}/> {isBn ? 'নতুন ভাড়াটিয়া · নতুন লিজ' : 'New Tenant · New Lease'}</button>
-                          <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
+                          <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-indigo-50 text-xs font-bold text-gray-700 hover:text-indigo-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
                           <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
                           <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
                           <div className="h-px w-full bg-gray-100 my-1"></div>
@@ -498,7 +498,7 @@ export default function BookingsTab(props) {
                     <div className="mt-3 flex flex-nowrap items-center justify-between gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar pb-1 -mb-1">
                       <button
                         onClick={() => toggleAutoReminder(booking.id)}
-                        className={`shrink-0 px-1.5 sm:px-2.5 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest transition-all flex items-center gap-1 ${booking.autoReminder ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+                        className={`shrink-0 px-1.5 sm:px-2.5 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest transition-all flex items-center gap-1 ${booking.autoReminder ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
                         title={booking.autoReminder ? `Auto-remind ${booking.reminderLeadDays}d before due` : 'Auto-reminder off'}
                       >
                         {booking.autoReminder ? <BellRing size={12}/> : <BellOff size={12}/>}
@@ -509,7 +509,7 @@ export default function BookingsTab(props) {
                         {/* Profile — opens the tenant's trust card (/tenant/:id). */}
                         <button
                           onClick={() => openTenantProfile(resolveTenantUserId(booking), { name: booking.tenant, avatar: booking.tenantAvatar })}
-                          className="shrink-0 px-1.5 sm:px-2.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest active:scale-95 flex items-center gap-1"
+                          className="shrink-0 px-1.5 sm:px-2.5 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest active:scale-95 flex items-center gap-1"
                           title={language === 'বাংলা' ? 'টেন্যান্ট প্রোফাইল' : 'Tenant profile'}
                         >
                           <UserCircle size={12} className="shrink-0"/> {language === 'বাংলা' ? 'প্রোফাইল' : 'Profile'}
@@ -672,13 +672,13 @@ export default function BookingsTab(props) {
                         // If they switch to multi and have a single building already, we keep it. Otherwise they just go to multi dashboard.
                         setLandlordProfile({...landlordProfile, buildingMode: 'multi'})
                       }}
-                      className="w-full flex items-center gap-4 p-5 rounded-2xl border-2 border-gray-100 hover:border-blue-600 hover:bg-blue-50 text-left group transition-all"
+                      className="w-full flex items-center gap-4 p-5 rounded-2xl border-2 border-gray-100 hover:border-indigo-600 hover:bg-indigo-50 text-left group transition-all"
                     >
-                      <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                      <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                         <Building2 size={24} />
                       </div>
                       <div>
-                        <h3 className="text-lg font-black text-gray-900 group-hover:text-blue-600 transition-colors">{isBn ? 'একাধিক বাসা' : 'Multiple houses'}</h3>
+                        <h3 className="text-lg font-black text-gray-900 group-hover:text-indigo-600 transition-colors">{isBn ? 'একাধিক বাসা' : 'Multiple houses'}</h3>
                         <p className="text-xs font-bold text-gray-500">{isBn ? 'একাধিক বিল্ডিং ম্যানেজ করছি' : 'I am managing multiple buildings'}</p>
                       </div>
                     </button>
@@ -979,14 +979,14 @@ export default function BookingsTab(props) {
                          const bldgSummary = getLeaseSummary(bldgBookings, todayDate);
                          const typeLabel = bldg.type === 'residential' ? (isBn ? 'Residential' : 'Residential') : bldg.type === 'commercial' ? (isBn ? 'Commercial' : 'Commercial') : (isBn ? 'Hostel' : 'Hostel');
                          const catLabel = bldg.category ? (bldg.category.charAt(0).toUpperCase() + bldg.category.slice(1)).replace('-', ' ') : '';
-                         const typeColor = bldg.type === 'residential' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : bldg.type === 'commercial' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200';
-                         const iconBg = bldg.type === 'residential' ? 'bg-emerald-100 text-emerald-600' : bldg.type === 'commercial' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600';
+                         const typeColor = bldg.type === 'residential' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : bldg.type === 'commercial' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-purple-50 text-purple-700 border-purple-200';
+                         const iconBg = bldg.type === 'residential' ? 'bg-emerald-100 text-emerald-600' : bldg.type === 'commercial' ? 'bg-indigo-100 text-indigo-600' : 'bg-purple-100 text-purple-600';
                          
                          return (
                            <div key={bldg.id} onClick={() => setCurrentBuildingId(bldg.id)} 
                              className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 cursor-pointer hover:shadow-lg hover:border-gray-200 transition-all group relative overflow-visible shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
                              {/* Top accent line */}
-                             <div className={`absolute top-0 left-0 right-0 h-1 ${bldg.type === 'residential' ? 'bg-emerald-500' : bldg.type === 'commercial' ? 'bg-blue-500' : 'bg-purple-500'}`}/>
+                             <div className={`absolute top-0 left-0 right-0 h-1 ${bldg.type === 'residential' ? 'bg-emerald-500' : bldg.type === 'commercial' ? 'bg-indigo-500' : 'bg-purple-500'}`}/>
                              <div className="flex items-start justify-between mb-3 pt-1">
                                <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0`}>
                                  {bldg.type === 'hostel' ? <Users size={18}/> : bldg.type === 'commercial' ? <Building2 size={18}/> : <Home size={18}/>}
