@@ -40,6 +40,7 @@ export default function BookingsTab(props) {
           const [editBuildingData, setEditBuildingData] = useState({ name: '', location: '', type: 'residential' });
           const [deleteBuildingId, setDeleteBuildingId] = useState(null);
           const [activeBldgDropdown, setActiveBldgDropdown] = useState(null);
+          const [showAllBuildings, setShowAllBuildings] = useState(false);
           const todayDate = today;
           
           let baseBookings = bookings;
@@ -739,13 +740,13 @@ export default function BookingsTab(props) {
                   </p>
                   
                   <div className="space-y-2.5 lg:space-y-6 relative z-10">
-                    {(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) ? (
-                      <div className="space-y-3">
-                        {(landlordProfile.buildings || []).map(bldg => {
+                    {(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) && (
+                      <div className="hidden md:block space-y-3">
+                        {(landlordProfile.buildings || []).map((bldg, idx) => {
                           const bldgBookings = bookings.filter(b => b.property === bldg.name);
                           const bldgSummary = getLeaseSummary(bldgBookings, todayDate);
                           return (
-                            <div key={bldg.id} className="bg-white/5 rounded-xl p-3">
+                            <div key={bldg.id} className={`bg-white/5 rounded-xl p-3 ${!showAllBuildings && idx >= 5 ? 'hidden' : ''}`}>
                               <h4 className="text-xs font-black text-white mb-2">{bldg.name} <span className="text-[9px] font-bold text-white/50 bg-white/10 px-1.5 py-0.5 rounded-md ml-1">{bldgBookings.length} {isBn ? 'ভাড়াটিয়া' : 'Tenants'}</span></h4>
                               <div className="grid grid-cols-2 gap-2">
                                 <div>
@@ -760,46 +761,54 @@ export default function BookingsTab(props) {
                             </div>
                           );
                         })}
-                      </div>
-                    ) : (
-                      <>
-                        <div className="grid grid-cols-2 gap-2 lg:gap-3 items-stretch">
-                          <div className="min-w-0">
-                            <p className="text-white/50 text-[8px] lg:text-[9px] font-black uppercase tracking-widest mb-0.5 lg:mb-1 leading-tight">{isBn ? 'মাসিক আয়' : 'Monthly Revenue'}</p>
-                            <p className="text-xl sm:text-2xl lg:text-4xl font-black text-white tracking-tight tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalMonthlyRevenue)}</p>
-                            <p className="text-[8px] lg:text-[9px] font-bold text-white/50 mt-1 leading-tight">{isBn ? 'চলমান লিজ (ভাড়া + সার্ভিস)' : 'live leases (rent + service)'}</p>
-                          </div>
-                          <div className="bg-white/5 rounded-xl lg:rounded-2xl p-2 lg:p-3 min-w-0">
-                            <p className="text-white/50 text-[8px] lg:text-[9px] font-black uppercase tracking-widest mb-0.5 lg:mb-1 leading-tight">{isBn ? 'সিকিউরিটি ডিপোজিট' : 'Security Deposits'}</p>
-                            <p className="text-base sm:text-lg lg:text-2xl font-black text-white tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalSecurityDeposits)}</p>
-                            <p className="text-[8px] lg:text-[9px] font-bold text-white/50 mt-1 leading-tight">{isBn ? 'লিজ শেষে রিটার্নযোগ্য' : 'returnable at lease end'}</p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 lg:gap-3">
-                          <div className="bg-white/5 rounded-xl lg:rounded-2xl px-2.5 py-2 lg:p-3 flex items-center justify-between gap-2 lg:flex-col lg:items-start">
-                            <p className="text-white/50 text-[9px] font-black uppercase tracking-widest lg:mb-1">{stageLabel('active', language)}</p>
-                            <p className="text-lg lg:text-2xl font-black text-green-400 tabular-nums leading-none">{leaseSummary.activeCount}</p>
-                          </div>
-                          <div className="bg-white/5 rounded-xl lg:rounded-2xl px-2.5 py-2 lg:p-3 flex items-center justify-between gap-2 lg:flex-col lg:items-start">
-                            <p className="text-white/50 text-[9px] font-black uppercase tracking-widest lg:mb-1">{stageLabel('done', language)}</p>
-                            <p className="text-lg lg:text-2xl font-black text-white/70 tabular-nums leading-none">{leaseSummary.doneCount}</p>
-                          </div>
-                        </div>
-                        {leaseSummary.endingSoonCount > 0 && (
+                        {(landlordProfile.buildings || []).length > 5 && (
                           <button
-                            type="button"
-                            onClick={() => setLeaseStageFilter('active')}
-                            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl bg-amber-400/15 border border-amber-300/25 text-left transition-colors hover:bg-amber-400/25"
+                            onClick={() => setShowAllBuildings(!showAllBuildings)}
+                            className="w-full py-2 text-[10px] font-black uppercase tracking-widest text-white/70 hover:text-white bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
                           >
-                            <AlertCircle size={13} className="text-amber-300 shrink-0" />
-                            <span className="text-[10px] font-black text-amber-200 uppercase tracking-wider flex-1 truncate">
-                              {isBn ? '৩০ দিনে শেষ হচ্ছে' : 'Ending within 30 days'}
-                            </span>
-                            <span className="text-[11px] font-black text-amber-100 tabular-nums shrink-0">{leaseSummary.endingSoonCount}</span>
+                            {showAllBuildings ? (isBn ? 'কম দেখুন' : 'See Less') : (isBn ? 'সি মোর' : 'See More')}
                           </button>
                         )}
-                      </>
+                      </div>
                     )}
+                    
+                    <div className={(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) ? "block md:hidden" : "block"}>
+                      <div className="grid grid-cols-2 gap-2 lg:gap-3 items-stretch">
+                        <div className="min-w-0">
+                          <p className="text-white/50 text-[8px] lg:text-[9px] font-black uppercase tracking-widest mb-0.5 lg:mb-1 leading-tight">{isBn ? 'মাসিক আয়' : 'Monthly Revenue'}</p>
+                          <p className="text-xl sm:text-2xl lg:text-4xl font-black text-white tracking-tight tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalMonthlyRevenue)}</p>
+                          <p className="text-[8px] lg:text-[9px] font-bold text-white/50 mt-1 leading-tight">{isBn ? 'চলমান লিজ (ভাড়া + সার্ভিস)' : 'live leases (rent + service)'}</p>
+                        </div>
+                        <div className="bg-white/5 rounded-xl lg:rounded-2xl p-2 lg:p-3 min-w-0">
+                          <p className="text-white/50 text-[8px] lg:text-[9px] font-black uppercase tracking-widest mb-0.5 lg:mb-1 leading-tight">{isBn ? 'সিকিউরিটি ডিপোজিট' : 'Security Deposits'}</p>
+                          <p className="text-base sm:text-lg lg:text-2xl font-black text-white tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalSecurityDeposits)}</p>
+                          <p className="text-[8px] lg:text-[9px] font-bold text-white/50 mt-1 leading-tight">{isBn ? 'লিজ শেষে রিটার্নযোগ্য' : 'returnable at lease end'}</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 lg:gap-3 mt-2 lg:mt-3">
+                        <div className="bg-white/5 rounded-xl lg:rounded-2xl px-2.5 py-2 lg:p-3 flex items-center justify-between gap-2 lg:flex-col lg:items-start">
+                          <p className="text-white/50 text-[9px] font-black uppercase tracking-widest lg:mb-1">{stageLabel('active', language)}</p>
+                          <p className="text-lg lg:text-2xl font-black text-green-400 tabular-nums leading-none">{leaseSummary.activeCount}</p>
+                        </div>
+                        <div className="bg-white/5 rounded-xl lg:rounded-2xl px-2.5 py-2 lg:p-3 flex items-center justify-between gap-2 lg:flex-col lg:items-start">
+                          <p className="text-white/50 text-[9px] font-black uppercase tracking-widest lg:mb-1">{stageLabel('done', language)}</p>
+                          <p className="text-lg lg:text-2xl font-black text-white/70 tabular-nums leading-none">{leaseSummary.doneCount}</p>
+                        </div>
+                      </div>
+                      {leaseSummary.endingSoonCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setLeaseStageFilter('active')}
+                          className="w-full flex items-center gap-2 px-2.5 py-2 mt-2 lg:mt-3 rounded-xl bg-amber-400/15 border border-amber-300/25 text-left transition-colors hover:bg-amber-400/25"
+                        >
+                          <AlertCircle size={13} className="text-amber-300 shrink-0" />
+                          <span className="text-[10px] font-black text-amber-200 uppercase tracking-wider flex-1 truncate">
+                            {isBn ? '৩০ দিনে শেষ হচ্ছে' : 'Ending within 30 days'}
+                          </span>
+                          <span className="text-[11px] font-black text-amber-100 tabular-nums shrink-0">{leaseSummary.endingSoonCount}</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 

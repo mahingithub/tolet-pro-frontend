@@ -36,6 +36,7 @@ export default function RentTab(props) {
   } = props;
 
   const [showAllOverdue, setShowAllOverdue] = useState(false);
+  const [showAllBuildings, setShowAllBuildings] = useState(false);
 
           const todayDate = today;
           const isBn = language === 'বাংলা';
@@ -490,14 +491,14 @@ export default function RentTab(props) {
                     {monthFullLabel(sm.key, language)} · {language === 'বাংলা' ? 'এই মাসের আদায়' : "This Month's Collection"}
                   </p>
                   <div className="space-y-2.5 xl:space-y-6 relative z-10">
-                    {(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) ? (
-                      <div className="space-y-3">
-                        {(landlordProfile.buildings || []).map(bldg => {
+                    {(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) && (
+                      <div className="hidden md:block space-y-3 mb-4">
+                        {(landlordProfile.buildings || []).map((bldg, idx) => {
                           const bldgBookings = bookings.filter(b => b.property === bldg.name);
                           const bldgRentUnits = bldgBookings.flatMap(rentUnitsOf);
                           const bldgSm = getMonthCollectionSummary(bldgRentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
                           return (
-                            <div key={bldg.id} className="bg-white/5 rounded-xl p-3">
+                            <div key={bldg.id} className={`bg-white/5 rounded-xl p-3 ${!showAllBuildings && idx >= 5 ? 'hidden' : ''}`}>
                               <h4 className="text-xs font-black text-white mb-2 flex items-center justify-between">
                                 <span>{bldg.name}</span>
                                 {bldgSm.overdueCount > 0 && (
@@ -521,53 +522,57 @@ export default function RentTab(props) {
                             </div>
                           );
                         })}
+                        {(landlordProfile.buildings || []).length > 5 && (
+                          <button
+                            onClick={() => setShowAllBuildings(!showAllBuildings)}
+                            className="w-full py-2 text-[10px] font-black uppercase tracking-widest text-white/70 hover:text-white bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+                          >
+                            {showAllBuildings ? (isBn ? 'কম দেখুন' : 'See Less') : (isBn ? 'সি মোর' : 'See More')}
+                          </button>
+                        )}
                       </div>
-                    ) : (
-                      <>
-                        {/* Expected — mobile puts the collection rate beside it so the
-                            two headline numbers occupy one row instead of three. */}
-                        <div className="flex items-end justify-between gap-3 xl:block">
-                          <div className="min-w-0">
-                            <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">
-                              <span className="xl:hidden">{monthFullLabel(sm.key, language)} · </span>{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}
-                            </p>
-                            <p className="text-2xl xl:text-4xl font-black text-white tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.expectedTotal)}</p>
-                          </div>
-                          <div className="shrink-0 text-right xl:hidden">
-                            <p className="text-white/50 text-[8px] font-black uppercase tracking-widest leading-tight">{language === 'বাংলা' ? 'রেট' : 'Rate'}</p>
-                            <p className="text-lg font-black text-white tabular-nums leading-none">{collectedPct}%</p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 xl:gap-4">
-                          <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2 xl:p-3 min-w-0">
-                            <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">{language === 'বাংলা' ? 'আদায় হয়েছে' : 'Collected'}</p>
-                            <p className="text-base xl:text-xl font-black text-green-400 tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.collectedTotal)}</p>
-                            <p className="text-[8px] xl:text-[9px] text-white/60 font-bold mt-1 leading-tight">{sm.paidCount}/{sm.totalDueCount} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}</p>
-                          </div>
-                          <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2 xl:p-3 min-w-0">
-                            <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">{language === 'বাংলা' ? 'বাকি' : 'Outstanding'}</p>
-                            <p className="text-base xl:text-xl font-black text-orange-400 tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.outstandingTotal)}</p>
-                            <p className="text-[8px] xl:text-[9px] text-white/60 font-bold mt-1 leading-tight">
-                              <span className={sm.overdueCount > 0 ? 'text-red-300' : 'text-white/60'}>
-                                {sm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'overdue'}
-                              </span>
-                            </p>
-                          </div>
-                        </div>
-                        <div>
-                          {/* Rate label is desktop-only — mobile already shows the %
-                              next to Expected, so only the bar remains here. */}
-                          <div className="hidden xl:flex items-center justify-between mb-1.5">
-                            <span className="text-white/50 text-[9px] font-black uppercase tracking-widest">{language === 'বাংলা' ? 'কালেকশন রেট' : 'Collection Rate'}</span>
-                            <span className="text-xs font-black text-white tabular-nums">{collectedPct}%</span>
-                          </div>
-                          <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full bg-gradient-to-r from-green-400 to-emerald-300 transition-all duration-700"
-                                 style={{ width: `${collectedPct}%` }} />
-                          </div>
-                        </div>
-                      </>
                     )}
+                    
+                    <div className={(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) ? "block md:hidden" : "block"}>
+                      <div className="flex items-end justify-between gap-3 xl:block">
+                        <div className="min-w-0">
+                          <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">
+                            <span className="xl:hidden">{monthFullLabel(sm.key, language)} · </span>{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}
+                          </p>
+                          <p className="text-2xl xl:text-4xl font-black text-white tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.expectedTotal)}</p>
+                        </div>
+                        <div className="shrink-0 text-right xl:hidden">
+                          <p className="text-white/50 text-[8px] font-black uppercase tracking-widest leading-tight">{language === 'বাংলা' ? 'রেট' : 'Rate'}</p>
+                          <p className="text-lg font-black text-white tabular-nums leading-none">{collectedPct}%</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 xl:gap-4 mt-2 xl:mt-4">
+                        <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2 xl:p-3 min-w-0">
+                          <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">{language === 'বাংলা' ? 'আদায় হয়েছে' : 'Collected'}</p>
+                          <p className="text-base xl:text-xl font-black text-green-400 tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.collectedTotal)}</p>
+                          <p className="text-[8px] xl:text-[9px] text-white/60 font-bold mt-1 leading-tight">{sm.paidCount}/{sm.totalDueCount} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}</p>
+                        </div>
+                        <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2 xl:p-3 min-w-0">
+                          <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">{language === 'বাংলা' ? 'বাকি' : 'Outstanding'}</p>
+                          <p className="text-base xl:text-xl font-black text-orange-400 tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.outstandingTotal)}</p>
+                          <p className="text-[8px] xl:text-[9px] text-white/60 font-bold mt-1 leading-tight">
+                            <span className={sm.overdueCount > 0 ? 'text-red-300' : 'text-white/60'}>
+                              {sm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'overdue'}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-2 xl:mt-4">
+                        <div className="hidden xl:flex items-center justify-between mb-1.5">
+                          <span className="text-white/50 text-[9px] font-black uppercase tracking-widest">{language === 'বাংলা' ? 'কালেকশন রেট' : 'Collection Rate'}</span>
+                          <span className="text-xs font-black text-white tabular-nums">{collectedPct}%</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full bg-gradient-to-r from-green-400 to-emerald-300 transition-all duration-700"
+                               style={{ width: `${collectedPct}%` }} />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
