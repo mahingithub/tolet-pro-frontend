@@ -610,7 +610,7 @@ export default function BookingsTab(props) {
               >
                 <span className="relative flex items-center justify-center gap-1.5">
                   <ScanLine size={13} strokeWidth={2.5} className="shrink-0" />
-                  <span className="text-[11px] font-black uppercase tracking-wider hidden sm:inline">
+                  <span className="text-[11px] font-black uppercase tracking-wider">
                     {isBn ? 'খাতা স্ক্যান' : 'AI Scan'}
                   </span>
                 </span>
@@ -630,7 +630,11 @@ export default function BookingsTab(props) {
                     {isPremium ? <Plus size={13} strokeWidth={3.5} /> : <Crown size={12} strokeWidth={3} />}
                   </span>
                   <span className="text-[11px] font-black uppercase tracking-wider truncate">
-                    {isBn ? 'ভাড়াটিয়া যোগ' : 'Add Tenant'}
+                    {isBn ? (
+                      <><span className="sm:hidden">ম্যানুয়াল</span><span className="hidden sm:inline">ভাড়াটিয়া যোগ</span></>
+                    ) : (
+                      <><span className="sm:hidden">Manual</span><span className="hidden sm:inline">Add Tenant</span></>
+                    )}
                   </span>
                 </span>
               </button>
