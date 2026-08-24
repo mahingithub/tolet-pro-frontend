@@ -144,9 +144,9 @@ export default function BookingsTab(props) {
             const hostelBooking = isHostelBooking(booking);
             const cardTitle = hostelBooking ? booking.property : booking.tenant;
             const cardAvatarText = hostelBooking ? ((booking.property || 'H').trim()[0] || 'H').toUpperCase() : booking.tenantInit;
-            const stageAvatar = stage !== 'active' ? 'bg-gradient-to-br from-gray-400 to-gray-500'
-                              : endingSoon ? 'bg-gradient-to-br from-amber-500 to-orange-500'
-                              : 'bg-gradient-to-br from-green-500 to-emerald-600';
+            const stageAvatar = stage !== 'active' ? 'bg-gradient-to-br from-indigo-500 to-purple-600'
+                              : endingSoon ? 'bg-gradient-to-br from-indigo-500 to-purple-600'
+                              : 'bg-gradient-to-br from-indigo-500 to-purple-600';
 
             return (
               <div id={`booking-${booking.id}`} key={booking.id} className={`bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
