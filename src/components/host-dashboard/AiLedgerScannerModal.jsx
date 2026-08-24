@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function getToken() {
@@ -200,7 +200,7 @@ export default function AiLedgerScannerModal({
     if (!imageBase64) return;
     setStage('scanning');
     try {
-      const resp = await fetch(`${API_BASE}/api/ai/scan-ledger`, {
+      const resp = await fetch(`${API_BASE}/ai/scan-ledger`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -254,7 +254,7 @@ export default function AiLedgerScannerModal({
     }
     setStage('saving');
     try {
-      const resp = await fetch(`${API_BASE}/api/bookings/batch`, {
+      const resp = await fetch(`${API_BASE}/bookings/batch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
