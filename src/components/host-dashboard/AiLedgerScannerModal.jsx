@@ -269,11 +269,16 @@ export default function AiLedgerScannerModal({
       setSaveResult({ created: data.created, errors: data.errors });
       setStage('done');
       if (data.bookings?.length) onBookingsCreated?.(data.bookings);
-      showToast(
-        isBn
-          ? `✅ ${data.created} জন ভাড়াটিয়া সেভ হয়েছে${data.errors > 0 ? `, ${data.errors}টি ব্যর্থ` : ''}!`
-          : `✅ ${data.created} tenant(s) saved${data.errors > 0 ? `, ${data.errors} failed` : ''}!`,
-      );
+      if (data.errors > 0 && data.errorDetails?.length > 0) {
+        const firstErr = data.errorDetails[0];
+        showToast(isBn ? `ব্যর্থ (${firstErr.name}): ${firstErr.reason}` : `Failed (${firstErr.name}): ${firstErr.reason}`, { type: 'error', duration: 8000 });
+      } else {
+        showToast(
+          isBn
+            ? `✅ ${data.created} জন ভাড়াটিয়া সেভ হয়েছে!`
+            : `✅ ${data.created} tenant(s) saved!`,
+        );
+      }
     } catch (err) {
       showToast(isBn ? `সেভ ব্যর্থ: ${err.message}` : `Save failed: ${err.message}`, { type: 'error' });
       setStage('review');
