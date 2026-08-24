@@ -599,7 +599,7 @@ export default function BookingsTab(props) {
           // Fills the remaining width on a phone, content-width from tablet up,
           // pinned to the right edge on desktop.
           const addTenantButton = (
-            <div className="flex items-center gap-1.5 lg:ml-auto">
+            <div className="flex items-center gap-1.5 ml-auto shrink-0">
               {/* ── AI Scan: photo of khata → auto-fill all tenants at once ── */}
               <button
                 type="button"
@@ -621,7 +621,7 @@ export default function BookingsTab(props) {
                 type="button"
                 onClick={() => isPremium ? openBlankLease(getPrefillBuilding()) : setActiveModal('premium_gate')}
                 aria-label={isBn ? 'নতুন ভাড়াটিয়া যোগ করুন' : 'Add a new tenant'}
-                className="group relative overflow-hidden flex-1 sm:flex-none sm:shrink-0 min-w-0 px-3 sm:px-3.5 py-2.5 rounded-xl bg-gradient-to-br from-[#ba0036] via-[#d1003d] to-[#ff004c] text-white shadow-[0_5px_16px_rgba(186,0,54,0.32)] hover:shadow-[0_9px_24px_rgba(186,0,54,0.42)] active:scale-[0.97] transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ba0036]/40 focus-visible:ring-offset-2"
+                className="group relative overflow-hidden shrink-0 min-w-0 px-3 sm:px-3.5 py-2.5 rounded-xl bg-gradient-to-br from-[#ba0036] via-[#d1003d] to-[#ff004c] text-white shadow-[0_5px_16px_rgba(186,0,54,0.32)] hover:shadow-[0_9px_24px_rgba(186,0,54,0.42)] active:scale-[0.97] transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ba0036]/40 focus-visible:ring-offset-2"
               >
                 {/* Soft top-light sheen on hover — depth without a colour change. */}
                 <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -629,12 +629,8 @@ export default function BookingsTab(props) {
                   <span className="w-5 h-5 rounded-lg bg-white/20 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110">
                     {isPremium ? <Plus size={13} strokeWidth={3.5} /> : <Crown size={12} strokeWidth={3} />}
                   </span>
-                  <span className="text-[11px] font-black uppercase tracking-wider truncate">
-                    {isBn ? (
-                      <><span className="sm:hidden">ম্যানুয়াল</span><span className="hidden sm:inline">ভাড়াটিয়া যোগ</span></>
-                    ) : (
-                      <><span className="sm:hidden">Manual</span><span className="hidden sm:inline">Add Tenant</span></>
-                    )}
+                  <span className="text-[11px] font-black uppercase tracking-wider">
+                    {isBn ? 'ভাড়াটিয়া যোগ' : 'Add Tenant'}
                   </span>
                 </span>
               </button>
