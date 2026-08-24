@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X, Camera, Upload, Loader2, CheckCircle2, AlertCircle, ChevronDown,
   ChevronUp, Trash2, Plus, ScanLine, Sparkles, Check, RefreshCw,
@@ -293,9 +294,9 @@ export default function AiLedgerScannerModal({
   // ── Flag count for review stage header ──────────────────────────────────────
   const flagCount = tenants.filter(t => Object.values(t._flags || {}).some(Boolean)).length;
 
-  return (
-    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-gray-900/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in">
-      <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-gray-900/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in">
+      <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[85vh] overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95">
 
         {/* Header */}
         <div className="flex items-center gap-2.5 px-4 pt-4 pb-3 border-b border-gray-100 shrink-0">
@@ -575,6 +576,7 @@ export default function AiLedgerScannerModal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
