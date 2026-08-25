@@ -4235,105 +4235,6 @@ const HostDashboard = () => {
               })() : null}
             </div>
 
-            {/* ১. Stats Bento Grid */}
-            <div data-tour="host-stats-grid" className="grid grid-cols-3 gap-3 md:gap-5">
-              {[
-                {
-	                  icon: Building, bg: 'bg-gradient-to-br from-red-50 to-rose-100/60', iconColor: 'text-[#ba0036]',
-	                  label: language === 'বাংলা' ? 'মোট বাসা' : 'PROPERTIES',
-	                  value: isPropertiesLoading && properties.length === 0 ? '...' : properties.length, shadow: 'shadow-[0_4px_20px_rgba(186,0,54,0.08)]',
-	                  indicator: 'bg-[#ba0036]'
-	                },
-	                {
-	                  icon: TrendingUp, bg: 'bg-gradient-to-br from-emerald-50 to-green-100/60', iconColor: 'text-emerald-600',
-	                  label: language === 'বাংলা' ? 'অ্যাক্টিভ' : 'ACTIVE',
-	                  value: isPropertiesLoading && properties.length === 0 ? '...' : properties.filter(p => p.status === 'active').length, shadow: 'shadow-[0_4px_20px_rgba(16,185,129,0.08)]',
-	                  indicator: 'bg-emerald-500'
-	                },
-                {
-                  icon: MessageSquare, bg: 'bg-gradient-to-br from-violet-50 to-purple-100/60', iconColor: 'text-violet-600',
-                  label: language === 'বাংলা' ? 'যোগাযোগ' : 'INQUIRIES',
-                  // Total across all four tabs. countInquiryBuckets() guarantees
-                  // pending + accepted + rented + rejected === total, so this number
-                  // always equals the sum of the tab counts in the Inquiries tab.
-                  value: inquiryCounts.total, shadow: 'shadow-[0_4px_20px_rgba(124,58,237,0.08)]',
-                  indicator: 'bg-violet-500',
-                  // Turn the box red the moment a new inquiry / reply the host hasn't opened arrives.
-                  unread: inquiries.some((inq) => isInquiryUnread(inq, 'host', inqSeen)),
-                },
-              ].map((stat, i) => {
-                // KPI boxes are one-tap deep links: Properties → all listings,
-                // Active → active-filtered listings, Inquiries → the inquiries tab.
-                const onCardClick = i === 0
-                  ? () => { setPropertyFilter('all'); setActiveTab('properties'); }
-                  : i === 1
-                    ? () => { setPropertyFilter('active'); setActiveTab('properties'); }
-                    : () => {
-                        // Land on a tab that actually has something in it. Tapping
-                        // "4 INQUIRIES" used to drop the landlord on whatever tab was
-                        // last active — usually an empty Pending — which read as
-                        // "the dashboard is lying to me". Pending wins when there's
-                        // work waiting; otherwise fall to the first non-empty bucket.
-                        const target = INQUIRY_BUCKETS.find((b) => inquiryCounts[b] > 0);
-                        if (target) setInquiryTab(target);
-                        setActiveTab('inquiries');
-                      };
-                return (
-                <div key={i} onClick={onCardClick} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(); } }} className={`p-3 md:px-7 md:py-6 rounded-2xl md:rounded-[1.5rem] ${stat.shadow} flex flex-col items-center justify-center md:flex-row md:items-center md:justify-between md:gap-3 group hover:scale-[1.02] hover:shadow-[0_12px_35px_rgba(0,0,0,0.10)] active:scale-95 transition-all duration-300 cursor-pointer relative overflow-hidden ${stat.unread ? 'bg-gradient-to-br from-red-50 to-rose-50 border border-[#ba0036]/30 ring-2 ring-[#ba0036]/40' : 'bg-white border border-white/80'}`}>
-                  {/* New-inquiry pulse dot — makes the red box unmistakable. */}
-                  {stat.unread && (
-                    <span className="absolute top-2 right-2 z-10 flex h-2.5 w-2.5" title={language === 'বাংলা' ? 'নতুন যোগাযোগ' : 'New inquiry'}>
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ba0036] opacity-60" />
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#ba0036]" />
-                    </span>
-                  )}
-                  <div className={`absolute top-0 right-0 w-16 h-16 md:w-24 md:h-24 rounded-full -translate-y-1/2 translate-x-1/2 ${stat.unread ? 'bg-rose-200' : stat.bg} blur-2xl opacity-60 pointer-events-none`}></div>
-                  {/* Left cluster — icon + label. On desktop this sits on the left
-                      of the horizontal card; on mobile it stays centered on top. */}
-                  <div className="flex flex-col items-center md:items-start shrink-0">
-                    <div className={`w-8 h-8 md:w-11 md:h-11 rounded-xl flex items-center justify-center mb-2 shrink-0 ${stat.unread ? 'bg-[#ba0036]/10 text-[#ba0036]' : `${stat.bg} ${stat.iconColor}`}`}>
-                      <stat.icon size={15} className="md:w-5 md:h-5" />
-                    </div>
-                    <p className={`text-[7px] md:text-[10px] font-black uppercase tracking-widest text-center md:text-left leading-tight ${stat.unread ? 'text-[#ba0036]' : 'text-gray-400'}`}>{stat.label}</p>
-                  </div>
-                  {/* Right cluster — big value + accent bar, right-aligned on desktop. */}
-                  <div className="flex flex-col items-center md:items-end mt-0.5 md:mt-0">
-                    <h3 className={`text-2xl md:text-5xl font-black leading-none ${stat.unread ? 'text-[#ba0036]' : 'text-gray-900'}`}>{stat.value}</h3>
-                    <div className={`w-6 h-1 rounded-full mt-2 md:mt-3 ${stat.unread ? 'bg-[#ba0036] opacity-70' : `${stat.indicator} opacity-40`}`}></div>
-                  </div>
-                </div>
-                );
-              })}
-            </div>
-
-            {/* ১.২ দ্রুত অ্যাকশন — ৪ টাইল, সহজ ও কেন্দ্রস্থ। */}
-            <div data-tour="host-quick-actions" className="bg-white dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800/60 rounded-2xl md:rounded-[1.5rem] p-4 md:p-5 shadow-[0_4px_25px_rgba(0,0,0,0.02)] dark:shadow-none">
-              <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white mb-4">
-                {language === 'বাংলা' ? 'জরুরী কাজ' : 'Quick Actions'}
-              </h3>
-              <div className="grid grid-cols-4 gap-[clamp(0.375rem,2vw,1rem)] items-stretch">
-                {[
-                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">ভাড়াটিয়া<br />যোগ করুন</span><span className="hidden md:block">ভাড়াটিয়া যোগ করুন</span></> : <><span className="md:hidden block leading-tight">Add<br />Tenant</span><span className="hidden md:block">Add Tenant</span></>,       Icon: Calendar,      iconColor: 'text-gray-500 dark:text-gray-400',     onClick: () => setActiveTab('bookings'), showOn: 'all' },
-                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">ভাড়া<br />কালেকশন</span><span className="hidden md:block">ভাড়া কালেকশন</span></> : <><span className="md:hidden block leading-tight">Rent<br />Collection</span><span className="hidden md:block">Rent Collection</span></>, Icon: Wallet,        iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('rent'), showOn: 'all' },
-                  { label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => navigate('/messages'), showOn: 'desktop' },
-                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">পেমেন্ট<br />সেটিংস</span><span className="hidden md:block">পেমেন্ট সেটিংস</span></> : <><span className="md:hidden block leading-tight">Payment<br />Settings</span><span className="hidden md:block">Payment Settings</span></>, Icon: CreditCard, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('payments'), showOn: 'mobile' },
-                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">স্মার্ট<br />অ্যালার্ট</span><span className="hidden md:block">স্মার্ট অ্যালার্ট</span></> : <><span className="md:hidden block leading-tight">Smart<br />Alerts</span><span className="hidden md:block">Smart Alerts</span></>, Icon: BellRing,      iconColor: 'text-gray-500 dark:text-gray-400',   onClick: () => setActiveTab('smartAlerts'), showOn: 'all' },
-                ].map(({ label, Icon, iconColor, onClick, showOn }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={onClick}
-                    className={`group min-w-0 w-full overflow-hidden flex-col items-center justify-start gap-[clamp(0.375rem,2vw,0.75rem)] px-[clamp(0.25rem,1.5vw,1.25rem)] py-[clamp(0.625rem,2.5vw,1.25rem)] rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300 ${showOn === 'mobile' ? 'flex md:hidden' : showOn === 'desktop' ? 'hidden md:flex' : 'flex'}`}
-                  >
-                    <Icon strokeWidth={2.2} className={`shrink-0 w-[clamp(20px,5.5vw,26px)] h-[clamp(20px,5.5vw,26px)] ${iconColor} group-hover:scale-110 transition-transform duration-300`} />
-                    <span className="w-full block text-[clamp(9px,2.6vw,0.875rem)] font-bold text-gray-700 dark:text-gray-300 text-center leading-snug break-words hyphens-auto">
-                      {label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* ১.৫ Shared Ledger Overview */}
             {(() => {
               const todayDate = today;
@@ -4476,6 +4377,33 @@ const HostDashboard = () => {
               );
             })()}
 
+            {/* ১.২ দ্রুত অ্যাকশন — ৪ টাইল, সহজ ও কেন্দ্রস্থ। */}
+            <div data-tour="host-quick-actions" className="bg-white dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800/60 rounded-2xl md:rounded-[1.5rem] p-4 md:p-5 shadow-[0_4px_25px_rgba(0,0,0,0.02)] dark:shadow-none">
+              <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white mb-4">
+                {language === 'বাংলা' ? 'জরুরী কাজ' : 'Quick Actions'}
+              </h3>
+              <div className="grid grid-cols-4 gap-[clamp(0.375rem,2vw,1rem)] items-stretch">
+                {[
+                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">ভাড়াটিয়া<br />যোগ করুন</span><span className="hidden md:block">ভাড়াটিয়া যোগ করুন</span></> : <><span className="md:hidden block leading-tight">Add<br />Tenant</span><span className="hidden md:block">Add Tenant</span></>,       Icon: Calendar,      iconColor: 'text-gray-500 dark:text-gray-400',     onClick: () => setActiveTab('bookings'), showOn: 'all' },
+                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">ভাড়া<br />কালেকশন</span><span className="hidden md:block">ভাড়া কালেকশন</span></> : <><span className="md:hidden block leading-tight">Rent<br />Collection</span><span className="hidden md:block">Rent Collection</span></>, Icon: Wallet,        iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('rent'), showOn: 'all' },
+                  { label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => navigate('/messages'), showOn: 'desktop' },
+                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">পেমেন্ট<br />সেটিংস</span><span className="hidden md:block">পেমেন্ট সেটিংস</span></> : <><span className="md:hidden block leading-tight">Payment<br />Settings</span><span className="hidden md:block">Payment Settings</span></>, Icon: CreditCard, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('payments'), showOn: 'mobile' },
+                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">স্মার্ট<br />অ্যালার্ট</span><span className="hidden md:block">স্মার্ট অ্যালার্ট</span></> : <><span className="md:hidden block leading-tight">Smart<br />Alerts</span><span className="hidden md:block">Smart Alerts</span></>, Icon: BellRing,      iconColor: 'text-gray-500 dark:text-gray-400',   onClick: () => setActiveTab('smartAlerts'), showOn: 'all' },
+                ].map(({ label, Icon, iconColor, onClick, showOn }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={onClick}
+                    className={`group min-w-0 w-full overflow-hidden flex-col items-center justify-start gap-[clamp(0.375rem,2vw,0.75rem)] px-[clamp(0.25rem,1.5vw,1.25rem)] py-[clamp(0.625rem,2.5vw,1.25rem)] rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300 ${showOn === 'mobile' ? 'flex md:hidden' : showOn === 'desktop' ? 'hidden md:flex' : 'flex'}`}
+                  >
+                    <Icon strokeWidth={2.2} className={`shrink-0 w-[clamp(20px,5.5vw,26px)] h-[clamp(20px,5.5vw,26px)] ${iconColor} group-hover:scale-110 transition-transform duration-300`} />
+                    <span className="w-full block text-[clamp(9px,2.6vw,0.875rem)] font-bold text-gray-700 dark:text-gray-300 text-center leading-snug break-words hyphens-auto">
+                      {label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
             {/* ২. আরও অ্যাকশন — কোলাপসিবল। আগে এখানে ৪টি বাটনের আলাদা সেকশন ছিল,
                 যা উপরের দ্রুত অ্যাকশন সারির সাথে মিলে ডুপ্লিকেট মনে হতো। সব
                 অপশন রেখে ডিফল্টে লুকানো, যাতে ড্যাশবোর্ড পরিষ্কার থাকে। */}
