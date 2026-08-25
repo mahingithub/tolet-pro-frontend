@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, Camera, Upload, Loader2, CheckCircle2, AlertCircle, ChevronDown,
@@ -213,15 +213,41 @@ export default function AiLedgerScannerModal({
           defaultSettings,
         }),
       });
+      
+      if (resp.status === 429 || resp.status === 503) {
+        throw new Error('OVERLOAD');
+      }
+
       const data = await resp.json();
-      if (!resp.ok) throw new Error(data.message || 'Scan failed');
+      if (!resp.ok) throw new Error(data.message || 'SCAN_ERROR');
 
       setAiRawText(data.rawText || '');
       setParseError(!!data.parseError);
       setTenants(data.tenants || []);
       setStage('review');
     } catch (err) {
-      showToast(isBn ? `স্ক্যান ব্যর্থ: ${err.message}` : `Scan failed: ${err.message}`, { type: 'error' });
+      let msgEn = "Same Problem, try again";
+      let msgBn = "একই সমস্যা, আবার চেষ্টা করুন";
+
+      const errMessage = (err.message || '').toLowerCase();
+      
+      const isOverload = err.message === 'OVERLOAD' || 
+                         errMessage.includes('too many') || 
+                         errMessage.includes('rate limit') || 
+                         errMessage.includes('capacity') ||
+                         errMessage.includes('503') ||
+                         errMessage.includes('service unavailable') ||
+                         errMessage.includes('high demand');
+
+      if (isOverload) {
+         msgEn = "Many people are trying right now. Please try again in 1-2 minutes.";
+         msgBn = "অনেকে একসাথে চেষ্টা করছেন। ১-২ মিনিট পর আবার চেষ্টা করুন।";
+      } else if (err.message === 'Failed to fetch') {
+         msgEn = "Network error. Please check your connection and try again.";
+         msgBn = "নেটওয়ার্ক সমস্যা। ইন্টারনেট চেক করে আবার চেষ্টা করুন।";
+      }
+
+      showToast(isBn ? msgBn : msgEn, { type: 'error', duration: 5000 });
       setStage('upload');
     }
   }, [imageBase64, mimeType, defaultSettings, isBn, showToast]);
@@ -285,14 +311,21 @@ export default function AiLedgerScannerModal({
     }
   }, [tenants, isBn, showToast, onBookingsCreated]);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setStage('upload');
     setImagePreview(null);
     setImageBase64(null);
     setTenants([]);
     setParseError(false);
     setSaveResult(null);
-  };
+    setAiRawText('');
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      handleReset();
+    }
+  }, [isOpen, handleReset]);
 
   if (!isOpen) return null;
 
