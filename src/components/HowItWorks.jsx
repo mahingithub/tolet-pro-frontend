@@ -367,6 +367,9 @@ export default function HowItWorks() {
                 {[
                   { en: 'Unlimited listings', bn: 'আনলিমিটেড লিস্টিং' },
                   { en: '50 photos + 5 videos/property', bn: '৫০ ছবি + ৫ ভিডিও/প্রপার্টি' },
+                  { en: 'Scan tenant NID to auto-fill profile', bn: 'স্ক্যান করে ভাড়াটিয়ার প্রোফাইল অটো ফিল' },
+                  { en: 'Monthly billing management', bn: 'প্রতি মাসের বিলিং ম্যানেজ' },
+                  { en: 'Automatic monthly reminders', bn: 'প্রতি মাসে অটোমেটিক রিমাইন্ডার' },
                   { en: 'Super boost + top position', bn: 'সুপার বুস্ট + টপ পজিশন' },
                   { en: 'Smart alerts & notifications', bn: 'স্মার্ট অ্যালার্ট ও নোটিফিকেশন' },
                   { en: 'AI insights & pricing help', bn: 'এআই ইনসাইটস ও প্রাইসিং সাহায্য' },

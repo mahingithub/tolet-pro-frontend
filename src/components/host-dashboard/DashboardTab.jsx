@@ -209,97 +209,6 @@ export default function DashboardTab({
         })() : null}
       </div>
 
-      {/* ১. Stats Bento Grid
-          NOTE: the `data-tour` anchors on this block, Quick Actions and the
-          Shared Ledger card below are steps 2–4 of the host dashboard tour.
-          They were missing here while the live markup (still inline in
-          HostDashboard.jsx) carried them, so wiring this component in would
-          have silently pruned three steps. Keep them in sync. */}
-      <div data-tour="host-stats-grid" className="grid grid-cols-3 gap-3 md:gap-5">
-        {[
-          {
-            icon: Building, bg: 'bg-gradient-to-br from-red-50 to-rose-100/60', iconColor: 'text-[#ba0036]',
-            label: language === 'বাংলা' ? 'মোট বাসা' : 'PROPERTIES',
-            value: isPropertiesLoading && properties.length === 0 ? '...' : properties.length, shadow: 'shadow-[0_4px_20px_rgba(186,0,54,0.08)]',
-            indicator: 'bg-[#ba0036]'
-          },
-          {
-            icon: TrendingUp, bg: 'bg-gradient-to-br from-emerald-50 to-green-100/60', iconColor: 'text-emerald-600',
-            label: language === 'বাংলা' ? 'অ্যাক্টিভ' : 'ACTIVE',
-            value: isPropertiesLoading && properties.length === 0 ? '...' : properties.filter(p => p.status === 'active').length, shadow: 'shadow-[0_4px_20px_rgba(16,185,129,0.08)]',
-            indicator: 'bg-emerald-500'
-          },
-          {
-            icon: MessageSquare, bg: 'bg-gradient-to-br from-violet-50 to-purple-100/60', iconColor: 'text-violet-600',
-            label: language === 'বাংলা' ? 'যোগাযোগ' : 'INQUIRIES',
-            value: inquiries.length, shadow: 'shadow-[0_4px_20px_rgba(124,58,237,0.08)]',
-            indicator: 'bg-violet-500',
-            // Turn the box red the moment a new inquiry / reply the host hasn't opened arrives.
-            unread: inquiries.some((inq) => isInquiryUnread(inq, 'host', inqSeen)),
-          },
-        ].map((stat, i) => {
-          // KPI boxes are one-tap deep links: Properties → all listings,
-          // Active → active-filtered listings, Inquiries → the inquiries tab.
-          const onCardClick = i === 0
-            ? () => { setPropertyFilter('all'); setActiveTab('properties'); }
-            : i === 1
-              ? () => { setPropertyFilter('active'); setActiveTab('properties'); }
-              : () => setActiveTab('inquiries');
-          return (
-          <div key={i} onClick={onCardClick} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(); } }} className={`p-3 md:px-7 md:py-6 rounded-2xl md:rounded-[1.5rem] ${stat.shadow} flex flex-col items-center justify-center md:flex-row md:items-center md:justify-between md:gap-3 group hover:scale-[1.02] hover:shadow-[0_12px_35px_rgba(0,0,0,0.10)] active:scale-95 transition-all duration-300 cursor-pointer relative overflow-hidden ${stat.unread ? 'bg-gradient-to-br from-red-50 to-rose-50 border border-[#ba0036]/30 ring-2 ring-[#ba0036]/40' : 'bg-white border border-white/80'}`}>
-            {/* New-inquiry pulse dot — makes the red box unmistakable. */}
-            {stat.unread && (
-              <span className="absolute top-2 right-2 z-10 flex h-2.5 w-2.5" title={language === 'বাংলা' ? 'নতুন যোগাযোগ' : 'New inquiry'}>
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ba0036] opacity-60" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#ba0036]" />
-              </span>
-            )}
-            <div className={`absolute top-0 right-0 w-16 h-16 md:w-24 md:h-24 rounded-full -translate-y-1/2 translate-x-1/2 ${stat.unread ? 'bg-rose-200' : stat.bg} blur-2xl opacity-60 pointer-events-none`}></div>
-            {/* Left cluster — icon + label. On desktop this sits on the left
-                of the horizontal card; on mobile it stays centered on top. */}
-            <div className="flex flex-col items-center md:items-start shrink-0">
-              <div className={`w-8 h-8 md:w-11 md:h-11 rounded-xl flex items-center justify-center mb-2 shrink-0 ${stat.unread ? 'bg-[#ba0036]/10 text-[#ba0036]' : `${stat.bg} ${stat.iconColor}`}`}>
-                <stat.icon size={15} className="md:w-5 md:h-5" />
-              </div>
-              <p className={`text-[7px] md:text-[10px] font-black uppercase tracking-widest text-center md:text-left leading-tight ${stat.unread ? 'text-[#ba0036]' : 'text-gray-400'}`}>{stat.label}</p>
-            </div>
-            {/* Right cluster — big value + accent bar, right-aligned on desktop. */}
-            <div className="flex flex-col items-center md:items-end mt-0.5 md:mt-0">
-              <h3 className={`text-2xl md:text-5xl font-black leading-none ${stat.unread ? 'text-[#ba0036]' : 'text-gray-900'}`}>{stat.value}</h3>
-              <div className={`w-6 h-1 rounded-full mt-2 md:mt-3 ${stat.unread ? 'bg-[#ba0036] opacity-70' : `${stat.indicator} opacity-40`}`}></div>
-            </div>
-          </div>
-          );
-        })}
-      </div>
-
-      {/* ১.২ দ্রুত অ্যাকশন — ৪ টাইল, সহজ ও কেন্দ্রস্থ। */}
-      <div data-tour="host-quick-actions" className="bg-white dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800/60 rounded-2xl md:rounded-[1.5rem] p-4 md:p-5 shadow-[0_4px_25px_rgba(0,0,0,0.02)] dark:shadow-none">
-        <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white mb-4">
-          {language === 'বাংলা' ? 'দ্রুত অ্যাকশন' : 'Quick Actions'}
-        </h3>
-        <div className="grid grid-cols-4 gap-2 md:gap-4">
-          {[
-            { id: 'add_tenant', label: language === 'বাংলা' ? <><span className="md:hidden whitespace-pre-line text-[10px] leading-tight">{'ভাড়াটিয়া যোগ\nকরুন'}</span><span className="hidden md:block">ভাড়াটিয়া যোগ করুন</span></> : 'Add Tenant', Icon: Calendar,      iconColor: 'text-blue-500 dark:text-blue-400',     onClick: () => setActiveTab('bookings') },
-            { id: 'rent_collection', label: language === 'বাংলা' ? <><span className="md:hidden whitespace-pre-line text-[10px] leading-tight">{'ভাড়া\nকালেকশন'}</span><span className="hidden md:block">ভাড়া কালেকশন</span></> : 'Rent', Icon: Wallet,        iconColor: 'text-emerald-500 dark:text-emerald-400', onClick: () => setActiveTab('rent') },
-            { id: 'messages', label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-violet-500 dark:text-violet-400', onClick: () => navigate('/messages') },
-            { id: 'smart_alerts', label: language === 'বাংলা' ? <><span className="md:hidden whitespace-pre-line text-[10px] leading-tight">{'স্মার্ট\nঅ্যালার্ট'}</span><span className="hidden md:block">স্মার্ট অ্যালার্ট</span></> : 'Smart Alerts', Icon: BellRing,      iconColor: 'text-amber-500 dark:text-amber-400',   onClick: () => setActiveTab('smartAlerts') },
-          ].map(({ id, label, Icon, iconColor, onClick }) => (
-            <div
-              key={id}
-              role="button"
-              tabIndex={0}
-              onClick={onClick}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
-              className="group min-w-0 w-full overflow-hidden flex flex-col items-center justify-start gap-2 md:gap-3 px-1 py-3 md:p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300 cursor-pointer"
-            >
-              <Icon size={24} strokeWidth={2.2} className={`shrink-0 md:w-[26px] md:h-[26px] ${iconColor} group-hover:scale-110 transition-transform duration-300`} />
-              <span className="w-full block text-[11px] md:text-sm font-bold text-gray-700 dark:text-gray-300 text-center leading-snug">{label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* ১.৫ Shared Ledger Overview — bird's-eye snapshot of the new
           Rent Collection tab. Tapping anywhere on the card (or the
           top-right "OPEN LEDGER" pill) jumps the host into the full
@@ -436,6 +345,32 @@ export default function DashboardTab({
         );
       })()}
 
+      {/* ১.২ দ্রুত অ্যাকশন — ৪ টাইল, সহজ ও কেন্দ্রস্থ। */}
+      <div data-tour="host-quick-actions" className="bg-white dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800/60 rounded-2xl md:rounded-[1.5rem] p-4 md:p-5 shadow-[0_4px_25px_rgba(0,0,0,0.02)] dark:shadow-none">
+        <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white mb-4">
+          {language === 'বাংলা' ? 'দ্রুত অ্যাকশন' : 'Quick Actions'}
+        </h3>
+        <div className="grid grid-cols-4 gap-2 md:gap-4">
+          {[
+            { id: 'add_tenant', label: language === 'বাংলা' ? <><span className="md:hidden whitespace-pre-line text-[10px] leading-tight">{'ভাড়াটিয়া যোগ\nকরুন'}</span><span className="hidden md:block">ভাড়াটিয়া যোগ করুন</span></> : 'Add Tenant', Icon: Calendar,      iconColor: 'text-blue-500 dark:text-blue-400',     onClick: () => setActiveTab('bookings') },
+            { id: 'rent_collection', label: language === 'বাংলা' ? <><span className="md:hidden whitespace-pre-line text-[10px] leading-tight">{'ভাড়া\nকালেকশন'}</span><span className="hidden md:block">ভাড়া কালেকশন</span></> : 'Rent', Icon: Wallet,        iconColor: 'text-emerald-500 dark:text-emerald-400', onClick: () => setActiveTab('rent') },
+            { id: 'messages', label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-violet-500 dark:text-violet-400', onClick: () => navigate('/messages') },
+            { id: 'smart_alerts', label: language === 'বাংলা' ? <><span className="md:hidden whitespace-pre-line text-[10px] leading-tight">{'স্মার্ট\nঅ্যালার্ট'}</span><span className="hidden md:block">স্মার্ট অ্যালার্ট</span></> : 'Smart Alerts', Icon: BellRing,      iconColor: 'text-amber-500 dark:text-amber-400',   onClick: () => setActiveTab('smartAlerts') },
+          ].map(({ id, label, Icon, iconColor, onClick }) => (
+            <div
+              key={id}
+              role="button"
+              tabIndex={0}
+              onClick={onClick}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
+              className="group min-w-0 w-full overflow-hidden flex flex-col items-center justify-start gap-2 md:gap-3 px-1 py-3 md:p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300 cursor-pointer"
+            >
+              <Icon size={24} strokeWidth={2.2} className={`shrink-0 md:w-[26px] md:h-[26px] ${iconColor} group-hover:scale-110 transition-transform duration-300`} />
+              <span className="w-full block text-[11px] md:text-sm font-bold text-gray-700 dark:text-gray-300 text-center leading-snug">{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
       {/* ২. আরও অ্যাকশন — কোলাপসিবল।  {/* ১.৩.২ Rent Card - Dashboard e ar dorkar nai, 
           যা উপরের শর্টকাট সারির সাথে মিলে ডুপ্লিকেট মনে হতো। সব
           অপশন রেখে ডিফল্টে লুকানো, যাতে ড্যাশবোর্ড পরিষ্কার থাকে। */}

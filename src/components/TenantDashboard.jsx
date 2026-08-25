@@ -2267,7 +2267,7 @@ const handleWizardSubmit = async (payload) => {
             {/* ── NAV CARDS — Messages · Services · Smart Alerts ──────────
                 Wider horizontal cards (icon + title + subtitle + chevron).
                 Stack to full-width rows on phones for big tap targets. */}
-            <div className="mb-4 md:mb-6 grid grid-cols-3 gap-2.5 md:gap-4">
+            <div className={`mb-4 md:mb-6 grid gap-2.5 md:gap-4 ${myBookings.length > 0 ? 'grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
               {[
                 {
                   id: 'messages',
@@ -2277,7 +2277,7 @@ const handleWizardSubmit = async (payload) => {
                   onClick: () => navigate('/messages'),
                   extraClass: 'hidden md:flex',
                 },
-                {
+                ...(myBookings.length > 0 ? [{
                   id: 'payments-mobile',
                   label: language === 'বাংলা' ? 'পেমেন্ট' : 'Payments',
                   sub: language === 'বাংলা' ? 'পেমেন্ট ও রিসিট' : 'Payments & receipts',
@@ -2285,7 +2285,7 @@ const handleWizardSubmit = async (payload) => {
                   badge: unreadReceiptsCount > 0 ? unreadReceiptsCount : null,
                   onClick: () => setActiveTab('payments'),
                   extraClass: 'flex md:hidden',
-                },
+                }] : []),
                 {
                   id: 'services',
                   label: language === 'বাংলা' ? 'সার্ভিস' : 'Services',
@@ -2293,14 +2293,14 @@ const handleWizardSubmit = async (payload) => {
                   Icon: Wrench, iconBg: 'bg-gray-100 border-gray-200', iconColor: 'text-gray-600',
                   onClick: () => navigate('/services'),
                 },
-                {
+                ...(myBookings.length > 0 ? [{
                   id: 'alerts',
                   label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts',
                   sub: language === 'বাংলা' ? 'নোটিফিকেশন ম্যানেজ করুন' : 'Manage notifications',
                   Icon: Bell, iconBg: 'bg-amber-50 border-amber-100', iconColor: 'text-amber-600',
                   badge: tenantAlertCount > 0 ? tenantAlertCount : null,
                   onClick: () => setActiveTab('alerts'),
-                },
+                }] : []),
               ].map(({ id, label, sub, Icon, iconBg, iconColor, badge, onClick, extraClass }) => (
                 <button
                   key={id || label}

@@ -221,7 +221,7 @@ const PaymentsTab = ({
       {!summaryOpen && (
         <button
           onClick={() => setSummaryOpen(true)}
-          className="fixed right-0 top-1/2 -translate-y-1/2 z-[60] rounded-l-2xl overflow-hidden shadow-[0_8px_30px_-4px_rgba(79,70,229,0.5)] active:scale-95 transition-all hover:shadow-[0_12px_40px_-4px_rgba(79,70,229,0.7)] group"
+          className="fixed right-0 top-[60%] -translate-y-1/2 z-[60] rounded-l-2xl overflow-hidden shadow-[0_8px_30px_-4px_rgba(79,70,229,0.5)] active:scale-95 transition-all hover:shadow-[0_12px_40px_-4px_rgba(79,70,229,0.7)] group"
           aria-label={bn ? 'পেমেন্ট সামারি খুলুন' : 'Open Payment Summary'}
         >
           <span className="flex flex-col items-center gap-1.5 bg-gradient-to-b from-violet-600 via-indigo-600 to-violet-700 text-white px-2.5 py-3 relative overflow-hidden">

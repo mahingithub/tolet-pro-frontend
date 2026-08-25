@@ -192,10 +192,57 @@ const SubscriptionPage = () => {
           </div>
         </div>
 
-        {/* SECTION 3: Plan Cards — paid plans only. The Free tier is still
-            described in the comparison table below, but it is not sold here,
-            so it gets no card. Two cards → a 2-column grid. */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 mb-12 items-center max-w-4xl mx-auto">
+        {/* SECTION 3: Plan Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-12 items-center max-w-6xl mx-auto">
+
+          {/* FREE CARD */}
+          <div className="bg-white dark:bg-[#13111C] border border-slate-200 dark:border-white/10 rounded-3xl p-8 shadow-xl shadow-slate-200/10 dark:shadow-[0_0_40px_-15px_rgba(255,255,255,0.05)] flex flex-col h-full hover:-translate-y-1 hover:shadow-slate-200/20 transition-all duration-300 relative overflow-hidden backdrop-blur-xl">
+            <div className="absolute top-0 left-0 w-full h-1 bg-slate-300 dark:bg-slate-700" />
+            <div className="mb-6">
+              <span className="inline-block px-3 py-1 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 text-xs font-black uppercase tracking-widest rounded-full mb-4">
+                FREE
+              </span>
+              <p className="text-sm text-slate-500 dark:text-slate-400 italic mb-3">
+                {isBn ? 'সাধারণ ব্যবহারের জন্য একদম ফ্রি' : 'Completely free for basic use'}
+              </p>
+              <div className="flex items-baseline gap-1 relative mb-2">
+                <span className="text-4xl font-display font-extrabold text-slate-900 dark:text-white transition-opacity duration-300">
+                  ৳0
+                </span>
+                <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">/{isBn ? 'সবসময়' : 'forever'}</span>
+              </div>
+            </div>
+            
+            <div className="flex-1 space-y-4 mb-8">
+              {[
+                isBn ? '১টি অ্যাক্টিভ লিস্টিং' : '1 Active Listing', 
+                isBn ? '৫টি ছবি' : '5 Photos per property', 
+                isBn ? 'সাধারণ প্রোফাইল' : 'Basic Profile'
+              ].map((feat, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <Check size={18} className="text-slate-500 dark:text-slate-400 shrink-0 mt-0.5" strokeWidth={3} />
+                  <span className="text-slate-700 dark:text-slate-300 text-sm font-medium">{feat}</span>
+                </div>
+              ))}
+              {[
+                isBn ? 'কোনো ভিডিও নেই' : 'No Videos', 
+                isBn ? 'ভাড়া কালেকশন নেই' : 'No Rent Collection', 
+                isBn ? 'কোনো স্মার্ট অ্যালার্ট নেই' : 'No Smart Alerts'
+              ].map((feat, i) => (
+                <div key={i} className="flex items-start gap-3 opacity-50">
+                  <X size={18} className="text-slate-400 shrink-0 mt-0.5" strokeWidth={3} />
+                  <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">{feat}</span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              disabled={isFree}
+              className={`w-full py-4 rounded-2xl font-bold transition-all ${isFree ? 'bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-slate-600 cursor-not-allowed' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'}`}
+            >
+              {isFree ? (isBn ? 'বর্তমান প্ল্যান' : 'Current Plan') : (isBn ? 'ফ্রি প্ল্যান' : 'Free Plan')}
+            </button>
+          </div>
 
           {/* PLUS CARD */}
           <div className="bg-white dark:bg-[#13111C] border border-violet-200 dark:border-violet-500/30 rounded-3xl p-8 shadow-2xl shadow-violet-500/10 dark:shadow-[0_0_40px_-15px_rgba(124,58,237,0.3)] flex flex-col h-full hover:-translate-y-1 hover:shadow-violet-500/20 transition-all duration-300 relative overflow-hidden backdrop-blur-xl">
@@ -217,15 +264,23 @@ const SubscriptionPage = () => {
             
             <div className="flex-1 space-y-4 mb-8">
               {[
-                'Up to 3 Active Listings', '15 Photos + 1 Video', '1× Top Search Boost/month',
-                'Rent Collection Ledger', 'Bookings Pipeline', 'Plus Badge on Profile'
+                isBn ? '৩টি পর্যন্ত অ্যাক্টিভ লিস্টিং' : 'Up to 3 Active Listings',
+                isBn ? '১৫টি ছবি + ১টি ভিডিও' : '15 Photos + 1 Video',
+                isBn ? 'মাসে ১ বার টপ সার্চ বুস্ট' : '1× Top Search Boost/month',
+                isBn ? 'ভাড়া কালেকশন লেজার' : 'Rent Collection Ledger',
+                isBn ? 'বুকিং পাইপলাইন' : 'Bookings Pipeline',
+                isBn ? 'প্রোফাইলে প্লাস ব্যাজ' : 'Plus Badge on Profile'
               ].map((feat, i) => (
                 <div key={i} className="flex items-start gap-3">
                   <Check size={18} className="text-violet-500 dark:text-violet-400 shrink-0 mt-0.5" strokeWidth={3} />
                   <span className="text-slate-700 dark:text-slate-300 text-sm font-medium">{feat}</span>
                 </div>
               ))}
-              {['No Smart Alerts', 'No AI Insights', 'No Gold Card'].map((feat, i) => (
+              {[
+                isBn ? 'কোনো স্মার্ট অ্যালার্ট নেই' : 'No Smart Alerts',
+                isBn ? 'এআই ইনসাইট নেই' : 'No AI Insights',
+                isBn ? 'গোল্ড কার্ড নেই' : 'No Gold Card'
+              ].map((feat, i) => (
                 <div key={i} className="flex items-start gap-3 opacity-50">
                   <X size={18} className="text-slate-400 shrink-0 mt-0.5" strokeWidth={3} />
                   <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">{feat}</span>
@@ -270,9 +325,15 @@ const SubscriptionPage = () => {
             
             <div className="flex-1 space-y-4 mb-8">
               {[
-                'Unlimited Listings (No limits)', '50 Photos + 5 Videos', 'Super Boost + Top Position',
-                'Smart Alerts (Push, WA, SMS)', 'Advanced Analytics & KPIs', 'Pro Badge + Gold Card',
-                'Revenue & Tenant Scorecards', 'AI Pricing & Demand Forecasts'
+                isBn ? 'আনলিমিটেড লিস্টিং' : 'Unlimited Listings',
+                isBn ? '৫০টি ছবি + ৫টি ভিডিও' : '50 Photos + 5 Videos',
+                isBn ? 'স্ক্যান করে ভাড়াটিয়ার প্রোফাইল অটো ফিল' : 'Scan tenant NID to auto-fill profile',
+                isBn ? 'প্রতি মাসের বিলিং ম্যানেজ' : 'Monthly billing management',
+                isBn ? 'প্রতি মাসে অটোমেটিক রিমাইন্ডার' : 'Automatic monthly reminders',
+                isBn ? 'সুপার বুস্ট + টপ পজিশন' : 'Super Boost + Top Position',
+                isBn ? 'স্মার্ট অ্যালার্ট (Push, WA, SMS)' : 'Smart Alerts (Push, WA, SMS)',
+                isBn ? 'রেভিনিউ এবং টেন্যান্ট স্কোরকার্ড' : 'Revenue & Tenant Scorecards',
+                isBn ? 'এআই প্রাইসিং ও ডিমান্ড ফোরকাস্ট' : 'AI Pricing & Demand Forecasts'
               ].map((feat, i) => (
                 <div key={i} className="flex items-start gap-3">
                   <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center shrink-0 mt-0.5">
