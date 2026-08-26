@@ -1888,37 +1888,6 @@ const handleWizardSubmit = async (payload) => {
             </span>
           </Link>
 
-          {/* Language toggle — English / বাংলা.
-              Visible on mobile too: the global marketing navbar is hidden on the dashboard,
-              so this is the tenant's only in-dashboard language toggle on phones.
-              Reuses the langRef + isLangOpen click-outside plumbing. */}
-          <div className="relative" ref={langRef}>
-            <button
-              onClick={() => setIsLangOpen((v) => !v)}
-              className="flex items-center gap-1.5 p-2 lg:px-3 lg:py-2 bg-white/60 rounded-xl border border-white/80 shadow-sm hover:bg-white transition-all active:scale-95"
-              title={language === 'বাংলা' ? 'ভাষা' : 'Language'}
-            >
-              <Globe size={16} className="text-gray-500" />
-              {/* Globe-only through tablet; the label + chevron appear from lg up */}
-              <span className="hidden lg:block text-[12px] font-black text-gray-700">{language === 'বাংলা' ? 'বাংলা' : 'English'}</span>
-              <ChevronDown size={14} className={`hidden lg:block text-gray-400 transition-transform duration-200 ${isLangOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {isLangOpen && (
-              <div className="absolute right-0 mt-2 w-36 bg-white/95 backdrop-blur-3xl border border-white shadow-[0_20px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[100] animate-in fade-in zoom-in-95 origin-top-right">
-                {['English', 'বাংলা'].map((lng) => (
-                  <button
-                    key={lng}
-                    onClick={() => { setLanguage(lng); setIsLangOpen(false); }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[12px] font-black transition-colors ${language === lng ? 'bg-red-50 text-[#ba0036]' : 'text-gray-600 hover:bg-gray-50'}`}
-                  >
-                    {lng === 'বাংলা' ? 'বাংলা' : 'English'}
-                    {language === lng && <Check size={14} strokeWidth={3} />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
           {/* Notifications — host-style chip with ping. */}
           <div className="relative cursor-pointer" ref={notifRef}>
             <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="p-2 bg-white/60 rounded-xl hover:bg-white transition-all border border-white/80 shadow-sm relative group">
@@ -1965,6 +1934,37 @@ const handleWizardSubmit = async (payload) => {
                     ))
                   )}
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Language toggle — English / বাংলা.
+              Visible on mobile too: the global marketing navbar is hidden on the dashboard,
+              so this is the tenant's only in-dashboard language toggle on phones.
+              Reuses the langRef + isLangOpen click-outside plumbing. */}
+          <div className="relative" ref={langRef}>
+            <button
+              onClick={() => setIsLangOpen((v) => !v)}
+              className="flex items-center gap-1.5 p-2 lg:px-3 lg:py-2 bg-white/60 rounded-xl border border-white/80 shadow-sm hover:bg-white transition-all active:scale-95"
+              title={language === 'বাংলা' ? 'ভাষা' : 'Language'}
+            >
+              <Globe size={16} className="text-gray-500" />
+              {/* Globe-only through tablet; the label + chevron appear from lg up */}
+              <span className="hidden lg:block text-[12px] font-black text-gray-700">{language === 'বাংলা' ? 'বাংলা' : 'English'}</span>
+              <ChevronDown size={14} className={`hidden lg:block text-gray-400 transition-transform duration-200 ${isLangOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isLangOpen && (
+              <div className="absolute right-0 mt-2 w-36 bg-white/95 backdrop-blur-3xl border border-white shadow-[0_20px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[100] animate-in fade-in zoom-in-95 origin-top-right">
+                {['English', 'বাংলা'].map((lng) => (
+                  <button
+                    key={lng}
+                    onClick={() => { setLanguage(lng); setIsLangOpen(false); }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[12px] font-black transition-colors ${language === lng ? 'bg-red-50 text-[#ba0036]' : 'text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    {lng === 'বাংলা' ? 'বাংলা' : 'English'}
+                    {language === lng && <Check size={14} strokeWidth={3} />}
+                  </button>
+                ))}
               </div>
             )}
           </div>
