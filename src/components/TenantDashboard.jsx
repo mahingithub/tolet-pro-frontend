@@ -31,7 +31,7 @@ import {
   Inbox, Home, Sparkles, KeyRound, CalendarCheck, DollarSign, Navigation,
   ChevronLeft, Filter, Zap, RefreshCw, Share2,
   FolderOpen, Lock, Info, Wallet, HeartPulse, Link2,
-  Wrench, ChevronRight, ChevronDown
+  Wrench, ChevronRight, ChevronDown, HeartHandshake
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -1798,8 +1798,11 @@ const handleWizardSubmit = async (payload) => {
     { id: 'messages', icon: MessageSquare, label: t.messages || (language === 'বাংলা' ? 'মেসেজ' : 'Messages'), isLink: true, path: '/messages', desktopOnly: true },
     { id: 'settings', icon: Settings, label: t.accountSettings || (language === 'বাংলা' ? 'অ্যাকাউন্ট সেটিংস' : 'Account Settings') },
     { id: 'how-it-works', icon: BookOpen, label: language === 'বাংলা' ? 'কীভাবে কাজ করে' : 'How it Works', isLink: true, path: '/how-it-works' },
-    { id: 'terms', icon: FileText, label: language === 'বাংলা' ? 'শর্তাবলী' : 'Terms & Policies', isLink: true, path: '/terms' },
     { id: 'support', icon: HelpCircle, label: t.support || (language === 'বাংলা' ? 'হেল্প ও সাপোর্ট' : 'Help & Support'), isLink: true, path: '/support' },
+    { id: 'trust', icon: HeartHandshake, label: language === 'বাংলা' ? 'বিশ্বাস ও নিরাপত্তা' : 'Trust & Safety', isLink: true, path: '/trust-safety' },
+    { id: 'privacy', icon: ShieldCheck, label: language === 'বাংলা' ? 'প্রাইভেসি পলিসি' : 'Privacy Policy', isLink: true, path: '/privacy-policy' },
+    { id: 'terms', icon: FileText, label: language === 'বাংলা' ? 'শর্তাবলী' : 'Terms & Policies', isLink: true, path: '/terms' },
+    { id: 'refund', icon: CreditCard, label: language === 'বাংলা' ? 'রিফান্ড পলিসি' : 'Refund Policy', isLink: true, path: '/refund' },
   ];
 
   return (

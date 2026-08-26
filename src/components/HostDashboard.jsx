@@ -13,7 +13,7 @@ import {
   XCircle, AlertCircle, RefreshCw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, MinusCircle,
   Banknote, ArrowRight, ArrowUpRight, Clock, Smartphone,
   BellOff, CalendarRange, BarChart3,
-  Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Map, Leaf
+  Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Map, Leaf, HeartHandshake
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -3499,22 +3499,20 @@ const HostDashboard = () => {
   // route changes, so any old in-app links still work.
   const menuItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: t?.dashboard || (language === 'বাংলা' ? 'ড্যাশবোর্ড' : "Dashboard") },
-    // Documents + Analytics now live under ONE sidebar entry; a segmented
-    // toggle at the top of the view switches between them (setActiveTab still
-    // uses 'documents' | 'analytics').
     { id: 'documents', icon: Folder, label: language === 'বাংলা' ? 'ডকুমেন্ট ও অ্যানালিটিক্স' : "Documents & Analytics" },
     { id: 'properties', icon: Building, label: t?.myProperties || (language === 'বাংলা' ? 'আমার বাসাসমূহ' : "My Properties") },
     { id: 'inquiries', icon: Zap, label: t?.inquiries || (language === 'বাংলা' ? 'যোগাযোগ সমূহ' : "Inquiries") },
     { id: 'messages', icon: MessageCircle, label: t?.messages || (language === 'বাংলা' ? 'মেসেজ' : "Messages"), isLink: true, path: '/messages' },
-    // Bookings + Rent Collection share the same `bookings` data and now live
-    // under ONE sidebar entry; a segmented toggle at the top of the view
-    // switches between the two (setActiveTab still uses 'bookings' | 'rent').
     { id: 'bookings', icon: Calendar, label: language === 'বাংলা' ? 'ভাড়াটিয়া ও রেন্ট' : "Tenants & Rent" },
     { id: 'payments', icon: CreditCard, label: language === 'বাংলা' ? 'পেমেন্ট সেটিংস' : 'Payment Settings' },
     { id: 'smartAlerts', icon: BellRing, label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্টস' : 'Smart Alerts' },
     { id: 'aiInsights',  icon: Sparkles, label: language === 'বাংলা' ? 'এআই ইনসাইটস'   : 'AI Insights' },
     { id: 'settings', icon: Settings, label: language === 'বাংলা' ? 'সেটিংস' : 'Settings' },
     { id: 'support', icon: HelpCircle, label: language === 'বাংলা' ? 'হেল্প ও সাপোর্ট' : 'Support', isLink: true, path: '/support' },
+    { id: 'trust', icon: HeartHandshake, label: language === 'বাংলা' ? 'বিশ্বাস ও নিরাপত্তা' : 'Trust & Safety', isLink: true, path: '/trust-safety' },
+    { id: 'privacy', icon: ShieldCheck, label: language === 'বাংলা' ? 'প্রাইভেসি পলিসি' : 'Privacy Policy', isLink: true, path: '/privacy-policy' },
+    { id: 'terms', icon: FileText, label: language === 'বাংলা' ? 'শর্তাবলী' : 'Terms & Policies', isLink: true, path: '/terms' },
+    { id: 'refund', icon: CreditCard, label: language === 'বাংলা' ? 'রিফান্ড পলিসি' : 'Refund Policy', isLink: true, path: '/refund' },
   ];
 
   return (
