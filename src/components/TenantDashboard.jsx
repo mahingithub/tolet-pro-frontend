@@ -1888,18 +1888,20 @@ const handleWizardSubmit = async (payload) => {
             </span>
           </Link>
 
-          {/* Language toggle — English / বাংলা. Desktop-only: the mobile
-              header stays clean (logo + bell + avatar), matching the mockup.
+          {/* Language toggle — English / বাংলা.
+              Visible on mobile too: the global marketing navbar is hidden on the dashboard,
+              so this is the tenant's only in-dashboard language toggle on phones.
               Reuses the langRef + isLangOpen click-outside plumbing. */}
-          <div className="relative hidden md:block" ref={langRef}>
+          <div className="relative" ref={langRef}>
             <button
               onClick={() => setIsLangOpen((v) => !v)}
-              className="flex items-center gap-1.5 p-2 md:pl-3 md:pr-2.5 bg-white/60 rounded-xl border border-white/80 shadow-sm hover:bg-white transition-all active:scale-95"
+              className="flex items-center gap-1.5 p-2 lg:px-3 lg:py-2 bg-white/60 rounded-xl border border-white/80 shadow-sm hover:bg-white transition-all active:scale-95"
               title={language === 'বাংলা' ? 'ভাষা' : 'Language'}
             >
               <Globe size={16} className="text-gray-500" />
-              <span className="hidden md:block text-[11px] font-black text-gray-700">{language === 'বাংলা' ? 'বাংলা' : 'English'}</span>
-              <ChevronDown size={13} className={`text-gray-400 transition-transform ${isLangOpen ? 'rotate-180' : ''}`} />
+              {/* Globe-only through tablet; the label + chevron appear from lg up */}
+              <span className="hidden lg:block text-[12px] font-black text-gray-700">{language === 'বাংলা' ? 'বাংলা' : 'English'}</span>
+              <ChevronDown size={14} className={`hidden lg:block text-gray-400 transition-transform duration-200 ${isLangOpen ? 'rotate-180' : ''}`} />
             </button>
             {isLangOpen && (
               <div className="absolute right-0 mt-2 w-36 bg-white/95 backdrop-blur-3xl border border-white shadow-[0_20px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[100] animate-in fade-in zoom-in-95 origin-top-right">
@@ -1910,7 +1912,7 @@ const handleWizardSubmit = async (payload) => {
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[12px] font-black transition-colors ${language === lng ? 'bg-red-50 text-[#ba0036]' : 'text-gray-600 hover:bg-gray-50'}`}
                   >
                     {lng === 'বাংলা' ? 'বাংলা' : 'English'}
-                    {language === lng && <Check size={14} />}
+                    {language === lng && <Check size={14} strokeWidth={3} />}
                   </button>
                 ))}
               </div>
@@ -2301,26 +2303,29 @@ const handleWizardSubmit = async (payload) => {
                   badge: tenantAlertCount > 0 ? tenantAlertCount : null,
                   onClick: () => setActiveTab('alerts'),
                 }] : []),
-              ].map(({ id, label, sub, Icon, iconBg, iconColor, badge, onClick, extraClass }) => (
-                <button
-                  key={id || label}
-                  type="button"
-                  onClick={onClick}
-                  className={`group ${extraClass || 'flex'} flex-col items-center text-center gap-2 p-3 md:flex-row md:text-left md:items-center md:gap-3 md:p-4 rounded-2xl bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300`}
-                >
-                  <span className={`relative w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 ${iconBg} ${iconColor} group-hover:scale-105 transition-transform`}>
-                    <Icon size={19} strokeWidth={2.4} />
-                    {badge ? (
-                      <span className="absolute -top-1.5 -right-1.5 bg-[#ba0036] text-white text-[9px] font-black min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center shadow-sm border border-white">{badge}</span>
-                    ) : null}
-                  </span>
-                  <span className="min-w-0 w-full md:flex-1">
-                    <span className="block text-[11px] md:text-sm font-black text-gray-900 leading-tight md:truncate">{label}</span>
-                    <span className="hidden md:block text-[11px] font-bold text-gray-400 leading-tight mt-0.5 truncate">{sub}</span>
-                  </span>
-                  <ChevronRight size={16} className="hidden md:block text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all shrink-0" />
-                </button>
-              ))}
+              ].map(({ id, label, sub, Icon, iconBg, iconColor, badge, onClick, extraClass }) => {
+                const isSingleMobile = myBookings.length === 0;
+                return (
+                  <button
+                    key={id || label}
+                    type="button"
+                    onClick={onClick}
+                    className={`group ${extraClass || 'flex'} ${isSingleMobile ? 'flex-row items-center text-left gap-3 p-4' : 'flex-col items-center text-center gap-2 p-3 md:flex-row md:text-left md:items-center md:gap-3 md:p-4'} rounded-2xl bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300`}
+                  >
+                    <span className={`relative w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 ${iconBg} ${iconColor} group-hover:scale-105 transition-transform`}>
+                      <Icon size={19} strokeWidth={2.4} />
+                      {badge ? (
+                        <span className="absolute -top-1.5 -right-1.5 bg-[#ba0036] text-white text-[9px] font-black min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center shadow-sm border border-white">{badge}</span>
+                      ) : null}
+                    </span>
+                    <span className={`min-w-0 ${isSingleMobile ? 'flex-1 block' : 'w-full md:flex-1'}`}>
+                      <span className="block text-[13px] md:text-sm font-black text-gray-900 leading-tight md:truncate">{label}</span>
+                      <span className={`${isSingleMobile ? 'block' : 'hidden md:block'} text-[11px] font-bold text-gray-400 leading-tight mt-0.5 truncate`}>{sub}</span>
+                    </span>
+                    <ChevronRight size={16} className={`${isSingleMobile ? 'block' : 'hidden md:block'} text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all shrink-0`} />
+                  </button>
+                );
+              })}
             </div>
 
             {/* ── PAYMENT PROOF — live rent tracker for the active lease ──
