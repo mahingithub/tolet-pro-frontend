@@ -2009,7 +2009,7 @@ const handleWizardSubmit = async (payload) => {
         {/* Profile preview at top — tap goes to profile tab */}
 
         
-        <div className="p-5 pt-14 pb-3 flex flex-col gap-4 relative">
+        <div className="p-5 pt-6 pb-3 flex flex-col gap-4 relative">
           <div onClick={() => { setActiveTab('profile'); setIsProfileDrawerOpen(false); }} className="flex items-center gap-3 bg-gray-50 hover:bg-[#ba0036]/5 p-3 rounded-2xl border border-gray-100 cursor-pointer transition-all group">
             <div className="relative shrink-0">
               <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg border border-blue-100 group-hover:scale-105 transition-transform overflow-hidden">

@@ -13,7 +13,7 @@ import {
   XCircle, AlertCircle, RefreshCw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, MinusCircle,
   Banknote, ArrowRight, ArrowUpRight, Clock, Smartphone,
   BellOff, CalendarRange, BarChart3,
-  Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Map, Leaf, HeartHandshake
+  Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Map, Leaf, HeartHandshake, BookOpen
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -3509,6 +3509,7 @@ const HostDashboard = () => {
     { id: 'aiInsights',  icon: Sparkles, label: language === 'বাংলা' ? 'এআই ইনসাইটস'   : 'AI Insights' },
     { id: 'settings', icon: Settings, label: language === 'বাংলা' ? 'সেটিংস' : 'Settings' },
     { id: 'support', icon: HelpCircle, label: language === 'বাংলা' ? 'হেল্প ও সাপোর্ট' : 'Support', isLink: true, path: '/support' },
+    { id: 'how-it-works', icon: BookOpen, label: language === 'বাংলা' ? 'কীভাবে কাজ করে' : 'How it Works', isLink: true, path: '/how-it-works' },
     { id: 'trust', icon: HeartHandshake, label: language === 'বাংলা' ? 'বিশ্বাস ও নিরাপত্তা' : 'Trust & Safety', isLink: true, path: '/trust-safety' },
     { id: 'privacy', icon: ShieldCheck, label: language === 'বাংলা' ? 'প্রাইভেসি পলিসি' : 'Privacy Policy', isLink: true, path: '/privacy-policy' },
     { id: 'terms', icon: FileText, label: language === 'বাংলা' ? 'শর্তাবলী' : 'Terms & Policies', isLink: true, path: '/terms' },
@@ -3749,7 +3750,7 @@ const HostDashboard = () => {
       <div className={`fixed top-0 right-0 h-full w-full max-w-[280px] bg-[#fdfdfd] shadow-2xl z-[70] transform transition-transform duration-500 ease-in-out flex flex-col border-l border-gray-100 ${isProfileDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
 
         
-        <div className="p-5 pt-14 pb-3 flex flex-col gap-4 relative">
+        <div className="p-5 pt-6 pb-3 flex flex-col gap-4 relative">
           <div onClick={() => { setActiveTab('profile'); setIsProfileDrawerOpen(false); }} className="flex items-center gap-3 bg-gray-50 hover:bg-[#ba0036]/5 p-3 rounded-2xl border border-gray-100 cursor-pointer transition-all group">
             <div className="relative shrink-0">
               {userData.avatar ? (
@@ -3836,17 +3837,7 @@ const HostDashboard = () => {
              )
           })}
           
-          {/* Added Static Links */}
-          <div className="pt-2 mt-2 border-t border-gray-100 flex flex-col gap-1">
-            <Link to="/how-it-works" onClick={() => setIsProfileDrawerOpen(false)} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer font-bold text-xs text-left text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-all duration-300">
-              <HelpCircle size={16} className="text-gray-400" />
-              <span className="flex-1 tracking-wide">{language === 'বাংলা' ? 'কীভাবে কাজ করে' : 'How it Works'}</span>
-            </Link>
-            <Link to="/terms" onClick={() => setIsProfileDrawerOpen(false)} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer font-bold text-xs text-left text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-all duration-300">
-              <FileText size={16} className="text-gray-400" />
-              <span className="flex-1 tracking-wide">{language === 'বাংলা' ? 'শর্তাবলী' : 'Terms & Policies'}</span>
-            </Link>
-          </div>
+
         </nav>
 
         <div className="p-5 border-t border-gray-100 bg-gray-50/50 flex flex-col gap-3 mt-auto">
