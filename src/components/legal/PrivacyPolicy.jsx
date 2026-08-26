@@ -265,7 +265,7 @@ export default function PrivacyPolicy() {
 									>
 										<div className={`p-1.5 rounded-lg ${activeSection === section.id ? 'bg-rose-500/20' : 'bg-transparent'}`}>
 											{React.cloneElement(section.icon, { 
-												className: \`w-4 h-4 \${activeSection === section.id ? 'text-rose-600 dark:text-rose-400' : 'opacity-70'}\`
+												className: `w-4 h-4 ${activeSection === section.id ? 'text-rose-600 dark:text-rose-400' : 'opacity-70'}`
 											})}
 										</div>
 										<span className="truncate">{isBn ? section.titleBn : section.titleEn}</span>
