@@ -33,3 +33,4 @@ dist/
 *.p12
 *.p8
 *.pem
+android/
