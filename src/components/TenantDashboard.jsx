@@ -647,22 +647,10 @@ const TenantDashboard = () => {
   } catch { return fallback; }
 };
   const [savedProperties, setSavedProperties] = useState(() => getCache('tenant_saved_props_cache', []));
+  useEffect(() => { localStorage.setItem('tenant_saved_props_cache', JSON.stringify(savedProperties)); }, [savedProperties]);
   const [searchQuery, setSearchQuery] = useState('');
 
   // 🟢 NEW: Payment receipts pushed in by the landlord from HostDashboard.
-  
-  useEffect(() => {
-    localStorage.setItem('tenant_saved_props_cache', JSON.stringify(savedProperties));
-  }, [savedProperties]);
-  
-  useEffect(() => {
-    localStorage.setItem('tenant_inquiries_cache', JSON.stringify(myInquiries));
-  }, [myInquiries]);
-  
-  useEffect(() => {
-    localStorage.setItem('tenant_bookings_cache', JSON.stringify(myBookings));
-  }, [myBookings]);
-
   const [paymentReceipts, setPaymentReceipts] = useState(() => getCache('tenant_receipts_cache', []));
   useEffect(() => { localStorage.setItem('tenant_receipts_cache', JSON.stringify(paymentReceipts)); }, [paymentReceipts]);
   const [activeReceipt, setActiveReceipt] = useState(null);
@@ -703,6 +691,7 @@ const TenantDashboard = () => {
   // shape the existing UI expects (title / location / price / stageIdx /
   // outcome / sentAt / lastUpdate / img).
   const [myInquiries, setMyInquiries] = useState(() => getCache('tenant_inquiries_cache', []));
+  useEffect(() => { localStorage.setItem('tenant_inquiries_cache', JSON.stringify(myInquiries)); }, [myInquiries]);
 
   // 🟢 NEW: the tenant's active leases (bookings). Rent Smart Alerts are
   // derived from each booking's `ledger` — the SAME source the landlord's
@@ -710,6 +699,7 @@ const TenantDashboard = () => {
   // (Receipts are only created once money changes hands, which is exactly
   // why unpaid rent was previously invisible to the tenant.)
   const [myBookings, setMyBookings] = useState(() => getCache('tenant_bookings_cache', []));
+  useEffect(() => { localStorage.setItem('tenant_bookings_cache', JSON.stringify(myBookings)); }, [myBookings]);
   // 🟢 V1 manual rent — the tenant's own "I have paid" submissions + a map of
   // each booking's landlord default payment method (drives rent-reminder text).
   const [rentSubmissions, setRentSubmissions] = useState([]);

@@ -1,5 +1,10 @@
 {
   "appId": "com.toletpro.app",
   "appName": "TO-LET PRO",
-  "webDir": "dist"
+  "webDir": "dist",
+  "plugins": {
+    "CapacitorUpdater": {
+      "autoUpdate": true
+    }
+  }
 }

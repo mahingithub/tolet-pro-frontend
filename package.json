@@ -17,6 +17,7 @@
     "@capacitor/core": "^8.4.0",
     "@capacitor/push-notifications": "^8.1.1",
     "@capacitor/splash-screen": "^8.0.1",
+    "@capgo/capacitor-updater": "^8.51.14",
     "@react-google-maps/api": "^2.20.8",
     "@sentry/react": "^10.55.0",
     "driver.js": "^1.8.0",

@@ -1134,29 +1134,15 @@ const HostDashboard = () => {
   } catch { return fallback; }
 };
   const [properties, setProperties] = useState(() => getCache('host_props_cache', initialPortfolio));
+  useEffect(() => { localStorage.setItem('host_props_cache', JSON.stringify(properties)); }, [properties]);
   const [isPropertiesLoading, setIsPropertiesLoading] = useState(true);
   const [propertyLoadError, setPropertyLoadError] = useState('');
   const [propertyRefreshTick, setPropertyRefreshTick] = useState(0);
   const [bookings, setBookings] = useState(() => getCache('host_bookings_cache', initialBookings));
+  useEffect(() => { localStorage.setItem('host_bookings_cache', JSON.stringify(bookings)); }, [bookings]);
   const [inquiries, setInquiries] = useState(() => getCache('host_inquiries_cache', initialInquiries));
+  useEffect(() => { localStorage.setItem('host_inquiries_cache', JSON.stringify(inquiries)); }, [inquiries]);
   // 🟢 V1 manual rent — landlord payment accounts + pending tenant claims.
-  
-  useEffect(() => {
-    localStorage.setItem('host_props_cache', JSON.stringify(properties));
-  }, [properties]);
-  
-  useEffect(() => {
-    localStorage.setItem('host_bookings_cache', JSON.stringify(bookings));
-  }, [bookings]);
-  
-  useEffect(() => {
-    localStorage.setItem('host_inquiries_cache', JSON.stringify(inquiries));
-  }, [inquiries]);
-
-  useEffect(() => {
-    localStorage.setItem('host_stats_cache', JSON.stringify(hostStats));
-  }, [hostStats]);
-
   const [paymentMethods, setPaymentMethods] = useState(() => getCache('host_payment_methods_cache', []));
   useEffect(() => { localStorage.setItem('host_payment_methods_cache', JSON.stringify(paymentMethods)); }, [paymentMethods]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
@@ -1748,6 +1734,7 @@ const HostDashboard = () => {
   // from live inquiries / bookings / chat threads. Replaces the old hardcoded
   // 98% / 15min / 24% card.
   const [hostStats, setHostStats] = useState(() => getCache('host_stats_cache', { responseRate: 0, avgResponseTime: 0, conversionRate: 0 }));
+  useEffect(() => { localStorage.setItem('host_stats_cache', JSON.stringify(hostStats)); }, [hostStats]);
   useEffect(() => {
     let cancelled = false;
     const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';

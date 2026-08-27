@@ -1,3 +1,4 @@
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import * as Sentry from '@sentry/react'
@@ -23,6 +24,13 @@ if (sentryDsn && import.meta.env.PROD) {
     // Session Replay is OFF by default (it can be heavy + privacy-sensitive).
     // Enable later if you want to watch what led to an error.
   });
+}
+
+
+try {
+  CapacitorUpdater.notifyAppReady();
+} catch (e) {
+  console.warn('CapacitorUpdater not available in this environment');
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
