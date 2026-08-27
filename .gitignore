@@ -34,3 +34,7 @@ dist/
 *.p8
 *.pem
 android/
+capacitor.config.json
+test_*.js
+test_*.cjs
+test_*.mjs
