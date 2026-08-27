@@ -1127,14 +1127,38 @@ const HostDashboard = () => {
   const toastTimerRef = useRef(null);
 
   // 🟢 DATA STATES
-  const [properties, setProperties] = useState(initialPortfolio);
+  const getCache = (key, fallback) => {
+  try {
+    const v = localStorage.getItem(key);
+    return v ? JSON.parse(v) : fallback;
+  } catch { return fallback; }
+};
+  const [properties, setProperties] = useState(() => getCache('host_props_cache', initialPortfolio));
   const [isPropertiesLoading, setIsPropertiesLoading] = useState(true);
   const [propertyLoadError, setPropertyLoadError] = useState('');
   const [propertyRefreshTick, setPropertyRefreshTick] = useState(0);
-  const [bookings, setBookings] = useState(initialBookings);
-  const [inquiries, setInquiries] = useState(initialInquiries);
+  const [bookings, setBookings] = useState(() => getCache('host_bookings_cache', initialBookings));
+  const [inquiries, setInquiries] = useState(() => getCache('host_inquiries_cache', initialInquiries));
   // 🟢 V1 manual rent — landlord payment accounts + pending tenant claims.
-  const [paymentMethods, setPaymentMethods] = useState([]);
+  
+  useEffect(() => {
+    localStorage.setItem('host_props_cache', JSON.stringify(properties));
+  }, [properties]);
+  
+  useEffect(() => {
+    localStorage.setItem('host_bookings_cache', JSON.stringify(bookings));
+  }, [bookings]);
+  
+  useEffect(() => {
+    localStorage.setItem('host_inquiries_cache', JSON.stringify(inquiries));
+  }, [inquiries]);
+
+  useEffect(() => {
+    localStorage.setItem('host_stats_cache', JSON.stringify(hostStats));
+  }, [hostStats]);
+
+  const [paymentMethods, setPaymentMethods] = useState(() => getCache('host_payment_methods_cache', []));
+  useEffect(() => { localStorage.setItem('host_payment_methods_cache', JSON.stringify(paymentMethods)); }, [paymentMethods]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
   const [pendingRentCount, setPendingRentCount] = useState(0);
   const [inquiryTab, setInquiryTab] = useState('pending'); // 'pending' | 'accepted' | 'rejected' | 'rented'
@@ -1723,7 +1747,7 @@ const HostDashboard = () => {
   // Response rate, avg response time, conversion rate — all server-computed
   // from live inquiries / bookings / chat threads. Replaces the old hardcoded
   // 98% / 15min / 24% card.
-  const [hostStats, setHostStats] = useState({ responseRate: 0, avgResponseTime: 0, conversionRate: 0 });
+  const [hostStats, setHostStats] = useState(() => getCache('host_stats_cache', { responseRate: 0, avgResponseTime: 0, conversionRate: 0 }));
   useEffect(() => {
     let cancelled = false;
     const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';

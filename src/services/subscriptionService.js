@@ -9,7 +9,15 @@ import { broadcast, subscribe as subscribeKey } from './_storage.js';
 const KEY_SUBSCRIPTION = 'subscription:update';
 const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
 
+
 let cachedStatus = { tier: 'free', isLoading: true, isPaid: false, isTrial: false, isExpired: false, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed: false, everPaid: false, planState: 'free_never' };
+try {
+  const saved = window.localStorage.getItem('tolet_sub_cache');
+  if (saved) {
+    cachedStatus = { ...JSON.parse(saved), isLoading: true };
+  }
+} catch(e) {}
+
 
 export const PREMIUM_FEATURES = [
   'analytics',
@@ -205,6 +213,7 @@ function updateCache(dbSub) {
     cachedStatus = { tier: 'free', isLoading: false, isPaid: false, isTrial: false, isExpired: everHadPeriod, daysRemaining: 0, trialEndsAt: null, plan: null, shareTrialClaimed, everPaid };
   }
   cachedStatus.planState = derivePlanState(cachedStatus);
+  try { window.localStorage.setItem('tolet_sub_cache', JSON.stringify(cachedStatus)); } catch(e) {}
   broadcast(KEY_SUBSCRIPTION);
   return cachedStatus;
 }

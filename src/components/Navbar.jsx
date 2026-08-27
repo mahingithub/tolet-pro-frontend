@@ -520,7 +520,7 @@ useEffect(() => {
                     if (e.key === 'Escape') setNavLocOpen(false);
                   }}
                   placeholder="Area, district, city…"
-                  className="bg-transparent outline-none border-none w-full text-sm font-bold text-gray-900 placeholder-gray-400 py-3 min-w-0"
+                  className="!bg-transparent outline-none border-none w-full text-sm font-bold text-gray-900 placeholder-gray-400 py-3 min-w-0"
                   autoComplete="off"
                 />
                 {navLoc && (
@@ -829,7 +829,7 @@ useEffect(() => {
                   if (e.key === 'Escape') { setMobileNavLocOpen(false); setIsMobileSearchOpen(false); }
                 }}
                 placeholder="Area, district, city…"
-                className="bg-transparent outline-none border-none text-sm font-bold text-gray-900 placeholder-gray-400 w-full"
+                className="!bg-transparent outline-none border-none text-sm font-bold text-gray-900 placeholder-gray-400 w-full"
                 autoComplete="off"
                 autoFocus
               />

@@ -640,11 +640,31 @@ const TenantDashboard = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLangOpen, setIsLangOpen] = useState(false);
   
-  const [savedProperties, setSavedProperties] = useState([]);
+  const getCache = (key, fallback) => {
+  try {
+    const v = localStorage.getItem(key);
+    return v ? JSON.parse(v) : fallback;
+  } catch { return fallback; }
+};
+  const [savedProperties, setSavedProperties] = useState(() => getCache('tenant_saved_props_cache', []));
   const [searchQuery, setSearchQuery] = useState('');
 
   // 🟢 NEW: Payment receipts pushed in by the landlord from HostDashboard.
-  const [paymentReceipts, setPaymentReceipts] = useState([]);
+  
+  useEffect(() => {
+    localStorage.setItem('tenant_saved_props_cache', JSON.stringify(savedProperties));
+  }, [savedProperties]);
+  
+  useEffect(() => {
+    localStorage.setItem('tenant_inquiries_cache', JSON.stringify(myInquiries));
+  }, [myInquiries]);
+  
+  useEffect(() => {
+    localStorage.setItem('tenant_bookings_cache', JSON.stringify(myBookings));
+  }, [myBookings]);
+
+  const [paymentReceipts, setPaymentReceipts] = useState(() => getCache('tenant_receipts_cache', []));
+  useEffect(() => { localStorage.setItem('tenant_receipts_cache', JSON.stringify(paymentReceipts)); }, [paymentReceipts]);
   const [activeReceipt, setActiveReceipt] = useState(null);
   const pdfReceiptRef = useRef(null);
 
@@ -682,14 +702,14 @@ const TenantDashboard = () => {
   // reflected within half a minute), and adapt each record into the
   // shape the existing UI expects (title / location / price / stageIdx /
   // outcome / sentAt / lastUpdate / img).
-  const [myInquiries, setMyInquiries] = useState([]);
+  const [myInquiries, setMyInquiries] = useState(() => getCache('tenant_inquiries_cache', []));
 
   // 🟢 NEW: the tenant's active leases (bookings). Rent Smart Alerts are
   // derived from each booking's `ledger` — the SAME source the landlord's
   // alerts use — so UNPAID rent shows up even before any receipt exists.
   // (Receipts are only created once money changes hands, which is exactly
   // why unpaid rent was previously invisible to the tenant.)
-  const [myBookings, setMyBookings] = useState([]);
+  const [myBookings, setMyBookings] = useState(() => getCache('tenant_bookings_cache', []));
   // 🟢 V1 manual rent — the tenant's own "I have paid" submissions + a map of
   // each booking's landlord default payment method (drives rent-reminder text).
   const [rentSubmissions, setRentSubmissions] = useState([]);

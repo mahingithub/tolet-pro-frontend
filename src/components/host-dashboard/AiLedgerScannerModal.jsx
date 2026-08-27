@@ -200,55 +200,69 @@ export default function AiLedgerScannerModal({
   const handleScan = useCallback(async () => {
     if (!imageBase64) return;
     setStage('scanning');
-    try {
-      const resp = await fetch(`${API_BASE}/ai/scan-ledger`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${getToken()}`,
-        },
-        body: JSON.stringify({
-          imageBase64,
-          mimeType,
-          defaultSettings,
-        }),
-      });
-      
-      if (resp.status === 429 || resp.status === 503) {
-        throw new Error('OVERLOAD');
+    
+    let attempt = 0;
+    const maxAttempts = 2;
+    
+    while (attempt < maxAttempts) {
+      try {
+        const resp = await fetch(`${API_BASE}/ai/scan-ledger`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${getToken()}`,
+          },
+          body: JSON.stringify({
+            imageBase64,
+            mimeType,
+            defaultSettings,
+          }),
+        });
+        
+        if (resp.status === 429 || resp.status === 503) {
+          throw new Error('OVERLOAD');
+        }
+
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.message || 'SCAN_ERROR');
+
+        setAiRawText(data.rawText || '');
+        setParseError(!!data.parseError);
+        setTenants(data.tenants || []);
+        setStage('review');
+        return; // Success, exit loop
+      } catch (err) {
+        const errMessage = (err.message || '').toLowerCase();
+        const isOverload = err.message === 'OVERLOAD' || 
+                           errMessage.includes('too many') || 
+                           errMessage.includes('rate limit') || 
+                           errMessage.includes('capacity') ||
+                           errMessage.includes('503') ||
+                           errMessage.includes('service unavailable') ||
+                           errMessage.includes('high demand');
+
+        if (isOverload && attempt < maxAttempts - 1) {
+          attempt++;
+          // Wait 2 seconds before retrying
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        }
+
+        let msgEn = "Same Problem, try again";
+        let msgBn = "একই সমস্যা, আবার চেষ্টা করুন";
+
+        if (isOverload) {
+           msgEn = "AI server is currently busy. Please try again in a few moments.";
+           msgBn = "AI সার্ভার এখন ব্যস্ত আছে। অনুগ্রহ করে একটু পর আবার চেষ্টা করুন।";
+        } else if (err.message === 'Failed to fetch') {
+           msgEn = "Network error. Please check your connection and try again.";
+           msgBn = "নেটওয়ার্ক সমস্যা। ইন্টারনেট চেক করে আবার চেষ্টা করুন।";
+        }
+
+        showToast(isBn ? msgBn : msgEn, { type: 'error', duration: 5000 });
+        setStage('upload');
+        return; // Failure, exit loop
       }
-
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.message || 'SCAN_ERROR');
-
-      setAiRawText(data.rawText || '');
-      setParseError(!!data.parseError);
-      setTenants(data.tenants || []);
-      setStage('review');
-    } catch (err) {
-      let msgEn = "Same Problem, try again";
-      let msgBn = "একই সমস্যা, আবার চেষ্টা করুন";
-
-      const errMessage = (err.message || '').toLowerCase();
-      
-      const isOverload = err.message === 'OVERLOAD' || 
-                         errMessage.includes('too many') || 
-                         errMessage.includes('rate limit') || 
-                         errMessage.includes('capacity') ||
-                         errMessage.includes('503') ||
-                         errMessage.includes('service unavailable') ||
-                         errMessage.includes('high demand');
-
-      if (isOverload) {
-         msgEn = "Many people are trying right now. Please try again in 1-2 minutes.";
-         msgBn = "অনেকে একসাথে চেষ্টা করছেন। ১-২ মিনিট পর আবার চেষ্টা করুন।";
-      } else if (err.message === 'Failed to fetch') {
-         msgEn = "Network error. Please check your connection and try again.";
-         msgBn = "নেটওয়ার্ক সমস্যা। ইন্টারনেট চেক করে আবার চেষ্টা করুন।";
-      }
-
-      showToast(isBn ? msgBn : msgEn, { type: 'error', duration: 5000 });
-      setStage('upload');
     }
   }, [imageBase64, mimeType, defaultSettings, isBn, showToast]);
 
@@ -279,6 +293,23 @@ export default function AiLedgerScannerModal({
       showToast(isBn ? 'কমপক্ষে একটি ভাড়াটিয়ার নাম ও ভাড়া দিন।' : 'At least one tenant with name & rent is required.', { type: 'error' });
       return;
     }
+
+    // Check for duplicate rows in the scanned list (same name, rent, and room)
+    const seen = new Set();
+    const duplicates = [];
+    for (const t of valid) {
+      const key = `${t.name.trim().toLowerCase()}|${t.monthlyRent}|${(t.roomNumber || '').trim().toLowerCase()}`;
+      if (seen.has(key)) {
+        duplicates.push(t.name);
+      }
+      seen.add(key);
+    }
+    
+    if (duplicates.length > 0) {
+      showToast(isBn ? `ডুপ্লিকেট ডাটা পাওয়া গেছে: ${duplicates[0]}। সেভ করার আগে ডিলিট বা মডিফাই করুন।` : `Duplicate data found: ${duplicates[0]}. Please edit or delete before saving.`, { type: 'error', duration: 6000 });
+      return;
+    }
+
     setStage('saving');
     try {
       const resp = await fetch(`${API_BASE}/bookings/batch`, {

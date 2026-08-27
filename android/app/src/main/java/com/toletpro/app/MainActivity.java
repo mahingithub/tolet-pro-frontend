@@ -1,4 +1,4 @@
-package pro.tolet.app;
+package com.toletpro.app;
 
 import com.getcapacitor.BridgeActivity;
 
