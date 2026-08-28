@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { tenantFieldReport } from '../../utils/tenantFields';
 import {
   X, Camera, Upload, Loader2, CheckCircle2, AlertCircle, ChevronDown,
   ChevronUp, Trash2, Plus, ScanLine, Sparkles, Check, RefreshCw,
@@ -27,7 +28,7 @@ function toBase64(file) {
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 // One editable tenant row in the review screen.
-function TenantReviewRow({ tenant, idx, onChange, onRemove, language }) {
+function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onRemove, language }) {
   const isBn = language === 'বাংলা';
   const [open, setOpen] = useState(true);
 
@@ -53,6 +54,7 @@ function TenantReviewRow({ tenant, idx, onChange, onRemove, language }) {
               title={isBn ? 'AI অনিশ্চিত — চেক করুন' : 'AI uncertain — please verify'} />
       )}
       <input
+        id={`scan-${idx}-${key}`}
         value={value ?? ''}
         onChange={e => onChange(idx, key, e.target.value)}
         className={`w-full px-2.5 py-2 rounded-lg text-xs font-bold border focus:outline-none focus:ring-1 transition-all ${
@@ -124,6 +126,7 @@ function TenantReviewRow({ tenant, idx, onChange, onRemove, language }) {
                   {isBn ? g.bn : g.en}
                 </label>
                 <input
+                  id={`scan-${idx}-${g.key}`}
                   autoFocus={gi === 0}
                   value={tenant[g.key] ?? ''}
                   onChange={e => onChange(idx, g.key, e.target.value)}
@@ -135,6 +138,75 @@ function TenantReviewRow({ tenant, idx, onChange, onRemove, language }) {
           </div>
         </div>
       )}
+
+
+      {/* ── What the admission form gave us ──────────────────────────────
+          Form mode only. A khata page has none of this on it, so rendering
+          fifteen empty boxes there would be noise. */}
+      {open && scanMode === 'form' && (() => {
+        const prof = tenant.tenantProfile || {};
+        const { filled, missing } = tenantFieldReport(
+          { ...prof, name: tenant.name, phone: tenant.phone, moveInDate: tenant.moveInDate },
+          isBn,
+        );
+        const row = (key, label, wide) => (
+          <div key={key} className={wide ? 'col-span-2' : ''}>
+            <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">{label}</label>
+            <input
+              id={`scan-${idx}-${key}`}
+              value={prof[key] ?? ''}
+              onChange={e => onProfileChange(idx, key, e.target.value)}
+              placeholder={isBn ? 'ফরমে পাওয়া যায়নি' : 'not found on the form'}
+              className={`w-full px-2.5 py-2 rounded-lg text-xs font-bold border focus:outline-none focus:ring-1 transition-all ${
+                String(prof[key] || '').trim()
+                  ? 'border-gray-200 bg-white focus:ring-[#ba0036]/40'
+                  : 'border-dashed border-amber-300 bg-amber-50/40 focus:ring-amber-400'
+              }`}
+            />
+          </div>
+        );
+        return (
+          <div className="px-3 pb-3 pt-2 bg-white border-t border-gray-100">
+            {/* The account of the scan, before any of the boxes. */}
+            <div className="mb-2 flex items-start gap-1.5 flex-wrap">
+              <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-[9px] font-black uppercase tabular-nums">
+                {isBn ? `পাওয়া গেছে ${filled.length}` : `read ${filled.length}`}
+              </span>
+              {missing.length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-[9px] font-black uppercase tabular-nums">
+                  {isBn ? `পাওয়া যায়নি ${missing.length}` : `not found ${missing.length}`}
+                </span>
+              )}
+              {missing.length > 0 && (
+                <span className="w-full text-[9px] font-bold text-amber-700/80 leading-relaxed">
+                  {missing.map(f => f.label).join(' · ')}
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {row('fatherName',       isBn ? 'পিতার নাম' : "Father's name", true)}
+              {row('dob',              isBn ? 'জন্ম তারিখ' : 'Date of birth')}
+              {row('maritalStatus',    isBn ? 'বৈবাহিক অবস্থা' : 'Marital status')}
+              {row('permanentAddress', isBn ? 'স্থায়ী ঠিকানা' : 'Permanent address', true)}
+              {row('tenantType',       isBn ? 'পেশা' : 'Profession')}
+              {row('organization',     isBn ? 'প্রতিষ্ঠান' : 'Organization')}
+              {row('department',       isBn ? 'ডিপার্টমেন্ট' : 'Department')}
+              {row('professionalIdNumber', isBn ? 'স্টুডেন্ট / এমপ্লয়ি আইডি' : 'Student / Employee ID')}
+              {row('govtIdNumber',     isBn ? 'NID / পাসপোর্ট' : 'NID / Passport', true)}
+              {row('emergencyName',    isBn ? 'জরুরি যোগাযোগ — নাম' : 'Emergency — name')}
+              {row('emergencyPhone',   isBn ? 'জরুরি যোগাযোগ — মোবাইল' : 'Emergency — mobile')}
+              {row('emergencyRelation', isBn ? 'সম্পর্ক' : 'Relation')}
+              {row('emergencyAddress',  isBn ? 'জরুরি যোগাযোগ — ঠিকানা' : 'Emergency — address')}
+            </div>
+            <p className="text-[9px] font-bold text-gray-400 mt-2 leading-relaxed">
+              {isBn
+                ? 'ড্যাশ-বর্ডার মানে ফরমে পাওয়া যায়নি। এগুলো ঐচ্ছিক — খালি রেখেও সেভ করা যাবে।'
+                : 'A dashed box means the form did not have it. These are optional — saving works without them.'}
+            </p>
+          </div>
+        );
+      })()}
 
       {/* What the AI already got — collapsed to a summary so it doesn't
           compete for attention with the boxes that still need filling. */}
@@ -329,7 +401,15 @@ export default function AiLedgerScannerModal({
 
   // ── Edit tenant field inline ─────────────────────────────────────────────────
   const handleFieldChange = useCallback((idx, key, value) => {
-    setTenants(prev => prev.map((t, i) => i === idx ? { ...t, [key]: value } : t));
+    setTenants(prev => prev.map((t, i) => (i === idx ? { ...t, [key]: value } : t)));
+  }, []);
+
+  // Same, for the fields that live under `tenantProfile` — father's name, NID,
+  // emergency contact and the rest of what an admission form carries.
+  const handleProfileChange = useCallback((idx, key, value) => {
+    setTenants(prev => prev.map((t, i) => (
+      i === idx ? { ...t, tenantProfile: { ...(t.tenantProfile || {}), [key]: value } } : t
+    )));
   }, []);
 
   const handleRemoveTenant = useCallback((idx) => {
@@ -349,6 +429,37 @@ export default function AiLedgerScannerModal({
 
   // ── Save all ─────────────────────────────────────────────────────────────────
   const handleSaveAll = useCallback(async () => {
+    // Nothing saves while a REQUIRED box is empty, and the first one is scrolled
+    // to and focused — hunting for it through a list of scanned rows is exactly
+    // the work the scan was supposed to remove.
+    //
+    // Required means the same four things it means everywhere else (name,
+    // mobile, room, move-in) plus the rent, which the ledger cannot work
+    // without. Optional gaps are shown but never block: "no NID" is an answer.
+    for (let i = 0; i < tenants.length; i += 1) {
+      const t = tenants[i];
+      const gaps = [];
+      if (!String(t.name || '').trim()) gaps.push('name');
+      if (!String(t.phone || '').trim()) gaps.push('phone');
+      if (!String(t.roomNumber || '').trim()) gaps.push('roomNumber');
+      if (!(Number(t.monthlyRent) > 0)) gaps.push('monthlyRent');
+      if (!gaps.length) continue;
+
+      showToast(isBn
+        ? `${t.name?.trim() || `সারি ${i + 1}`} — ${gaps.length}টি ঘর খালি, পূরণ করুন`
+        : `${t.name?.trim() || `Row ${i + 1}`} — ${gaps.length} required field(s) still empty`,
+        { type: 'error' });
+      setTenants(prev => prev.map((x, j) => (j === i ? { ...x, _forceOpen: Date.now() } : x)));
+      setTimeout(() => {
+        const el = document.getElementById(`scan-${i}-${gaps[0]}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          try { el.focus({ preventScroll: true }); } catch { /* focus optional */ }
+        }
+      }, 80);
+      return;
+    }
+
     const valid = tenants.filter(t => t.name?.trim() && Number(t.monthlyRent) > 0);
     if (valid.length === 0) {
       showToast(isBn ? 'কমপক্ষে একটি ভাড়াটিয়ার নাম ও ভাড়া দিন।' : 'At least one tenant with name & rent is required.', { type: 'error' });
@@ -479,8 +590,14 @@ export default function AiLedgerScannerModal({
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { id: 'khata', en: 'Rent Book', bn: 'ভাড়ার খাতা', subEn: 'Many tenants · rent + rooms', subBn: 'অনেক ভাড়াটিয়া · ভাড়া ও রুম' },
-                    { id: 'form',  en: 'Admission Form', bn: 'ভর্তি ফরম', subEn: 'One tenant · full details', subBn: 'একজন ভাড়াটিয়া · সব তথ্য' },
+                    { id: 'khata', en: 'Rent Book', bn: 'ভাড়ার খাতা',
+                      subEn: 'Many tenants', subBn: 'অনেক ভাড়াটিয়া',
+                      readsEn: 'Reads: name, mobile, rent, advance, room',
+                      readsBn: 'পড়বে: নাম, মোবাইল, ভাড়া, অগ্রিম, রুম' },
+                    { id: 'form',  en: 'Admission Form', bn: 'ভর্তি ফরম',
+                      subEn: 'One tenant', subBn: 'একজন ভাড়াটিয়া',
+                      readsEn: 'Also reads: father, address, DOB, profession, IDs, emergency contact',
+                      readsBn: 'আরও পড়বে: পিতা, ঠিকানা, জন্ম তারিখ, পেশা, আইডি, জরুরি যোগাযোগ' },
                   ].map(m => {
                     const on = scanMode === m.id;
                     return (
@@ -495,6 +612,12 @@ export default function AiLedgerScannerModal({
                         </p>
                         <p className="text-[9px] font-bold text-gray-500 leading-tight mt-0.5">
                           {isBn ? m.subBn : m.subEn}
+                        </p>
+                        {/* Which fields this mode can actually extract. Without
+                            it, scanning an admission form as a খাতা quietly
+                            reads five fields out of fifteen. */}
+                        <p className={`text-[9px] font-bold leading-tight mt-1 ${on ? 'text-[#ba0036]/80' : 'text-gray-400'}`}>
+                          {isBn ? m.readsBn : m.readsEn}
                         </p>
                       </button>
                     );
@@ -698,6 +821,8 @@ export default function AiLedgerScannerModal({
                     tenant={t}
                     idx={i}
                     onChange={handleFieldChange}
+                    onProfileChange={handleProfileChange}
+                    scanMode={scanMode}
                     onRemove={handleRemoveTenant}
                     language={language}
                   />

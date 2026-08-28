@@ -18,9 +18,9 @@
  */
 
 import React, { useRef, useState } from 'react';
-import { X, Loader2, Check, RefreshCw, UserPlus, DoorOpen, ScanLine, Sparkles } from 'lucide-react';
+import { X, Loader2, Check, RefreshCw, UserPlus, DoorOpen, ScanLine, Sparkles, AlertCircle } from 'lucide-react';
 import TenantInfoForm from './TenantInfoForm';
-import { emptyTenantProfile, validateTenantProfile } from '../../utils/tenantFields';
+import { emptyTenantProfile, validateTenantProfile, tenantFieldReport } from '../../utils/tenantFields';
 import { addTenantToUnit, replaceTenantInUnit } from '../../services/buildingService';
 import { unitNoun } from '../../utils/buildingTypes';
 import { submitOnEnter } from '../../utils/submitOnEnter';
@@ -202,16 +202,48 @@ export default function SeatTenantModal({
               className="hidden"
               onChange={(e) => { handleScan(e.target.files?.[0]); e.target.value = ''; }}
             />
-            {scanned && (
-              <p className="text-[10px] font-bold text-emerald-700 mt-1.5 inline-flex items-start gap-1 leading-relaxed">
-                <Sparkles size={10} className="shrink-0 mt-0.5" />
-                <span>
-                  {isBn
-                    ? `ফরম থেকে ${scanned.length}টি ঘর ভরা হয়েছে। বাকিগুলো খালি — ফরমে ছিল না।`
-                    : `${scanned.length} field(s) came from the form. The rest are blank because the page did not have them.`}
-                </span>
-              </p>
-            )}
+            {/* What the scan actually got, and what it did not. A bare count
+                left the landlord to work out which fields were still empty by
+                opening the section and reading every box. */}
+            {scanned && (() => {
+              const { filled, missing } = tenantFieldReport(profile, isBn);
+              return (
+                <div className="mt-2 rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="px-2.5 py-2 bg-emerald-50 border-b border-emerald-100">
+                    <p className="text-[10px] font-black text-emerald-800 inline-flex items-center gap-1">
+                      <Sparkles size={10} className="shrink-0" />
+                      {isBn ? `ফরম থেকে পাওয়া গেছে — ${filled.length}টি` : `Read from the form — ${filled.length}`}
+                    </p>
+                    <p className="text-[10px] font-bold text-emerald-700/80 leading-relaxed mt-0.5">
+                      {filled.map((f) => f.label).join(' · ')}
+                    </p>
+                  </div>
+
+                  {missing.length > 0 ? (
+                    <div className="px-2.5 py-2 bg-amber-50">
+                      <p className="text-[10px] font-black text-amber-800 inline-flex items-center gap-1">
+                        <AlertCircle size={10} className="shrink-0" />
+                        {isBn ? `পাওয়া যায়নি — ${missing.length}টি` : `Not found — ${missing.length}`}
+                      </p>
+                      <p className="text-[10px] font-bold text-amber-700/90 leading-relaxed mt-0.5">
+                        {missing.map((f) => f.label).join(' · ')}
+                      </p>
+                      <p className="text-[9px] font-bold text-amber-700/70 leading-relaxed mt-1">
+                        {isBn
+                          ? 'ফরমে ছিল না বা পড়া যায়নি। দরকার হলে নিচে হাতে লিখুন — না লিখলেও সেভ হবে।'
+                          : 'Either not on the page or not readable. Fill them in below if you need them — saving works without them.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="px-2.5 py-2 bg-emerald-50/60">
+                      <p className="text-[10px] font-black text-emerald-800">
+                        {isBn ? 'সব ঘর ভরা হয়েছে — দেখে নিয়ে সেভ করুন।' : 'Every field was read — check them and save.'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* The same tenant form as everywhere else: name, mobile, move-in,

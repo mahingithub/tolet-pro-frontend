@@ -247,6 +247,60 @@ export const hasExtraTenantInfo = (p = {}) => {
   ));
 };
 
+// ── What a scan actually captured ───────────────────────────────────────────
+// After reading a form, the landlord needs to know two things before saving:
+// what came through, and what did NOT. "৭টি ঘর ভরা হয়েছে" answers the first and
+// leaves the second to guesswork — so a blank permanent address looks the same
+// as a field the page never had.
+//
+// A field answered "নেই" is NOT missing. It was answered. Only genuinely blank
+// fields are reported as needing attention.
+export const tenantFieldReport = (p = {}, isBn = false) => {
+  const has = (k) => String(p?.[k] ?? '').trim() !== '';
+  const L = (bn, en) => (isBn ? bn : en);
+  const type = tenantTypeById(p.tenantType);
+
+  const rows = [
+    { key: 'name',             label: L('নাম', 'Name'), required: true },
+    { key: 'phone',            label: L('মোবাইল নম্বর', 'Mobile number'), required: true },
+    { key: 'moveInDate',       label: L('মুভ-ইন তারিখ', 'Move-in date'), required: true },
+    { key: 'fatherName',       label: L('পিতার নাম', "Father's name") },
+    { key: 'dob',              label: L('জন্ম তারিখ', 'Date of birth') },
+    { key: 'maritalStatus',    label: L('বৈবাহিক অবস্থা', 'Marital status') },
+    { key: 'permanentAddress', label: L('স্থায়ী ঠিকানা', 'Permanent address') },
+    { key: 'tenantType',       label: L('পেশা', 'Profession') },
+    {
+      key: 'organization',
+      label: type ? (isBn ? type.orgLabel.bn : type.orgLabel.en) : L('প্রতিষ্ঠান', 'Organization'),
+    },
+    // Only meaningful once we know they are a student.
+    ...(p.tenantType === 'student'
+      ? [{ key: 'department', label: L('ডিপার্টমেন্ট', 'Department') }]
+      : []),
+    {
+      key: 'professionalIdNumber',
+      label: type ? (isBn ? type.idLabel.bn : type.idLabel.en) : L('আইডি', 'ID'),
+      // "নেই" is a complete answer — do not list it as missing.
+      answered: p.professionalIdStatus === HAS_STATUS.NONE,
+    },
+    {
+      key: 'govtIdNumber',
+      label: L('NID / পাসপোর্ট', 'NID / Passport'),
+      answered: p.govtIdStatus === HAS_STATUS.NONE,
+    },
+    { key: 'emergencyName',  label: L('জরুরি যোগাযোগ — নাম', 'Emergency contact — name') },
+    { key: 'emergencyPhone', label: L('জরুরি যোগাযোগ — মোবাইল', 'Emergency contact — mobile') },
+  ];
+
+  const filled = [];
+  const missing = [];
+  rows.forEach((r) => {
+    if (has(r.key)) filled.push(r);
+    else if (!r.answered) missing.push(r);
+  });
+  return { filled, missing };
+};
+
 // Human label for the tenant's profession, for cards and lists. Falls back to
 // the free-text answer when the type is 'other'.
 export const tenantTypeLabel = (p = {}, isBn = false) => {
