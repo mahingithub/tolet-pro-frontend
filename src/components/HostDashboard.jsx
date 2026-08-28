@@ -3826,7 +3826,15 @@ const HostDashboard = () => {
 
       {/* --- TOP HEADER --- */}
       <div className="w-full max-w-[1600px] mx-auto z-40 relative">
-        <header className="mx-4 md:mx-8 mt-4 bg-white/60 backdrop-blur-3xl border border-white/80 rounded-[2rem] px-4 md:px-8 py-3.5 flex items-center justify-between shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+        {/* Hidden on the Rent Collection tab below lg. On a phone this bar plus
+            its margins costs roughly a fifth of the screen, and rent collection
+            is the one tab a landlord scrolls through every month with 70–80
+            rooms in it — that space is worth more as tenant rows.
+            Nothing is stranded: the Add Tenant / Rent Collection strip is a
+            separate element below, and MobileBottomNav (App.jsx) keeps Home,
+            Messages and Profile reachable. It returns on any other tab and on
+            desktop, where the space is not scarce. */}
+        <header className={`mx-4 md:mx-8 mt-4 bg-white/60 backdrop-blur-3xl border border-white/80 rounded-[2rem] px-4 md:px-8 py-3.5 items-center justify-between shadow-[0_8px_30px_rgb(0,0,0,0.04)] ${activeTab === 'rent' ? 'hidden lg:flex' : 'flex'}`}>
           {/* Logo → opens the "where to?" popup instead of jumping straight to
               the public homepage, because the dashboard is the landlord's home. */}
           <button

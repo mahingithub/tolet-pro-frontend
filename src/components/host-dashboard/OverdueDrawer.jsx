@@ -11,9 +11,12 @@
  * opposite edges of the same screen should look like siblings, not like two
  * different ideas that happen to be nearby.
  *
- * The Shared Ledger and Overdue Tenants sections in the rail are untouched.
- * This is a second way to reach the overdue list once you have scrolled past
- * them, not a replacement for them.
+ * THE ONLY PLACE overdue tenants are listed. The rail used to carry a box with
+ * the same list, which put it on screen twice.
+ *
+ * Scoped to ONE building: the tab appears after the landlord has entered a
+ * building, and shows that building's arrears. On the all-buildings overview
+ * there is no single set of tenants to chase, so it is not rendered at all.
  */
 
 import React, { useEffect, useRef } from 'react';
@@ -47,11 +50,7 @@ export default function OverdueDrawer({
   }, [open, onClose]);
 
   return (
-    // MOBILE AND TABLET ONLY. From lg up the left rail is permanently on
-    // screen with the overdue box already in it, so a floating tab beside it
-    // would just be the same list twice. This exists for the widths where the
-    // rail stacks above the tenant list and scrolls out of reach.
-    <div ref={ref} className="lg:hidden fixed left-0 top-1/2 -translate-y-1/2 z-[100] flex items-center">
+    <div ref={ref} className="fixed left-0 top-1/2 -translate-y-1/2 z-[100] flex items-center">
       <div
         className={`
           flex items-center bg-white dark:bg-gray-800 border border-l-0 border-gray-200 dark:border-gray-700

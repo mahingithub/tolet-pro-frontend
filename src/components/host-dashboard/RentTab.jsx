@@ -43,7 +43,6 @@ export default function RentTab(props) {
     landlordProfile, setLandlordProfile, currentBuildingId, setCurrentBuildingId
   } = props;
 
-  const [showAllOverdue, setShowAllOverdue] = useState(false);
   const [showAllBuildings, setShowAllBuildings] = useState(false);
   // On a phone the ledger + reminder rail used to sit ON TOP of the list, so a
   // landlord scrolled past roughly a screenful of summary before reaching the
@@ -611,45 +610,10 @@ export default function RentTab(props) {
                   </div>
                 </div>
 
-                {/* Only show Overdue Tenants and Legend if we are inside a specific building, or in single mode */}
-                {!(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) && sm.overdueTenants.length > 0 && (
-                  <div className="bg-white rounded-2xl xl:rounded-[2rem] p-4 xl:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none shrink-0">
-                    <div className="flex items-center justify-between mb-3 xl:mb-4">
-                      <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                        <AlertCircle size={14} className="text-red-500" />
-                        {language === 'বাংলা' ? 'বকেয়া ভাড়াটিয়া' : 'Overdue Tenants'}
-                      </h4>
-                      <span className="bg-red-50 text-red-600 px-2.5 py-1 rounded-lg text-xs font-black tabular-nums">{sm.overdueTenants.length}</span>
-                    </div>
-                    <div className="space-y-2">
-                      {sm.overdueTenants.slice(0, showAllOverdue ? sm.overdueTenants.length : 2).map(b => (
-                        <div key={b.id} className="flex items-center justify-between gap-2 p-2 rounded-xl hover:bg-gray-50 transition-colors">
-                          <button onClick={() => setExpandedRentId(b.id)} className="flex items-center gap-2.5 min-w-0 flex-1 text-left">
-                            <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center text-[10px] font-black shrink-0">{b.tenantInit}</div>
-                            <div className="min-w-0">
-                              <p className="text-[11px] font-black text-gray-900 truncate">{b.tenant}</p>
-                              <p className="text-[9px] font-bold text-gray-500 truncate tabular-nums">{formatBDT(b.monthlyRent)} · {b.property}</p>
-                            </div>
-                          </button>
-                          <button onClick={() => sendRentReminder(b, sm.key)} className="shrink-0 p-2 rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors" title="Send reminder">
-                            <BellRing size={14} />
-                          </button>
-                        </div>
-                      ))}
-                      {sm.overdueTenants.length > 2 && (
-                        <button
-                          onClick={() => setShowAllOverdue(!showAllOverdue)}
-                          className="w-full mt-2 py-2 rounded-xl bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-[10px] font-black uppercase tracking-widest transition-colors flex justify-center items-center gap-1"
-                        >
-                          {showAllOverdue 
-                            ? (language === 'বাংলা' ? 'কম দেখান' : 'Show less') 
-                            : (language === 'বাংলা' ? `আরও ${sm.overdueTenants.length - 2} জন দেখুন` : `Show ${sm.overdueTenants.length - 2} more`)}
-                          {showAllOverdue ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
+                {/* The Overdue Tenants box used to sit here. It moved into
+                    OverdueDrawer — a floating tab, like the theme switcher on
+                    the opposite edge. Rendering it in both places put the same
+                    list on screen twice. */}
 
                 {/* Legend — desktop only. Hidden on mobile + iPad (below xl,
                     where the rail stacks on top of the list); shown only in the
@@ -975,10 +939,14 @@ export default function RentTab(props) {
                 )}
               </main>
 
-              {/* Reminders on the left edge, like the day/night tab opposite.
-                  The Shared Ledger and Overdue Tenants sections above are
-                  untouched — this is a second way in once you have scrolled
-                  past them, not a replacement. */}
+              {/* Reminders on the left edge, like the theme tab opposite — and
+                  the only place overdue tenants are listed.
+                  Only INSIDE a building: `sm` is computed from baseBookings,
+                  which scopeBookings() has already narrowed to the building on
+                  screen, so the tab always shows that building's arrears and
+                  swaps when the landlord switches buildings. On the
+                  all-buildings overview there is no single set to chase. */}
+              {!(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) && (
               <OverdueDrawer
                 open={remindersOpen}
                 onOpen={() => setRemindersOpen(true)}
@@ -992,6 +960,7 @@ export default function RentTab(props) {
                   setRemindersOpen(false);
                 }}
               />
+              )}
 
             </div>
           </div>
