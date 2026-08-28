@@ -105,10 +105,15 @@ export default function TenantDetailModal({
             <Row label={isBn ? 'স্থায়ী ঠিকানা' : 'Permanent address'} value={p.permanentAddress} Icon={MapPin} />
           </Section>
 
-          <Section title={isBn ? 'ব্যক্তিগত' : 'Personal'}>
-            <Row label={isBn ? 'পিতার নাম' : "Father's name"} value={p.fatherName} />
+          {/* Ownership has to be unmistakable here. With "Father's name" listed
+              first, the date of birth and marital status underneath it read as
+              the FATHER's — they are the tenant's. The tenant's own facts come
+              first, and the father's name is labelled as the one borrowed
+              field it is. */}
+          <Section title={isBn ? 'ভাড়াটিয়ার ব্যক্তিগত তথ্য' : "Tenant's Personal Details"}>
             <Row label={isBn ? 'জন্ম তারিখ' : 'Date of birth'} value={fmtDate(p.dob, isBn)} />
             <Row label={isBn ? 'বৈবাহিক অবস্থা' : 'Marital status'} value={marital ? (isBn ? marital.bn : marital.en) : ''} />
+            <Row label={isBn ? 'পিতার নাম' : "Father's name"} value={p.fatherName} />
           </Section>
 
           {/* Profession — the labels follow the tenant's own answer, so a

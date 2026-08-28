@@ -19,6 +19,7 @@ import MembersManager from "../MembersManager.jsx";
 import { scopeBookings, bookingInBuilding, sortRentUnits } from '../../utils/buildingScope';
 import { buildingTypeLabel, buildingTypeColor, normaliseSubCategory } from '../../utils/buildingTypes';
 import VacantUnitsPanel from './VacantUnitsPanel';
+import RoomRentGroup from './RoomRentGroup';
 
 // Month labels for the 12-month rent matrix cells. Kept local to this file so
 // the tab renders standalone — the parent has its own copy for other tabs.
@@ -63,6 +64,21 @@ export default function RentTab(props) {
           const activeBuilding = currentBuildingId
             ? (landlordProfile?.buildings || []).find(b => String(b.id) === String(currentBuildingId)) || null
             : (landlordProfile?.buildingMode === 'single' ? (landlordProfile?.buildings?.[0] || null) : null);
+
+          // Rooms, in building order, each holding its seats. A booking is made
+          // once but rent is collected every month, so THIS is the screen that
+          // has to be organised: a twelve-seat hostel was twelve loose cards
+          // with nothing saying which room any of them belonged to.
+          const groupByRoom = (units) => {
+            const groups = [];
+            const byKey = new Map();
+            units.forEach((u) => {
+              const key = String(u.__realId || u.id);
+              if (!byKey.has(key)) { const g = { key, units: [] }; byKey.set(key, g); groups.push(g); }
+              byKey.get(key).units.push(u);
+            });
+            return groups;
+          };
 
           const rentUnits = sortRentUnits(baseBookings.flatMap(rentUnitsOf));
           const sm = getMonthCollectionSummary(rentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
@@ -877,7 +893,19 @@ export default function RentTab(props) {
                             </span>
                             <div className="flex-1 h-px bg-fuchsia-200/60"/>
                           </div>
-                          {attentionRent.map(b => renderRentRow(b, forceOpen))}
+                          {((list) => groupByRoom(list).map(g => (
+                          <RoomRentGroup
+                            key={g.key}
+                            units={g.units}
+                            renderRow={renderRentRow}
+                            forceOpen={forceOpen}
+                            language={language}
+                            formatBDT={formatBDT}
+                            monthKey={monthKey(todayDate.getFullYear(), todayDate.getMonth() + 1)}
+                            getRentStatus={getRentStatus}
+                            today={todayDate}
+                          />
+                        )))(attentionRent)}
                           {otherRent.length > 0 && (
                             <div className="flex items-center gap-2 px-1 pt-3 pb-1">
                               <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
@@ -886,10 +914,34 @@ export default function RentTab(props) {
                               <div className="flex-1 h-px bg-gray-200"/>
                             </div>
                           )}
-                          {otherRent.map(b => renderRentRow(b, forceOpen))}
+                          {((list) => groupByRoom(list).map(g => (
+                          <RoomRentGroup
+                            key={g.key}
+                            units={g.units}
+                            renderRow={renderRentRow}
+                            forceOpen={forceOpen}
+                            language={language}
+                            formatBDT={formatBDT}
+                            monthKey={monthKey(todayDate.getFullYear(), todayDate.getMonth() + 1)}
+                            getRentStatus={getRentStatus}
+                            today={todayDate}
+                          />
+                        )))(otherRent)}
                         </>
                       ) : (
-                        filteredBookings.map(b => renderRentRow(b, forceOpen))
+                        ((list) => groupByRoom(list).map(g => (
+                          <RoomRentGroup
+                            key={g.key}
+                            units={g.units}
+                            renderRow={renderRentRow}
+                            forceOpen={forceOpen}
+                            language={language}
+                            formatBDT={formatBDT}
+                            monthKey={monthKey(todayDate.getFullYear(), todayDate.getMonth() + 1)}
+                            getRentStatus={getRentStatus}
+                            today={todayDate}
+                          />
+                        )))(filteredBookings)
                       )}
                     </div>
                   );

@@ -17,12 +17,13 @@
  * its seats, and typing it again per tenant is how the numbers drift apart.
  */
 
-import React, { useState } from 'react';
-import { X, Loader2, Check, RefreshCw, UserPlus, DoorOpen } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { X, Loader2, Check, RefreshCw, UserPlus, DoorOpen, ScanLine, Sparkles } from 'lucide-react';
 import TenantInfoForm from './TenantInfoForm';
 import { emptyTenantProfile, validateTenantProfile } from '../../utils/tenantFields';
 import { addTenantToUnit, replaceTenantInUnit } from '../../services/buildingService';
 import { unitNoun } from '../../utils/buildingTypes';
+import { scanTenantForm } from '../../services/aiScanService';
 
 const todayIso = () => {
   const d = new Date();
@@ -51,6 +52,39 @@ export default function SeatTenantModal({
   }));
   const [errors, setErrors] = useState([]);
   const [saving, setSaving] = useState(false);
+  // Scanning the admission form the landlord is already holding, straight into
+  // THIS form. Manual and scanned are not two flows — the scan just fills the
+  // boxes, and the landlord corrects whatever the page did not say clearly.
+  const [scanning, setScanning] = useState(false);
+  const [scanned, setScanned] = useState(null);   // which fields the page filled
+  const scanInputRef = useRef(null);
+
+  const handleScan = async (file) => {
+    if (!file) return;
+    if (!file.type?.startsWith('image/')) {
+      showToast?.(isBn ? 'ছবি ফাইল দিন' : 'Please choose an image file');
+      return;
+    }
+    setScanning(true);
+    try {
+      const result = await scanTenantForm(file);
+      if (!result || !Object.keys(result.patch).length) {
+        showToast?.(isBn ? 'ফরম থেকে কিছু পড়া গেল না — হাতে লিখুন' : 'Nothing readable on that page — fill it in by hand');
+        return;
+      }
+      // Blanks on the page never overwrite what is already typed: scanTenantForm
+      // only returns keys the form actually had a value for.
+      setProfile((prev) => ({ ...prev, ...result.patch }));
+      setScanned(Object.keys(result.patch));
+      showToast?.(isBn
+        ? `${Object.keys(result.patch).length}টি ঘর ভরা হয়েছে — যাচাই করে নিন`
+        : `Filled ${Object.keys(result.patch).length} field(s) — please check them`);
+    } catch (err) {
+      showToast?.(err.message || (isBn ? 'স্ক্যান ব্যর্থ' : 'Scan failed'));
+    } finally {
+      setScanning(false);
+    }
+  };
 
   // What this person will be charged. A seat takes an equal share of the room
   // rent; a whole unit takes the lot. Shown so the host can see it — never
@@ -138,6 +172,44 @@ export default function SeatTenantModal({
             </p>
           </div>
 
+          {/* Scan the admission form instead of typing it. Same record either
+              way — this only prefills the boxes below. */}
+          <div className="mb-3">
+            <button
+              type="button"
+              disabled={scanning}
+              onClick={() => scanInputRef.current?.click()}
+              className="w-full px-3 py-3 rounded-2xl border-2 border-dashed border-[#ba0036]/30 bg-[#ba0036]/[0.03] text-[#ba0036] hover:bg-[#ba0036]/[0.06] active:scale-[0.99] transition-all inline-flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {scanning
+                ? <><Loader2 size={15} className="animate-spin" /> <span className="text-[11px] font-black uppercase tracking-wider">{isBn ? 'পড়া হচ্ছে…' : 'Reading…'}</span></>
+                : <>
+                    <ScanLine size={15} strokeWidth={2.5} />
+                    <span className="text-[11px] font-black uppercase tracking-wider">
+                      {isBn ? 'ভর্তি ফরম স্ক্যান করুন' : 'Scan the admission form'}
+                    </span>
+                  </>}
+            </button>
+            <input
+              ref={scanInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => { handleScan(e.target.files?.[0]); e.target.value = ''; }}
+            />
+            {scanned && (
+              <p className="text-[10px] font-bold text-emerald-700 mt-1.5 inline-flex items-start gap-1 leading-relaxed">
+                <Sparkles size={10} className="shrink-0 mt-0.5" />
+                <span>
+                  {isBn
+                    ? `ফরম থেকে ${scanned.length}টি ঘর ভরা হয়েছে। বাকিগুলো খালি — ফরমে ছিল না।`
+                    : `${scanned.length} field(s) came from the form. The rest are blank because the page did not have them.`}
+                </span>
+              </p>
+            )}
+          </div>
+
           {/* The same tenant form as everywhere else: name, mobile, move-in,
               then everything optional under অতিরিক্ত তথ্য. */}
           <TenantInfoForm
@@ -147,6 +219,7 @@ export default function SeatTenantModal({
             errors={errors}
             showToast={showToast}
             fieldId={(k) => `seat-${k}`}
+            defaultExpanded={!!scanned}
           />
 
           <div className="pt-4 flex items-center gap-2">

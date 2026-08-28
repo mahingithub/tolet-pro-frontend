@@ -1,3 +1,5 @@
+import { isBdMobile } from './validators.js';
+
 /*
  * tenantFields.js
  * ──────────────────────────────────────────────────────────────────────────
@@ -89,6 +91,27 @@ export const GOVT_ID_TYPES = [
   { id: 'passport', en: 'Passport', bn: 'পাসপোর্ট' },
 ];
 
+// A Bangladeshi NID number is 10 digits (Smart card), 13 (old), or 17 (old
+// with the 4-digit birth year prefixed). Nothing else is a real NID, and those
+// three lengths are unambiguous — so a typo in one is catchable.
+export const isValidNid = (v) => /^(\d{10}|\d{13}|\d{17})$/.test(String(v || '').replace(/\D/g, ''));
+
+// A BD passport number is nine characters: an e-passport is one letter then 8
+// digits (A01234567); an older MRP is two letters then 7 (BX0123456). Lenient
+// on case and spacing — the goal is to catch a slipped digit, not to reject an
+// unusual but genuine document.
+// The lookahead pins the total at nine, or `[A-Z]{1,2}\d{7,8}` would also
+// accept a ten-character AB12345678.
+export const isValidPassport = (v) => /^(?=[A-Z\d]{9}$)[A-Z]{1,2}\d{7,8}$/i
+  .test(String(v || '').replace(/[\s-]/g, ''));
+
+export const isValidGovtId = (type, value) => {
+  if (type === 'nid') return isValidNid(value);
+  if (type === 'passport') return isValidPassport(value);
+  // An unknown type is not something to hold the tenant to.
+  return true;
+};
+
 // The two answers every "…আছে?" question takes. `has` is a claim that the
 // document exists, and is the ONLY thing that can make a number required.
 export const HAS_STATUS = { HAS: 'has', NONE: 'none' };
@@ -176,11 +199,27 @@ export const validateTenantProfile = (p = {}) => {
   if (blank('phone'))      missing.push('phone');
   if (blank('moveInDate')) missing.push('moveInDate');
 
+  // A mobile number is the one field where being ALMOST right is worse than
+  // being empty: it is how the tenant's account is auto-linked, where every
+  // rent reminder goes, and the number the landlord calls when something is
+  // wrong. One transposed digit sends all of that to a stranger, silently.
+  // So the shape is checked, not just the presence.
+  if (!blank('phone') && !isBdMobile(p.phone)) missing.push('phone');
+
+  // Optional, but a wrong emergency number is worse than none — it is only
+  // ever used in the one situation where it must work.
+  if (!blank('emergencyPhone') && !isBdMobile(p.emergencyPhone)) missing.push('emergencyPhone');
+
   // "আছে" is a promise that a number exists — so we hold them to it. "নেই"
   // and unanswered both fall straight through with nothing to validate.
   if (p.govtIdStatus === HAS_STATUS.HAS) {
     if (blank('govtIdType'))   missing.push('govtIdType');
     if (blank('govtIdNumber')) missing.push('govtIdNumber');
+    // Shape-checked only once they have said which document it is. A wrong NID
+    // is as useless as a wrong phone number, and the lengths are unambiguous.
+    else if (p.govtIdType && !isValidGovtId(p.govtIdType, p.govtIdNumber)) {
+      missing.push('govtIdNumber');
+    }
   }
   if (p.professionalIdStatus === HAS_STATUS.HAS && blank('professionalIdNumber')) {
     missing.push('professionalIdNumber');

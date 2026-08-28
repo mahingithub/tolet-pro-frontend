@@ -30,7 +30,12 @@ import {
 import { privateUpload } from '../../services/cloudinaryUpload';
 import {
   TENANT_TYPES, tenantTypeById, GOVT_ID_TYPES, MARITAL_STATUSES, HAS_STATUS,
+  isValidNid, isValidPassport,
 } from '../../utils/tenantFields';
+import { isBdMobile } from '../../utils/validators';
+// The landlord's own profile already uses this; reusing it means one list of
+// institutions and companies across the app instead of a second one here.
+import WorkplaceAutocomplete from '../shared/Workplaceautocomplete';
 
 export default function TenantInfoForm({
   value,                       // tenant profile object (see emptyTenantProfile)
@@ -55,6 +60,14 @@ export default function TenantInfoForm({
   const v = value || {};
   const set = (patch) => onChange?.(patch);
   const err = (k) => (errors.includes(k) ? '!border-rose-400 ring-2 ring-rose-200' : '');
+
+  // Why a field is red. Only shown once it has been marked, so nothing nags at
+  // a box the landlord has not reached yet.
+  const Hint = ({ show, children }) => (show ? (
+    <p className="text-[10px] font-bold text-rose-600 mt-1 leading-relaxed">{children}</p>
+  ) : null);
+
+  const phoneBad = (k) => errors.includes(k) && String(v[k] || '').trim() && !isBdMobile(v[k]);
 
   const labelCls = 'text-[10px] font-black text-gray-400 uppercase tracking-widest';
   const inputCls = 'w-full mt-1.5 p-3.5 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all';
@@ -173,9 +186,16 @@ export default function TenantInfoForm({
             placeholder="+880 1xxx xxxxxx"
             className={`${inputCls} ${err('phone')}`}
           />
-          <p className="text-[9px] font-bold text-gray-400 mt-1">
-            {isBn ? 'নম্বর দিয়ে ভাড়াটিয়ার অ্যাকাউন্ট অটো-লিংক হয়' : 'The number auto-links the tenant’s account'}
-          </p>
+          <Hint show={phoneBad('phone')}>
+            {isBn
+              ? 'সঠিক বাংলাদেশি মোবাইল নম্বর দিন — ১১ ডিজিট, ০১৩ থেকে ০১৯ দিয়ে শুরু।'
+              : 'Enter a valid Bangladeshi mobile — 11 digits starting 013–019.'}
+          </Hint>
+          {!phoneBad('phone') && (
+            <p className="text-[9px] font-bold text-gray-400 mt-1">
+              {isBn ? 'নম্বর দিয়ে ভাড়াটিয়ার অ্যাকাউন্ট অটো-লিংক হয়' : 'The number auto-links the tenant’s account'}
+            </p>
+          )}
         </div>
         <div>
           <label className={`${labelCls} flex items-center gap-1`}>
@@ -266,15 +286,26 @@ export default function TenantInfoForm({
               />
             </div>
 
-            {/* ── Personal ── */}
+            {/* ── Personal ──
+                The tenant's OWN facts come first. With "Father's Name" at the
+                top, the date of birth and marital status beneath it read as
+                the father's, which is the wrong person entirely. */}
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              {isBn ? 'ভাড়াটিয়ার নিজের তথ্য' : "The tenant's own details"}
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="sm:col-span-2">
-                <label className={labelCls}>{isBn ? 'পিতার নাম' : "Father's Name"}</label>
-                <input type="text" value={v.fatherName || ''} onChange={(e) => set({ fatherName: e.target.value })} className={subInputCls} />
-              </div>
               <div>
                 <label className={labelCls}>{isBn ? 'জন্ম তারিখ' : 'Date of Birth'}</label>
-                <input type="date" value={v.dob || ''} onChange={(e) => set({ dob: e.target.value })} className={subInputCls} />
+                <input
+                  type="date"
+                  value={v.dob || ''}
+                  onChange={(e) => set({ dob: e.target.value })}
+                  // Nobody was born tomorrow. Without this the picker happily
+                  // accepted a date this year, which is how a tenant ends up
+                  // recorded as a few months old.
+                  max={new Date().toISOString().slice(0, 10)}
+                  className={subInputCls}
+                />
               </div>
               <div>
                 <label className={labelCls}>{isBn ? 'বৈবাহিক অবস্থা' : 'Marital Status'}</label>
@@ -284,6 +315,10 @@ export default function TenantInfoForm({
                     <option key={m.id} value={m.id}>{isBn ? m.bn : m.en}</option>
                   ))}
                 </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelCls}>{isBn ? 'পিতার নাম' : "Father's Name"}</label>
+                <input type="text" value={v.fatherName || ''} onChange={(e) => set({ fatherName: e.target.value })} className={subInputCls} />
               </div>
               <div className="sm:col-span-2">
                 <label className={`${labelCls} flex items-center gap-1`}>
@@ -341,7 +376,14 @@ export default function TenantInfoForm({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className={type.showDepartment ? '' : 'sm:col-span-2'}>
                       <label className={labelCls}>{isBn ? type.orgLabel.bn : type.orgLabel.en}</label>
-                      <input type="text" value={v.organization || ''} onChange={(e) => set({ organization: e.target.value })} className={subInputCls} />
+                      <div className="mt-1.5">
+                        <WorkplaceAutocomplete
+                          value={v.organization || ''}
+                          onChange={(text) => set({ organization: text })}
+                          language={language}
+                          placeholder={isBn ? type.orgLabel.bn : type.orgLabel.en}
+                        />
+                      </div>
                     </div>
                     {type.showDepartment && (
                       <div>
@@ -412,11 +454,16 @@ export default function TenantInfoForm({
                     <input
                       id={fieldId('govtIdNumber')}
                       type="text"
-                      inputMode="numeric"
+                      inputMode={v.govtIdType === 'passport' ? 'text' : 'numeric'}
                       value={v.govtIdNumber || ''}
                       onChange={(e) => set({ govtIdNumber: e.target.value })}
                       className={`${subInputCls} ${err('govtIdNumber')}`}
                     />
+                    <Hint show={errors.includes('govtIdNumber') && String(v.govtIdNumber || '').trim()}>
+                      {v.govtIdType === 'passport'
+                        ? (isBn ? 'পাসপোর্ট নম্বর ৯ অক্ষরের — যেমন A01234567 বা BX0123456।' : 'A passport number is 9 characters — e.g. A01234567 or BX0123456.')
+                        : (isBn ? 'NID নম্বর ১০, ১৩ বা ১৭ ডিজিটের হয়।' : 'An NID number is 10, 13 or 17 digits.')}
+                    </Hint>
                   </div>
                 </div>
               )}
@@ -441,7 +488,18 @@ export default function TenantInfoForm({
                 </div>
                 <div>
                   <label className={labelCls}>{isBn ? 'মোবাইল নম্বর' : 'Mobile Number'}</label>
-                  <input type="tel" value={v.emergencyPhone || ''} onChange={(e) => set({ emergencyPhone: e.target.value })} className={subInputCls} />
+                  <input
+                    id={fieldId('emergencyPhone')}
+                    type="tel"
+                    value={v.emergencyPhone || ''}
+                    onChange={(e) => set({ emergencyPhone: e.target.value })}
+                    className={`${subInputCls} ${err('emergencyPhone')}`}
+                  />
+                  <Hint show={phoneBad('emergencyPhone')}>
+                    {isBn
+                      ? 'সঠিক ১১ ডিজিটের নম্বর দিন, নয়তো খালি রাখুন — ভুল নম্বর না থাকার চেয়েও খারাপ।'
+                      : 'Give a valid 11-digit number or leave it empty — a wrong one is worse than none.'}
+                  </Hint>
                 </div>
                 <div>
                   <label className={labelCls}>{isBn ? 'ঠিকানা' : 'Address'}</label>

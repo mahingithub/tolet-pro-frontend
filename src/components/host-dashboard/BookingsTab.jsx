@@ -716,7 +716,14 @@ export default function BookingsTab(props) {
                 language={language}
                 showToast={showToast}
                 dismissible={false}
-                onCreated={(b) => { onBuildingCreated?.(b); setCurrentBuildingId?.(b.id); }}
+                onCreated={(b) => {
+                  // Drill into it only when it is their FIRST building. Jumping
+                  // inside a newly created second building is what made the
+                  // first one look like it had disappeared.
+                  const hadBuildings = (landlordProfile?.buildings || []).length > 0;
+                  onBuildingCreated?.(b);
+                  if (!hadBuildings) setCurrentBuildingId?.(b.id);
+                }}
               />
             );
           }

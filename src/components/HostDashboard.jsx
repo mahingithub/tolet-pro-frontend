@@ -659,6 +659,12 @@ const rentUnitsOf = (booking) => {
     id: `${booking.id}::${m.id || i}`,
     __realId: booking.id,
     __memberId: m.id || null,
+    // Which seat this person is in. Rent Collection groups by room and then
+    // lists seats inside it, so the seat has to survive the expansion — without
+    // this a hostel room's four rows were four names with nothing saying which
+    // bed each one was paying for.
+    __seatLabel: m.seatLabel || '',
+    __seatIndex: i + 1,
     members: undefined,
     tenant: m.name || booking.tenant,
     tenantAvatar: m.avatar || booking.tenantAvatar,
@@ -1763,11 +1769,26 @@ const HostDashboard = () => {
       .catch((err) => console.warn('[host] booking refresh failed:', err.message || err));
   };
 
-  const effectiveLandlordProfile = useMemo(() => (
-    (serverBuildings && serverBuildings.length)
-      ? { ...landlordProfile, buildings: serverBuildings }
-      : landlordProfile
-  ), [landlordProfile, serverBuildings]);
+  const effectiveLandlordProfile = useMemo(() => {
+    if (!(serverBuildings && serverBuildings.length)) return landlordProfile;
+    return {
+      ...landlordProfile,
+      buildings: serverBuildings,
+      // DERIVED, never stored. `buildingMode` is not a path on
+      // LandlordProfileSchema — like `buildings` before it, the strict schema
+      // silently discarded it, so it survived only in localStorage.
+      //
+      // The visible symptom: creating a second building left the mode on
+      // 'single', and single mode only ever renders buildings[0]. The building
+      // you already had vanished from the list, then "came back" on reload
+      // because currentBuildingId reset and buildings[0] was it again.
+      //
+      // Two buildings IS multi-building mode. Counting them cannot go stale.
+      buildingMode: serverBuildings.length > 1
+        ? 'multi'
+        : (landlordProfile?.buildingMode || 'single'),
+    };
+  }, [landlordProfile, serverBuildings]);
 
   // ── Auto-recovery for lost building profiles ────────────────────────────
   // If the user's `landlordProfile.buildings` is empty but they have bookings,

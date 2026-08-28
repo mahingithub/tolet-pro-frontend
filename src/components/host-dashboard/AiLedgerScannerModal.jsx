@@ -218,6 +218,8 @@ export default function AiLedgerScannerModal({
   const [aiRawText,    setAiRawText]    = useState('');
 
   const [saveResult,   setSaveResult]   = useState(null);    // { created, errors }
+  // Floor for the whole page, for rows the ledger did not label individually.
+  const [pageFloor,    setPageFloor]    = useState('');
 
   const fileInputRef = useRef();
   const cameraInputRef = useRef();
@@ -641,6 +643,50 @@ export default function AiLedgerScannerModal({
                   <span className="text-[10px] font-black text-gray-700">{building.name}</span>
                   <span className="text-[10px] font-bold text-gray-400">·</span>
                   <span className="text-[10px] font-bold text-gray-500">{isBn ? `${defaultSettings.rentDueDay} তারিখে ভাড়া` : `Due day ${defaultSettings.rentDueDay}`}</span>
+                </div>
+              )}
+
+              {/* ── Floor for the whole page ──────────────────────────────
+                  A ledger page normally names the floor once, at the top, and
+                  not again on any row. Rows that came back without one would
+                  otherwise land on the ground floor — splitting "Room 201" into
+                  two rooms with two separate bookings. Setting it here fills
+                  only the rows the page left blank. */}
+              {tenants.some(t => !String(t.floorNumber || '').trim()) && (
+                <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <AlertCircle size={13} className="text-amber-600 shrink-0" />
+                    <span className="text-[11px] font-black text-amber-800 flex-1 min-w-[140px]">
+                      {isBn
+                        ? `${tenants.filter(t => !String(t.floorNumber || '').trim()).length}টি সারিতে ফ্লোর নেই`
+                        : `${tenants.filter(t => !String(t.floorNumber || '').trim()).length} row(s) have no floor`}
+                    </span>
+                    <input
+                      type="number"
+                      value={pageFloor}
+                      onChange={(e) => setPageFloor(e.target.value)}
+                      placeholder={isBn ? 'ফ্লোর' : 'Floor'}
+                      className="w-20 px-2.5 py-1.5 rounded-lg border border-amber-300 bg-white text-xs font-bold text-gray-900 outline-none focus:border-amber-500 tabular-nums"
+                    />
+                    <button
+                      type="button"
+                      disabled={pageFloor === ''}
+                      onClick={() => {
+                        setTenants(prev => prev.map(t => (
+                          String(t.floorNumber || '').trim() ? t : { ...t, floorNumber: String(pageFloor) }
+                        )));
+                        showToast(isBn ? 'খালি সারিগুলোতে ফ্লোর বসানো হয়েছে' : 'Floor applied to the blank rows');
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-white text-[10px] font-black uppercase tracking-widest transition-colors"
+                    >
+                      {isBn ? 'বসান' : 'Apply'}
+                    </button>
+                  </div>
+                  <p className="text-[10px] font-bold text-amber-700 mt-1.5 leading-relaxed">
+                    {isBn
+                      ? 'ফ্লোর ছাড়া একই রুম নম্বর আলাদা রুম হিসেবে তৈরি হতে পারে — যেমন "২০১" দুইবার।'
+                      : 'Without a floor, one room number can become two separate rooms — e.g. "201" twice.'}
+                  </p>
                 </div>
               )}
 
