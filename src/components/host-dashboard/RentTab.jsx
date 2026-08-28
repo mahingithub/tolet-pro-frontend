@@ -4,7 +4,7 @@ import {
   LayoutDashboard, LayoutGrid, Building, Building2, MessageSquare, Calendar,
   Settings, HelpCircle, Plus, PlusCircle, Search, Bell, Filter, ArrowUpDown,
   Edit3, PauseCircle, PlayCircle, FileText, MapPin, Globe, CheckCircle2,
-  X, PanelLeft, CreditCard, MoreVertical, Download, Trash2, MessageCircle, Archive,
+  X, CreditCard, MoreVertical, Download, Trash2, MessageCircle, Archive,
   Send, Paperclip, Smile, Mail, Shield, ShieldCheck, LogOut, BadgeCheck, Camera, Check,
   Hourglass, Upload, User, UserCircle, Image as ImageIcon, CheckCircle, ScanFace, Zap,
   BellRing, Folder, Scale, ClipboardCheck, Receipt, UploadCloud, ArrowLeft,
@@ -23,6 +23,7 @@ import { scopeBookings, bookingInBuilding, sortRentUnits } from '../../utils/bui
 import { buildingTypeLabel, buildingTypeColor, normaliseSubCategory } from '../../utils/buildingTypes';
 import VacantUnitsPanel from './VacantUnitsPanel';
 import RoomRentGroup from './RoomRentGroup';
+import OverdueDrawer from './OverdueDrawer';
 
 // Month labels for the 12-month rent matrix cells. Kept local to this file so
 // the tab renders standalone — the parent has its own copy for other tabs.
@@ -49,7 +50,11 @@ export default function RentTab(props) {
   // first tenant — with 70–80 rooms that is the wrong thing to make them pay
   // for on every visit. Below lg it becomes a left drawer instead: same
   // content, one element, out of the way until asked for.
-  const [ledgerOpen, setLedgerOpen] = useState(false);
+  // The reminder drawer, opened from a tab on the LEFT edge — the mirror of
+  // the day/night tab on the right. The Shared Ledger and Overdue Tenants
+  // sections stay where they are; this is a second, always-reachable way to
+  // see who owes money without scrolling back up.
+  const [remindersOpen, setRemindersOpen] = useState(false);
 
           const todayDate = today;
           const isBn = language === 'বাংলা';
@@ -496,20 +501,7 @@ export default function RentTab(props) {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:h-[calc(100vh-140px)] overflow-visible lg:overflow-hidden">
 
               {/* ── LEFT RAIL — full Shared Ledger ALWAYS visible (mobile + desktop) ── */}
-              <aside className={`lg:col-span-4 w-full flex-col gap-3 lg:gap-5 lg:h-full lg:overflow-y-auto custom-scrollbar lg:pt-1 lg:pb-4 lg:pr-1 lg:flex lg:static lg:z-auto lg:w-auto lg:max-w-none lg:bg-transparent lg:p-0 lg:shadow-none ${
-                ledgerOpen
-                  ? 'flex fixed inset-y-0 left-0 z-[60] w-[88%] max-w-sm bg-gray-50 p-3 overflow-y-auto shadow-[8px_0_40px_rgba(0,0,0,0.25)] animate-in slide-in-from-left duration-200'
-                  : 'hidden'
-              }`}>
-                {/* Close, drawer only. */}
-                <button
-                  type="button"
-                  onClick={() => setLedgerOpen(false)}
-                  className="lg:hidden self-end -mb-1 p-2 rounded-lg bg-white text-gray-500 shadow-sm"
-                  aria-label={language === 'বাংলা' ? 'বন্ধ করুন' : 'Close'}
-                >
-                  <X size={16} />
-                </button>
+              <aside className="lg:col-span-4 w-full flex flex-col gap-3 lg:gap-5 lg:h-full lg:overflow-y-auto custom-scrollbar lg:pt-1 lg:pb-4 lg:pr-1">
 
                 {/* Shared Ledger hero — always visible, SLIM on mobile.
                     On a phone this card used to push the tenant rows well below
@@ -677,13 +669,7 @@ export default function RentTab(props) {
                 )}
               </aside>
 
-              {/* Tap-away, drawer only. */}
-              {ledgerOpen && (
-                <div
-                  className="lg:hidden fixed inset-0 z-[55] bg-gray-900/50 backdrop-blur-sm animate-in fade-in"
-                  onClick={() => setLedgerOpen(false)}
-                />
-              )}
+
 
               {/* ── RIGHT MAIN ── */}
               <main className="lg:col-span-8 w-full lg:h-full lg:overflow-y-auto custom-scrollbar pb-24 lg:pr-3 min-w-0">
@@ -799,19 +785,6 @@ export default function RentTab(props) {
                       Filter pills live on their own wrapping row (Row 2) below so
                       nothing needs horizontal scrolling on mobile / iPad. */}
                   <div className="flex items-center gap-1.5 sm:gap-2">
-                    {/* Opens the ledger + overdue rail, which lives off-screen
-                        on a phone so the tenant list starts at the top. */}
-                    <button
-                      type="button"
-                      onClick={() => setLedgerOpen(true)}
-                      className="lg:hidden shrink-0 inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-white text-[9px] font-black text-gray-700 uppercase tracking-widest shadow-[0_1px_3px_rgba(0,0,0,0.04)] active:scale-95 transition-transform"
-                      aria-label={language === 'বাংলা' ? 'লেজার ও বকেয়া' : 'Ledger and overdue'}
-                    >
-                      <PanelLeft size={12} className="text-[#ba0036]" />
-                      {sm.overdueCount > 0 && (
-                        <span className="px-1 rounded bg-rose-100 text-rose-700 tabular-nums">{sm.overdueCount}</span>
-                      )}
-                    </button>
                     {/* Title corner chip — small, gray, with live count. */}
                     <span className="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/70 text-[9px] xl:text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
                       <Wallet size={11} className="text-emerald-600"/>
@@ -1001,6 +974,24 @@ export default function RentTab(props) {
                   </div>
                 )}
               </main>
+
+              {/* Reminders on the left edge, like the day/night tab opposite.
+                  The Shared Ledger and Overdue Tenants sections above are
+                  untouched — this is a second way in once you have scrolled
+                  past them, not a replacement. */}
+              <OverdueDrawer
+                open={remindersOpen}
+                onOpen={() => setRemindersOpen(true)}
+                onClose={() => setRemindersOpen(false)}
+                tenants={sm.overdueTenants || []}
+                language={language}
+                formatBDT={formatBDT}
+                onRemind={(u) => sendRentReminder?.(u, monthKey(todayDate.getFullYear(), todayDate.getMonth() + 1))}
+                onOpenTenant={(u) => {
+                  setExpandedRentId?.(u.id);
+                  setRemindersOpen(false);
+                }}
+              />
 
             </div>
           </div>

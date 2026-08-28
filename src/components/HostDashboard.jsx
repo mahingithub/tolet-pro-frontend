@@ -2552,15 +2552,17 @@ const HostDashboard = () => {
         showToast(language === 'বাংলা' ? 'কত টাকা পেয়েছেন লিখুন' : 'Enter the amount received');
         return;
       }
-      // Measured against what is STILL OWED, not the whole month. With ৳5,000
-      // already banked on a ৳6,000 rent, the remaining ৳1,000 is a perfectly
-      // good partial — comparing it to ৳6,000 said nothing useful.
-      if (amt >= remainingBefore) {
-        showToast(language === 'বাংলা'
-          ? 'এতে পুরো ভাড়া মিটে যাচ্ছে — "Full Payment" নির্বাচন করুন'
-          : 'That settles the month — please choose "Full Payment" instead');
-        return;
-      }
+      // Deliberately NOT refused when the amount settles the month.
+      //
+      // Re-opening a ৳5,000 partial pre-fills the remaining ৳1,000 and keeps
+      // the status on 'partial' (that is what the month currently is) — so
+      // rejecting "partial that clears the month" left the landlord in a form
+      // that could not be saved in the state it opened in, told to pick a
+      // different button to enter the number already in the box.
+      //
+      // The status is derived from the money on save, so ৳1,000 here simply
+      // becomes a full month. There is nothing to correct and nothing to warn
+      // about.
     } else if (status === 'due') {
       if (!dueNote.trim()) {
         showToast(language === 'বাংলা' ? 'কারণটি একটু লিখুন' : 'Please add a short note for the due');
@@ -6821,9 +6823,17 @@ const HostDashboard = () => {
                                   <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'এক্সপেক্টেড' : 'Expected'}</p>
                                   <p className="text-[12px] font-black text-gray-900 mt-0.5 tabular-nums">{formatBDT(expected)}</p>
                                 </div>
-                                <div className={`rounded-lg py-2 border ${payForm.status === 'full' ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'}`}>
+                                <div className={`rounded-lg py-2 border ${balance <= 0 ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'}`}>
                                   <p className={`text-[8px] font-black uppercase tracking-widest ${theme.accent}`}>{language === 'বাংলা' ? 'পেইড' : 'Paid'}</p>
-                                  <p className="text-[12px] font-black text-gray-900 mt-0.5 tabular-nums">{formatBDT(amt)}</p>
+                                  {/* The month's TOTAL after this payment, not just this one.
+                                      Showing ৳1,200 next to an Expected of ৳6,200 read as if the
+                                      ৳5,000 already banked had been forgotten. */}
+                                  <p className="text-[12px] font-black text-gray-900 mt-0.5 tabular-nums">{formatBDT(alreadyBanked + amt)}</p>
+                                  {alreadyBanked > 0 && (
+                                    <p className="text-[8px] font-bold text-gray-500 tabular-nums leading-tight">
+                                      {formatBDT(alreadyBanked)} + {formatBDT(amt)}
+                                    </p>
+                                  )}
                                 </div>
                                 <div className={`rounded-lg py-2 border ${balance > 0 ? 'bg-rose-50 border-rose-200' : 'bg-green-50 border-green-200'}`}>
                                   <p className={`text-[8px] font-black uppercase tracking-widest ${balance > 0 ? 'text-rose-600' : 'text-green-600'}`}>{language === 'বাংলা' ? 'বাকি' : 'Balance'}</p>
@@ -6831,7 +6841,20 @@ const HostDashboard = () => {
                                 </div>
                               </div>
                               {payForm.status === 'full' && (
-                                <p className="text-[10px] font-bold text-blue-600 mt-2 flex items-center gap-1.5"><Lock size={10}/> {language === 'বাংলা' ? 'সম্পূর্ণ পেমেন্ট মোড — অ্যামাউন্ট লক করা' : 'Full Payment mode — amount locked to monthly rent'}</p>
+                                <p className="text-[10px] font-bold text-blue-600 mt-2 flex items-center gap-1.5">
+                                  <Lock size={10}/>
+                                  {/* Once part of the month is banked, "full" means
+                                      the REMAINING amount — saying "locked to the
+                                      monthly rent" would have the landlord expecting
+                                      ৳6,200 in a box showing ৳1,200. */}
+                                  {alreadyBanked > 0
+                                    ? (language === 'বাংলা'
+                                        ? `বাকি ${formatBDT(stillOwed)} — মাস মিটে যাবে`
+                                        : `The remaining ${formatBDT(stillOwed)} — settles the month`)
+                                    : (language === 'বাংলা'
+                                        ? 'সম্পূর্ণ পেমেন্ট মোড — অ্যামাউন্ট লক করা'
+                                        : 'Full Payment mode — amount locked to the month’s rent')}
+                                </p>
                               )}
                             </div>
 
@@ -6867,8 +6890,15 @@ const HostDashboard = () => {
                             onClick={submitMarkPaid}
                             className={`flex-[2] bg-gradient-to-br ${theme.from} ${theme.to} text-white py-4 rounded-xl font-black hover:-translate-y-0.5 transition-all text-sm flex items-center justify-center gap-2 shadow-[0_10px_25px_rgba(0,0,0,0.15)]`}
                           >
-                            {payForm.status === 'full' && <><CheckCheck size={18} strokeWidth={3}/> {language === 'বাংলা' ? 'পূর্ণ পেইড সেভ ও রিসিট পাঠান' : 'Save Full Payment & Send Receipt'}</>}
-                            {payForm.status === 'partial' && <><Hourglass size={18} strokeWidth={3}/> {language === 'বাংলা' ? 'আংশিক সেভ ও রিসিট পাঠান' : 'Save Partial & Send Receipt'}</>}
+                            {/* The button says what will ACTUALLY be saved. With the
+                                remaining ৳1,200 typed into a form still marked
+                                "partial", a button reading "Save Partial" was
+                                describing the button, not the outcome — the month
+                                settles either way, because the status follows the
+                                money. */}
+                            {payForm.status !== 'due' && (balance <= 0
+                              ? <><CheckCheck size={18} strokeWidth={3}/> {language === 'বাংলা' ? 'পূর্ণ পেইড সেভ ও রিসিট পাঠান' : 'Save Full Payment & Send Receipt'}</>
+                              : <><Hourglass size={18} strokeWidth={3}/> {language === 'বাংলা' ? 'আংশিক সেভ ও রিসিট পাঠান' : 'Save Partial & Send Receipt'}</>)}
                             {payForm.status === 'due' && <><AlertCircle size={18} strokeWidth={3}/> {language === 'বাংলা' ? 'বকেয়া হিসেবে সেভ' : 'Save as Due'}</>}
                           </button>
                           {isEditing && (
