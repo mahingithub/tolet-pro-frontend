@@ -16,7 +16,12 @@ import {
   Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Map, Leaf
 } from 'lucide-react';
 import MembersManager from "../MembersManager.jsx";
+import BuildingSetupWizard from "./BuildingSetupWizard.jsx";
+import UnitsManager from "./UnitsManager.jsx";
+import { buildingTypeLabel, buildingTypeColor, normaliseSubCategory, unitNoun } from "../../utils/buildingTypes";
+import { updateBuilding, archiveBuilding } from "../../services/buildingService";
 import AiLedgerScannerModal from "./AiLedgerScannerModal.jsx";
+import { scopeBookings, bookingInBuilding } from '../../utils/buildingScope';
 
 
 
@@ -32,7 +37,13 @@ export default function BookingsTab(props) {
     isOpenEndedLease, leaseMonthsRunning,
     formatBDT, daysUntilNextDue, computeBookingProgress,
     isHostelBooking, formatDate, stageLabel,
-    landlordProfile, setLandlordProfile, currentBuildingId, setCurrentBuildingId
+    landlordProfile, setLandlordProfile, currentBuildingId, setCurrentBuildingId,
+    // Refreshes the building list after the wizard creates one — buildings are
+    // server records now, not entries in the landlord profile blob.
+    onBuildingCreated,
+    // The scanner's batch endpoint returns per-tenant summaries, not whole
+    // bookings, so the list has to be re-read from the server after a scan.
+    refreshBookings
   } = props;
 
           const isBn = language === 'বাংলা';
@@ -45,24 +56,25 @@ export default function BookingsTab(props) {
           const [showAllBuildings, setShowAllBuildings] = useState(false);
           // AI Ledger Scanner modal toggle
           const [showAiScanner, setShowAiScanner] = useState(false);
+          // Spaces vs people — two views of the same building. Rooms first,
+          // because a room is set up once and tenants come and go from it.
+          const [buildingView, setBuildingView] = useState('tenants');
           const todayDate = today;
           
-          let baseBookings = bookings;
-          if (landlordProfile?.buildingMode === 'multi') {
-            if (currentBuildingId) {
-              const bldg = landlordProfile.buildings?.find(b => b.id === currentBuildingId);
-              baseBookings = bldg ? bookings.filter(b => b.property === bldg.name) : [];
-            } else {
-              const bldgNames = (landlordProfile.buildings || []).map(b => b.name);
-              baseBookings = bookings.filter(b => bldgNames.includes(b.property));
-            }
-          } else if (landlordProfile?.buildingMode === 'single') {
-            const bldgName = landlordProfile.buildings?.[0]?.name;
-            baseBookings = bldgName ? bookings.filter(b => b.property === bldgName) : [];
-          }
+          // Scoped by buildingId, in one shared place — see utils/buildingScope.js.
+          // The name-equality filters that used to live here (one copy per screen)
+          // are why hostel and single-room leases vanished after a successful save.
+          const baseBookings = scopeBookings(bookings, landlordProfile?.buildings, currentBuildingId);
           
           const leaseSummary = getLeaseSummary(baseBookings, todayDate);
           
+          // The building being viewed. Single mode has exactly one; multi mode
+          // has whichever the host drilled into. Null on the buildings overview,
+          // where there is no single set of rooms to show.
+          const activeBuilding = currentBuildingId
+            ? (landlordProfile?.buildings || []).find(b => String(b.id) === String(currentBuildingId)) || null
+            : (landlordProfile?.buildingMode === 'single' ? (landlordProfile?.buildings?.[0] || null) : null);
+
           const getPrefillBuilding = () => {
             if (landlordProfile?.buildingMode === 'single' && landlordProfile.buildings?.length > 0) {
               return landlordProfile.buildings[0];
@@ -619,7 +631,13 @@ export default function BookingsTab(props) {
               {/* ── Manual add: blank lease form ── */}
               <button
                 type="button"
-                onClick={() => isPremium ? openBlankLease(getPrefillBuilding()) : setActiveModal('premium_gate')}
+                onClick={() => {
+                  if (!isPremium) { setActiveModal('premium_gate'); return; }
+                  // Rooms exist ⇒ tenants go into one of them, never into a
+                  // brand-new booking of their own.
+                  if (activeBuilding?.id) { setBuildingView('units'); return; }
+                  openBlankLease(getPrefillBuilding());
+                }}
                 aria-label={isBn ? 'নতুন ভাড়াটিয়া যোগ করুন' : 'Add a new tenant'}
                 className="group relative overflow-hidden shrink-0 min-w-0 px-3 sm:px-3.5 py-2.5 rounded-xl bg-gradient-to-br from-[#ba0036] via-[#d1003d] to-[#ff004c] text-white shadow-[0_5px_16px_rgba(186,0,54,0.32)] hover:shadow-[0_9px_24px_rgba(186,0,54,0.42)] active:scale-[0.97] transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ba0036]/40 focus-visible:ring-offset-2"
               >
@@ -688,53 +706,18 @@ export default function BookingsTab(props) {
             );
           }
 
+          // A landlord in single-building mode with no building yet cannot use
+          // anything on this tab, so the wizard is the whole screen and is not
+          // dismissible. It replaces the old two-field form, which could only
+          // ever produce a residential flat and wrote to the profile blob.
           if (landlordProfile?.buildingMode === 'single' && (!landlordProfile.buildings || landlordProfile.buildings.length === 0)) {
             return (
-              <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in">
-                <div className="bg-white rounded-3xl p-6 md:p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95">
-                  <div className="text-center mb-6">
-                    <h2 className="text-xl font-black text-gray-900 mb-2">{isBn ? 'বাসার তথ্য দিন' : 'Enter House Details'}</h2>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1.5">{isBn ? 'বাসার নাম' : 'House Name'}</label>
-                      <input type="text" value={newBuilding.name} onChange={(e) => setNewBuilding({...newBuilding, name: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#ba0036]/20 focus:border-[#ba0036]" placeholder={isBn ? 'যেমন: স্কাই ভিউ টাওয়ার' : 'e.g. Sky View Tower'} />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1.5">{isBn ? 'ঠিকানা / লোকেশন' : 'Location'}</label>
-                      <input type="text" value={newBuilding.location} onChange={(e) => setNewBuilding({...newBuilding, location: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#ba0036]/20 focus:border-[#ba0036]" placeholder={isBn ? 'যেমন: মিরপুর ১০' : 'e.g. Mirpur 10'} />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1.5">{isBn ? 'ধরন' : 'Type'}</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { value: 'residential', label: isBn ? 'Residential' : 'Residential', icon: <Home size={18}/>, sub: isBn ? 'ফ্ল্যাট/বাসা' : 'Flat/House' },
-                          { value: 'commercial', label: isBn ? 'Commercial' : 'Commercial', icon: <Building2 size={18}/>, sub: isBn ? 'অফিস/দোকান' : 'Office/Shop' },
-                        ].map(opt => (
-                          <button key={opt.value} type="button" onClick={() => setNewBuilding({...newBuilding, type: opt.value, category: opt.value === 'residential' ? 'flat' : ''})}
-                            className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-center transition-all ${newBuilding.type === opt.value ? 'border-[#ba0036] bg-red-50 text-[#ba0036]' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
-                            {opt.icon}
-                            <span className="text-[10px] font-black uppercase tracking-wider">{opt.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    {/* Categories are handled via 'Add Tenant' format selection */}
-                    <button 
-                      onClick={() => {
-                        if(!newBuilding.name || !newBuilding.location) return;
-                        setLandlordProfile({
-                          ...landlordProfile, 
-                          buildings: [{ ...newBuilding, id: 'bldg_' + Date.now(), createdAt: new Date().toISOString() }]
-                        });
-                      }}
-                      className="w-full bg-[#ba0036] hover:bg-[#a0002f] text-white font-black py-3.5 rounded-xl shadow-lg hover:shadow-xl transition-all"
-                    >
-                      {isBn ? 'সেভ করুন' : 'Save Details'}
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <BuildingSetupWizard
+                language={language}
+                showToast={showToast}
+                dismissible={false}
+                onCreated={(b) => { onBuildingCreated?.(b); setCurrentBuildingId?.(b.id); }}
+              />
             );
           }
 
@@ -768,7 +751,7 @@ export default function BookingsTab(props) {
                     {(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) && (
                       <div className="hidden md:block space-y-3">
                         {(landlordProfile.buildings || []).map((bldg, idx) => {
-                          const bldgBookings = bookings.filter(b => b.property === bldg.name);
+                          const bldgBookings = bookings.filter(b => bookingInBuilding(b, bldg));
                           const bldgSummary = getLeaseSummary(bldgBookings, todayDate);
                           return (
                             <div key={bldg.id} className={`bg-white/5 rounded-xl p-3 ${!showAllBuildings && idx >= 5 ? 'hidden' : ''}`}>
@@ -906,35 +889,17 @@ export default function BookingsTab(props) {
                         </button>
                       </div>
                     </div>
+                    {/* Same wizard as first-run setup — one place where a
+                        building gets its four-type classification, so a hostel
+                        added later is classified like a hostel rather than
+                        silently landing as a residential flat. */}
                     {showBuildingForm && (
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4 animate-in slide-in-from-top-2">
-                        <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-3">{isBn ? 'নতুন বিল্ডিং যোগ করুন' : 'Add New Building'}</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                          <input type="text" value={newBuilding.name} onChange={(e) => setNewBuilding({...newBuilding, name: e.target.value})} placeholder={isBn ? 'বাসার নাম' : 'House Name'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold" />
-                          <input type="text" value={newBuilding.location} onChange={(e) => setNewBuilding({...newBuilding, location: e.target.value})} placeholder={isBn ? 'ঠিকানা' : 'Location'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 mb-3">
-                          {[
-                            { value: 'residential', label: 'Residential', icon: <Home size={14}/> },
-                            { value: 'commercial', label: 'Commercial', icon: <Building2 size={14}/> },
-                          ].map(opt => (
-                            <button key={opt.value} type="button" onClick={() => setNewBuilding({...newBuilding, type: opt.value, category: opt.value === 'residential' ? 'flat' : ''})}
-                              className={`flex items-center justify-center gap-1.5 py-2 rounded-xl border-2 text-[10px] font-black uppercase tracking-wider transition-all ${newBuilding.type === opt.value ? 'border-[#ba0036] bg-red-50 text-[#ba0036]' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
-                              {opt.icon} {opt.label}
-                            </button>
-                          ))}
-                        </div>
-                        {/* Categories are handled via 'Add Tenant' format selection */}
-                        <div className="flex justify-end gap-2">
-                          <button onClick={() => setShowBuildingForm(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100">{isBn ? 'বাতিল' : 'Cancel'}</button>
-                          <button onClick={() => {
-                            if(!newBuilding.name) return;
-                            setLandlordProfile({ ...landlordProfile, buildings: [...(landlordProfile.buildings||[]), { ...newBuilding, id: 'bldg_' + Date.now(), createdAt: new Date().toISOString() }] });
-                            setShowBuildingForm(false);
-                            setNewBuilding({ name: '', location: '', type: 'residential', category: 'flat' });
-                          }} className="px-4 py-2 rounded-xl text-xs font-black bg-[#ba0036] text-white hover:bg-[#a0002f]">{isBn ? 'যোগ করুন' : 'Save'}</button>
-                        </div>
-                      </div>
+                      <BuildingSetupWizard
+                        language={language}
+                        showToast={showToast}
+                        onCancel={() => setShowBuildingForm(false)}
+                        onCreated={(b) => { onBuildingCreated?.(b); setShowBuildingForm(false); }}
+                      />
                     )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {(landlordProfile.buildings || []).map(bldg => {
@@ -945,8 +910,10 @@ export default function BookingsTab(props) {
                                <div className="grid grid-cols-1 gap-3 mb-3">
                                  {/* Name disabled because modifying it breaks existing booking relationships */}
                                  <div>
-                                   <p className="text-[10px] font-bold text-gray-400 mb-1 ml-1">{isBn ? 'বিল্ডিংয়ের নাম পরিবর্তন করা যাবে না কারণ এটি ভাড়াটিয়াদের সাথে যুক্ত আছে।' : 'Name cannot be changed as it is linked to existing tenants.'}</p>
-                                   <input type="text" disabled value={editBuildingData.name} className="bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-500 w-full cursor-not-allowed" />
+                                   {/* Renaming is safe now: bookings join on buildingId, so a
+                                       name is only a label. It was disabled before precisely
+                                       because the name itself WAS the foreign key. */}
+                                   <input type="text" value={editBuildingData.name} onChange={(e) => setEditBuildingData({...editBuildingData, name: e.target.value})} placeholder={isBn ? 'বিল্ডিংয়ের নাম' : 'Building name'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold w-full" />
                                  </div>
                                  <input type="text" value={editBuildingData.location} onChange={(e) => setEditBuildingData({...editBuildingData, location: e.target.value})} placeholder={isBn ? 'ঠিকানা' : 'Location'} className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold w-full" />
                                </div>
@@ -963,33 +930,51 @@ export default function BookingsTab(props) {
                                </div>
                                <div className="flex justify-end gap-2">
                                  <button onClick={() => setEditingBuildingId(null)} className="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100">{isBn ? 'বাতিল' : 'Cancel'}</button>
-                                 <button onClick={() => {
-                                   setLandlordProfile({ 
-                                     ...landlordProfile, 
-                                     buildings: landlordProfile.buildings.map(b => b.id === bldg.id ? { ...b, location: editBuildingData.location, type: editBuildingData.type, category: editBuildingData.category } : b)
-                                   });
-                                   setEditingBuildingId(null);
+                                 <button onClick={async () => {
+                                   // Was writing to landlordProfile.buildings — a path that does
+                                   // not exist on the (strict) LandlordProfileSchema, so Mongoose
+                                   // discarded every "save" silently. Buildings are real records.
+                                   try {
+                                     await updateBuilding(bldg.id, {
+                                       name: editBuildingData.name,
+                                       address: editBuildingData.address ?? editBuildingData.location,
+                                     });
+                                     setEditingBuildingId(null);
+                                     onBuildingCreated?.();
+                                     showToast?.(isBn ? 'বিল্ডিং আপডেট হয়েছে' : 'Building updated');
+                                   } catch (err) {
+                                     showToast?.(err.message || (isBn ? 'আপডেট ব্যর্থ' : 'Update failed'));
+                                   }
                                  }} className="px-4 py-2 rounded-xl text-xs font-black bg-[#ba0036] text-white hover:bg-[#a0002f]">{isBn ? 'সেভ করুন' : 'Save Changes'}</button>
                                </div>
                              </div>
                            );
                          }
 
-                         const bldgBookings = bookings.filter(b => b.property === bldg.name);
+                         const bldgBookings = bookings.filter(b => bookingInBuilding(b, bldg));
                          const bldgSummary = getLeaseSummary(bldgBookings, todayDate);
-                         const typeLabel = bldg.type === 'residential' ? (isBn ? 'Residential' : 'Residential') : bldg.type === 'commercial' ? (isBn ? 'Commercial' : 'Commercial') : (isBn ? 'Hostel' : 'Hostel');
-                         const catLabel = bldg.category ? (bldg.category.charAt(0).toUpperCase() + bldg.category.slice(1)).replace('-', ' ') : '';
-                         const typeColor = bldg.type === 'residential' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : bldg.type === 'commercial' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-purple-50 text-purple-700 border-purple-200';
-                         const iconBg = bldg.type === 'residential' ? 'bg-emerald-100 text-emerald-600' : bldg.type === 'commercial' ? 'bg-indigo-100 text-indigo-600' : 'bg-purple-100 text-purple-600';
+                         // Card labels come from the shared classification
+                         // helper, so Family Flat / Bachelor Flat / Hostel /
+                         // Single Room read the same everywhere they appear.
+                         const typeLabel = buildingTypeLabel(bldg, isBn);
+                         const typeColor = buildingTypeColor(bldg);
+                         const subCat    = normaliseSubCategory(bldg.subCategory);
+                         const catLabel  = bldg.rentedAs === 'seat'
+                           ? (isBn ? 'সিট ভিত্তিক' : 'By seat')
+                           : bldg.rentedAs === 'room' ? (isBn ? 'রুম ভিত্তিক' : 'By room') : '';
+                         const iconBg = subCat === 'hostel' ? 'bg-orange-100 text-orange-600'
+                           : subCat === 'single_room' ? 'bg-sky-100 text-sky-600'
+                           : bldg.category === 'commercial' ? 'bg-violet-100 text-violet-600'
+                           : 'bg-emerald-100 text-emerald-600';
                          
                          return (
                            <div key={bldg.id} onClick={() => setCurrentBuildingId(bldg.id)} 
                              className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 cursor-pointer hover:shadow-lg hover:border-gray-200 transition-all group relative overflow-visible shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
                              {/* Top accent line */}
-                             <div className={`absolute top-0 left-0 right-0 h-1 ${bldg.type === 'residential' ? 'bg-emerald-500' : bldg.type === 'commercial' ? 'bg-indigo-500' : 'bg-purple-500'}`}/>
+                             <div className={`absolute top-0 left-0 right-0 h-1 ${subCat === 'hostel' ? 'bg-orange-500' : subCat === 'single_room' ? 'bg-sky-500' : bldg.category === 'commercial' ? 'bg-violet-500' : 'bg-emerald-500'}`}/>
                              <div className="flex items-start justify-between mb-3 pt-1">
                                <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0`}>
-                                 {bldg.type === 'hostel' ? <Users size={18}/> : bldg.type === 'commercial' ? <Building2 size={18}/> : <Home size={18}/>}
+                                 {subCat === 'hostel' ? <Users size={18}/> : subCat === 'single_room' ? <BedDouble size={18}/> : bldg.category === 'commercial' ? <Building2 size={18}/> : <Home size={18}/>}
                                </div>
                                <div className="flex items-center gap-2 relative">
                                  <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border ${typeColor}`}>{typeLabel}</span>
@@ -1036,7 +1021,7 @@ export default function BookingsTab(props) {
                                </div>
                              </div>
                              <h4 className="text-sm font-black text-gray-900 group-hover:text-[#ba0036] transition-colors mb-1 pr-8">{bldg.name}</h4>
-                             <p className="text-[11px] font-bold text-gray-400 flex items-center gap-1 mb-3"><MapPin size={10}/> {bldg.location}</p>
+                             <p className="text-[11px] font-bold text-gray-400 flex items-center gap-1 mb-3"><MapPin size={10}/> {bldg.address || bldg.location}</p>
                              
                              <div className="grid grid-cols-2 gap-2 mb-3">
                                <div className="bg-gray-50 rounded-xl p-2.5 min-w-0">
@@ -1097,6 +1082,40 @@ export default function BookingsTab(props) {
                         </button>
                       </div>
                     )}
+                    {/* ── Rooms / Flats ──────────────────────────────────
+                        Two views of the same building: the SPACES it holds,
+                        and the PEOPLE renting them. Rooms come first because
+                        a room is created once and outlives every tenant who
+                        passes through it — you set the building up here, then
+                        add people to seats from the room itself. */}
+                    {activeBuilding && (
+                      <div className="mb-3 flex items-center gap-1.5">
+                        {[
+                          { id: 'tenants', en: 'Tenants', bn: 'ভাড়াটিয়া' },
+                          { id: 'units',   en: unitNoun(activeBuilding, false) + 's', bn: unitNoun(activeBuilding, true) },
+                        ].map(v => (
+                          <button
+                            key={v.id}
+                            type="button"
+                            onClick={() => setBuildingView(v.id)}
+                            className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${buildingView === v.id ? 'bg-gray-900 text-white shadow-[0_3px_10px_rgba(0,0,0,0.18)]' : 'bg-white text-gray-500 hover:text-gray-900 shadow-[0_2px_6px_rgba(0,0,0,0.03)]'}`}
+                          >
+                            {isBn ? v.bn : v.en}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {activeBuilding && buildingView === 'units' ? (
+                      <UnitsManager
+                        building={activeBuilding}
+                        language={language}
+                        showToast={showToast}
+                        formatBDT={formatBDT}
+                        onAddTenant={(unit) => isPremium ? openBlankLease({ ...activeBuilding, unit }) : setActiveModal('premium_gate')}
+                      />
+                    ) : (
+                    <>
                 {/* Sticky toolbar — three layouts, one set of controls.
                     Because <main> is the scroll container this bar pins to the
                     top of the list as the host scrolls, on every device.
@@ -1165,7 +1184,13 @@ export default function BookingsTab(props) {
                               step looks identical wherever the host meets it. */}
                           <button
                             type="button"
-                            onClick={() => isPremium ? openBlankLease(getPrefillBuilding()) : setActiveModal('premium_gate')}
+                            onClick={() => {
+                  if (!isPremium) { setActiveModal('premium_gate'); return; }
+                  // Rooms exist ⇒ tenants go into one of them, never into a
+                  // brand-new booking of their own.
+                  if (activeBuilding?.id) { setBuildingView('units'); return; }
+                  openBlankLease(getPrefillBuilding());
+                }}
                             aria-label={isBn ? 'নতুন ভাড়াটিয়া যোগ করুন' : 'Add a new tenant'}
                             className="group relative overflow-hidden w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-br from-[#ba0036] via-[#d1003d] to-[#ff004c] text-white shadow-[0_8px_24px_rgba(186,0,54,0.3)] hover:shadow-[0_12px_32px_rgba(186,0,54,0.4)] active:scale-[0.97] transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ba0036]/40 focus-visible:ring-offset-2"
                           >
@@ -1217,6 +1242,8 @@ export default function BookingsTab(props) {
                     </div>
                   );
                 })()}
+                    </>
+                    )}
                   </div>
                 )}
               </main>
@@ -1247,12 +1274,18 @@ export default function BookingsTab(props) {
                           {isBn ? 'বাতিল' : 'Cancel'}
                         </button>
                         <button
-                          onClick={() => {
-                            setLandlordProfile({ 
-                              ...landlordProfile, 
-                              buildings: landlordProfile.buildings.filter(b => b.id !== deleteBuildingId) 
-                            });
-                            setDeleteBuildingId(null);
+                          onClick={async () => {
+                            // Archived server-side, not filtered out of a blob that was
+                            // never persisted. Soft, so past leases still resolve a name.
+                            try {
+                              await archiveBuilding(deleteBuildingId);
+                              setDeleteBuildingId(null);
+                              if (String(currentBuildingId) === String(deleteBuildingId)) setCurrentBuildingId(null);
+                              onBuildingCreated?.();
+                              showToast?.(isBn ? 'বিল্ডিং সরানো হয়েছে' : 'Building removed');
+                            } catch (err) {
+                              showToast?.(err.message || (isBn ? 'সরানো যায়নি' : 'Could not remove it'));
+                            }
                           }}
                           className="w-full bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-colors active:scale-[0.98] shadow-[0_4px_16px_rgba(225,29,72,0.25)]"
                         >
@@ -1278,8 +1311,12 @@ export default function BookingsTab(props) {
             landlordProfile={landlordProfile}
             currentBuildingId={currentBuildingId}
             showToast={showToast}
-            onBookingsCreated={(newBookings) => {
-              newBookings.forEach(b => handleBookingUpdated(b));
+            onBookingsCreated={() => {
+              // The batch returns { bookingId, memberId, name, roomNumber } —
+              // no `id`, so handleBookingUpdated silently ignored every row and
+              // scanned tenants stayed invisible until a page reload.
+              refreshBookings?.();
+              onBuildingCreated?.();
               setShowAiScanner(false);
             }}
           />

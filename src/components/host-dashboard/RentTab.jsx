@@ -16,6 +16,9 @@ import {
   Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Map, Leaf
 } from 'lucide-react';
 import MembersManager from "../MembersManager.jsx";
+import { scopeBookings, bookingInBuilding, sortRentUnits } from '../../utils/buildingScope';
+import { buildingTypeLabel, buildingTypeColor, normaliseSubCategory } from '../../utils/buildingTypes';
+import VacantUnitsPanel from './VacantUnitsPanel';
 
 // Month labels for the 12-month rent matrix cells. Kept local to this file so
 // the tab renders standalone — the parent has its own copy for other tabs.
@@ -41,25 +44,27 @@ export default function RentTab(props) {
           const todayDate = today;
           const isBn = language === 'বাংলা';
           
-          let baseBookings = bookings;
-          if (landlordProfile?.buildingMode === 'multi') {
-            if (currentBuildingId) {
-              const bldg = landlordProfile.buildings?.find(b => b.id === currentBuildingId);
-              baseBookings = bldg ? bookings.filter(b => b.property === bldg.name) : [];
-            } else {
-              const bldgNames = (landlordProfile.buildings || []).map(b => b.name);
-              baseBookings = bookings.filter(b => bldgNames.includes(b.property));
-            }
-          } else if (landlordProfile?.buildingMode === 'single') {
-            const bldgName = landlordProfile.buildings?.[0]?.name;
-            baseBookings = bldgName ? bookings.filter(b => b.property === bldgName) : [];
-          }
+          // Scoped by buildingId, in one shared place — see utils/buildingScope.js.
+          // The name-equality filters that used to live here (one copy per screen)
+          // are why hostel and single-room leases vanished after a successful save.
+          const baseBookings = scopeBookings(bookings, landlordProfile?.buildings, currentBuildingId);
 
           // Rent Collection counts one unit per occupant: expand each booking
           // into its active members (each carrying their split share + own
           // ledger), so the KPI hero + overdue list are per person and match the
           // per-roommate cards below.
-          const rentUnits = baseBookings.flatMap(rentUnitsOf);
+          // Ordered the way a landlord walks the building: ground floor up,
+          // then 101 · 102 · 110 within each floor, then seat by seat inside a
+          // room. Rent Collection used to render in insertion order — whatever
+          // sequence the leases happened to be created in — which for a hostel
+          // meant a list that matched nothing about the actual building.
+          // The building on screen. Vacancies are per-building; on the
+          // all-buildings overview there is no single room list to show.
+          const activeBuilding = currentBuildingId
+            ? (landlordProfile?.buildings || []).find(b => String(b.id) === String(currentBuildingId)) || null
+            : (landlordProfile?.buildingMode === 'single' ? (landlordProfile?.buildings?.[0] || null) : null);
+
+          const rentUnits = sortRentUnits(baseBookings.flatMap(rentUnitsOf));
           const sm = getMonthCollectionSummary(rentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
           const collectedPct = sm.expectedTotal > 0 ? Math.min(100, Math.round((sm.collectedTotal / sm.expectedTotal) * 100)) : 0;
           const yearMonths = Array.from({ length: 12 }, (_, i) => monthKey(ledgerYear, i + 1));
@@ -494,7 +499,7 @@ export default function RentTab(props) {
                     {(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) && (
                       <div className="hidden md:block space-y-3 mb-4">
                         {(landlordProfile.buildings || []).map((bldg, idx) => {
-                          const bldgBookings = bookings.filter(b => b.property === bldg.name);
+                          const bldgBookings = bookings.filter(b => bookingInBuilding(b, bldg));
                           const bldgRentUnits = bldgBookings.flatMap(rentUnitsOf);
                           const bldgSm = getMonthCollectionSummary(bldgRentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
                           return (
@@ -650,24 +655,30 @@ export default function RentTab(props) {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {(landlordProfile.buildings || []).map(bldg => {
-                         const bldgBookings = bookings.filter(b => b.property === bldg.name);
+                         const bldgBookings = bookings.filter(b => bookingInBuilding(b, bldg));
                          const bldgRentUnits = bldgBookings.flatMap(rentUnitsOf);
                          const bldgSm = getMonthCollectionSummary(bldgRentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
-                         const typeLabel = bldg.type === 'residential' ? (isBn ? 'Residential' : 'Residential') : bldg.type === 'commercial' ? (isBn ? 'Commercial' : 'Commercial') : (isBn ? 'Hostel' : 'Hostel');
-                         const typeColor = bldg.type === 'residential' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : bldg.type === 'commercial' ? 'bg-indigo-50 text-indigo-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200';
-                         const iconBg = bldg.type === 'residential' ? 'bg-emerald-100 text-emerald-600' : bldg.type === 'commercial' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600';
+                         // Same shared classification the Bookings tab uses, so
+                         // a Bachelor Flat reads identically on every screen.
+                         const typeLabel = buildingTypeLabel(bldg, isBn);
+                         const typeColor = buildingTypeColor(bldg);
+                         const subCat    = normaliseSubCategory(bldg.subCategory);
+                         const iconBg = subCat === 'hostel' ? 'bg-orange-100 text-orange-600'
+                           : subCat === 'single_room' ? 'bg-sky-100 text-sky-600'
+                           : bldg.category === 'commercial' ? 'bg-violet-100 text-violet-600'
+                           : 'bg-emerald-100 text-emerald-600';
                          return (
                            <div key={bldg.id} onClick={() => setCurrentBuildingId(bldg.id)} 
                              className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 cursor-pointer hover:shadow-lg hover:border-gray-200 transition-all group relative overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                             <div className={`absolute top-0 left-0 right-0 h-1 ${bldg.type === 'residential' ? 'bg-emerald-500' : bldg.type === 'commercial' ? 'bg-indigo-500' : 'bg-purple-500'}`}/>
+                             <div className={`absolute top-0 left-0 right-0 h-1 ${subCat === 'hostel' ? 'bg-orange-500' : subCat === 'single_room' ? 'bg-sky-500' : bldg.category === 'commercial' ? 'bg-violet-500' : 'bg-emerald-500'}`}/>
                              <div className="flex items-start justify-between mb-3 pt-1">
                                <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0`}>
-                                 {bldg.type === 'hostel' ? <Users size={18}/> : bldg.type === 'commercial' ? <Building2 size={18}/> : <Home size={18}/>}
+                                 {subCat === 'hostel' ? <Users size={18}/> : subCat === 'single_room' ? <BedDouble size={18}/> : bldg.category === 'commercial' ? <Building2 size={18}/> : <Home size={18}/>}
                                </div>
                                <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border ${typeColor}`}>{typeLabel}</span>
                              </div>
                              <h4 className="text-sm font-black text-gray-900 group-hover:text-[#ba0036] transition-colors mb-1">{bldg.name}</h4>
-                             <p className="text-[11px] font-bold text-gray-400 flex items-center gap-1 mb-3"><MapPin size={10}/> {bldg.location}</p>
+                             <p className="text-[11px] font-bold text-gray-400 flex items-center gap-1 mb-3"><MapPin size={10}/> {bldg.address || bldg.location}</p>
                              
                              <div className="grid grid-cols-2 gap-2 mb-3">
                                <div className="bg-gray-50 rounded-xl p-2.5 min-w-0">
@@ -883,6 +894,15 @@ export default function RentTab(props) {
                     </div>
                   );
                 })()}
+
+                {/* Where the money is NOT coming from. Rent Collection only
+                    ever listed rows that had a tenant, so an empty room was
+                    invisible on the one screen that should account for it. */}
+                <VacantUnitsPanel
+                  building={activeBuilding}
+                  language={language}
+                  formatBDT={formatBDT}
+                />
                   </div>
                 )}
               </main>

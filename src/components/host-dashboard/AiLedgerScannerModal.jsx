@@ -31,6 +31,21 @@ function TenantReviewRow({ tenant, idx, onChange, onRemove, language }) {
   const isBn = language === 'বাংলা';
   const [open, setOpen] = useState(true);
 
+  // The four things a tenant cannot be saved without, plus anything the AI
+  // flagged as uncertain. Optional fields left blank are not gaps: "no NID" is
+  // a complete answer, and nagging about it is what made the old screen noisy.
+  const gaps = [
+    { key: 'name',        en: 'Name',        bn: 'নাম',        wide: true },
+    { key: 'phone',       en: 'Mobile',      bn: 'মোবাইল' },
+    { key: 'roomNumber',  en: 'Room / Flat', bn: 'রুম / ফ্ল্যাট' },
+    { key: 'monthlyRent', en: 'Rent',        bn: 'ভাড়া' },
+  ].filter(g => {
+    const v = tenant[g.key];
+    const empty = v === '' || v === undefined || v === null || (g.key === 'monthlyRent' && !Number(v));
+    const unsure = tenant._flags?.[`${g.key}Low`];
+    return empty || unsure;
+  });
+
   const field = (key, value, flagKey) => (
     <div className="relative">
       {flagKey && tenant._flags?.[flagKey] && (
@@ -72,9 +87,13 @@ function TenantReviewRow({ tenant, idx, onChange, onRemove, language }) {
           </p>
         </div>
         {/* Flag indicator */}
-        {Object.values(tenant._flags || {}).some(Boolean) && (
-          <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-[9px] font-black uppercase">
-            {isBn ? 'যাচাই করুন' : 'Check'}
+        {gaps.length > 0 ? (
+          <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-[9px] font-black uppercase tabular-nums">
+            {gaps.length} {isBn ? 'বাকি' : 'to fill'}
+          </span>
+        ) : (
+          <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-[9px] font-black uppercase inline-flex items-center gap-0.5">
+            <Check size={9} strokeWidth={4}/> {isBn ? 'প্রস্তুত' : 'Ready'}
           </span>
         )}
         <button
@@ -88,7 +107,37 @@ function TenantReviewRow({ tenant, idx, onChange, onRemove, language }) {
         <div className="shrink-0 text-gray-400">{open ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</div>
       </button>
 
-      {/* Editable fields */}
+      {/* ── Needs your input ──────────────────────────────────────────────
+          Fields the AI could not read, or read with low confidence, listed
+          FIRST and open by default. Amber stops meaning "warning" here and
+          starts meaning "this one is waiting for you". */}
+      {open && gaps.length > 0 && (
+        <div className="px-3 pt-2 pb-1 bg-amber-50/50 border-t border-amber-100">
+          <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+            <AlertCircle size={10}/> {isBn ? 'আপনার ইনপুট দরকার' : 'Needs your input'}
+            <span className="tabular-nums">{gaps.length}</span>
+          </p>
+          <div className="grid grid-cols-2 gap-2 pb-2">
+            {gaps.map((g, gi) => (
+              <div key={g.key} className={g.wide ? 'col-span-2' : ''}>
+                <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">
+                  {isBn ? g.bn : g.en}
+                </label>
+                <input
+                  autoFocus={gi === 0}
+                  value={tenant[g.key] ?? ''}
+                  onChange={e => onChange(idx, g.key, e.target.value)}
+                  placeholder={isBn ? 'লিখুন' : 'Type here'}
+                  className="w-full px-2.5 py-2 rounded-lg text-xs font-bold border border-amber-300 bg-white focus:outline-none focus:ring-1 focus:ring-amber-400 transition-all"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* What the AI already got — collapsed to a summary so it doesn't
+          compete for attention with the boxes that still need filling. */}
       {open && (
         <div className="px-3 pb-3 pt-1 bg-gray-50/60 grid grid-cols-2 gap-2">
           {/* Name */}
@@ -154,6 +203,12 @@ export default function AiLedgerScannerModal({
   // ── Stage: 'upload' | 'scanning' | 'review' | 'saving' | 'done'
   const [stage, setStage] = useState('upload');
 
+  // WHAT is being photographed. A খাতা page physically holds names, rooms and
+  // amounts — never a father's name or an NID. Those live on the ভর্তি ফরম, one
+  // page per tenant. Same review screen and same saved record either way; only
+  // the prompt differs, because the two pages contain different things.
+  const [scanMode, setScanMode] = useState('khata');
+
   const [imagePreview, setImagePreview] = useState(null);    // data-URL for <img>
   const [imageBase64,  setImageBase64]  = useState(null);    // full data-URL
   const [mimeType,     setMimeType]     = useState('image/jpeg');
@@ -176,7 +231,10 @@ export default function AiLedgerScannerModal({
 
   const defaultSettings = {
     property:        building?.name   || '',
-    location:        building?.location || '',
+    // `address` on a real Building record; `location` was the old profile-blob
+    // spelling. Both read, because a landlord can be on either side of the
+    // buildings/units migration.
+    location:        building?.address || building?.location || '',
     rentDueDay:      landlordProfile?.rentDueDay      ?? 5,
     paymentMethod:   landlordProfile?.paymentMethod   || '',
     reminderLeadDays: landlordProfile?.reminderLeadDays ?? 3,
@@ -216,6 +274,7 @@ export default function AiLedgerScannerModal({
             imageBase64,
             mimeType,
             defaultSettings,
+            mode: scanMode,
           }),
         });
         
@@ -264,7 +323,7 @@ export default function AiLedgerScannerModal({
         return; // Failure, exit loop
       }
     }
-  }, [imageBase64, mimeType, defaultSettings, isBn, showToast]);
+  }, [imageBase64, mimeType, defaultSettings, scanMode, isBn, showToast]);
 
   // ── Edit tenant field inline ─────────────────────────────────────────────────
   const handleFieldChange = useCallback((idx, key, value) => {
@@ -310,6 +369,11 @@ export default function AiLedgerScannerModal({
       return;
     }
 
+    if (!building?.id) {
+      showToast(isBn ? 'কোন বিল্ডিং-এ যোগ হবে সেটি আগে বাছুন।' : 'Pick which building these tenants go into first.', { type: 'error' });
+      return;
+    }
+
     setStage('saving');
     try {
       const resp = await fetch(`${API_BASE}/bookings/batch`, {
@@ -318,7 +382,10 @@ export default function AiLedgerScannerModal({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${getToken()}`,
         },
-        body: JSON.stringify({ tenants: valid }),
+        // Scanned tenants are placed INTO units of this building, through the
+        // same code the manual form uses. Without a buildingId the server
+        // refuses rather than creating leases linked to nothing.
+        body: JSON.stringify({ tenants: valid, buildingId: building?.id }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.message || 'Save failed');
@@ -399,6 +466,40 @@ export default function AiLedgerScannerModal({
           {/* ── UPLOAD STAGE ── */}
           {(stage === 'upload') && (
             <div className="p-4 space-y-4">
+
+              {/* What are we photographing? A খাতা lists many tenants but only
+                  names, rooms and amounts. A ভর্তি ফরম is one tenant with
+                  nearly every field on it — which is where the real time
+                  saving is, because a ledger page has no father's name on it. */}
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                  {isBn ? 'কীসের ছবি?' : 'What are you scanning?'}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'khata', en: 'Rent Book', bn: 'ভাড়ার খাতা', subEn: 'Many tenants · rent + rooms', subBn: 'অনেক ভাড়াটিয়া · ভাড়া ও রুম' },
+                    { id: 'form',  en: 'Admission Form', bn: 'ভর্তি ফরম', subEn: 'One tenant · full details', subBn: 'একজন ভাড়াটিয়া · সব তথ্য' },
+                  ].map(m => {
+                    const on = scanMode === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setScanMode(m.id)}
+                        className={`px-3 py-2.5 rounded-xl border-2 text-left transition-all active:scale-[0.98] ${on ? 'border-[#ba0036] bg-red-50/70' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+                      >
+                        <p className={`text-[11px] font-black leading-tight ${on ? 'text-[#ba0036]' : 'text-gray-900'}`}>
+                          {isBn ? m.bn : m.en}
+                        </p>
+                        <p className="text-[9px] font-bold text-gray-500 leading-tight mt-0.5">
+                          {isBn ? m.subBn : m.subEn}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Tips */}
               <div className="bg-blue-50 rounded-2xl p-3.5 border border-blue-100">
                 <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest mb-1.5 flex items-center gap-1">
@@ -407,7 +508,9 @@ export default function AiLedgerScannerModal({
                 <ul className="space-y-1 text-[10px] font-bold text-blue-600">
                   <li>• {isBn ? 'পুরো পাতা ফ্রেমের মধ্যে রাখুন' : 'Keep the full page inside the frame'}</li>
                   <li>• {isBn ? 'পর্যাপ্ত আলোতে ছবি তুলুন' : 'Take the photo in good lighting'}</li>
-                  <li>• {isBn ? 'নাম, ভাড়া, নাম্বার একই পাতায় রাখুন' : 'Name, rent and phone on the same page'}</li>
+                  <li>• {scanMode === 'form'
+                    ? (isBn ? 'একটি ফরম = একজন ভাড়াটিয়া' : 'One form = one tenant')
+                    : (isBn ? 'নাম, ভাড়া, নাম্বার একই পাতায় রাখুন' : 'Name, rent and phone on the same page')}</li>
                 </ul>
               </div>
 

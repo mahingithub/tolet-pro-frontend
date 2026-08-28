@@ -1,0 +1,136 @@
+/**
+ * buildingService.js — HTTP client for /api/buildings and /api/units.
+ * ──────────────────────────────────────────────────────────────────────────
+ * Buildings used to live inside the landlord's profile blob with client-made
+ * ids that nothing referenced; a booking found its building by matching the
+ * property NAME with `===`. They are real records now, and `booking.buildingId`
+ * is the join — see models/Building.js for the bug that forced the change.
+ *
+ * Same shape as bookingService.js: getCurrentToken() for auth, named exports.
+ */
+
+import { getCurrentToken } from './authService';
+
+const BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000')
+  .replace(/\/+$/, '')
+  .replace(/\/api$/, '');
+
+async function request(path, options = {}) {
+  const token = getCurrentToken();
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const err = new Error(body.message || `HTTP ${res.status}`);
+    err.status = res.status;
+    err.code = body.code;
+    throw err;
+  }
+  return res.json();
+}
+
+// ── Buildings ───────────────────────────────────────────────────────────────
+
+/** Every building the landlord owns, with unit / seat / occupancy counts. */
+export async function listBuildings() {
+  const { buildings } = await request('/api/buildings');
+  return buildings || [];
+}
+
+/**
+ * Create a building. `rentedAs` LOCKS which booking form this building ever
+ * opens — 'seat' means the seat flow and nothing else.
+ * @param {{name, address, category, subCategory, rentedAs, defaultMonthlyRent, defaultServiceCharge, defaultRentDueDay}} data
+ */
+export async function createBuilding(data) {
+  const { building } = await request('/api/buildings', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  return building;
+}
+
+/** Rename / re-address / change defaults. Renaming is safe now — it's a label. */
+export async function updateBuilding(id, data) {
+  const { building } = await request(`/api/buildings/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  return building;
+}
+
+/** Soft delete — archived, so historic leases still resolve their building. */
+export async function archiveBuilding(id) {
+  const { success } = await request(`/api/buildings/${id}`, { method: 'DELETE' });
+  return success;
+}
+
+// ── Units (rooms) ───────────────────────────────────────────────────────────
+
+/**
+ * Rooms in building order (ground floor up, 101 · 102 · 110 within a floor),
+ * each carrying its occupants and vacant seat count.
+ */
+export async function listUnits(buildingId) {
+  const { building, units } = await request(`/api/buildings/${buildingId}/units`);
+  return { building, units: units || [] };
+}
+
+/** Create a room. No tenant needed — a room exists before anyone lives in it. */
+export async function createUnit(buildingId, data) {
+  const { unit } = await request(`/api/buildings/${buildingId}/units`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  return unit;
+}
+
+export async function updateUnit(unitId, data) {
+  const { unit } = await request(`/api/units/${unitId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  return unit;
+}
+
+/** Archive a room. Refused while someone is still living in it. */
+export async function archiveUnit(unitId) {
+  const { success } = await request(`/api/units/${unitId}`, { method: 'DELETE' });
+  return success;
+}
+
+// ── Tenants inside a unit ───────────────────────────────────────────────────
+// Neither of these creates a room, and neither creates a second booking for a
+// room that already has one. That is the whole rule: the unit is set up once,
+// and people are added to it or swapped out of it.
+
+/**
+ * Put a tenant into this unit — an empty seat in a hostel room, or a vacant
+ * flat. Creates the unit's single booking only if it doesn't have one yet.
+ * @param {string} unitId
+ * @param {{name, phone, moveInDate, tenantProfile, monthlyRent?}} data
+ */
+export async function addTenantToUnit(unitId, data) {
+  return request(`/api/units/${unitId}/tenants`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * The occupant left; someone else takes the SAME seat. The room, its rent and
+ * the seat are untouched — only the person changes, and the outgoing member is
+ * kept (moved-out) so their rent history survives.
+ */
+export async function replaceTenantInUnit(unitId, memberId, data) {
+  return request(`/api/units/${unitId}/tenants/${memberId}/replace`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}

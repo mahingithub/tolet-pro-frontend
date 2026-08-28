@@ -1,0 +1,179 @@
+/*
+ * SeatTenantModal.jsx
+ * ──────────────────────────────────────────────────────────────────────────
+ * Putting a person into a space that already exists.
+ *
+ * This is deliberately NOT the lease wizard. There is no property picker, no
+ * room number, no floor, no rent and no due day — the unit was set up once and
+ * already carries all of that. What is left is the person, which is the only
+ * thing that changes when a tenant arrives or is replaced.
+ *
+ * Two modes, one form:
+ *   add     — an empty seat / a vacant flat
+ *   replace — the occupant left; the SAME seat gets a new person, and the
+ *             outgoing one is kept (moved-out) so their rent history survives
+ *
+ * The rent is shown, not asked for: a seat's share is the room rent divided by
+ * its seats, and typing it again per tenant is how the numbers drift apart.
+ */
+
+import React, { useState } from 'react';
+import { X, Loader2, Check, RefreshCw, UserPlus, DoorOpen } from 'lucide-react';
+import TenantInfoForm from './TenantInfoForm';
+import { emptyTenantProfile, validateTenantProfile } from '../../utils/tenantFields';
+import { addTenantToUnit, replaceTenantInUnit } from '../../services/buildingService';
+import { unitNoun } from '../../utils/buildingTypes';
+
+const todayIso = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+export default function SeatTenantModal({
+  unit,
+  building,
+  seatNumber,           // 1-based, for the heading
+  replacingMember,      // { id, name } when replacing; null when adding
+  language,
+  showToast,
+  onClose,
+  onSaved,              // () => void — parent reloads the units
+  formatBDT,
+}) {
+  const isBn = language === 'বাংলা';
+  const isSeat = building?.rentedAs === 'seat';
+  const noun = unitNoun(building, isBn);
+  const replacing = !!replacingMember;
+
+  const [profile, setProfile] = useState(() => ({
+    ...emptyTenantProfile(),
+    moveInDate: todayIso(),
+  }));
+  const [errors, setErrors] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  // What this person will be charged. A seat takes an equal share of the room
+  // rent; a whole unit takes the lot. Shown so the host can see it — never
+  // retyped, because the room already holds the number.
+  const capacity = isSeat ? Math.max(1, Number(unit?.seatCapacity) || 1) : 1;
+  const share = Math.round(((Number(unit?.monthlyRent) || 0) + (Number(unit?.serviceCharge) || 0)) / capacity);
+
+  const patch = (p) => setProfile((prev) => ({ ...prev, ...p }));
+
+  const submit = async () => {
+    const missing = validateTenantProfile(profile);
+    if (missing.length) {
+      setErrors(missing);
+      showToast?.(isBn ? 'লাল ঘরগুলো পূরণ করুন' : 'Please fill the highlighted fields');
+      setTimeout(() => {
+        const el = document.getElementById(`seat-${missing[0]}`);
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); try { el.focus({ preventScroll: true }); } catch { /* optional */ } }
+      }, 60);
+      return;
+    }
+    setErrors([]);
+    setSaving(true);
+    try {
+      const body = {
+        name: profile.name,
+        phone: profile.phone,
+        moveInDate: profile.moveInDate,
+        tenantProfile: profile,
+      };
+      if (replacing) await replaceTenantInUnit(unit.id, replacingMember.id, body);
+      else await addTenantToUnit(unit.id, body);
+
+      showToast?.(replacing
+        ? (isBn ? 'নতুন ভাড়াটিয়া বসানো হয়েছে — রেন্ট লেজার চালু' : 'New tenant moved in — rent ledger is live')
+        : (isBn ? 'ভাড়াটিয়া যোগ হয়েছে' : 'Tenant added'));
+      onSaved?.();
+      onClose?.();
+    } catch (err) {
+      showToast?.(err.message || (isBn ? 'সেভ ব্যর্থ' : 'Could not save'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+      <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+        <div className="p-5 sm:p-6">
+
+          <div className="flex items-start gap-2 mb-4">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${replacing ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+              {replacing ? <RefreshCw size={19} /> : <UserPlus size={19} />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base font-black text-gray-900 leading-tight">
+                {replacing
+                  ? (isBn ? 'নতুন ভাড়াটিয়া বসান' : 'Replace the tenant')
+                  : (isBn ? 'ভাড়াটিয়া যোগ করুন' : 'Add a tenant')}
+              </h2>
+              <p className="text-[11px] font-bold text-gray-500 mt-0.5">
+                {noun} {unit?.roomNumber}
+                {isSeat && <> · {isBn ? `সিট ${seatNumber}` : `Seat ${seatNumber}`}</>}
+                {' · '}
+                <span className="tabular-nums">{formatBDT ? formatBDT(share) : `৳${share}`}</span>
+                {isSeat && <span className="text-gray-400">{isBn ? '/সিট' : ' each'}</span>}
+              </p>
+            </div>
+            <button type="button" onClick={onClose} className="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors">
+              <X size={17} />
+            </button>
+          </div>
+
+          {/* The space is already set up — say so, so nobody looks for the
+              rent or room fields that used to be on this form. */}
+          <div className="rounded-2xl bg-gray-50 border border-gray-100 p-3 mb-4 flex items-start gap-2.5">
+            <DoorOpen size={15} className="text-[#ba0036] shrink-0 mt-0.5" />
+            <p className="text-[11px] font-bold text-gray-600 leading-relaxed">
+              {replacing
+                ? (isBn
+                    ? `${replacingMember?.name || 'পুরোনো ভাড়াটিয়া'} মুভ-আউট হিসেবে থাকবেন — তাঁর ভাড়ার হিসাব মুছবে না। রুম, সিট ও ভাড়া অপরিবর্তিত।`
+                    : `${replacingMember?.name || 'The previous tenant'} is kept as moved-out, so their rent history survives. The room, seat and rent are unchanged.`)
+                : (isBn
+                    ? 'রুম ও ভাড়া আগেই সেট করা আছে — শুধু ব্যক্তির তথ্য দিন।'
+                    : 'The room and its rent are already set — just add the person.')}
+            </p>
+          </div>
+
+          {/* The same tenant form as everywhere else: name, mobile, move-in,
+              then everything optional under অতিরিক্ত তথ্য. */}
+          <TenantInfoForm
+            value={profile}
+            onChange={patch}
+            language={language}
+            errors={errors}
+            showToast={showToast}
+            fieldId={(k) => `seat-${k}`}
+          />
+
+          <div className="pt-4 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 px-4 py-3 rounded-xl bg-white border-2 border-gray-200 text-gray-600 font-black text-xs uppercase tracking-widest hover:bg-gray-50 active:scale-95 transition-all"
+            >
+              {isBn ? 'বাতিল' : 'Cancel'}
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={submit}
+              className={`flex-1 text-white py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.99] disabled:opacity-60 ${
+                replacing
+                  ? 'bg-amber-600 hover:bg-amber-700 shadow-[0_8px_15px_rgba(217,119,6,0.25)]'
+                  : 'bg-emerald-600 hover:bg-emerald-700 shadow-[0_8px_15px_rgba(5,150,105,0.25)]'
+              }`}
+            >
+              {saving
+                ? <><Loader2 size={16} className="animate-spin" /> {isBn ? 'সেভ হচ্ছে' : 'Saving'}</>
+                : <><Check size={17} strokeWidth={3} /> {replacing ? (isBn ? 'নতুন ভাড়াটিয়া বসান' : 'Move them in') : (isBn ? 'যোগ করুন' : 'Add tenant')}</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

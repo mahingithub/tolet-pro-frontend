@@ -3,7 +3,6 @@ import {
   Users, UserPlus, Copy, Check, X, LogOut, Undo2, CheckCircle2, Plus,
 } from 'lucide-react';
 import {
-  addMember as addMemberApi,
   updateMemberLedger as updateMemberLedgerApi,
   undoMemberLedger as undoMemberLedgerApi,
   removeMember as removeMemberApi,
@@ -117,6 +116,13 @@ function spaceLabel(m, isBn) {
   return isBn ? 'সিট' : 'Seat';
 }
 
+// OWNERSHIP: this component owns the RENT LEDGER for a booking's occupants —
+// who paid which month, and the per-seat split that makes those amounts add up.
+//
+// It does NOT own occupancy. Adding or replacing the person in a seat happens
+// in UnitsManager, because only a Unit knows how many seats a room has and what
+// details a new tenant must bring. Two components writing the same seat by
+// different rules is how a three-seat room ended up able to hold five people.
 export default function MembersManager({ booking, language = 'English', onChange, today = new Date(), showLedger = true, showManage = true }) {
   const isBn = language === 'বাংলা';
   const bookingId = booking._id || booking.id;
@@ -172,7 +178,6 @@ export default function MembersManager({ booking, language = 'English', onChange
     [booking.leaseStart, booking.leaseEnd],
   );
 
-  const [showAdd, setShowAdd] = useState(false);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [cell, setCell] = useState(null); // { memberId, key }
@@ -196,29 +201,6 @@ export default function MembersManager({ booking, language = 'English', onChange
     } catch { /* clipboard unavailable — no-op */ }
   };
 
-  const submitAdd = async () => {
-    if (!persistable) return;
-    if (!form.name.trim() && !form.phone.trim()) return;
-    setBusy(true);
-    try {
-      const updated = await addMemberApi(bookingId, {
-        name: form.name.trim(),
-        phone: form.phone.trim(),
-        rentType: form.rentType,
-        floor: form.floor.trim(),
-        roomLabel: form.roomLabel.trim(),
-        seatLabel: form.seatLabel.trim(),
-        monthlyRent: form.monthlyRent ? Number(form.monthlyRent) : undefined,
-      });
-      emit(updated);
-      setForm({ name: '', phone: '', rentType: defaultRentType, floor: booking.floorNumber || '', roomLabel: booking.roomNumber || '', seatLabel: '', monthlyRent: '' });
-      setShowAdd(false);
-    } catch (err) {
-      console.warn('[members] add failed:', err.message || err);
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const markCell = async (member, key, action) => {
     if (!persistable) return;
@@ -302,80 +284,20 @@ export default function MembersManager({ booking, language = 'English', onChange
               <span className="tabular-nums tracking-widest">{booking.inviteCode}</span>
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setShowAdd((v) => !v)}
-            disabled={!persistable}
-            className="px-2.5 py-1 rounded-lg bg-[#ba0036] hover:bg-[#a1002f] disabled:opacity-40 text-white text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-1"
-          >
-            {showAdd ? <X size={11} /> : <UserPlus size={11} />}
-            {showAdd ? (isBn ? 'বন্ধ' : 'Close') : (isBn ? 'সদস্য যোগ' : 'Add')}
-          </button>
         </div>
       </div>
 
-      {!persistable && (
-        <p className="text-[10px] font-bold text-amber-600 mb-2">
-          {isBn ? 'সদস্য যোগ করতে বুকিংটি সেভ হওয়া দরকার।' : 'Save the booking first to manage members.'}
-        </p>
-      )}
 
-      {/* Add member form */}
-      {showAdd && persistable && (
-        <div className="mb-3 p-2.5 rounded-xl bg-gray-50 border border-gray-100 space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder={isBn ? 'নাম' : 'Name'}
-              className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold outline-none focus:border-[#ba0036]"
-            />
-            <input
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              placeholder={isBn ? 'ফোন' : 'Phone'}
-              className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold outline-none focus:border-[#ba0036]"
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <input
-              value={form.floor}
-              onChange={(e) => setForm({ ...form, floor: e.target.value })}
-              placeholder={isBn ? 'ফ্লোর' : 'Floor'}
-              className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold outline-none focus:border-[#ba0036]"
-            />
-            <input
-              value={form.roomLabel}
-              onChange={(e) => setForm({ ...form, roomLabel: e.target.value })}
-              placeholder={isBn ? 'রুম (৩০১)' : 'Room (301)'}
-              className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold outline-none focus:border-[#ba0036]"
-            />
-            <input
-              value={form.seatLabel}
-              onChange={(e) => setForm({ ...form, seatLabel: e.target.value })}
-              placeholder={isBn ? 'সিট (১)' : 'Seat (1)'}
-              className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold outline-none focus:border-[#ba0036]"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              value={form.monthlyRent}
-              onChange={(e) => setForm({ ...form, monthlyRent: e.target.value.replace(/[^0-9]/g, '') })}
-              placeholder={isBn ? `ভাড়া (খালি = সমান ভাগ ${taka(equalShare)})` : `Rent (blank = equal split ${taka(equalShare)})`}
-              inputMode="numeric"
-              className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold outline-none focus:border-[#ba0036]"
-            />
-            <button
-              type="button"
-              onClick={submitAdd}
-              disabled={busy || (!form.name.trim() && !form.phone.trim())}
-              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-1"
-            >
-              <Plus size={12} /> {isBn ? 'যোগ করুন' : 'Add'}
-            </button>
-          </div>
-        </div>
-      )}
+      {/* The "add member" form used to live here. It called addMember()
+          directly, with no idea of the room it was adding to: no seatCapacity
+          check, no unitId, and none of the tenant details the intake form
+          collects. A three-seat room could be given a fifth occupant through
+          this panel while the seat grid refused it — the same action with two
+          different rules depending on which door you came through.
+
+          Occupancy belongs to UnitsManager, where a seat is a real place with
+          a capacity. This panel keeps what is genuinely its own: the rent
+          ledger — who paid which month. */}
       </>)}
 
       {/* Room-rent split summary — hostels only. Makes the ÷seats math visible

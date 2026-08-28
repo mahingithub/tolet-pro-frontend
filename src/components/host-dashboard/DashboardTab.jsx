@@ -9,6 +9,7 @@ import {
 import { Link } from 'react-router-dom';
 import Footer from '../Footer';
 import { isInquiryUnread } from '../../utils/inquiryUnread';
+import { scopeBookings, bookingInBuilding } from '../../utils/buildingScope';
 
 export default function DashboardTab({
   language,
@@ -314,19 +315,10 @@ export default function DashboardTab({
       {(() => {
         const todayDate = today;
         
-        let baseBookings = bookings;
-        if (landlordProfile?.buildingMode === 'multi') {
-          if (currentBuildingId) {
-            const bldg = landlordProfile.buildings?.find(b => b.id === currentBuildingId);
-            baseBookings = bldg ? bookings.filter(b => b.property === bldg.name) : [];
-          } else {
-            const bldgNames = (landlordProfile.buildings || []).map(b => b.name);
-            baseBookings = bookings.filter(b => bldgNames.includes(b.property));
-          }
-        } else if (landlordProfile?.buildingMode === 'single') {
-          const bldgName = landlordProfile.buildings?.[0]?.name;
-          baseBookings = bldgName ? bookings.filter(b => b.property === bldgName) : [];
-        }
+        // Scoped by buildingId, in one shared place — see utils/buildingScope.js.
+        // The name-equality filters that used to live here (one copy per screen)
+        // are why hostel and single-room leases vanished after a successful save.
+        const baseBookings = scopeBookings(bookings, landlordProfile?.buildings, currentBuildingId);
 
         const rentUnits = baseBookings.flatMap(rentUnitsOf);
         const sm = getMonthCollectionSummary(rentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
@@ -361,7 +353,7 @@ export default function DashboardTab({
             {landlordProfile?.buildingMode === 'multi' && !currentBuildingId ? (
               <div className="mt-5 space-y-3">
                 {(landlordProfile.buildings || []).map(bldg => {
-                  const bldgBookings = bookings.filter(b => b.property === bldg.name);
+                  const bldgBookings = bookings.filter(b => bookingInBuilding(b, bldg));
                   const bldgRentUnits = bldgBookings.flatMap(rentUnitsOf);
                   const bldgSm = getMonthCollectionSummary(bldgRentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
                   return (
@@ -455,19 +447,10 @@ export default function DashboardTab({
       {(() => {
         const todayDate = today;
         
-        let baseBookings = bookings;
-        if (landlordProfile?.buildingMode === 'multi') {
-          if (currentBuildingId) {
-            const bldg = landlordProfile.buildings?.find(b => b.id === currentBuildingId);
-            baseBookings = bldg ? bookings.filter(b => b.property === bldg.name) : [];
-          } else {
-            const bldgNames = (landlordProfile.buildings || []).map(b => b.name);
-            baseBookings = bookings.filter(b => bldgNames.includes(b.property));
-          }
-        } else if (landlordProfile?.buildingMode === 'single') {
-          const bldgName = landlordProfile.buildings?.[0]?.name;
-          baseBookings = bldgName ? bookings.filter(b => b.property === bldgName) : [];
-        }
+        // Scoped by buildingId, in one shared place — see utils/buildingScope.js.
+        // The name-equality filters that used to live here (one copy per screen)
+        // are why hostel and single-room leases vanished after a successful save.
+        const baseBookings = scopeBookings(bookings, landlordProfile?.buildings, currentBuildingId);
 
         const rentUnits = baseBookings.flatMap(rentUnitsOf);
         const sm = getMonthCollectionSummary(rentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
@@ -502,7 +485,7 @@ export default function DashboardTab({
             {landlordProfile?.buildingMode === 'multi' && !currentBuildingId ? (
               <div className="mt-5 space-y-3">
                 {(landlordProfile.buildings || []).map(bldg => {
-                  const bldgBookings = bookings.filter(b => b.property === bldg.name);
+                  const bldgBookings = bookings.filter(b => bookingInBuilding(b, bldg));
                   const bldgRentUnits = bldgBookings.flatMap(rentUnitsOf);
                   const bldgSm = getMonthCollectionSummary(bldgRentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
                   return (

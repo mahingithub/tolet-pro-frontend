@@ -63,6 +63,10 @@ import useDeepLinkHighlight, { highlightNotifTarget } from '../hooks/useDeepLink
 import useTabHistory from '../hooks/useTabHistory';
 import useBackGuard, { useOverlayNavigate } from '../hooks/useBackGuard';
 import LandlordHomeChoiceModal from './shared/LandlordHomeChoiceModal';
+import TenantInfoForm from './host-dashboard/TenantInfoForm';
+import { emptyTenantProfile, validateTenantProfile, toTenantProfile } from '../utils/tenantFields';
+import { scopeBookings, bookingInBuilding } from '../utils/buildingScope';
+import { listBuildings } from '../services/buildingService';
 
 // Every tab the dashboard can render, in sidebar order. This is the single
 // list the Back button and any ?tab= deep link are validated against — an id
@@ -514,11 +518,18 @@ const isLeaseEndingSoon = (booking, today = new Date()) => {
 //     its own lease;
 //   • the SAME unit can be leased over and over as tenants come and go — only
 //     ONE of those leases is live at a time.
-const unitKeyOf = (b) => [
-  String(b?.propertyId || b?.property || '').trim().toLowerCase(),
-  String(b?.floorNumber || '').trim().toLowerCase(),
-  String(b?.roomNumber || '').trim().toLowerCase(),
-].join('|');
+// A unit's identity is its `unitId` — a real Unit record. The name-and-number
+// key below it is the LEGACY path, for bookings written before the buildings/
+// units restructure: it is the same string-matching that made hostel leases
+// vanish, kept only so old rows still resolve until the migration runs.
+const unitKeyOf = (b) => {
+  if (b?.unitId) return `unit:${String(b.unitId)}`;
+  return [
+    String(b?.propertyId || b?.property || '').trim().toLowerCase(),
+    String(b?.floorNumber || '').trim().toLowerCase(),
+    String(b?.roomNumber || '').trim().toLowerCase(),
+  ].join('|');
+};
 
 // The live lease occupying this unit, if any. `excludeId` skips the lease being
 // replaced during a tenant change.
@@ -682,6 +693,34 @@ const CATEGORY_TYPES = {
 const propTypeToCategory = (type) => {
   if (type === 'hostel') return 'hostel';
   if (type === 'single_room' || type === 'sublet') return 'single_room';
+  return 'flat';
+};
+
+// ─── Reading a building, whichever shape it arrives in ──────────────────────
+// A building can reach the lease form as either:
+//   • a real Building record  { address, category: residential|commercial,
+//                               subCategory: flat|hostel|single_room }
+//   • the legacy profile blob { location, type: residential|commercial,
+//                               category: flat|hostel }
+// Both exist at once during the buildings/units rollout, and the two use the
+// SAME word — `category` — for different things: a real record means
+// residential-vs-commercial, the blob means flat-vs-hostel. Reading the wrong
+// one put 'residential' into the lease's format field, which matches no format,
+// so the picker silently came up with nothing selected.
+const bldgAddress = (b) => b?.address || b?.location || '';
+
+const bldgIsCommercial = (b) => b?.category === 'commercial' || b?.type === 'commercial';
+
+// The lease form's format (flat | single_room | hostel), from either shape.
+// Commercial carries no residential format at all.
+const bldgLeaseCategory = (b) => {
+  if (!b) return 'flat';
+  if (bldgIsCommercial(b)) return '';
+  // Real record: subCategory already IS the format.
+  if (b.subCategory) return propTypeToCategory(b.subCategory);
+  // Legacy blob: `category` held the format, `type` held residential/commercial.
+  if (b.category && b.category !== 'residential') return propTypeToCategory(b.category);
+  if (b.type && b.type !== 'residential') return propTypeToCategory(b.type);
   return 'flat';
 };
 
@@ -1409,6 +1448,10 @@ const HostDashboard = () => {
     tenant: '',
     tenantPhone: '',
     leaseStart: todayIso(),
+    // Everything about the PERSON beyond name / phone / move-in — profession,
+    // IDs, address, emergency contact, photo. All optional; see
+    // utils/tenantFields.js for the (very short) list of what can block a save.
+    tenantProfile: emptyTenantProfile(),
     leaseEnd: '',
     monthlyRent: '',
     // One-time advance / booking money collected up front.
@@ -1463,9 +1506,34 @@ const HostDashboard = () => {
   // straight to the step holding the empty box.
   const LEASE_FIELD_STEP = {
     property: 1, roomNumber: 1,
-    tenant: 2, tenantPhone: 2, businessName: 2,
-    leaseStart: 3, leaseEnd: 3, leaseTermMonths: 3, monthlyRent: 3,
+    name: 2, phone: 2, moveInDate: 2, businessName: 2,
+    // Conditional — only reachable when the host answered "আছে", or chose the
+    // "অন্যান্য" profession and owes us the description that replaces it.
+    govtIdType: 2, govtIdNumber: 2, professionalIdNumber: 2, tenantTypeOther: 2,
+    leaseEnd: 3, leaseTermMonths: 3, monthlyRent: 3,
   };
+  // The person, assembled from where the lease already stores them. `tenant`,
+  // `tenantPhone` and `leaseStart` stay the canonical fields (the whole app
+  // reads them) — this is just the view TenantInfoForm and the shared validator
+  // expect, so there is no second copy of a name to drift out of sync.
+  const leaseTenantView = (f = leaseForm) => ({
+    ...toTenantProfile(f.tenantProfile),
+    name: f.tenant || '',
+    phone: f.tenantPhone || '',
+    moveInDate: f.leaseStart || '',
+  });
+  // Route a patch from TenantInfoForm back to the right home: the three
+  // canonical fields to the lease, everything else to tenantProfile.
+  const applyTenantPatch = (patch) => setLeaseForm((f) => {
+    const next = { ...f, tenantProfile: { ...toTenantProfile(f.tenantProfile) } };
+    Object.entries(patch).forEach(([k, val]) => {
+      if (k === 'name') next.tenant = val;
+      else if (k === 'phone') next.tenantPhone = val;
+      else if (k === 'moveInDate') next.leaseStart = val;
+      else next.tenantProfile[k] = val;
+    });
+    return next;
+  });
   // Per-step required fields for the New Lease wizard. "Next" won't advance while
   // the current step still has an empty required box, so the host is told what's
   // missing while they're looking at it — not after filling in everything else.
@@ -1474,11 +1542,15 @@ const HostDashboard = () => {
     const missing = [];
     if (step === 1) {
       if (f.manualProperty ? !String(f.property || '').trim() : !f.propertyId) missing.push('property');
-      if (!isCommercial && (f.category === 'single_room' || f.category === 'hostel') && !String(f.roomNumber || '').trim()) missing.push('roomNumber');
+      // Room / flat number is required for EVERY format now, not just rooms and
+      // hostels — it is one of the four things that identify a tenancy, and a
+      // flat in a building needs its number as much as a hostel seat does.
+      if (!isCommercial && !String(f.roomNumber || '').trim()) missing.push('roomNumber');
     }
     if (step === 2) {
-      if (!String(f.tenant || '').trim()) missing.push('tenant');
-      if (!String(f.tenantPhone || '').trim()) missing.push('tenantPhone');
+      // The whole tenant rulebook lives in one shared validator: three required
+      // person fields, plus any ID the host affirmatively said exists.
+      missing.push(...validateTenantProfile(leaseTenantView(f)));
       if (isCommercial && !String(f.businessName || '').trim()) missing.push('businessName');
     }
     if (step === 3) {
@@ -1648,6 +1720,54 @@ const HostDashboard = () => {
     const interval = setInterval(hydrate, 30_000);
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
+
+  // ── Real Building records ───────────────────────────────────────────────
+  // Buildings are their own collection now, with ObjectIds that bookings
+  // actually reference. Until the buildings/units migration has run for a given
+  // landlord the API returns nothing, and we leave the old profile blob in
+  // place — utils/buildingScope.js falls back to name matching for rows with no
+  // buildingId yet, so nothing disappears mid-rollout.
+  const [serverBuildings, setServerBuildings] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    listBuildings()
+      .then((rows) => { if (!cancelled) setServerBuildings(rows); })
+      .catch((err) => console.warn('[host] failed to load buildings:', err.message || err));
+    return () => { cancelled = true; };
+  }, []);
+
+  // Server buildings win once they exist; the profile blob is the pre-migration
+  // fallback. Every tab reads buildings through this, so there is one answer to
+  // "what buildings does this landlord have".
+  // A building was just created by the wizard. Add it optimistically so the
+  // tab it was created from can switch straight into it, then re-read from the
+  // server so counts are real.
+  // "The buildings changed" — created, renamed or archived. A new building is
+  // added optimistically so the tab it came from can switch into it; every
+  // case then re-reads from the server so the counts are real. Called with no
+  // argument (edit / archive) it is just a refresh.
+  const handleBuildingCreated = (building) => {
+    if (building) setServerBuildings((prev) => [...(prev || []), building]);
+    listBuildings()
+      .then(setServerBuildings)
+      .catch((err) => console.warn('[host] building refresh failed:', err.message || err));
+  };
+
+  // Re-read the bookings. The AI scanner needs this: its batch endpoint returns
+  // a per-tenant summary rather than whole bookings, so there is nothing to
+  // merge into state — the list has to come back from the server or the
+  // freshly scanned tenants sit invisible until a reload.
+  const refreshBookings = () => {
+    listHostBookings()
+      .then(setBookings)
+      .catch((err) => console.warn('[host] booking refresh failed:', err.message || err));
+  };
+
+  const effectiveLandlordProfile = useMemo(() => (
+    (serverBuildings && serverBuildings.length)
+      ? { ...landlordProfile, buildings: serverBuildings }
+      : landlordProfile
+  ), [landlordProfile, serverBuildings]);
 
   // ── Auto-recovery for lost building profiles ────────────────────────────
   // If the user's `landlordProfile.buildings` is empty but they have bookings,
@@ -3029,6 +3149,10 @@ const HostDashboard = () => {
       // Floor 0 is the ground floor — carry it as a readable label, never a bare "0".
       floorNumber: floorToLabel(matchingProp?.floorNumber ?? matchingProp?.floor, language),
       roomNumber: '',
+      // Fresh person: nothing carried over, nothing pre-required.
+      tenantProfile: emptyTenantProfile(),
+      buildingId: null,
+      unitId: null,
       manualProperty: false,
       seats: [],
       serviceCharge: String(landlordProfile?.serviceCharge ?? authUser?.landlordProfile?.serviceCharge ?? ''),
@@ -3102,7 +3226,10 @@ const HostDashboard = () => {
       replacesBookingId: null,
       propertyId: prefillBuilding ? prefillBuilding.id : (properties[0]?.id || ''),
       property: prefillBuilding ? prefillBuilding.name : (properties[0]?.title || ''),
-      location: prefillBuilding ? prefillBuilding.location : (properties[0]?.location || ''),
+      // `address` is what a real Building record carries; `location` is the old
+      // profile-blob spelling. Both are read because a landlord can be on
+      // either side of the buildings/units migration.
+      location: prefillBuilding ? bldgAddress(prefillBuilding) : (properties[0]?.location || ''),
       tenant: '',
       tenantPhone: '',
       leaseStart: startIso,
@@ -3114,15 +3241,19 @@ const HostDashboard = () => {
       // Blank "New Lease" always opens on the RESIDENTIAL form first; the host
       // taps "Commercial Area / Lease" to switch. (Converting a commercial
       // inquiry still opens commercial — that path is context-driven.)
-      dealType: prefillBuilding ? (prefillBuilding.type === 'commercial' ? 'commercial' : 'residential') : 'residential',
+      dealType: prefillBuilding ? (bldgIsCommercial(prefillBuilding) ? 'commercial' : 'residential') : 'residential',
       businessName: '',
       licenseNumber: '',
-      leaseTermMonths: prefillBuilding ? (prefillBuilding.type === 'commercial' ? '24' : '') : (properties[0]?.intent === 'commercial' ? '24' : ''),
-      category: prefillBuilding 
-        ? (prefillBuilding.category || (prefillBuilding.type === 'hostel' ? 'hostel' : (prefillBuilding.type === 'commercial' ? '' : 'flat'))) 
+      leaseTermMonths: prefillBuilding ? (bldgIsCommercial(prefillBuilding) ? '24' : '') : (properties[0]?.intent === 'commercial' ? '24' : ''),
+      category: prefillBuilding
+        ? bldgLeaseCategory(prefillBuilding)
         : (properties[0]?.intent === 'commercial' ? '' : propTypeToCategory(properties[0]?.type)),
       floorNumber: '',
       roomNumber: '',
+      // Fresh person: nothing carried over, nothing pre-required.
+      tenantProfile: emptyTenantProfile(),
+      buildingId: null,
+      unitId: null,
       manualProperty: !!prefillBuilding,
       seats: [],
       serviceCharge: String(landlordProfile?.serviceCharge ?? authUser?.landlordProfile?.serviceCharge ?? ''),
@@ -3184,6 +3315,11 @@ const HostDashboard = () => {
       // ── Cleared: everything tied to the person who just left ──
       tenant: '',
       tenantPhone: '',
+      // The unit carries over; the person does not. Their profession, IDs,
+      // address, emergency contact and photo all go with them.
+      tenantProfile: emptyTenantProfile(),
+      buildingId: null,
+      unitId: null,
       occupants: '',
       businessName: '',
       advancePayment: '',
@@ -3254,12 +3390,13 @@ const HostDashboard = () => {
     const { startIso: effLeaseStart, endIso: effLeaseEnd } = resolveLeaseDates(leaseForm);
     const termMonths = Number(leaseForm.leaseTermMonths) || 0;
     const missing = [];
-    if (!tenant.trim()) missing.push('tenant');
-    if (!tenantPhone.trim()) missing.push('tenantPhone');
+    // Same rulebook the wizard steps use — name, mobile, move-in, plus any ID
+    // the host said this tenant HAS. Nothing else about the person blocks.
+    missing.push(...validateTenantProfile(leaseTenantView(leaseForm)));
     if (manualProperty ? !String(leaseForm.property || '').trim() : !propertyId) missing.push('property');
     if (isCommercial) {
       if (!String(leaseForm.businessName || '').trim()) missing.push('businessName');
-    } else if ((leaseForm.category === 'single_room' || leaseForm.category === 'hostel') && !String(leaseForm.roomNumber || '').trim()) {
+    } else if (!String(leaseForm.roomNumber || '').trim()) {
       missing.push('roomNumber');
     }
     const rent = Number(monthlyRent) || 0;
@@ -3335,9 +3472,16 @@ const HostDashboard = () => {
     // amount — otherwise the room rent is split equally across the seats
     // (handled in MembersManager). We deliberately DON'T stamp Seat 1 with the
     // full room rent, or the ÷seats split would skip it.
+    // The person as entered on the tenant step — profession, IDs, address,
+    // emergency contact, photo. Only ever as complete as the host chose to make
+    // it; blank fields are stored blank rather than blocking the save.
+    const tenantProfile = toTenantProfile(leaseTenantView(leaseForm));
     const hostelMembers = (leaseForm.category === 'hostel')
       ? [
-          { name: tenant.trim(), phone: tenantPhone.trim(), rentType: 'seat', floor: leaseForm.floorNumber || '', roomLabel: leaseForm.roomNumber || '', seatLabel: language === 'বাংলা' ? 'সিট ১' : 'Seat 1' },
+          // Seat 1 is this tenant, so it carries their full profile. Seats 2+
+          // are added with just a name/phone here and can be filled in later
+          // from the members panel.
+          { name: tenant.trim(), phone: tenantPhone.trim(), rentType: 'seat', floor: leaseForm.floorNumber || '', roomLabel: leaseForm.roomNumber || '', seatLabel: language === 'বাংলা' ? 'সিট ১' : 'Seat 1', tenantProfile, avatar: tenantProfile.photoUrl || '' },
           ...(Array.isArray(leaseForm.seats) ? leaseForm.seats : [])
             .filter(s => (s.name || '').trim() || (s.phone || '').trim() || Number(s.monthlyRent) > 0)
             .map((s, i) => ({
@@ -3351,10 +3495,20 @@ const HostDashboard = () => {
             })),
         ]
       : undefined;
+    // A real Building/Unit id when we have one — that, not the property name,
+    // is what ties this lease to a building from now on. The server re-reads
+    // both and refuses ids the landlord doesn't own.
+    const isMongoId = (v) => /^[0-9a-fA-F]{24}$/.test(String(v || ''));
+    const scopedBuilding = (leaseForm.buildingId && isMongoId(leaseForm.buildingId))
+      ? leaseForm.buildingId
+      : (isMongoId(currentBuildingId) ? currentBuildingId : null);
+
     const newBooking = {
       id: `BKG-${String(Date.now()).slice(-6)}`,
       inquiryId: leaseForm.inquiryId,
       tenantId: tenantUserId,
+      buildingId: scopedBuilding,
+      unitId: leaseForm.unitId || null,
       propertyId: pidStr,
       property: matchingProp?.title || leaseForm.property,
       propertyType: matchingProp?.type || leaseForm.category || '',
@@ -3365,6 +3519,10 @@ const HostDashboard = () => {
       tenantInit: initials,
       tenantPhone: tenantPhone.trim(),
       tenantEmail: '',
+      tenantProfile,
+      // Landlord's own snapshot. Cleared server-side the moment the tenant
+      // joins with the invite code — their profile picture wins from then on.
+      tenantAvatar: tenantProfile.photoUrl || '',
       tenantsCount: occupants,
       // Empty leaseEnd = ongoing tenancy, no expiry.
       leaseStart: effLeaseStart, leaseEnd: effLeaseEnd,
@@ -3398,6 +3556,8 @@ const HostDashboard = () => {
     }
 
     createBookingApi({
+      ...(scopedBuilding ? { buildingId: scopedBuilding } : {}),
+      ...(isMongoId(leaseForm.unitId) ? { unitId: leaseForm.unitId } : {}),
       propertyId: matchingProp ? (matchingProp._id || matchingProp.id) : propertyId,
       propertyType: matchingProp?.type || leaseForm.category || '',
       tenantId: tenantUserId,
@@ -3417,6 +3577,7 @@ const HostDashboard = () => {
       notes: leaseForm.notes || '',
       tenant: tenant.trim(),
       tenantPhone: tenantPhone.trim(),
+      tenantProfile,
       tenantsCount: occupants,
       advancePayment,
       paymentMethod,
@@ -3457,7 +3618,7 @@ const HostDashboard = () => {
       // dates, rent, due day, reminder, payment) and clear only the per-booking
       // ones so the host can add the next room/tenant immediately — the way to
       // set 20+ bookings without re-typing everything.
-      setLeaseForm(f => ({ ...f, tenant: '', tenantPhone: '', roomNumber: '', occupants: '', businessName: '', licenseNumber: '', seats: [], inquiryId: null, inquirerUserId: null, replacesBookingId: null }));
+      setLeaseForm(f => ({ ...f, tenant: '', tenantPhone: '', tenantProfile: emptyTenantProfile(), roomNumber: '', occupants: '', businessName: '', licenseNumber: '', seats: [], inquiryId: null, inquirerUserId: null, replacesBookingId: null }));
       setLeaseStep(1);
       showToast(language === 'বাংলা' ? 'লিজ তৈরি হয়েছে — পরের রুম/ভাড়াটিয়া যোগ করুন' : 'Lease created — add the next room / tenant');
     } else {
@@ -4332,19 +4493,10 @@ const HostDashboard = () => {
             {(() => {
               const todayDate = today;
               
-              let baseBookings = bookings;
-              if (landlordProfile?.buildingMode === 'multi') {
-                if (currentBuildingId) {
-                  const bldg = landlordProfile.buildings?.find(b => b.id === currentBuildingId);
-                  baseBookings = bldg ? bookings.filter(b => b.property === bldg.name) : [];
-                } else {
-                  const bldgNames = (landlordProfile.buildings || []).map(b => b.name);
-                  baseBookings = bookings.filter(b => bldgNames.includes(b.property));
-                }
-              } else if (landlordProfile?.buildingMode === 'single') {
-                const bldgName = landlordProfile.buildings?.[0]?.name;
-                baseBookings = bldgName ? bookings.filter(b => b.property === bldgName) : [];
-              }
+              // Scoped by buildingId, in one shared place — see utils/buildingScope.js.
+              // The name-equality filters that used to live here (one copy per screen)
+              // are why hostel and single-room leases vanished after a successful save.
+              const baseBookings = scopeBookings(bookings, landlordProfile?.buildings, currentBuildingId);
 
               const rentUnits = baseBookings.flatMap(rentUnitsOf);
               const sm = getMonthCollectionSummary(rentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
@@ -4429,7 +4581,7 @@ const HostDashboard = () => {
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {(landlordProfile.buildings || []).map(bldg => {
-                          const bldgBookings = bookings.filter(b => b.property === bldg.name);
+                          const bldgBookings = bookings.filter(b => bookingInBuilding(b, bldg));
                           const bldgRentUnits = bldgBookings.flatMap(rentUnitsOf);
                           const bldgSm = getMonthCollectionSummary(bldgRentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
                           const bldgPct = bldgSm.expectedTotal > 0 ? Math.min(100, Math.round((bldgSm.collectedTotal / bldgSm.expectedTotal) * 100)) : 0;
@@ -4479,19 +4631,10 @@ const HostDashboard = () => {
             {(() => {
               const todayDate = today;
               
-              let baseBookings = bookings;
-              if (landlordProfile?.buildingMode === 'multi') {
-                if (currentBuildingId) {
-                  const bldg = landlordProfile.buildings?.find(b => b.id === currentBuildingId);
-                  baseBookings = bldg ? bookings.filter(b => b.property === bldg.name) : [];
-                } else {
-                  const bldgNames = (landlordProfile.buildings || []).map(b => b.name);
-                  baseBookings = bookings.filter(b => bldgNames.includes(b.property));
-                }
-              } else if (landlordProfile?.buildingMode === 'single') {
-                const bldgName = landlordProfile.buildings?.[0]?.name;
-                baseBookings = bldgName ? bookings.filter(b => b.property === bldgName) : [];
-              }
+              // Scoped by buildingId, in one shared place — see utils/buildingScope.js.
+              // The name-equality filters that used to live here (one copy per screen)
+              // are why hostel and single-room leases vanished after a successful save.
+              const baseBookings = scopeBookings(bookings, landlordProfile?.buildings, currentBuildingId);
 
               const rentUnits = baseBookings.flatMap(rentUnitsOf);
               const sm = getMonthCollectionSummary(rentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
@@ -4576,7 +4719,7 @@ const HostDashboard = () => {
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {(landlordProfile.buildings || []).map(bldg => {
-                          const bldgBookings = bookings.filter(b => b.property === bldg.name);
+                          const bldgBookings = bookings.filter(b => bookingInBuilding(b, bldg));
                           const bldgRentUnits = bldgBookings.flatMap(rentUnitsOf);
                           const bldgSm = getMonthCollectionSummary(bldgRentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
                           const bldgPct = bldgSm.expectedTotal > 0 ? Math.min(100, Math.round((bldgSm.collectedTotal / bldgSm.expectedTotal) * 100)) : 0;
@@ -4967,7 +5110,9 @@ const HostDashboard = () => {
             isHostelBooking={isHostelBooking}
             formatDate={formatDate}
             stageLabel={stageLabel}
-            landlordProfile={landlordProfile}
+            landlordProfile={effectiveLandlordProfile}
+            onBuildingCreated={handleBuildingCreated}
+            refreshBookings={refreshBookings}
             setLandlordProfile={persistLandlordProfile}
             currentBuildingId={currentBuildingId}
             setCurrentBuildingId={setCurrentBuildingId}
@@ -5029,7 +5174,9 @@ const HostDashboard = () => {
             setActiveModal={setActiveModal}
             exportRentCsv={exportRentCsv}
             isPremium={isPremium}
-            landlordProfile={landlordProfile}
+            landlordProfile={effectiveLandlordProfile}
+            onBuildingCreated={handleBuildingCreated}
+            refreshBookings={refreshBookings}
             setLandlordProfile={persistLandlordProfile}
             currentBuildingId={currentBuildingId}
             setCurrentBuildingId={setCurrentBuildingId}
@@ -5959,17 +6106,18 @@ const HostDashboard = () => {
                         </button>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className={labelCls}>{isBn ? 'ভাড়াটিয়ার নাম' : 'Tenant Name'}</label>
-                          <input id="lease-tenant" type="text" value={leaseForm.tenant} onChange={e => setLeaseForm(f => ({ ...f, tenant: e.target.value }))} placeholder={isBn ? 'যেমন: আশরাফ আলম' : 'e.g. Asraf Alom'} className={`${inputCls} ${leaseErrCls('tenant')}`} />
-                        </div>
-                        <div>
-                          <label className={labelCls}>{isBn ? 'ফোন নম্বর' : 'Tenant Phone'}</label>
-                          <input id="lease-tenantPhone" type="tel" value={leaseForm.tenantPhone} onChange={e => setLeaseForm(f => ({ ...f, tenantPhone: e.target.value }))} placeholder="+880 1xxx xxxxxx" className={`${inputCls} ${leaseErrCls('tenantPhone')}`} />
-                          <p className="text-[9px] font-bold text-gray-400 mt-1">{isBn ? 'নম্বর দিয়ে ভাড়াটিয়ার অ্যাকাউন্ট অটো-লিংক হয়' : 'The number auto-links the tenant\u2019s account'}</p>
-                        </div>
-                      </div>
+                      {/* Name + mobile + move-in, then everything else folded
+                          away under "অতিরিক্ত তথ্য". Three boxes and the host can
+                          move on — nothing in the optional section can block a
+                          save, and an ID is only ever required because the host
+                          answered "আছে" for it. */}
+                      <TenantInfoForm
+                        value={leaseTenantView(leaseForm)}
+                        onChange={applyTenantPatch}
+                        language={language}
+                        errors={leaseErrors}
+                        showToast={showToast}
+                      />
 
                       {/* Commercial — business identity instead of family size. */}
                       {isCommercial && (
@@ -6177,11 +6325,21 @@ const HostDashboard = () => {
                               </span>
                             </div>
 
-                            {/* Move-in is the only date a residential tenancy needs. */}
-                            <div className={`grid grid-cols-1 gap-3 ${(isCommercial || fixedTerm) ? 'sm:grid-cols-2' : ''}`}>
+                            {/* Move-in now lives on the TENANT step, with the
+                                other three fields that actually identify a
+                                tenancy. It is shown here read-only so the term
+                                below still reads as a whole. */}
+                            <div className={`grid grid-cols-1 gap-3 ${(isCommercial || fixedTerm) ? "sm:grid-cols-2" : ""}`}>
                               <div>
                                 <label className={labelCls}>{isBn ? 'মুভ-ইন তারিখ' : 'Move-In Date'}</label>
-                                <input id="lease-leaseStart" type="date" value={leaseForm.leaseStart} onChange={e => setLeaseForm(f => ({ ...f, leaseStart: e.target.value }))} className="w-full mt-1.5 p-3.5 bg-white rounded-xl text-sm font-bold text-gray-900 outline-none focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-gray-100 focus:border-[#ba0036]/30 transition-all" />
+                                <button
+                                  type="button"
+                                  onClick={() => goLeaseStep(2)}
+                                  className="w-full mt-1.5 p-3.5 bg-white rounded-xl text-sm font-bold text-gray-900 border border-gray-100 flex items-center gap-2 text-left hover:border-[#ba0036]/30 transition-all"
+                                >
+                                  <span className="flex-1 truncate">{formatDate(leaseForm.leaseStart, language)}</span>
+                                  <span className="shrink-0 text-[10px] font-black text-[#ba0036] uppercase tracking-widest">{isBn ? 'এডিট' : 'Edit'}</span>
+                                </button>
                               </div>
                               {isCommercial ? (
                                 <div>
