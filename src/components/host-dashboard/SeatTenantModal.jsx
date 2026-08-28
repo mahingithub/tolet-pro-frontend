@@ -23,6 +23,7 @@ import TenantInfoForm from './TenantInfoForm';
 import { emptyTenantProfile, validateTenantProfile } from '../../utils/tenantFields';
 import { addTenantToUnit, replaceTenantInUnit } from '../../services/buildingService';
 import { unitNoun } from '../../utils/buildingTypes';
+import { submitOnEnter } from '../../utils/submitOnEnter';
 import { scanTenantForm } from '../../services/aiScanService';
 
 const todayIso = () => {
@@ -131,7 +132,10 @@ export default function SeatTenantModal({
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+      <div
+        className="bg-white rounded-3xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 max-h-[92vh] overflow-y-auto"
+        onKeyDown={submitOnEnter(submit, { enabled: !saving && !scanning })}
+      >
         <div className="p-5 sm:p-6">
 
           <div className="flex items-start gap-2 mb-4">

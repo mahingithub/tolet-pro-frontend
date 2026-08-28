@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { listUnits, createUnit, createUnitsBulk, archiveUnit, updateUnit } from '../../services/buildingService';
 import SeatTenantModal from './SeatTenantModal';
+import { submitOnEnter } from '../../utils/submitOnEnter';
 import TenantDetailModal from './TenantDetailModal';
 import {
   SUITABLE_FOR, suitableForCardLabel, suitableForColor, unitNoun,
@@ -266,7 +267,10 @@ export default function UnitsManager({
 
       {/* ── Add form — shaped by how this building is let ── */}
       {adding && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-3 shadow-[0_2px_12px_rgba(0,0,0,0.04)] animate-in slide-in-from-top-2 duration-200">
+        <div
+          className="bg-white rounded-2xl border border-gray-100 p-4 mb-3 shadow-[0_2px_12px_rgba(0,0,0,0.04)] animate-in slide-in-from-top-2 duration-200"
+          onKeyDown={submitOnEnter(submit, { enabled: !saving })}
+        >
           {/* One room, or a whole floor. Thirty rooms through thirty forms is
               why a 70–80 room building never got set up. */}
           <div className="flex items-center gap-1.5 mb-3">

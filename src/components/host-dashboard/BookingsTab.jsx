@@ -908,7 +908,7 @@ export default function BookingsTab(props) {
                         onCreated={(b) => { onBuildingCreated?.(b); setShowBuildingForm(false); }}
                       />
                     )}
-                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {(landlordProfile.buildings || []).map(bldg => {
                          if (editingBuildingId === bldg.id) {
                            return (

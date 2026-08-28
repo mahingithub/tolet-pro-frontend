@@ -153,6 +153,14 @@ const WorkplaceAutocomplete = ({
       setHighlightIdx((i) => (i - 1 + totalRows) % totalRows);
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      // The open dropdown CONSUMES this Enter — it is choosing a suggestion,
+      // not submitting anything. Without stopping it here the keystroke also
+      // reaches the surrounding form (see utils/submitOnEnter.js), so picking
+      // "Daffodil International University" would pick it AND save the tenant
+      // in one press.
+      //
+      // Only when the list is open. With it closed, Enter belongs to the form.
+      e.stopPropagation();
       if (highlightIdx < flatResults.length) {
         pickWorkplace(flatResults[highlightIdx]);
       } else {

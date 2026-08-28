@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { RESIDENTIAL_TYPES } from '../../utils/buildingTypes';
 import { createBuilding } from '../../services/buildingService';
+import { submitOnEnter } from '../../utils/submitOnEnter';
 
 const TYPE_ICONS = {
   flat:        Home,
@@ -128,7 +129,13 @@ export default function BuildingSetupWizard({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl animate-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+      <div
+        className="bg-white rounded-3xl w-full max-w-md shadow-2xl animate-in zoom-in-95 max-h-[92vh] overflow-y-auto"
+        onKeyDown={submitOnEnter(
+          () => (step < 5 ? (canAdvance() && go(1)) : submit()),
+          { enabled: !saving },
+        )}
+      >
         <div className="p-5 sm:p-6">
 
           <div className="flex items-start gap-2 mb-4">

@@ -39,7 +39,7 @@ import { listMyPaymentMethods } from "../services/paymentMethodService.js";
 import { listHostRentPayments } from "../services/rentPaymentService.js";
 import PaymentSettings from './payments/PaymentSettings';
 import PendingRentPayments from './payments/PendingRentPayments';
-import PaymentSettingsPopup from './payments/PaymentSettingsPopup';
+import PaymentSettingsPopup, { PAYMENT_PROMO_DISMISS_KEY } from './payments/PaymentSettingsPopup';
 import RentPaymentHistory from './payments/RentPaymentHistory';
 import { listDocuments as listDocsApi, uploadDocument as uploadDocApi, deleteDocument as deleteDocApi, downloadUrlFor } from "../services/documentService.js";
 import tenantService from "../services/tenantService.js";
@@ -67,6 +67,7 @@ import TenantInfoForm from './host-dashboard/TenantInfoForm';
 import { emptyTenantProfile, validateTenantProfile, toTenantProfile } from '../utils/tenantFields';
 import { scopeBookings, bookingInBuilding } from '../utils/buildingScope';
 import { paidSoFar, remainingFor, applyPaymentToEntry } from '../utils/rentLedger';
+import { submitOnEnter } from '../utils/submitOnEnter';
 import { listBuildings } from '../services/buildingService';
 
 // Every tab the dashboard can render, in sidebar order. This is the single
@@ -788,7 +789,20 @@ const HostDashboard = () => {
     };
   }, []);
   const [showHomeChoice, setShowHomeChoice] = useState(false);
-  const [hidePaymentPromo, setHidePaymentPromo] = useState(false);
+  // Persisted, not just component state. This was `useState(false)`, so the X
+  // worked until the page reloaded and the card returned — the landlord had
+  // dismissed it, and it came back anyway.
+  //
+  // Shares its key with PaymentSettingsPopup: they are two faces of the same
+  // reminder, so silencing one silences both.
+  const [hidePaymentPromo, setHidePaymentPromo] = useState(() => {
+    try { return localStorage.getItem(PAYMENT_PROMO_DISMISS_KEY) === '1'; }
+    catch { return false; }
+  });
+  const dismissPaymentPromo = () => {
+    try { localStorage.setItem(PAYMENT_PROMO_DISMISS_KEY, '1'); } catch { /* ignore */ }
+    setHidePaymentPromo(true);
+  };
   // Scroll to + flash the specific row a notification points at (uses
   // location.state.highlightId set by NotificationPanel). The row ids are
   // stamped on each inquiry/booking/rent card below.
@@ -4303,7 +4317,7 @@ const HostDashboard = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setHidePaymentPromo(true);
+                          dismissPaymentPromo();
                         }}
                         className="absolute top-2 right-2 md:top-1/2 md:-translate-y-1/2 md:right-4 p-1.5 rounded-full bg-emerald-100/50 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:hover:bg-emerald-800/50 text-emerald-700 dark:text-emerald-300 transition-colors z-10"
                       >
@@ -5901,7 +5915,10 @@ const HostDashboard = () => {
                 const stepDone = (n) => leaseStepMissing(n).length === 0;
 
                 return (
-                <div className="space-y-4">
+                <div
+                  className="space-y-4"
+                  onKeyDown={submitOnEnter(() => (leaseStep < 3 ? goLeaseStep(leaseStep + 1) : submitCreateLease(false)))}
+                >
 
                   {/* ── Stepper — where am I, what's left ── */}
                   <div className="flex items-center gap-1">
@@ -6629,7 +6646,10 @@ const HostDashboard = () => {
                     : { from: 'from-rose-500', to: 'to-red-600', soft: 'bg-rose-50 text-rose-700', accent: 'text-rose-600', ring: 'focus:border-rose-500/30 focus:shadow-[0_4px_15px_rgba(244,63,94,0.10)]' };
 
                 return (
-                  <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                  <div
+                    className="space-y-4 animate-in fade-in zoom-in-95 duration-200"
+                    onKeyDown={submitOnEnter(submitMarkPaid, { enabled: payForm.step === 'form' })}
+                  >
                     {/* ── Header — same on both steps so the host always sees who/what/when ── */}
                     <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${theme.from} ${theme.to} text-white p-4 shadow-[0_10px_30px_rgba(0,0,0,0.12)]`}>
                       <div className="absolute -top-10 -right-10 w-36 h-36 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>

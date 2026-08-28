@@ -11,7 +11,8 @@ const SNOOZE_KEY = 'tolet_payment_settings_snoozed';
 // Turning it off permanently is safe because it is not the only nudge — the
 // inline Payment Settings card stays on the dashboard, and the popup never
 // appears at all once a payment method exists.
-const DISMISS_KEY = 'tolet_payment_settings_dismissed';
+export const PAYMENT_PROMO_DISMISS_KEY = 'tolet_payment_settings_dismissed';
+const DISMISS_KEY = PAYMENT_PROMO_DISMISS_KEY;
 
 /**
  * PaymentSettingsPopup — reminds a landlord to configure Payment Settings when
