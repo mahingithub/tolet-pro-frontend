@@ -2,9 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { X, CreditCard, ArrowRight, Clock } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 
-// Once-per-session dismissal key so "Remind Me Later" doesn't nag on every
-// re-render / tab switch within the same login session.
+// "Remind Me Later" — quiet for the rest of this session only.
 const SNOOZE_KEY = 'tolet_payment_settings_snoozed';
+// "Don't show again" — quiet for good, across sessions. Everything used to be
+// a session snooze, so the popup returned on every new tab and every browser
+// restart: dismissing it never actually dismissed it.
+//
+// Turning it off permanently is safe because it is not the only nudge — the
+// inline Payment Settings card stays on the dashboard, and the popup never
+// appears at all once a payment method exists.
+const DISMISS_KEY = 'tolet_payment_settings_dismissed';
 
 /**
  * PaymentSettingsPopup — reminds a landlord to configure Payment Settings when
@@ -37,9 +44,12 @@ export default function PaymentSettingsPopup({ hasPaymentMethod, hasBookings, lo
     // stays closed on first paint and opens later if a tenant connects while the
     // dashboard is open.
     if (!hasBookings) { setVisible(false); return; }
-    let snoozed = false;
-    try { snoozed = sessionStorage.getItem(SNOOZE_KEY) === '1'; } catch { /* ignore */ }
-    if (!snoozed) setVisible(true);
+    let quiet = false;
+    try {
+      quiet = sessionStorage.getItem(SNOOZE_KEY) === '1'
+        || localStorage.getItem(DISMISS_KEY) === '1';
+    } catch { /* storage unavailable — show it rather than swallow the reminder */ }
+    if (!quiet) setVisible(true);
   }, [hasPaymentMethod, hasBookings, loading]);
 
   if (!visible) return null;
@@ -49,8 +59,17 @@ export default function PaymentSettingsPopup({ hasPaymentMethod, hasBookings, lo
     setVisible(false);
   };
 
+  // Permanent. Separate from snooze so "later" and "never" stay distinguishable.
+  const dismissForever = () => {
+    try { localStorage.setItem(DISMISS_KEY, '1'); } catch { /* ignore */ }
+    setVisible(false);
+  };
+
   const add = () => {
-    try { sessionStorage.setItem(SNOOZE_KEY, '1'); } catch { /* ignore */ }
+    try {
+      sessionStorage.setItem(SNOOZE_KEY, '1');
+      localStorage.setItem(DISMISS_KEY, '1');
+    } catch { /* ignore */ }
     setVisible(false);
     onAddMethod?.();
   };
@@ -73,7 +92,7 @@ export default function PaymentSettingsPopup({ hasPaymentMethod, hasBookings, lo
         <div className="relative bg-gradient-to-br from-[#ba0036] to-[#ff004c] px-6 pt-7 pb-8 text-white overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/3 translate-x-1/3 blur-2xl" />
           <button
-            onClick={snooze}
+            onClick={dismissForever}
             className="absolute top-4 right-4 w-9 h-9 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center transition-colors"
           >
             <X size={18} />

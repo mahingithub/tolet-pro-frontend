@@ -78,8 +78,11 @@ export default function UnitsManager({
   building,
   language,
   showToast,
-  onAddTenant,      // (unit, seatIndex) => void — opens the lease form for a seat
   formatBDT,
+  // Adding or replacing a tenant writes a BOOKING, not just a unit. Reloading
+  // only the room list left the Tenants tab and Rent Collection showing stale
+  // data until the page was refreshed by hand.
+  onBookingsChanged,
 }) {
   const isBn = language === 'বাংলা';
   const [units, setUnits] = useState([]);
@@ -661,7 +664,7 @@ export default function UnitsManager({
           showToast={showToast}
           formatBDT={formatBDT}
           onClose={() => setSeatTarget(null)}
-          onSaved={load}
+          onSaved={() => { load(); onBookingsChanged?.(); }}
         />
       )}
 
