@@ -622,12 +622,12 @@ useEffect(() => {
               route — or this cluster collapses left against the logo. */}
           <div className={`hidden md:flex items-center gap-3 text-sm font-bold text-gray-700 ${(showNavSearch && (isScrolled || compactHeader)) ? '' : 'ml-auto'}`}>
 
-            {/* ── Guest marketing links (HousingAnywhere-style) ── */}
+            {/* ── Guest marketing links (Airbnb/OYO style) ── */}
             {!isLoggedIn && (
-              <nav className="hidden lg:flex items-center gap-6 mr-1">
-                <Link to="/how-it-works" className="hover:text-[#ba0036] transition-colors">{t?.navHowItWorks || 'How it works'}</Link>
-                <Link to="/how-it-works#pricing" className="hover:text-[#ba0036] transition-colors">{t?.navPricing || 'Pricing'}</Link>
-                <Link to="/support" className="hover:text-[#ba0036] transition-colors">{t?.navHelp || 'Help'}</Link>
+              <nav className="hidden lg:flex items-center gap-1 mr-4">
+                <Link to="/how-it-works" className="px-4 py-2 rounded-full text-[13px] font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors">{t?.navHowItWorks || 'How it works'}</Link>
+                <Link to="/how-it-works#pricing" className="px-4 py-2 rounded-full text-[13px] font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors">{t?.navPricing || 'Pricing'}</Link>
+                <Link to="/support" className="px-4 py-2 rounded-full text-[13px] font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors">{t?.navHelp || 'Help'}</Link>
               </nav>
             )}
 
@@ -652,19 +652,27 @@ useEffect(() => {
             ) : (
               <button
                 onClick={() => (isLoggedIn ? handleProtected('/list-property') : navigate('/login?mode=signup&role=landlord'))}
-                className="group flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[#ba0036] bg-white text-[#ba0036] hover:bg-[#ba0036] hover:text-white font-bold text-xs lg:text-sm shadow-sm hover:shadow transition-all active:scale-95 whitespace-nowrap"
+                className="relative group overflow-hidden flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#ba0036] to-[#e11d48] text-white font-black text-xs lg:text-sm shadow-[0_4px_15px_rgba(186,0,54,0.4)] hover:shadow-[0_6px_25px_rgba(225,29,72,0.6)] hover:-translate-y-0.5 transition-all duration-300 active:scale-95 whitespace-nowrap border border-rose-400/30"
               >
-                <PlusCircle size={16} />
-                {t?.listProperty || 'Post Property'}
-                <span className="rounded-full bg-[#ba0036]/10 text-[#ba0036] group-hover:bg-white/25 group-hover:text-white px-1.5 py-0.5 text-[9px] font-extrabold leading-none tracking-wider transition-colors">FREE</span>
+                {/* Subtle outer pulse */}
+                <span className="absolute inset-0 rounded-xl ring-2 ring-white/20 group-hover:ring-white/40 transition-all duration-300"></span>
+                <span className="absolute inset-0 rounded-xl bg-gradient-to-r from-white/0 via-white/20 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-pulse"></span>
+                
+                {/* Shine effect on hover */}
+                <div className="absolute top-0 -left-[100%] w-[120%] h-full bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-[-25deg] group-hover:left-[100%] transition-all duration-700 ease-in-out"></div>
+                
+                <Sparkles size={16} className="relative z-10" />
+                <span className="relative z-10 tracking-wide">{t?.listProperty || 'Post Property'}</span>
+                <span className="relative z-10 rounded-full bg-white/20 text-white px-2 py-0.5 text-[9px] font-extrabold leading-none tracking-widest border border-white/20 backdrop-blur-sm group-hover:bg-white group-hover:text-[#ba0036] transition-colors uppercase shadow-sm">
+                  FREE
+                </span>
               </button>
             )}
 
             <div className="relative" ref={langRef}>
-              <div onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="flex items-center gap-2 cursor-pointer hover:text-[#ba0036] transition-colors">
-                <Globe size={16} /> <span>{language}</span>
-                <ChevronDown size={14} className={`transition-transform duration-300 ${isLangMenuOpen ? 'rotate-180' : ''}`} />
-              </div>
+              <button onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} aria-label="Select Language" className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-full hover:bg-gray-100 transition-colors text-gray-700 hover:text-gray-900 font-bold">
+                <Globe size={16} /> <span className="text-[13px]">{language}</span>
+              </button>
               {isLangMenuOpen && (
                 <div className="absolute top-full right-0 mt-4 w-40 bg-white/95 backdrop-blur-3xl border border-white shadow-[0_20px_40px_rgba(0,0,0,0.1)] rounded-2xl p-2 z-[70]">
                   {languages.map(lang => (

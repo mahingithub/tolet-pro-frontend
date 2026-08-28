@@ -347,7 +347,7 @@ const getDueDate = (key, dueDay) => {
 const getRentStatus = (booking, key, today = new Date()) => {
   const entry = booking?.ledger?.[key];
   if (entry?.paid) {
-    if (entry.status === 'partial' || (Number(entry.balance) || 0) > 0) return 'partial';
+    if ((Number(entry.balance) || 0) > 0) return 'partial';
     return 'paid';
   }
   if (entry?.status === 'due') return 'due-marked';
@@ -403,7 +403,7 @@ const getMonthCollectionSummary = (bookings, year, month, today = new Date()) =>
     const entry = b.ledger?.[key];
     if (entry?.paid) {
       collectedTotal += Number(entry.amount || 0);
-      const isPartial = entry.status === 'partial' || (Number(entry.balance) || 0) > 0;
+      const isPartial = (Number(entry.balance) || 0) > 0;
       if (isPartial) {
         partialCount += 1;
         partialTenants.push(b);

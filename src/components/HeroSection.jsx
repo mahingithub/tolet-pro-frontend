@@ -10,7 +10,7 @@ import usePropertyStore from '../store/usePropertyStore';
 import { SALE_INTENT_ENABLED } from '../constants/listingIntents';
 import { DIVISIONS, POPULAR_AREAS, POPULAR_AREA_IMAGES, POPULAR_AREA_IMAGES_DESKTOP, POPULAR_AREA_TAGLINES, POPULAR_AREA_SUBZONES, buildSearchUrl } from '../data/searchData';
 import LocationSearchModal from './shared/LocationSearchModal';
-import YouTubeBackground from './shared/YouTubeBackground';
+
 import { useAppInstall, requestInstallGuide } from '../hooks/useAppInstall';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -465,7 +465,7 @@ const HeroSection = () => {
     }
   };
 
-  const HERO_YOUTUBE_ID = 'PpeE86P9TnA';
+
 
   // Listing mode is now GLOBAL — shared with the navbar ModeSwitcher and
   // persisted across reloads (usePropertyStore.activeMode). The hero
@@ -673,18 +673,25 @@ const HeroSection = () => {
         {/* 1. HERO SECTION                                                */}
         {/* ═══════════════════════════════════════════════════════════════ */}
         <section className="w-full max-w-[1400px] mx-auto px-4 md:px-6 pt-4">
-          <div className="relative w-full h-[240px] md:h-[300px] lg:h-[380px] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-sm flex flex-col justify-center items-center text-center">
-            <YouTubeBackground videoId={HERO_YOUTUBE_ID} title="To-Let Pro hero video" />
-            {/* Cinematic gradient for headline contrast, layered above the
-                poster's z-5. The blur layer that used to sit here only existed to
-                smudge YouTube's centre buttons — YouTubeBackground handles those
-                now, so the video stays sharp. */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/30 z-10" />
-            <div className="relative z-20 px-4 -mt-12 md:-mt-20 md:hidden">
-              <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1] mb-3 drop-shadow-2xl">
-                {t?.heroTitle1 || 'Find Your Next'} <br className="md:hidden" /> {t?.heroTitle2 || 'Perfect Home'}
+          <div className="relative w-full h-[240px] md:h-[400px] lg:h-[480px] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-sm flex flex-col justify-center items-center text-center">
+            <video
+              src="https://res.cloudinary.com/dsrolbe0j/video/upload/q_auto,f_auto/0821_qeyayb.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+            />
+            {/* Cinematic gradient for headline contrast */}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-slate-900/10 z-10" />
+            
+            {/* Desktop & Mobile Hero Text */}
+            <div className="relative z-20 px-4 -mt-10 md:-mt-24 w-full max-w-4xl mx-auto flex flex-col items-center justify-center">
+              <h1 className="text-3xl md:text-5xl lg:text-[4.5rem] font-black text-white tracking-tight leading-[1.05] mb-3 md:mb-6 drop-shadow-2xl">
+                {t?.heroTitle1 || 'Find Your Next'} <br className="md:hidden" /> 
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-rose-600 ml-0 md:ml-3">{t?.heroTitle2 || 'Perfect Home'}</span>
               </h1>
-              <p className="text-[12px] md:text-base font-bold text-slate-100 max-w-xl mx-auto drop-shadow-md hidden md:block">
+              <p className="text-[12px] md:text-lg lg:text-xl font-bold text-slate-100 max-w-2xl mx-auto drop-shadow-md hidden md:block leading-relaxed">
                 {t?.heroSubtext || 'Discover premium apartments, duplexes, and commercial spaces across Bangladesh.'}
               </p>
             </div>
@@ -974,9 +981,46 @@ const HeroSection = () => {
         </section>
 
         {/* ═══════════════════════════════════════════════════════════════ */}
-        {/* 3. POPULAR DISTRICTS (Marquee Slider)                         */}
+        {/* 3. PROPERTY & AMENITIES BENEFITS                              */}
         {/* ═══════════════════════════════════════════════════════════════ */}
-        <section className="w-full mt-12 md:mt-24 overflow-hidden relative" data-tour="explore-divisions">
+        <section className="w-full max-w-[1400px] mx-auto px-4 md:px-6 mt-8 md:mt-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] transition-all">
+              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-6">
+                <HomeIcon size={24} />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 mb-3">{language === 'বাংলা' ? 'প্রিমিয়াম প্রপার্টি এবং সুবিধা' : 'Premium Properties & Amenities'}</h3>
+              <p className="text-sm font-medium text-slate-600 leading-relaxed">
+                {language === 'বাংলা' ? 'হাজার হাজার ভেরিফাইড এবং আধুনিক প্রপার্টি থেকে বেছে নিন। ২৪/৭ নিরাপত্তা, নিরবচ্ছিন্ন বিদ্যুৎ ও পানি, এবং আধুনিক সুযোগ-সুবিধা সহ ফ্যামিলি বা ব্যাচেলর বাসা খুঁজে পান সহজেই।' : 'Explore thousands of verified, high-quality properties. Find modern family apartments or bachelor accommodations equipped with essential amenities, 24/7 security, and reliable utilities.'}
+              </p>
+            </div>
+            
+            <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] transition-all">
+              <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-6">
+                <Users size={24} />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 mb-3">{language === 'বাংলা' ? 'যাচাইকৃত ভাড়াটিয়া ও ল্যান্ডলর্ড' : 'Verified Tenants & Landlords'}</h3>
+              <p className="text-sm font-medium text-slate-600 leading-relaxed">
+                {language === 'বাংলা' ? 'নিরাপত্তাই আমাদের প্রধান লক্ষ্য। প্রতিটি ল্যান্ডলর্ড এবং ভাড়াটিয়া একটি কঠোর ভেরিফিকেশন প্রক্রিয়ার মাধ্যমে যুক্ত হন। বাসা পরিদর্শনের আগেই মেসেজিং এর মাধ্যমে কথা বলে নিশ্চিত হোন।' : 'Safety is our top priority. Every landlord and tenant undergoes a strict verification process. Enjoy peace of mind with transparent profiles and secure in-app messaging before arranging any visits.'}
+              </p>
+            </div>
+
+            <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] transition-all">
+              <div className="w-12 h-12 bg-[#ba0036]/10 text-[#ba0036] rounded-2xl flex items-center justify-center mb-6">
+                <ShieldCheck size={24} />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 mb-3">{language === 'বাংলা' ? 'স্মার্ট ও ঝামেলাবিহীন সেবা' : 'Smart & Hassle-Free Benefits'}</h3>
+              <p className="text-sm font-medium text-slate-600 leading-relaxed">
+                {language === 'বাংলা' ? 'দালালকে বিদায় জানান! টু-লেট প্রো দিচ্ছে জিরো ব্রোকারেজ সুবিধা, সঠিক বাসা খুঁজে পেতে স্মার্ট এআই প্রযুক্তি এবং সরাসরি প্ল্যাটফর্ম থেকে চুক্তি করার সুযোগ।' : 'Say goodbye to broker fees! To-Let Pro offers zero brokerage, smart AI matchmaking to find your perfect fit instantly, and a seamless, end-to-end rental experience.'}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* 4. POPULAR DISTRICTS (Marquee Slider)                         */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        <section className="w-full mt-10 md:mt-16 overflow-hidden relative" data-tour="explore-divisions">
           <div className="max-w-[1400px] mx-auto px-4 md:px-6 mb-6">
             <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">{t?.exploreDivisions || 'Explore Divisions'}</h2>
             <p className="text-sm font-bold text-slate-500 mt-1">{t?.exploreDivisionsDesc || 'Discover properties across all major cities'}</p>

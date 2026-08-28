@@ -637,7 +637,7 @@ const TenantProfile = () => {
                   ) : (
                     <div className="space-y-2">
                       {paymentReceipts.map((r) => {
-                        const partial = r.status === 'partial';
+                        const partial = (Number(r.balance) || 0) > 0;
                         return (
                           <div key={r.key} className="flex items-center gap-3 p-3 md:p-3.5 bg-white rounded-2xl border border-gray-100 hover:border-emerald-200 hover:shadow-[0_6px_18px_rgba(16,185,129,0.08)] transition-all">
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${partial ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
