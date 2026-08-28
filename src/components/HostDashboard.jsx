@@ -66,6 +66,7 @@ import LandlordHomeChoiceModal from './shared/LandlordHomeChoiceModal';
 import TenantInfoForm from './host-dashboard/TenantInfoForm';
 import { emptyTenantProfile, validateTenantProfile, toTenantProfile } from '../utils/tenantFields';
 import { scopeBookings, bookingInBuilding } from '../utils/buildingScope';
+import { paidSoFar, remainingFor, applyPaymentToEntry } from '../utils/rentLedger';
 import { listBuildings } from '../services/buildingService';
 
 // Every tab the dashboard can render, in sidebar order. This is the single
@@ -2477,7 +2478,11 @@ const HostDashboard = () => {
       paidOn: existing?.paidOn || todayIso(),
       method: existing?.method || 'bKash',
       txnId: existing?.txnId || '',
-      amount: String(existing?.amount ?? expected ?? ''),
+      // What is STILL OWED, not what has already been banked. The field used to
+      // pre-fill with the existing entry's total, so re-opening a ৳5,000 partial
+      // offered ৳5,000 again — which, now that payments add up, would record
+      // ৳10,000 against a ৳6,000 month.
+      amount: String(remainingFor(existing, expected) || expected || ''),
       expectedRent: expected,
       dueNote: existing?.dueNote || '',
       expectedPayBy: existing?.expectedPayBy || '',
@@ -2493,8 +2498,11 @@ const HostDashboard = () => {
       ...prev,
       status,
       step: 'form',
+      // "Full payment" means settling the month — which, once part of it has
+      // been collected, is the REMAINING amount, not the whole rent again.
+      // `prev.amount` already holds the remaining (set by openMarkPaid).
       amount: status === 'full'
-        ? String(prev.expectedRent || prev.amount || '')
+        ? String(prev.amount || prev.expectedRent || '')
         : (status === 'due' ? '0' : prev.amount),
     }));
   };
@@ -2523,6 +2531,16 @@ const HostDashboard = () => {
     const expected = payMember ? seatShare(booking, payMember, activeMems.length) : (Number(booking.monthlyRent || 0) + Number(booking.serviceCharge || 0));
     const amt = Number(amount) || 0;
 
+    // What is already banked for this month, and what is therefore still owed.
+    // A month's entry holds the TOTAL received, so a second payment adds to the
+    // first rather than replacing it — collecting the last ৳1,000 of a ৳6,000
+    // rent used to wipe out the ৳5,000 recorded earlier.
+    const existingEntry = payMember
+      ? (payMember.ledger || {})[key]
+      : (booking.ledger || {})[key];
+    const alreadyPaid = paidSoFar(existingEntry);
+    const remainingBefore = remainingFor(existingEntry, expected);
+
     // ── Branch validation ──────────────────────────────────────────────────
     if (status === 'full') {
       if (amt <= 0) {
@@ -2534,10 +2552,13 @@ const HostDashboard = () => {
         showToast(language === 'বাংলা' ? 'কত টাকা পেয়েছেন লিখুন' : 'Enter the amount received');
         return;
       }
-      if (amt >= expected) {
+      // Measured against what is STILL OWED, not the whole month. With ৳5,000
+      // already banked on a ৳6,000 rent, the remaining ৳1,000 is a perfectly
+      // good partial — comparing it to ৳6,000 said nothing useful.
+      if (amt >= remainingBefore) {
         showToast(language === 'বাংলা'
-          ? 'পুরো ভাড়া পেয়ে গেছেন — "Full Payment" নির্বাচন করুন'
-          : 'Amount covers the full rent — please choose "Full Payment" instead');
+          ? 'এতে পুরো ভাড়া মিটে যাচ্ছে — "Full Payment" নির্বাচন করুন'
+          : 'That settles the month — please choose "Full Payment" instead');
         return;
       }
     } else if (status === 'due') {
@@ -2548,10 +2569,17 @@ const HostDashboard = () => {
     }
 
     // ── Build the ledger entry ─────────────────────────────────────────────
-    const balance = status === 'due' ? expected : Math.max(0, expected - amt);
+    // A payment folds into whatever was already received; `status` then follows
+    // from the money rather than from which button was pressed. Marking a month
+    // "Full" while ৳5,000 of it is still outstanding only makes the ledger lie.
     const entry = status === 'due'
-      ? { paid: false, status: 'due', dueNote: dueNote.trim(), expectedPayBy, amount: 0, balance }
-      : { paid: true, status, paidOn, method, txnId, amount: amt, balance };
+      ? { paid: false, status: 'due', dueNote: dueNote.trim(), expectedPayBy, amount: 0, balance: expected }
+      : applyPaymentToEntry(existingEntry, {
+        amount: amt,
+        expected,
+        meta: { paidOn, method, txnId },
+      });
+    const balance = entry.balance;
 
     setBookings(prev => prev.map(b => {
       if (b.id !== bookingId) return b;
@@ -2581,7 +2609,16 @@ const HostDashboard = () => {
     }
 
     const bookingMongoId = booking._id || bookingId;
-    const apiBody = { ...entry, monthLabel: monthFullLabel(key, language), totalDue: expected };
+    // `amountReceived` is THIS payment; the server folds it into the month and
+    // derives the total itself, so the two sides cannot disagree about what has
+    // been collected. `amount` still carries the resulting total for any older
+    // client or reader that expects it.
+    const apiBody = {
+      ...entry,
+      amountReceived: status === 'due' ? 0 : amt,
+      monthLabel: monthFullLabel(key, language),
+      totalDue: expected,
+    };
     (payMember
       ? updateMemberLedgerApi(bookingMongoId, memberId, key, apiBody)
       : updateLedgerApi(bookingMongoId, key, apiBody)
@@ -6560,8 +6597,17 @@ const HostDashboard = () => {
                 const due = getDueDate(payForm.monthKey, booking.rentDueDay);
                 const expected = mpMember ? seatShare(booking, mpMember, mpActive.length) : (Number(booking.monthlyRent || 0) + Number(booking.serviceCharge || 0));
                 const amt = Number(payForm.amount) || 0;
-                const balance = payForm.status === 'due' ? expected : Math.max(0, expected - amt);
                 const existing = mpMember ? (mpMember.ledger?.[payForm.monthKey]) : (booking.ledger?.[payForm.monthKey]);
+                // Money already banked for this month. The amount typed here is
+                // what is being received NOW, so the balance has to be measured
+                // against the two together — showing ৳6,000 − ৳1,000 = ৳5,000
+                // still owing, after ৳5,000 had already come in, is what made
+                // the second payment look like it had not worked.
+                const alreadyBanked = paidSoFar(existing);
+                const stillOwed = remainingFor(existing, expected);
+                const balance = payForm.status === 'due'
+                  ? expected
+                  : Math.max(0, expected - (alreadyBanked + amt));
                 const isEditing = !!existing?.paid || existing?.status === 'due';
 
                 // Per-status visual theme (drives the gradient header + pill colour).
@@ -6591,6 +6637,32 @@ const HostDashboard = () => {
                         </div>
                       </div>
                     </div>
+
+                    {/* Money already banked for this month. Without this the
+                        landlord has no way to know what to type: the form asked
+                        for "the amount" with nothing saying ৳5,000 was already
+                        in, so the natural entry was the whole ৳6,000 again. */}
+                    {alreadyBanked > 0 && payForm.status !== 'due' && (
+                      <div className="mx-4 mt-3 rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2.5 flex items-center gap-2 flex-wrap">
+                        <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                        <span className="text-[11px] font-black text-emerald-800">
+                          {language === 'বাংলা'
+                            ? `আগে পাওয়া গেছে ${formatBDT(alreadyBanked)}`
+                            : `${formatBDT(alreadyBanked)} already received`}
+                        </span>
+                        <span className="text-emerald-300">·</span>
+                        <span className="text-[11px] font-black text-gray-700">
+                          {language === 'বাংলা'
+                            ? `বাকি ${formatBDT(stillOwed)}`
+                            : `${formatBDT(stillOwed)} still owed`}
+                        </span>
+                        <span className="w-full text-[10px] font-bold text-emerald-700/80 leading-relaxed">
+                          {language === 'বাংলা'
+                            ? 'নিচে এইবার যত টাকা পেলেন সেটাই লিখুন — আগেরটার সাথে যোগ হবে।'
+                            : 'Enter only what you received this time — it adds to what is already recorded.'}
+                        </span>
+                      </div>
+                    )}
 
                     {/* ─────────────── STEP 1 — CHOICE SCREEN ─────────────── */}
                     {payForm.step === 'choose' && (

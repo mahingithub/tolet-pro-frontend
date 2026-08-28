@@ -30,12 +30,40 @@ import {
   Plus, X, Loader2, Users, Home, BedDouble, Trash2, Pencil,
   UserPlus, ChevronDown, ChevronUp, DoorOpen, Check, RefreshCw,
 } from 'lucide-react';
-import { listUnits, createUnit, archiveUnit, updateUnit } from '../../services/buildingService';
+import { listUnits, createUnit, createUnitsBulk, archiveUnit, updateUnit } from '../../services/buildingService';
 import SeatTenantModal from './SeatTenantModal';
 import TenantDetailModal from './TenantDetailModal';
 import {
   SUITABLE_FOR, suitableForCardLabel, suitableForColor, unitNoun,
 } from '../../utils/buildingTypes';
+
+// Expand "101" → "109" into the nine room numbers it means.
+//
+// MIRRORS expandRoomRange() in the backend's building.controller.js. The server
+// is authoritative — this copy exists only so the landlord can SEE what is
+// about to be created before pressing the button. Kept deliberately simple so
+// the two cannot drift: same prefix and suffix, only the number moves, and zero
+// padding is preserved because "007" and "7" are different doors.
+const MAX_RANGE = 200;
+export const expandRoomRange = (from, to) => {
+  const a = String(from || '').trim();
+  const b = String(to || '').trim();
+  if (!a || !b) return { rooms: [], error: 'both' };
+  const shape = /^(\D*)(\d+)(\D*)$/;
+  const ma = shape.exec(a);
+  const mb = shape.exec(b);
+  if (!ma || !mb) return { rooms: [], error: 'shape' };
+  if (ma[1] !== mb[1] || ma[3] !== mb[3]) return { rooms: [], error: 'mismatch' };
+  const start = parseInt(ma[2], 10);
+  const end = parseInt(mb[2], 10);
+  if (end < start) return { rooms: [], error: 'backwards' };
+  if (end - start + 1 > MAX_RANGE) return { rooms: [], error: 'toomany' };
+  const width = ma[2].length;
+  const pad = (n) => (ma[2].startsWith('0') ? String(n).padStart(width, '0') : String(n));
+  const rooms = [];
+  for (let n = start; n <= end; n += 1) rooms.push(`${ma[1]}${pad(n)}${ma[3]}`);
+  return { rooms, error: null };
+};
 
 // 0 is the ground floor and must read as such — "Floor 0" is not a thing a
 // landlord says. Negative floors are basements.
@@ -81,6 +109,11 @@ export default function UnitsManager({
     suitableFor: '', monthlyRent: '', serviceCharge: '', rentDueDay: '',
   };
   const [form, setForm] = useState(blank);
+  // A floor is built in one go in the real world. Adding thirty rooms through
+  // thirty forms is why a landlord with 70–80 rooms never finishes setting up.
+  const [bulk, setBulk] = useState(false);
+  const [range, setRange] = useState({ from: '', to: '' });
+  const preview = expandRoomRange(range.from, range.to);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
   const load = useCallback(async () => {
@@ -98,7 +131,41 @@ export default function UnitsManager({
 
   useEffect(() => { load(); }, [load]);
 
+  const submitRange = async () => {
+    if (preview.error || !preview.rooms.length) {
+      showToast?.(isBn ? 'রুম নম্বরের পরিসরটি ঠিক করুন' : 'Check the room number range');
+      return;
+    }
+    setSaving(true);
+    try {
+      const r = await createUnitsBulk(building.id, {
+        from: range.from.trim(),
+        to: range.to.trim(),
+        floor: Number(form.floor) || 0,
+        seatCapacity: isSeat ? Number(form.seatCapacity) || 1 : 1,
+        suitableFor: isFlat ? form.suitableFor : '',
+        ...(form.monthlyRent !== '' ? { monthlyRent: Number(form.monthlyRent) } : {}),
+        ...(form.serviceCharge !== '' ? { serviceCharge: Number(form.serviceCharge) } : {}),
+        ...(form.rentDueDay !== '' ? { rentDueDay: Number(form.rentDueDay) } : {}),
+      });
+      setRange({ from: '', to: '' });
+      await load();
+      // Skipped rooms are said out loud: silently creating 6 of 15 and
+      // reporting "done" leaves the landlord counting doors to find out.
+      showToast?.(r.skipped
+        ? (isBn
+            ? `${r.created}টি ${noun} যোগ হয়েছে · ${r.skipped}টি আগে থেকেই ছিল`
+            : `${r.created} added · ${r.skipped} already existed`)
+        : (isBn ? `${r.created}টি ${noun} যোগ হয়েছে` : `${r.created} ${noun.toLowerCase()}s added`));
+    } catch (err) {
+      showToast?.(err.message || (isBn ? 'যোগ করা যায়নি' : 'Could not add them'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const submit = async () => {
+    if (bulk) return submitRange();
     if (!String(form.roomNumber).trim()) {
       showToast?.(isBn ? `${noun} নম্বর দিন` : `Enter the ${noun.toLowerCase()} number`);
       return;
@@ -197,7 +264,82 @@ export default function UnitsManager({
       {/* ── Add form — shaped by how this building is let ── */}
       {adding && (
         <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-3 shadow-[0_2px_12px_rgba(0,0,0,0.04)] animate-in slide-in-from-top-2 duration-200">
+          {/* One room, or a whole floor. Thirty rooms through thirty forms is
+              why a 70–80 room building never got set up. */}
+          <div className="flex items-center gap-1.5 mb-3">
+            {[
+              { id: false, en: 'One at a time', bn: 'একটি করে' },
+              { id: true,  en: 'A whole range', bn: 'একসাথে অনেকগুলো' },
+            ].map((m) => (
+              <button
+                key={String(m.id)}
+                type="button"
+                onClick={() => setBulk(m.id)}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all active:scale-95 ${
+                  bulk === m.id ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                {isBn ? m.bn : m.en}
+              </button>
+            ))}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
+            {bulk ? (
+              <div className="col-span-2 grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>{isBn ? 'শুরু' : 'From'}</label>
+                  <input
+                    autoFocus
+                    type="text"
+                    value={range.from}
+                    onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
+                    placeholder={isBn ? 'যেমন ১০১' : 'e.g. 101'}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>{isBn ? 'শেষ' : 'To'}</label>
+                  <input
+                    type="text"
+                    value={range.to}
+                    onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
+                    placeholder={isBn ? 'যেমন ১০৯' : 'e.g. 109'}
+                    className={inputCls}
+                  />
+                </div>
+                {/* What is about to be created, before the button is pressed. */}
+                {(range.from || range.to) && (
+                  <div className="col-span-2">
+                    {preview.error ? (
+                      <p className="text-[10px] font-bold text-rose-600 leading-relaxed">
+                        {preview.error === 'mismatch'
+                          ? (isBn ? 'শুরু ও শেষের গঠন এক হতে হবে — যেমন A101 থেকে A109।' : 'Both ends must share a shape — e.g. A101 to A109.')
+                          : preview.error === 'backwards'
+                            ? (isBn ? 'শেষ নম্বরটি শুরুর চেয়ে বড় হতে হবে।' : 'The last number must be higher than the first.')
+                            : preview.error === 'toomany'
+                              ? (isBn ? 'একবারে সর্বোচ্চ ২০০টি রুম।' : 'At most 200 rooms at a time.')
+                              : preview.error === 'shape'
+                                ? (isBn ? 'রুম নম্বরে অন্তত একটি সংখ্যা থাকতে হবে।' : 'A room number needs at least one digit.')
+                                : (isBn ? 'শুরু ও শেষ দুটোই দিন।' : 'Enter both ends of the range.')}
+                      </p>
+                    ) : (
+                      <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2">
+                        <p className="text-[11px] font-black text-emerald-800">
+                          {isBn
+                            ? `${preview.rooms.length}টি ${noun} তৈরি হবে`
+                            : `${preview.rooms.length} ${noun.toLowerCase()}${preview.rooms.length === 1 ? '' : 's'} will be created`}
+                        </p>
+                        <p className="text-[10px] font-bold text-emerald-700/80 truncate mt-0.5 tabular-nums">
+                          {preview.rooms.slice(0, 8).join(' · ')}
+                          {preview.rooms.length > 8 ? ` … ${preview.rooms[preview.rooms.length - 1]}` : ''}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
             <div>
               <label className={labelCls}>{isBn ? `${noun} নম্বর` : `${noun} No.`}</label>
               <input
@@ -209,6 +351,7 @@ export default function UnitsManager({
                 className={inputCls}
               />
             </div>
+            )}
             <div>
               <label className={labelCls}>{isBn ? 'ফ্লোর' : 'Floor'}</label>
               <input
@@ -289,7 +432,9 @@ export default function UnitsManager({
           >
             {saving
               ? <><Loader2 size={14} className="animate-spin" /> {isBn ? 'সেভ হচ্ছে' : 'Saving'}</>
-              : <><Plus size={14} strokeWidth={3} /> {isBn ? `${noun} যোগ করুন` : `Add ${noun}`}</>}
+              : <><Plus size={14} strokeWidth={3} /> {bulk && preview.rooms.length
+                  ? (isBn ? `${preview.rooms.length}টি ${noun} যোগ করুন` : `Add ${preview.rooms.length} ${noun.toLowerCase()}s`)
+                  : (isBn ? `${noun} যোগ করুন` : `Add ${noun}`)}</>}
           </button>
         </div>
       )}

@@ -67,15 +67,15 @@ export default function RoomRentGroup({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-2.5 px-3 py-3 text-left hover:bg-gray-50/60 transition-colors"
+        className="w-full flex items-center gap-2 px-2.5 py-2 text-left hover:bg-gray-50/60 transition-colors"
       >
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${allPaid ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-          {allPaid ? <CheckCircle2 size={17} /> : <DoorOpen size={17} />}
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${allPaid ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+          {allPaid ? <CheckCircle2 size={15} /> : <DoorOpen size={15} />}
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <h4 className="text-[13px] font-black text-gray-900">
+          <div className="flex items-center gap-1 min-w-0">
+            <h4 className="text-xs sm:text-[13px] font-black text-gray-900">
               {isBn ? 'রুম' : 'Room'} {roomNumber}
             </h4>
             {floorNumber !== '' && floorNumber != null && (
@@ -92,7 +92,7 @@ export default function RoomRentGroup({
               {paidCount}/{units.length} {isBn ? 'পরিশোধ' : 'paid'}
             </span>
           </div>
-          <p className="text-[10px] font-bold text-gray-500 truncate mt-0.5">
+          <p className="text-[10px] font-bold text-gray-500 truncate">
             <span className="tabular-nums">{formatBDT ? formatBDT(expected) : expected}</span>
             <span className="text-gray-400">{isBn ? ' /মাস মোট' : ' /mo total'}</span>
             <span className="mx-1 text-gray-300">·</span>
@@ -100,18 +100,18 @@ export default function RoomRentGroup({
           </p>
         </div>
 
-        <div className="shrink-0 p-1.5 rounded-lg bg-gray-50 text-gray-400">
+        <div className="shrink-0 p-1 rounded-lg bg-gray-50 text-gray-400">
           {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </div>
       </button>
 
       {/* Inside the room: one card per seat, each labelled with its seat. */}
       {open && (
-        <div className="border-t border-gray-100 bg-gray-50/40 px-2 py-2 space-y-2 animate-in slide-in-from-top-1 duration-200">
+        <div className="border-t border-gray-100 bg-gray-50/40 px-1.5 py-1.5 space-y-1.5 animate-in slide-in-from-top-1 duration-200">
           {units.map((u, i) => (
             <div key={u.id}>
-              <div className="flex items-center gap-1.5 px-1.5 pb-1">
-                <span className="w-5 h-5 rounded-md bg-[#ba0036] text-white text-[9px] font-black flex items-center justify-center shrink-0">
+              <div className="flex items-center gap-1.5 px-1.5 pb-0.5">
+                <span className="w-4 h-4 rounded bg-[#ba0036] text-white text-[8px] font-black flex items-center justify-center shrink-0">
                   {u.__seatIndex || i + 1}
                 </span>
                 <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">

@@ -91,6 +91,19 @@ export async function createUnit(buildingId, data) {
   return unit;
 }
 
+/**
+ * Create a whole floor at once: "101" to "109" is nine rooms sharing one set of
+ * terms. Rooms that already exist are SKIPPED rather than failing the batch, so
+ * widening a range later just adds the new ones.
+ * @returns {Promise<{created:number, skipped:number, skippedRooms:string[], units:object[]}>}
+ */
+export async function createUnitsBulk(buildingId, data) {
+  return request(`/api/buildings/${buildingId}/units/bulk`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function updateUnit(unitId, data) {
   const { unit } = await request(`/api/units/${unitId}`, {
     method: 'PATCH',
