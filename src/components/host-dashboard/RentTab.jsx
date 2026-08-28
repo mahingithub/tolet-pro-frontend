@@ -71,8 +71,7 @@ export default function RentTab(props) {
             if (!months.includes(sm.key)) return 'none';
             const entry = booking.ledger?.[sm.key];
             if (entry?.paid) {
-              const balance = Number(entry.balance) || 0;
-              const isPartial = balance > 0;
+              const isPartial = entry.status === 'partial' || (Number(entry.balance) || 0) > 0;
               return isPartial ? 'partial' : 'cleared';
             }
             const due = getDueDate(sm.key, booking.rentDueDay);

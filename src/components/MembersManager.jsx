@@ -68,8 +68,8 @@ function dueDateOf(key, dueDay) {
 // legacy rent matrix. ledger is a plain object keyed by 'YYYY-MM'.
 function memberRentStatus(booking, ledger, key, today) {
   const entry = ledger && ledger[key];
-  if (entry?.paid) {
-    if ((Number(entry.balance) || 0) > 0) return 'partial';
+  if (entry && entry.paid) {
+    if (entry.status === 'partial' || (Number(entry.balance) || 0) > 0) return 'partial';
     return 'paid';
   }
   if (entry && entry.status === 'due') return 'due-marked';

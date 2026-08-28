@@ -46,7 +46,6 @@ import {
 // the feed is empty and we show an empty-state card.
 import { propertyService, subscribeUserProperties, propertyLocationHaystack } from '../../services/Propertyservice';
 import LocationSearchModal from '../shared/LocationSearchModal';
-import YouTubeBackground from '../shared/YouTubeBackground';
 import { locationQueryMatches } from '../../data/locationAliases';
 
 /**
@@ -64,9 +63,6 @@ import { locationQueryMatches } from '../../data/locationAliases';
  *   truth) — the same list the listings + details screens consume. There is
  *   no demo data anywhere.
  */
-
-// Marketing banner — drop your campaign poster URL here.
-const HERO_YOUTUBE_ID = 'PpeE86P9TnA';
 
 const SEARCH_TYPES = [
   { id: 'rent',       labelKey: 'tabResidential' },
@@ -1149,7 +1145,15 @@ const MobileHome = () => {
       {/* ───────── MARKETING BANNER ───────── */}
       <div className="px-4 pt-3">
         <div className="relative overflow-hidden rounded-3xl aspect-[16/10] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.25)]">
-          <YouTubeBackground videoId={HERO_YOUTUBE_ID} title="To-Let Pro banner video" />
+          <video
+            src="https://res.cloudinary.com/dsrolbe0j/video/upload/q_auto,f_auto/0821_qeyayb.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+            title="To-Let Pro hero video"
+          ></video>
           {/* z-10 keeps the scrim above the poster (z-5) as well as the video. */}
           <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/10 via-black/30 to-black/55" />
           

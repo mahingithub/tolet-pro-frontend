@@ -10,7 +10,6 @@ import usePropertyStore from '../store/usePropertyStore';
 import { SALE_INTENT_ENABLED } from '../constants/listingIntents';
 import { DIVISIONS, POPULAR_AREAS, POPULAR_AREA_IMAGES, POPULAR_AREA_IMAGES_DESKTOP, POPULAR_AREA_TAGLINES, POPULAR_AREA_SUBZONES, buildSearchUrl } from '../data/searchData';
 import LocationSearchModal from './shared/LocationSearchModal';
-
 import { useAppInstall, requestInstallGuide } from '../hooks/useAppInstall';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -465,8 +464,6 @@ const HeroSection = () => {
     }
   };
 
-
-
   // Listing mode is now GLOBAL — shared with the navbar ModeSwitcher and
   // persisted across reloads (usePropertyStore.activeMode). The hero
   // historically used 'buy' for the sale mode, so we adapt at this single
@@ -681,7 +678,9 @@ const HeroSection = () => {
               muted
               playsInline
               className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-            />
+              title="To-Let Pro hero video"
+            ></video>
+            
             {/* Cinematic gradient for headline contrast */}
             <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-slate-900/10 z-10" />
             
