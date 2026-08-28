@@ -13,7 +13,10 @@ import {
   XCircle, AlertCircle, RefreshCw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, MinusCircle,
   Banknote, ArrowRight, ArrowUpRight, Clock, Smartphone,
   BellOff, CalendarRange, BarChart3,
-  Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Map, Leaf
+  // `Map` is deliberately NOT imported from lucide-react here: the icon of
+  // that name shadows the JavaScript Map built-in for the whole module, and
+  // `new Map()` in this file then tries to construct an icon component.
+  Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Leaf
 } from 'lucide-react';
 import MembersManager from "../MembersManager.jsx";
 import { scopeBookings, bookingInBuilding, sortRentUnits } from '../../utils/buildingScope';
