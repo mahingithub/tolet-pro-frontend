@@ -4,13 +4,19 @@ import { toast } from 'sonner';
 import notificationService from '../services/notificationService';
 import callProvider from '../services/callProvider';
 import { useAuth } from './AuthContext'; // Need to make sure AuthContext exists and can be imported
+import { notificationDestination, isLandlordMode } from '../utils/notificationRoute';
 
 const NotificationContext = createContext();
 
 export function NotificationProvider({ children }) {
-  const { user } = useAuth();
+  const auth = useAuth();
+  const { user } = auth;
   const navigate = useNavigate();
   const isAuthed = !!user;
+  // Recomputed on every role switch, so a toast that arrives after the user
+  // flips the mode pill routes to the dashboard they are actually looking at.
+  const isLandlord = isLandlordMode(auth);
+  const myId = user?.id || user?._id || '';
 
   // Items and Unread Count
   const [items, setItems] = useState([]);
@@ -104,7 +110,13 @@ export function NotificationProvider({ children }) {
       //
       // 'rent_updated' too — the landlord changed this tenant's rent or lease
       // terms, which is at least as worth interrupting for as a receipt.
-      const TOASTABLE = ['booking', 'payment', 'receipt', 'rent_receipt', 'rent_updated', 'marketing'];
+      //
+      // 'tenant_onboarding' as well, in both directions: to the landlord it is
+      // a person standing in a room waiting to be let in, and to the tenant it
+      // is the answer to a form they filled in with their NID on it. Both are
+      // as time-sensitive as anything else on this list, and neither was
+      // surfacing at all until it was added here.
+      const TOASTABLE = ['booking', 'payment', 'receipt', 'rent_receipt', 'rent_updated', 'marketing', 'tenant_onboarding'];
 
       // DND applies to PROMOTIONAL traffic only. The rest of this list is
       // transactional — a rent receipt or an overdue notice is exactly what a
@@ -118,53 +130,17 @@ export function NotificationProvider({ children }) {
           action: {
             label: "দেখুন",
             onClick: () => {
-              const { targetId, peerId, peerName, peerAvatar, bookingId } = data.data || {};
-              switch (data.type) {
-                case 'message':
-                case 'message_new':
-                  navigate('/messages', {
-                    state: {
-                      peerUserId: peerId,
-                      peerName: peerName,
-                      peerAvatar: peerAvatar,
-                      conversationId: targetId || data.data?.conversationId,
-                      autoOpen: true
-                    }
-                  });
-                  break;
-                case 'booking':
-                  navigate('/tenant-dashboard?tab=bookings', { 
-                    state: { highlightId: targetId, autoOpen: true, scrollTo: true } 
-                  });
-                  break;
-                // booking.controller.js sends { bookingId } (not targetId) for
-                // both rent_updated emits — a rent/lease change and being added
-                // to a rent as a member. Both belong on the bookings tab.
-                case 'rent_updated':
-                  navigate('/tenant-dashboard?tab=bookings', {
-                    state: { highlightId: targetId || bookingId, autoOpen: true, scrollTo: true }
-                  });
-                  break;
-                case 'payment':
-                case 'receipt':
-                case 'rent_receipt':
-                case 'rent_invoice':
-                case 'rent_overdue':
-                  navigate('/tenant-dashboard?tab=payments', { 
-                    state: { highlightId: targetId, autoOpen: true, scrollTo: true } 
-                  });
-                  break;
-                // Admin offers carry their own destination (the plan page by
-                // default) in data.path / data.url.
-                case 'marketing':
-                  navigate(data.data?.path || data.data?.url || '/subscription');
-                  break;
-                default:
-                  // '/notifications' is NOT a registered route — App.jsx's
-                  // catch-all silently redirects unknown paths to '/', so this
-                  // used to make a tapped toast look like it did nothing.
-                  navigate(data.data?.path || data.data?.url || '/');
-              }
+              // One routing table, shared with the bell dropdown
+              // (NotificationPanel). This switch used to be a second copy that
+              // hardcoded /tenant-dashboard for every type — so a landlord who
+              // tapped a payment toast was sent to the tenant dashboard — and
+              // pointed at `?tab=bookings`, a tab the tenant dashboard does not
+              // have, which useTabHistory silently resolved to `overview`.
+              const { path, state } = notificationDestination(data, {
+                isLandlord,
+                userId: myId,
+              });
+              navigate(path, state ? { state } : undefined);
               // Mark read optimistically when clicked from toast
               setItems((prev) => prev.map((x) => x.id === data.id ? { ...x, read: true } : x));
               setUnreadCount((u) => Math.max(0, u - 1));
@@ -206,8 +182,9 @@ export function NotificationProvider({ children }) {
     };
     // isDNDActive is a dependency because the toast gate above reads it; it only
     // changes when the user edits their DND schedule, so the listener churn is
-    // negligible.
-  }, [isAuthed, loadNotifications, isDNDActive]);
+    // negligible. `isLandlord` / `myId` are read by the toast's routing and
+    // change only on a role switch or re-login, for the same reason.
+  }, [isAuthed, loadNotifications, isDNDActive, isLandlord, myId, navigate]);
 
   const markAsRead = async (id) => {
     setItems((prev) => prev.map((x) => x.id === id ? { ...x, read: true } : x));

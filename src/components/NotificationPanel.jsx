@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { Bell, MessageCircle, Inbox, CheckCheck, X, Trash2 } from 'lucide-react';
+import { Bell, MessageCircle, Inbox, CheckCheck, X, Trash2, UserCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { useNotificationContext } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { notificationDestination, isLandlordMode } from '../utils/notificationRoute';
 
 const typeIcon = (t) => {
   if (t === 'message_new' || t === 'message') return <MessageCircle size={14} className="text-blue-500" />;
   if (t === 'inquiry_new' || t === 'inquiry') return <Inbox         size={14} className="text-[#ba0036]" />;
   if (t === 'inquiry_status')                 return <CheckCheck    size={14} className="text-emerald-500" />;
+  if (t === 'tenant_onboarding')              return <UserCheck     size={14} className="text-amber-600" />;
   return <Bell size={14} className="text-amber-500" />;
 };
 
@@ -107,10 +109,14 @@ export default function NotificationPanel({ onClose }) {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { items, unreadCount, loading, markAsRead, markAllRead, removeNotification, clearAllNotifications } = useNotificationContext();
-  const { user } = useAuth();
+  const auth = useAuth();
+  const { user } = auth;
   // "Clear all" wipes every notification with no undo, so it asks first.
   const [confirmClear, setConfirmClear] = useState(false);
-  const isLandlord = user?.roles?.includes('landlord') || user?.roles?.includes('host') || user?.role === 'landlord';
+  // The mode the user is in right now, NOT every role the account owns. See
+  // utils/notificationRoute.js — role ownership sent a landlord-who-is-also-a-
+  // tenant to the host dashboard for every tenant-side notification they got.
+  const isLandlord = isLandlordMode(auth);
 
   const handleRowClick = async (n) => {
     try {
@@ -122,132 +128,25 @@ export default function NotificationPanel({ onClose }) {
     } finally {
       onClose();
 
-      // Deep-link by type. We support both old and new types.
-      const { targetId, peerId, peerName, peerAvatar } = n.data || {};
+      const { path, state } = notificationDestination(n, {
+        isLandlord,
+        userId: user?.id || user?._id || '',
+      });
 
-      switch (n.type) {
-        case 'message':
-        case 'message_new': {
-          const state = {
-            peerUserId: peerId,
-            peerName: peerName,
-            peerAvatar: peerAvatar,
-            conversationId: targetId || (n.data && n.data.conversationId),
-            autoOpen: true
-          };
-          if (window.location.pathname.startsWith('/admin')) {
-            const queryParams = new URLSearchParams({
-              peerUserId: state.peerUserId || '',
-              conversationId: state.conversationId || '',
-              autoOpen: 'true'
-            }).toString();
-            window.open(`/messages?${queryParams}`, '_blank');
-          } else {
-            navigate('/messages', { state });
-          }
-          break;
-        }
-
-        case 'inquiry_new':
-          navigate('/host-dashboard?tab=inquiries', {
-            state: { highlightId: targetId || n?.data?.inquiryId, autoOpen: true, scrollTo: true }
-          });
-          break;
-
-        case 'inquiry_status':
-          navigate('/tenant-dashboard?tab=applications', {
-            state: { highlightId: targetId || n?.data?.inquiryId, autoOpen: true, scrollTo: true }
-          });
-          break;
-
-        // Legacy untyped inquiry notifications (created before the
-        // inquiry_new / inquiry_status split) don't record which surface they
-        // belong to. Route by the viewer's role so a tenant lands on their
-        // applications and a landlord on the host inbox.
-        case 'inquiry':
-          navigate(
-            isLandlord ? '/host-dashboard?tab=inquiries' : '/tenant-dashboard?tab=applications',
-            { state: { highlightId: targetId || n?.data?.inquiryId, autoOpen: true, scrollTo: true } }
-          );
-          break;
-
-        case 'booking':
-          navigate(isLandlord ? '/host-dashboard?tab=bookings' : '/tenant-dashboard?tab=payments', {
-            state: { highlightId: targetId, autoOpen: true, scrollTo: true }
-          });
-          break;
-
-        case 'payment':
-        case 'receipt':
-        case 'rent_receipt':
-        case 'rent_invoice':
-        case 'rent_overdue':
-          navigate(isLandlord ? '/host-dashboard?tab=rent' : '/tenant-dashboard?tab=payments', {
-            state: { highlightId: targetId, autoOpen: true, scrollTo: true }
-          });
-          break;
-
-        case 'property':
-          navigate(`/property/${targetId}`, { state: { autoOpen: true, scrollTo: true } });
-          break;
-
-        case 'review': {
-          // Property reviews were removed — reputation reviews now live on the
-          // user's PROFILE. A review notification means the recipient was
-          // reviewed, so deep-link to their own (role-appropriate) profile
-          // where the review appears.
-          const myId = user?.id || user?._id;
-          if (myId) navigate(isLandlord ? `/landlord/${myId}` : `/tenant/${myId}`);
-          else navigate('/');
-          break;
-        }
-
-        case 'maintenance':
-          navigate('/host-dashboard?tab=maintenance', {
-            state: { highlightId: targetId, autoOpen: true, scrollTo: true }
-          });
-          break;
-
-        case 'kyc_tenant':
-        case 'kyc_landlord':
-        case 'support_ticket':
-        case 'support_message':
-          if (n.data && n.data.path) {
-            navigate(n.data.path, { state: { ticketId: n.data.ticketId || targetId } });
-          } else {
-            navigate('/admin');
-          }
-          break;
-
-        case 'rent_updated':
-          navigate(isLandlord ? '/host-dashboard?tab=rent' : '/tenant-dashboard?tab=bookings', {
-            state: {
-              highlightId: targetId || (n.data && n.data.bookingId),
-              autoOpen: true,
-              scrollTo: true,
-            },
-          });
-          break;
-
-        case 'marketing':
-          // Admin offers carry their own destination (the plan page by default).
-          navigate((n.data && (n.data.path || n.data.url)) || '/subscription');
-          break;
-
-        case 'system':
-          // Admin-facing system events (e.g. user reports) carry a path.
-          if (n.data && n.data.path) navigate(n.data.path);
-          else navigate('/');
-          break;
-
-        default:
-          // NOTE: '/notifications' is NOT a registered route — App.jsx ends with
-          // a catch-all that silently redirects unknown paths to '/'. Falling
-          // back to it made a tapped notification look like it did nothing, so
-          // prefer a destination supplied by the notification itself.
-          navigate((n.data && (n.data.path || n.data.url)) || '/');
-          break;
+      // Chat is the one destination the admin console can't navigate to in
+      // place — the panel is mounted inside /admin, which is a different shell.
+      if ((n.type === 'message' || n.type === 'message_new')
+        && window.location.pathname.startsWith('/admin')) {
+        const queryParams = new URLSearchParams({
+          peerUserId: state?.peerUserId || '',
+          conversationId: state?.conversationId || '',
+          autoOpen: 'true',
+        }).toString();
+        window.open(`/messages?${queryParams}`, '_blank');
+        return;
       }
+
+      navigate(path, state ? { state } : undefined);
     }
   };
 

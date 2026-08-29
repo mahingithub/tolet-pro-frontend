@@ -137,7 +137,12 @@ export default function OnboardingApprovalsPanel({ language, showToast, onApprov
           const busy = busyId === row.id;
 
           return (
-            <div key={row.id} className="bg-white/70">
+            // `data-notif-target` is what useDeepLinkHighlight looks for: a
+            // landlord who taps "X wants to join — approve" lands on this exact
+            // card with it flashed, rather than at the top of the Tenants tab
+            // to hunt for it. The id matches the notification's
+            // data.onboardingId (invite.controller.js).
+            <div key={row.id} data-notif-target={row.id} className="bg-white/70">
               <div className="px-4 py-3">
                 <div className="flex items-start gap-3">
                   <div className="w-11 h-11 rounded-xl bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center text-gray-300">

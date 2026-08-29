@@ -36,6 +36,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Building2, DoorOpen, User, Phone, Calendar, MapPin, Briefcase, IdCard, PhoneCall,
   Camera, Loader2, Check, AlertTriangle, ChevronRight, ChevronLeft, ShieldCheck, X, Clock,
+  ArrowLeftRight, KeyRound,
 } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext.jsx';
@@ -64,9 +65,17 @@ const todayIso = () => new Date().toISOString().slice(0, 10);
 const labelCls = 'block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5';
 const inputCls = 'w-full px-3.5 py-3 rounded-xl border-2 border-gray-100 bg-white text-sm font-bold text-gray-900 placeholder:text-gray-300 placeholder:font-medium focus:border-gray-900 focus:outline-none transition-colors';
 
+// The bottom padding is not decoration. MobileBottomNav is `fixed bottom-0`
+// with a 64px bar (plus its own fade strip above it) and /join/:token is not in
+// its hideOnRoutes list, so on a phone it floats over the last stretch of this
+// page — which is exactly where every step of this flow puts its primary
+// button. Ending the page above the bar keeps "পরবর্তী" reachable instead of
+// hidden behind it. The bar is md:hidden, so the reserve is too.
 const Shell = ({ children }) => (
   <div className="min-h-screen bg-gray-50">
-    <div className="max-w-lg mx-auto px-4 py-6 sm:py-10">{children}</div>
+    <div className="max-w-lg mx-auto px-4 pt-6 sm:pt-10 pb-[calc(64px+env(safe-area-inset-bottom)+1.5rem)] md:pb-10">
+      {children}
+    </div>
   </div>
 );
 
@@ -124,7 +133,7 @@ const HasToggle = ({ isBn, value, onPick, clearKeys = [] }) => (
 export default function JoinPropertyPage() {
   const { token } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, activeRole, roles, addRole, setActiveRole } = useAuth();
   const { language } = useLanguage();
   const isBn = language === 'বাংলা';
   const L = (bn, en) => (isBn ? bn : en);
@@ -142,8 +151,45 @@ export default function JoinPropertyPage() {
   const [uploading, setUploading] = useState(false);
   const [localPreview, setLocalPreview] = useState('');
   const [result, setResult] = useState(null);
+  const [switching, setSwitching] = useState(false);
 
   const set = (patch) => setForm((prev) => ({ ...prev, ...patch }));
+
+  // ── Landlord mode ─────────────────────────────────────────────────────────
+  // This form writes a TENANT record. A landlord scanning a QR is a normal
+  // thing to happen for two different reasons, and they need different answers:
+  //
+  //   • They are renting somewhere themselves. Half the landlords on this app
+  //     also rent a flat, and the QR on their own landlord's wall is the whole
+  //     point of the feature. They just have to be in tenant mode first, so
+  //     the record lands on the right side of their account — hence a one-tap
+  //     switch, in place, with nothing retyped afterwards.
+  //   • It is their OWN building — almost always someone testing the code they
+  //     just printed. submitOnboarding refuses this outright, so switching
+  //     modes would walk them through an eleven-field form to a rejection at
+  //     the end. Say it up front instead.
+  const myId = String(user?.id || user?._id || '');
+  const isOwnBuilding = !!(myId && invite?.hostId && String(invite.hostId) === myId);
+  const isLandlordMode = isAuthenticated
+    && (activeRole === 'landlord' || activeRole === 'host');
+
+  // Grant the tenant role if this account has never held it, then activate it.
+  // No navigation: `activeRole` flips, this component re-renders, and the gate
+  // below gives way to the room picker / form with their draft intact. Mirrors
+  // the Navbar pill and InquiryModal's landlord notice.
+  const switchToTenant = async () => {
+    if (switching) return;
+    setSwitching(true);
+    setError('');
+    try {
+      if (!(Array.isArray(roles) && roles.includes('tenant'))) await addRole?.('tenant');
+      await setActiveRole?.('tenant');
+    } catch (err) {
+      setError(err?.message || L('মোড বদলানো গেল না। আবার চেষ্টা করুন।', 'Could not switch mode. Please try again.'));
+    } finally {
+      setSwitching(false);
+    }
+  };
 
   // ── Resolve the token ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -402,6 +448,83 @@ export default function JoinPropertyPage() {
       </button>
     </div>
   ) : null);
+
+  // ── Gate: their own building ──────────────────────────────────────────────
+  // Checked before the mode gate, because switching to tenant mode does not
+  // help here — the server refuses either way.
+  if (isOwnBuilding) {
+    return (
+      <Shell>
+        <Header />
+        <div className="bg-white rounded-3xl border border-gray-100 p-6 text-center space-y-4">
+          <div className="w-16 h-16 rounded-3xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+            <KeyRound size={28} />
+          </div>
+          <div className="space-y-1.5">
+            <h2 className="text-lg font-black text-gray-900 leading-tight">
+              {L('এটি আপনার নিজের বিল্ডিং', 'This is your own building')}
+            </h2>
+            <p className="text-xs font-bold text-gray-500 leading-relaxed">
+              {L('আপনার QR / লিংক ঠিকঠাক কাজ করছে। আপনার ভাড়াটিয়ারা এটি স্ক্যান করে নিজেরাই তথ্য পূরণ করতে পারবেন — আপনি নিজে ভাড়াটিয়া হিসেবে যুক্ত হতে পারবেন না।',
+                 "Your QR / link is working. Your tenants can scan this and fill in their own details — you can't join your own building as a tenant.")}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/host-dashboard?tab=bookings')}
+            className="w-full py-3.5 rounded-xl bg-gray-900 text-white font-black text-[11px] uppercase tracking-widest hover:bg-black active:scale-[0.99] transition-all"
+          >
+            {L('ভাড়াটিয়াদের তালিকায় যান', 'Go to my tenants')}
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ── Gate: landlord mode ───────────────────────────────────────────────────
+  // One tap, no navigation, nothing retyped. See switchToTenant() above.
+  if (isLandlordMode) {
+    return (
+      <Shell>
+        <Header />
+        <ErrorBar />
+        <div className="bg-white rounded-3xl border border-gray-100 p-6 text-center space-y-4">
+          <div className="w-16 h-16 rounded-3xl bg-[#ba0036]/10 text-[#ba0036] flex items-center justify-center mx-auto">
+            <ArrowLeftRight size={26} />
+          </div>
+          <div className="space-y-1.5">
+            <h2 className="text-lg font-black text-gray-900 leading-tight">
+              {L('আপনি এখন বাড়িওয়ালা মোডে আছেন', "You're in landlord mode")}
+            </h2>
+            <p className="text-xs font-bold text-gray-500 leading-relaxed">
+              {L('এই ফর্মটি ভাড়াটিয়ার তথ্য জমা দেয়। ভাড়াটিয়া মোডে গেলে আপনি নিজের তথ্য পূরণ করে এই বাড়িতে যুক্ত হতে পারবেন। আপনার বাড়িওয়ালার হিসাব আগের মতোই থাকবে।',
+                 'This form submits a tenant’s details. Switch to tenant mode and you can fill in your own and join this property. Your landlord account stays exactly as it is.')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={switchToTenant}
+            disabled={switching}
+            className="w-full py-3.5 rounded-xl bg-[#ba0036] text-white font-black text-[11px] uppercase tracking-widest hover:bg-[#9a002d] active:scale-[0.99] transition-all disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+          >
+            {switching
+              ? <Loader2 size={14} className="animate-spin" />
+              : <ArrowLeftRight size={14} />}
+            {switching
+              ? L('বদলানো হচ্ছে…', 'Switching…')
+              : L('ভাড়াটিয়া মোডে যান', 'Switch to tenant mode')}
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/host-dashboard')}
+            className="w-full py-3 rounded-xl text-[11px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-colors"
+          >
+            {L('বাতিল করুন', 'Not now')}
+          </button>
+        </div>
+      </Shell>
+    );
+  }
 
   // ── Step: pick a room (universal link only) ───────────────────────────────
   if (step === 'select') {
@@ -728,7 +851,7 @@ export default function JoinPropertyPage() {
           </Field>
         </Section>
 
-        <div className="flex items-center gap-2 pb-8">
+        <div className="flex items-center gap-2">
           {invite.scope === 'building' && (
             <button
               type="button"
