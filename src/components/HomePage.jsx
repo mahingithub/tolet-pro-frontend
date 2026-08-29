@@ -6,6 +6,7 @@ import HeroSection from './HeroSection';
 // 📱 Premium mobile-only home experience — gated below at md:hidden so it never
 // affects desktop, and the desktop hero never renders inside the mobile viewport.
 import MobileHome from './mobile/MobileHome';
+import HomeSeoContent from './seo/HomeSeoContent';
 
 import useSeo from '../seo/useSeo';
 import { webPageSchema } from '../seo/schema';
@@ -59,6 +60,20 @@ const HomePage = () => {
       {/* full-bleed image-carousel property feed. Hidden from md and up.    */}
       <div className="md:hidden">
         <MobileHome />
+
+        {/* ⚠️ MOBILE-FIRST INDEXING — do not remove this instance.
+            Google crawls and ranks this site from a ~375px viewport, where the
+            entire desktop tree below (HeroSection, its footer, and the copy of
+            HomeSeoContent inside it) is `hidden md:flex` — display:none, and
+            therefore invisible to the crawler. Measured: at 375px the homepage
+            rendered 202 words and ZERO links to /to-let, /meal-manager or any
+            other landing page.
+
+            So the section is rendered in BOTH trees, exactly like MobileHome
+            and HeroSection themselves. Only one is ever visible at a given
+            width, which is the same responsive pattern this page already uses
+            for its entire layout. */}
+        <HomeSeoContent />
       </div>
 
       {/* ───── DESKTOP / TABLET HOMEPAGE (≥ md) ───── */}

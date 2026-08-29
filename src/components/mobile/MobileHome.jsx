@@ -1156,7 +1156,26 @@ const MobileHome = () => {
           ></video>
           {/* z-10 keeps the scrim above the poster (z-5) as well as the video. */}
           <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/10 via-black/30 to-black/55" />
-          
+
+          {/* ⚠️ The page's only <h1> at mobile widths — which is the width
+              Google indexes from. The desktop hero's <h1> lives inside a
+              `hidden md:flex` wrapper, so at 375px it is display:none and the
+              homepage had NO heading at all, just a silent video. This also
+              earns the scrim that was already being drawn over the video some
+              text to sit under, and states in one line what the app actually
+              is: not only listings. */}
+          {/* pb-9 clears the search panel, which is pulled up over the banner
+              with `-mt-6` and would otherwise crowd the second line. */}
+          <h1 className="absolute inset-x-0 bottom-0 z-20 px-4 pb-9 text-white text-[19px] leading-[1.25] font-black tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
+            {language === 'বাংলা'
+              ? 'বাসা ভাড়া, বাড়ি ম্যানেজমেন্ট ও মেসের হিসাব'
+              : 'House rent, property management & mess accounts'}
+            <span className="block mt-1 text-[11px] font-bold text-white/70 tracking-normal">
+              {language === 'বাংলা'
+                ? 'House rent, property management & mess accounts'
+                : 'বাসা ভাড়া, বাড়ি ম্যানেজমেন্ট ও মেসের হিসাব'}
+            </span>
+          </h1>
         </div>
       </div>
 

@@ -11,6 +11,9 @@ import { SALE_INTENT_ENABLED } from '../constants/listingIntents';
 import { DIVISIONS, POPULAR_AREAS, POPULAR_AREA_IMAGES, POPULAR_AREA_IMAGES_DESKTOP, POPULAR_AREA_TAGLINES, POPULAR_AREA_SUBZONES, buildSearchUrl } from '../data/searchData';
 import LocationSearchModal from './shared/LocationSearchModal';
 import { useAppInstall, requestInstallGuide } from '../hooks/useAppInstall';
+// The homepage's "so what is this, actually?" section — three pillars plus the
+// body copy that lets the homepage rank for more than its own brand name.
+import HomeSeoContent from './seo/HomeSeoContent';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTEXT DATA
@@ -1332,6 +1335,18 @@ const HeroSection = () => {
 
           </div>
         </section>
+
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* WHAT TO-LET PRO ACTUALLY IS                                   */}
+        {/*                                                               */}
+        {/* The name says "TO-LET", so visitors assume listings and stop  */}
+        {/* there — the meal manager, roommate wallet and digital ভাড়ার  */}
+        {/* খাতা were invisible to anyone who hadn't signed up. This also */}
+        {/* gives the homepage its only real body copy; before it, the    */}
+        {/* page was a search box, a carousel and a footer, which is why  */}
+        {/* it could rank for nothing but the brand name.                 */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        <HomeSeoContent />
 
         {/* ═══════════════════════════════════════════════════════════════ */}
         {/* FOOTER                                                        */}

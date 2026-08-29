@@ -20,7 +20,7 @@ import {
   UtensilsCrossed, ShoppingBasket, Calculator, Scale, PieChart, BellRing,
   Receipt, Split, Wallet, Activity, Building2, DoorOpen, Megaphone, FileText,
   Users, AlertTriangle, QrCode, ScanLine, Truck, Sparkles, Wrench, Wifi,
-  ShieldCheck, ArrowRight, Check,
+  ShieldCheck, ArrowRight, Check, Crown,
 } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
@@ -168,6 +168,94 @@ const FeatureLanding = () => {
             ))}
           </ol>
         </section>
+
+        {/* ── Long-form sections ───────────────────────────────────────────
+            The body copy that lets these pages compete. Each paragraph shows
+            in the reader's language first, with the other language beneath in
+            a smaller, muted style.
+
+            That second copy is NOT a duplicate for crawlers — it is here
+            because a Bangladeshi renter searches in both registers within one
+            session ("মিল ম্যানেজার" and "meal manager" are the same person),
+            and because plenty of readers here are comfortable in either. It
+            is real, visible text, never hidden, so it stays on the right side
+            of the line. */}
+        <section aria-labelledby="about-heading" className="mt-14 md:mt-20 max-w-3xl">
+          <h2 id="about-heading" className="sr-only">
+            {bn ? `${L(page.h1)} সম্পর্কে` : `About ${L(page.h1)}`}
+          </h2>
+          {page.sections?.map((sec, i) => (
+            <article key={i} className="mb-10 md:mb-14">
+              <h3 className="text-xl md:text-2xl font-black tracking-tight text-gray-900 mb-1">
+                {L(sec.h2)}
+              </h3>
+              <p className="text-[12px] font-bold text-gray-400 mb-4">{other(sec.h2)}</p>
+              {sec.paragraphs.map((para, j) => (
+                <div key={j} className="mb-5">
+                  <p className="text-[14px] md:text-[15px] font-medium text-gray-700 leading-[1.85]">
+                    {L(para)}
+                  </p>
+                  {other(para) && (
+                    <p className="mt-2 text-[12px] md:text-[13px] font-medium text-gray-400 leading-[1.75]">
+                      {other(para)}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </article>
+          ))}
+        </section>
+
+        {/* ── Pricing, stated plainly ──────────────────────────────────────
+            Competing mess apps bury the paid tier behind a trial, which is a
+            recurring complaint in their reviews. Saying exactly what is free
+            and what is not — including that rent collection is NOT free — is
+            both the honest thing and the thing that earns the click. */}
+        {page.pricing && (
+          <section aria-labelledby="pricing-heading" className="mt-14 md:mt-20">
+            <h2 id="pricing-heading" className="text-2xl md:text-3xl font-black tracking-tight mb-2">
+              {L(page.pricing.h2)}
+            </h2>
+            <p className="text-sm font-bold text-gray-500 mb-8">{other(page.pricing.h2)}</p>
+
+            <div className="grid md:grid-cols-2 gap-4 md:gap-5">
+              <div className="p-6 rounded-2xl border-2 border-emerald-200 bg-emerald-50/50">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 mb-3">
+                  {bn ? 'সম্পূর্ণ ফ্রি' : 'Free forever'}
+                </p>
+                <ul className="space-y-2.5">
+                  {L(page.pricing.free).map((item, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-[13px] font-bold text-gray-700">
+                      <Check size={15} className="text-emerald-600 shrink-0 mt-0.5" strokeWidth={3} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="p-6 rounded-2xl border border-gray-200 bg-white">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500 mb-3">
+                  {bn ? 'Plus ও Pro প্ল্যানে' : 'On the Plus & Pro plans'}
+                </p>
+                <ul className="space-y-2.5">
+                  {L(page.pricing.paid).map((item, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-[13px] font-bold text-gray-500">
+                      <Crown size={15} className="text-amber-500 shrink-0 mt-0.5" strokeWidth={2.5} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <p className="mt-5 text-[13px] font-bold text-gray-600 leading-relaxed max-w-2xl">
+              {L(page.pricing.note)}
+            </p>
+            <p className="mt-1.5 text-[12px] font-medium text-gray-400 leading-relaxed max-w-2xl">
+              {other(page.pricing.note)}
+            </p>
+          </section>
+        )}
 
         {/* ── FAQ (mirrors the FAQPage schema above) ───────────────────── */}
         <section aria-labelledby="faq-heading" className="mt-14 md:mt-20">

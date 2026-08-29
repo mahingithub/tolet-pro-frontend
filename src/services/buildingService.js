@@ -147,3 +147,25 @@ export async function replaceTenantInUnit(unitId, memberId, data) {
     body: JSON.stringify(data),
   });
 }
+
+/**
+ * The SAME person, a DIFFERENT room — 203 moves to 206. The mirror image of
+ * replace: there the room stays and the person changes; here the person stays
+ * and the room changes.
+ *
+ * Nothing is retyped. Their account link, NID, photo and emergency contact are
+ * carried across server-side from the row being left. Their RENT HISTORY is
+ * not — it stays on the old room, which is where the question "what did they
+ * pay for 203" belongs.
+ *
+ * @param {string} unitId    the room they are leaving
+ * @param {string} memberId  their member row, or 'primary' for a legacy
+ *                           whole-unit tenancy that predates members[]
+ * @param {{toUnitId, moveInDate?, monthlyRent?, seatLabel?}} data
+ */
+export async function shiftTenantToUnit(unitId, memberId, data) {
+  return request(`/api/units/${unitId}/tenants/${memberId}/shift`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}

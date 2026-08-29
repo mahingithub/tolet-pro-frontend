@@ -33,6 +33,7 @@ import {
 import InviteShareSheet from '../invite/InviteShareSheet';
 import { listUnits, createUnit, createUnitsBulk, archiveUnit, updateUnit } from '../../services/buildingService';
 import SeatTenantModal from './SeatTenantModal';
+import ShiftTenantModal from './ShiftTenantModal';
 import { submitOnEnter } from '../../utils/submitOnEnter';
 import TenantDetailModal from './TenantDetailModal';
 import {
@@ -96,6 +97,10 @@ export default function UnitsManager({
   // Which seat is being filled or swapped. The tenant form is seat-scoped: it
   // never creates a room and never creates a second booking for this one.
   const [seatTarget, setSeatTarget] = useState(null);
+  // Which occupant is being moved to a different room: { unit, person }. The
+  // landlord's own button — see ShiftTenantModal for why this is theirs and not
+  // the tenant's.
+  const [shiftTarget, setShiftTarget] = useState(null);
   // Reading back the eleven fields and the photo. Until this existed the intake
   // form wrote details nobody could ever look at again — which is exactly when
   // they matter: the moment something goes wrong and you need to reach someone.
@@ -701,6 +706,30 @@ export default function UnitsManager({
             setSeatTarget({ unit: viewing.unit, seatNumber: seatNumber || 1, member: { id: viewing.person.memberId, name: viewing.person.name } });
             setViewing(null);
           } : undefined}
+          // Unlike Replace, this is offered for LEGACY whole-unit tenancies
+          // too (memberId null → 'primary' server-side). A building that was
+          // set up before members[] existed is exactly the kind that has
+          // tenants who have been shuffling rooms for years.
+          onShift={() => {
+            setShiftTarget({ unit: viewing.unit, person: viewing.person });
+            setViewing(null);
+          }}
+        />
+      )}
+
+      {/* Same person, new room. The mirror image of the seat form below: there
+          the room stays and the person changes; here the person stays and the
+          room changes. Nothing is retyped either way. */}
+      {shiftTarget && (
+        <ShiftTenantModal
+          fromUnit={shiftTarget.unit}
+          person={shiftTarget.person}
+          units={units}
+          building={building}
+          language={language}
+          showToast={showToast}
+          onClose={() => setShiftTarget(null)}
+          onSaved={() => { load(); onBookingsChanged?.(); }}
         />
       )}
 

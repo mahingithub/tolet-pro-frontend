@@ -27,7 +27,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   UserCheck, Check, X, Loader2, ChevronDown, ChevronUp, Phone, IdCard,
-  Briefcase, PhoneCall, MapPin, Calendar, User, DoorOpen, AlertTriangle,
+  Briefcase, PhoneCall, MapPin, Calendar, User, DoorOpen, AlertTriangle, ArrowRight,
 } from 'lucide-react';
 import { listOnboardings, approveOnboarding, rejectOnboarding } from '../../services/inviteService';
 import { tenantTypeLabel, GOVT_ID_TYPES, HAS_STATUS } from '../../utils/tenantFields';
@@ -135,6 +135,7 @@ export default function OnboardingApprovalsPanel({ language, showToast, onApprov
           const open = expanded === row.id;
           const govtType = GOVT_ID_TYPES.find((g) => g.id === p.govtIdType);
           const busy = busyId === row.id;
+          const isShift = row.kind === 'shift';
 
           return (
             // `data-notif-target` is what useDeepLinkHighlight looks for: a
@@ -152,12 +153,34 @@ export default function OnboardingApprovalsPanel({ language, showToast, onApprov
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-black text-gray-900 leading-tight truncate">{row.name}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-sm font-black text-gray-900 leading-tight truncate">{row.name}</p>
+                      {isShift && (
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100 text-[8px] font-black uppercase tracking-wider">
+                          {L('রুম বদল', 'Room shift')}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[10px] font-bold text-gray-500 mt-0.5 flex items-center gap-1 flex-wrap">
                       <DoorOpen size={10} className="text-gray-300" />
                       {row.building?.name}
                       {row.unit && <>· {row.unit.floorLabel} · {L('রুম', 'Room')} {row.unit.roomNumber}</>}
                     </p>
+                    {/* A shift is a different question from a join — "may they
+                        move from 301 to 204" — and it cannot be answered
+                        without being told 301. */}
+                    {isShift && (
+                      <p className="text-[10px] font-black text-blue-700 mt-1 flex items-center gap-1 flex-wrap">
+                        {row.fromUnit
+                          ? `${L('রুম', 'Room')} ${row.fromUnit.roomNumber}`
+                          : L('আগের রুম', 'their old room')}
+                        <ArrowRight size={10} className="text-blue-400" />
+                        {row.unit ? `${L('রুম', 'Room')} ${row.unit.roomNumber}` : ''}
+                        <span className="text-blue-500/70 font-bold">
+                          {L('· অনুমোদন দিলে আগের রুম বন্ধ হবে', '· approving closes the old room')}
+                        </span>
+                      </p>
+                    )}
                     <p className="text-[10px] font-bold text-gray-400 mt-0.5 tabular-nums">{row.phone}</p>
                   </div>
 

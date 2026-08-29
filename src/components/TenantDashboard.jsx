@@ -31,7 +31,7 @@ import {
   Inbox, Home, Sparkles, KeyRound, CalendarCheck, DollarSign, Navigation,
   ChevronLeft, Filter, Zap, RefreshCw, Share2,
   FolderOpen, Lock, Info, Wallet, HeartPulse, Link2,
-  Wrench, ChevronRight, ChevronDown, HeartHandshake
+  Wrench, ChevronRight, ChevronDown, HeartHandshake, DoorOpen
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -69,6 +69,7 @@ import SavedTab from './tenant-dashboard/SavedTab';
 import ApplicationsTab from './tenant-dashboard/ApplicationsTab';
 import AlertsTab from './tenant-dashboard/AlertsTab';
 import PaymentsTab from './tenant-dashboard/PaymentsTab';
+import ShiftRoomModal from './tenant-dashboard/ShiftRoomModal';
 
 import InquiryStatusTimeline from './InquiryStatusTimeline';
 
@@ -635,6 +636,10 @@ const TenantDashboard = () => {
   const [addLandlordOpen, setAddLandlordOpen] = useState(false);
   const [inviteCodeInput, setInviteCodeInput] = useState('');
   const [joinBusy, setJoinBusy] = useState(false);
+  // "Moved room" — the booking they are shifting FROM, or null. See
+  // ShiftRoomModal: this is the alternative to re-scanning the building QR and
+  // ending up with two live tenancies for one person.
+  const [shiftBooking, setShiftBooking] = useState(null);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -1728,8 +1733,24 @@ const handleWizardSubmit = async (payload) => {
   // 🟢 Overview rent summary — active leases drive both the "Due Amount"
   // stat card and the Payment Proof rent tracker below. Kept as memoised
   // derivations so the overview never recomputes on unrelated re-renders.
+  //
+  // `isPastTenancy` is the tenant's OWN membership status, computed server-side
+  // in listTenantBookings. This filter used to read `b.status !== 'cancelled'`
+  // — the BOOKING's status, not the viewer's — so a room they had moved out of
+  // months ago still rendered a live rent card with its dues counted in the
+  // total. Move somewhere new and you had two cards for one person. The row is
+  // never deleted (the ledger and receipts hang off it, and the landlord is
+  // entitled to "who was in 301 last winter"), so the two have to be told apart
+  // rather than one of them removed — see pastTenancies below.
   const activeLeases = useMemo(
-    () => (myBookings || []).filter((b) => b && b.status !== 'cancelled' && !b.deletedAt),
+    () => (myBookings || []).filter((b) => b && b.status !== 'cancelled' && !b.deletedAt && !b.isPastTenancy),
+    [myBookings],
+  );
+  // Homes they have left. Kept visible — a tenant who moved in March still
+  // wants last year's receipts, and a card that silently vanished would read as
+  // lost data — but out of the active rent flow entirely.
+  const pastTenancies = useMemo(
+    () => (myBookings || []).filter((b) => b && !b.deletedAt && b.isPastTenancy),
     [myBookings],
   );
   const primaryLease = activeLeases[0] || null;
@@ -2178,10 +2199,67 @@ const handleWizardSubmit = async (payload) => {
                   <p className="text-[11px] font-bold text-gray-500 leading-snug">{language === 'বাংলা' ? 'ইনভাইট কোড দিয়ে আপনার ভাড়া ও রিসিট দেখুন' : 'Enter an invite code to see your rent & receipts'}</p>
                 </div>
               </div>
-              <button onClick={() => setAddLandlordOpen(true)} className="w-full sm:w-auto shrink-0 inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#ba0036] text-white font-black text-xs uppercase tracking-widest hover:bg-[#a1002f] active:scale-95 transition-all">
-                <KeyRound size={14} /> {language === 'বাংলা' ? 'কোড যোগ করুন' : 'Add code'}
-              </button>
+              <div className="w-full sm:w-auto shrink-0 flex gap-2">
+                {/* MOVED ROOM? — the alternative is re-scanning the building QR
+                    and filling the join form again, which creates a SECOND live
+                    tenancy for one person. This sits next to "Add code" because
+                    that is where a tenant already comes to change where they
+                    live, and it only appears once they have somewhere to move
+                    FROM. See ShiftRoomModal. */}
+                {activeLeases.length > 0 && (
+                  <button
+                    onClick={() => setShiftBooking(primaryLease)}
+                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-white border-2 border-gray-200 text-gray-600 font-black text-xs uppercase tracking-widest hover:border-gray-900 hover:text-gray-900 active:scale-95 transition-all"
+                  >
+                    <DoorOpen size={14} /> {language === 'বাংলা' ? 'রুম বদলেছি' : 'Moved room'}
+                  </button>
+                )}
+                <button onClick={() => setAddLandlordOpen(true)} className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#ba0036] text-white font-black text-xs uppercase tracking-widest hover:bg-[#a1002f] active:scale-95 transition-all">
+                  <KeyRound size={14} /> {language === 'বাংলা' ? 'কোড যোগ করুন' : 'Add code'}
+                </button>
+              </div>
             </div>
+
+            {/* ── PAST HOMES ─────────────────────────────────────────────────
+                Tenancies this person has left. They are not deleted — the rent
+                ledger and the receipts hang off them — so they are shown here
+                rather than silently disappearing, and kept out of the active
+                rent flow entirely (no dues, no "Pay Your Rent" card). */}
+            {pastTenancies.length > 0 && (
+              <div className="mb-5 md:mb-7 rounded-2xl border border-gray-100 bg-white/70 p-4">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2.5">
+                  {language === 'বাংলা' ? 'আগের বাসা' : 'Past homes'}
+                </p>
+                <div className="space-y-2">
+                  {pastTenancies.map((b) => (
+                    <div key={b.id || b._id} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-white border border-gray-100 text-gray-300 flex items-center justify-center shrink-0">
+                        <DoorOpen size={14} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[12px] font-black text-gray-600 truncate">
+                          {b.property || (language === 'বাংলা' ? 'আগের ভাড়া' : 'Previous rental')}
+                          {b.roomNumber ? ` · ${language === 'বাংলা' ? 'রুম' : 'Room'} ${b.roomNumber}` : ''}
+                        </p>
+                        <p className="text-[10px] font-bold text-gray-400 mt-0.5">
+                          {b.myMembership?.moveOutDate
+                            ? `${language === 'বাংলা' ? 'ছেড়েছেন' : 'Left'} ${new Date(b.myMembership.moveOutDate).toLocaleDateString(language === 'বাংলা' ? 'bn-BD' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
+                            : (language === 'বাংলা' ? 'শেষ হয়েছে' : 'Ended')}
+                        </p>
+                      </div>
+                      <span className="shrink-0 px-2 py-0.5 rounded-md bg-gray-200 text-gray-500 text-[9px] font-black uppercase tracking-wider">
+                        {language === 'বাংলা' ? 'সমাপ্ত' : 'Past'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] font-bold text-gray-400 leading-relaxed mt-2.5">
+                  {language === 'বাংলা'
+                    ? 'আপনার পুরোনো ভাড়ার রেকর্ড ও রিসিট মুছে যায়নি — পেমেন্ট ট্যাবে দেখতে পাবেন।'
+                    : 'Your old rent records and receipts are kept — they stay in the Payments tab.'}
+                </p>
+              </div>
+            )}
 
             {addLandlordOpen && (
               <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setAddLandlordOpen(false)}>
@@ -3415,6 +3493,20 @@ const handleWizardSubmit = async (payload) => {
             entry links there directly (no in-dashboard duplicate). */}
 
       </main>
+
+      {/* Moved room — mounted at the dashboard root like every other modal, so
+          the entry point can move without the modal following it around. */}
+      {shiftBooking && (
+        <ShiftRoomModal
+          booking={shiftBooking}
+          language={language}
+          onClose={() => setShiftBooking(null)}
+          // The request is only PENDING at this point — nothing has moved yet —
+          // but refetching keeps the dashboard honest if the landlord approves
+          // while this is still open (the socket 'rent:updated' arrives here).
+          onSubmitted={refreshRentData}
+        />
+      )}
 
       {/* 🟢 NEW: Inquiry Modal — shared with PropertyDetails / PropertyListing.
           Mounted at the dashboard root so any tab can trigger it. */}

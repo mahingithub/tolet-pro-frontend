@@ -91,6 +91,38 @@ const LocationSeoBlock = ({ seo }) => {
           </div>
         )}
 
+        {/* ── Body copy ─────────────────────────────────────────────────
+            Three sections woven with this district's own data. Without them
+            these 65 pages are 65 identical result grids with a different noun
+            in the heading, which is exactly the thing search engines collapse
+            into one. Each paragraph appears in the reader's language first
+            and the other language beneath, smaller — visible text, because a
+            renter here genuinely searches in both. */}
+        {seo.sections?.length > 0 && (
+          <div className="mt-9 max-w-4xl">
+            {seo.sections.map((sec, i) => (
+              <article key={i} className="mb-8">
+                <h3 className="text-base md:text-lg font-black text-gray-900 mb-0.5">
+                  {bn ? sec.h2.bn : sec.h2.en}
+                </h3>
+                <p className="text-[11px] font-bold text-gray-400 mb-3">
+                  {bn ? sec.h2.en : sec.h2.bn}
+                </p>
+                {sec.paragraphs.map((para, j) => (
+                  <div key={j} className="mb-4">
+                    <p className="text-[13px] md:text-sm font-medium text-gray-600 leading-[1.85]">
+                      {bn ? para.bn : para.en}
+                    </p>
+                    <p className="mt-1.5 text-[11px] md:text-[12px] font-medium text-gray-400 leading-[1.7]">
+                      {bn ? para.en : para.bn}
+                    </p>
+                  </div>
+                ))}
+              </article>
+            ))}
+          </div>
+        )}
+
         {/* ── FAQ — mirrored by the FAQPage schema on this route ────────── */}
         <div className="mt-9">
           <h3 className="text-base md:text-lg font-black text-gray-900 mb-4">

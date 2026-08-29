@@ -39,7 +39,9 @@ import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { SITE_URL, BRAND, OG_IMAGE } from '../src/seo/siteConfig.js';
-import { ALL_LOCATION_PAGES, ALL_DISTRICTS, districtPath } from '../src/seo/locationSeo.js';
+import {
+  ALL_LOCATION_PAGES, ALL_DISTRICTS, districtPath, HUB_SECTIONS,
+} from '../src/seo/locationSeo.js';
 import { FEATURE_PAGES } from '../src/seo/featurePages.js';
 import {
   breadcrumbSchema, faqSchema, serviceSchema, webPageSchema,
@@ -149,6 +151,37 @@ const linksHtml = (heading, links) => (links.length ? `
         </ul>
       </nav>` : '');
 
+/**
+ * Long-form sections, both languages. The React page shows the reader's
+ * language first and the other beneath; a crawler reading raw HTML gets both,
+ * which is the same content in the same order.
+ */
+const sectionsHtml = (sections = []) => sections.map((sec) => `
+      <section>
+        <h2>${esc(sec.h2.bn)} / ${esc(sec.h2.en)}</h2>
+        ${sec.paragraphs
+    .flatMap((p) => [p.bn, p.en])
+    .filter(Boolean)
+    .map((text) => `<p>${esc(text)}</p>`)
+    .join('\n        ')}
+      </section>`).join('\n');
+
+/** The free/paid split, stated as plainly in the HTML as it is on the page. */
+const pricingHtml = (pricing) => (pricing ? `
+      <section>
+        <h2>${esc(pricing.h2.bn)} / ${esc(pricing.h2.en)}</h2>
+        <h3>সম্পূর্ণ ফ্রি / Free forever</h3>
+        <ul>
+          ${pricing.free.bn.map((item, i) => `<li>${esc(item)}${pricing.free.en[i] ? ` — ${esc(pricing.free.en[i])}` : ''}</li>`).join('\n          ')}
+        </ul>
+        <h3>Plus ও Pro প্ল্যানে / On the Plus &amp; Pro plans</h3>
+        <ul>
+          ${pricing.paid.bn.map((item, i) => `<li>${esc(item)}${pricing.paid.en[i] ? ` — ${esc(pricing.paid.en[i])}` : ''}</li>`).join('\n          ')}
+        </ul>
+        <p>${esc(pricing.note.bn)}</p>
+        <p>${esc(pricing.note.en)}</p>
+      </section>` : '');
+
 /** Shared trailer: the crawl path off every prerendered page. */
 const siteLinks = () => linksHtml('TO-LET PRO', [
   { href: '/', label: 'বাসা ভাড়া ও টু-লেট — Home' },
@@ -174,6 +207,7 @@ function locationBody(seo) {
       <h1>${esc(seo.h1)}</h1>
       <p>${esc(seo.description)}</p>
       ${areas.length ? `<section><h2>${esc(seo.en)} এর জনপ্রিয় এলাকা / Popular areas</h2><p>${esc(areas.join(' · '))}</p></section>` : ''}
+      ${sectionsHtml(seo.sections)}
       ${faqHtml(seo.faq)}
       ${linksHtml(
     seo.kind === 'district'
@@ -204,6 +238,8 @@ function featureBody(page) {
           ${page.steps.map((s) => `<li>${esc(s.bn)} — ${esc(s.en)}</li>`).join('\n          ')}
         </ol>
       </section>
+      ${sectionsHtml(page.sections)}
+      ${pricingHtml(page.pricing)}
       ${faqHtml(page.faq)}
       ${linksHtml('আরও দেখুন / Explore more', page.related.map((slug) => {
     const rel = FEATURE_PAGES.find((p) => p.slug === slug);
@@ -231,6 +267,7 @@ const pages = [
     <main>
       <h1>সারা বাংলাদেশে বাসা ভাড়া ও টু-লেট / To-let and house rent across Bangladesh</h1>
       <p>${esc(HUB_DESCRIPTION)}</p>
+      ${sectionsHtml(HUB_SECTIONS)}
       ${linksHtml('সব বিভাগ ও জেলা / All divisions and districts',
     ALL_LOCATION_PAGES.map((p) => ({ href: p.path, label: `${p.en} (${p.bn}) — ${p.kind === 'division' ? 'বিভাগ' : 'জেলা'} বাসা ভাড়া` })))}
       ${siteLinks()}

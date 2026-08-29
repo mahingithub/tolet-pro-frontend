@@ -115,3 +115,30 @@ export async function listMySubmissions() {
   const { submissions } = await request('/api/invite/my-submissions');
   return submissions || [];
 }
+
+// ── Tenant: shifting room inside a building they are already in ─────────────
+
+/**
+ * Where this tenant could move to. Returns the building they are currently in,
+ * the room they are in now, and every active room with its vacancy — the same
+ * list the QR picker shows, from the same helper, so a room cannot look free on
+ * one screen and full on the other.
+ */
+export async function getShiftOptions(bookingId) {
+  const { shift } = await request(`/api/invite/shift/${encodeURIComponent(bookingId)}/rooms`);
+  return shift;
+}
+
+/**
+ * "I have moved to 204." Their name, phone, NID, photo and emergency contact
+ * come off the row they are already on — the server carries them across, so
+ * this only sends what actually changed. Waits for the landlord, like any
+ * building-scoped claim.
+ */
+export async function requestShift(payload) {
+  const { onboarding } = await request('/api/invite/shift', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return onboarding;
+}

@@ -109,7 +109,11 @@ const PaymentsTab = ({
     if (!d || Number.isNaN(d.getTime())) return '';
     return d.toLocaleDateString(language === 'বাংলা' ? 'bn-BD' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   };
-  const activeLeases = (myBookings || []).filter((b) => b.status !== 'cancelled');
+  // `isPastTenancy` is the viewer's OWN membership status (listTenantBookings),
+  // not the booking's. Without it a room this tenant moved out of still got a
+  // "Pay Your Rent" card — an invitation to pay rent on somewhere they no
+  // longer live. See TenantDashboard's activeLeases for the full note.
+  const activeLeases = (myBookings || []).filter((b) => b.status !== 'cancelled' && !b.isPastTenancy);
 
   // 🟢 V1 manual rent — a "Pay Your Rent" card per active lease. Shows
   // the landlord's bKash/Nagad/Rocket/Bank account + QR, one-click copy,

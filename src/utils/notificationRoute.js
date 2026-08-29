@@ -132,7 +132,10 @@ export function notificationDestination(n, { isLandlord = false, userId = '' } =
     // has said yes, and their own dashboard when the answer was no.
     case 'tenant_onboarding': {
       if (onboardingAudience(data) === 'landlord') {
-        return at(HOST.bookings, data.onboardingId);
+        // A pending claim anchors on its onboarding card; a move-out
+        // ("X has left 301") has no card to anchor on, so it falls back to the
+        // booking row that just emptied.
+        return at(HOST.bookings, data.onboardingId || bookingId);
       }
       return bookingId ? at(TENANT.payments, bookingId) : { path: TENANT.overview };
     }

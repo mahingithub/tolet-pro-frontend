@@ -19,7 +19,7 @@
 
 import React from 'react';
 import {
-  X, Phone, Calendar, MapPin, Briefcase, IdCard, PhoneCall, User, Home,
+  X, Phone, Calendar, MapPin, Briefcase, IdCard, PhoneCall, User, Home, DoorOpen,
 } from 'lucide-react';
 import {
   tenantTypeLabel, tenantTypeById, GOVT_ID_TYPES, MARITAL_STATUSES, HAS_STATUS,
@@ -40,6 +40,7 @@ export default function TenantDetailModal({
   language,
   onClose,
   onReplace,       // optional — opens the replace flow for this person
+  onShift,         // optional — opens the "move them to another room" flow
 }) {
   const isBn = language === 'বাংলা';
   const p = tenant?.tenantProfile || {};
@@ -161,6 +162,10 @@ export default function TenantDetailModal({
             <Row label={isBn ? 'ঠিকানা' : 'Address'} value={p.emergencyAddress} />
           </Section>
 
+          {/* Two actions that are easy to confuse and mean opposite things, so
+              they are labelled for what CHANGES rather than what stays:
+                Move room — the same person, a different room (they shifted).
+                Replace   — the same room, a different person (they left). */}
           <div className="flex items-center gap-2 pt-1">
             {tenant?.phone && (
               <a
@@ -170,13 +175,24 @@ export default function TenantDetailModal({
                 <Phone size={14} /> {isBn ? 'কল করুন' : 'Call'}
               </a>
             )}
+            {onShift && (
+              <button
+                type="button"
+                onClick={onShift}
+                className="shrink-0 px-4 py-3 rounded-xl bg-white border-2 border-gray-200 text-gray-600 font-black text-xs uppercase tracking-widest hover:border-blue-200 hover:text-blue-700 active:scale-95 transition-all inline-flex items-center gap-1.5"
+                title={isBn ? 'একই ভাড়াটিয়া, অন্য রুমে' : 'Same tenant, different room'}
+              >
+                <DoorOpen size={14} /> {isBn ? 'রুম বদলান' : 'Move room'}
+              </button>
+            )}
             {onReplace && (
               <button
                 type="button"
                 onClick={onReplace}
                 className="shrink-0 px-4 py-3 rounded-xl bg-white border-2 border-gray-200 text-gray-600 font-black text-xs uppercase tracking-widest hover:border-amber-200 hover:text-amber-700 active:scale-95 transition-all inline-flex items-center gap-1.5"
+                title={isBn ? 'একই রুম, নতুন ভাড়াটিয়া' : 'Same room, new tenant'}
               >
-                <Home size={14} /> {isBn ? 'বদলান' : 'Replace'}
+                <Home size={14} /> {isBn ? 'ভাড়াটিয়া বদলান' : 'Replace'}
               </button>
             )}
           </div>

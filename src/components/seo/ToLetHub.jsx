@@ -21,6 +21,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { DIVISIONS } from '../../data/bdGeo';
 import {
   divisionSeo, districtSeo, districtPath, ALL_DISTRICTS, PRIORITY_DISTRICTS,
+  HUB_SECTIONS,
 } from '../../seo/locationSeo';
 import { FEATURE_PAGES } from '../../seo/featurePages';
 import useSeo from '../../seo/useSeo';
@@ -117,6 +118,36 @@ const ToLetHub = () => {
       </header>
 
       <main className="max-w-[1100px] mx-auto px-5 md:px-8 py-12 md:py-16">
+        {/* ── Body copy ─────────────────────────────────────────────────
+            Shared with the prerendered version of this page (HUB_SECTIONS in
+            seo/locationSeo.js) so a crawler that never runs JavaScript reads
+            the same words. Without it this page is 65 links and an FAQ. */}
+        <section aria-labelledby="hub-about" className="max-w-3xl mb-14 md:mb-20">
+          <h2 id="hub-about" className="sr-only">
+            {bn ? 'টু-লেট প্রো সম্পর্কে' : 'About TO-LET PRO listings'}
+          </h2>
+          {HUB_SECTIONS.map((sec, i) => (
+            <article key={i} className="mb-8">
+              <h3 className="text-lg md:text-xl font-black tracking-tight text-gray-900 mb-0.5">
+                {bn ? sec.h2.bn : sec.h2.en}
+              </h3>
+              <p className="text-[11px] font-bold text-gray-400 mb-3">
+                {bn ? sec.h2.en : sec.h2.bn}
+              </p>
+              {sec.paragraphs.map((para, j) => (
+                <div key={j} className="mb-4">
+                  <p className="text-[13px] md:text-sm font-medium text-gray-600 leading-[1.85]">
+                    {bn ? para.bn : para.en}
+                  </p>
+                  <p className="mt-1.5 text-[11px] md:text-[12px] font-medium text-gray-400 leading-[1.7]">
+                    {bn ? para.en : para.bn}
+                  </p>
+                </div>
+              ))}
+            </article>
+          ))}
+        </section>
+
         {/* ── Popular districts ────────────────────────────────────────── */}
         <section aria-labelledby="popular-heading">
           <h2 id="popular-heading" className="text-2xl md:text-3xl font-black tracking-tight mb-6">
