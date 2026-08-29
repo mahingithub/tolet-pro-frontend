@@ -21,7 +21,7 @@ import UnitsManager from "./UnitsManager.jsx";
 import { buildingTypeLabel, buildingTypeColor, normaliseSubCategory, unitNoun } from "../../utils/buildingTypes";
 import { updateBuilding, archiveBuilding } from "../../services/buildingService";
 import AiLedgerScannerModal from "./AiLedgerScannerModal.jsx";
-import ModalPortal from "../shared/ModalPortal.jsx";
+import OnboardingApprovalsPanel from "./OnboardingApprovalsPanel.jsx";
 import { scopeBookings, bookingInBuilding } from '../../utils/buildingScope';
 
 
@@ -667,7 +667,6 @@ export default function BookingsTab(props) {
 
           if (!landlordProfile?.buildingMode) {
             return (
-              <ModalPortal>
               <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in">
                 <div className="bg-white rounded-3xl p-6 md:p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95">
                   <div className="text-center mb-6">
@@ -705,7 +704,6 @@ export default function BookingsTab(props) {
                   </div>
                 </div>
               </div>
-              </ModalPortal>
             );
           }
 
@@ -734,6 +732,16 @@ export default function BookingsTab(props) {
           return (
           <>
           <div className="w-full animate-in fade-in zoom-in-95 duration-500">
+
+            {/* Tenants who filled in their own details via a QR / link and are
+                waiting on a yes. Renders NOTHING when the queue is empty — it
+                sits above everything precisely because it is only ever here
+                when it is the most important thing on the screen. */}
+            <OnboardingApprovalsPanel
+              language={language}
+              showToast={showToast}
+              onApproved={refreshBookings}
+            />
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:h-[calc(100vh-140px)] overflow-visible lg:overflow-hidden">
 
@@ -1260,7 +1268,6 @@ export default function BookingsTab(props) {
 
               {/* Building Delete Confirmation Modal */}
               {deleteBuildingId && (
-                <ModalPortal>
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                   <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteBuildingId(null)} />
                   <div className="relative bg-white w-full max-w-sm rounded-[1.5rem] shadow-2xl p-6 sm:p-7 overflow-hidden animate-in zoom-in-95 duration-200">
@@ -1306,7 +1313,6 @@ export default function BookingsTab(props) {
                     </div>
                   </div>
                 </div>
-                </ModalPortal>
               )}
 
             </div>

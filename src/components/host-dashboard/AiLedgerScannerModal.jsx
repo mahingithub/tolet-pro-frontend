@@ -270,6 +270,9 @@ export default function AiLedgerScannerModal({
   currentBuildingId,
   showToast,
   onBookingsCreated,   // called with the array of new bookings after save
+  // Pre-selects the room when the scanner was opened from one (the Rooms view
+  // opens it per-room). The landlord can still change it before shooting.
+  initialUnitId = '',
 }) {
   const isBn = language === 'বাংলা';
 
@@ -345,8 +348,19 @@ export default function AiLedgerScannerModal({
     return () => { alive = false; };
   }, [isOpen, building?.id]);
 
-  // A room is remembered per building, not across them.
-  useEffect(() => { setPinnedUnitId(''); }, [building?.id]);
+  // A room is remembered per building, not across them. Opening the scanner
+  // from a specific room seeds it; opening it from the toolbar clears it, so a
+  // room pinned last time never silently captures the next scan.
+  useEffect(() => {
+    if (isOpen) setPinnedUnitId(initialUnitId || '');
+  }, [isOpen, initialUnitId, building?.id]);
+
+  // An admission form is one page for one person, and the landlord opening it
+  // is almost always standing in the room — so default that mode when the
+  // scanner was launched from a room.
+  useEffect(() => {
+    if (isOpen && initialUnitId) setScanMode('form');
+  }, [isOpen, initialUnitId]);
 
   const pinnedUnit = units.find((u) => String(u.id) === String(pinnedUnitId)) || null;
   const floorLabel = (n) => (Number(n) === 0
