@@ -32,7 +32,18 @@ const RequireAuth = ({ children, requireRole }) => {
 
   if (!isAuthenticated) {
     const next = encodeURIComponent(location.pathname + location.search);
-    return <Navigate to={`/login?next=${next}`} replace />;
+    // Carry the role the destination needs into the login screen, so a visitor
+    // who landed on a landlord surface doesn't get the tenant signup form and
+    // have to notice the toggle. LoginPage reads ?role= and preselects it;
+    // without this it always defaults to tenant.
+    //
+    // This matters most for the public landing pages: someone arriving from
+    // /tenant-manager ("ভাড়ার খাতা") is a landlord and should be offered the
+    // landlord side, while /living has no requireRole and correctly stays on
+    // tenant — which is what a visitor from /meal-manager or /roommate-wallet
+    // almost always is.
+    const roleHint = requireRole ? `&role=${encodeURIComponent(requireRole)}` : '';
+    return <Navigate to={`/login?next=${next}${roleHint}`} replace />;
   }
 
   if (requireRole && Array.isArray(roles) && !roles.includes(requireRole)) {

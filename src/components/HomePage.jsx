@@ -61,19 +61,19 @@ const HomePage = () => {
       <div className="md:hidden">
         <MobileHome />
 
-        {/* ⚠️ MOBILE-FIRST INDEXING — do not remove this instance.
-            Google crawls and ranks this site from a ~375px viewport, where the
-            entire desktop tree below (HeroSection, its footer, and the copy of
-            HomeSeoContent inside it) is `hidden md:flex` — display:none, and
-            therefore invisible to the crawler. Measured: at 375px the homepage
-            rendered 202 words and ZERO links to /to-let, /meal-manager or any
-            other landing page.
+        {/* COMPACT on purpose. A wall of explanatory text directly under the
+            property feed reads as an ad break in the middle of browsing, so
+            the mobile homepage gets the three pillars and the links row only —
+            enough to answer "does this do more than listings?" at a glance —
+            with a tap through to /how-it-works for the full explanation.
 
-            So the section is rendered in BOTH trees, exactly like MobileHome
-            and HeroSection themselves. Only one is ever visible at a given
-            width, which is the same responsive pattern this page already uses
-            for its entire layout. */}
-        <HomeSeoContent />
+            ⚠️ Do not delete this instance outright. Google crawls from a
+            ~375px viewport, where the entire desktop tree below (HeroSection
+            and its footer) is `hidden md:flex` → display:none. Measured before
+            this existed: 202 words and ZERO links to /to-let, /meal-manager or
+            any other landing page. The pillars are what keep those links
+            reachable on the surface that actually gets indexed. */}
+        <HomeSeoContent variant="compact" />
       </div>
 
       {/* ───── DESKTOP / TABLET HOMEPAGE (≥ md) ───── */}

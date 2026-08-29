@@ -9,10 +9,11 @@
     "preview": "vite preview",
     "geo:generate": "node scripts/generate-bd-geo.mjs",
     "geo:verify": "node scripts/verify-bd-geo.mjs",
-    "prebuild": "node scripts/generate-sitemap.mjs",
+    "prebuild": "node scripts/generate-dhaka-areas.mjs && node scripts/generate-sitemap.mjs",
     "postbuild": "node scripts/prerender-seo.mjs",
     "seo:sitemap": "node scripts/generate-sitemap.mjs",
-    "seo:prerender": "node scripts/prerender-seo.mjs"
+    "seo:prerender": "node scripts/prerender-seo.mjs",
+    "seo:areas": "node scripts/generate-dhaka-areas.mjs"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",

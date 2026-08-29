@@ -2036,8 +2036,15 @@ const PropertyListing = () => {
 									</>
 								)}
 							</p>
+							{/* On a recognised location URL the heading uses the place's
+							    real name — "মিরপুর", not the raw slug text "Mirpur dhaka"
+							    that the free-text search box happens to hold. This is the
+							    page's H1, so it is also the first thing a search engine
+							    reads about it. */}
 							<h1 className="text-3xl font-black text-gray-900 tracking-tight">
-								{searchArea && searchArea !== (t.nearMe || "Nearby Location") ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision} {unitNoun}
+								{locationSeo
+									? `${language === "বাংলা" ? locationSeo.bn : locationSeo.en} ${unitNoun}`
+									: `${searchArea && searchArea !== (t.nearMe || "Nearby Location") ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision} ${unitNoun}`}
 							</h1>
 						</div>
 						<div className="flex items-center gap-3">

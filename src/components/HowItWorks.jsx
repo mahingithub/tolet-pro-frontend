@@ -18,6 +18,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { getSectionGuides } from '../services/aiGuideService';
 import VideoGuides from './shared/VideoGuides';
 import BackButton from './shared/BackButton';
+import HomeSeoContent from './seo/HomeSeoContent';
 import useSeo from '../seo/useSeo';
 import { faqSchema, breadcrumbSchema, webPageSchema } from '../seo/schema';
 import { RENT_KEYWORDS, MANAGEMENT_KEYWORDS, toKeywordString } from '../seo/keywords';
@@ -153,8 +154,18 @@ export default function HowItWorks() {
         </div>
       </div>
 
+      {/* ── What TO-LET PRO actually is ──────────────────────────────────
+          The full three-pillar explainer, moved here from the mobile homepage
+          where it sat awkwardly under the property feed. This is also the page
+          that carries this content in the search index: the copy on the
+          desktop homepage lives inside `hidden md:flex`, so it is display:none
+          at the ~375px viewport Google crawls with. Rendered at every width
+          here, right after the hero, because "is this just a listings site?"
+          is the first question this page exists to answer. */}
+      <HomeSeoContent />
+
       {/* For tenants */}
-      <section className="max-w-5xl mx-auto px-4 -mt-8">
+      <section className="max-w-5xl mx-auto px-4 mt-8">
         <div className="bg-white/60 backdrop-blur rounded-[2rem] p-2 md:p-4">
           <div className="px-3 pt-3 pb-1">
             <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036] mb-1">{tr('For tenants', 'ভাড়াটিয়াদের জন্য')}</p>

@@ -29,6 +29,7 @@ import {
   getDivision, getDistrict, getDivisionOfDistrict, getThanas,
 } from '../data/bdGeo.js';
 import { RENT_KEYWORDS, toKeywordString } from './keywords.js';
+import { areaSeo } from './areaSeo.js';
 
 /** The 8 division slugs the listing route treats as a division filter. */
 export const DIVISION_IDS = DIVISIONS.map((d) => d.id);
@@ -405,6 +406,10 @@ export function locationSeoFor(slug) {
     || districtSeo(DISTRICT_ID_BY_SEARCH_SLUG[key])
     || districtSeo(key)
     || districtSeo(key.replace(/-/g, '_'))
+    // Dhaka city areas — "mirpur-dhaka", "uttara-east-dhaka", "gulshan-1-dhaka".
+    // Checked last so a district can never lose its slug to an area, and it is
+    // a plain Map lookup, so the cost on non-matching slugs is nil.
+    || areaSeo(key)
     || null;
 }
 

@@ -46,6 +46,11 @@ import { FEATURE_PAGES } from '../src/seo/featurePages.js';
 import {
   breadcrumbSchema, faqSchema, serviceSchema, webPageSchema,
 } from '../src/seo/schema.js';
+import { PILLARS, BODY_SECTIONS, FREE_LIST } from '../src/seo/homeContent.js';
+import { ALL_AREA_PAGES, ALL_DHAKA_AREAS, areaPath } from '../src/seo/areaSeo.js';
+// Sub-area names are lazy-loaded in the browser but free to read here, so the
+// prerendered HTML carries the full long tail for crawlers that run no JS.
+import { DHAKA_SUB_AREAS } from '../src/seo/dhakaSubAreas.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DIST = resolve(HERE, '../dist');
@@ -192,29 +197,68 @@ const siteLinks = () => linksHtml('TO-LET PRO', [
 ]);
 
 function locationBody(seo) {
-  const neighbours = (seo.kind === 'district'
-    ? ALL_DISTRICTS.filter((d) => d.divisionId === seo.divisionId && d.id !== seo.id)
-    : (seo.districts || [])
-  ).slice(0, 12).map((d) => ({
-    href: districtPath(d.id),
-    label: `${d.en} (${d.bn}) বাসা ভাড়া`,
-  }));
+  const isArea = seo.kind === 'area';
 
-  const areas = (seo.areas || []).slice(0, 10);
+  // Sibling links, matching what LocationSeoBlock renders: other areas of the
+  // city for an area page, other districts of the division for a district,
+  // own districts for a division.
+  const neighbours = isArea
+    ? [
+      ...ALL_DHAKA_AREAS.filter((a) => a.slug !== seo.id && a.thana && a.thana === seo.thana),
+      ...ALL_DHAKA_AREAS.filter((a) => a.slug !== seo.id && a.thana !== seo.thana),
+    ].slice(0, 14).map((a) => ({
+      href: areaPath(a.slug),
+      label: `${a.bn} (${a.en}) বাসা ভাড়া`,
+    }))
+    : (seo.kind === 'district'
+      ? ALL_DISTRICTS.filter((d) => d.divisionId === seo.divisionId && d.id !== seo.id)
+      : (seo.districts || [])
+    ).slice(0, 12).map((d) => ({
+      href: districtPath(d.id),
+      label: `${d.en} (${d.bn}) বাসা ভাড়া`,
+    }));
+
+  const neighbourHeading = isArea
+    ? 'ঢাকার আশপাশের এলাকা / Other areas of Dhaka'
+    : seo.kind === 'district'
+      ? `${seo.divisionEn} বিভাগের অন্য জেলা / Other districts`
+      : `${seo.en} বিভাগের জেলা / Districts`;
+
+  const subs = isArea ? (DHAKA_SUB_AREAS[seo.id] || []) : [];
+  const areas = (isArea ? subs.map((s) => s.en) : (seo.areas || [])).slice(0, 24);
+  const areasBn = (isArea ? subs.map((s) => s.bn || s.en) : (seo.areasBn || [])).slice(0, 24);
+  const areasHeading = isArea
+    ? `${seo.bn} এর ভেতরের এলাকা / Inside ${seo.en}`
+    : `${seo.en} এর জনপ্রিয় এলাকা / Popular areas`;
+
+  // Dhaka's own page is the crawl path into all 129 area pages.
+  const dhakaAreaIndex = seo.id === 'dhaka'
+    ? linksHtml('ঢাকা শহরের সব এলাকা / Every area of Dhaka city',
+      ALL_DHAKA_AREAS.map((a) => ({
+        href: areaPath(a.slug),
+        label: `${a.bn} (${a.en}) বাসা ভাড়া`,
+      })))
+    : '';
+
+  // Campus / office context — the two reasons anyone picks a Dhaka area.
+  const nearby = [];
+  if (seo.campuses?.length) {
+    nearby.push(`<p>কাছাকাছি ক্যাম্পাস / Nearby campuses: ${esc(seo.campuses.join(', '))}</p>`);
+  }
+  if (seo.offices?.length) {
+    nearby.push(`<p>কাছাকাছি অফিস এলাকা / Nearby workplaces: ${esc(seo.offices.join(', '))}</p>`);
+  }
 
   return `
     <main>
       <h1>${esc(seo.h1)}</h1>
       <p>${esc(seo.description)}</p>
-      ${areas.length ? `<section><h2>${esc(seo.en)} এর জনপ্রিয় এলাকা / Popular areas</h2><p>${esc(areas.join(' · '))}</p></section>` : ''}
+      ${nearby.join('\n      ')}
+      ${areas.length ? `<section><h2>${esc(areasHeading)}</h2><p>${esc(areas.join(' · '))}</p><p>${esc(areasBn.join(' · '))}</p></section>` : ''}
       ${sectionsHtml(seo.sections)}
       ${faqHtml(seo.faq)}
-      ${linksHtml(
-    seo.kind === 'district'
-      ? `${seo.divisionEn} বিভাগের অন্য জেলা / Other districts`
-      : `${seo.en} বিভাগের জেলা / Districts`,
-    neighbours,
-  )}
+      ${dhakaAreaIndex}
+      ${linksHtml(neighbourHeading, neighbours)}
       ${siteLinks()}
     </main>`;
 }
@@ -257,7 +301,57 @@ const HUB_DESCRIPTION =
   + 'বিজ্ঞাপন — জেলা ধরে খুঁজুন। Browse to-let listings across all 8 divisions and 64 '
   + 'districts of Bangladesh.';
 
+const HIW_TITLE = 'কিভাবে কাজ করে — How TO-LET PRO Works for Tenants & Landlords';
+const HIW_DESCRIPTION =
+  'ভাড়াটিয়া হিসেবে বাসা খোঁজা থেকে চাবি হাতে পাওয়া, আর বাড়িওয়ালা হিসেবে ফ্রি টু-লেট '
+  + 'বিজ্ঞাপন থেকে ভাড়া আদায় — TO-LET PRO ধাপে ধাপে কিভাবে কাজ করে, দালাল ফি কেন নেই এবং '
+  + 'ভেরিফিকেশন কিভাবে হয়। How renting and listing works on TO-LET PRO, with pricing.';
+
 const pages = [
+  /* ── /how-it-works ──────────────────────────────────────────────────────
+     This is the page that carries the "what is TO-LET PRO" explainer in the
+     search index. The same copy also renders on the DESKTOP homepage, but that
+     copy sits inside `hidden md:flex` — display:none at the ~375px viewport
+     Google crawls with — so the two can never compete with each other.
+
+     No FAQPage schema here: the FAQ on this route is rendered by the React
+     component from its own `faqs` array and is not in this prerendered HTML.
+     Emitting FAQ markup for content a crawler cannot see is exactly the
+     mismatch Google issues manual actions for. useSeo() adds it at runtime,
+     where the questions really are on screen. */
+  {
+    path: '/how-it-works',
+    title: HIW_TITLE,
+    description: HIW_DESCRIPTION,
+    body: `
+    <main>
+      <h1>কিভাবে কাজ করে / How TO-LET PRO works</h1>
+      <p>${esc(HIW_DESCRIPTION)}</p>
+      <section>
+        <h2>বাসা ভাড়া, বাড়ি ম্যানেজমেন্ট আর মেসের হিসাব — তিনটাই এক অ্যাপে
+            / House rent, property management and mess accounts — all in one app</h2>
+        <ul>
+          ${PILLARS.map((p) => `<li><a href="${attr(p.to)}"><strong>${esc(p.bn.t)} / ${esc(p.en.t)}</strong></a> — ${esc(p.bn.d)} ${esc(p.en.d)}</li>`).join('\n          ')}
+        </ul>
+      </section>
+      ${sectionsHtml(BODY_SECTIONS)}
+      <section>
+        <h2>যা সবসময় ফ্রি / Always free</h2>
+        <ul>
+          ${FREE_LIST.bn.map((item, i) => `<li>${esc(item)}${FREE_LIST.en[i] ? ` — ${esc(FREE_LIST.en[i])}` : ''}</li>`).join('\n          ')}
+        </ul>
+      </section>
+      ${siteLinks()}
+    </main>`,
+    jsonLd: [
+      webPageSchema({ name: HIW_TITLE, description: HIW_DESCRIPTION, url: '/how-it-works' }),
+      breadcrumbSchema([
+        { name: 'Home', path: '/' },
+        { name: 'How it works', path: '/how-it-works' },
+      ]),
+    ],
+  },
+
   // The hub.
   {
     path: '/to-let',
@@ -280,6 +374,24 @@ const pages = [
 
   // Every division and district.
   ...ALL_LOCATION_PAGES.map((seo) => ({
+    path: seo.path,
+    title: seo.title,
+    description: seo.description,
+    keywords: seo.keywords,
+    body: locationBody(seo),
+    jsonLd: [
+      breadcrumbSchema(seo.breadcrumb),
+      faqSchema(seo.faq),
+      webPageSchema({ name: seo.title, description: seo.description, url: seo.path }),
+    ],
+  })),
+
+  /* ── Every area of Dhaka city ────────────────────────────────────────────
+     129 pages. These are the ones that answer "মিরপুর বাসা ভাড়া" — the search
+     people actually run. Same body generator as a district page, so a campus
+     area and an office area do not read like the same page with the name
+     swapped (see src/seo/areaSeo.js). */
+  ...ALL_AREA_PAGES.map((seo) => ({
     path: seo.path,
     title: seo.title,
     description: seo.description,

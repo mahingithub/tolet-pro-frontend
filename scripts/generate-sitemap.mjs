@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { SITE_URL } from '../src/seo/siteConfig.js';
 import { ALL_LOCATION_PAGES } from '../src/seo/locationSeo.js';
 import { FEATURE_PAGES } from '../src/seo/featurePages.js';
+import { ALL_AREA_PAGES } from '../src/seo/areaSeo.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(HERE, '../public/sitemap.xml');
@@ -61,6 +62,11 @@ const entries = [
     priority: p.kind === 'division' ? 0.8 : 0.7,
   })),
 
+  // ── Every area of Dhaka city ───────────────────────────────────────────
+  // Higher priority than a district: "মিরপুর বাসা ভাড়া" is a far more common
+  // search than "ঢাকা জেলা বাসা ভাড়া", and Dhaka is where the demand is.
+  ...ALL_AREA_PAGES.map((p) => url(p.path, { changefreq: 'daily', priority: 0.8 })),
+
   // ── Feature landing pages ──────────────────────────────────────────────
   ...FEATURE_PAGES.map((p) => url(p.slug, { changefreq: 'monthly', priority: 0.7 })),
 
@@ -93,7 +99,8 @@ const divisions = ALL_LOCATION_PAGES.filter((p) => p.kind === 'division').length
 const districts = ALL_LOCATION_PAGES.filter((p) => p.kind === 'district').length;
 console.log(
   `✓ sitemap.xml — ${entries.length} URLs `
-  + `(${divisions} divisions, ${districts} districts, ${FEATURE_PAGES.length} landing pages) → public/sitemap.xml`,
+  + `(${divisions} divisions, ${districts} districts, ${ALL_AREA_PAGES.length} Dhaka areas, `
+  + `${FEATURE_PAGES.length} landing pages) → public/sitemap.xml`,
 );
 
 /* ─────────────────────────────────────────────────────────────────────────────

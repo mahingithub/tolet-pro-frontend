@@ -136,6 +136,12 @@ const PRICING_FREE_TOOLS = {
 
 const mealManager = {
   slug: '/meal-manager',
+  // Where the primary button goes. NOT /login — see the note in
+  // FeatureLanding.jsx. RequireAuth turns this into
+  // /login?next=%2Fliving%3Fm%3Dmeals for a signed-out visitor, and LoginPage
+  // returns them here afterwards, so a search for "মিল ম্যানেজার" ends inside
+  // the meal manager rather than on a generic sign-in screen.
+  cta: { to: '/living?m=meals', bn: 'মিল ম্যানেজার খুলুন', en: 'Open the meal manager' },
   serviceType: 'Meal and mess management',
   eyebrow: { bn: 'মেস ও ব্যাচেলর লাইফ', en: 'For mess & bachelor life' },
 
@@ -351,6 +357,7 @@ const mealManager = {
 
 const roommateWallet = {
   slug: '/roommate-wallet',
+  cta: { to: '/living?m=expenses', bn: 'ওয়ালেট খুলুন', en: 'Open the wallet' },
   serviceType: 'Shared expense and bill splitting',
   eyebrow: { bn: 'শেয়ার্ড খরচ', en: 'Shared expenses' },
 
@@ -546,6 +553,7 @@ const roommateWallet = {
 
 const houseManager = {
   slug: '/house-manager',
+  cta: { to: '/host-dashboard?tab=properties', bn: 'বাড়ি ম্যানেজ করুন', en: 'Manage your property' },
   serviceType: 'Property and building management',
   eyebrow: { bn: 'বাড়িওয়ালাদের জন্য', en: 'For landlords' },
 
@@ -743,6 +751,9 @@ const houseManager = {
 
 const tenantManager = {
   slug: '/tenant-manager',
+  // Landlord surface: RequireAuth appends role=landlord so the login screen
+  // opens on the landlord side instead of defaulting to tenant.
+  cta: { to: '/host-dashboard?tab=rent', bn: 'ভাড়ার খাতা খুলুন', en: 'Open the rent book' },
   serviceType: 'Tenant and rent management',
   eyebrow: { bn: 'ভাড়ার খাতা', en: 'The rent book' },
 
@@ -936,6 +947,8 @@ const tenantManager = {
 
 const homeServices = {
   slug: '/home-services',
+  // Public route — no auth gate, so this opens straight away.
+  cta: { to: '/services', bn: 'সার্ভিস দেখুন', en: 'Browse services' },
   serviceType: 'Home services marketplace',
   eyebrow: { bn: 'বাসার সার্ভিস', en: 'Home services' },
 

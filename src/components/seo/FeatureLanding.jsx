@@ -104,12 +104,26 @@ const FeatureLanding = () => {
             {L(page.intro)}
           </p>
 
+          {/* ── The primary button goes to the FEATURE, not to /login ────
+              Someone who searched "মিল ম্যানেজার" and clicked this result
+              wants the meal manager, and a bare sign-in screen is where that
+              intent goes to die. This links straight to /living?m=meals; the
+              existing plumbing does the rest:
+
+                RequireAuth  → /login?next=%2Fliving%3Fm%3Dmeals&role=tenant
+                LoginPage    → reads `next`, and lands them back on the meal
+                               manager the moment they are signed in.
+
+              Role is inferred from the destination too — a landlord surface
+              like /host-dashboard opens the login on the landlord side, while
+              /living defaults to tenant, which is what someone arriving from
+              the roommate-wallet page almost always is. */}
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
-              to="/login"
+              to={page.cta.to}
               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-white text-[#ba0036] font-black text-sm hover:bg-rose-50 active:scale-95 transition-all shadow-lg"
             >
-              {bn ? 'ফ্রি শুরু করুন' : 'Start free'} <ArrowRight size={16} />
+              {L(page.cta)} <ArrowRight size={16} />
             </Link>
             <Link
               to="/to-let"
