@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { tenantFieldReport } from '../../utils/tenantFields';
+import { listUnits } from '../../services/buildingService';
 import {
   X, Camera, Upload, Loader2, CheckCircle2, AlertCircle, ChevronDown,
   ChevronUp, Trash2, Plus, ScanLine, Sparkles, Check, RefreshCw,
@@ -293,6 +294,19 @@ export default function AiLedgerScannerModal({
   // Floor for the whole page, for rows the ledger did not label individually.
   const [pageFloor,    setPageFloor]    = useState('');
 
+  // ── Pinning the room BEFORE the photo ─────────────────────────────────────
+  // The room number is the least reliable thing on a handwritten page and the
+  // one with the worst failure mode: read "Room 101" where the app already has
+  // "101" and you get a second room, a second booking and a second rent ledger
+  // for one physical room.
+  //
+  // When the landlord already knows the room — which for an admission form they
+  // always do, they are standing in it — saying so up front removes the guess
+  // entirely. The server then ignores whatever the page says about rooms.
+  const [units, setUnits] = useState([]);
+  const [unitsLoading, setUnitsLoading] = useState(false);
+  const [pinnedUnitId, setPinnedUnitId] = useState('');
+
   const fileInputRef = useRef();
   const cameraInputRef = useRef();
 
@@ -315,6 +329,29 @@ export default function AiLedgerScannerModal({
     autoReminder:    landlordProfile?.autoReminder    !== false,
     leaseStart:      new Date().toISOString().split('T')[0],
   };
+
+  // Load this building's rooms so the landlord can pin one. Runs when the modal
+  // opens rather than on mount, so a room added since last time is offered.
+  useEffect(() => {
+    if (!isOpen || !building?.id) { setUnits([]); return; }
+    let alive = true;
+    setUnitsLoading(true);
+    listUnits(building.id)
+      .then(({ units: rows }) => { if (alive) setUnits(Array.isArray(rows) ? rows : []); })
+      // A failed room list must not block scanning — it only costs the landlord
+      // the shortcut, and the server still de-duplicates by room number.
+      .catch(() => { if (alive) setUnits([]); })
+      .finally(() => { if (alive) setUnitsLoading(false); });
+    return () => { alive = false; };
+  }, [isOpen, building?.id]);
+
+  // A room is remembered per building, not across them.
+  useEffect(() => { setPinnedUnitId(''); }, [building?.id]);
+
+  const pinnedUnit = units.find((u) => String(u.id) === String(pinnedUnitId)) || null;
+  const floorLabel = (n) => (Number(n) === 0
+    ? (isBn ? 'নিচতলা' : 'Ground')
+    : (isBn ? `${n} তলা` : `Floor ${n}`));
 
   // ── Image selection ──────────────────────────────────────────────────────────
   const handleFileSelect = useCallback(async (file) => {
@@ -441,7 +478,10 @@ export default function AiLedgerScannerModal({
       const gaps = [];
       if (!String(t.name || '').trim()) gaps.push('name');
       if (!String(t.phone || '').trim()) gaps.push('phone');
-      if (!String(t.roomNumber || '').trim()) gaps.push('roomNumber');
+      // A pinned room already answers this, and a form photo that never showed
+      // a room number is the normal case then — demanding one would block a
+      // scan whose destination is not in doubt.
+      if (!pinnedUnitId && !String(t.roomNumber || '').trim()) gaps.push('roomNumber');
       if (!(Number(t.monthlyRent) > 0)) gaps.push('monthlyRent');
       if (!gaps.length) continue;
 
@@ -498,7 +538,15 @@ export default function AiLedgerScannerModal({
         // Scanned tenants are placed INTO units of this building, through the
         // same code the manual form uses. Without a buildingId the server
         // refuses rather than creating leases linked to nothing.
-        body: JSON.stringify({ tenants: valid, buildingId: building?.id }),
+        //
+        // `unitId`, when the landlord pinned a room, overrides every room and
+        // floor on the page — so no room can be created and none can be
+        // duplicated by a misread number.
+        body: JSON.stringify({
+          tenants: valid,
+          buildingId: building?.id,
+          ...(pinnedUnitId ? { unitId: pinnedUnitId } : {}),
+        }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.message || 'Save failed');
@@ -520,7 +568,7 @@ export default function AiLedgerScannerModal({
       showToast(isBn ? `সেভ ব্যর্থ: ${err.message}` : `Save failed: ${err.message}`, { type: 'error' });
       setStage('review');
     }
-  }, [tenants, isBn, showToast, onBookingsCreated]);
+  }, [tenants, isBn, showToast, onBookingsCreated, building?.id, pinnedUnitId]);
 
   const handleReset = useCallback(() => {
     setStage('upload');
@@ -624,6 +672,60 @@ export default function AiLedgerScannerModal({
                   })}
                 </div>
               </div>
+
+              {/* ── Which room? ────────────────────────────────────────────
+                  Asked BEFORE the photo, because this is the one field the
+                  landlord always knows and the camera reads worst. Pinning a
+                  room makes a duplicate impossible: the server places every
+                  tenant from this scan into that unit and ignores whatever the
+                  page says about rooms.
+
+                  Left on "read from the page" this behaves as before — except
+                  the server now matches "Room 101" to an existing "101" instead
+                  of creating a second room beside it. */}
+              {building?.id && units.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                    {isBn ? 'কোন রুমে যুক্ত হবে?' : 'Which room does this go into?'}
+                  </p>
+                  <select
+                    value={pinnedUnitId}
+                    onChange={(e) => setPinnedUnitId(e.target.value)}
+                    disabled={unitsLoading}
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 bg-white text-xs font-bold text-gray-900 outline-none focus:border-[#ba0036] transition-colors"
+                  >
+                    <option value="">
+                      {scanMode === 'form'
+                        ? (isBn ? '— ফরম থেকে পড়ুন (ঝুঁকি আছে) —' : '— Read it from the form (riskier) —')
+                        : (isBn ? '— পাতা থেকে পড়ুন —' : '— Read it from the page —')}
+                    </option>
+                    {units.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {floorLabel(u.floor)} · {isBn ? 'রুম' : 'Room'} {u.roomNumber}
+                      </option>
+                    ))}
+                  </select>
+
+                  {pinnedUnit ? (
+                    <p className="text-[10px] font-bold text-emerald-700 mt-1.5 leading-relaxed flex items-start gap-1">
+                      <Check size={11} className="shrink-0 mt-0.5" />
+                      {isBn
+                        ? `সবাই "${pinnedUnit.roomNumber}" রুমে যুক্ত হবেন। ফরমে যা-ই লেখা থাক, নতুন রুম তৈরি হবে না।`
+                        : `Everyone goes into room ${pinnedUnit.roomNumber}. No new room will be created, whatever the form says.`}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] font-bold text-gray-400 mt-1.5 leading-relaxed">
+                      {scanMode === 'form'
+                        ? (isBn
+                            ? 'একটি ফরমের জন্য রুম বেছে নেওয়াই নিরাপদ — হাতে লেখা রুম নম্বর ভুল পড়া সবচেয়ে সাধারণ সমস্যা।'
+                            : 'For a single form, picking the room is safest — a misread handwritten room number is the most common problem.')
+                        : (isBn
+                            ? 'রুম ও তলা নম্বর পাতা থেকে পড়া হবে; আগের তৈরি রুমের সাথে মিলিয়ে নেওয়া হবে।'
+                            : 'Room and floor are read from the page and matched against rooms you already created.')}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Tips */}
               <div className="bg-blue-50 rounded-2xl p-3.5 border border-blue-100">
@@ -775,7 +877,20 @@ export default function AiLedgerScannerModal({
                   otherwise land on the ground floor — splitting "Room 201" into
                   two rooms with two separate bookings. Setting it here fills
                   only the rows the page left blank. */}
-              {tenants.some(t => !String(t.floorNumber || '').trim()) && (
+              {/* A pinned room settles the destination, so everyone can see it
+                  before saving — and the floor warning below is moot. */}
+              {pinnedUnit && (
+                <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-start gap-2">
+                  <Home size={13} className="text-emerald-600 shrink-0 mt-0.5" />
+                  <p className="text-[11px] font-black text-emerald-800 leading-relaxed">
+                    {isBn
+                      ? `সবাই যুক্ত হবেন: ${floorLabel(pinnedUnit.floor)} · রুম ${pinnedUnit.roomNumber} — নতুন রুম তৈরি হবে না।`
+                      : `Everyone goes into ${floorLabel(pinnedUnit.floor)} · Room ${pinnedUnit.roomNumber} — no new room will be created.`}
+                  </p>
+                </div>
+              )}
+
+              {!pinnedUnitId && tenants.some(t => !String(t.floorNumber || '').trim()) && (
                 <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200">
                   <div className="flex items-center gap-2 flex-wrap">
                     <AlertCircle size={13} className="text-amber-600 shrink-0" />
