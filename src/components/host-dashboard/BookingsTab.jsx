@@ -21,6 +21,7 @@ import UnitsManager from "./UnitsManager.jsx";
 import { buildingTypeLabel, buildingTypeColor, normaliseSubCategory, unitNoun } from "../../utils/buildingTypes";
 import { updateBuilding, archiveBuilding } from "../../services/buildingService";
 import AiLedgerScannerModal from "./AiLedgerScannerModal.jsx";
+import OnboardingApprovalsPanel from "./OnboardingApprovalsPanel.jsx";
 import { scopeBookings, bookingInBuilding } from '../../utils/buildingScope';
 
 
@@ -731,6 +732,16 @@ export default function BookingsTab(props) {
           return (
           <>
           <div className="w-full animate-in fade-in zoom-in-95 duration-500">
+
+            {/* Tenants who filled in their own details via a QR / link and are
+                waiting on a yes. Renders NOTHING when the queue is empty — it
+                sits above everything precisely because it is only ever here
+                when it is the most important thing on the screen. */}
+            <OnboardingApprovalsPanel
+              language={language}
+              showToast={showToast}
+              onApproved={refreshBookings}
+            />
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:h-[calc(100vh-140px)] overflow-visible lg:overflow-hidden">
 

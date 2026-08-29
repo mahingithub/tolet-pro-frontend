@@ -36,6 +36,8 @@ import CheckoutPage from "./components/CheckoutPage";
 import SupportPage from "./components/SupportPage";
 import ServicesPage from "./components/ServicesPage";
 import HowItWorks from "./components/HowItWorks";
+import JoinPropertyPage from "./components/JoinPropertyPage";
+import DeepLinkHandler from "./components/DeepLinkHandler";
 
 // --- Mobile Shell ---
 import MobileBottomNav from "./components/mobile/MobileBottomNav";
@@ -213,6 +215,10 @@ const AppLayout = () => {
 
 	return (
 		<div className="min-h-screen bg-white">
+			{/* Routes an https://…/join/<token> link that was opened on a device
+			    with the app installed INTO the app, instead of letting it bounce
+			    the tenant into a mobile browser. No-op on the web build. */}
+			<DeepLinkHandler />
 			<GlobalCallSocket />
 			<AppDownloadBanner />
 			{!shouldHideNavbar && (
@@ -228,6 +234,13 @@ const AppLayout = () => {
 				<Route path="/property/:id" element={<PropertyDetails />} />
 				<Route path="/inquire/:id" element={<InquiryPage />} />
 				<Route path="/login" element={<LoginPage />} />
+
+				{/* Tenant self-onboarding — the screen a landlord's invite QR opens.
+				    PUBLIC on purpose: the link lands on phones with no account yet,
+				    and a signup wall in front of "whose building is this?" is how a
+				    shared link dies in a group chat. The page asks for a login itself
+				    at the point it needs one — see JoinPropertyPage.jsx. */}
+				<Route path="/join/:token" element={<JoinPropertyPage />} />
 
 				{/* Help & Support — public; ticket features handle auth internally */}
 				<Route path="/support" element={<SupportPage />} />

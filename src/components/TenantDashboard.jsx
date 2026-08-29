@@ -731,8 +731,27 @@ const TenantDashboard = () => {
   // Connect the tenant to their landlord's booking/seat via an invite code. On
   // success their own rent + receipts start showing (see applyMyMemberLedger).
   const handleJoinByInvite = async () => {
-    const code = inviteCodeInput.trim().toUpperCase();
-    if (!code) return;
+    const raw = inviteCodeInput.trim();
+    if (!raw) return;
+
+    // A LINK PASTED INTO THE CODE BOX.
+    // Two ways in exist — a spoken six-character code, and a QR/link — and the
+    // tenant has no reason to know they are different things. Someone who
+    // long-presses the link their landlord sent in WhatsApp and pastes it here
+    // was doing the obvious thing, and telling them "invalid code" for it is a
+    // dead end they cannot debug. Send them where the link goes instead.
+    //
+    // Matched on the /join/<token> path rather than on a host, so it works
+    // whatever domain the deployment is on and for a bare path too.
+    const linked = raw.match(/\/join\/([A-Za-z0-9]{8,64})/);
+    if (linked) {
+      setAddLandlordOpen(false);
+      setInviteCodeInput('');
+      navigate(`/join/${linked[1]}`);
+      return;
+    }
+
+    const code = raw.toUpperCase();
     setJoinBusy(true);
     try {
       await joinByInvite(code);

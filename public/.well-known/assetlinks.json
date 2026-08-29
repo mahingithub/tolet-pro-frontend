@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.toletpro.app",
+      "sha256_cert_fingerprints": [
+        "7E:14:DC:B8:82:59:F5:E7:DD:1B:B8:49:09:83:D6:39:F8:07:30:A3:97:A7:DB:7A:8B:E9:7C:CE:1B:70:D1:7F"
+      ]
+    }
+  }
+]

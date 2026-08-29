@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Users, UserPlus, Copy, Check, X, LogOut, Undo2, CheckCircle2, Plus,
+  Users, UserPlus, Copy, Check, X, LogOut, Undo2, CheckCircle2, Plus, QrCode,
 } from 'lucide-react';
+import InviteShareSheet from './invite/InviteShareSheet';
 import {
   updateMemberLedger as updateMemberLedgerApi,
   undoMemberLedger as undoMemberLedgerApi,
@@ -181,6 +182,9 @@ export default function MembersManager({ booking, language = 'English', onChange
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [cell, setCell] = useState(null); // { memberId, key }
+  // The QR/link sheet for THIS room. Opens from the chip below — there is no
+  // new dashboard surface for inviting, deliberately: see InviteShareSheet.jsx.
+  const [shareOpen, setShareOpen] = useState(false);
   const defaultRentType = 'seat'; // hostel occupants are seats
   const [form, setForm] = useState({
     name: '', phone: '', rentType: defaultRentType,
@@ -272,7 +276,28 @@ export default function MembersManager({ booking, language = 'English', onChange
             </span>
           )}
         </div>
+        {/* THE INVITE AFFORDANCE.
+            This used to be a chip that copied a six-character code, and it sat
+            in exactly the right place — beside the room it belongs to, on the
+            screen the landlord is already on. So the QR and link were hung off
+            it rather than given a section of their own: same pixel, same
+            location, the thing it does is just bigger now.
+
+            The spoken code stays visible next to it. It is what works over a
+            phone call, and for a legacy booking with no unitId it is the only
+            invite there is. */}
         <div className="flex items-center gap-1.5">
+          {booking.unitId && (
+            <button
+              type="button"
+              onClick={() => setShareOpen(true)}
+              className="px-2.5 py-1 rounded-lg bg-gray-900 hover:bg-black text-white text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-1 active:scale-95 transition-all"
+              title={isBn ? 'QR / লিংক শেয়ার করুন' : 'Share QR / link'}
+            >
+              <QrCode size={11} />
+              {isBn ? 'ইনভাইট' : 'Invite'}
+            </button>
+          )}
           {booking.inviteCode && (
             <button
               type="button"
@@ -437,6 +462,17 @@ export default function MembersManager({ booking, language = 'English', onChange
             );
           })}
         </div>
+      )}
+
+      {shareOpen && booking.unitId && (
+        <InviteShareSheet
+          scope="unit"
+          unitId={booking.unitId}
+          buildingName={booking.property || ''}
+          roomLabel={booking.roomNumber ? `${isBn ? 'রুম' : 'Room'} ${booking.roomNumber}` : ''}
+          language={language}
+          onClose={() => setShareOpen(false)}
+        />
       )}
     </div>
   );
