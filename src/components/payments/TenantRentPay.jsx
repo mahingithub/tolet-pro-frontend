@@ -2,25 +2,26 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   CreditCard, Copy, Check, Smartphone, Landmark, X, UploadCloud, Loader2,
   CheckCircle2, Hourglass, AlertCircle, Wallet, Calendar, Hash, StickyNote,
-  Image as ImageIcon, BadgeCheck, ArrowRight, Home, MapPin,
+  Image as ImageIcon, BadgeCheck, ArrowRight, Home, MapPin, DoorOpen,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '../../context/LanguageContext';
 import { listPaymentMethodsForBooking } from '../../services/paymentMethodService';
 import { submitRentPayment, uploadRentPaymentScreenshot } from '../../services/rentPaymentService';
+import {
+  PAYMENT_METHOD_META, sortPaymentMethods, unitParts, formatUnitLabel, currentMonthKey,
+} from '../../utils/tenantRent';
 
-const METHOD_META = {
-  bkash:  { label: 'bKash',  icon: Smartphone, tint: 'bg-pink-50 text-pink-600 border-pink-100',       ring: 'ring-pink-300' },
-  nagad:  { label: 'Nagad',  icon: Smartphone, tint: 'bg-orange-50 text-orange-600 border-orange-100', ring: 'ring-orange-300' },
-  rocket: { label: 'Rocket', icon: Smartphone, tint: 'bg-violet-50 text-violet-600 border-violet-100', ring: 'ring-violet-300' },
-  bank:   { label: 'Bank',   icon: Landmark,   tint: 'bg-blue-50 text-blue-600 border-blue-100',       ring: 'ring-blue-300' },
+// Rail presentation comes from utils/tenantRent (ONE definition app-wide); the
+// icon component is bound here because that module stays React-free.
+const METHOD_ICONS = { smartphone: Smartphone, landmark: Landmark };
+const metaFor = (type) => {
+  const m = PAYMENT_METHOD_META[String(type || '').toLowerCase()] || PAYMENT_METHOD_META.bank;
+  return { ...m, icon: METHOD_ICONS[m.icon] || Landmark };
 };
 
 function fmtAmount(n) {
   return `৳${Number(n || 0).toLocaleString('en-IN')}`;
-}
-function currentMonthKey(d = new Date()) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 /**
@@ -48,19 +49,35 @@ export default function TenantRentPay({ booking, submissions = [], onSubmitted }
     () => new Date().toLocaleDateString(bn ? 'bn-BD' : 'en-US', { month: 'long', year: 'numeric' }),
     [bn],
   );
+  // The booking handed in here is already normalized to THIS tenant's row
+  // (normalizeTenantBooking), so monthlyRent/serviceCharge are their own —
+  // not the whole unit's. That distinction is the ৳6,000-vs-৳45,600 bug.
   const totalDue = (Number(booking.monthlyRent) || 0) + (Number(booking.serviceCharge) || 0);
+  const where = useMemo(() => unitParts(booking, language), [booking, language]);
 
+  // The landlord's accounts for THIS booking. Sorted centrally (default first,
+  // then the canonical bKash → Nagad → Rocket → Bank order) so the tabs don't
+  // reshuffle between this card and the submit modal.
+  //
+  // `methodsError` matters: a failure here used to be swallowed into an empty
+  // list, which renders identically to "my landlord hasn't added an account".
+  // For anyone who joined by invite code that was permanently wrong — the
+  // endpoint was rejecting members outright (fixed in paymentMethod.controller)
+  // — and the tenant had no way to know they were being shown a lie.
+  const [methodsError, setMethodsError] = useState(false);
   useEffect(() => {
     let cancelled = false;
     setLoadingMethods(true);
+    setMethodsError(false);
     listPaymentMethodsForBooking(booking.id)
       .then((rows) => {
         if (cancelled) return;
-        setMethods(rows);
-        const def = rows.find((m) => m.isDefault) || rows[0];
+        const sorted = sortPaymentMethods(rows);
+        setMethods(sorted);
+        const def = sorted.find((m) => m.isDefault) || sorted[0];
         setSelectedId(def?.id || '');
       })
-      .catch(() => { if (!cancelled) setMethods([]); })
+      .catch(() => { if (!cancelled) { setMethods([]); setMethodsError(true); } })
       .finally(() => { if (!cancelled) setLoadingMethods(false); });
     return () => { cancelled = true; };
   }, [booking.id]);
@@ -91,15 +108,28 @@ export default function TenantRentPay({ booking, submissions = [], onSubmitted }
   return (
     <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm overflow-hidden">
       <div className="p-5">
-        {/* Which lease this is for — property / owner name. Slim on purpose
-            (the big "Monthly Rent" amount box was removed by request). */}
-        <div className="flex items-center gap-2.5 mb-4">
+        {/* WHICH TENANCY THIS CARD IS FOR.
+            With two rooms in one building, two of these cards appear on the
+            same screen and used to differ only in the amounts inside them.
+            The floor / room / seat chips are what tell them apart, and the
+            month's total is spelled out (rent + service) so the number the
+            tenant is asked to send is never unexplained. */}
+        <div className="flex items-start gap-2.5 mb-4">
           <div className="w-8 h-8 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center shrink-0"><Home size={15} /></div>
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-black text-gray-900 truncate leading-tight">
               {booking.property || selected?.accountHolderName || (bn ? 'আপনার বাসা' : 'Your rental')}
             </p>
-            <p className="text-[10px] font-bold text-gray-400 truncate leading-tight flex items-center gap-1">
+            {where.length > 0 && (
+              <div className="flex items-center gap-1 flex-wrap mt-1">
+                {where.map((part) => (
+                  <span key={part} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-50 border border-gray-100 text-[9px] font-black text-gray-600 uppercase tracking-wider">
+                    <DoorOpen size={9} className="text-gray-400" /> {part}
+                  </span>
+                ))}
+              </div>
+            )}
+            <p className="text-[10px] font-bold text-gray-400 truncate leading-tight flex items-center gap-1 mt-1">
               {booking.location
                 ? (<><MapPin size={9} className="shrink-0" /> {booking.location}</>)
                 : (bn ? 'ভাড়া পরিশোধ করুন' : 'Pay your rent')}
@@ -112,6 +142,21 @@ export default function TenantRentPay({ booking, submissions = [], onSubmitted }
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100 text-[9px] font-black uppercase tracking-widest shrink-0"><Hourglass size={10} /> {bn ? 'যাচাই চলছে' : 'Pending'}</span>
           )}
         </div>
+
+        {/* This month's obligation, itemised. */}
+        {!isPaid && totalDue > 0 && (
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
+            <div className="min-w-0">
+              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{monthLabel}</p>
+              <p className="text-[10px] font-bold text-gray-500 leading-tight mt-0.5 tabular-nums">
+                {Number(booking.serviceCharge) > 0
+                  ? `${fmtAmount(booking.monthlyRent)} + ${fmtAmount(booking.serviceCharge)} ${bn ? 'সার্ভিস' : 'service'}`
+                  : (bn ? 'মাসিক ভাড়া' : 'Monthly rent')}
+              </p>
+            </div>
+            <p className="text-lg font-black text-gray-900 tabular-nums shrink-0">{fmtAmount(totalDue)}</p>
+          </div>
+        )}
 
         {isRejected && latestSub?.rejectionReason && (
           <p className="mb-4 text-[11px] font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
@@ -133,7 +178,7 @@ export default function TenantRentPay({ booking, submissions = [], onSubmitted }
                   {methods.length > 1 && (
                     <div className="flex items-center gap-2 flex-wrap">
                       {methods.map((m) => {
-                        const meta = METHOD_META[m.type] || METHOD_META.bank;
+                        const meta = metaFor(m.type);
                         const Icon = meta.icon;
                         const active = m.id === selected?.id;
                         return (
@@ -162,6 +207,20 @@ export default function TenantRentPay({ booking, submissions = [], onSubmitted }
                   )}
                 </div>
               </>
+            )}
+
+            {/* We couldn't LOAD the accounts — say so, instead of silently
+                rendering the same thing as "the landlord has none". The tenant
+                can still record an offline payment below. */}
+            {methods.length === 0 && methodsError && (
+              <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-100 px-3 py-2.5">
+                <AlertCircle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-[11px] font-bold text-amber-700 leading-snug">
+                  {bn
+                    ? 'বাড়িওয়ালার পেমেন্ট অ্যাকাউন্ট লোড করা যায়নি। আপনি এখনো পেমেন্ট রেকর্ড করতে পারবেন।'
+                    : "Couldn't load your landlord's payment accounts. You can still record a payment below."}
+                </p>
+              </div>
             )}
 
             {/* Pay actions — available with or without a preset method (unless
@@ -254,7 +313,7 @@ function CopyRow({ label, value, language, big }) {
 }
 
 function AccountDetails({ method, bn, language, onZoomQr }) {
-  const meta = METHOD_META[method.type] || METHOD_META.bank;
+  const meta = metaFor(method.type);
   const Icon = meta.icon;
   return (
     <div className={`rounded-xl md:rounded-2xl border p-3 md:p-3.5 ${meta.tint}`}>
@@ -328,7 +387,7 @@ function SubmitPaymentModal({ booking, methods, selectedMethod, totalDue, monthK
         txnId: txnId.trim(),
         paymentDate,
         paymentMethodType: chosenMethod?.type || '',
-        paymentMethodLabel: chosenMethod ? (METHOD_META[chosenMethod.type]?.label || chosenMethod.type) : '',
+        paymentMethodLabel: chosenMethod ? (metaFor(chosenMethod.type).label || chosenMethod.type) : '',
         notes: notes.trim(),
       });
       if (file && submission?.id) {
@@ -359,9 +418,16 @@ function SubmitPaymentModal({ booking, methods, selectedMethod, totalDue, monthK
         </div>
 
         <form onSubmit={submit} className="p-6 overflow-y-auto custom-scrollbar space-y-4">
+          {/* Name the exact unit on the submit form too — the landlord will
+              see this claim next to eleven others from the same building. */}
           <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl px-4 py-3">
             <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">{monthLabel}</p>
-            <p className="text-sm font-bold text-gray-700 mt-0.5">{booking.property || (bn ? 'আপনার বাসা' : 'Your rental')}</p>
+            <p className="text-sm font-bold text-gray-700 mt-0.5">{formatUnitLabel(booking, language)}</p>
+            {totalDue > 0 && (
+              <p className="text-[11px] font-black text-gray-500 mt-1 tabular-nums">
+                {bn ? 'এই মাসের মোট' : "This month's total"}: {fmtAmount(totalDue)}
+              </p>
+            )}
           </div>
 
           {methods.length > 1 && (
@@ -369,7 +435,7 @@ function SubmitPaymentModal({ booking, methods, selectedMethod, totalDue, monthK
               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{bn ? 'কোন অ্যাকাউন্টে পাঠিয়েছেন?' : 'Which account did you pay?'}</label>
               <div className="flex flex-wrap gap-2">
                 {methods.map((m) => {
-                  const meta = METHOD_META[m.type] || METHOD_META.bank;
+                  const meta = metaFor(m.type);
                   const active = m.id === methodId;
                   return (
                     <button key={m.id} type="button" onClick={() => setMethodId(m.id)}

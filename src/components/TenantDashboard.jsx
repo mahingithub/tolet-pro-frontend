@@ -10,6 +10,13 @@ import TenantRentPay from './payments/TenantRentPay';
 import { listNotifications, getUnreadCount, markRead } from '../services/notificationService.js';
 import { propertyService } from '../services/Propertyservice.js';
 import { buildTenantAlerts } from '../utils/rentAlerts';
+// The tenant's rent truth — one module, imported by every tenant surface.
+import {
+  MONTHS_EN, MONTHS_BN,
+  normalizeTenantBookings, getBookingRentSnapshot,
+  buildTenantRentSummary, decorateReceipts,
+  formatUnitLabel, unitParts, receiptUnitLabel,
+} from '../utils/tenantRent';
 import { loadSeenMap, isInquiryUnread, markInquirySeen } from '../utils/inquiryUnread';
 import SmartAlertsPage from './Smartalertspage';
 import SmartAlertsPopup from './SmartAlertsPopup';
@@ -314,140 +321,11 @@ const COMMERCIAL_TYPE_OPTIONS = [
 ];
 
 // Localised month labels for the rent-proof month strip.
-const RENT_MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const RENT_MONTHS_BN = ['জানু', 'ফেব', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগ', 'সেপ্ট', 'অক্টো', 'নভে', 'ডিসে'];
-
-const RENT_MS_DAY = 86400000;
-const rentStartOfDay = (v) => {
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return null;
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
-const rentMonthKey = (y, m0) => `${y}-${String(m0 + 1).padStart(2, '0')}`;
-
-// ╔════════════════════════════════════════════════════════════════════════╗
-// ║  getBookingRentSnapshot — the single source of truth for the tenant's   ║
-// ║  rent status. Pure (no React). Given a booking, the tenant's receipts,  ║
-// ║  a calendar year and "today", it returns:                               ║
-// ║    months[]     → 12 entries, each with a status the UI colour-codes     ║
-// ║                   (paid | partial | submitted | overdue | due |          ║
-// ║                    upcoming | inactive)                                  ║
-// ║    paidCount    → paid months within the lease this year                 ║
-// ║    activeCount  → months this year that fall inside the lease            ║
-// ║    outstanding  → total unpaid amount up to & including this month        ║
-// ║    current      → this month's { total, paid, remaining, daysLate }      ║
-// ║                                                                          ║
-// ║  Status is derived from the booking ledger FIRST (server truth), then    ║
-// ║  reconciled against receipts, then finally against the due-date + grace  ║
-// ║  window — mirroring rentAlerts.js so the overview never disagrees with   ║
-// ║  Smart Alerts.                                                           ║
-// ╚════════════════════════════════════════════════════════════════════════╝
-function getBookingRentSnapshot(booking, receipts = [], year, today = new Date()) {
-  const rent = Math.max(Number(booking?.monthlyRent) || 0, 0);
-  const service = Math.max(Number(booking?.serviceCharge) || 0, 0);
-  const perMonth = rent + service;
-  const dueDay = Math.min(Math.max(Number(booking?.rentDueDay) || 5, 1), 28);
-  const grace = Math.max(Number(booking?.gracePeriodDays) || 0, 0);
-  const ledger = booking?.ledger || {};
-  const t0 = rentStartOfDay(today) || new Date();
-
-  // Receipts for THIS booking's property, keyed by monthKey.
-  const rcptByMonth = {};
-  for (const r of (receipts || [])) {
-    if (!r?.monthKey) continue;
-    if (booking?.property && r.propertyTitle && r.propertyTitle !== booking.property) continue;
-    rcptByMonth[r.monthKey] = r;
-  }
-
-  const monthFloor = (iso) => {
-    const d = iso ? new Date(iso) : null;
-    return d && !isNaN(d.getTime()) ? new Date(d.getFullYear(), d.getMonth(), 1) : null;
-  };
-  const leaseStartMonth = monthFloor(booking?.leaseStart);
-  const leaseEndMonth = monthFloor(booking?.leaseEnd);
-
-  const months = [];
-  let paidCount = 0;
-  let activeCount = 0;
-  let outstanding = 0;
-
-  for (let m = 0; m < 12; m++) {
-    const key = rentMonthKey(year, m);
-    const monthStart = new Date(year, m, 1);
-    const dueDate = new Date(year, m, dueDay);
-    const inLease =
-      (!leaseStartMonth || monthStart >= leaseStartMonth) &&
-      (!leaseEndMonth || monthStart <= leaseEndMonth);
-
-    const entry = ledger[key] || null;
-    const rcpt = rcptByMonth[key] || null;
-    const rcptPaid = rcpt ? (Number(rcpt.totalPaid) || 0) : 0;
-    const rcptBalance = rcpt
-      ? Number(rcpt.balance ?? ((Number(rcpt.totalDue) || 0) - rcptPaid))
-      : null;
-
-    const isPaid =
-      (entry && (entry.paid === true || entry.status === 'full')) ||
-      (rcpt && (rcpt.status === 'full' || (rcptBalance != null && rcptBalance <= 0)));
-    const isSubmitted = !isPaid && entry && entry.status === 'submitted';
-    const isPartial =
-      !isPaid && ((entry && entry.status === 'partial') || (rcpt && rcptPaid > 0 && rcptBalance > 0));
-
-    let paidAmt = 0;
-    if (isPaid) paidAmt = rcpt ? (rcptPaid || perMonth) : perMonth;
-    else if (isPartial) paidAmt = rcptPaid;
-    const remaining = Math.max(perMonth - paidAmt, 0);
-
-    let status;
-    if (!inLease) status = 'inactive';
-    else if (isPaid) status = 'paid';
-    else if (isSubmitted) status = 'submitted';
-    else if (isPartial) status = 'partial';
-    else {
-      const graceEnd = new Date(dueDate);
-      graceEnd.setDate(graceEnd.getDate() + grace);
-      if (t0 > graceEnd) status = 'overdue';
-      else if (t0 >= dueDate) status = 'due';
-      else status = 'upcoming';
-    }
-
-    if (inLease) {
-      activeCount += 1;
-      if (status === 'paid') paidCount += 1;
-      const isPastOrCurrent =
-        year < t0.getFullYear() || (year === t0.getFullYear() && m <= t0.getMonth());
-      if (isPastOrCurrent && status !== 'paid' && status !== 'submitted') outstanding += remaining;
-    }
-
-    months.push({ key, monthIndex: m, status, perMonth, paidAmt, remaining, dueDate, inLease });
-  }
-
-  // Current-month summary — only meaningful when viewing the current year.
-  let current = null;
-  if (year === t0.getFullYear()) {
-    const cm = months[t0.getMonth()];
-    const daysLate =
-      cm.status === 'overdue' || cm.status === 'due'
-        ? Math.max(Math.round((t0 - cm.dueDate) / RENT_MS_DAY), 0)
-        : 0;
-    current = { ...cm, daysLate };
-  }
-
-  return { months, paidCount, activeCount, outstanding, perMonth, current };
-}
-
-// Sum of every active lease's outstanding rent (this year, up to this month).
-// Drives the "Due Amount" stat card on the overview.
-function computeTenantDue(bookings = [], receipts = [], today = new Date()) {
-  const y = (today instanceof Date && !isNaN(today.getTime()) ? today : new Date()).getFullYear();
-  let due = 0;
-  for (const b of (bookings || [])) {
-    if (!b || b.status === 'cancelled' || b.deletedAt) continue;
-    due += getBookingRentSnapshot(b, receipts, y, today).outstanding;
-  }
-  return due;
-}
+// Month names + the whole rent-snapshot engine now live in utils/tenantRent.js
+// so the overview, the Payments tab and the rent card cannot answer the same
+// question three different ways (they used to — see that file's header).
+const RENT_MONTHS_EN = MONTHS_EN;
+const RENT_MONTHS_BN = MONTHS_BN;
 
 // ────────────────────────────────────────────────────────────────────────
 // NearbyAreaSuggestion — the "AI"-flavoured location hint shown below the
@@ -712,26 +590,14 @@ const TenantDashboard = () => {
 
   // Re-fetch bookings + submissions right after the tenant submits a payment,
   // so the rent card flips to "Pending Verification" without waiting for a poll.
-  // Multi-member bookings: the backend returns THIS tenant's own member (with
-  // their ledger) and strips co-tenants' ledgers. Overlay that member's ledger
-  // + rent onto the booking so the existing rent UI shows the tenant's OWN
-  // per-member data. Legacy single-tenant bookings pass through unchanged.
-  const applyMyMemberLedger = (rows) => (rows || []).map((b) => {
-    if (Array.isArray(b.members) && b.members.length) {
-      const mine = b.members.find((m) => m && m.ledger && typeof m.ledger === 'object');
-      if (mine) {
-        return {
-          ...b,
-          ledger: mine.ledger || {},
-          monthlyRent: Number(mine.monthlyRent) || b.monthlyRent,
-          serviceCharge: mine.serviceCharge != null ? mine.serviceCharge : b.serviceCharge,
-          memberId: mine.id,
-          tenant: b.tenant || mine.name,
-        };
-      }
-    }
-    return b;
-  });
+  //
+  // Multi-member bookings: the backend returns THIS tenant's own member row
+  // (with their ledger) and strips co-tenants'. normalizeTenantBookings
+  // overlays that row — their rent, their service charge, their ledger — and
+  // attaches `unit` (house / floor / room / seat) plus a stable `leaseKey`.
+  // It identifies the row by `myMembership.memberId` rather than by guessing
+  // which member still has a ledger attached. See utils/tenantRent.js.
+  const applyMyMemberLedger = normalizeTenantBookings;
 
   // Connect the tenant to their landlord's booking/seat via an invite code. On
   // success their own rent + receipts start showing (see applyMyMemberLedger).
@@ -1742,22 +1608,60 @@ const handleWizardSubmit = async (payload) => {
   // never deleted (the ledger and receipts hang off it, and the landlord is
   // entitled to "who was in 301 last winter"), so the two have to be told apart
   // rather than one of them removed — see pastTenancies below.
+  //
+  // Re-normalized here rather than trusting the shape: `myBookings` can be
+  // rehydrated from a localStorage cache written by an older build, which has
+  // no `leaseKey`/`unit` on it. normalizeTenantBooking is idempotent, so this
+  // costs nothing and removes a class of "works after 30 seconds" bugs.
   const activeLeases = useMemo(
-    () => (myBookings || []).filter((b) => b && b.status !== 'cancelled' && !b.deletedAt && !b.isPastTenancy),
+    () => normalizeTenantBookings(
+      (myBookings || []).filter((b) => b && b.status !== 'cancelled' && !b.deletedAt && !b.isPastTenancy),
+    ),
     [myBookings],
   );
   // Homes they have left. Kept visible — a tenant who moved in March still
   // wants last year's receipts, and a card that silently vanished would read as
   // lost data — but out of the active rent flow entirely.
   const pastTenancies = useMemo(
-    () => (myBookings || []).filter((b) => b && !b.deletedAt && b.isPastTenancy),
+    () => normalizeTenantBookings((myBookings || []).filter((b) => b && !b.deletedAt && b.isPastTenancy)),
     [myBookings],
   );
-  const primaryLease = activeLeases[0] || null;
-  const totalDueAmount = useMemo(
-    () => computeTenantDue(activeLeases, paymentReceipts, new Date()),
-    [activeLeases, paymentReceipts],
+  // ── ONE RENT SUMMARY, RENDERED BY BOTH TABS ────────────────────────────
+  // The overview's "Due Amount" and the Payments tab's "Outstanding" are the
+  // same number because they are now literally the same number: both read
+  // this object. They used to be computed separately — the overview from the
+  // ledger, Payments by summing every receipt's `balance` — which is how one
+  // screen could show ৳6,000 for a month the other billed at ৳45,600.
+  const rentSummary = useMemo(
+    () => buildTenantRentSummary({
+      bookings: activeLeases,
+      receipts: paymentReceipts,
+      year: payYear,
+      today: new Date(),
+    }),
+    [activeLeases, paymentReceipts, payYear],
   );
+
+  // Receipts carrying the tenancy they belong to (+ its floor/room), so a
+  // receipt card can name the unit even for rows issued before receipts
+  // snapshotted one. Past tenancies are included: their receipts stay readable.
+  const decoratedReceipts = useMemo(
+    () => decorateReceipts(paymentReceipts, [...activeLeases, ...pastTenancies]),
+    [paymentReceipts, activeLeases, pastTenancies],
+  );
+
+  // Which tenancy the overview's Payment Proof card is showing. A tenant can
+  // legitimately rent two places (or two rooms of one building) — showing the
+  // first and hiding the rest behind "+1 more" made the second one look like a
+  // duplicate of the first. They are now switchable, and each is labelled with
+  // its own floor + room.
+  const [overviewLeaseKey, setOverviewLeaseKey] = useState('');
+  const shownLease = useMemo(
+    () => activeLeases.find((b) => b.leaseKey === overviewLeaseKey) || activeLeases[0] || null,
+    [activeLeases, overviewLeaseKey],
+  );
+  const primaryLease = shownLease;
+  const totalDueAmount = rentSummary.outstanding;
 
   const downloadModernPdf = async (receipt) => {
     if (!pdfReceiptRef.current) return;
@@ -1798,7 +1702,12 @@ const handleWizardSubmit = async (payload) => {
   const handleAlertAction = (alert) => {
     if (!alert) return;
     if (alert.actionType === 'view_receipt') {
-      const r = paymentReceipts.find(x => x.monthKey === alert.monthKey);
+      // Match the alert's own lease first. Keying on the month alone opened
+      // whichever receipt happened to come first when a tenant rents two
+      // places — often the wrong one, for the wrong amount.
+      const sameMonth = paymentReceipts.filter(x => x.monthKey === alert.monthKey);
+      const r = (alert.bookingId && sameMonth.find(x => String(x.bookingId) === String(alert.bookingId)))
+        || sameMonth[0];
       if (r) { setActiveReceipt(r); markReceiptRead(r.id); }
       else { setActiveTab('payments'); }
     } else if (alert.actionType === 'contact_landlord') {
@@ -2238,8 +2147,7 @@ const handleWizardSubmit = async (payload) => {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-[12px] font-black text-gray-600 truncate">
-                          {b.property || (language === 'বাংলা' ? 'আগের ভাড়া' : 'Previous rental')}
-                          {b.roomNumber ? ` · ${language === 'বাংলা' ? 'রুম' : 'Room'} ${b.roomNumber}` : ''}
+                          {formatUnitLabel(b, language)}
                         </p>
                         <p className="text-[10px] font-bold text-gray-400 mt-0.5">
                           {b.myMembership?.moveOutDate
@@ -2439,20 +2347,58 @@ const handleWizardSubmit = async (payload) => {
             </div>
 
             {/* ── PAYMENT PROOF — live rent tracker for the active lease ──
-                Renders only when the tenant has a booking. Year navigator +
-                12-month status strip + this-month summary + one-tap "Pay".
-                Multiple leases: primary shows here, the rest live in Payments. */}
+                Year navigator + 12-month status strip + this-month summary +
+                one-tap "Pay".
+
+                MULTIPLE TENANCIES. Renting two places — or two rooms of one
+                building — is normal here, and the old card showed the first
+                one with "+1 more →" pointing at another tab. Two cards for
+                "White-house" with different numbers on them read as a bug, not
+                as two rooms. Each tenancy is now a named tab (floor + room),
+                so which rent you are looking at is never in doubt. */}
             {primaryLease && (
               <div className="mb-4 md:mb-6">
                 <div className="flex items-center gap-2 mb-3 px-1">
                   <div className="w-7 h-7 rounded-lg bg-[#ba0036]/10 text-[#ba0036] flex items-center justify-center"><Receipt size={14} /></div>
                   <h3 className="text-[13px] font-black text-gray-800 uppercase tracking-[0.14em]">{language === 'বাংলা' ? 'পেমেন্ট প্রুফ' : 'Payment Proof'}</h3>
                   {activeLeases.length > 1 && (
-                    <button onClick={() => setActiveTab('payments')} className="ml-auto text-[10px] font-black text-[#ba0036] hover:underline">
-                      +{activeLeases.length - 1} {language === 'বাংলা' ? 'আরও লিজ' : 'more'} →
-                    </button>
+                    <span className="ml-auto text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      {activeLeases.length} {language === 'বাংলা' ? 'টি ভাড়া' : 'tenancies'}
+                    </span>
                   )}
                 </div>
+
+                {activeLeases.length > 1 && (
+                  <div className="flex gap-2 mb-3 overflow-x-auto scrollbar-hide pb-1">
+                    {activeLeases.map((b) => {
+                      const active = b.leaseKey === primaryLease.leaseKey;
+                      const parts = unitParts(b, language);
+                      const dueHere = (rentSummary.leases.find((l) => l.key === b.leaseKey)?.outstanding) || 0;
+                      return (
+                        <button
+                          key={b.leaseKey}
+                          onClick={() => setOverviewLeaseKey(b.leaseKey)}
+                          className={`shrink-0 text-left px-3.5 py-2 rounded-xl border transition-all active:scale-95 ${
+                            active
+                              ? 'bg-gray-900 text-white border-gray-900 shadow-md'
+                              : 'bg-white text-gray-600 border-gray-100 hover:border-gray-300'
+                          }`}
+                        >
+                          <span className="block text-[11px] font-black leading-tight truncate max-w-[13rem]">
+                            {b.property || (language === 'বাংলা' ? 'আপনার ভাড়া' : 'Your rental')}
+                          </span>
+                          <span className={`block text-[9px] font-bold leading-tight mt-0.5 truncate ${active ? 'text-white/60' : 'text-gray-400'}`}>
+                            {parts.length > 0
+                              ? parts.join(' · ')
+                              : (language === 'বাংলা' ? 'পুরো ইউনিট' : 'Whole unit')}
+                            {dueHere > 0 ? ` • ৳${dueHere.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}` : ''}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
                 <RentProofCard
                   booking={primaryLease}
                   receipts={paymentReceipts}
@@ -3458,7 +3404,7 @@ const handleWizardSubmit = async (payload) => {
         {activeTab === 'payments' && (
           <PaymentsTab
             language={language}
-            paymentReceipts={paymentReceipts}
+            paymentReceipts={decoratedReceipts}
             payYear={payYear}
             setPayYear={setPayYear}
             payMonth={payMonth}
@@ -3469,6 +3415,10 @@ const handleWizardSubmit = async (payload) => {
             setPaySearch={setPaySearch}
             unreadReceiptsCount={unreadReceiptsCount}
             myBookings={myBookings}
+            activeLeases={activeLeases}
+            pastTenancies={pastTenancies}
+            /* The SAME summary the overview renders — see rentSummary above. */
+            rentSummary={rentSummary}
             rentSubmissions={rentSubmissions}
             refreshRentData={refreshRentData}
             setActiveReceipt={setActiveReceipt}
@@ -3607,6 +3557,16 @@ const handleWizardSubmit = async (payload) => {
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'প্রপার্টি' : 'Property'}</span>
                 <span className="text-sm font-black text-gray-900 text-right max-w-[220px] line-clamp-2">{activeReceipt.propertyTitle}</span>
               </div>
+              {/* A receipt is a document the tenant may have to show someone.
+                  The building name alone doesn't say what was rented. */}
+              {(activeReceipt.floorNumber || activeReceipt.roomNumber || activeReceipt.seatLabel) && (
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ইউনিট' : 'Unit'}</span>
+                  <span className="text-sm font-black text-gray-900 text-right max-w-[220px]">
+                    {receiptUnitLabel(activeReceipt, language).split(' · ').slice(1).join(' · ')}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between items-center py-2 border-b border-gray-100">
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'মাস' : 'Month'}</span>
                 <span className="text-sm font-black text-gray-900">{activeReceipt.monthLabel || activeReceipt.monthKey}</span>
@@ -4030,6 +3990,8 @@ const RentProofCard = ({ booking, receipts = [], language, tenantName, avatar, i
   const months = bn ? RENT_MONTHS_BN : RENT_MONTHS_EN;
   const cur = snap.current;
   const fmt = (n) => Number(n || 0).toLocaleString(bn ? 'bn-BD' : 'en-IN');
+  // Floor / room / seat chips — the tenant's actual address inside the building.
+  const where = useMemo(() => unitParts(booking, language), [booking, language]);
 
   // Status → month-chip palette.
   const chipCls = (status) => {
@@ -4076,12 +4038,29 @@ const RentProofCard = ({ booking, receipts = [], language, tenantName, avatar, i
               <p className="text-sm font-black text-gray-900 truncate">{tenantName}</p>
               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border shrink-0 ${statusPill.cls}`}>{bn ? statusPill.bn : statusPill.en}</span>
             </div>
+            {/* WHERE, not just WHICH BUILDING. "White-house" is the landlord's
+                name for twenty rooms; the tenant rents one of them, and the
+                rent on this card belongs to that one. */}
             <p className="text-[11px] font-bold text-gray-500 truncate flex items-center gap-1.5 mt-0.5">
               <Home size={11} className="text-gray-400 shrink-0" />
               <span className="truncate">{booking.property || (bn ? 'আপনার ভাড়া' : 'Your rental')}</span>
               {snap.outstanding > 0 && <span className="text-[#ba0036] shrink-0">• ৳{fmt(snap.outstanding)} {bn ? 'বকেয়া' : 'due'}</span>}
               {cur?.daysLate > 0 && <span className="text-rose-500 shrink-0">• {cur.daysLate}d late</span>}
             </p>
+            {(where.length > 0 || booking.location) && (
+              <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                {where.map((part) => (
+                  <span key={part} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 border border-gray-100 text-[9px] font-black text-gray-600 uppercase tracking-wider">
+                    <DoorOpen size={9} className="text-gray-400" /> {part}
+                  </span>
+                ))}
+                {booking.location && (
+                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-gray-400 truncate max-w-[12rem]">
+                    <MapPin size={9} /> {booking.location}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
         {/* Year nav + paid count */}
@@ -4114,6 +4093,13 @@ const RentProofCard = ({ booking, receipts = [], language, tenantName, avatar, i
             <div className="bg-gray-50 rounded-xl p-3">
               <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{bn ? 'মোট ভাড়া' : 'Total rent'}</p>
               <p className="text-base md:text-lg font-black text-gray-900 tabular-nums leading-tight mt-0.5">৳{fmt(cur.perMonth)}</p>
+              {/* Show the split when there is one, so the headline number is
+                  never a figure the tenant can't account for. */}
+              {Number(booking.serviceCharge) > 0 && (
+                <p className="text-[9px] font-bold text-gray-400 leading-tight mt-1 tabular-nums">
+                  ৳{fmt(booking.monthlyRent)} + ৳{fmt(booking.serviceCharge)} {bn ? 'সার্ভিস' : 'service'}
+                </p>
+              )}
             </div>
             <div className="bg-emerald-50 rounded-xl p-3">
               <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">{bn ? 'পেমেন্ট' : 'Paid'}</p>

@@ -451,7 +451,16 @@ export function buildTenantAlerts(bookings = [], inquiries = [], receipts = [], 
     const isPaid = !!entry && (entry.paid === true || entry.status === 'full');
     if (isPaid) continue; // paid months surface via receipts, not here
 
-    const property = b.property || (bn ? 'আপনার বাসা' : 'your rental');
+    // Name the UNIT, not just the building. A tenant renting two rooms of one
+    // house got two alerts reading "Rent overdue — White-house" with different
+    // amounts, and no way to tell which room either one meant. `myMembership`
+    // is resolved server-side (booking.controller.listTenantBookings).
+    const unitBits = [
+      (b.myMembership?.floor || b.floorNumber || '') && `${b.myMembership?.floor || b.floorNumber} ${bn ? 'তলা' : 'floor'}`,
+      (b.myMembership?.roomLabel || b.roomNumber || '') && `${bn ? 'রুম' : 'Room'} ${b.myMembership?.roomLabel || b.roomNumber}`,
+      (b.myMembership?.seatLabel || '') && `${bn ? 'সিট' : 'Seat'} ${b.myMembership.seatLabel}`,
+    ].filter(Boolean);
+    const property = [b.property || (bn ? 'আপনার বাসা' : 'your rental'), ...unitBits].join(' · ');
     const dueStr = fmtDate(dueDate, bn);
     const amountStr = fmtAmount(totalDue, bn);
 

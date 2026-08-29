@@ -207,9 +207,16 @@ export default function RentPaymentHistory() {
                         </h4>
                         <span className={`text-base font-black tabular-nums shrink-0 ${approved ? 'text-emerald-600' : 'text-rose-500 line-through'}`}>{fmtAmount(s.amount)}</span>
                       </div>
+                      {/* Building AND unit — see PendingRentPayments. */}
                       {s.propertyTitle && (
                         <p className="text-[11px] font-bold text-gray-500 mt-0.5 truncate flex items-center gap-1.5">
-                          <Building2 size={12} className="text-gray-400 shrink-0" /> {s.propertyTitle}
+                          <Building2 size={12} className="text-gray-400 shrink-0" />
+                          {[
+                            s.propertyTitle,
+                            s.floorNumber && `${s.floorNumber} ${bn ? 'তলা' : 'floor'}`,
+                            s.roomNumber && `${bn ? 'রুম' : 'Room'} ${s.roomNumber}`,
+                            s.seatLabel && `${bn ? 'সিট' : 'Seat'} ${s.seatLabel}`,
+                          ].filter(Boolean).join(' · ')}
                         </p>
                       )}
                       <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">

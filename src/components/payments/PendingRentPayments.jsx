@@ -155,9 +155,20 @@ export default function PendingRentPayments({ onChange }) {
                         </h4>
                         <span className="text-base font-black text-emerald-600 tabular-nums shrink-0">{fmtAmount(s.amount)}</span>
                       </div>
+                      {/* Building AND unit. Twelve claims from one building
+                          all read "White-house" otherwise, and the landlord
+                          has to open each one to find out which room paid.
+                          Submissions carry these from the occupant's row
+                          (rentPayment.controller → resolvePayer). */}
                       {s.propertyTitle && (
                         <p className="text-[11px] font-bold text-gray-500 mt-0.5 truncate flex items-center gap-1.5">
-                          <Building2 size={12} className="text-gray-400 shrink-0" /> {s.propertyTitle}
+                          <Building2 size={12} className="text-gray-400 shrink-0" />
+                          {[
+                            s.propertyTitle,
+                            s.floorNumber && `${s.floorNumber} ${bn ? 'তলা' : 'floor'}`,
+                            s.roomNumber && `${bn ? 'রুম' : 'Room'} ${s.roomNumber}`,
+                            s.seatLabel && `${bn ? 'সিট' : 'Seat'} ${s.seatLabel}`,
+                          ].filter(Boolean).join(' · ')}
                         </p>
                       )}
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">

@@ -53,9 +53,21 @@ const PdfReceiptTemplate = forwardRef(({ receipt, language = 'en' }, ref) => {
             <h3 className="text-lg font-black text-gray-900 mb-4 border-b pb-2 flex items-center gap-2">
               <MapPin size={18} className="text-[#ba0036]" /> {bn ? 'প্রপার্টি' : 'Property Details'}
             </h3>
-            <p className="text-xl font-black text-gray-800 leading-tight mb-4 break-words">
+            <p className="text-xl font-black text-gray-800 leading-tight mb-1 break-words">
               {receipt.propertyTitle}
             </p>
+            {/* Floor / room / seat — the printed receipt has to identify the
+                unit, not just the building it sits in. */}
+            {(receipt.floorNumber || receipt.roomNumber || receipt.seatLabel) && (
+              <p className="text-sm font-black text-gray-500 mb-4">
+                {[
+                  receipt.floorNumber && `${receipt.floorNumber} ${bn ? 'তলা' : 'Floor'}`,
+                  receipt.roomNumber && `${bn ? 'রুম' : 'Room'} ${receipt.roomNumber}`,
+                  receipt.seatLabel && `${bn ? 'সিট' : 'Seat'} ${receipt.seatLabel}`,
+                ].filter(Boolean).join(' · ')}
+              </p>
+            )}
+            {!(receipt.floorNumber || receipt.roomNumber || receipt.seatLabel) && <div className="mb-4" />}
             {/* Big Property Image */}
             {receipt.propertyImage ? (
               <div className="w-full h-48 rounded-2xl overflow-hidden shadow-md">

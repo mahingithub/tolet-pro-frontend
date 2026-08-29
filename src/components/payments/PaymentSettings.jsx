@@ -9,14 +9,22 @@ import {
   listMyPaymentMethods, createPaymentMethod, updatePaymentMethod,
   deletePaymentMethod, uploadPaymentMethodQr, deletePaymentMethodQr,
 } from '../../services/paymentMethodService';
+import { PAYMENT_METHOD_META } from '../../utils/tenantRent';
 
 // Rail presentation — colours + icon + label per payment type.
-export const METHOD_META = {
-  bkash:  { label: 'bKash',  icon: Smartphone, ring: 'ring-pink-200',   tint: 'bg-pink-50 text-pink-600 border-pink-100',       dot: 'bg-pink-500' },
-  nagad:  { label: 'Nagad',  icon: Smartphone, ring: 'ring-orange-200', tint: 'bg-orange-50 text-orange-600 border-orange-100', dot: 'bg-orange-500' },
-  rocket: { label: 'Rocket', icon: Smartphone, ring: 'ring-violet-200', tint: 'bg-violet-50 text-violet-600 border-violet-100', dot: 'bg-violet-500' },
-  bank:   { label: 'Bank',   icon: Landmark,   ring: 'ring-blue-200',   tint: 'bg-blue-50 text-blue-600 border-blue-100',       dot: 'bg-blue-500' },
-};
+//
+// The values come from utils/tenantRent so the landlord's Payment Settings,
+// the tenant's rent card and the pending/history lists cannot drift into
+// showing the same account in three different colours (or, as happened,
+// missing a rail entirely on one screen). That module stays React-free, so the
+// icon component is bound to its `icon` name here.
+const METHOD_ICONS = { smartphone: Smartphone, landmark: Landmark };
+export const METHOD_META = Object.fromEntries(
+  Object.entries(PAYMENT_METHOD_META).map(([id, m]) => [
+    id,
+    { ...m, icon: METHOD_ICONS[m.icon] || Landmark },
+  ]),
+);
 
 const TYPE_OPTIONS = [
   { id: 'bkash',  labelEn: 'bKash Personal',  labelBn: 'বিকাশ (পার্সোনাল)' },

@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  Wallet, FileText, Calendar, ArrowRight, ShieldCheck, CheckCircle2, Lock, Receipt, X, CheckCheck, Hourglass, Search, Filter, ChevronDown, Clock, CreditCard, Home, MapPin, KeyRound
+  Wallet, FileText, Calendar, ArrowRight, ShieldCheck, CheckCircle2, Lock, Receipt, X, CheckCheck, Hourglass, Search, Filter, ChevronDown, Clock, CreditCard, Home, MapPin, KeyRound, DoorOpen
 } from 'lucide-react';
 import TenantRentPay from '../payments/TenantRentPay';
+import {
+  formatUnitLabel, unitParts, receiptUnitLabel, leaseKey,
+} from '../../utils/tenantRent';
 
 const isFreshBooking = (b) => {
   const iso = b?.createdAt;
@@ -33,13 +36,16 @@ const PaymentsTab = ({
   paySearch, setPaySearch,
   unreadReceiptsCount,
   myBookings,
+  activeLeases = [],
+  pastTenancies = [],
+  rentSummary,
   rentSubmissions,
   refreshRentData,
   setActiveReceipt,
   markReceiptRead,
   markAllReceiptsRead
 }) => {
-  // ── derive year/property/month/search-filtered data ─────────
+  // ── derive year/tenancy/month/search-filtered data ─────────
   const monthNamesEn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const monthNamesBn = ['জানু','ফেব','মার্চ','এপ্রিল','মে','জুন','জুল','আগ','সেপ্ট','অক্টো','নভে','ডিসে'];
   const monthNames = language === 'বাংলা' ? monthNamesBn : monthNamesEn;
@@ -56,13 +62,25 @@ const PaymentsTab = ({
   });
   const years = [...yearSet].sort((a, b) => b - a);
 
-  // property dropdown options
-  const propMap = new Map();
-  paymentReceipts.forEach((r) => {
-    const key = r.propertyId || r.propertyTitle;
-    if (key) propMap.set(key, r.propertyTitle || key);
-  });
-  const properties = [...propMap.entries()];
+  // ── TENANCY FILTER OPTIONS ────────────────────────────────────────────
+  // Was a PROPERTY dropdown keyed on `propertyId || propertyTitle`, which is
+  // the same value for two rooms of one building — picking "White-house"
+  // returned both rooms' receipts mixed together with no way to tell them
+  // apart. The filter is now per TENANCY (booking + occupant), labelled with
+  // its floor and room. Past tenancies are listed too, so old receipts stay
+  // reachable instead of vanishing when a lease ends.
+  const tenancies = useMemo(() => {
+    const rows = [...(activeLeases || []), ...(pastTenancies || [])];
+    return rows.map((b) => ({
+      key: leaseKey(b),
+      label: formatUnitLabel(b, language),
+      past: !!b.isPastTenancy,
+    }));
+  }, [activeLeases, pastTenancies, language]);
+
+  // A receipt matches the tenancy filter through the `leaseKey` that
+  // decorateReceipts stamped on it (by bookingId + memberId — never by name).
+  const matchesTenancy = (r) => payProperty === 'all' || r.leaseKey === payProperty;
 
   // bucket receipts by month for the active year (used by month strip)
   const buckets = {};
@@ -70,7 +88,7 @@ const PaymentsTab = ({
     if (!r.monthKey) return;
     const [y, m] = r.monthKey.split('-');
     if (Number(y) !== payYear) return;
-    if (payProperty !== 'all' && (r.propertyId || r.propertyTitle) !== payProperty) return;
+    if (!matchesTenancy(r)) return;
     const list = buckets[m] || (buckets[m] = []);
     list.push(r);
   });
@@ -83,22 +101,27 @@ const PaymentsTab = ({
       const [y, m] = r.monthKey.split('-');
       if (Number(y) !== payYear) return false;
       if (payMonth && m !== payMonth) return false;
-      if (payProperty !== 'all' && (r.propertyId || r.propertyTitle) !== payProperty) return false;
+      if (!matchesTenancy(r)) return false;
       if (!q) return true;
-      const hay = `${r.propertyTitle || ''} ${r.monthLabel || ''} ${r.monthKey || ''} ${r.totalPaid || ''} ${r.totalDue || ''}`.toLowerCase();
+      // Floor + room are searchable: "301" should find that room's receipts.
+      const hay = `${r.propertyTitle || ''} ${r.floorNumber || ''} ${r.roomNumber || ''} ${r.seatLabel || ''} ${r.monthLabel || ''} ${r.monthKey || ''} ${r.totalPaid || ''} ${r.totalDue || ''}`.toLowerCase();
       return hay.includes(q);
     })
     .sort((a, b) => (b.monthKey || '').localeCompare(a.monthKey || ''));
 
-  // KPIs for the hero strip
-  const paidThisYear = paymentReceipts
-    .filter((r) => r.monthKey?.startsWith(`${payYear}-`))
-    .reduce((s, r) => s + (r.totalPaid || 0), 0);
-  const outstanding = paymentReceipts.reduce((s, r) => s + (r.balance || 0), 0);
-  const partialCount = paymentReceipts.filter((r) => (r.balance || 0) > 0).length;
-  const nextDue = paymentReceipts
-    .filter((r) => (r.balance || 0) > 0)
-    .sort((a, b) => (a.monthKey || '').localeCompare(b.monthKey || ''))[0];
+  // ── KPIs — READ FROM THE SHARED SUMMARY, NOT RE-DERIVED ───────────────
+  // These used to be their own arithmetic over the raw receipt rows:
+  //   paid       = Σ receipt.totalPaid      (double-counted re-issued months)
+  //   outstanding= Σ receipt.balance        (every year at once, and blind to
+  //                                          unpaid months that have no receipt
+  //                                          at all — the common case)
+  // So this tab and the overview quoted different totals for the same rent.
+  // Both now render `rentSummary` (utils/tenantRent → buildTenantRentSummary).
+  const summary = rentSummary || { paidInYear: 0, outstanding: 0, partialCount: 0, nextDue: null, receiptsInYear: 0, leases: [] };
+  const paidThisYear = summary.paidInYear;
+  const outstanding = summary.outstanding;
+  const partialCount = summary.partialCount;
+  const nextDue = summary.nextDue;
 
   // ── "Your Bookings" banner — notifies the tenant the moment a host
   //    creates a booking / lease for them (shows even before any rent
@@ -113,25 +136,34 @@ const PaymentsTab = ({
   // not the booking's. Without it a room this tenant moved out of still got a
   // "Pay Your Rent" card — an invitation to pay rent on somewhere they no
   // longer live. See TenantDashboard's activeLeases for the full note.
-  const activeLeases = (myBookings || []).filter((b) => b.status !== 'cancelled' && !b.isPastTenancy);
+  // The parent already resolved (and normalized) these; the fallback keeps
+  // this component usable on its own.
+  const leases = (activeLeases && activeLeases.length)
+    ? activeLeases
+    : (myBookings || []).filter((b) => b.status !== 'cancelled' && !b.isPastTenancy);
 
-  // 🟢 V1 manual rent — a "Pay Your Rent" card per active lease. Shows
+  // 🟢 V1 manual rent — a "Pay Your Rent" card per active tenancy. Shows
   // the landlord's bKash/Nagad/Rocket/Bank account + QR, one-click copy,
   // and the "I Have Paid" / "Upload Proof" submission flow.
-  const rentPaySection = activeLeases.length > 0 ? (
+  const rentPaySection = leases.length > 0 ? (
     <div className="space-y-3">
       <div className="flex items-center gap-2.5 px-1">
         <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><Wallet size={15} /></div>
         <div className="min-w-0">
           <h3 className="text-sm font-black text-gray-800 leading-tight">{language === 'বাংলা' ? 'ভাড়া পরিশোধ করুন' : 'Pay Your Rent'}</h3>
-          <p className="text-[10px] font-bold text-gray-400 leading-tight">{language === 'বাংলা' ? 'এই মাসের ভাড়া ও পেমেন্ট তথ্য' : "This month's rent & payment details"}</p>
+          <p className="text-[10px] font-bold text-gray-400 leading-tight">
+            {leases.length > 1
+              ? (language === 'বাংলা' ? `আপনার ${leases.length} টি ভাড়ার প্রতিটির জন্য আলাদা` : `One card per tenancy — ${leases.length} in total`)
+              : (language === 'বাংলা' ? 'এই মাসের ভাড়া ও পেমেন্ট তথ্য' : "This month's rent & payment details")}
+          </p>
         </div>
       </div>
-      {/* Single column — each card now lives in a half-width outer
-          column (paired with "Your Bookings"), so it stacks its cards. */}
+      {/* One card per tenancy. With two rooms in the same building these
+          cards are otherwise identical on their face — TenantRentPay prints
+          the floor + room so they can be told apart. */}
       <div className="grid grid-cols-1 gap-4">
-        {activeLeases.map((b) => (
-          <div key={b.id || b._id} id={`payment-${b.id || b._id}`}>
+        {leases.map((b) => (
+          <div key={b.leaseKey || b.id || b._id} id={`payment-${b.id || b._id}`}>
             <TenantRentPay booking={b} submissions={rentSubmissions} onSubmitted={refreshRentData} />
           </div>
         ))}
@@ -143,6 +175,22 @@ const PaymentsTab = ({
   const receiptsThisYear = paymentReceipts.filter((r) => r.monthKey?.startsWith(`${payYear}-`)).length;
 
   // ── Page hero header — removed per user request ──
+
+  // The month `nextDue` points at, in words, plus which tenancy owes it —
+  // with more than one lease "Next Due: Aug" alone doesn't say whose rent.
+  const nextDueMonthLabel = nextDue
+    ? `${monthNames[nextDue.month.monthIndex]} ${nextDue.month.key.split('-')[0]}`
+    : '';
+  const nextDueWhere = nextDue ? formatUnitLabel(nextDue.lease.booking, language) : '';
+
+  // Jump to the rent card for whichever tenancy owes next — that card is
+  // where the landlord's account details and the "I Have Paid" flow live.
+  const goToNextDuePayment = () => {
+    if (!nextDue) return;
+    const b = nextDue.lease.booking;
+    const el = document.getElementById(`payment-${b.id || b._id}`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
 
   // ── Payment Summary — compact purple KPI card (Paid / Outstanding /
   //    Next Due). Replaces the old full-width blue banner and sits
@@ -164,8 +212,10 @@ const PaymentsTab = ({
     },
     {
       label: bn ? 'পরবর্তী বকেয়া' : 'Next Due',
-      value: nextDue ? (nextDue.monthLabel || nextDue.monthKey) : (bn ? 'কিছু বাকি নেই' : 'Nothing due'),
-      sub: nextDue ? `৳${(nextDue.balance || 0).toLocaleString(bn ? 'bn-BD' : 'en-IN')}` : (bn ? 'আপনি আপ-টু-ডেট!' : "You're all set!"),
+      value: nextDue ? nextDueMonthLabel : (bn ? 'কিছু বাকি নেই' : 'Nothing due'),
+      sub: nextDue
+        ? `৳${nextDue.month.remaining.toLocaleString(bn ? 'bn-BD' : 'en-IN')}${leases.length > 1 ? ` • ${nextDueWhere}` : ''}`
+        : (bn ? 'আপনি আপ-টু-ডেট!' : "You're all set!"),
       Icon: Calendar,
       valueClass: '',
       small: true,
@@ -195,12 +245,15 @@ const PaymentsTab = ({
           </React.Fragment>
         ))}
       </div>
+      {/* The CTA used to open a RECEIPT for the next due month — but an
+          unpaid month has no receipt, so it opened the wrong one or nothing.
+          It now goes to the rent card that can actually settle it. */}
       {nextDue && (
         <button
-          onClick={() => { setActiveReceipt(nextDue); markReceiptRead(nextDue.id); }}
+          onClick={goToNextDuePayment}
           className="relative mt-4 w-full inline-flex items-center justify-center gap-1.5 bg-white text-indigo-700 py-2.5 rounded-xl text-[11px] font-black active:scale-95 transition-all shadow-md hover:shadow-lg"
         >
-          {bn ? 'রিসিট দেখুন' : 'Open receipt'} <ArrowRight size={12} />
+          {bn ? 'এখনই পরিশোধ করুন' : 'Pay this month'} <ArrowRight size={12} />
         </button>
       )}
     </div>
@@ -289,34 +342,39 @@ const PaymentsTab = ({
                 ))}
               </div>
 
-              {/* Open Receipt button */}
+              {/* Settle the next unpaid month (not "open receipt" — an unpaid
+                  month has no receipt to open). */}
               {nextDue && (
                 <button
-                  onClick={() => { setActiveReceipt(nextDue); markReceiptRead(nextDue.id); setSummaryOpen(false); }}
+                  onClick={() => { goToNextDuePayment(); setSummaryOpen(false); }}
                   className="w-full inline-flex items-center justify-center gap-1.5 bg-white text-indigo-700 py-2.5 rounded-xl text-[11px] font-black active:scale-95 transition-all shadow-lg hover:shadow-xl"
                 >
-                  {bn ? 'রিসিট দেখুন' : 'Open receipt'} <ArrowRight size={12} />
+                  {bn ? 'এখনই পরিশোধ করুন' : 'Pay this month'} <ArrowRight size={12} />
                 </button>
               )}
 
               {/* Divider */}
-              {activeLeases.length > 0 && (
+              {leases.length > 0 && (
                 <>
                   <div className="flex items-center gap-3">
                     <div className="h-px flex-1 bg-white/10" />
                     <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/30">
-                      {bn ? 'বুকিং' : 'Bookings'}
+                      {bn ? 'আপনার ভাড়া' : 'Your tenancies'}
                     </span>
                     <div className="h-px flex-1 bg-white/10" />
                   </div>
 
-                  {/* Your Bookings inside the panel */}
+                  {/* Your tenancies inside the panel — each one named by its
+                      floor + room, with its OWN outstanding balance. */}
                   <div className="space-y-2.5">
-                    {activeLeases.map((b) => {
+                    {leases.map((b) => {
                       const fresh = isFreshBooking(b);
+                      const where = unitParts(b, language);
+                      const lease = (summary.leases || []).find((l) => l.key === (b.leaseKey || leaseKey(b)));
+                      const dueHere = lease ? lease.outstanding : 0;
                       return (
                         <div
-                          key={b.id || b._id}
+                          key={b.leaseKey || b.id || b._id}
                           className="relative bg-white/10 backdrop-blur-sm rounded-xl p-3 hover:bg-white/15 transition-colors"
                         >
                           {fresh && (
@@ -331,6 +389,9 @@ const PaymentsTab = ({
                             </div>
                             <div className="min-w-0">
                               <p className="text-sm font-black text-white truncate">{b.property || (bn ? 'আপনার ভাড়া' : 'Your rental')}</p>
+                              {where.length > 0 && (
+                                <p className="text-[10px] font-black text-white/60 truncate flex items-center gap-1"><DoorOpen size={8} /> {where.join(' · ')}</p>
+                              )}
                               {b.location && <p className="text-[10px] font-bold text-white/40 truncate flex items-center gap-1"><MapPin size={8} /> {b.location}</p>}
                             </div>
                           </div>
@@ -343,9 +404,11 @@ const PaymentsTab = ({
                               <p className="text-[7px] font-black text-white/40 uppercase tracking-widest">{bn ? 'অ্যাডভান্স' : 'Advance'}</p>
                               <p className="text-[11px] font-black text-white tabular-nums">৳{(Number(b.advancePayment) || 0).toLocaleString('en-IN')}</p>
                             </div>
-                            <div className="bg-white/10 rounded-lg p-1.5">
-                              <p className="text-[7px] font-black text-white/40 uppercase tracking-widest">{bn ? 'মেথড' : 'Method'}</p>
-                              <p className="text-[10px] font-black text-white truncate">{b.paymentMethod || '—'}</p>
+                            <div className={`rounded-lg p-1.5 ${dueHere > 0 ? 'bg-rose-500/25' : 'bg-emerald-500/20'}`}>
+                              <p className="text-[7px] font-black text-white/50 uppercase tracking-widest">{bn ? 'বকেয়া' : 'Due'}</p>
+                              <p className="text-[11px] font-black text-white tabular-nums">
+                                {dueHere > 0 ? `৳${dueHere.toLocaleString('en-IN')}` : (bn ? 'ক্লিয়ার' : 'Clear')}
+                              </p>
                             </div>
                           </div>
                           {b.leaseStart && (
@@ -512,13 +575,13 @@ const PaymentsTab = ({
             type="search"
             value={paySearch}
             onChange={(e) => setPaySearch(e.target.value)}
-            placeholder={language === 'বাংলা' ? 'প্রপার্টি, মাস বা রিসিট খুঁজুন…' : 'Find a receipt by property, month or amount…'}
+            placeholder={language === 'বাংলা' ? 'বাসা, রুম, মাস বা টাকা দিয়ে খুঁজুন…' : 'Find a receipt by house, room, month or amount…'}
             className="w-full bg-white pl-10 pr-4 py-3 rounded-2xl text-[12px] font-bold text-gray-700 placeholder:text-gray-400 border border-gray-100 focus:border-[#ba0036] focus:ring-4 focus:ring-[#ba0036]/10 outline-none transition-all"
           />
         </div>
-        {(properties.length > 1 || unreadReceiptsCount > 0) && (
+        {(tenancies.length > 1 || unreadReceiptsCount > 0) && (
           <div className="flex items-center gap-2.5">
-            {properties.length > 1 && (
+            {tenancies.length > 1 && (
               <div className="relative flex-1 md:flex-none">
                 <Filter size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <select
@@ -526,9 +589,11 @@ const PaymentsTab = ({
                   onChange={(e) => setPayProperty(e.target.value)}
                   className="w-full appearance-none bg-white pl-9 pr-9 py-3 rounded-2xl text-[12px] font-black text-gray-700 border border-gray-100 focus:border-[#ba0036] focus:ring-4 focus:ring-[#ba0036]/10 outline-none transition-all"
                 >
-                  <option value="all">{language === 'বাংলা' ? 'সব প্রপার্টি' : 'All properties'}</option>
-                  {properties.map(([id, title]) => (
-                    <option key={id} value={id}>{title}</option>
+                  <option value="all">{language === 'বাংলা' ? 'সব ভাড়া' : 'All tenancies'}</option>
+                  {tenancies.map((t) => (
+                    <option key={t.key} value={t.key}>
+                      {t.label}{t.past ? (language === 'বাংলা' ? ' (আগের)' : ' (past)') : ''}
+                    </option>
                   ))}
                 </select>
                 <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -558,7 +623,7 @@ const PaymentsTab = ({
             {language === 'বাংলা' ? 'এই ফিল্টারে কিছু পাওয়া যায়নি' : 'No receipts match this filter'}
           </p>
           <p className="text-[11px] font-bold text-gray-400">
-            {language === 'বাংলা' ? 'অন্য মাস, বছর বা প্রপার্টি বেছে নিন' : 'Try a different month, year or property'}
+            {language === 'বাংলা' ? 'অন্য মাস, বছর বা ভাড়া বেছে নিন' : 'Try a different month, year or tenancy'}
           </p>
         </div>
       ) : (
@@ -596,6 +661,17 @@ const PaymentsTab = ({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] md:text-base font-black text-gray-900 leading-tight truncate">{r.propertyTitle}</p>
+                    {/* WHICH UNIT this receipt is for. Without it, two rooms of
+                        one building produce a grid of identical-looking cards
+                        with different amounts on them. */}
+                    {(r.floorNumber || r.roomNumber || r.seatLabel) && (
+                      <p className="text-[10px] md:text-[11px] font-black text-gray-600 mt-0.5 flex items-center gap-1 md:gap-1.5">
+                        <DoorOpen size={10} className="text-gray-400 shrink-0" />
+                        <span className="truncate">
+                          {receiptUnitLabel(r, language).split(' · ').slice(1).join(' · ')}
+                        </span>
+                      </p>
+                    )}
                     <p className="text-[10px] md:text-[11px] font-bold text-gray-500 mt-0.5 flex items-center gap-1 md:gap-1.5">
                       <Calendar size={10} className="text-gray-400 shrink-0" />
                       <span className="truncate">{r.monthLabel || r.monthKey}</span>
