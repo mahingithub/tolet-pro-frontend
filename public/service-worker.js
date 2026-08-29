@@ -27,7 +27,7 @@ importScripts('/call-notification-sw.js');
 // Bump this on any release that changes a PRECACHED file (index.html, manifest,
 // icons, offline.html). Hashed build assets (index-*.js/css) already bust their
 // own cache via unique filenames, so they don't need a version bump.
-const CACHE_VERSION = 'tolet-pro-v3';
+const CACHE_VERSION = 'tolet-pro-v4';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 // Minimal app shell. Hashed build assets (index-*.js/css) are cached at runtime
@@ -109,9 +109,18 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          // keep a fresh copy of the shell for offline
-          const copy = res.clone();
-          caches.open(STATIC_CACHE).then((c) => c.put('/index.html', copy)).catch(() => {});
+          // Keep a fresh copy of the shell for offline — but ONLY from the root
+          // navigation. The build now emits prerendered HTML per route
+          // (scripts/prerender-seo.mjs), so caching every navigation under the
+          // '/index.html' key would leave whichever district page you happened
+          // to visit last standing in as the offline shell for the whole app.
+          // NOTE: `url` is req.url (a string) — it needs parsing for the path.
+          let isRoot = false;
+          try { isRoot = new URL(url).pathname === '/'; } catch { isRoot = false; }
+          if (isRoot) {
+            const copy = res.clone();
+            caches.open(STATIC_CACHE).then((c) => c.put('/index.html', copy)).catch(() => {});
+          }
           return res;
         })
         .catch(() => caches.match(req).then((r) => r || caches.match('/offline.html')).then((r) => r || new Response('Offline', { status: 503 })))

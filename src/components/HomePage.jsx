@@ -7,7 +7,43 @@ import HeroSection from './HeroSection';
 // affects desktop, and the desktop hero never renders inside the mobile viewport.
 import MobileHome from './mobile/MobileHome';
 
+import useSeo from '../seo/useSeo';
+import { webPageSchema } from '../seo/schema';
+import { ALL_KEYWORDS, toKeywordString } from '../seo/keywords';
+
+// The homepage has to carry BOTH halves of the product in one description —
+// the marketplace ("বাসা ভাড়া") and the management tools ("মিল ম্যানেজার") —
+// because a brand search for "tolet pro" lands here and needs to see both, and
+// because this is the page every other page links back to.
+// Kept short on purpose: Google truncates a title around 600px of rendered
+// width, and Bengali glyphs are wide. The meal-manager and rent-manager terms
+// are carried by their own landing pages, not crammed in here.
+const HOME_TITLE = 'বাসা ভাড়া ও টু-লেট — House Rent in Bangladesh';
+
+const HOME_DESCRIPTION =
+  'বাংলাদেশের ৬৪ জেলায় বাসা, ফ্ল্যাট, রুম, সিট ও মেস ভাড়ার টু-লেট বিজ্ঞাপন — দালাল ছাড়াই '
+  + 'সরাসরি বাড়িওয়ালার সাথে। সাথে মিল ম্যানেজার, রুমমেট ওয়ালেট, ভাড়া কালেকশন ও ভাড়াটিয়া '
+  + 'ম্যানেজমেন্ট। Find to-let flats across Bangladesh and manage rent, tenants, meals '
+  + 'and shared expenses — free, in Bangla and English.';
+
 const HomePage = () => {
+  // No FAQPage block here on purpose: this page renders no visible FAQ, and
+  // FAQ markup without matching on-page content is a structured-data violation
+  // Google issues manual actions for. The visible FAQs live on /to-let, the
+  // feature landing pages and the district pages, and those emit the schema.
+  // Organization + WebSite are emitted once, from index.html.
+  useSeo({
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
+    keywords: toKeywordString(ALL_KEYWORDS, 30),
+    canonical: '/',
+    jsonLd: webPageSchema({
+      name: HOME_TITLE,
+      description: HOME_DESCRIPTION,
+      url: '/',
+    }),
+  });
+
   // Always start at the top when this page mounts.
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });

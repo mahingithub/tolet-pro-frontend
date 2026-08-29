@@ -39,6 +39,15 @@ import HowItWorks from "./components/HowItWorks";
 import JoinPropertyPage from "./components/JoinPropertyPage";
 import DeepLinkHandler from "./components/DeepLinkHandler";
 
+// --- SEO landing pages ---
+// Public, content-rich pages for the half of the product that lives behind a
+// login (meal manager, roommate wallet, tenant/house management) plus the
+// /to-let hub that links out to all 8 divisions and 64 districts. A crawler
+// could not see any of this before — see src/seo/featurePages.js.
+import ToLetHub from "./components/seo/ToLetHub";
+import FeatureLanding from "./components/seo/FeatureLanding";
+import RouteSeoGuard from "./components/seo/RouteSeoGuard";
+
 // --- Mobile Shell ---
 import MobileBottomNav from "./components/mobile/MobileBottomNav";
 
@@ -219,6 +228,12 @@ const AppLayout = () => {
 			    with the app installed INTO the app, instead of letting it bounce
 			    the tenant into a mobile browser. No-op on the web build. */}
 			<DeepLinkHandler />
+			{/* Head defaults for routes that don't manage their own: noindex for
+			    every private screen and for /join/<token> invite links, plus
+			    real titles for the small public pages. Rendered ABOVE <Routes>
+			    on purpose — its effect runs first, so any page with its own
+			    useSeo() still wins. */}
+			<RouteSeoGuard />
 			<GlobalCallSocket />
 			<AppDownloadBanner />
 			{!shouldHideNavbar && (
@@ -250,6 +265,19 @@ const AppLayout = () => {
 
 				{/* How it Works — public marketing page */}
 				<Route path="/how-it-works" element={<HowItWorks />} />
+
+				{/* ── SEO landing pages (public, no auth) ─────────────────────
+				    /to-let is the crawlable index of all 71 location pages;
+				    the rest describe a feature to a signed-out visitor who
+				    arrived from a search like "মিল ম্যানেজার অ্যাপ". All five
+				    feature routes render one component driven by
+				    src/seo/featurePages.js, keyed off the pathname. */}
+				<Route path="/to-let" element={<ToLetHub />} />
+				<Route path="/meal-manager" element={<FeatureLanding />} />
+				<Route path="/roommate-wallet" element={<FeatureLanding />} />
+				<Route path="/house-manager" element={<FeatureLanding />} />
+				<Route path="/tenant-manager" element={<FeatureLanding />} />
+				<Route path="/home-services" element={<FeatureLanding />} />
 
 				{/* Legal pages — public, no auth required (Phase 7) */}
 				<Route path="/privacy-policy" element={<PrivacyPolicy />} />

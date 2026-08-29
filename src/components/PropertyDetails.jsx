@@ -36,6 +36,12 @@ import { getDynamicFields, hasBedsBaths } from '../constants/propertyFields';
 // match was so we only describe surroundings we can honestly claim.
 import { resolveApproxCoords, USABLE_FOR_SURROUNDINGS } from '../constants/geoCentroids';
 import { toast } from 'sonner';
+// ─── SEO ─────────────────────────────────────────────────────────────────────
+// A listing page carries a price, a location and photos — everything Google
+// needs for a rich result, and none of which it could see while every route
+// shared one <title>. See the detailSeo memo further down.
+import useSeo from '../seo/useSeo';
+import { propertySchema, breadcrumbSchema } from '../seo/schema';
 
 // ╔══════════════════════════════════════════════════════════════════════════╗
 // ║  GOOGLE MAPS                                                            ║
@@ -2302,6 +2308,76 @@ const PropertyDetails = () => {
 
   // Suppress lint warnings for retained-but-currently-unused language vars (logic kept intact)
   void ctxLanguage; void setLanguage;
+
+  // ── SEO ────────────────────────────────────────────────────────────────────
+  // Listing pages are the ones that win long-tail searches — "2 bedroom flat
+  // rent mirpur 10" is a query only a specific listing can answer. Each one
+  // gets a title built from the facts a renter typed (rooms, area, district,
+  // rent), and a Product+Accommodation block so Google can show the price and
+  // bed/bath count in the result itself.
+  //
+  // MUST stay above the loading / not-found early returns below — a hook that
+  // only runs on some renders is a hook that crashes on the others.
+  const seoImages = useMemo(
+    () => buildGallery(property).map((g) => g.url).filter(Boolean).slice(0, 8),
+    [property],
+  );
+
+  const detailSeo = useMemo(() => {
+    if (!property) {
+      // Still loading, or genuinely missing. Either way there is nothing
+      // worth indexing yet, and a half-built title is worse than none.
+      return { title: 'Property', noindex: true };
+    }
+    const place = [property.area, property.thana, property.district]
+      .filter(Boolean).join(', ');
+    const rent = Number(property.price)
+      ? `৳${Number(property.price).toLocaleString('en-IN')}${property.intent === 'sell' ? '' : '/mo'}`
+      : '';
+    const rooms = property.beds
+      ? `${property.beds} ${property.beds > 1 ? 'beds' : 'bed'}`
+      : '';
+    const titleBits = [property.title, place, rent].filter(Boolean).join(' — ');
+
+    const description = (property.description || '').trim()
+      ? `${(property.description || '').trim().slice(0, 150)}…`
+      : [
+        `${property.title}`,
+        place ? `${place} এ ভাড়ার জন্য` : '',
+        rooms, rent ? `ভাড়া ${rent}` : '',
+        'ছবি, সুবিধা ও বাড়িওয়ালার সাথে সরাসরি যোগাযোগ — TO-LET PRO.',
+      ].filter(Boolean).join(', ');
+
+    // Only listings a renter can actually act on belong in the index. A
+    // paused, inactive or draft listing in search results is a dead end that
+    // costs trust on the click and quality signal on the site.
+    const indexable = property.status === 'active' || property.status === 'rented';
+
+    return {
+      title: titleBits,
+      description,
+      canonical: `/property/${property.id || property._id || id}`,
+      type: 'product',
+      image: seoImages[0],
+      noindex: !indexable,
+      jsonLd: indexable ? [
+        propertySchema(property, {
+          url: `/property/${property.id || property._id || id}`,
+          images: seoImages,
+        }),
+        breadcrumbSchema([
+          { name: 'Home', path: '/' },
+          { name: 'To-Let', path: '/to-let' },
+          ...(property.division
+            ? [{ name: property.division, path: `/properties/${property.division}` }]
+            : []),
+          { name: property.title, path: `/property/${property.id || property._id || id}` },
+        ]),
+      ] : null,
+    };
+  }, [property, seoImages, id]);
+
+  useSeo(detailSeo);
 
   // ── LOADING / NOT-FOUND STATES ────────────────────────────────────────────
   // While we wait for propertyService to resolve we render a lightweight

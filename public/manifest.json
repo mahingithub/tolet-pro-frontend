@@ -1,8 +1,9 @@
 {
-  "name": "TO-LET PRO",
+  "name": "TO-LET PRO — বাসা ভাড়া ও হাউস ম্যানেজমেন্ট",
   "short_name": "TO-LET PRO",
-  "description": "Find and manage rental properties across Bangladesh — listings, chat, and calls in one app.",
-  "lang": "en",
+  "description": "বাংলাদেশের ৬৪ জেলায় বাসা, ফ্ল্যাট, রুম ও মেস ভাড়ার টু-লেট — সাথে মিল ম্যানেজার, রুমমেট ওয়ালেট, ভাড়া কালেকশন ও ভাড়াটিয়া ম্যানেজমেন্ট। Find a house to rent across Bangladesh and manage rent, tenants, meals and shared expenses in one app.",
+  "categories": ["business", "lifestyle", "productivity"],
+  "lang": "bn",
   "dir": "ltr",
   "start_url": "/",
   "scope": "/",

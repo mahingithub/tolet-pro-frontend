@@ -1,9 +1,12 @@
 <!doctype html>
-<html lang="en">
+<!-- lang="bn": Bangla is the app's DEFAULT language (LanguageContext), and
+     LanguageContext rewrites this attribute at runtime when the user switches.
+     Declaring "en" here told crawlers the opposite of what the page shows. -->
+<html lang="bn">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>TO-LET PRO</title>
+    <title>বাসা ভাড়া ও টু-লেট — House Rent in Bangladesh | TO-LET PRO</title>
 
     <!-- PWA: manifest + theme (Phase Call-5) -->
     <link rel="manifest" href="/manifest.json" />
@@ -24,11 +27,30 @@
     <link rel="dns-prefetch" href="https://maps.gstatic.com">
 
 
-    <!-- SEO (Phase 7) -->
-    <meta name="description" content="TO-LET PRO — find and list rental properties across Bangladesh. Browse verified flats, apartments, and rooms, chat with landlords, and book viewings. বাংলাদেশে ভাড়া বাসা খুঁজুন ও তালিকাভুক্ত করুন।" />
-    <meta name="keywords" content="to-let, rent, Bangladesh, flat rent, apartment, bachelor, family, Dhaka, ভাড়া বাসা, টু-লেট" />
+    <!-- ─── SEO ──────────────────────────────────────────────────────────────
+         These are the DEFAULTS. Every route overrides them at runtime through
+         src/seo/useSeo.js, and the build writes route-specific copies of this
+         file for the main public pages (scripts/prerender-seo.mjs), so a
+         crawler that never runs JavaScript still gets the right title.
+
+         ⚠️  The canonical host is www.toletpro.rent. It used to say
+         tolet-pro.vercel.app here, which has been a dead 404 for a while — so
+         every page on the site was pointing search engines at a domain that
+         does not resolve. See DEEP_LINKS.md. -->
+    <meta name="description" content="বাংলাদেশের ৬৪ জেলায় বাসা, ফ্ল্যাট, রুম, সিট ও মেস ভাড়ার টু-লেট বিজ্ঞাপন — দালাল ছাড়াই সরাসরি বাড়িওয়ালার সাথে। সাথে মিল ম্যানেজার, রুমমেট ওয়ালেট, ভাড়া কালেকশন ও ভাড়াটিয়া ম্যানেজমেন্ট। Find to-let flats across Bangladesh and manage rent, tenants, meals and shared expenses — free." />
+    <meta name="keywords" content="to-let, টু-লেট, বাসা ভাড়া, house rent Bangladesh, basa vara, flat rent Dhaka, ফ্ল্যাট ভাড়া, bachelor flat, ব্যাচেলর বাসা, family flat, মেস ভাড়া, sublet, সাবলেট, room rent, রুম ভাড়া, meal manager, মিল ম্যানেজার, mess manager, roommate wallet, রুমমেট ওয়ালেট, খরচ ভাগ, house manager, হাউস ম্যানেজার, tenant manager, ভাড়াটিয়া ম্যানেজমেন্ট, ভাড়া কালেকশন, rent collection app, বাড়িওয়ালা অ্যাপ" />
     <meta name="robots" content="index, follow" />
-    <link rel="canonical" href="https://tolet-pro.vercel.app/" />
+    <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="author" content="TO-LET PRO" />
+    <meta name="geo.region" content="BD" />
+    <meta name="geo.placename" content="Bangladesh" />
+    <link rel="canonical" href="https://www.toletpro.rent/" />
+
+    <!-- Both languages are served from the same URL (the toggle is client-side
+         state, not a route), so these are self-referential by design. -->
+    <link rel="alternate" hreflang="bn-BD" href="https://www.toletpro.rent/" />
+    <link rel="alternate" hreflang="en-BD" href="https://www.toletpro.rent/" />
+    <link rel="alternate" hreflang="x-default" href="https://www.toletpro.rent/" />
 
     <!-- Favicons -->
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2" />
@@ -55,19 +77,98 @@
     <link rel="apple-touch-startup-image" href="/splash/splash-ipad.png"
           media="(min-device-width: 768px) and (max-device-width: 1024px)" />
 
-    <!-- Open Graph / Twitter (nice link previews) -->
-    <meta property="og:title" content="TO-LET PRO — Rental Properties in Bangladesh" />
-    <meta property="og:description" content="Find and list rental properties across Bangladesh. Verified listings, chat, and calls in one app." />
+    <!-- Open Graph / Twitter (link previews in Facebook, Messenger, WhatsApp).
+         og:image is the 1024×500 feature graphic — inside the 1.91:1 window
+         these platforms want, so it renders as a large card instead of a
+         thumbnail. A 512×512 icon (what this used to point at, on the dead
+         domain) renders as neither. -->
+    <meta property="og:title" content="বাসা ভাড়া ও টু-লেট — TO-LET PRO" />
+    <meta property="og:description" content="বাংলাদেশের ৬৪ জেলায় বাসা, ফ্ল্যাট, রুম ও মেস ভাড়ার টু-লেট — দালাল ছাড়াই। সাথে মিল ম্যানেজার, রুমমেট ওয়ালেট ও ভাড়া ম্যানেজমেন্ট। Find a house to rent across Bangladesh, and manage rent, meals and shared expenses in one app." />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://tolet-pro.vercel.app/" />
+    <meta property="og:url" content="https://www.toletpro.rent/" />
     <meta property="og:site_name" content="TO-LET PRO" />
-    <meta property="og:image" content="https://tolet-pro.vercel.app/icons/icon-512.png" />
-    <meta property="og:locale" content="en_US" />
-    <meta property="og:locale:alternate" content="bn_BD" />
+    <meta property="og:image" content="https://www.toletpro.rent/feature_graphic.png" />
+    <meta property="og:image:width" content="1024" />
+    <meta property="og:image:height" content="500" />
+    <meta property="og:image:alt" content="TO-LET PRO — house rent and house management in Bangladesh" />
+    <meta property="og:locale" content="bn_BD" />
+    <meta property="og:locale:alternate" content="en_US" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="TO-LET PRO — Rental Properties in Bangladesh" />
-    <meta name="twitter:description" content="Find and list rental properties across Bangladesh. Verified listings, chat, and calls in one app." />
-    <meta name="twitter:image" content="https://tolet-pro.vercel.app/icons/icon-512.png" />
+    <meta name="twitter:title" content="বাসা ভাড়া ও টু-লেট — TO-LET PRO" />
+    <meta name="twitter:description" content="বাংলাদেশের ৬৪ জেলায় টু-লেট বিজ্ঞাপন, সাথে মিল ম্যানেজার ও ভাড়া ম্যানেজমেন্ট — সব এক অ্যাপে।" />
+    <meta name="twitter:image" content="https://www.toletpro.rent/feature_graphic.png" />
+
+    <!-- ─── Structured data ─────────────────────────────────────────────────
+         Emitted once here rather than per-route: Organization and WebSite are
+         properties of the SITE, and repeating them on every page just gives a
+         crawler the same facts to reconcile over and over. Per-page blocks
+         (breadcrumbs, listings, FAQs) are injected at runtime by useSeo().
+         Keep in sync with src/seo/schema.js. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://www.toletpro.rent/#organization",
+          "name": "TO-LET PRO",
+          "alternateName": ["টু-লেট প্রো", "ToLet Pro", "Tolet Pro Bangladesh"],
+          "url": "https://www.toletpro.rent",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://www.toletpro.rent/icons/icon-512.png",
+            "width": 512,
+            "height": 512
+          },
+          "image": "https://www.toletpro.rent/feature_graphic.png",
+          "description": "TO-LET PRO is a Bangladeshi house rent marketplace and house management app — find to-let flats, rooms, seats and mess in all 64 districts, and manage rent, tenants, meals and shared expenses in one place.",
+          "areaServed": { "@type": "Country", "name": "Bangladesh" },
+          "address": { "@type": "PostalAddress", "addressCountry": "BD" },
+          "contactPoint": [{
+            "@type": "ContactPoint",
+            "telephone": "+8801742898206",
+            "contactType": "customer support",
+            "areaServed": "BD",
+            "availableLanguage": ["bn", "en"]
+          }],
+          "sameAs": [
+            "https://www.facebook.com/profile.php?id=61593003425206",
+            "https://www.youtube.com/channel/UC7mc__2GpSdoqUMglb7BS8g",
+            "https://www.instagram.com/toletpro.rent/"
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://www.toletpro.rent/#website",
+          "url": "https://www.toletpro.rent",
+          "name": "TO-LET PRO",
+          "alternateName": "টু-লেট প্রো",
+          "inLanguage": ["bn-BD", "en-BD"],
+          "publisher": { "@id": "https://www.toletpro.rent/#organization" },
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://www.toletpro.rent/properties/all?search={search_term_string}"
+            },
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "TO-LET PRO",
+          "operatingSystem": "Android",
+          "applicationCategory": "BusinessApplication",
+          "applicationSubCategory": "Real Estate",
+          "installUrl": "https://play.google.com/store/apps/details?id=com.toletpro.app",
+          "downloadUrl": "https://play.google.com/store/apps/details?id=com.toletpro.app",
+          "identifier": "com.toletpro.app",
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BDT" },
+          "description": "Find to-let houses across Bangladesh and manage rent, tenants, meals and roommate expenses from one app."
+        }
+      ]
+    }
+    </script>
 
     <!-- ─── Instant boot splash (Phase Load-1) ──────────────────────────────
          Pure HTML/CSS so it paints the INSTANT the document loads — before the

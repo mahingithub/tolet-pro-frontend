@@ -18,6 +18,15 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { getSectionGuides } from '../services/aiGuideService';
 import VideoGuides from './shared/VideoGuides';
 import BackButton from './shared/BackButton';
+import useSeo from '../seo/useSeo';
+import { faqSchema, breadcrumbSchema, webPageSchema } from '../seo/schema';
+import { RENT_KEYWORDS, MANAGEMENT_KEYWORDS, toKeywordString } from '../seo/keywords';
+
+const HIW_TITLE = 'কিভাবে কাজ করে — How TO-LET PRO Works for Tenants & Landlords';
+const HIW_DESCRIPTION =
+  'ভাড়াটিয়া হিসেবে বাসা খোঁজা থেকে চাবি হাতে পাওয়া, আর বাড়িওয়ালা হিসেবে ফ্রি টু-লেট '
+  + 'বিজ্ঞাপন থেকে ভাড়া আদায় — TO-LET PRO ধাপে ধাপে কিভাবে কাজ করে, দালাল ফি কেন নেই এবং '
+  + 'ভেরিফিকেশন কিভাবে হয়। How renting and listing works on TO-LET PRO, with pricing.';
 
 export default function HowItWorks() {
   const navigate = useNavigate();
@@ -83,6 +92,26 @@ export default function HowItWorks() {
     { q: { en: 'How long does owner verification take?', bn: 'মালিক ভেরিফিকেশনে কত সময় লাগে?' }, a: { en: 'Most verifications are completed within 24\u201348 hours once you submit a valid NID and ownership proof.', bn: 'সঠিক এনআইডি ও মালিকানার প্রমাণ জমা দিলে বেশিরভাগ ভেরিফিকেশন ২৪–৪৮ ঘণ্টার মধ্যে সম্পন্ন হয়।' } },
     { q: { en: 'What if I need help?', bn: 'সাহায্য দরকার হলে কী করব?' }, a: { en: 'Open the Help & Support center anytime. Send us a request and our support team replies right inside the app.', bn: 'যেকোনো সময় সহায়তা ও সাপোর্ট সেন্টার খুলুন। একটি অনুরোধ পাঠান, আমাদের সাপোর্ট টিম অ্যাপের ভেতরেই উত্তর দেবে।' } },
   ];
+
+  // The FAQPage block below is built from the SAME `faqs` array the page
+  // renders, in whichever language is on screen — so the markup always
+  // describes content a visitor can actually see, which is what Google
+  // requires of FAQ rich results.
+  useSeo({
+    title: HIW_TITLE,
+    appendBrand: false,
+    description: HIW_DESCRIPTION,
+    keywords: toKeywordString([...RENT_KEYWORDS.slice(0, 12), ...MANAGEMENT_KEYWORDS.slice(0, 10)]),
+    canonical: '/how-it-works',
+    jsonLd: [
+      webPageSchema({ name: HIW_TITLE, description: HIW_DESCRIPTION, url: '/how-it-works' }),
+      breadcrumbSchema([
+        { name: 'Home', path: '/' },
+        { name: 'How it works', path: '/how-it-works' },
+      ]),
+      faqSchema(faqs.map((f) => ({ q: tr(f.q.en, f.q.bn), a: tr(f.a.en, f.a.bn) }))),
+    ],
+  }, [isBn]);
 
   const StepCard = ({ Icon, title, desc, n }) => (
     <div className="relative bg-white rounded-3xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">

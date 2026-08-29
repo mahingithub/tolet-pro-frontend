@@ -14,7 +14,7 @@
 import {
   SITE_URL, BRAND, BRAND_BN, ORG_NAME, LOGO_URL, OG_IMAGE,
   CONTACT_PHONE, SOCIAL_PROFILES, PLAY_STORE_URL, ANDROID_APP_ID, absoluteUrl,
-} from './siteConfig';
+} from './siteConfig.js';
 
 /** Strip undefined/empty keys — Google warns about empty properties. */
 const clean = (obj) => {

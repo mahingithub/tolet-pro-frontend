@@ -495,9 +495,14 @@ useEffect(() => {
             <div className="bg-[#ba0036] p-1.5 md:p-2 rounded-xl shadow-[0_4px_15px_rgba(186,0,54,0.3)] group-hover:scale-105 transition-transform duration-300">
               <Building2 className="text-white w-4 h-4 md:w-[18px] md:h-[18px]" />
             </div>
-            <h1 className="font-black text-base md:text-lg lg:text-xl tracking-tighter">
+            {/* The brand mark is a logo, not the page's heading. It used to be
+                an <h1>, which meant EVERY page's first heading was "TO-LET PRO"
+                — so a district page told search engines it was about the brand
+                rather than about Gazipur. <div> keeps the layout identical
+                (Tailwind preflight already strips h1 margins). */}
+            <div className="font-black text-base md:text-lg lg:text-xl tracking-tighter">
               <span className="text-gray-900">TO-LET</span> <span className="text-[#ba0036]">PRO</span>
-            </h1>
+            </div>
             {/* Beta badge (Phase 7) — signals the app is in beta testing. */}
             <span className="ml-1 px-1.5 py-0.5 text-[9px] md:text-[10px] font-black uppercase tracking-wider text-[#ba0036] bg-red-50 border border-[#ba0036]/30 rounded-md leading-none self-center">
               Beta
@@ -927,9 +932,10 @@ useEffect(() => {
               <div className="bg-[#ba0036] p-2 rounded-xl shadow-[0_4px_15px_rgba(186,0,54,0.3)] group-active:scale-95 transition-transform">
                 <Building2 className="text-white w-[18px] h-[18px]" />
               </div>
-              <h1 className="font-black text-lg tracking-tighter">
+              {/* Logo, not a heading — see the note on the desktop brand above. */}
+              <div className="font-black text-lg tracking-tighter">
                 <span className="text-gray-900">TO-LET</span> <span className="text-[#ba0036]">PRO</span>
-              </h1>
+              </div>
               <span className="ml-0.5 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-[#ba0036] bg-red-50 border border-[#ba0036]/30 rounded-md leading-none self-center">
                 Beta
               </span>

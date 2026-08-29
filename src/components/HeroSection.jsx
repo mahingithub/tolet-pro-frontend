@@ -1343,7 +1343,9 @@ const HeroSection = () => {
               <div className="col-span-2 md:col-span-1 flex flex-col gap-3 md:gap-6">
                 <a href="/" className="flex items-center gap-2">
                   <div className="bg-crimson-500 p-1.5 rounded-lg"><HomeIcon className="text-white w-4 h-4 md:w-5 md:h-5" /></div>
-                  <h1 className="font-black text-base md:text-2xl tracking-tighter text-white">TO-LET <span className="text-crimson-500">PRO</span></h1>
+                  {/* Footer brand mark — a logo, not a heading. As an <h1> it
+                      gave the homepage a second, competing top-level heading. */}
+                  <div className="font-black text-base md:text-2xl tracking-tighter text-white">TO-LET <span className="text-crimson-500">PRO</span></div>
                 </a>
                 <p className="text-[11px] md:text-sm font-medium text-slate-400 leading-relaxed max-w-[280px]">
                   {t?.footerDesc || "Bangladesh's most trusted property rental platform. Designed for the modern era, built for your comfort."}
@@ -1377,9 +1379,14 @@ const HeroSection = () => {
                 <h4 className="text-white font-black uppercase tracking-widest text-[9px] md:text-xs mb-3 md:mb-6">{t?.exploreFooter || 'Explore'}</h4>
                 <ul className="flex flex-col gap-2 md:gap-4 text-[11px] md:text-sm font-bold text-slate-400">
                   <li><Link to="/properties/all?intent=rent" className="hover:text-white transition-colors">{t?.allProperties || 'All Properties'}</Link></li>
+                  {/* The hub linking all 8 divisions and 64 districts. This is
+                      the crawl path into 71 location pages — without a link
+                      from the homepage they exist only in the sitemap, which
+                      Google treats as a suggestion rather than a signal. */}
+                  <li><Link to="/to-let" className="hover:text-white transition-colors">{language === 'বাংলা' ? 'সব জেলার টু-লেট' : 'To-Let in All Districts'}</Link></li>
                   <li><Link to="/properties/dhaka" className="hover:text-white transition-colors">{t?.popularDistrictsFooter || 'Popular Districts'}</Link></li>
                   <li><Link to="/properties/all?intent=commercial" className="hover:text-white transition-colors">{t?.commercialSpaces || 'Commercial Spaces'}</Link></li>
-                  <li><Link to="/host-dashboard" className="hover:text-white transition-colors">{t?.hostDashboard || 'Host Dashboard'}</Link></li>
+                  <li><Link to="/how-it-works" className="hover:text-white transition-colors">{t?.navHowItWorks || 'How It Works'}</Link></li>
                 </ul>
               </div>
 
@@ -1401,6 +1408,25 @@ const HeroSection = () => {
                   <li className="flex items-center gap-2"><MapPin size={13} className="text-crimson-500 shrink-0" /> Banani, Dhaka, Bangladesh</li>
                 </ul>
               </div>
+            </div>
+
+            {/* ── Tools row ──────────────────────────────────────────────
+                The meal manager, roommate wallet and management tools all
+                live behind a login, so their public landing pages need a
+                link from somewhere a crawler already visits. A row here is
+                that link, and it also tells a first-time visitor the app is
+                more than a listings board. */}
+            <div className="pt-5 md:pt-8 border-t border-white/10 mb-4 md:mb-6">
+              <h4 className="text-white font-black uppercase tracking-widest text-[9px] md:text-xs mb-3">
+                {language === 'বাংলা' ? 'টুলস' : 'Tools'}
+              </h4>
+              <ul className="flex flex-wrap gap-x-5 gap-y-2 text-[11px] md:text-sm font-bold text-slate-400">
+                <li><Link to="/meal-manager" className="hover:text-white transition-colors">{language === 'বাংলা' ? 'মিল ম্যানেজার' : 'Meal Manager'}</Link></li>
+                <li><Link to="/roommate-wallet" className="hover:text-white transition-colors">{language === 'বাংলা' ? 'রুমমেট ওয়ালেট' : 'Roommate Wallet'}</Link></li>
+                <li><Link to="/house-manager" className="hover:text-white transition-colors">{language === 'বাংলা' ? 'হাউস ম্যানেজার' : 'House Manager'}</Link></li>
+                <li><Link to="/tenant-manager" className="hover:text-white transition-colors">{language === 'বাংলা' ? 'ভাড়াটিয়া ম্যানেজমেন্ট' : 'Tenant Manager'}</Link></li>
+                <li><Link to="/home-services" className="hover:text-white transition-colors">{language === 'বাংলা' ? 'হোম সার্ভিস' : 'Home Services'}</Link></li>
+              </ul>
             </div>
 
             <div className="pt-5 md:pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-2 text-center md:text-left">

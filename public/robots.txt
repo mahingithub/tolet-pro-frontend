@@ -1,18 +1,52 @@
-# robots.txt — TO-LET PRO  [Phase 7 / SEO]
-# Allows search engines to crawl public pages, but keeps private/authenticated
-# and API areas out of the index.
+# robots.txt — TO-LET PRO
+# ─────────────────────────────────────────────────────────────────────────────
+# Public pages are open. Private/authenticated areas and one-time invite links
+# are not, and neither are the endless URL permutations a filter UI can mint.
+#
+# The sitemap line used to point at tolet-pro.vercel.app, which is a dead 404 —
+# so search engines had no working sitemap at all. Canonical host is www.
 
 User-agent: *
 Allow: /
 
-# Don't index private / authenticated areas (no SEO value, keeps them private).
+# ── Private / authenticated areas ────────────────────────────────────────────
 Disallow: /login
 Disallow: /admin
 Disallow: /tenant-dashboard
 Disallow: /host-dashboard
+Disallow: /list-property
 Disallow: /account
 Disallow: /messages
+Disallow: /living
+Disallow: /checkout
+Disallow: /subscription
+Disallow: /smart-alerts
+Disallow: /ai-insights
 Disallow: /api/
 
-# Point crawlers at the sitemap.
-Sitemap: https://tolet-pro.vercel.app/sitemap.xml
+# ── Never index these ────────────────────────────────────────────────────────
+# /join/<token> are landlord invite links, printed onto QR codes and stuck on
+# walls. An indexed token is a stranger with a key to someone's building record.
+Disallow: /join/
+Disallow: /inquire/
+# Individual people's profiles — thin for search, and not ours to publish.
+Disallow: /landlord/
+Disallow: /tenant/
+# The in-app services hub; /home-services is the public version of this content.
+Disallow: /services
+
+# ── Crawl-budget hygiene ─────────────────────────────────────────────────────
+# Filter and sort permutations are the same listings in a different order. Let
+# crawlers spend their budget on the 71 location pages and the listings instead.
+Disallow: /*?*sort=
+Disallow: /*?*minPrice=
+Disallow: /*?*maxPrice=
+Disallow: /*?*beds=
+Disallow: /*?*view=map
+
+# Explicitly open the money pages, in case a broad rule above ever shadows them.
+Allow: /properties/
+Allow: /property/
+Allow: /to-let
+
+Sitemap: https://www.toletpro.rent/sitemap.xml

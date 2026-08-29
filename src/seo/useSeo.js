@@ -79,9 +79,17 @@ function setCanonical(url) {
  * is client-side state, not a route), so the honest signal is a self-referential
  * pair plus x-default — it tells Google the page serves bn-BD and en-BD readers
  * without inventing /bn/ and /en/ URLs that do not exist.
+ *
+ * Clears EVERY hreflang link, not just the ones this hook created: index.html
+ * (and each prerendered page) ships its own set pointing at that page's URL,
+ * and leaving those in place alongside the new ones produced six alternates
+ * per page, half of them naming the wrong URL. The baseline is restored on
+ * cleanup, so the homepage's static tags survive an unmount.
  */
-function setAlternates(url) {
-  document.querySelectorAll(`link[rel="alternate"][${OWNED}]`).forEach((n) => n.remove());
+const clearAlternates = () =>
+  document.querySelectorAll('link[rel="alternate"][hreflang]').forEach((n) => n.remove());
+
+function addAlternates(url) {
   if (!url) return;
   [['bn-BD', url], ['en-BD', url], ['x-default', url]].forEach(([lang, href]) => {
     const el = document.createElement('link');
@@ -91,6 +99,11 @@ function setAlternates(url) {
     el.setAttribute(OWNED, '');
     head().appendChild(el);
   });
+}
+
+function setAlternates(url) {
+  clearAlternates();
+  addAlternates(url);
 }
 
 function setJsonLd(blocks) {
@@ -117,6 +130,9 @@ const BASELINE = typeof document === 'undefined' ? null : {
   keywords: readMeta('meta[name="keywords"]'),
   robots: readMeta('meta[name="robots"]') || 'index, follow',
   canonical: document.querySelector('link[rel="canonical"]')?.getAttribute('href') || SITE_URL,
+  // The hreflang set the document loaded with — restored verbatim on cleanup.
+  alternates: [...document.querySelectorAll('link[rel="alternate"][hreflang]')]
+    .map((el) => ({ lang: el.getAttribute('hreflang'), href: el.getAttribute('href') })),
   ogTitle: readMeta('meta[property="og:title"]'),
   ogDescription: readMeta('meta[property="og:description"]'),
   ogUrl: readMeta('meta[property="og:url"]'),
@@ -165,7 +181,11 @@ export default function useSeo(seo = {}, deps = []) {
     setName('robots', noindex ? 'noindex, follow' : 'index, follow');
     setName('googlebot', noindex ? 'noindex, follow' : 'index, follow, max-image-preview:large, max-snippet:-1');
 
-    setCanonical(noindex ? null : url);
+    // Canonical stays self-referential even on noindex pages. Leaving the
+    // previous page's canonical in place would say "/services IS the homepage"
+    // while the robots tag says "don't index /services" — two contradictory
+    // instructions, and Google resolves those by guessing.
+    setCanonical(url);
     setAlternates(noindex ? null : url);
 
     setProp('og:title', fullTitle);
@@ -194,7 +214,14 @@ export default function useSeo(seo = {}, deps = []) {
       setName('robots', BASELINE.robots);
       setName('googlebot', null);
       setCanonical(BASELINE.canonical);
-      setAlternates(null);
+      clearAlternates();
+      BASELINE.alternates.forEach(({ lang, href }) => {
+        const el = document.createElement('link');
+        el.setAttribute('rel', 'alternate');
+        el.setAttribute('hreflang', lang);
+        el.setAttribute('href', href);
+        head().appendChild(el);
+      });
       setProp('og:title', BASELINE.ogTitle);
       setProp('og:description', BASELINE.ogDescription);
       setProp('og:url', BASELINE.ogUrl);

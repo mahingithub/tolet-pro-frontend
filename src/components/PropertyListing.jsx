@@ -18,6 +18,15 @@ import { hasBedsBaths } from "../constants/propertyFields";
 // Falls back to an approximate area/division coordinate for listings created
 // without precise GPS, so they still appear on the map instead of vanishing.
 import { effectiveCoords } from "../constants/geoCentroids";
+// ─── SEO: this one route IS all 71 location pages ────────────────────────────
+// Every division and district slug lands here, so this is where each of them
+// gets its own title, description, breadcrumbs and body copy. Slugs that are
+// just ad-hoc searches ("dhanmondi-dhaka") resolve to null and stay out of the
+// index rather than spawning unlimited thin duplicates.
+import useSeo from "../seo/useSeo";
+import { locationSeoFor } from "../seo/locationSeo";
+import { breadcrumbSchema, faqSchema, listingCollectionSchema } from "../seo/schema";
+import LocationSeoBlock from "./seo/LocationSeoBlock";
 // ─── INTENT-AWARE FILTER CONFIG (single source of truth for all filter data) ──
 import {
 	getFilterConfig,
@@ -1490,6 +1499,58 @@ const PropertyListing = () => {
 	const sliderMax = cfg.budgetSlider.max;
 	const sliderStep = cfg.budgetSlider.step;
 
+	// ── SEO ────────────────────────────────────────────────────────────────────
+	// `locationSeo` is null for /properties/all and for free-text search slugs.
+	// Those two cases are handled differently on purpose:
+	//   • /properties/all  → a real, indexable "browse everything" page.
+	//   • dhanmondi-dhaka  → noindex. Every typed search would otherwise mint a
+	//     new URL with near-identical content, and hundreds of those is how a
+	//     site teaches Google that its pages are interchangeable.
+	// A filtered view (?category=bachelor&minPrice=…) canonicalises to the clean
+	// location URL so the filters never fragment the page's ranking signals.
+	const locationSeo = useMemo(() => locationSeoFor(routeParam), [routeParam]);
+	const isGenericSearchSlug = !locationSeo && routeParam !== 'all';
+
+	const listingSeo = useMemo(() => {
+		if (isGenericSearchSlug) {
+			return { title: `${searchArea || 'Search'} — বাসা ভাড়া`, noindex: true };
+		}
+		if (!locationSeo) {
+			return {
+				title: 'সব বিজ্ঞাপন — Browse All To-Let Listings in Bangladesh',
+				description:
+					'বাংলাদেশের সব জেলার বাসা, ফ্ল্যাট, রুম, সিট ও মেস ভাড়ার টু-লেট বিজ্ঞাপন '
+					+ 'এক তালিকায় — ভাড়া, এলাকা ও ধরন অনুযায়ী ফিল্টার করুন। Browse every to-let '
+					+ 'listing on TO-LET PRO: flats, rooms, mess seats, sublets and family houses.',
+				canonical: '/properties/all',
+				jsonLd: breadcrumbSchema([
+					{ name: 'Home', path: '/' },
+					{ name: 'To-Let', path: '/to-let' },
+					{ name: 'All listings', path: '/properties/all' },
+				]),
+			};
+		}
+		return {
+			title: locationSeo.title,
+			appendBrand: false,
+			description: locationSeo.description,
+			keywords: locationSeo.keywords,
+			canonical: locationSeo.path,
+			jsonLd: [
+				breadcrumbSchema(locationSeo.breadcrumb),
+				faqSchema(locationSeo.faq),
+				listingCollectionSchema({
+					name: locationSeo.title,
+					description: locationSeo.description,
+					url: locationSeo.path,
+					items: filteredProperties,
+				}),
+			],
+		};
+	}, [locationSeo, isGenericSearchSlug, searchArea, filteredProperties]);
+
+	useSeo(listingSeo);
+
 	return (
 		<div className="w-full bg-[#f8f9fa] min-h-screen font-sans pb-20 relative">
 			{/* TOAST */}
@@ -2172,6 +2233,15 @@ const PropertyListing = () => {
 					</motion.div>
 				)}
 			</AnimatePresence>
+
+			{/* ── LOCATION COPY (SEO + genuinely useful) ────────────────────────
+			    Sits under the results in list mode: what this district is, the
+			    areas it covers, four answered questions and links to the
+			    districts next door. It is the on-page content the FAQPage
+			    schema for this route describes — markup without it visible is
+			    a policy violation, not a shortcut. Hidden in map mode (the map
+			    is full-bleed) and absent for ad-hoc search slugs. */}
+			{!isMapMode && locationSeo && <LocationSeoBlock seo={locationSeo} />}
 
 			{/* ── INQUIRY MODAL (single instance, shown for whichever property was clicked) ── */}
 			<InquiryModal isOpen={!!inquiryTarget} onClose={closeInquiry} property={inquiryTarget} landlord={inquiryLandlord} />

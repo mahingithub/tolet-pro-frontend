@@ -103,11 +103,14 @@ const Footer = () => {
 
           <div>
             <h4 className="text-brandRed text-xs font-bold uppercase tracking-widest mb-6">{t.discoveryTitle}</h4>
+            {/* These were four unclickable <li>s styled to look like links —
+                dead ends for a visitor and invisible to a crawler. They now
+                point at the pages they were always describing. */}
             <ul className="space-y-4 text-gray-400 text-sm font-medium">
-              <li className="hover:text-white transition-colors cursor-pointer">{t.navNewListings}</li>
-              <li className="hover:text-white transition-colors cursor-pointer">{t.navPopularAreas}</li>
-              <li className="hover:text-white transition-colors cursor-pointer">{t.navAffordableStudios}</li>
-              <li className="hover:text-white transition-colors cursor-pointer">{t.navLuxuryFlats}</li>
+              <li><Link to="/properties/all" className="hover:text-white transition-colors">{t.navNewListings}</Link></li>
+              <li><Link to="/to-let" className="hover:text-white transition-colors">{t.navPopularAreas}</Link></li>
+              <li><Link to="/meal-manager" className="hover:text-white transition-colors">{t.mealManagerNav || 'মিল ম্যানেজার / Meal Manager'}</Link></li>
+              <li><Link to="/roommate-wallet" className="hover:text-white transition-colors">{t.roommateWalletNav || 'রুমমেট ওয়ালেট / Roommate Wallet'}</Link></li>
             </ul>
           </div>
 
@@ -123,7 +126,8 @@ const Footer = () => {
               <li>
                 <Link to="/how-it-works#safety" className="hover:text-white transition-colors">{t.navTrustSafety}</Link>
               </li>
-              <li className="hover:text-white transition-colors cursor-pointer">{t.navHostGuidelines}</li>
+              <li><Link to="/house-manager" className="hover:text-white transition-colors">{t.houseManagerNav || 'হাউস ম্যানেজার / House Manager'}</Link></li>
+              <li><Link to="/tenant-manager" className="hover:text-white transition-colors">{t.tenantManagerNav || 'ভাড়াটিয়া ম্যানেজমেন্ট / Tenant Manager'}</Link></li>
             </ul>
           </div>
 
