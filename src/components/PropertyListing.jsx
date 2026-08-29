@@ -26,6 +26,7 @@ import { effectiveCoords } from "../constants/geoCentroids";
 import useSeo from "../seo/useSeo";
 import { locationSeoFor } from "../seo/locationSeo";
 import { breadcrumbSchema, faqSchema, listingCollectionSchema } from "../seo/schema";
+import { hasListings } from "../seo/listingCounts";
 import LocationSeoBlock from "./seo/LocationSeoBlock";
 // ─── INTENT-AWARE FILTER CONFIG (single source of truth for all filter data) ──
 import {
@@ -1530,15 +1531,43 @@ const PropertyListing = () => {
 				]),
 			};
 		}
+		// ── A location page with nothing on it stays out of the index ──────
+		// The decision is deliberately ASYMMETRIC, because the two signals
+		// available here are not equally trustworthy:
+		//
+		//   build time  scripts/fetch-listing-counts.mjs asked the API directly and
+		//               only wrote numbers when the call succeeded, so a "has
+		//               listings" from it is reliable. It fails open — if the
+		//               API was unreachable, every page reads as having some.
+		//   runtime     propertyService falls back to localStorage and returns
+		//               an EMPTY ARRAY when the backend is unreachable, without
+		//               throwing. So "0 results" here does not mean "0 houses";
+		//               it might just mean the API is down.
+		//
+		// Therefore runtime may only ever UPGRADE a page to indexable (it found
+		// listings the last build did not know about), never downgrade one. A
+		// backend outage would otherwise de-index every location page on the
+		// site at once — which is exactly what happened when this was first
+		// written against `propertyLoadError`, a flag that never fires because
+		// the service swallows the failure.
+		//
+		// `follow` stays on either way, so crawlers still walk out to the
+		// areas that do have listings.
+		const isEmpty = !hasListings(locationSeo.path)
+			&& filteredProperties.length === 0;
+
 		return {
 			title: locationSeo.title,
 			appendBrand: false,
 			description: locationSeo.description,
 			keywords: locationSeo.keywords,
 			canonical: locationSeo.path,
+			noindex: isEmpty,
 			jsonLd: [
 				breadcrumbSchema(locationSeo.breadcrumb),
-				faqSchema(locationSeo.faq),
+				// FAQ markup describes a page we are asking Google to skip —
+				// drop it rather than send two contradictory signals.
+				...(isEmpty ? [] : [faqSchema(locationSeo.faq)]),
 				listingCollectionSchema({
 					name: locationSeo.title,
 					description: locationSeo.description,

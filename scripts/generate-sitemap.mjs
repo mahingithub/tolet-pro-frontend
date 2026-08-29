@@ -26,6 +26,7 @@ import { SITE_URL } from '../src/seo/siteConfig.js';
 import { ALL_LOCATION_PAGES } from '../src/seo/locationSeo.js';
 import { FEATURE_PAGES } from '../src/seo/featurePages.js';
 import { ALL_AREA_PAGES } from '../src/seo/areaSeo.js';
+import { hasListings, LISTING_COUNTS_OK } from '../src/seo/listingCounts.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(HERE, '../public/sitemap.xml');
@@ -54,18 +55,26 @@ const entries = [
   url('/to-let', { changefreq: 'daily', priority: 0.9 }),
   url('/properties/all', { changefreq: 'daily', priority: 0.9 }),
 
-  // ── Every division and district ────────────────────────────────────────
-  // These are the pages that win "flat rent in <place>" — the highest-volume
-  // rental searches in the country, and one page each.
-  ...ALL_LOCATION_PAGES.map((p) => url(p.path, {
-    changefreq: 'daily',
-    priority: p.kind === 'division' ? 0.8 : 0.7,
-  })),
+  // ── Locations WITH LISTINGS ────────────────────────────────────────────
+  // Only places that actually have something to show. There are 194 location
+  // pages and, right now, ~21 with any inventory — submitting the other ~173
+  // empty ones would ask Google to judge this domain on a couple of hundred
+  // pages that have nothing on them. They stay live and crawlable for anyone
+  // who follows a link; they are simply not offered until they fill up, and
+  // the next build adds them back automatically.
+  //
+  // `hasListings` fails open: if the API was unreachable at build time every
+  // page is included, exactly as before.
+  ...ALL_LOCATION_PAGES
+    .filter((p) => hasListings(p.path))
+    .map((p) => url(p.path, {
+      changefreq: 'daily',
+      priority: p.kind === 'division' ? 0.8 : 0.7,
+    })),
 
-  // ── Every area of Dhaka city ───────────────────────────────────────────
-  // Higher priority than a district: "মিরপুর বাসা ভাড়া" is a far more common
-  // search than "ঢাকা জেলা বাসা ভাড়া", and Dhaka is where the demand is.
-  ...ALL_AREA_PAGES.map((p) => url(p.path, { changefreq: 'daily', priority: 0.8 })),
+  ...ALL_AREA_PAGES
+    .filter((p) => hasListings(p.path))
+    .map((p) => url(p.path, { changefreq: 'daily', priority: 0.8 })),
 
   // ── Feature landing pages ──────────────────────────────────────────────
   ...FEATURE_PAGES.map((p) => url(p.slug, { changefreq: 'monthly', priority: 0.7 })),
@@ -95,13 +104,16 @@ ${entries.join('\n')}
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, xml, 'utf8');
 
-const divisions = ALL_LOCATION_PAGES.filter((p) => p.kind === 'division').length;
-const districts = ALL_LOCATION_PAGES.filter((p) => p.kind === 'district').length;
+const allLocations = [...ALL_LOCATION_PAGES, ...ALL_AREA_PAGES];
+const submitted = allLocations.filter((p) => hasListings(p.path)).length;
 console.log(
   `✓ sitemap.xml — ${entries.length} URLs `
-  + `(${divisions} divisions, ${districts} districts, ${ALL_AREA_PAGES.length} Dhaka areas, `
+  + `(${submitted}/${allLocations.length} location pages have listings, `
   + `${FEATURE_PAGES.length} landing pages) → public/sitemap.xml`,
 );
+if (!LISTING_COUNTS_OK) {
+  console.log('  ⚠ listing counts unavailable — every location page included');
+}
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * WHEN YOU WANT LISTINGS IN THE INDEX TOO

@@ -1166,16 +1166,7 @@ const MobileHome = () => {
               is: not only listings. */}
           {/* pb-9 clears the search panel, which is pulled up over the banner
               with `-mt-6` and would otherwise crowd the second line. */}
-          <h1 className="absolute inset-x-0 bottom-0 z-20 px-4 pb-9 text-white text-[19px] leading-[1.25] font-black tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
-            {language === 'বাংলা'
-              ? 'বাসা ভাড়া, বাড়ি ম্যানেজমেন্ট ও মেসের হিসাব'
-              : 'House rent, property management & mess accounts'}
-            <span className="block mt-1 text-[11px] font-bold text-white/70 tracking-normal">
-              {language === 'বাংলা'
-                ? 'House rent, property management & mess accounts'
-                : 'বাসা ভাড়া, বাড়ি ম্যানেজমেন্ট ও মেসের হিসাব'}
-            </span>
-          </h1>
+          {/* Hero text removed as requested */}
         </div>
       </div>
 

@@ -687,16 +687,7 @@ const HeroSection = () => {
             {/* Cinematic gradient for headline contrast */}
             <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-slate-900/10 z-10" />
             
-            {/* Desktop & Mobile Hero Text */}
-            <div className="relative z-20 px-4 -mt-10 md:-mt-24 w-full max-w-4xl mx-auto flex flex-col items-center justify-center">
-              <h1 className="text-3xl md:text-5xl lg:text-[4.5rem] font-black text-white tracking-tight leading-[1.05] mb-3 md:mb-6 drop-shadow-2xl">
-                {t?.heroTitle1 || 'Find Your Next'} <br className="md:hidden" /> 
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-rose-600 ml-0 md:ml-3">{t?.heroTitle2 || 'Perfect Home'}</span>
-              </h1>
-              <p className="text-[12px] md:text-lg lg:text-xl font-bold text-slate-100 max-w-2xl mx-auto drop-shadow-md hidden md:block leading-relaxed">
-                {t?.heroSubtext || 'Discover premium apartments, duplexes, and commercial spaces across Bangladesh.'}
-              </p>
-            </div>
+            {/* Desktop & Mobile Hero Text removed as requested */}
           </div>
         </section>
 

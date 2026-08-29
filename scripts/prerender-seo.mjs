@@ -51,6 +51,7 @@ import { ALL_AREA_PAGES, ALL_DHAKA_AREAS, areaPath } from '../src/seo/areaSeo.js
 // Sub-area names are lazy-loaded in the browser but free to read here, so the
 // prerendered HTML carries the full long tail for crawlers that run no JS.
 import { DHAKA_SUB_AREAS } from '../src/seo/dhakaSubAreas.js';
+import { hasListings } from '../src/seo/listingCounts.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DIST = resolve(HERE, '../dist');
@@ -84,11 +85,24 @@ function setTag(html, matcher, replacement) {
     : html.replace('</head>', `    ${replacement}\n  </head>`);
 }
 
-function buildHead(html, { title, description, keywords, path, image = OG_IMAGE, jsonLd = [] }) {
+function buildHead(html, {
+  title, description, keywords, path, image = OG_IMAGE, jsonLd = [], noindex = false,
+}) {
   const url = SITE_URL + path;
   let out = html;
 
   out = out.replace(/<title>[\s\S]*?<\/title>/, `<title>${esc(title)}</title>`);
+
+  // An empty location page is still a real page for anyone who follows a link
+  // to it — it just should not be competing in the index with nothing on it.
+  // `follow` is deliberate: crawlers should still walk out through its links
+  // to the areas and districts that DO have listings.
+  if (noindex) {
+    out = setTag(out, /<meta name="robots"[^>]*>/,
+      '<meta name="robots" content="noindex, follow" />');
+    out = setTag(out, /<meta name="googlebot"[^>]*>/,
+      '<meta name="googlebot" content="noindex, follow" />');
+  }
 
   out = setTag(out, /<meta name="description"[^>]*>/,
     `<meta name="description" content="${attr(description)}" />`);
@@ -378,10 +392,11 @@ const pages = [
     title: seo.title,
     description: seo.description,
     keywords: seo.keywords,
+    noindex: !hasListings(seo.path),
     body: locationBody(seo),
     jsonLd: [
       breadcrumbSchema(seo.breadcrumb),
-      faqSchema(seo.faq),
+      ...(hasListings(seo.path) ? [faqSchema(seo.faq)] : []),
       webPageSchema({ name: seo.title, description: seo.description, url: seo.path }),
     ],
   })),
@@ -396,10 +411,11 @@ const pages = [
     title: seo.title,
     description: seo.description,
     keywords: seo.keywords,
+    noindex: !hasListings(seo.path),
     body: locationBody(seo),
     jsonLd: [
       breadcrumbSchema(seo.breadcrumb),
-      faqSchema(seo.faq),
+      ...(hasListings(seo.path) ? [faqSchema(seo.faq)] : []),
       webPageSchema({ name: seo.title, description: seo.description, url: seo.path }),
     ],
   })),
@@ -438,4 +454,8 @@ for (const page of pages) {
   written += 1;
 }
 
-console.log(`✓ prerendered ${written} pages → dist/**/index.html`);
+const noindexed = pages.filter((p) => p.noindex).length;
+console.log(
+  `✓ prerendered ${written} pages → dist/**/index.html`
+  + (noindexed ? ` (${noindexed} noindex — no listings yet)` : ''),
+);

@@ -63,7 +63,13 @@ const HomeSeoContent = ({ variant = 'full' }) => {
       aria-labelledby="what-is-toletpro"
       className={`w-full bg-white border-t border-gray-100 ${compact ? '' : ''}`}
     >
-      <div className={`max-w-[1400px] mx-auto px-4 md:px-8 ${compact ? 'py-9' : 'py-14 md:py-20'}`}>
+      {/* pb-28 on the compact variant clears the fixed MobileBottomNav.
+          MobileHome carries its own pb-28 for exactly this reason, but this
+          section renders AFTER it and so sits outside that padding — which
+          left the last element of the page (the "read the full story" button)
+          under the nav bar: half hidden and not clickable, with no scroll left
+          to reveal it. Measured: button 734–776px, nav top at 748px. */}
+      <div className={`max-w-[1400px] mx-auto px-4 md:px-8 ${compact ? 'pt-9 pb-28' : 'py-14 md:py-20'}`}>
 
         {/* ── Heading ──────────────────────────────────────────────────── */}
         <div className="max-w-3xl">
