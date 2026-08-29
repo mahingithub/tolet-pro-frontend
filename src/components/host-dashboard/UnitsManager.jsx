@@ -28,13 +28,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Plus, X, Loader2, Users, Home, BedDouble, Trash2, Pencil,
-  UserPlus, ChevronDown, ChevronUp, DoorOpen, Check, RefreshCw, QrCode,
+  UserPlus, ChevronDown, ChevronUp, DoorOpen, Check, RefreshCw,
 } from 'lucide-react';
-import InviteShareSheet from '../invite/InviteShareSheet';
 import { listUnits, createUnit, createUnitsBulk, archiveUnit, updateUnit } from '../../services/buildingService';
 import SeatTenantModal from './SeatTenantModal';
 import { submitOnEnter } from '../../utils/submitOnEnter';
 import TenantDetailModal from './TenantDetailModal';
+import ModalPortal from '../shared/ModalPortal.jsx';
 import {
   SUITABLE_FOR, suitableForCardLabel, suitableForColor, unitNoun,
 } from '../../utils/buildingTypes';
@@ -104,10 +104,6 @@ export default function UnitsManager({
   // corrected freely — a landlord who let 102 to a family this year and to
   // bachelors the next changes one word, not the flat.
   const [editingSuitable, setEditingSuitable] = useState(null);
-  // Which invite the QR/link sheet is showing: { scope:'building' } for the
-  // universal one, or { scope:'unit', unit } for a single room. One piece of
-  // state for both, because only ever one sheet is open.
-  const [shareTarget, setShareTarget] = useState(null);
 
   const isSeat = building?.rentedAs === 'seat';
   const isFlat = building?.rentedAs === 'flat';
@@ -260,29 +256,10 @@ export default function UnitsManager({
             <span className="tabular-nums text-gray-400">{totalSeats}</span>
           </span>
         )}
-        {/* The building's UNIVERSAL invite — the one that goes in the house
-            WhatsApp group, or gets printed and taped up by the gate. It sits
-            here, inside the building the landlord already opened, rather than
-            on the dashboard home: there is one of these per building, and the
-            landlord is holding the building when they want it.
-
-            Shown only once there are rooms to pick from, because the tenant's
-            first step through this link is choosing one. */}
-        {units.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setShareTarget({ scope: 'building' })}
-            className="ml-auto shrink-0 inline-flex items-center gap-1.5 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-900 text-gray-600 hover:text-gray-900 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95"
-            title={isBn ? 'সবাইকে ইনভাইট করুন' : 'Invite everyone'}
-          >
-            <QrCode size={13} />
-            {isBn ? 'সবাইকে ইনভাইট' : 'Invite all'}
-          </button>
-        )}
         <button
           type="button"
           onClick={() => setAdding((a) => !a)}
-          className={`${units.length > 0 ? '' : 'ml-auto '}shrink-0 inline-flex items-center gap-1.5 bg-[#ba0036] hover:bg-[#a0002f] text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-[0_4px_12px_rgba(186,0,54,0.25)] active:scale-95`}
+          className="ml-auto shrink-0 inline-flex items-center gap-1.5 bg-[#ba0036] hover:bg-[#a0002f] text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-[0_4px_12px_rgba(186,0,54,0.25)] active:scale-95"
         >
           {adding ? <X size={13} strokeWidth={3} /> : <Plus size={13} strokeWidth={3} />}
           {adding ? (isBn ? 'বাতিল' : 'Cancel') : (isBn ? `${noun} যোগ` : `Add ${noun}`)}
@@ -645,22 +622,10 @@ export default function UnitsManager({
                               <span className="mx-1.5 text-gray-300">·</span>
                               {isBn ? 'ডিউ' : 'Due'} <span className="tabular-nums">{u.rentDueDay}</span>
                             </span>
-                            {/* This room's own invite link. The one that matters
-                                most is on an EMPTY room — that is the room a
-                                landlord is trying to fill, and the link is what
-                                they send to the person moving in. */}
-                            <button
-                              type="button"
-                              onClick={() => setShareTarget({ scope: 'unit', unit: u })}
-                              className="ml-auto shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-all"
-                              title={isBn ? 'এই রুমের ইনভাইট লিংক' : "This room's invite link"}
-                            >
-                              <QrCode size={13} />
-                            </button>
                             <button
                               type="button"
                               onClick={() => setConfirmDelete(u)}
-                              className="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
+                              className="ml-auto shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
                               title={isBn ? 'মুছে ফেলুন' : 'Remove'}
                             >
                               <Trash2 size={13} />
@@ -675,18 +640,6 @@ export default function UnitsManager({
             </div>
           ))}
         </div>
-      )}
-
-      {shareTarget && (
-        <InviteShareSheet
-          scope={shareTarget.scope}
-          buildingId={building?.id}
-          unitId={shareTarget.unit?.id}
-          buildingName={building?.name || ''}
-          roomLabel={shareTarget.unit ? `${noun} ${shareTarget.unit.roomNumber}` : ''}
-          language={language}
-          onClose={() => setShareTarget(null)}
-        />
       )}
 
       {viewing && (
@@ -722,6 +675,7 @@ export default function UnitsManager({
 
       {/* Delete confirmation — refused server-side while anyone lives here. */}
       {confirmDelete && (
+        <ModalPortal>
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setConfirmDelete(null)} />
           <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 animate-in zoom-in-95">
@@ -746,6 +700,7 @@ export default function UnitsManager({
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

@@ -28,6 +28,7 @@ import {
 import { RESIDENTIAL_TYPES } from '../../utils/buildingTypes';
 import { createBuilding } from '../../services/buildingService';
 import { submitOnEnter } from '../../utils/submitOnEnter';
+import ModalPortal from '../shared/ModalPortal.jsx';
 
 const TYPE_ICONS = {
   flat:        Home,
@@ -128,6 +129,7 @@ export default function BuildingSetupWizard({
   );
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in">
       <div
         className="bg-white rounded-3xl w-full max-w-md shadow-2xl animate-in zoom-in-95 max-h-[92vh] overflow-y-auto"
@@ -342,5 +344,6 @@ export default function BuildingSetupWizard({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

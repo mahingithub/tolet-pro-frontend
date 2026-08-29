@@ -25,6 +25,7 @@ import { addTenantToUnit, replaceTenantInUnit } from '../../services/buildingSer
 import { unitNoun } from '../../utils/buildingTypes';
 import { submitOnEnter } from '../../utils/submitOnEnter';
 import { scanTenantForm } from '../../services/aiScanService';
+import ModalPortal from '../shared/ModalPortal.jsx';
 
 const todayIso = () => {
   const d = new Date();
@@ -131,6 +132,7 @@ export default function SeatTenantModal({
   };
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in">
       <div
         className="bg-white rounded-3xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 max-h-[92vh] overflow-y-auto"
@@ -284,5 +286,6 @@ export default function SeatTenantModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
