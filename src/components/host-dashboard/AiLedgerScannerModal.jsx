@@ -2,11 +2,13 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { tenantFieldReport } from '../../utils/tenantFields';
 import { listUnits } from '../../services/buildingService';
+import { isBdMobile } from '../../utils/validators';
 import {
   X, Camera, Upload, Loader2, CheckCircle2, AlertCircle, ChevronDown,
   ChevronUp, Trash2, Plus, ScanLine, Sparkles, Check, RefreshCw,
-  User, Phone, Banknote, Building, Home, Eye, Save,
+  User, Phone, Banknote, Building, Home, Eye, Save, Info,
 } from 'lucide-react';
+
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
@@ -32,7 +34,22 @@ function toBase64(file) {
 function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onRemove, language }) {
   const isBn = language === 'বাংলা';
   const [open, setOpen] = useState(true);
+  // Tracks which fields the user has touched (blurred) so we only show
+  // validation errors after they've interacted with the field — Stripe-style.
+  const [touched, setTouched] = useState({});
+  // "অতিরিক্ত তথ্য" collapsible section for khata mode
+  const [extraOpen, setExtraOpen] = useState(false);
 
+  const touch = (key) => setTouched(prev => ({ ...prev, [key]: true }));
+
+  // ── Validation helpers ─────────────────────────────────────────────────────
+  const phoneVal = String(tenant.phone || '').trim();
+  const phoneInvalid = touched.phone && phoneVal && !isBdMobile(phoneVal);
+  const phoneMissing = touched.phone && !phoneVal;
+  const nameVal  = String(tenant.name  || '').trim();
+  const nameMissing = touched.name && !nameVal;
+
+  // ── Gaps (mandatory empty fields + AI-uncertain fields) ────────────────────
   // The four things a tenant cannot be saved without, plus anything the AI
   // flagged as uncertain. Optional fields left blank are not gaps: "no NID" is
   // a complete answer, and nagging about it is what made the old screen noisy.
@@ -48,24 +65,54 @@ function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onR
     return empty || unsure;
   });
 
-  const field = (key, value, flagKey) => (
-    <div className="relative">
-      {flagKey && tenant._flags?.[flagKey] && (
-        <span className="absolute -top-1.5 -right-1 z-10 w-3 h-3 rounded-full bg-amber-400 border-2 border-white"
-              title={isBn ? 'AI অনিশ্চিত — চেক করুন' : 'AI uncertain — please verify'} />
-      )}
-      <input
-        id={`scan-${idx}-${key}`}
-        value={value ?? ''}
-        onChange={e => onChange(idx, key, e.target.value)}
-        className={`w-full px-2.5 py-2 rounded-lg text-xs font-bold border focus:outline-none focus:ring-1 transition-all ${
-          flagKey && tenant._flags?.[flagKey]
-            ? 'border-amber-300 bg-amber-50 focus:ring-amber-400'
-            : 'border-gray-200 bg-white focus:ring-[#ba0036]/40'
-        }`}
-      />
-    </div>
-  );
+  // ── Validated input renderer (main fields, bottom section) ────────────────
+  const field = (key, value, flagKey) => {
+    const isPhone = key === 'phone';
+    const isName  = key === 'name';
+    const showPhoneErr = isPhone && (phoneInvalid || phoneMissing);
+    const showNameErr  = isName  && nameMissing;
+    const flagged  = flagKey && tenant._flags?.[flagKey];
+    let borderCls = 'border-gray-200 bg-white focus:ring-[#ba0036]/40';
+    if (flagged)        borderCls = 'border-amber-300 bg-amber-50 focus:ring-amber-400';
+    if (showPhoneErr || showNameErr) borderCls = 'border-rose-400 bg-rose-50 focus:ring-rose-400';
+    else if (isPhone && touched.phone && phoneVal && isBdMobile(phoneVal))
+                        borderCls = 'border-emerald-400 bg-emerald-50 focus:ring-emerald-400';
+
+    return (
+      <div className="relative">
+        {flagged && !showPhoneErr && !showNameErr && (
+          <span className="absolute -top-1.5 -right-1 z-10 w-3 h-3 rounded-full bg-amber-400 border-2 border-white"
+                title={isBn ? 'AI অনিশ্চিত — চেক করুন' : 'AI uncertain — please verify'} />
+        )}
+        <input
+          id={`scan-${idx}-${key}`}
+          type={isPhone ? 'tel' : 'text'}
+          value={value ?? ''}
+          onChange={e => onChange(idx, key, e.target.value)}
+          onBlur={() => touch(key)}
+          placeholder={isPhone ? '01xxxxxxxxx' : ''}
+          className={`w-full px-2.5 py-2 rounded-lg text-xs font-bold border focus:outline-none focus:ring-1 transition-all ${borderCls}`}
+        />
+        {showPhoneErr && (
+          <p className="text-[9px] font-bold text-rose-600 mt-0.5 leading-snug">
+            {phoneInvalid
+              ? (isBn ? '০১৩-০১৯ দিয়ে শুরু ১১ ডিজিট দিন' : 'Enter 11 digits starting 013–019')
+              : (isBn ? 'মোবাইল নম্বর দিতেই হবে' : 'Mobile number is required')}
+          </p>
+        )}
+        {showNameErr && (
+          <p className="text-[9px] font-bold text-rose-600 mt-0.5 leading-snug">
+            {isBn ? 'নাম দিতেই হবে' : 'Name is required'}
+          </p>
+        )}
+        {isPhone && touched.phone && phoneVal && isBdMobile(phoneVal) && (
+          <p className="text-[9px] font-bold text-emerald-600 mt-0.5 flex items-center gap-0.5">
+            <Check size={9} strokeWidth={3}/> {isBn ? 'বৈধ নম্বর' : 'Valid number'}
+          </p>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className={`rounded-2xl border overflow-hidden transition-all ${
@@ -121,21 +168,47 @@ function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onR
             <span className="tabular-nums">{gaps.length}</span>
           </p>
           <div className="grid grid-cols-2 gap-2 pb-2">
-            {gaps.map((g, gi) => (
-              <div key={g.key} className={g.wide ? 'col-span-2' : ''}>
-                <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">
-                  {isBn ? g.bn : g.en}
-                </label>
-                <input
-                  id={`scan-${idx}-${g.key}`}
-                  autoFocus={gi === 0}
-                  value={tenant[g.key] ?? ''}
-                  onChange={e => onChange(idx, g.key, e.target.value)}
-                  placeholder={isBn ? 'লিখুন' : 'Type here'}
-                  className="w-full px-2.5 py-2 rounded-lg text-xs font-bold border border-amber-300 bg-white focus:outline-none focus:ring-1 focus:ring-amber-400 transition-all"
-                />
-              </div>
-            ))}
+            {gaps.map((g, gi) => {
+              const isPhone = g.key === 'phone';
+              const gPhoneInvalid = isPhone && touched[g.key] && String(tenant[g.key] || '').trim() && !isBdMobile(tenant[g.key]);
+              const gPhoneMissing = isPhone && touched[g.key] && !String(tenant[g.key] || '').trim();
+              const gPhoneOk     = isPhone && touched[g.key] && isBdMobile(tenant[g.key]);
+              let borderCls = 'border-amber-300 bg-white focus:ring-amber-400';
+              if (gPhoneInvalid || gPhoneMissing) borderCls = 'border-rose-400 bg-rose-50 focus:ring-rose-400';
+              else if (gPhoneOk)                  borderCls = 'border-emerald-400 bg-emerald-50 focus:ring-emerald-400';
+              return (
+                <div key={g.key} className={g.wide ? 'col-span-2' : ''}>
+                  <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">
+                    {isBn ? g.bn : g.en}
+                    {(g.key === 'name' || g.key === 'phone' || g.key === 'monthlyRent') && (
+                      <span className="ml-1 text-rose-500">*</span>
+                    )}
+                  </label>
+                  <input
+                    id={`scan-${idx}-${g.key}`}
+                    autoFocus={gi === 0}
+                    type={isPhone ? 'tel' : 'text'}
+                    value={tenant[g.key] ?? ''}
+                    onChange={e => onChange(idx, g.key, e.target.value)}
+                    onBlur={() => touch(g.key)}
+                    placeholder={isPhone ? '01xxxxxxxxx' : (isBn ? 'লিখুন' : 'Type here')}
+                    className={`w-full px-2.5 py-2 rounded-lg text-xs font-bold border focus:outline-none focus:ring-1 transition-all ${borderCls}`}
+                  />
+                  {(gPhoneInvalid || gPhoneMissing) && (
+                    <p className="text-[9px] font-bold text-rose-600 mt-0.5">
+                      {gPhoneInvalid
+                        ? (isBn ? '০১৩-০১৯ দিয়ে শুরু ১১ ডিজিট' : '11 digits starting 013–019')
+                        : (isBn ? 'মোবাইল নম্বর আবশ্যক' : 'Required')}
+                    </p>
+                  )}
+                  {gPhoneOk && (
+                    <p className="text-[9px] font-bold text-emerald-600 mt-0.5 flex items-center gap-0.5">
+                      <Check size={9} strokeWidth={3}/> {isBn ? 'বৈধ নম্বর' : 'Valid'}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -208,6 +281,116 @@ function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onR
           </div>
         );
       })()}
+
+      {/* ── Extra details from the khata — only shown when the ledger actually
+          had them (NID column, father name column, etc.). Most ledgers will
+          have nothing here; the section is hidden in that case. */}
+      {open && scanMode === 'khata' && (() => {
+        const prof = tenant.tenantProfile || {};
+        const ALL_EXTRAS = [
+          { key: 'fatherName',    label: isBn ? 'পিতার নাম'        : "Father's name",   wide: true  },
+          { key: 'dob',           label: isBn ? 'জন্ম তারিখ'        : 'Date of birth'               },
+          { key: 'govtIdNumber',  label: isBn ? 'NID / পাসপোর্ট'   : 'NID / Passport',  wide: true  },
+          { key: 'permanentAddress', label: isBn ? 'স্থায়ী ঠিকানা' : 'Permanent address', wide: true },
+          { key: 'tenantType',    label: isBn ? 'পেশা'              : 'Profession'                   },
+          { key: 'organization',  label: isBn ? 'প্রতিষ্ঠান'        : 'Organization'                 },
+          { key: 'emergencyName', label: isBn ? 'জরুরি — নাম'       : 'Emergency — name'             },
+          { key: 'emergencyPhone',label: isBn ? 'জরুরি — মোবাইল'   : 'Emergency — mobile'           },
+          { key: 'emergencyRelation', label: isBn ? 'জরুরি — সম্পর্ক' : 'Emergency — relation'      },
+          { key: 'emergencyAddress', label: isBn ? 'জরুরি — ঠিকানা' : 'Emergency — address', wide: true },
+          { key: 'maritalStatus', label: isBn ? 'বৈবাহিক অবস্থা'   : 'Marital status'               },
+          { key: 'department',    label: isBn ? 'ডিপার্টমেন্ট'      : 'Department'                   },
+          { key: 'professionalIdNumber', label: isBn ? 'স্টুডেন্ট / এমপ্লয়ি আইডি' : 'Student / Employee ID', wide: true },
+        ];
+
+        // Split into AI-found (non-empty) and manually addable (empty)
+        const aiFound = ALL_EXTRAS.filter(e => String(prof[e.key] || '').trim());
+        // When extraOpen is true, show ALL fields (so user can also edit AI-found ones)
+        const manualExtras = extraOpen ? ALL_EXTRAS : aiFound;
+
+        const extraInput = (e) => {
+          const isEmgPhone = e.key === 'emergencyPhone';
+          const emgPhoneVal = String(prof[e.key] || '').trim();
+          const emgPhoneErr = isEmgPhone && emgPhoneVal && !isBdMobile(emgPhoneVal);
+          return (
+            <div key={e.key} className={e.wide ? 'col-span-2' : ''}>
+              <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">
+                {e.label}
+              </label>
+              <input
+                id={`scan-${idx}-prof-${e.key}`}
+                type={isEmgPhone ? 'tel' : 'text'}
+                value={prof[e.key] ?? ''}
+                onChange={ev => onProfileChange(idx, e.key, ev.target.value)}
+                placeholder={isEmgPhone ? '01xxxxxxxxx' : (isBn ? 'লিখুন' : 'Type here')}
+                className={`w-full px-2.5 py-2 rounded-lg text-xs font-bold border focus:outline-none focus:ring-1 transition-all ${
+                  emgPhoneErr
+                    ? 'border-rose-400 bg-rose-50 focus:ring-rose-400'
+                    : isEmgPhone && emgPhoneVal && isBdMobile(emgPhoneVal)
+                      ? 'border-emerald-400 bg-white focus:ring-emerald-400'
+                      : 'border-blue-200 bg-white focus:ring-blue-400'
+                }`}
+              />
+              {emgPhoneErr && (
+                <p className="text-[9px] font-bold text-rose-600 mt-0.5">
+                  {isBn ? '০১৩-০১৯ দিয়ে শুরু ১১ ডিজিট' : '11 digits starting 013–019'}
+                </p>
+              )}
+            </div>
+          );
+        };
+
+        return (
+          <div className="border-t border-blue-100">
+            {/* AI-found extras — always show if any */}
+            {aiFound.length > 0 && (
+              <div className="px-3 pb-2 pt-2 bg-blue-50/40">
+                <p className="text-[9px] font-black text-blue-700 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                  <Info size={9}/> {isBn ? 'খাতা থেকে পাওয়া অতিরিক্ত তথ্য' : 'Extra details from ledger'}
+                </p>
+                {!extraOpen && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {aiFound.map(extraInput)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* "অতিরিক্ত তথ্য যোগ করুন" toggle button */}
+            <button
+              type="button"
+              onClick={() => setExtraOpen(o => !o)}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors border-t border-gray-100"
+            >
+              <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest flex items-center gap-1">
+                <Plus size={10}/>
+                {isBn ? 'অতিরিক্ত তথ্য যোগ করুন' : 'Add extra info'}
+                <span className="font-bold text-gray-400 normal-case tracking-normal">
+                  {isBn ? '(ঐচ্ছিক)' : '(optional)'}
+                </span>
+              </span>
+              <span className="shrink-0 text-gray-400">
+                {extraOpen ? <ChevronUp size={13}/> : <ChevronDown size={13}/>}
+              </span>
+            </button>
+
+            {/* All extra fields — shown when expanded */}
+            {extraOpen && (
+              <div className="px-3 pb-3 pt-2 bg-white">
+                <p className="text-[9px] font-bold text-gray-400 mb-2 leading-relaxed">
+                  {isBn
+                    ? 'সবগুলো ঐচ্ছিক — খালি রেখেও সেভ হবে।'
+                    : 'All optional — you can save with any or all of these empty.'}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {ALL_EXTRAS.map(extraInput)}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
 
       {/* What the AI already got — collapsed to a summary so it doesn't
           compete for attention with the boxes that still need filling. */}
