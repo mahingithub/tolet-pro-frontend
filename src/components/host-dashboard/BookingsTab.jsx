@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, LayoutGrid, Building, Building2, MessageSquare, Calendar,
@@ -22,7 +22,8 @@ import { buildingTypeLabel, buildingTypeColor, normaliseSubCategory, unitNoun } 
 import { updateBuilding, archiveBuilding } from "../../services/buildingService";
 import AiLedgerScannerModal from "./AiLedgerScannerModal.jsx";
 import OnboardingApprovalsPanel from "./OnboardingApprovalsPanel.jsx";
-import { scopeBookings, bookingInBuilding } from '../../utils/buildingScope';
+import { scopeBookings, bookingInBuilding, sortByBuildingOrder } from '../../utils/buildingScope';
+import { occupantCount, occupantNames, primaryOccupant } from '../../utils/occupants';
 
 
 
@@ -86,6 +87,27 @@ export default function BookingsTab(props) {
             return null;
           };
 
+          // The lease opened in the detail modal. Looked up in baseBookings, not
+          // the filtered list, so changing a filter while it's open doesn't pull
+          // the tenant out from under the landlord.
+          const activeBookingDetail = expandedBookingId
+            ? baseBookings.find(b => b.id === expandedBookingId) || null
+            : null;
+          const closeBookingDetail = () => { setExpandedBookingId(null); setActiveDropdownId(null); };
+
+          // Escape closes it, and the list behind doesn't scroll while it's open.
+          useEffect(() => {
+            if (!activeBookingDetail) return undefined;
+            const onKey = (e) => { if (e.key === 'Escape') { setExpandedBookingId(null); setActiveDropdownId(null); } };
+            document.addEventListener('keydown', onKey);
+            const prev = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            return () => {
+              document.removeEventListener('keydown', onKey);
+              document.body.style.overflow = prev;
+            };
+          }, [activeBookingDetail, setExpandedBookingId, setActiveDropdownId]);
+
           const matchesSearch = (b) => b.tenant.toLowerCase().includes(searchQuery.toLowerCase()) || b.property.toLowerCase().includes(searchQuery.toLowerCase());
           // Only 'active' and 'done' are real stages now. `leaseStageFilter` is
           // shared with the Documents tab (which reuses the same state for its
@@ -93,7 +115,10 @@ export default function BookingsTab(props) {
           // rather than silently rendering an empty list.
           const stageFilter = (leaseStageFilter === 'active' || leaseStageFilter === 'done') ? leaseStageFilter : 'all';
           
-          let searchMatched = baseBookings.filter(matchesSearch);
+          // The order the landlord walks the building: ground floor up, then
+          // 101 · 102 · 110 inside each floor. Shared with Rent Collection, so
+          // the same tenant sits in the same place on both screens.
+          let searchMatched = sortByBuildingOrder(baseBookings.filter(matchesSearch));
 
           const filtered = searchMatched.filter(b => {
             const stage = computeLeaseStage(b, todayDate);
@@ -124,16 +149,46 @@ export default function BookingsTab(props) {
           const attentionLeases = filtered.filter(b => isLeaseEndingSoon(b, todayDate));
           const otherLeases     = filtered.filter(b => !isLeaseEndingSoon(b, todayDate));
 
-          // ── RENDER ONE COMPACT ROW (collapsed-by-default accordion) ────
-          // Collapsed: avatar + tenant + property + ৳rent + stage pill + next-due chip + chevron (~76px tall on mobile)
-          // Expanded: collapsed header + 4-tile financial breakdown + 3-tile lease term + progress bar + auto-reminder + actions
+          // The ⋮ menu for one lease. Lives in the DETAIL MODAL's header now —
+          // a dropdown anchored to a list row would open behind the modal that
+          // row summons.
+          const renderBookingActions = (booking) => (
+            <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => setActiveDropdownId(activeDropdownId === booking.id ? null : booking.id)}
+                className="p-1.5 rounded-lg bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"
+                title={language === 'বাংলা' ? 'আরও অ্যাকশন' : 'More actions'}
+              >
+                <MoreVertical size={16}/>
+              </button>
+              {activeDropdownId === booking.id && (
+                <div className="absolute right-0 top-full mt-2 w-52 bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[50] animate-in fade-in zoom-in-95 origin-top-right border border-gray-100">
+                  {/* Tenant change — the outgoing tenant left, so hand
+                      this unit to the next one. Carries the whole unit
+                      over; the host only edits name + phone. */}
+                  <button onClick={() => openTenantChangeLease(booking)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-700 transition-colors text-left"><RefreshCw size={14}/> {isBn ? 'নতুন ভাড়াটিয়া · নতুন লিজ' : 'New Tenant · New Lease'}</button>
+                  <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-indigo-50 text-xs font-bold text-gray-700 hover:text-indigo-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
+                  <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
+                  <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
+                  <div className="h-px w-full bg-gray-100 my-1"></div>
+                  <button onClick={() => { setActiveDropdownId(null); setConfirmDeleteBookingId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
+                </div>
+              )}
+            </div>
+          );
+
+          // ── ONE LEASE, in two shapes ───────────────────────────────────
+          //   mode 'row'    → the compact list card: avatar + tenant + property
+          //                   + ৳rent + stage pill + next-due chip (~76px tall)
+          //   mode 'detail' → everything else: 4-tile financial breakdown,
+          //                   3-tile lease term, progress, seats, actions
           //
-          // `forceOpen` (set by the list mapping when ≤ AUTO_EXPAND_THRESHOLD
-          // rows match) skips the tap-to-toggle behaviour and the chevron
-          // entirely — the row renders fully expanded on first paint and
-          // stays that way. Small portfolios get a static, fully-readable
-          // layout instead of accordion friction.
-          const renderBookingRow = (booking, forceOpen = false) => {
+          // The detail used to unfold underneath the row. With a building's
+          // worth of tenants on screen that pushed every other row out of view,
+          // so the same content now opens in a modal instead: one tenant, one
+          // room, nothing else competing for the screen.
+          const renderBookingRow = (booking, mode = 'row') => {
             const stage = computeLeaseStage(booking, todayDate);
             const endingSoon = isLeaseEndingSoon(booking, todayDate);
             const daysLeft = leaseDaysLeft(booking, todayDate);
@@ -147,37 +202,48 @@ export default function BookingsTab(props) {
             const progressBar = stage !== 'active' ? 'bg-gray-400' : endingSoon ? 'bg-amber-500' : 'bg-green-500';
             const next = daysUntilNextDue(booking, todayDate);
             const monthlyTotal = Number(booking.monthlyRent || 0) + Number(booking.serviceCharge || 0);
-            const tenantsLabel = (booking.tenantsCount || 1) === 1
+            // WHO IS ACTUALLY IN HERE — read off members[], not the headcount
+            // typed once on the lease form. A room filled from the Rooms view
+            // never sets tenantsCount at all, so a two-seat room reported
+            // "1 Tenant" while listing two people inside itself.
+            const people = occupantNames(booking);
+            const headCount = occupantCount(booking);
+            const occupant = primaryOccupant(booking, language);
+            const tenantsLabel = headCount === 1
               ? (language === 'বাংলা' ? '১ ভাড়াটিয়া' : '1 Tenant')
-              : (language === 'বাংলা' ? `${booking.tenantsCount} ভাড়াটিয়া` : `${booking.tenantsCount} Tenants`);
-            const isExpanded = forceOpen || expandedBookingId === booking.id;
+              : (language === 'বাংলা' ? `${headCount} ভাড়াটিয়া` : `${headCount} Tenants`);
+            const isExpanded = expandedBookingId === booking.id;
             // HOSTEL bookings are identified by the PROPERTY (house · room · floor),
             // NOT a tenant — the tenants are the per-seat rent boxes inside. Other
-            // formats keep the tenant name as the card title.
+            // formats are titled by the person, and that person comes from
+            // members[] first: on a seat building the server leaves
+            // booking.tenant EMPTY on purpose, and on a flat it goes stale the
+            // moment the tenant joins with the invite code.
             const hostelBooking = isHostelBooking(booking);
-            const cardTitle = hostelBooking ? booking.property : booking.tenant;
-            const cardAvatarText = hostelBooking ? ((booking.property || 'H').trim()[0] || 'H').toUpperCase() : booking.tenantInit;
+            const cardTitle = hostelBooking ? booking.property : occupant.name;
+            const cardAvatar = hostelBooking ? '' : occupant.avatar;
+            const cardAvatarText = hostelBooking ? ((booking.property || 'H').trim()[0] || 'H').toUpperCase() : occupant.init;
             const stageAvatar = stage !== 'active' ? 'bg-gradient-to-br from-indigo-500 to-purple-600'
                               : endingSoon ? 'bg-gradient-to-br from-indigo-500 to-purple-600'
                               : 'bg-gradient-to-br from-indigo-500 to-purple-600';
 
             return (
-              <div id={`booking-${booking.id}`} key={booking.id} className={`bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
-
-                {/* Compact row — always visible. Click-to-toggle suppressed in
-                    forceOpen mode. Rendered as a div (not a <button>) so the 3-dot
-                    actions menu can live at the header's top-right without nesting
-                    a button inside a button. */}
+              <React.Fragment key={booking.id}>
+              {mode === 'row' && (
+                /* The list card. The whole card is the target — tapping it
+                   opens this lease in a modal. Still a div (not a <button>) so
+                   nothing nests a button inside a button. */
                 <div
-                  role={forceOpen ? undefined : 'button'}
-                  tabIndex={forceOpen ? undefined : 0}
-                  onClick={forceOpen ? undefined : () => setExpandedBookingId(isExpanded ? null : booking.id)}
-                  onKeyDown={forceOpen ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedBookingId(isExpanded ? null : booking.id); } }}
-                  className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-3 text-left transition-colors ${forceOpen ? 'cursor-default' : 'cursor-pointer hover:bg-gray-50/50'}`}
+                  id={`booking-${booking.id}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setExpandedBookingId(booking.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedBookingId(booking.id); } }}
+                  className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-3 text-left bg-white rounded-2xl border overflow-hidden transition-all duration-300 cursor-pointer ${isExpanded ? 'border-[#ba0036]/30 shadow-[0_6px_24px_rgba(186,0,54,0.10)]' : 'border-gray-100/80 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:border-gray-200 hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}
                 >
                   <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-black text-[11px] sm:text-xs shrink-0 ${stageAvatar} overflow-hidden`}>
-                    {(!hostelBooking && booking.tenantAvatar) ? (
-                      <img src={booking.tenantAvatar} alt={booking.tenant} className="w-full h-full object-cover" />
+                    {cardAvatar ? (
+                      <img src={cardAvatar} alt={occupant.name} className="w-full h-full object-cover" />
                     ) : (
                       cardAvatarText
                     )}
@@ -185,6 +251,13 @@ export default function BookingsTab(props) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
                       <h4 className="text-[13px] sm:text-sm font-black text-gray-900 truncate max-w-[130px] sm:max-w-[200px]">{cardTitle}</h4>
+                      {/* Real occupancy, off members[]. Seats, not heads — one
+                          person holding a whole 4-seat room reads as 4. */}
+                      {headCount > 1 && (
+                        <span className="px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-black uppercase tracking-wider bg-gray-100 text-gray-700 border border-gray-200 shrink-0 inline-flex items-center gap-0.5 tabular-nums">
+                          <Users size={9}/> {headCount}
+                        </span>
+                      )}
                       {booking.floorNumber && (
                         <span className="px-1.5 py-0.5 rounded-md text-[8px] sm:text-[9px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 border border-indigo-200 shrink-0 inline-flex items-center gap-0.5">
                           {language === 'বাংলা' ? 'ফ্লোর' : 'Floor'} {booking.floorNumber}
@@ -209,7 +282,18 @@ export default function BookingsTab(props) {
                       )}
                     </div>
                     <p className="text-[10px] font-bold text-gray-500 truncate">
-                      <span className="text-emerald-600 font-black">{hostelBooking ? tenantsLabel : booking.property}</span>
+                      {/* The card carries BOTH facts, whichever way round it is
+                          titled: a hostel room is titled by the room, so the
+                          names go here; a flat is titled by the person, so the
+                          property does. "How do I know who is in this booking"
+                          should never need the card to be opened. */}
+                      <span className="text-emerald-600 font-black">
+                        {hostelBooking
+                          ? (people.length > 0
+                              ? people.slice(0, 2).join(', ') + (people.length > 2 ? ` +${people.length - 2}` : '')
+                              : (isBn ? 'সিট খালি' : 'No tenant yet'))
+                          : booking.property}
+                      </span>
                       {booking.roomNumber && (
                         <>
                           <span className="mx-1 text-gray-300">·</span>
@@ -227,12 +311,10 @@ export default function BookingsTab(props) {
                       )}
                     </p>
                   </div>
-                  {/* Right-hand meter — desktop, COLLAPSED only. Hidden once
-                      expanded (the body already shows the full detail), freeing
-                      the top-right corner for the 3-dot menu.
+                  {/* Right-hand meter — desktop only.
                       Fixed term ⇒ % complete. Ongoing tenancy ⇒ how long the
                       tenant has been here, which is the only honest number. */}
-                  <div className={`flex-col items-end gap-0.5 shrink-0 mr-1 ${isExpanded ? 'hidden' : 'hidden sm:flex'}`}>
+                  <div className="hidden sm:flex flex-col items-end gap-0.5 shrink-0 mr-1">
                     {progress == null ? (
                       <span className="px-1.5 py-0.5 rounded-md bg-green-50 text-green-700 text-[9px] font-black uppercase tracking-wider tabular-nums whitespace-nowrap">
                         {monthsRunning}{isBn ? ' মাস' : ' mo'}
@@ -246,42 +328,16 @@ export default function BookingsTab(props) {
                       </>
                     )}
                   </div>
-                  {/* 3-dot actions menu — top-right of the card, next to the profile
-                      photo/name. stopPropagation keeps opening it from toggling the row; 
-                      it opens downward so it doesn't get clipped. */}
-                  {isExpanded && (
-                    <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={() => setActiveDropdownId(activeDropdownId === booking.id ? null : booking.id)}
-                        className="p-1.5 rounded-lg bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all border border-gray-100"
-                        title={language === 'বাংলা' ? 'আরও অ্যাকশন' : 'More actions'}
-                      >
-                        <MoreVertical size={16}/>
-                      </button>
-                      {activeDropdownId === booking.id && (
-                        <div className="absolute right-0 top-full mt-2 w-52 bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)] rounded-2xl p-1.5 z-[50] animate-in fade-in zoom-in-95 origin-top-right border border-gray-100">
-                          {/* Tenant change — the outgoing tenant left, so hand
-                              this unit to the next one. Carries the whole unit
-                              over; the host only edits name + phone. */}
-                          <button onClick={() => openTenantChangeLease(booking)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-700 transition-colors text-left"><RefreshCw size={14}/> {isBn ? 'নতুন ভাড়াটিয়া · নতুন লিজ' : 'New Tenant · New Lease'}</button>
-                          <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-indigo-50 text-xs font-bold text-gray-700 hover:text-indigo-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
-                          <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
-                          <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
-                          <div className="h-px w-full bg-gray-100 my-1"></div>
-                          <button onClick={() => { setActiveDropdownId(null); setConfirmDeleteBookingId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
-                        </div>
-                      )}
-                    </div>
-                  )}
                   <div className="shrink-0 p-1.5 rounded-lg bg-gray-50 text-gray-400">
-                    {isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                    <ChevronRight size={14}/>
                   </div>
                 </div>
+                )}
 
-                {/* Expanded body — full agreement details */}
-                {isExpanded && (
-                  <div className="border-t border-gray-100 bg-gray-50/40 px-3 sm:px-4 py-4 animate-in slide-in-from-top-2 fade-in duration-300">
+                {/* Detail — the modal body. Everything the accordion used to
+                    unfold, now shown with only this lease on screen. */}
+                {mode === 'detail' && (
+                  <div className="px-3 sm:px-4 py-4">
 
                     {/* Location + commercial terms — ONE horizontal row on every
                         device. Pills never wrap or change position: on a narrow
@@ -436,32 +492,16 @@ export default function BookingsTab(props) {
                       </div>
                     )}
 
-                    {/* Seats — HOSTEL bookings only (each seat = a member with
-                        their own rent box). Flat / sublet stay single-tenant. */}
-                    {isHostelBooking(booking) && (
-                      <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} showLedger={false} />
-                    )}
-
-                    {/* Tenant connection code — non-hostel (hostels show it in
-                        the members panel). Share so the tenant can self-connect. */}
-                    {!isHostelBooking(booking) && booking.inviteCode && (
-                      <div className="mt-3 bg-white rounded-xl border border-gray-100 p-3 flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Lock size={14} className="text-[#ba0036] shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'টেন্যান্ট কানেকশন কোড' : 'Tenant Connection Code'}</p>
-                            <p className="text-sm font-black text-gray-900 tracking-widest tabular-nums">{booking.inviteCode}</p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => { try { navigator.clipboard.writeText(booking.inviteCode); showToast(language === 'বাংলা' ? 'কোড কপি হয়েছে' : 'Code copied'); } catch { /* clipboard unavailable */ } }}
-                          className="shrink-0 px-2.5 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 text-[10px] font-black text-gray-700 inline-flex items-center gap-1"
-                        >
-                          <ClipboardCheck size={12} /> {language === 'বাংলা' ? 'কপি' : 'Copy'}
-                        </button>
-                      </div>
-                    )}
+                    {/* WHO LIVES HERE — every format, not just hostels.
+                        This panel used to be hostel-only, so a flat or a single
+                        room showed no occupant anywhere on the card: the person
+                        was in members[], and nothing on this screen read that
+                        array. MembersManager already handles the single-tenant
+                        case (it synthesises one member from the booking's own
+                        tenant fields), so flat · single room · sublet · hostel
+                        seat all now name their occupants in the same place,
+                        with the same invite code and QR beside them. */}
+                    <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} showLedger={false} />
 
                     {/* ── Hand the unit to the next tenant ──────────────────
                         A landlord sets a unit up ONCE. When the tenancy ends —
@@ -552,7 +592,7 @@ export default function BookingsTab(props) {
                     </div>
                   </div>
                 )}
-              </div>
+              </React.Fragment>
             );
           };
           // ── TOOLBAR PIECES ─────────────────────────────────────────────
@@ -1115,7 +1155,7 @@ export default function BookingsTab(props) {
                           <button
                             key={v.id}
                             type="button"
-                            onClick={() => setBuildingView(v.id)}
+                            onClick={() => { setBuildingView(v.id); closeBookingDetail(); }}
                             className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${buildingView === v.id ? 'bg-gray-900 text-white shadow-[0_3px_10px_rgba(0,0,0,0.18)]' : 'bg-white text-gray-500 hover:text-gray-900 shadow-[0_2px_6px_rgba(0,0,0,0.03)]'}`}
                           >
                             {isBn ? v.bn : v.en}
@@ -1168,13 +1208,11 @@ export default function BookingsTab(props) {
                   <div className="flex lg:hidden items-center gap-1.5 mt-2 overflow-x-auto no-scrollbar">{filterPills}</div>
                 </div>
 
-                {/* List — flat sequence of compact rows. Sticky toolbar above
-                    floats on scroll. forceOpen auto-engages when the filtered
-                    list is ≤5 rows; small portfolios then get a fully-readable
-                    static layout instead of accordion friction. */}
+                {/* List — compact rows in building order (floor, then room).
+                    Sticky toolbar above floats on scroll. Tapping a row opens
+                    that lease in a modal; nothing expands in place, so row 1
+                    and row 70 read the same. */}
                 {(() => {
-                  const AUTO_EXPAND_THRESHOLD = 5;
-                  const forceOpen = false;
                   if (filtered.length === 0) {
                     // Empty state carries the primary action. A host with no
                     // bookings yet used to land on a dead card that only told
@@ -1243,7 +1281,7 @@ export default function BookingsTab(props) {
                             </span>
                             <div className="flex-1 h-px bg-amber-200/60"/>
                           </div>
-                          {attentionLeases.map((b) => renderBookingRow(b, forceOpen))}
+                          {attentionLeases.map((b) => renderBookingRow(b))}
                           {otherLeases.length > 0 && (
                             <div className="flex items-center gap-2 px-1 pt-3 pb-1">
                               <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
@@ -1252,10 +1290,10 @@ export default function BookingsTab(props) {
                               <div className="flex-1 h-px bg-gray-200"/>
                             </div>
                           )}
-                          {otherLeases.map((b) => renderBookingRow(b, forceOpen))}
+                          {otherLeases.map((b) => renderBookingRow(b))}
                         </>
                       ) : (
-                        filtered.map((b) => renderBookingRow(b, forceOpen))
+                        filtered.map((b) => renderBookingRow(b))
                       )}
                     </div>
                   );
@@ -1265,6 +1303,76 @@ export default function BookingsTab(props) {
                   </div>
                 )}
               </main>
+
+              {/* ── ONE LEASE, nothing else ───────────────────────────────
+                  The tenant the landlord tapped, on top of the list rather
+                  than shoving it around. With a building's worth of rows an
+                  in-place accordion moved everything below it and buried the
+                  row that was just tapped; this shows one tenant, one room. */}
+              {activeBookingDetail && (() => {
+                const detailIsHostel = isHostelBooking(activeBookingDetail);
+                const detailOccupant = primaryOccupant(activeBookingDetail, language);
+                const detailPeople = occupantNames(activeBookingDetail);
+                const detailHeads = occupantCount(activeBookingDetail);
+                const detailTitle = detailIsHostel ? activeBookingDetail.property : detailOccupant.name;
+                const detailStage = computeLeaseStage(activeBookingDetail, todayDate);
+                return (
+                  <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4">
+                    <div className="absolute inset-0 bg-black/45 backdrop-blur-sm animate-in fade-in duration-200" onClick={closeBookingDetail} />
+                    <div
+                      role="dialog"
+                      aria-modal="true"
+                      aria-label={detailTitle}
+                      className="relative bg-gray-50 w-full sm:max-w-2xl rounded-t-[1.75rem] sm:rounded-[1.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.28)] max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
+                    >
+                      <div className="shrink-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-xs shrink-0 bg-gradient-to-br from-indigo-500 to-purple-600 overflow-hidden">
+                          {(!detailIsHostel && detailOccupant.avatar)
+                            ? <img src={detailOccupant.avatar} alt={detailOccupant.name} className="w-full h-full object-cover" />
+                            : (detailIsHostel ? ((activeBookingDetail.property || 'H').trim()[0] || 'H').toUpperCase() : detailOccupant.init)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h3 className="text-base font-black text-gray-900 truncate">{detailTitle}</h3>
+                            {detailHeads > 1 && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-gray-100 text-gray-700 border border-gray-200 shrink-0 inline-flex items-center gap-0.5 tabular-nums">
+                                <Users size={10}/> {detailHeads}
+                              </span>
+                            )}
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border shrink-0 ${stageBadge(detailStage, isLeaseEndingSoon(activeBookingDetail, todayDate))}`}>
+                              {stageLabel(detailStage, language)}
+                            </span>
+                          </div>
+                          <p className="text-[10px] font-bold text-gray-500 truncate mt-0.5">
+                            {activeBookingDetail.roomNumber && (
+                              <>
+                                <span className="text-emerald-600 font-black">{isBn ? 'রুম' : 'Room'} {activeBookingDetail.roomNumber}</span>
+                                {activeBookingDetail.floorNumber && <>{' · '}{isBn ? 'ফ্লোর' : 'Floor'} {activeBookingDetail.floorNumber}</>}
+                                <span className="mx-1 text-gray-300">·</span>
+                              </>
+                            )}
+                            {detailIsHostel
+                              ? (detailPeople.length > 0 ? detailPeople.join(', ') : (isBn ? 'সিট খালি' : 'No tenant yet'))
+                              : (detailOccupant.phone || activeBookingDetail.property)}
+                          </p>
+                        </div>
+                        {renderBookingActions(activeBookingDetail)}
+                        <button
+                          type="button"
+                          onClick={closeBookingDetail}
+                          aria-label={isBn ? 'বন্ধ করুন' : 'Close'}
+                          className="shrink-0 p-2 rounded-xl text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                        >
+                          <X size={18}/>
+                        </button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        {renderBookingRow(activeBookingDetail, 'detail')}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Building Delete Confirmation Modal */}
               {deleteBuildingId && (

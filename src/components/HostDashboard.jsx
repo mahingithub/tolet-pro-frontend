@@ -67,6 +67,7 @@ import TenantInfoForm from './host-dashboard/TenantInfoForm';
 import { emptyTenantProfile, validateTenantProfile, toTenantProfile } from '../utils/tenantFields';
 import { scopeBookings, bookingInBuilding } from '../utils/buildingScope';
 import { paidSoFar, remainingFor, applyPaymentToEntry } from '../utils/rentLedger';
+import { primaryOccupant, occupantNames, occupantCount } from '../utils/occupants';
 import { submitOnEnter } from '../utils/submitOnEnter';
 import { listBuildings } from '../services/buildingService';
 
@@ -2645,6 +2646,93 @@ const HostDashboard = () => {
     setActiveModal(null);
   };
 
+  // ── Settle a WHOLE ROOM for one month ──────────────────────────────────────
+  // A room with two occupants where one has paid and one hasn't is still ONE
+  // room. Collecting the rest of it was four taps per seat through the mark-paid
+  // modal, and the room only existed in the landlord's head while they did it.
+  // This clears every seat that still owes something for `key` in one action.
+  //
+  // Seats that are already settled are left alone — this collects what is
+  // outstanding, it does not re-charge anyone. Each seat's payment is folded
+  // into its own ledger through applyPaymentToEntry, exactly as a single
+  // mark-paid would, so the room shortcut and the per-seat flow can never
+  // disagree about what a month holds.
+  const markRoomPaid = (units, key, meta = {}) => {
+    const rows = Array.isArray(units) ? units : [];
+    if (rows.length === 0 || !key) return;
+    const bookingId = rows[0].__realId || rows[0].id;
+    const booking = bookings.find(b => b.id === bookingId);
+    if (!booking) return;
+
+    const paidOn = meta.paidOn || todayIso();
+    const method = meta.method || 'Cash';
+    const activeMems = Array.isArray(booking.members) ? booking.members.filter(m => m && m.status !== 'moved-out') : [];
+
+    // One target per seat that still owes money for this month.
+    const targets = [];
+    rows.forEach((u) => {
+      if (!enumerateLeaseMonths(u.leaseStart, u.leaseEnd, today).includes(key)) return;
+      const memberId = u.__memberId || null;
+      const mem = memberId ? activeMems.find(m => m.id === memberId) : null;
+      const expected = mem
+        ? seatShare(booking, mem, activeMems.length)
+        : (Number(booking.monthlyRent || 0) + Number(booking.serviceCharge || 0));
+      const existing = mem ? (mem.ledger || {})[key] : (booking.ledger || {})[key];
+      const remaining = remainingFor(existing, expected);
+      if (remaining <= 0) return;
+      targets.push({
+        memberId,
+        expected,
+        remaining,
+        name: mem?.name || booking.tenant,
+        entry: applyPaymentToEntry(existing, { amount: remaining, expected, meta: { paidOn, method, txnId: '' } }),
+      });
+    });
+
+    if (targets.length === 0) {
+      showToast(language === 'বাংলা' ? 'এই মাসের রুমের ভাড়া আগেই ক্লিয়ার' : 'This room is already cleared for the month');
+      return;
+    }
+
+    setBookings(prev => prev.map(b => {
+      if (b.id !== bookingId) return b;
+      const next = { ...b };
+      const seatTargets = targets.filter(t => t.memberId);
+      if (seatTargets.length > 0) {
+        next.members = (b.members || []).map(m => {
+          const t = seatTargets.find(x => x.memberId === m.id);
+          return t ? { ...m, ledger: { ...(m.ledger || {}), [key]: t.entry } } : m;
+        });
+      }
+      // A room with no members is itself the tenancy — its ledger is the room's.
+      const roomTarget = targets.find(t => !t.memberId);
+      if (roomTarget) next.ledger = { ...(b.ledger || {}), [key]: roomTarget.entry };
+      return next;
+    }));
+
+    const total = targets.reduce((n, t) => n + t.remaining, 0);
+    const monthLabel = monthFullLabel(key, language);
+    showToast(language === 'বাংলা'
+      ? `${monthLabel} — পুরো রুম ক্লিয়ার · ${formatBDT(total)} · ${targets.length} জন`
+      : `${monthLabel} — whole room cleared · ${formatBDT(total)} from ${targets.length} tenant${targets.length > 1 ? 's' : ''}`);
+
+    const bookingMongoId = booking._id || bookingId;
+    targets.forEach((t) => {
+      const apiBody = {
+        ...t.entry,
+        amountReceived: t.remaining,
+        monthLabel,
+        totalDue: t.expected,
+      };
+      (t.memberId
+        ? updateMemberLedgerApi(bookingMongoId, t.memberId, key, apiBody)
+        : updateLedgerApi(bookingMongoId, key, apiBody)
+      ).catch(err => {
+        console.warn('[host] room mark paid sync failed:', err.message || err);
+      });
+    });
+  };
+
   // Reverse a payment record — used when a payment was logged by mistake.
   // Also pulls the receipt from the tenant's inbox so they don't see a
   // stale "Paid" notification for a payment that never happened.
@@ -2765,9 +2853,15 @@ const HostDashboard = () => {
       line('Parties', { size: 12, bold: true, gap: 20 });
       kv('Landlord', userData?.fullName || authUser?.name || authUser?.fullName || '—');
       kv('Landlord Phone', userData?.phone || authUser?.phone || '—');
-      kv('Tenant', booking.tenant || '—');
-      kv('Tenant Phone', booking.tenantPhone || '—');
-      kv('Occupants', booking.tenantsCount || 1);
+      // Off members[], not the headcount typed once on the lease form — an
+      // agreement that names the wrong person, or claims one occupant for a
+      // two-seat room, is a document the landlord can't hand to anyone.
+      const agreementOccupant = primaryOccupant(booking, language);
+      const agreementNames = occupantNames(booking);
+      kv('Tenant', agreementOccupant.name);
+      kv('Tenant Phone', agreementOccupant.phone || '—');
+      kv('Occupants', occupantCount(booking));
+      if (agreementNames.length > 1) kv('Occupant Names', agreementNames.join(', '));
       y += 4; rule();
 
       line('Property', { size: 12, bold: true, gap: 20 });
@@ -2853,7 +2947,11 @@ const HostDashboard = () => {
         return '';
       });
       lines.push([
-        b.tenant || '', b.property || '', b.location || '', b.tenantPhone || '', b.tenantsCount || 1,
+        // Who is actually in the unit, read off members[] — b.tenant is blank
+        // for every seat-rented room, so the export used to have empty name
+        // columns for exactly the rooms with the most people in them.
+        occupantNames(b).join(' | ') || b.tenant || '',
+        b.property || '', b.location || '', primaryOccupant(b, language).phone || '', occupantCount(b),
         Number(b.monthlyRent) || 0, Number(b.advancePayment) || 0, b.paymentMethod || '',
         ...monthCells, yearTotal, b.leaseStart || '', b.leaseEnd || 'Ongoing', computeLeaseStage(b, today),
       ].map(esc).join(','));
@@ -5234,6 +5332,7 @@ const HostDashboard = () => {
             setActiveTab={setActiveTab}
             t={t}
             openMarkPaid={openMarkPaid}
+            markRoomPaid={markRoomPaid}
             ledgerYear={ledgerYear}
             setLedgerYear={setLedgerYear}
             rentUnitsOf={rentUnitsOf}

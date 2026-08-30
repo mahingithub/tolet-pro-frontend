@@ -267,6 +267,86 @@ export const normalizeTenantBooking = (booking) => {
 export const normalizeTenantBookings = (rows = []) => (rows || []).map(normalizeTenantBooking);
 
 // ─────────────────────────────────────────────────────────────────────────────
+// One person lives in one place
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * When this tenancy began, for the viewer. Mirrors tenancy.service.js on the
+ * server: their own move-in beats the lease's start date (on a shared unit the
+ * lease may predate them by years), which beats when the record was created.
+ */
+export const tenancyStartedAt = (booking) => {
+  const mine = resolveMyMember(booking);
+  const candidates = [mine?.joinDate, booking?.leaseStart, booking?.createdAt];
+  for (const c of candidates) {
+    const d = c ? new Date(c) : null;
+    if (d && !Number.isNaN(d.getTime())) return d;
+  }
+  return new Date(0);
+};
+
+/** Newest tenancy first. `createdAt` is the tie-break, not the signal. */
+export const sortByRecency = (bookings = []) => [...(bookings || [])].sort((a, b) => {
+  const at = tenancyStartedAt(a).getTime();
+  const bt = tenancyStartedAt(b).getTime();
+  if (bt !== at) return bt - at;
+  return new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0);
+});
+
+/**
+ * SPLIT A TENANT'S BOOKINGS INTO "HOME" AND "USED TO LIVE THERE".
+ *
+ * A person lives in one place. When several tenancies are open at once it is
+ * not because they rent four homes — it is because they moved and nobody
+ * stamped the old rows: the previous landlord has no reason to think about a
+ * tenant who has gone, and until now the tenant had no button. So the dashboard
+ * showed four rent cards and added up four sets of dues.
+ *
+ * The most recently started tenancy is home. Everything else is history —
+ * KEPT, labelled, and still holding its own rent ledger and receipts, because
+ * a tenant who moved in March still needs last year's receipts and a card that
+ * silently vanished reads as lost data.
+ *
+ * The server answers this too (`isCurrentHome`, set in listTenantBookings) and
+ * that answer wins when present; the local ordering is the fallback for a
+ * cached payload written by an older build.
+ *
+ * NOTE ON BEING WRONG: someone who genuinely holds two lets at once — a shop
+ * and a home — sees the older one filed as a previous home. Their landlord can
+ * re-add them, and no history is lost either way. That trade is deliberate and
+ * matches what the server already does when a tenant joins somewhere new
+ * (tenancy.service.closeOtherTenancies).
+ */
+export const resolveTenancies = (bookings = []) => {
+  const rows = normalizeTenantBookings(
+    (bookings || []).filter((b) => b && b.status !== 'cancelled' && !b.deletedAt),
+  );
+
+  const ended = rows.filter((b) => b.isPastTenancy);
+  const open = rows.filter((b) => !b.isPastTenancy);
+
+  // Trust the server's answer when it gave one.
+  let current = open.find((b) => b.isCurrentHome) || null;
+  if (!current && open.length) current = sortByRecency(open)[0];
+
+  const superseded = open
+    .filter((b) => b !== current)
+    .map((b) => ({ ...b, isSupersededTenancy: true }));
+
+  // Previous homes, most recently left first.
+  const previous = sortByRecency([...superseded, ...ended]);
+
+  return {
+    current,
+    previous,
+    /** What the rent flow acts on: exactly one tenancy, or none. */
+    active: current ? [current] : [],
+    /** True when we INFERRED the move rather than the landlord stamping it. */
+    hasUnstampedMoves: superseded.length > 0,
+  };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Receipts → leases
 // ─────────────────────────────────────────────────────────────────────────────
 

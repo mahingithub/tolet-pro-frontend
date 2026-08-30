@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, LayoutGrid, Building, Building2, MessageSquare, Calendar,
@@ -20,9 +20,11 @@ import {
 } from 'lucide-react';
 import MembersManager from "../MembersManager.jsx";
 import { scopeBookings, bookingInBuilding, sortRentUnits } from '../../utils/buildingScope';
+import { primaryOccupant, occupantCount } from '../../utils/occupants';
 import { buildingTypeLabel, buildingTypeColor, normaliseSubCategory } from '../../utils/buildingTypes';
 import VacantUnitsPanel from './VacantUnitsPanel';
-import RoomRentGroup from './RoomRentGroup';
+import RentRoomCard from './RentRoomCard';
+import RentRoomModal from './RentRoomModal';
 import OverdueDrawer from './OverdueDrawer';
 
 // Month labels for the 12-month rent matrix cells. Kept local to this file so
@@ -35,7 +37,7 @@ export default function RentTab(props) {
   const {
     today, bookings, language, searchQuery, setSearchQuery, rentPriorityFilter, setRentPriorityFilter,
     expandedRentId, setExpandedRentId, activeDropdownId, setActiveDropdownId,
-    handleCallUser, resolveTenantUserId, setActiveTab, t, openMarkPaid, ledgerYear, setLedgerYear,
+    handleCallUser, resolveTenantUserId, setActiveTab, t, openMarkPaid, markRoomPaid, ledgerYear, setLedgerYear,
     rentUnitsOf, getMonthCollectionSummary, enumerateLeaseMonths, getRentStatus, monthKey,
     monthFullLabel, monthShortLabel, getDueDate, parseMonthKey, formatBDT, formatDate,
     computeBookingStatus, daysUntilNextDue, computeLeaseStage, isOpenEndedLease,
@@ -54,6 +56,23 @@ export default function RentTab(props) {
   // sections stay where they are; this is a second, always-reachable way to
   // see who owes money without scrolling back up.
   const [remindersOpen, setRemindersOpen] = useState(false);
+  // The room being looked at — { key, focusUnitId }. Rent Collection opens ONE
+  // room at a time in a modal instead of expanding accordions in place: with
+  // seventy rooms, expanding one buried the rest and the landlord lost their
+  // place on the page they were reading.
+  const [roomModal, setRoomModal] = useState(null);
+
+  // Everything that used to "expand a tenant" — the Bookings tab's Invoice
+  // button, the overdue drawer, a notification deep link — still hands us an
+  // id. It now opens that tenant's ROOM, with their seat already unfolded.
+  // Rent rows are `bookingId::memberId`; a bare booking id arrives from the
+  // screens that don't know about seats.
+  useEffect(() => {
+    if (!expandedRentId) return;
+    const id = String(expandedRentId);
+    const [realId] = id.split('::');
+    setRoomModal({ key: realId, focusUnitId: id.includes('::') ? id : null });
+  }, [expandedRentId]);
 
           const todayDate = today;
           const isBn = language === 'বাংলা';
@@ -137,24 +156,50 @@ export default function RentTab(props) {
             if (!viewingPastYear && computeLeaseStage(b, today) === 'done') return false;
             return true;
           });
-          // One card per occupant: expand each in-scope booking into its active
-          // members (each carrying their divided share + own ledger). Bookings
-          // without members render as a single card exactly as before.
-          const rentRows = yearBookings.flatMap(rentUnitsOf);
-          const filteredBookings = rentRows.filter(b => {
-            if (!matchesQuery(b)) return false;
-            if (rentPriorityFilter === 'all') return true;
-            return tenantBucket(b) === rentPriorityFilter;
+          // One unit per occupant (each carrying their divided share + own
+          // ledger), in building order: ground floor up, 101 · 102 · 110 within
+          // a floor, seat by seat within a room.
+          const rentRows = sortRentUnits(yearBookings.flatMap(rentUnitsOf));
+
+          // ── ROOMS, NOT PEOPLE ────────────────────────────────────────────
+          // The list is rooms. Room 201 with one occupant paid and one not used
+          // to come apart — the payer to the cleared list, the other to arrears —
+          // so the room itself, the thing the landlord owns and walks into,
+          // appeared on the screen nowhere. A room's status is now the status of
+          // the WORST seat in it: one person short and the whole room is short.
+          const ROOM_BUCKET_ORDER = ['overdue', 'partial', 'upcoming', 'cleared', 'none'];
+          const roomsFrom = (units) => groupByRoom(units).map((g) => {
+            const buckets = g.units.map(tenantBucket);
+            const bucket = ROOM_BUCKET_ORDER.find(b => buckets.includes(b)) || 'none';
+            return { ...g, buckets, bucket };
           });
-          const counts = rentRows.reduce((acc, b) => { const k = tenantBucket(b); acc[k] = (acc[k] || 0) + 1; return acc; }, {});
-          // Auto-pin: overdue + partial when filter is "all" — the rows the
-          // host actually needs to do something about.
-          const attentionRent = rentPriorityFilter === 'all'
-            ? filteredBookings.filter(b => { const k = tenantBucket(b); return k === 'overdue' || k === 'partial'; })
+
+          // Every room in the year, unfiltered — what the modal looks a room up
+          // in, so a deep link still opens it when a filter would have hidden it.
+          const allRooms = roomsFrom(rentRows);
+          // Search matches a PERSON but keeps their whole room: finding "Mahin"
+          // and being shown half of 201 is how the room came apart in the first
+          // place.
+          const searchedRooms = allRooms.filter(g => g.units.some(matchesQuery));
+          const visibleRooms = rentPriorityFilter === 'all'
+            ? searchedRooms
+            : searchedRooms.filter(g => g.bucket === rentPriorityFilter);
+          // The occupant rows behind the visible rooms — what the CSV exports and
+          // what "is this list empty" is measured against.
+          const filteredBookings = visibleRooms.flatMap(g => g.units);
+          const counts = allRooms.reduce((acc, g) => { acc[g.bucket] = (acc[g.bucket] || 0) + 1; return acc; }, {});
+          // Auto-pin: overdue + partial rooms when the filter is "all" — the
+          // rooms the host actually needs to do something about.
+          const attentionRooms = rentPriorityFilter === 'all'
+            ? visibleRooms.filter(g => g.bucket === 'overdue' || g.bucket === 'partial')
             : [];
-          const otherRent = rentPriorityFilter === 'all'
-            ? filteredBookings.filter(b => { const k = tenantBucket(b); return k !== 'overdue' && k !== 'partial'; })
-            : filteredBookings;
+          const otherRooms = rentPriorityFilter === 'all'
+            ? visibleRooms.filter(g => g.bucket !== 'overdue' && g.bucket !== 'partial')
+            : visibleRooms;
+
+          // The room on screen, resolved from the whole year's rooms.
+          const openRoom = roomModal ? allRooms.find(g => g.key === roomModal.key) : null;
+          const closeRoomModal = () => { setRoomModal(null); setExpandedRentId?.(null); };
 
           // Coloured palette per current-month bucket — re-used across the
           // avatar gradient, status pill, and progress bar.
@@ -166,15 +211,17 @@ export default function RentTab(props) {
             none:     { cls: 'bg-gray-100 text-gray-600 border-gray-200',         label: language === 'বাংলা' ? 'লিজের বাইরে' : 'OUTSIDE', icon: <MinusCircle size={10} strokeWidth={3}/>, bar: 'bg-gray-300',    avatar: 'bg-gradient-to-br from-indigo-500 to-purple-600' },
           };
 
-          // ── RENDER ONE COMPACT ROW (collapsed-by-default accordion) ────
-          // Collapsed: avatar + tenant + property + ৳outstanding + status pill + chevron (~76px tall)
-          // Expanded: collapsed header + this-month ledger panel + 12-month matrix + per-month rows + actions
+          // ── ONE TENANT'S RENT CARD ─────────────────────────────────────
+          // header (avatar + tenant + status) + this-month ledger panel +
+          // 12-month matrix + per-month rows + actions.
           //
-          // `forceOpen` (set by the list mapping when ≤ AUTO_EXPAND_THRESHOLD
-          // tenants match) skips the tap-to-toggle behaviour and the chevron
-          // entirely — every row renders fully expanded on first paint and
-          // stays that way. Hosts with a handful of tenants get a static,
-          // fully-readable layout instead of accordion friction.
+          // This is no longer a row in the list — the list is rooms. It renders
+          // INSIDE RentRoomModal, for the seat the landlord picked, which is why
+          // it is passed down as `renderRow` and always called with
+          // `forceOpen = true`: there is nothing left to collapse into once a
+          // room has been opened and a person chosen. The collapsible branches
+          // stay because this same card is what every existing deep link and
+          // mark-paid flow already writes to.
           const renderRentRow = (booking, forceOpen = false) => {
             const bucket = tenantBucket(booking);
             const theme = bucketTheme[bucket];
@@ -196,14 +243,14 @@ export default function RentTab(props) {
             // Show the REAL occupant. When a tenant joins the room via invite
             // code they become a member; the booking's original `tenant` (typed
             // at creation) can go stale — e.g. the card shows "Mahin" while the
-            // person on the booking is "Mofizul Islam". Prefer the primary active
-            // member's name + avatar so Rent Collection matches the Bookings tab.
-            const rentMembers = Array.isArray(booking.members) ? booking.members.filter(m => m && m.status !== 'moved-out') : [];
-            const primaryMember = rentMembers[0] || null;
-            const displayTenant = String(primaryMember?.name || booking.tenant || (language === 'বাংলা' ? 'ভাড়াটিয়া' : 'Tenant')).trim();
-            const displayAvatar = primaryMember?.avatar || booking.tenantAvatar || '';
-            const displayInit = (displayTenant[0] || '?').toUpperCase();
-            const extraMembers = Math.max(0, rentMembers.length - 1);
+            // person on the booking is "Mofizul Islam". Same helper the Bookings
+            // tab uses, so one person never reads as two different names on two
+            // screens.
+            const occupant = primaryOccupant(booking, language);
+            const displayTenant = occupant.name;
+            const displayAvatar = occupant.avatar;
+            const displayInit = occupant.init;
+            const extraMembers = Math.max(0, occupantCount(booking) - 1);
 
             return (
               <div id={`rent-${booking.id}`} key={booking.id} className={`bg-white rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
@@ -752,8 +799,8 @@ export default function RentTab(props) {
                     {/* Title corner chip — small, gray, with live count. */}
                     <span className="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/70 text-[9px] xl:text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
                       <Wallet size={11} className="text-emerald-600"/>
-                      <span className="hidden sm:inline">{language === 'বাংলা' ? 'রেন্ট' : 'Rent'}</span>
-                      <span className="text-gray-400 tabular-nums">{filteredBookings.length}</span>
+                      <span className="hidden sm:inline">{language === 'বাংলা' ? 'রুম' : 'Rooms'}</span>
+                      <span className="text-gray-400 tabular-nums">{visibleRooms.length}</span>
                     </span>
                     {/* Year stepper. */}
                     <div className="shrink-0 flex items-center gap-1 bg-white rounded-xl px-1 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
@@ -815,13 +862,12 @@ export default function RentTab(props) {
                   </div>
                 </div>
 
-                {/* List — compact rows. forceOpen auto-engages when filtered
-                    list is ≤5; small portfolios get a fully-readable static
-                    layout instead of accordion friction. */}
+                {/* List — ONE ROW PER ROOM. Tapping a room opens it in a modal
+                    (RentRoomModal) with nothing else on screen; the ledger of a
+                    seat inside it is one more tap. Nothing expands in place, so
+                    a seventy-room building reads the same on row 1 and row 70. */}
                 {(() => {
-                  const AUTO_EXPAND_THRESHOLD = 5;
-                  const forceOpen = filteredBookings.length > 0 && filteredBookings.length <= AUTO_EXPAND_THRESHOLD;
-                  if (filteredBookings.length === 0) {
+                  if (visibleRooms.length === 0) {
                     // Nothing to collect. Distinguish "no tenants at all" (send
                     // the host to create a lease — the ledger is built FROM a
                     // lease) from "this filter is empty" (offer All).
@@ -862,66 +908,43 @@ export default function RentTab(props) {
                       </div>
                     );
                   }
+                  const roomCard = (g) => (
+                    <RentRoomCard
+                      key={g.key}
+                      units={g.units}
+                      bucket={g.bucket}
+                      buckets={g.buckets}
+                      language={language}
+                      formatBDT={formatBDT}
+                      activeMonthKey={sm.key}
+                      isOpen={roomModal?.key === g.key}
+                      onOpen={() => setRoomModal({ key: g.key, focusUnitId: null })}
+                    />
+                  );
                   return (
                     <div className="space-y-2">
-                      {rentPriorityFilter === 'all' && attentionRent.length > 0 ? (
+                      {rentPriorityFilter === 'all' && attentionRooms.length > 0 ? (
                         <>
                           <div className="flex items-center gap-2 mt-1 px-1 pt-1">
                             <AlertCircle size={12} className="text-fuchsia-600 shrink-0"/>
                             <span className="text-[10px] font-black text-fuchsia-700 uppercase tracking-widest">
-                              {language === 'বাংলা' ? 'এখনই দরকার' : 'Needs Attention'} · {attentionRent.length}
+                              {language === 'বাংলা' ? 'এখনই দরকার' : 'Needs Attention'} · {attentionRooms.length}
                             </span>
                             <div className="flex-1 h-px bg-fuchsia-200/60"/>
                           </div>
-                          {((list) => groupByRoom(list).map(g => (
-                          <RoomRentGroup
-                            key={g.key}
-                            units={g.units}
-                            renderRow={renderRentRow}
-                            forceOpen={forceOpen}
-                            language={language}
-                            formatBDT={formatBDT}
-                            monthKey={monthKey(todayDate.getFullYear(), todayDate.getMonth() + 1)}
-                            getRentStatus={getRentStatus}
-                            today={todayDate}
-                          />
-                        )))(attentionRent)}
-                          {otherRent.length > 0 && (
+                          {attentionRooms.map(roomCard)}
+                          {otherRooms.length > 0 && (
                             <div className="flex items-center gap-2 px-1 pt-3 pb-1">
                               <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                                {language === 'বাংলা' ? 'অন্যান্য' : 'All Other Tenants'} · {otherRent.length}
+                                {language === 'বাংলা' ? 'অন্যান্য রুম' : 'All Other Rooms'} · {otherRooms.length}
                               </span>
                               <div className="flex-1 h-px bg-gray-200"/>
                             </div>
                           )}
-                          {((list) => groupByRoom(list).map(g => (
-                          <RoomRentGroup
-                            key={g.key}
-                            units={g.units}
-                            renderRow={renderRentRow}
-                            forceOpen={forceOpen}
-                            language={language}
-                            formatBDT={formatBDT}
-                            monthKey={monthKey(todayDate.getFullYear(), todayDate.getMonth() + 1)}
-                            getRentStatus={getRentStatus}
-                            today={todayDate}
-                          />
-                        )))(otherRent)}
+                          {otherRooms.map(roomCard)}
                         </>
                       ) : (
-                        ((list) => groupByRoom(list).map(g => (
-                          <RoomRentGroup
-                            key={g.key}
-                            units={g.units}
-                            renderRow={renderRentRow}
-                            forceOpen={forceOpen}
-                            language={language}
-                            formatBDT={formatBDT}
-                            monthKey={monthKey(todayDate.getFullYear(), todayDate.getMonth() + 1)}
-                            getRentStatus={getRentStatus}
-                            today={todayDate}
-                          />
-                        )))(filteredBookings)
+                        visibleRooms.map(roomCard)
                       )}
                     </div>
                   );
@@ -956,10 +979,32 @@ export default function RentTab(props) {
                 formatBDT={formatBDT}
                 onRemind={(u) => sendRentReminder?.(u, monthKey(todayDate.getFullYear(), todayDate.getMonth() + 1))}
                 onOpenTenant={(u) => {
-                  setExpandedRentId?.(u.id);
+                  // Their ROOM, with their seat unfolded — the drawer names a
+                  // person, but the thing you settle is the room they're in.
+                  const id = String(u.id);
+                  setRoomModal({ key: id.split('::')[0], focusUnitId: id.includes('::') ? id : null });
                   setRemindersOpen(false);
                 }}
               />
+              )}
+
+              {/* ── ONE ROOM, nothing else ────────────────────────────────
+                  The room the landlord tapped, on top of everything, with its
+                  seats, its outstanding total and a single button that settles
+                  the whole room. */}
+              {openRoom && (
+                <RentRoomModal
+                  units={openRoom.units}
+                  buckets={openRoom.buckets}
+                  language={language}
+                  formatBDT={formatBDT}
+                  activeMonthKey={sm.key}
+                  monthFullLabel={monthFullLabel}
+                  renderRow={renderRentRow}
+                  markRoomPaid={markRoomPaid}
+                  focusUnitId={roomModal?.focusUnitId}
+                  onClose={closeRoomModal}
+                />
               )}
 
             </div>

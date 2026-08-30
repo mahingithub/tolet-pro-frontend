@@ -13,9 +13,10 @@ import { buildTenantAlerts } from '../utils/rentAlerts';
 // The tenant's rent truth — one module, imported by every tenant surface.
 import {
   MONTHS_EN, MONTHS_BN,
-  normalizeTenantBookings, getBookingRentSnapshot,
+  resolveTenancies, getBookingRentSnapshot,
   buildTenantRentSummary, decorateReceipts,
   formatUnitLabel, unitParts, receiptUnitLabel,
+  normalizeTenantBookings,
 } from '../utils/tenantRent';
 import { loadSeenMap, isInquiryUnread, markInquirySeen } from '../utils/inquiryUnread';
 import SmartAlertsPage from './Smartalertspage';
@@ -1609,23 +1610,19 @@ const handleWizardSubmit = async (payload) => {
   // entitled to "who was in 301 last winter"), so the two have to be told apart
   // rather than one of them removed — see pastTenancies below.
   //
-  // Re-normalized here rather than trusting the shape: `myBookings` can be
-  // rehydrated from a localStorage cache written by an older build, which has
-  // no `leaseKey`/`unit` on it. normalizeTenantBooking is idempotent, so this
-  // costs nothing and removes a class of "works after 30 seconds" bugs.
-  const activeLeases = useMemo(
-    () => normalizeTenantBookings(
-      (myBookings || []).filter((b) => b && b.status !== 'cancelled' && !b.deletedAt && !b.isPastTenancy),
-    ),
-    [myBookings],
-  );
+  // ONE PERSON LIVES IN ONE PLACE. resolveTenancies picks the home they are in
+  // now — the most recently started tenancy, or whichever the server flagged
+  // `isCurrentHome` — and files every other open row as a previous home. Four
+  // live rent cards was never four homes; it was four rooms nobody stamped as
+  // left. See utils/tenantRent.js → resolveTenancies.
+  const tenancies = useMemo(() => resolveTenancies(myBookings), [myBookings]);
+  // The rent flow acts on the current home only: one card, one set of dues,
+  // one lot of alerts.
+  const activeLeases = tenancies.active;
   // Homes they have left. Kept visible — a tenant who moved in March still
   // wants last year's receipts, and a card that silently vanished would read as
   // lost data — but out of the active rent flow entirely.
-  const pastTenancies = useMemo(
-    () => normalizeTenantBookings((myBookings || []).filter((b) => b && !b.deletedAt && b.isPastTenancy)),
-    [myBookings],
-  );
+  const pastTenancies = tenancies.previous;
   // ── ONE RENT SUMMARY, RENDERED BY BOTH TABS ────────────────────────────
   // The overview's "Due Amount" and the Payments tab's "Outstanding" are the
   // same number because they are now literally the same number: both read
@@ -1650,17 +1647,8 @@ const handleWizardSubmit = async (payload) => {
     [paymentReceipts, activeLeases, pastTenancies],
   );
 
-  // Which tenancy the overview's Payment Proof card is showing. A tenant can
-  // legitimately rent two places (or two rooms of one building) — showing the
-  // first and hiding the rest behind "+1 more" made the second one look like a
-  // duplicate of the first. They are now switchable, and each is labelled with
-  // its own floor + room.
-  const [overviewLeaseKey, setOverviewLeaseKey] = useState('');
-  const shownLease = useMemo(
-    () => activeLeases.find((b) => b.leaseKey === overviewLeaseKey) || activeLeases[0] || null,
-    [activeLeases, overviewLeaseKey],
-  );
-  const primaryLease = shownLease;
+  // The one home the rent card is for.
+  const primaryLease = tenancies.current;
   const totalDueAmount = rentSummary.outstanding;
 
   const downloadModernPdf = async (receipt) => {
@@ -2152,11 +2140,20 @@ const handleWizardSubmit = async (payload) => {
                         <p className="text-[10px] font-bold text-gray-400 mt-0.5">
                           {b.myMembership?.moveOutDate
                             ? `${language === 'বাংলা' ? 'ছেড়েছেন' : 'Left'} ${new Date(b.myMembership.moveOutDate).toLocaleDateString(language === 'বাংলা' ? 'bn-BD' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
-                            : (language === 'বাংলা' ? 'শেষ হয়েছে' : 'Ended')}
+                            : b.isSupersededTenancy
+                              ? (language === 'বাংলা' ? 'আপনি নতুন বাসায় উঠেছেন' : 'You moved somewhere newer')
+                              : (language === 'বাংলা' ? 'শেষ হয়েছে' : 'Ended')}
                         </p>
                       </div>
-                      <span className="shrink-0 px-2 py-0.5 rounded-md bg-gray-200 text-gray-500 text-[9px] font-black uppercase tracking-wider">
-                        {language === 'বাংলা' ? 'সমাপ্ত' : 'Past'}
+                      {/* A tenancy the landlord stamped closed, versus one we
+                          INFERRED they left by joining somewhere newer. The
+                          second is a presumption and is labelled as one. */}
+                      <span className={`shrink-0 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
+                        b.isSupersededTenancy ? 'bg-amber-100 text-amber-700' : 'bg-gray-200 text-gray-500'
+                      }`}>
+                        {b.isSupersededTenancy
+                          ? (language === 'বাংলা' ? 'ছেড়ে দেওয়া' : 'Moved out')
+                          : (language === 'বাংলা' ? 'সমাপ্ত' : 'Past')}
                       </span>
                     </div>
                   ))}
@@ -2166,6 +2163,17 @@ const handleWizardSubmit = async (payload) => {
                     ? 'আপনার পুরোনো ভাড়ার রেকর্ড ও রিসিট মুছে যায়নি — পেমেন্ট ট্যাবে দেখতে পাবেন।'
                     : 'Your old rent records and receipts are kept — they stay in the Payments tab.'}
                 </p>
+                {/* Say it out loud when we inferred the move. The tenant is the
+                    only person who knows whether they really left, and if we
+                    guessed wrong they need to know why a home disappeared from
+                    their rent card rather than wondering what broke. */}
+                {tenancies.hasUnstampedMoves && (
+                  <p className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2 leading-relaxed mt-2">
+                    {language === 'বাংলা'
+                      ? 'আপনি নতুন বাসায় ওঠায় আগের ভাড়াগুলো এখানে সরানো হয়েছে। এখনো ওখানে থাকলে বাড়িওয়ালাকে জানান — তিনি আবার যুক্ত করতে পারবেন।'
+                      : 'These moved here because you joined somewhere newer. If you still live at one of them, tell that landlord — they can add you back.'}
+                  </p>
+                )}
               </div>
             )}
 
@@ -2350,54 +2358,21 @@ const handleWizardSubmit = async (payload) => {
                 Year navigator + 12-month status strip + this-month summary +
                 one-tap "Pay".
 
-                MULTIPLE TENANCIES. Renting two places — or two rooms of one
-                building — is normal here, and the old card showed the first
-                one with "+1 more →" pointing at another tab. Two cards for
-                "White-house" with different numbers on them read as a bug, not
-                as two rooms. Each tenancy is now a named tab (floor + room),
-                so which rent you are looking at is never in doubt. */}
+                ONE HOME, NOT FOUR. This card is for the tenancy the tenant is
+                in NOW — resolveTenancies picks it, and every other open row is
+                filed under "Past homes" above. Four rent cards was never four
+                homes: it was one person who moved three times and whose old
+                landlords never stamped the rows they left. */}
             {primaryLease && (
               <div className="mb-4 md:mb-6">
                 <div className="flex items-center gap-2 mb-3 px-1">
                   <div className="w-7 h-7 rounded-lg bg-[#ba0036]/10 text-[#ba0036] flex items-center justify-center"><Receipt size={14} /></div>
                   <h3 className="text-[13px] font-black text-gray-800 uppercase tracking-[0.14em]">{language === 'বাংলা' ? 'পেমেন্ট প্রুফ' : 'Payment Proof'}</h3>
-                  {activeLeases.length > 1 && (
-                    <span className="ml-auto text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                      {activeLeases.length} {language === 'বাংলা' ? 'টি ভাড়া' : 'tenancies'}
-                    </span>
-                  )}
+                  <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 text-[9px] font-black text-emerald-600 uppercase tracking-widest">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    {language === 'বাংলা' ? 'বর্তমান বাসা' : 'Current home'}
+                  </span>
                 </div>
-
-                {activeLeases.length > 1 && (
-                  <div className="flex gap-2 mb-3 overflow-x-auto scrollbar-hide pb-1">
-                    {activeLeases.map((b) => {
-                      const active = b.leaseKey === primaryLease.leaseKey;
-                      const parts = unitParts(b, language);
-                      const dueHere = (rentSummary.leases.find((l) => l.key === b.leaseKey)?.outstanding) || 0;
-                      return (
-                        <button
-                          key={b.leaseKey}
-                          onClick={() => setOverviewLeaseKey(b.leaseKey)}
-                          className={`shrink-0 text-left px-3.5 py-2 rounded-xl border transition-all active:scale-95 ${
-                            active
-                              ? 'bg-gray-900 text-white border-gray-900 shadow-md'
-                              : 'bg-white text-gray-600 border-gray-100 hover:border-gray-300'
-                          }`}
-                        >
-                          <span className="block text-[11px] font-black leading-tight truncate max-w-[13rem]">
-                            {b.property || (language === 'বাংলা' ? 'আপনার ভাড়া' : 'Your rental')}
-                          </span>
-                          <span className={`block text-[9px] font-bold leading-tight mt-0.5 truncate ${active ? 'text-white/60' : 'text-gray-400'}`}>
-                            {parts.length > 0
-                              ? parts.join(' · ')
-                              : (language === 'বাংলা' ? 'পুরো ইউনিট' : 'Whole unit')}
-                            {dueHere > 0 ? ` • ৳${dueHere.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-IN')}` : ''}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
 
                 <RentProofCard
                   booking={primaryLease}

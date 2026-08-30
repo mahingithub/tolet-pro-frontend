@@ -77,6 +77,22 @@ const floorLabel = (n, isBn) => {
   return isBn ? `${f}য় তলা` : `Floor ${f}`;
 };
 
+// One slot per seat in the room, each holding whoever is sitting in it or null.
+//
+// Not simply occupants[i]: a tenant who took the room outright is ONE occupant
+// row holding every seat, so indexing by position put them in seat 1 and left
+// the rest drawn as empty — tappable, offering to add a tenant to a room the
+// server would refuse. Each occupant fills as many slots as they hold.
+const seatSlotsOf = (unit, capacity) => {
+  const slots = Array.from({ length: capacity }, () => null);
+  let at = 0;
+  (unit.occupants || []).forEach((person) => {
+    const held = Math.max(1, Number(person.seatsBooked) || 1);
+    for (let n = 0; n < held && at < capacity; n += 1, at += 1) slots[at] = person;
+  });
+  return slots;
+};
+
 export default function UnitsManager({
   building,
   language,
@@ -562,14 +578,25 @@ export default function UnitsManager({
                               seat is a one-tap "add tenant HERE", which is the
                               whole reason the room exists on its own. */}
                           <div className="space-y-1.5">
-                            {Array.from({ length: capacity }).map((_, i) => {
-                              const person = u.occupants?.[i] || null;
+                            {seatSlotsOf(u, capacity).map((person, i, slots) => {
+                              // A tenant holding the whole room occupies several
+                              // slots. Their name, number and Replace button
+                              // belong to the FIRST of them; repeating all three
+                              // four times over would read as four tenants, which
+                              // is the misreading this grid exists to prevent.
+                              const heldRun = !!person && slots[i - 1] === person;
                               return (
                                 <div key={i} className="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-white border border-gray-100">
                                   <span className={`w-6 h-6 rounded-lg text-[10px] font-black flex items-center justify-center shrink-0 ${person ? 'bg-[#ba0036] text-white' : 'bg-gray-100 text-gray-400'}`}>
                                     {i + 1}
                                   </span>
-                                  {person ? (
+                                  {person && heldRun ? (
+                                    <span className="text-[10px] font-bold text-gray-400 flex-1 truncate">
+                                      {isBn
+                                        ? `↑ ${person.name || 'নামহীন'} — পুরো রুম নিয়েছেন`
+                                        : `↑ held by ${person.name || 'Unnamed'} (whole room)`}
+                                    </span>
+                                  ) : person ? (
                                     <>
                                       <button
                                         type="button"
@@ -578,6 +605,11 @@ export default function UnitsManager({
                                         title={isBn ? 'বিস্তারিত দেখুন' : 'View details'}
                                       >
                                         {person.name || (isBn ? 'নামহীন' : 'Unnamed')}
+                                        {(Number(person.seatsBooked) || 1) > 1 && (
+                                          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-[#ba0036]/10 text-[#ba0036] text-[8px] font-black uppercase tracking-wider">
+                                            {isBn ? `পুরো রুম · ${person.seatsBooked} সিট` : `whole room · ${person.seatsBooked} seats`}
+                                          </span>
+                                        )}
                                       </button>
                                       {person.phone && <span className="hidden sm:inline text-[10px] font-bold text-gray-400 shrink-0 tabular-nums">{person.phone}</span>}
                                       {/* Same seat, new person — the room, its

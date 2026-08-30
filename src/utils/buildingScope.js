@@ -90,15 +90,25 @@ const compareRoom = (a, b) => {
 };
 
 /**
- * Sort expanded rent units (one per occupant) into building order.
- * Non-mutating: Rent Collection derives this list every render.
+ * Sort ANYTHING that carries `floorNumber` + `roomNumber` into building order:
+ * expanded rent units, whole bookings, room groups. Ground floor up, then
+ * 101 · 102 · 110 within the floor, then seat by seat inside a room.
+ *
+ * Every list of tenants the landlord reads — Rent Collection AND the Bookings
+ * tenants view — goes through this, so the two screens can't disagree about
+ * what order the building is in.
+ *
+ * Non-mutating: both screens derive their list every render.
  */
-export const sortRentUnits = (units) => [...(units || [])].sort((x, y) => (
+export const sortByBuildingOrder = (rows) => [...(rows || [])].sort((x, y) => (
   (floorRank(x) - floorRank(y))
   || compareRoom(x?.roomNumber, y?.roomNumber)
   // Same room ⇒ seats, in the order they were added to it.
   || String(x?.id ?? '').localeCompare(String(y?.id ?? ''), undefined, { numeric: true })
 ));
+
+/** Rent Collection's original name for the same ordering. */
+export const sortRentUnits = sortByBuildingOrder;
 
 /**
  * Leases we could not place in any building — pre-migration rows whose name

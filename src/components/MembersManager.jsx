@@ -363,7 +363,11 @@ export default function MembersManager({ booking, language = 'English', onChange
                       </p>
                     </div>
                   </div>
-                  {showManage && (
+                  {/* No move-out for the SYNTHETIC member. A legacy
+                      single-tenant booking has no member row to remove — the
+                      call would 404 — and the way that tenancy ends is the
+                      "New Tenant · New Lease" panel below the card. */}
+                  {showManage && !m.__legacy && (
                   <button
                     type="button"
                     onClick={() => moveOut(m)}

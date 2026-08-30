@@ -28,10 +28,31 @@ function toBase64(file) {
   });
 }
 
+// Two profile fields are fixed lists on the server (TenantProfileSchema enums),
+// not free text. Typed by hand they failed the WHOLE row — mongoose rejects
+// `ছাত্র` for tenantType — and the landlord saw a raw English validation string
+// in the error toast. Rendered as pickers, the only values that can leave this
+// screen are the ones the schema accepts.
+const ENUM_CHOICES = {
+  tenantType: [
+    { value: 'student',    bn: 'ছাত্র / শিক্ষার্থী', en: 'Student' },
+    { value: 'employee',   bn: 'চাকরিজীবী',          en: 'Employee' },
+    { value: 'business',   bn: 'ব্যবসায়ী',           en: 'Business' },
+    { value: 'freelancer', bn: 'ফ্রিল্যান্সার',       en: 'Freelancer' },
+    { value: 'other',      bn: 'অন্যান্য',            en: 'Other' },
+  ],
+  maritalStatus: [
+    { value: 'single',   bn: 'অবিবাহিত', en: 'Single' },
+    { value: 'married',  bn: 'বিবাহিত',  en: 'Married' },
+    { value: 'divorced', bn: 'তালাকপ্রাপ্ত', en: 'Divorced' },
+    { value: 'widowed',  bn: 'বিধবা / বিপত্নীক', en: 'Widowed' },
+  ],
+};
+
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 // One editable tenant row in the review screen.
-function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onRemove, language }) {
+function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onRemove, language, buildingRentedAs }) {
   const isBn = language === 'বাংলা';
   const [open, setOpen] = useState(true);
   // Tracks which fields the user has touched (blurred) so we only show
@@ -223,22 +244,40 @@ function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onR
           { ...prof, name: tenant.name, phone: tenant.phone, moveInDate: tenant.moveInDate },
           isBn,
         );
-        const row = (key, label, wide) => (
-          <div key={key} className={wide ? 'col-span-2' : ''}>
-            <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">{label}</label>
-            <input
-              id={`scan-${idx}-${key}`}
-              value={prof[key] ?? ''}
-              onChange={e => onProfileChange(idx, key, e.target.value)}
-              placeholder={isBn ? 'ফরমে পাওয়া যায়নি' : 'not found on the form'}
-              className={`w-full px-2.5 py-2 rounded-lg text-xs font-bold border focus:outline-none focus:ring-1 transition-all ${
-                String(prof[key] || '').trim()
-                  ? 'border-gray-200 bg-white focus:ring-[#ba0036]/40'
-                  : 'border-dashed border-amber-300 bg-amber-50/40 focus:ring-amber-400'
-              }`}
-            />
-          </div>
-        );
+        const row = (key, label, wide) => {
+          const choices = ENUM_CHOICES[key];
+          const boxCls = `w-full px-2.5 py-2 rounded-lg text-xs font-bold border focus:outline-none focus:ring-1 transition-all ${
+            String(prof[key] || '').trim()
+              ? 'border-gray-200 bg-white focus:ring-[#ba0036]/40'
+              : 'border-dashed border-amber-300 bg-amber-50/40 focus:ring-amber-400'
+          }`;
+          return (
+            <div key={key} className={wide ? 'col-span-2' : ''}>
+              <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">{label}</label>
+              {choices ? (
+                <select
+                  id={`scan-${idx}-${key}`}
+                  value={prof[key] ?? ''}
+                  onChange={e => onProfileChange(idx, key, e.target.value)}
+                  className={boxCls}
+                >
+                  <option value="">{isBn ? 'ফরমে পাওয়া যায়নি' : 'not found on the form'}</option>
+                  {choices.map(c => (
+                    <option key={c.value} value={c.value}>{isBn ? c.bn : c.en}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id={`scan-${idx}-${key}`}
+                  value={prof[key] ?? ''}
+                  onChange={e => onProfileChange(idx, key, e.target.value)}
+                  placeholder={isBn ? 'ফরমে পাওয়া যায়নি' : 'not found on the form'}
+                  className={boxCls}
+                />
+              )}
+            </div>
+          );
+        };
         return (
           <div className="px-3 pb-3 pt-2 bg-white border-t border-gray-100">
             {/* The account of the scan, before any of the boxes. */}
@@ -305,32 +344,46 @@ function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onR
 
         // Split into AI-found (non-empty) and manually addable (empty)
         const aiFound = ALL_EXTRAS.filter(e => String(prof[e.key] || '').trim());
-        // When extraOpen is true, show ALL fields (so user can also edit AI-found ones)
-        const manualExtras = extraOpen ? ALL_EXTRAS : aiFound;
 
         const extraInput = (e) => {
+          const choices = ENUM_CHOICES[e.key];
           const isEmgPhone = e.key === 'emergencyPhone';
           const emgPhoneVal = String(prof[e.key] || '').trim();
           const emgPhoneErr = isEmgPhone && emgPhoneVal && !isBdMobile(emgPhoneVal);
+          const boxCls = `w-full px-2.5 py-2 rounded-lg text-xs font-bold border focus:outline-none focus:ring-1 transition-all ${
+            emgPhoneErr
+              ? 'border-rose-400 bg-rose-50 focus:ring-rose-400'
+              : isEmgPhone && emgPhoneVal && isBdMobile(emgPhoneVal)
+                ? 'border-emerald-400 bg-white focus:ring-emerald-400'
+                : 'border-blue-200 bg-white focus:ring-blue-400'
+          }`;
           return (
             <div key={e.key} className={e.wide ? 'col-span-2' : ''}>
               <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">
                 {e.label}
               </label>
-              <input
-                id={`scan-${idx}-prof-${e.key}`}
-                type={isEmgPhone ? 'tel' : 'text'}
-                value={prof[e.key] ?? ''}
-                onChange={ev => onProfileChange(idx, e.key, ev.target.value)}
-                placeholder={isEmgPhone ? '01xxxxxxxxx' : (isBn ? 'লিখুন' : 'Type here')}
-                className={`w-full px-2.5 py-2 rounded-lg text-xs font-bold border focus:outline-none focus:ring-1 transition-all ${
-                  emgPhoneErr
-                    ? 'border-rose-400 bg-rose-50 focus:ring-rose-400'
-                    : isEmgPhone && emgPhoneVal && isBdMobile(emgPhoneVal)
-                      ? 'border-emerald-400 bg-white focus:ring-emerald-400'
-                      : 'border-blue-200 bg-white focus:ring-blue-400'
-                }`}
-              />
+              {choices ? (
+                <select
+                  id={`scan-${idx}-prof-${e.key}`}
+                  value={prof[e.key] ?? ''}
+                  onChange={ev => onProfileChange(idx, e.key, ev.target.value)}
+                  className={boxCls}
+                >
+                  <option value="">{isBn ? '— বাছুন —' : '— Select —'}</option>
+                  {choices.map(c => (
+                    <option key={c.value} value={c.value}>{isBn ? c.bn : c.en}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id={`scan-${idx}-prof-${e.key}`}
+                  type={isEmgPhone ? 'tel' : 'text'}
+                  value={prof[e.key] ?? ''}
+                  onChange={ev => onProfileChange(idx, e.key, ev.target.value)}
+                  placeholder={isEmgPhone ? '01xxxxxxxxx' : (isBn ? 'লিখুন' : 'Type here')}
+                  className={boxCls}
+                />
+              )}
               {emgPhoneErr && (
                 <p className="text-[9px] font-bold text-rose-600 mt-0.5">
                   {isBn ? '০১৩-০১৯ দিয়ে শুরু ১১ ডিজিট' : '11 digits starting 013–019'}
@@ -342,17 +395,17 @@ function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onR
 
         return (
           <div className="border-t border-blue-100">
-            {/* AI-found extras — always show if any */}
-            {aiFound.length > 0 && (
+            {/* What the AI read off the khata. Hidden entirely once the full
+                list is expanded — these same fields are in it, and a heading
+                left standing over nothing reads like something failed to load. */}
+            {aiFound.length > 0 && !extraOpen && (
               <div className="px-3 pb-2 pt-2 bg-blue-50/40">
                 <p className="text-[9px] font-black text-blue-700 uppercase tracking-widest mb-1.5 flex items-center gap-1">
                   <Info size={9}/> {isBn ? 'খাতা থেকে পাওয়া অতিরিক্ত তথ্য' : 'Extra details from ledger'}
                 </p>
-                {!extraOpen && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {aiFound.map(extraInput)}
-                  </div>
-                )}
+                <div className="grid grid-cols-2 gap-2">
+                  {aiFound.map(extraInput)}
+                </div>
               </div>
             )}
 
@@ -431,6 +484,42 @@ function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onR
             </label>
             {field('roomNumber', tenant.roomNumber)}
           </div>
+
+          {/* Seat booking toggle: Full Room vs Single Seat */}
+          {buildingRentedAs === 'seat' && (
+            <div className="col-span-2 mt-1">
+              <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                <Info size={9}/> {isBn ? 'বুকিং ধরন' : 'Booking Type'}
+              </label>
+              <div className="flex bg-gray-200/60 p-0.5 rounded-lg border border-gray-200 w-full relative">
+                <div
+                  className="absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] bg-white rounded-md shadow-sm transition-transform duration-200 ease-out"
+                  style={{
+                    transform: tenant.bookAs === 'room' ? 'translateX(calc(100% + 4px))' : 'translateX(0)',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => onChange(idx, 'bookAs', 'seat')}
+                  className={`relative flex-1 py-1.5 text-xs font-bold rounded-md z-10 transition-colors ${
+                    tenant.bookAs !== 'room' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {isBn ? 'এক সিট (স্বাভাবিক)' : 'Single Seat'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChange(idx, 'bookAs', 'room')}
+                  className={`relative flex-1 py-1.5 text-xs font-bold rounded-md z-10 transition-colors ${
+                    tenant.bookAs === 'room' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {isBn ? 'পুরো রুম (সব সিট)' : 'Full Room'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Property (building name — pre-filled from defaults) */}
           <div className="col-span-2">
             <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1 flex items-center gap-1">
@@ -443,6 +532,7 @@ function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onR
     </div>
   );
 }
+
 
 // ── Main Modal ─────────────────────────────────────────────────────────────────
 export default function AiLedgerScannerModal({
@@ -640,9 +730,18 @@ export default function AiLedgerScannerModal({
 
   // Same, for the fields that live under `tenantProfile` — father's name, NID,
   // emergency contact and the rest of what an admission form carries.
+  //
+  // Typing an ID number IS the আছে answer, so the matching *Status is set with
+  // it. Every other intake form in the app asks the আছে/নেই question outright
+  // and sends both; this screen only has the box, and a number that arrives
+  // without its status is discarded by sanitiseTenantProfile — which is exactly
+  // what happened to every NID and student ID a landlord typed here.
   const handleProfileChange = useCallback((idx, key, value) => {
+    const patch = { [key]: value };
+    if (key === 'govtIdNumber')         patch.govtIdStatus = value.trim() ? 'has' : '';
+    if (key === 'professionalIdNumber') patch.professionalIdStatus = value.trim() ? 'has' : '';
     setTenants(prev => prev.map((t, i) => (
-      i === idx ? { ...t, tenantProfile: { ...(t.tenantProfile || {}), [key]: value } } : t
+      i === idx ? { ...t, tenantProfile: { ...(t.tenantProfile || {}), ...patch } } : t
     )));
   }, []);
 
@@ -674,7 +773,11 @@ export default function AiLedgerScannerModal({
       const t = tenants[i];
       const gaps = [];
       if (!String(t.name || '').trim()) gaps.push('name');
-      if (!String(t.phone || '').trim()) gaps.push('phone');
+      // Not merely "is there something in the box". A number the row has already
+      // painted red used to save anyway, because this only checked emptiness —
+      // so the whole Stripe-style validation was decoration, and a mistyped
+      // number went into the record where it matched no account for good.
+      if (!isBdMobile(t.phone)) gaps.push('phone');
       // A pinned room already answers this, and a form photo that never showed
       // a room number is the normal case then — demanding one would block a
       // scan whose destination is not in doubt.
@@ -682,9 +785,18 @@ export default function AiLedgerScannerModal({
       if (!(Number(t.monthlyRent) > 0)) gaps.push('monthlyRent');
       if (!gaps.length) continue;
 
-      showToast(isBn
-        ? `${t.name?.trim() || `সারি ${i + 1}`} — ${gaps.length}টি ঘর খালি, পূরণ করুন`
-        : `${t.name?.trim() || `Row ${i + 1}`} — ${gaps.length} required field(s) still empty`,
+      // A filled-but-wrong number is not an empty box, and telling someone to
+      // fill in a field they can see they already filled is its own dead end.
+      const who = t.name?.trim() || (isBn ? `সারি ${i + 1}` : `Row ${i + 1}`);
+      const badPhone = gaps[0] === 'phone' && String(t.phone || '').trim();
+      showToast(
+        badPhone
+          ? (isBn
+              ? `${who} — মোবাইল নম্বর সঠিক নয়: ০১৩-০১৯ দিয়ে শুরু ১১ ডিজিট দিন`
+              : `${who} — that mobile number isn't valid: 11 digits starting 013–019`)
+          : (isBn
+              ? `${who} — ${gaps.length}টি ঘর খালি, পূরণ করুন`
+              : `${who} — ${gaps.length} required field(s) still empty`),
         { type: 'error' });
       setTenants(prev => prev.map((x, j) => (j === i ? { ...x, _forceOpen: Date.now() } : x)));
       setTimeout(() => {
@@ -1137,7 +1249,9 @@ export default function AiLedgerScannerModal({
                     scanMode={scanMode}
                     onRemove={handleRemoveTenant}
                     language={language}
+                    buildingRentedAs={building?.rentedAs}
                   />
+
                 ))}
               </div>
 

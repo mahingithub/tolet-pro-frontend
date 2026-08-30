@@ -57,7 +57,9 @@ export default function BuildingSetupWizard({
     defaultMonthlyRent: '',
     defaultServiceCharge: '',
     defaultRentDueDay: 5,
+    defaultSeatCapacity: 1,
   });
+
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   const type = RESIDENTIAL_TYPES.find((t) => t.id === form.subCategory) || null;
@@ -100,7 +102,9 @@ export default function BuildingSetupWizard({
         defaultMonthlyRent: Number(form.defaultMonthlyRent) || 0,
         defaultServiceCharge: Number(form.defaultServiceCharge) || 0,
         defaultRentDueDay: Number(form.defaultRentDueDay) || 5,
+        defaultSeatCapacity: Number(form.defaultSeatCapacity) || 1,
       });
+
       onCreated?.(building);
     } catch (err) {
       showToast?.(err.message || (isBn ? 'বিল্ডিং তৈরি ব্যর্থ' : 'Could not create the building'));
@@ -285,9 +289,17 @@ export default function BuildingSetupWizard({
                   <input type="number" min="0" value={form.defaultServiceCharge} onChange={(e) => set({ defaultServiceCharge: e.target.value })} placeholder="0" className={inputCls} />
                 </div>
               </div>
-              <div>
-                <label className={labelCls}>{isBn ? 'প্রতি মাসের কত তারিখে ভাড়া?' : 'Rent Due Day'}</label>
-                <input type="number" min="1" max="28" value={form.defaultRentDueDay} onChange={(e) => set({ defaultRentDueDay: e.target.value })} className={inputCls} />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>{isBn ? 'প্রতি মাসের কত তারিখে ভাড়া?' : 'Rent Due Day'}</label>
+                  <input type="number" min="1" max="28" value={form.defaultRentDueDay} onChange={(e) => set({ defaultRentDueDay: e.target.value })} className={inputCls} />
+                </div>
+                {form.rentedAs === 'seat' && (
+                  <div>
+                    <label className={labelCls}>{isBn ? 'রুম প্রতি ডিফল্ট সিট সংখ্যা' : 'Default Seats/Room'}</label>
+                    <input type="number" min="1" max="60" value={form.defaultSeatCapacity} onChange={(e) => set({ defaultSeatCapacity: e.target.value })} className={inputCls} />
+                  </div>
+                )}
               </div>
 
               {/* What is about to be created, in one line. */}

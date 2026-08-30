@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import TenantRentPay from '../payments/TenantRentPay';
 import {
-  formatUnitLabel, unitParts, receiptUnitLabel, leaseKey,
+  formatUnitLabel, unitParts, receiptUnitLabel, leaseKey, resolveTenancies,
 } from '../../utils/tenantRent';
 
 const isFreshBooking = (b) => {
@@ -74,9 +74,17 @@ const PaymentsTab = ({
     return rows.map((b) => ({
       key: leaseKey(b),
       label: formatUnitLabel(b, language),
-      past: !!b.isPastTenancy,
+      past: !!b.isPastTenancy || !!b.isSupersededTenancy,
     }));
   }, [activeLeases, pastTenancies, language]);
+
+  // Receipts issued for a home the tenant has left. They stay in the list —
+  // they are the tenant's proof of what they paid — but they are badged, so a
+  // receipt for last year's room is never mistaken for this month's rent.
+  const pastLeaseKeys = useMemo(
+    () => new Set((pastTenancies || []).map((b) => leaseKey(b))),
+    [pastTenancies],
+  );
 
   // A receipt matches the tenancy filter through the `leaseKey` that
   // decorateReceipts stamped on it (by bookingId + memberId — never by name).
@@ -138,9 +146,12 @@ const PaymentsTab = ({
   // longer live. See TenantDashboard's activeLeases for the full note.
   // The parent already resolved (and normalized) these; the fallback keeps
   // this component usable on its own.
+  // ONE HOME. The parent resolved it (resolveTenancies); the fallback keeps
+  // this component usable on its own and applies the same rule rather than a
+  // looser one, so a standalone render can't resurrect the four-card view.
   const leases = (activeLeases && activeLeases.length)
     ? activeLeases
-    : (myBookings || []).filter((b) => b.status !== 'cancelled' && !b.isPastTenancy);
+    : resolveTenancies(myBookings).active;
 
   // 🟢 V1 manual rent — a "Pay Your Rent" card per active tenancy. Shows
   // the landlord's bKash/Nagad/Rocket/Bank account + QR, one-click copy,
@@ -152,15 +163,13 @@ const PaymentsTab = ({
         <div className="min-w-0">
           <h3 className="text-sm font-black text-gray-800 leading-tight">{language === 'বাংলা' ? 'ভাড়া পরিশোধ করুন' : 'Pay Your Rent'}</h3>
           <p className="text-[10px] font-bold text-gray-400 leading-tight">
-            {leases.length > 1
-              ? (language === 'বাংলা' ? `আপনার ${leases.length} টি ভাড়ার প্রতিটির জন্য আলাদা` : `One card per tenancy — ${leases.length} in total`)
-              : (language === 'বাংলা' ? 'এই মাসের ভাড়া ও পেমেন্ট তথ্য' : "This month's rent & payment details")}
+            {language === 'বাংলা' ? 'এই মাসের ভাড়া ও পেমেন্ট তথ্য' : "This month's rent & payment details"}
           </p>
         </div>
       </div>
-      {/* One card per tenancy. With two rooms in the same building these
-          cards are otherwise identical on their face — TenantRentPay prints
-          the floor + room so they can be told apart. */}
+      {/* The home they are in now — one card. TenantRentPay prints the floor
+          and room, because "White-house" alone doesn't say which room's rent
+          this is. */}
       <div className="grid grid-cols-1 gap-4">
         {leases.map((b) => (
           <div key={b.leaseKey || b.id || b._id} id={`payment-${b.id || b._id}`}>
@@ -359,7 +368,7 @@ const PaymentsTab = ({
                   <div className="flex items-center gap-3">
                     <div className="h-px flex-1 bg-white/10" />
                     <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/30">
-                      {bn ? 'আপনার ভাড়া' : 'Your tenancies'}
+                      {bn ? 'বর্তমান বাসা' : 'Current home'}
                     </span>
                     <div className="h-px flex-1 bg-white/10" />
                   </div>
@@ -423,6 +432,73 @@ const PaymentsTab = ({
                       );
                     })}
                   </div>
+                </>
+              )}
+
+              {/* ── HOMES YOU'VE LIVED IN ──────────────────────────────────
+                  Where the other tenancies went. They are not deleted and not
+                  hidden — a tenant's rent history is the whole point of having
+                  an account — they are just no longer part of this month's
+                  rent. Each row carries what they paid there, so the summary
+                  reads as a record of the places they have rented. */}
+              {pastTenancies.length > 0 && (
+                <>
+                  <div className="flex items-center gap-3">
+                    <div className="h-px flex-1 bg-white/10" />
+                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/30">
+                      {bn ? 'যেসব বাসায় ছিলেন' : "Homes you've lived in"}
+                    </span>
+                    <div className="h-px flex-1 bg-white/10" />
+                  </div>
+
+                  <div className="space-y-2">
+                    {pastTenancies.map((b) => {
+                      const key = b.leaseKey || leaseKey(b);
+                      const paidThere = paymentReceipts
+                        .filter((r) => r.leaseKey === key)
+                        .reduce((s, r) => s + (Number(r.totalPaid) || 0), 0);
+                      const where = unitParts(b, language);
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => { setPayProperty(key); setPayMonth(null); setSummaryOpen(false); }}
+                          className="w-full text-left bg-white/5 hover:bg-white/10 rounded-xl p-3 transition-colors"
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                              <DoorOpen size={13} className="text-white/50" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[12px] font-black text-white/80 truncate">
+                                {b.property || (bn ? 'আগের ভাড়া' : 'Previous rental')}
+                              </p>
+                              {where.length > 0 && (
+                                <p className="text-[10px] font-bold text-white/40 truncate">{where.join(' · ')}</p>
+                              )}
+                              <p className="text-[10px] font-bold text-white/30 mt-0.5">
+                                {b.myMembership?.moveOutDate
+                                  ? `${bn ? 'ছেড়েছেন' : 'Left'} ${fmtLeaseDate(b.myMembership.moveOutDate)}`
+                                  : b.isSupersededTenancy
+                                    ? (bn ? 'নতুন বাসায় উঠেছেন' : 'Moved somewhere newer')
+                                    : (bn ? 'শেষ হয়েছে' : 'Ended')}
+                              </p>
+                            </div>
+                            <div className="shrink-0 text-right">
+                              <p className="text-[8px] font-black text-white/30 uppercase tracking-widest">{bn ? 'পরিশোধ' : 'Paid'}</p>
+                              <p className="text-[11px] font-black text-white/70 tabular-nums">
+                                ৳{paidThere.toLocaleString('en-IN')}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[9px] font-bold text-white/25 leading-relaxed">
+                    {bn
+                      ? 'একটিতে ট্যাপ করলে সেই বাসার রিসিটগুলো দেখা যাবে।'
+                      : 'Tap one to see the receipts from that home.'}
+                  </p>
                 </>
               )}
 
@@ -671,6 +747,14 @@ const PaymentsTab = ({
                           {receiptUnitLabel(r, language).split(' · ').slice(1).join(' · ')}
                         </span>
                       </p>
+                    )}
+                    {/* From a home they have left. Kept in the list — it is
+                        their proof of payment — but never mistakable for the
+                        rent that is due now. */}
+                    {pastLeaseKeys.has(r.leaseKey) && (
+                      <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 text-[8px] md:text-[9px] font-black uppercase tracking-wider">
+                        {language === 'বাংলা' ? 'আগের বাসা' : 'Past home'}
+                      </span>
                     )}
                     <p className="text-[10px] md:text-[11px] font-bold text-gray-500 mt-0.5 flex items-center gap-1 md:gap-1.5">
                       <Calendar size={10} className="text-gray-400 shrink-0" />
