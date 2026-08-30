@@ -111,15 +111,24 @@ export default function BookingsTab(props) {
 
           const openSeatReplace = async (booking, member, seatNumber) => {
             if (!booking?.unitId || loadingSeat) return;
-            const bldg = (landlordProfile?.buildings || []).find(b => String(b.id) === String(booking.buildingId)) || activeBuilding;
             setLoadingSeat(true);
             try {
-              const units = await listUnits(booking.buildingId);
+              // listUnits resolves to { building, units } — NOT an array. Calling
+              // .find() straight on it threw, the catch swallowed it as "could
+              // not load the room", and the Replace button did nothing at all.
+              const { building: unitBuilding, units } = await listUnits(booking.buildingId);
               const unit = (units || []).find(u => String(u.id ?? u._id) === String(booking.unitId));
               if (!unit) {
                 showToast?.(isBn ? 'রুমটি খুঁজে পাওয়া যায়নি' : 'Could not find that room');
                 return;
               }
+              // The building that came back with the units is the authoritative
+              // record; `rentedAs` on it is what tells the seat form it is
+              // replacing a SEAT and not a whole unit. The profile copy is only
+              // a fallback for a building the list didn't return.
+              const bldg = unitBuilding
+                || (landlordProfile?.buildings || []).find(b => String(b.id) === String(booking.buildingId))
+                || activeBuilding;
               closeBookingDetail();
               setSeatReplace({ unit, building: bldg, member, seatNumber });
             } catch (err) {
