@@ -35,6 +35,7 @@ export default function BookingsTab(props) {
     confirmDeleteBookingId, setConfirmDeleteBookingId, handleCallUser, resolveTenantUserId,
     setActiveTab, setExpandedRentId, downloadAgreement, t, showToast, toggleAutoReminder,
     openTenantProfile, openChatPanel, openModal, isPremium, openBlankLease, setActiveModal,
+    openEditLease,
     handleBookingUpdated,
     getLeaseSummary, computeLeaseStage, isLeaseEndingSoon, leaseDaysLeft, openTenantChangeLease,
     isOpenEndedLease, leaseMonthsRunning,
@@ -174,6 +175,11 @@ export default function BookingsTab(props) {
                       came up STACKED on top of an open tenant card, and
                       "Rent Ledger" switched tabs while leaving the card
                       hanging over the Bookings list to be found later. */}
+                  {/* CORRECT what's already here. Sits above the hand-over on
+                      purpose: fixing a typo is the everyday action, and the two
+                      were one keystroke apart in consequence — the hand-over
+                      ends the tenancy and opens a fresh ledger. */}
+                  <button onClick={() => { closeBookingDetail(); openEditLease(booking); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-indigo-50 text-xs font-bold text-gray-700 hover:text-indigo-700 transition-colors text-left"><FileEdit size={14}/> {isBn ? 'লিজ এডিট করুন' : 'Edit Lease'}</button>
                   <button onClick={() => { closeBookingDetail(); openTenantChangeLease(booking); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-700 transition-colors text-left"><RefreshCw size={14}/> {isBn ? 'নতুন ভাড়াটিয়া · নতুন লিজ' : 'New Tenant · New Lease'}</button>
                   <button onClick={() => { closeBookingDetail(); handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-indigo-50 text-xs font-bold text-gray-700 hover:text-indigo-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
                   <button onClick={() => { closeBookingDetail(); setActiveTab('rent'); setExpandedRentId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
@@ -592,7 +598,10 @@ export default function BookingsTab(props) {
                           <Wallet size={12} className="shrink-0"/> {language === 'বাংলা' ? 'ইনভয়েস' : 'Invoice'}
                         </button>
                         {/* Docs — agreement document vault */}
-                        <button onClick={() => { closeBookingDetail(); openModal('download_user_document'); }} className="shrink-0 px-1.5 sm:px-2.5 py-2 bg-gray-50 text-gray-700 hover:bg-gray-100 transition-all rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest active:scale-95 flex items-center gap-1">
+                        {/* The booking goes WITH the request. Without it the docs
+                            modal had no idea whose documents it was showing —
+                            hence the generic "ভাড়াটিয়া / প্রপার্টি" header. */}
+                        <button onClick={() => { closeBookingDetail(); openModal('download_user_document', booking); }} className="shrink-0 px-1.5 sm:px-2.5 py-2 bg-gray-50 text-gray-700 hover:bg-gray-100 transition-all rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest active:scale-95 flex items-center gap-1">
                           <Folder size={12} className="shrink-0"/> {language === 'বাংলা' ? 'ডকস' : 'Docs'}
                         </button>
                       </div>

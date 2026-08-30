@@ -22,7 +22,7 @@ import { getDynamicFields } from '../constants/propertyFields';
 import { subscriptionService } from '../services/subscriptionService';
 import boostService from '../services/boostService';
 import { listHostInquiries, updateInquiryStatus, deleteInquiry, replyToInquiry, respondVisit, proposeVisit } from "../services/inquiryService.js";
-import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi, cancelBooking as cancelBookingApi, updateBookingSettings as updateBookingSettingsApi, updateMemberLedger as updateMemberLedgerApi, undoMemberLedger as undoMemberLedgerApi } from "../services/bookingService.js";
+import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi, cancelBooking as cancelBookingApi, updateBookingSettings as updateBookingSettingsApi, updateMember as updateMemberApi, updateMemberLedger as updateMemberLedgerApi, undoMemberLedger as undoMemberLedgerApi } from "../services/bookingService.js";
 import { getRoomTypes, firstRoomTypeId, roomLabel } from '../constants/roomCategories';
 import MembersManager from "./MembersManager.jsx";
 import DashboardTab from "./host-dashboard/DashboardTab";
@@ -65,9 +65,13 @@ import useBackGuard, { useOverlayNavigate } from '../hooks/useBackGuard';
 import LandlordHomeChoiceModal from './shared/LandlordHomeChoiceModal';
 import TenantInfoForm from './host-dashboard/TenantInfoForm';
 import { emptyTenantProfile, validateTenantProfile, toTenantProfile } from '../utils/tenantFields';
-import { scopeBookings, bookingInBuilding } from '../utils/buildingScope';
+import { scopeBookings, bookingInBuilding, sortByBuildingOrder } from '../utils/buildingScope';
 import { paidSoFar, remainingFor, applyPaymentToEntry } from '../utils/rentLedger';
-import { primaryOccupant, occupantNames, occupantCount } from '../utils/occupants';
+import { primaryOccupant, occupantNames, occupantCount, activeMembers } from '../utils/occupants';
+import { PLAY_STORE_URL } from '../hooks/useAppInstall';
+import { SITE_URL } from '../seo/siteConfig';
+import { directUpload } from '../services/cloudinaryUpload';
+import AgreementBrandModal from './host-dashboard/AgreementBrandModal.jsx';
 import { submitOnEnter } from '../utils/submitOnEnter';
 import { listBuildings } from '../services/buildingService';
 
@@ -606,6 +610,23 @@ const formatDate = (iso, lang) => {
   return lang === 'বাংলা' ? `${day} ${m} ${d.getFullYear()}` : `${m} ${day}, ${d.getFullYear()}`;
 };
 
+// Where a generated document points people. The QR encodes the Play Store
+// listing (the app is what a tenant wants on a phone); the printed line names
+// the site, which is shorter to read and works on a desktop.
+const APP_LINK_URL = PLAY_STORE_URL;
+const APP_LINK_LABEL = SITE_URL.replace(/^https?:\/\//, '');
+
+// Human file size for the document vault. Only ever fed a REAL byte count from
+// the upload record — the tenant-docs modal used to print invented sizes next
+// to buttons that downloaded nothing.
+const prettyBytes = (n) => {
+  const b = Number(n) || 0;
+  if (b <= 0) return '';
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${Math.round(b / 1024)} KB`;
+  return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+};
+
 // Today's ISO date (YYYY-MM-DD) — for default values in the mark-paid form.
 const todayIso = () => {
   const d = new Date();
@@ -884,6 +905,10 @@ const HostDashboard = () => {
     houseRules:       [],
     buildingMode:     null,
     buildings:        [],
+    // The landlord's own letterhead for generated documents. Only a Cloudinary
+    // URL is kept, never the image bytes — this whole object is synced to the
+    // profile endpoint, and a base64 logo would bloat every save.
+    brand:            { orgName: '', logoUrl: '', phone: '' },
   };
 
   const [landlordProfile, setLandlordProfile] = useState(() => {
@@ -1472,6 +1497,10 @@ const HostDashboard = () => {
     // lease is closed out (status 'completed') and this fresh lease + its own
     // empty rent ledger takes its place on the Rent Collection tab.
     replacesBookingId: null,
+    // Set when the host is CORRECTING an existing lease rather than creating
+    // one. Editing and re-letting are different acts: a re-let ends a tenancy
+    // and starts another, an edit fixes what was typed wrong the first time.
+    editingBookingId: null,
     serviceCharge: '',
     propertyId: '',
     property: '',
@@ -1972,11 +2001,14 @@ const HostDashboard = () => {
   // ── Document Vault (real Cloudinary-backed storage) ────────────────────
   const [documents, setDocuments] = useState([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
-  const [uploadForm, setUploadForm] = useState({ folder: 'agreements', bookingId: '', file: null, error: null });
+  const [uploadForm, setUploadForm] = useState({ folder: 'agreements', bookingId: '', docName: '', file: null, error: null });
   const [uploadingDoc, setUploadingDoc] = useState(false);
 
+  // The vault is also read by the per-tenant "Docs" modal, which opens from the
+  // Bookings tab — where this effect had never run, so the list was empty and
+  // the modal could only ever claim the tenant had no files.
   useEffect(() => {
-    if (activeTab !== 'documents') return;
+    if (activeTab !== 'documents' && activeModal !== 'download_user_document') return;
     let alive = true;
     setLoadingDocs(true);
     (async () => {
@@ -1990,7 +2022,7 @@ const HostDashboard = () => {
       }
     })();
     return () => { alive = false; };
-  }, [activeTab]);
+  }, [activeTab, activeModal]);
 
   const handleDocUpload = async () => {
     if (!uploadForm.file) {
@@ -2002,17 +2034,28 @@ const HostDashboard = () => {
       const fd = new FormData();
       fd.append('file', uploadForm.file);
       fd.append('folder', uploadForm.folder);
-      fd.append('fileName', uploadForm.file.name);
+      // The landlord's own label for the file. Falls back to the upload's
+      // filename, which for a phone photo is "IMG_20260830.jpg" — accurate and
+      // useless in a list of forty documents.
+      fd.append('fileName', String(uploadForm.docName || '').trim() || uploadForm.file.name);
       const b = bookings.find(x => String(x.id) === String(uploadForm.bookingId));
       if (b) {
-        if (b.tenantId) fd.append('tenantId', b.tenantId);
-        fd.append('tenantName', b.tenant || '');
-        fd.append('tenantPhone', b.tenantPhone || '');
+        // The REAL occupant, not booking.tenant — which is blank on every
+        // seat-rented room and stale on a flat once the tenant joins by invite.
+        // The snapshot stored here is what names the file after the booking is
+        // gone, so it has to be the person, not an empty string.
+        const occ = primaryOccupant(b, language);
+        // Their own linked account where they have one; the booking's only as a
+        // fallback for legacy rows with no members.
+        const uid = (activeMembers(b)[0]?.userId) || b.tenantId || '';
+        if (uid) fd.append('tenantId', String(uid));
+        fd.append('tenantName', occ.name);
+        fd.append('tenantPhone', occ.phone || '');
         fd.append('bookingId', b.id);
       }
       const doc = await uploadDocApi(fd);
       setDocuments(prev => [doc, ...prev]);
-      setUploadForm({ folder: 'agreements', bookingId: '', file: null, error: null });
+      setUploadForm({ folder: 'agreements', bookingId: '', docName: '', file: null, error: null });
       setActiveModal(null);
       showToast(language === 'বাংলা' ? 'ডকুমেন্ট আপলোড হয়েছে!' : 'Document uploaded!');
     } catch (err) {
@@ -2390,7 +2433,7 @@ const HostDashboard = () => {
     setIsProfileDrawerOpen(false);
     setConfirmDeleteBookingId(null);
     if (type === 'upload_document') {
-      setUploadForm({ folder: activeFolder?.id || 'agreements', bookingId: '', file: null, error: null });
+      setUploadForm({ folder: activeFolder?.id || 'agreements', bookingId: '', docName: '', file: null, error: null });
     }
     if (type === 'edit' && data) {
       // Seed every editable field. Demo seed entries only carry a subset of
@@ -2823,108 +2866,263 @@ const HostDashboard = () => {
     }
   };
 
-  // Generate + download a real lease-agreement PDF for a booking. Uses jsPDF
-  // (already a dependency), imported lazily so it doesn't bloat the initial
-  // bundle. Landlord details come from the signed-in host; everything else
-  // from the booking record. Replaces the old toast-only stub.
-  const downloadAgreement = async (booking) => {
+  // Generate + download a real lease-agreement PDF for a booking.
+  //
+  // WHY THIS IS RENDERED THROUGH THE BROWSER AND NOT WRITTEN WITH doc.text()
+  // It used to be drawn straight into jsPDF with the built-in `helvetica`
+  // font. Those core fonts are WinAnsi-encoded: they carry no Bangla glyphs and
+  // no ৳ sign. So every Bangla value — the tenant's name, the generated date,
+  // the month names — came out as a row of accented Latin rubble, and the rent
+  // figures printed "ó 6,000". The landlord got a 8 KB PDF that looked empty
+  // where it mattered most: who the agreement is between.
+  //
+  // Embedding a Bangla TTF does not fix it either. jsPDF places glyphs in the
+  // order the code points arrive; Bangla needs shaping — ি reorders before its
+  // consonant, conjuncts fuse — so the words would still come out wrong, just
+  // in Bangla letters.
+  //
+  // The browser already does that shaping perfectly. So the agreement is built
+  // as HTML, rasterised with html2canvas (already a dependency), and placed
+  // into the PDF as an image. The trade is selectable text for a document that
+  // is actually readable in the language it was written in.
+  const generateAgreementPdf = async (booking, brand = null) => {
     if (!booking) return;
-    showToast(language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট তৈরি হচ্ছে…' : 'Generating agreement…');
+    const isBnDoc = language === 'বাংলা';
+    showToast(isBnDoc ? 'অ্যাগ্রিমেন্ট তৈরি হচ্ছে…' : 'Generating agreement…');
+
+    // Values are interpolated into markup, so they are escaped — a tenant
+    // named with an angle bracket must not become a tag.
+    const esc = (v) => String(v ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    const occupant = primaryOccupant(booking, language);
+    const names = occupantNames(booking);
+    const L = (bn, en) => (isBnDoc ? bn : en);
+
+    const row = (k, v) => `
+      <tr>
+        <td style="padding:7px 0;width:210px;vertical-align:top;font-size:11px;font-weight:700;color:#6b7280;letter-spacing:.04em;">${esc(k)}</td>
+        <td style="padding:7px 0;vertical-align:top;font-size:13px;font-weight:600;color:#111827;">${esc(v || '—')}</td>
+      </tr>`;
+
+    const section = (title, rowsHtml) => `
+      <h2 style="margin:26px 0 6px;font-size:14px;font-weight:800;color:#111827;">${esc(title)}</h2>
+      <div style="height:1px;background:#e5e7eb;margin-bottom:4px;"></div>
+      <table style="width:100%;border-collapse:collapse;">${rowsHtml}</table>`;
+
+    const terms = isBnDoc ? [
+      'ভাড়াটিয়া প্রতি মাসের নির্ধারিত তারিখ বা তার আগে ভাড়া পরিশোধ করবেন।',
+      'জামানত (ডিপোজিট) ফেরতযোগ্য — হস্তান্তরের সময় সম্পত্তির অবস্থার উপর নির্ভর করে।',
+      'ভাড়াটিয়া সম্পত্তি ভালো অবস্থায় রাখবেন এবং কোনো ক্ষতি হলে দ্রুত জানাবেন।',
+      'উভয় পক্ষ প্রচলিত আইন অনুযায়ী আগাম লিখিত নোটিশ দিয়ে এই চুক্তি বাতিল করতে পারবেন।',
+      'এই ডকুমেন্টটি TO-LET PRO থেকে রেকর্ড রাখার জন্য তৈরি একটি সারসংক্ষেপ।',
+    ] : [
+      'The tenant agrees to pay the monthly rent on or before the due date each month.',
+      'The security deposit is refundable subject to the condition of the property at handover.',
+      'The tenant shall maintain the property in good condition and report damage promptly.',
+      'Either party may terminate this agreement with prior written notice as per local law.',
+      'This document is a summary generated by TO-LET PRO for record-keeping purposes.',
+    ];
+
+    // ── Letterhead ──────────────────────────────────────────────────────────
+    // Whose document is this? If the landlord has set a business name or logo,
+    // theirs is the name at the top and TO-LET PRO shrinks to a corner mark.
+    // With nothing set, the header is exactly what it was before.
+    const orgName = String(brand?.orgName || '').trim();
+    const orgPhone = String(brand?.phone || '').trim();
+    const branded = !!(orgName || brand?.logoUrl);
+
+    // The logo is inlined as a data URL before rendering. html2canvas draws
+    // remote images through the canvas, and a cross-origin one taints it —
+    // toDataURL() then throws and the whole download fails. A logo that can't
+    // be fetched is dropped; it must never take the agreement down with it.
+    let logoData = '';
+    if (brand?.logoUrl) {
+      try {
+        const res = await fetch(brand.logoUrl, { mode: 'cors' });
+        if (res.ok) {
+          const blob = await res.blob();
+          logoData = await new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(String(fr.result || ''));
+            fr.onerror = reject;
+            fr.readAsDataURL(blob);
+          });
+        }
+      } catch (err) {
+        console.warn('[host] agreement logo skipped:', err?.message || err);
+      }
+    }
+
+    // Footer QR — where a tenant holding the paper can find the app.
+    let qrData = '';
     try {
-      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-      const pageW = doc.internal.pageSize.getWidth();
-      const margin = 48;
-      let y = margin;
+      const QR = await import('qrcode');
+      qrData = await QR.toDataURL(APP_LINK_URL, { margin: 0, width: 160, errorCorrectionLevel: 'M' });
+    } catch (err) {
+      console.warn('[host] footer QR skipped:', err?.message || err);
+    }
 
-      const line = (text, opts = {}) => {
-        const { size = 11, bold = false, gap = 16, color = [30, 30, 30], align = 'left' } = opts;
-        doc.setFont('helvetica', bold ? 'bold' : 'normal');
-        doc.setFontSize(size);
-        doc.setTextColor(color[0], color[1], color[2]);
-        const x = align === 'center' ? pageW / 2 : margin;
-        doc.text(String(text), x, y, { align });
-        y += gap;
-      };
-      const rule = () => { doc.setDrawColor(214); doc.line(margin, y, pageW - margin, y); y += 16; };
-      const kv = (k, v) => {
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(110, 110, 110);
-        doc.text(String(k).toUpperCase(), margin, y);
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(20, 20, 20);
-        doc.text(String(v ?? '—'), margin + 160, y);
-        y += 19;
-      };
+    const headerLeft = branded
+      ? `<div style="display:flex;align-items:center;gap:14px;min-width:0;">
+           ${logoData ? `<img src="${logoData}" alt="" style="width:56px;height:56px;object-fit:contain;flex:0 0 auto;" />` : ''}
+           <div style="min-width:0;">
+             <div style="font-size:22px;font-weight:900;color:#111827;letter-spacing:-.01em;line-height:1.2;">${esc(orgName || booking.property)}</div>
+             ${orgPhone ? `<div style="font-size:11px;font-weight:700;color:#6b7280;margin-top:3px;">${esc(orgPhone)}</div>` : ''}
+           </div>
+         </div>`
+      : `<div style="font-size:24px;font-weight:900;color:#ba0036;letter-spacing:-.01em;">TO-LET PRO</div>`;
 
-      // Header
-      line('TO-LET PRO', { size: 18, bold: true, color: [186, 0, 54], gap: 22 });
-      line('Rental / Lease Agreement', { size: 14, bold: true, gap: 12 });
-      line(`Generated: ${formatDate(todayIso(), language)}`, { size: 9, color: [130, 130, 130], gap: 20 });
-      rule();
+    // Only shown when the landlord's own name has taken the headline, so the
+    // page never says TO-LET PRO twice.
+    const headerRight = branded
+      ? `<div style="text-align:right;flex:0 0 auto;padding-left:16px;">
+           <div style="font-size:11px;font-weight:900;color:#ba0036;letter-spacing:.02em;">TO-LET PRO</div>
+           <div style="font-size:8px;font-weight:700;color:#9ca3af;margin-top:2px;">${esc(APP_LINK_LABEL)}</div>
+         </div>`
+      : '';
 
-      line('Parties', { size: 12, bold: true, gap: 20 });
-      kv('Landlord', userData?.fullName || authUser?.name || authUser?.fullName || '—');
-      kv('Landlord Phone', userData?.phone || authUser?.phone || '—');
-      // Off members[], not the headcount typed once on the lease form — an
-      // agreement that names the wrong person, or claims one occupant for a
-      // two-seat room, is a document the landlord can't hand to anyone.
-      const agreementOccupant = primaryOccupant(booking, language);
-      const agreementNames = occupantNames(booking);
-      kv('Tenant', agreementOccupant.name);
-      kv('Tenant Phone', agreementOccupant.phone || '—');
-      kv('Occupants', occupantCount(booking));
-      if (agreementNames.length > 1) kv('Occupant Names', agreementNames.join(', '));
-      y += 4; rule();
+    // 794px = A4 width at 96dpi, so the capture maps 1:1 onto the page.
+    const host = document.createElement('div');
+    host.setAttribute('aria-hidden', 'true');
+    host.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;background:#ffffff;z-index:-1;';
+    host.innerHTML = `
+      <div style="width:794px;box-sizing:border-box;padding:48px 56px;background:#fff;color:#111827;
+                  font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans Bengali','Hind Siliguri',sans-serif;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+          ${headerLeft}
+          ${headerRight}
+        </div>
+        <div style="font-size:17px;font-weight:800;margin-top:${branded ? '16px' : '6px'};">${esc(L('ভাড়ার চুক্তিপত্র', 'Rental / Lease Agreement'))}</div>
+        <div style="font-size:11px;font-weight:600;color:#9ca3af;margin-top:4px;">
+          ${esc(L('তৈরি', 'Generated'))}: ${esc(formatDate(todayIso(), language))}
+        </div>
+        <div style="height:2px;background:#111827;margin-top:14px;"></div>
 
-      line('Property', { size: 12, bold: true, gap: 20 });
-      kv('Property', booking.property || '—');
-      kv('Location', booking.location || '—');
-      y += 4; rule();
+        ${section(L('পক্ষসমূহ', 'Parties'),
+          row(L('বাড়িওয়ালা', 'Landlord'), userData?.fullName || authUser?.name || authUser?.fullName)
+          + row(L('বাড়িওয়ালার ফোন', 'Landlord Phone'), userData?.phone || authUser?.phone)
+          + row(L('ভাড়াটিয়া', 'Tenant'), occupant.name)
+          + row(L('ভাড়াটিয়ার ফোন', 'Tenant Phone'), occupant.phone)
+          + row(L('মোট বাসিন্দা', 'Occupants'), occupantCount(booking))
+          + (names.length > 1 ? row(L('বাসিন্দাদের নাম', 'Occupant Names'), names.join(', ')) : ''))}
 
-      line('Lease Terms', { size: 12, bold: true, gap: 20 });
-      kv('Move-In Date', formatDate(booking.leaseStart, language));
-      // An ongoing tenancy has no end date to print — the agreement says so
-      // instead of leaving a blank the tenant could read as an expiry.
-      kv('Lease End', isOpenEndedLease(booking)
-        ? 'Ongoing — until either party gives notice'
-        : formatDate(booking.leaseEnd, language));
-      kv('Monthly Rent', formatBDT(booking.monthlyRent));
-      kv('Service Charge', formatBDT(booking.serviceCharge || 0));
-      kv('Security Deposit', formatBDT(booking.securityDeposit || 0));
-      kv('Advance Payment', formatBDT(booking.advancePayment || 0));
-      kv('Payment Method', booking.paymentMethod || '—');
-      kv('Rent Due Day', `${booking.rentDueDay || 5} of each month`);
-      y += 8; rule();
+        ${section(L('সম্পত্তি', 'Property'),
+          row(L('প্রপার্টি', 'Property'), booking.property)
+          + row(L('ঠিকানা', 'Location'), booking.location)
+          + (booking.roomNumber ? row(L('রুম', 'Room'), booking.roomNumber) : '')
+          + (booking.floorNumber ? row(L('ফ্লোর', 'Floor'), booking.floorNumber) : ''))}
 
-      line('Terms & Conditions', { size: 12, bold: true, gap: 16 });
-      const terms = [
-        '1. The tenant agrees to pay the monthly rent on or before the due date each month.',
-        '2. The security deposit is refundable subject to the condition of the property at handover.',
-        '3. The tenant shall maintain the property in good condition and report damage promptly.',
-        '4. Either party may terminate this agreement with prior written notice as per local law.',
-        '5. This document is a summary generated by TO-LET PRO for record-keeping purposes.',
-      ];
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(60, 60, 60);
-      terms.forEach((tline) => {
-        const wrapped = doc.splitTextToSize(tline, pageW - margin * 2);
-        doc.text(wrapped, margin, y);
-        y += wrapped.length * 14 + 4;
+        ${section(L('ভাড়ার শর্তাবলি', 'Lease Terms'),
+          row(L('মুভ-ইন তারিখ', 'Move-In Date'), formatDate(booking.leaseStart, language))
+          + row(L('লিজের মেয়াদ', 'Lease End'), isOpenEndedLease(booking)
+              ? L('চলমান — যেকোনো পক্ষ নোটিশ না দেওয়া পর্যন্ত', 'Ongoing — until either party gives notice')
+              : formatDate(booking.leaseEnd, language))
+          + row(L('মাসিক ভাড়া', 'Monthly Rent'), formatBDT(booking.monthlyRent))
+          + row(L('সার্ভিস চার্জ', 'Service Charge'), formatBDT(booking.serviceCharge || 0))
+          + row(L('জামানত', 'Security Deposit'), formatBDT(booking.securityDeposit || 0))
+          + row(L('অগ্রিম', 'Advance Payment'), formatBDT(booking.advancePayment || 0))
+          + row(L('পেমেন্ট মাধ্যম', 'Payment Method'), booking.paymentMethod)
+          + row(L('ভাড়ার তারিখ', 'Rent Due Day'), L(`প্রতি মাসের ${booking.rentDueDay || 5} তারিখ`, `${booking.rentDueDay || 5} of each month`)))}
+
+        <h2 style="margin:26px 0 6px;font-size:14px;font-weight:800;">${esc(L('শর্তাবলি', 'Terms & Conditions'))}</h2>
+        <div style="height:1px;background:#e5e7eb;margin-bottom:10px;"></div>
+        <ol style="margin:0;padding-left:18px;font-size:12px;line-height:1.85;color:#374151;font-weight:500;">
+          ${terms.map(tx => `<li style="margin-bottom:2px;">${esc(tx)}</li>`).join('')}
+        </ol>
+
+        <div style="display:flex;justify-content:space-between;margin-top:64px;">
+          <div style="width:230px;">
+            <div style="height:1px;background:#9ca3af;"></div>
+            <div style="font-size:11px;font-weight:700;color:#6b7280;margin-top:7px;">${esc(L('বাড়িওয়ালার স্বাক্ষর', 'Landlord Signature'))}</div>
+          </div>
+          <div style="width:230px;">
+            <div style="height:1px;background:#9ca3af;"></div>
+            <div style="font-size:11px;font-weight:700;color:#6b7280;margin-top:7px;">${esc(L('ভাড়াটিয়ার স্বাক্ষর', 'Tenant Signature'))}</div>
+          </div>
+        </div>
+
+        <!-- Foot of the page: small, out of the way, and scannable. The tenant
+             holding this sheet is the person most likely to want the app. -->
+        <div style="margin-top:40px;padding-top:12px;border-top:1px solid #e5e7eb;
+                    display:flex;align-items:center;justify-content:space-between;gap:16px;">
+          <div style="min-width:0;">
+            <div style="font-size:9px;font-weight:700;color:#9ca3af;">
+              ${esc(L('তৈরি হয়েছে TO-LET PRO দিয়ে', 'Generated with TO-LET PRO'))}
+            </div>
+            <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-top:2px;">${esc(APP_LINK_LABEL)}</div>
+          </div>
+          ${qrData ? `<img src="${qrData}" alt="" style="width:52px;height:52px;flex:0 0 auto;" />` : ''}
+        </div>
+      </div>`;
+    document.body.appendChild(host);
+
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      const canvas = await html2canvas(host.firstElementChild, {
+        scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
       });
 
-      y += 46;
-      doc.setDrawColor(120);
-      doc.line(margin, y, margin + 180, y);
-      doc.line(pageW - margin - 180, y, pageW - margin, y);
-      y += 14;
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(90, 90, 90);
-      doc.text('Landlord Signature', margin, y);
-      doc.text('Tenant Signature', pageW - margin - 180, y);
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const ratio = pageW / canvas.width;          // canvas px → pt
+      const sliceSrcH = Math.floor(pageH / ratio); // how many source px fit on one page
 
-      const safeName = String(booking.tenant || 'tenant').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-      doc.save(`lease-agreement-${safeName}.pdf`);
-      showToast(language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড হয়েছে ✓' : 'Agreement downloaded ✓');
+      for (let sy = 0, page = 0; sy < canvas.height; sy += sliceSrcH, page += 1) {
+        const h = Math.min(sliceSrcH, canvas.height - sy);
+        const slice = document.createElement('canvas');
+        slice.width = canvas.width;
+        slice.height = h;
+        slice.getContext('2d').drawImage(canvas, 0, sy, canvas.width, h, 0, 0, canvas.width, h);
+        if (page > 0) doc.addPage();
+        doc.addImage(slice.toDataURL('image/png'), 'PNG', 0, 0, pageW, h * ratio);
+      }
+
+      // The name on the file is the name on the agreement. Non-Latin names have
+      // no safe filename form, so those fall back to the room or a plain label
+      // rather than to a string of dashes.
+      const latin = occupant.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase();
+      const slug = latin || String(booking.roomNumber || '').replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'tenant';
+      doc.save(`lease-agreement-${slug}.pdf`);
+      showToast(isBnDoc ? 'অ্যাগ্রিমেন্ট ডাউনলোড হয়েছে ✓' : 'Agreement downloaded ✓');
     } catch (err) {
       console.warn('[host] agreement generation failed:', err?.message || err);
-      showToast(language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট তৈরি ব্যর্থ' : 'Could not generate agreement');
+      showToast(isBnDoc ? 'অ্যাগ্রিমেন্ট তৈরি ব্যর্থ' : 'Could not generate agreement');
+    } finally {
+      host.remove();
     }
+  };
+
+  // The booking waiting on the branding step, or null.
+  const [agreementFor, setAgreementFor] = useState(null);
+
+  // Upload a brand logo. Cloudinary, like avatars and vault documents — only
+  // the URL is ever stored, so the profile blob stays small enough to sync.
+  const uploadBrandLogo = async (file) => {
+    const { secureUrl } = await directUpload(file, {
+      folder: `tolet-pro/brand/${authUser?.id || 'host'}`,
+      publicId: 'logo',
+    });
+    return secureUrl;
+  };
+
+  // What every "Download Agreement" button calls. The branding step comes
+  // first — the landlord asked to decide whose name is on the page at the
+  // moment they produce it, not once buried in a settings screen.
+  const downloadAgreement = (booking) => {
+    if (!booking) return;
+    setAgreementFor(booking);
+  };
+
+  // Chosen in the modal: remember the letterhead, then build the PDF.
+  const confirmAgreementDownload = (brand) => {
+    const booking = agreementFor;
+    setAgreementFor(null);
+    if (!booking) return;
+    persistLandlordProfile({ ...landlordProfile, brand });
+    generateAgreementPdf(booking, brand);
   };
 
   // Export the Rent Collection view (for the selected year) to a CSV file.
@@ -3310,6 +3508,7 @@ const HostDashboard = () => {
       inquiryId: inquiry.id,
       inquirerUserId: inquiry.inquirerUserId || null,
       replacesBookingId: null,
+      editingBookingId: null,
       propertyId: inquiry.propertyId || (matchingProp?.id ?? ''),
       property: inquiry.propTitle || matchingProp?.title || '',
       location: matchingProp?.location || inquiry.location || '',
@@ -3406,6 +3605,7 @@ const HostDashboard = () => {
       inquiryId: null,
       inquirerUserId: null,
       replacesBookingId: null,
+      editingBookingId: null,
       propertyId: prefillBuilding ? prefillBuilding.id : (properties[0]?.id || ''),
       property: prefillBuilding ? prefillBuilding.name : (properties[0]?.title || ''),
       // `address` is what a real Building record carries; `location` is the old
@@ -3476,6 +3676,11 @@ const HostDashboard = () => {
       inquiryId: null,
       inquirerUserId: null,
       replacesBookingId: booking.id,
+      // MUST be cleared. This form is shared with the edit flow, and a stale
+      // editingBookingId here would send the hand-over down the edit branch —
+      // silently rewriting the outgoing tenant's lease instead of closing it
+      // out and starting a new one.
+      editingBookingId: null,
       // ── Carried over: the unit + its money terms ──
       propertyId: booking.propertyId ? String(booking.propertyId) : '',
       property: booking.property || '',
@@ -3521,6 +3726,161 @@ const HostDashboard = () => {
     setActiveModal('create_lease');
   };
 
+  // ── EDIT AN EXISTING LEASE ────────────────────────────────────────────────
+  // The only thing a saved lease offered was "New Tenant · New Lease", which
+  // ENDS the tenancy and starts a fresh one with an empty ledger. That is the
+  // right tool for a tenant moving out and completely the wrong one for a
+  // mistyped rent or a name spelled wrong in a hurry — using it to fix a typo
+  // would retire the real tenancy and throw away the rent history attached to
+  // it. So correcting is now its own action: same form, same fields, saved
+  // back onto the SAME booking, ledger untouched.
+  const openEditLease = (booking) => {
+    if (!booking) return;
+    // NOT premium-gated, unlike creating or re-letting.
+    //
+    // Creating a lease is the paid capability. Correcting a mistake in a lease
+    // the landlord has ALREADY made is not a feature — it is the difference
+    // between their records being right and being permanently wrong. A rent
+    // typed as 6,000 instead of 16,000 during Eid would otherwise be frozen
+    // into every future month with no way back except ending the tenancy and
+    // losing its rent history.
+    const termMonths = Number(booking.commercialTerms?.leaseTermMonths) || 0;
+    // Whoever is really in the unit — a member who joined by invite outranks
+    // the name typed at creation (see utils/occupants.js).
+    const occ = primaryOccupant(booking, language);
+    setLeaseForm((f) => ({
+      ...f,
+      inquiryId: booking.inquiryId || null,
+      inquirerUserId: null,
+      replacesBookingId: null,
+      editingBookingId: booking.id,
+      propertyId: booking.propertyId ? String(booking.propertyId) : '',
+      property: booking.property || '',
+      location: booking.location || '',
+      category: booking.dealType === 'commercial' ? '' : propTypeToCategory(booking.propertyType),
+      dealType: booking.dealType === 'commercial' ? 'commercial' : 'residential',
+      floorNumber: booking.floorNumber || '',
+      roomNumber: booking.roomNumber || '',
+      manualProperty: !booking.propertyId,
+      buildingId: booking.buildingId || null,
+      unitId: booking.unitId || null,
+      monthlyRent: String(booking.monthlyRent ?? ''),
+      serviceCharge: String(booking.serviceCharge ?? ''),
+      advancePayment: String(booking.advancePayment ?? ''),
+      paymentMethod: booking.paymentMethod || 'bKash',
+      lateFeeAmount: Number(booking.lateFeeAmount) > 0 ? String(booking.lateFeeAmount) : '',
+      gracePeriodDays: Number(booking.gracePeriodDays) ?? 5,
+      rentDueDay: Number(booking.rentDueDay) || 5,
+      reminderLeadDays: Number(booking.reminderLeadDays) || 3,
+      autoReminder: booking.autoReminder !== false,
+      leaseTermMonths: termMonths > 0 ? String(termMonths) : '',
+      businessName: booking.commercialTerms?.businessName || '',
+      licenseNumber: booking.commercialTerms?.licenseNumber || '',
+      tenant: occ.name,
+      tenantPhone: occ.phone || '',
+      tenantProfile: booking.tenantProfile || emptyTenantProfile(),
+      occupants: String(occupantCount(booking) || ''),
+      // Seats are owned by the members panel, not this form — editing a lease
+      // must never silently rewrite who is sitting in which bed.
+      seats: [],
+      notes: booking.notes || '',
+      leaseStart: booking.leaseStart ? String(booking.leaseStart).slice(0, 10) : '',
+      leaseEnd: booking.leaseEnd ? String(booking.leaseEnd).slice(0, 10) : '',
+    }));
+    setConfirmDeleteBookingId(null);
+    setActiveDropdownId(null);
+    setLeaseErrors([]);
+    setLeaseStep(1);
+    setActiveModal('create_lease');
+  };
+
+  // Save the corrections back onto the same booking. Deliberately narrow: it
+  // writes the fields the form owns and nothing else. `ledger`, `members`,
+  // `inviteCode` and `status` are never touched, so a correction cannot cost
+  // the landlord a month of rent history.
+  const submitEditLease = (bookingId, values) => {
+    const booking = bookings.find(b => String(b.id) === String(bookingId));
+    if (!booking) return;
+
+    const patch = {
+      tenant: values.tenant,
+      tenantPhone: values.tenantPhone,
+      // The whole person, not just the name — NID, profession, address,
+      // emergency contact, photo. These are the "many things about the tenant"
+      // the form let a landlord type and then gave them no way to correct.
+      tenantProfile: values.tenantProfile,
+      tenantsCount: values.occupants,
+      property: values.property,
+      location: values.location,
+      floorNumber: values.floorNumber,
+      roomNumber: values.roomNumber,
+      monthlyRent: values.monthlyRent,
+      serviceCharge: values.serviceCharge,
+      advancePayment: values.advancePayment,
+      paymentMethod: values.paymentMethod,
+      lateFeeAmount: values.lateFeeAmount,
+      gracePeriodDays: values.gracePeriodDays,
+      rentDueDay: values.rentDueDay,
+      reminderLeadDays: values.reminderLeadDays,
+      autoReminder: values.autoReminder,
+      notes: values.notes,
+      leaseStart: values.leaseStart,
+      leaseEnd: values.leaseEnd || null,
+      ...(values.dealType === 'commercial'
+        ? { commercialTerms: { businessName: values.businessName, licenseNumber: values.licenseNumber, leaseTermMonths: values.leaseTermMonths } }
+        : {}),
+    };
+
+    // THE NAME ON THE CARD IS members[0].name, not booking.tenant (see
+    // utils/occupants.js). So renaming the tenant here has to reach that row as
+    // well, or the landlord fixes a misspelling, saves, and the card still
+    // shows the old spelling — the exact "it won't let me correct it" they hit
+    // in the first place. Only the FIRST occupant is touched: that is the
+    // person this form is about; the rest are the members panel's business.
+    const activeMems = Array.isArray(booking.members)
+      ? booking.members.filter(m => m && m.status !== 'moved-out')
+      : [];
+    const primaryMem = activeMems[0] || null;
+    const renamePrimary = !!primaryMem
+      && (String(primaryMem.name || '') !== patch.tenant || String(primaryMem.phone || '') !== patch.tenantPhone);
+
+    // A hostel room's rent is split across its seats, and each seat's share is
+    // derived from booking.monthlyRent at display time — so changing the room
+    // rent re-splits it automatically and no member row needs rewriting here.
+    setBookings(prev => prev.map(b => (String(b.id) === String(bookingId)
+      ? {
+          ...b,
+          ...patch,
+          leaseEnd: patch.leaseEnd || '',
+          tenantInit: (String(patch.tenant || '?').trim().charAt(0) || '?').toUpperCase(),
+          ...(renamePrimary
+            ? { members: (b.members || []).map(m => (m.id === primaryMem.id
+                ? { ...m, name: patch.tenant, phone: patch.tenantPhone }
+                : m)) }
+            : {}),
+          ...(values.dealType === 'commercial'
+            ? { commercialTerms: { ...(b.commercialTerms || {}), businessName: values.businessName, licenseNumber: values.licenseNumber, leaseTermMonths: values.leaseTermMonths } }
+            : {}),
+        }
+      : b)));
+
+    setActiveModal(null);
+    setLeaseErrors([]);
+    showToast(language === 'বাংলা' ? 'লিজ আপডেট হয়েছে ✓' : 'Lease updated ✓');
+
+    const mongoId = booking._id || bookingId;
+    if (/^[0-9a-fA-F]{24}$/.test(String(mongoId))) {
+      updateBookingSettingsApi(mongoId, patch).catch(err => {
+        console.warn('[host] lease update sync failed:', err.message || err);
+        showToast(language === 'বাংলা' ? 'সার্ভারে সেভ হয়নি — আবার চেষ্টা করুন' : 'Could not save to the server — please try again');
+      });
+      if (renamePrimary && primaryMem.id) {
+        updateMemberApi(mongoId, primaryMem.id, { name: patch.tenant, phone: patch.tenantPhone })
+          .catch(err => console.warn('[host] member rename sync failed:', err.message || err));
+      }
+    }
+  };
+
   // Close out a lease: the tenancy is over as of `endIso`. We never delete —
   // receipts and past-year ledgers hang off this row — we mark it 'completed'
   // and pull the end date back so it stops counting as live revenue and drops
@@ -3553,7 +3913,10 @@ const HostDashboard = () => {
   // TODO(backend): POST /api/host/bookings  body: { ...leaseForm }
   //   On success the inquiry should be marked converted server-side.
   const submitCreateLease = (keepOpen = false) => {
-    if (!isPremium) { setActiveModal('premium_gate'); return; }
+    // Saving a CORRECTION is never gated — see openEditLease. Gating it here
+    // would have let the form open and then refused at the save button, which
+    // is worse than not offering it at all.
+    if (!isPremium && !leaseForm.editingBookingId) { setActiveModal('premium_gate'); return; }
     const { tenant, tenantPhone, propertyId, leaseStart, leaseEnd, monthlyRent, manualProperty } = leaseForm;
     // Collect EVERY empty required box so they all turn red, then jump to the
     // WIZARD STEP holding the first one and focus it. Without the step hop the
@@ -3609,6 +3972,43 @@ const HostDashboard = () => {
     // units, so a hostel or a multi-room house still takes many leases at once.
     const pidStr = String(propertyId);
     const replacesId = leaseForm.replacesBookingId || null;
+    const editingId = leaseForm.editingBookingId || null;
+
+    // ── EDITING: correct this lease and stop ────────────────────────────────
+    // Everything past this point creates a NEW booking — the inquiry-duplicate
+    // check, the occupancy guard, the close-out of a replaced lease. None of it
+    // applies to fixing the lease that is already there, and the occupancy
+    // guard would refuse the edit outright: the unit is occupied by the very
+    // booking being edited.
+    if (editingId) {
+      submitEditLease(editingId, {
+        tenant: tenant.trim(),
+        tenantPhone: tenantPhone.trim(),
+        tenantProfile: toTenantProfile(leaseTenantView(leaseForm)),
+        occupants: Math.max(1, Number(leaseForm.occupants) || 1),
+        property: leaseForm.property,
+        location: leaseForm.location || '',
+        floorNumber: leaseForm.floorNumber || '',
+        roomNumber: leaseForm.roomNumber || '',
+        monthlyRent: rent,
+        serviceCharge: Number(leaseForm.serviceCharge) || 0,
+        advancePayment: Number(leaseForm.advancePayment) || 0,
+        paymentMethod: leaseForm.paymentMethod || 'Cash',
+        lateFeeAmount: Math.max(0, Number(leaseForm.lateFeeAmount) || 0),
+        gracePeriodDays: Math.max(0, Number(leaseForm.gracePeriodDays) || 0),
+        rentDueDay: Number(leaseForm.rentDueDay) || 5,
+        reminderLeadDays: Number(leaseForm.reminderLeadDays) || 3,
+        autoReminder: !!leaseForm.autoReminder,
+        notes: leaseForm.notes || '',
+        leaseStart: effLeaseStart,
+        leaseEnd: effLeaseEnd,
+        dealType: leaseForm.dealType,
+        businessName: String(leaseForm.businessName || '').trim(),
+        licenseNumber: String(leaseForm.licenseNumber || '').trim(),
+        leaseTermMonths: termMonths,
+      });
+      return;
+    }
 
     // One active booking per inquiry — converting the same inquiry twice is a
     // double-entry, not a re-let.
@@ -3800,7 +4200,7 @@ const HostDashboard = () => {
       // dates, rent, due day, reminder, payment) and clear only the per-booking
       // ones so the host can add the next room/tenant immediately — the way to
       // set 20+ bookings without re-typing everything.
-      setLeaseForm(f => ({ ...f, tenant: '', tenantPhone: '', tenantProfile: emptyTenantProfile(), roomNumber: '', occupants: '', businessName: '', licenseNumber: '', seats: [], inquiryId: null, inquirerUserId: null, replacesBookingId: null }));
+      setLeaseForm(f => ({ ...f, tenant: '', tenantPhone: '', tenantProfile: emptyTenantProfile(), roomNumber: '', occupants: '', businessName: '', licenseNumber: '', seats: [], inquiryId: null, inquirerUserId: null, replacesBookingId: null, editingBookingId: null }));
       setLeaseStep(1);
       showToast(language === 'বাংলা' ? 'লিজ তৈরি হয়েছে — পরের রুম/ভাড়াটিয়া যোগ করুন' : 'Lease created — add the next room / tenant');
     } else {
@@ -4657,14 +5057,14 @@ const HostDashboard = () => {
               </h3>
               <div className="grid grid-cols-4 gap-[clamp(0.375rem,2vw,1rem)] items-stretch">
                 {[
-                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">ভাড়াটিয়া<br />যোগ করুন</span><span className="hidden md:block">ভাড়াটিয়া যোগ করুন</span></> : <><span className="md:hidden block leading-tight">Add<br />Tenant</span><span className="hidden md:block">Add Tenant</span></>,       Icon: Calendar,      iconColor: 'text-gray-500 dark:text-gray-400',     onClick: () => setActiveTab('bookings'), showOn: 'all' },
-                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">ভাড়া<br />কালেকশন</span><span className="hidden md:block">ভাড়া কালেকশন</span></> : <><span className="md:hidden block leading-tight">Rent<br />Collection</span><span className="hidden md:block">Rent Collection</span></>, Icon: Wallet,        iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('rent'), showOn: 'all' },
-                  { label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => navigate('/messages'), showOn: 'desktop' },
-                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">পেমেন্ট<br />সেটিংস</span><span className="hidden md:block">পেমেন্ট সেটিংস</span></> : <><span className="md:hidden block leading-tight">Payment<br />Settings</span><span className="hidden md:block">Payment Settings</span></>, Icon: CreditCard, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('payments'), showOn: 'mobile' },
-                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">স্মার্ট<br />অ্যালার্ট</span><span className="hidden md:block">স্মার্ট অ্যালার্ট</span></> : <><span className="md:hidden block leading-tight">Smart<br />Alerts</span><span className="hidden md:block">Smart Alerts</span></>, Icon: BellRing,      iconColor: 'text-gray-500 dark:text-gray-400',   onClick: () => setActiveTab('smartAlerts'), showOn: 'all' },
-                ].map(({ label, Icon, iconColor, onClick, showOn }) => (
+                  { id: 'add_tenant', label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">ভাড়াটিয়া<br />যোগ করুন</span><span className="hidden md:block">ভাড়াটিয়া যোগ করুন</span></> : <><span className="md:hidden block leading-tight">Add<br />Tenant</span><span className="hidden md:block">Add Tenant</span></>,       Icon: Calendar,      iconColor: 'text-gray-500 dark:text-gray-400',     onClick: () => setActiveTab('bookings'), showOn: 'all' },
+                  { id: 'rent_collection', label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">ভাড়া<br />কালেকশন</span><span className="hidden md:block">ভাড়া কালেকশন</span></> : <><span className="md:hidden block leading-tight">Rent<br />Collection</span><span className="hidden md:block">Rent Collection</span></>, Icon: Wallet,        iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('rent'), showOn: 'all' },
+                  { id: 'messages', label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => navigate('/messages'), showOn: 'desktop' },
+                  { id: 'payment_settings', label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">পেমেন্ট<br />সেটিংস</span><span className="hidden md:block">পেমেন্ট সেটিংস</span></> : <><span className="md:hidden block leading-tight">Payment<br />Settings</span><span className="hidden md:block">Payment Settings</span></>, Icon: CreditCard, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('payments'), showOn: 'mobile' },
+                  { id: 'smart_alerts', label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">স্মার্ট<br />অ্যালার্ট</span><span className="hidden md:block">স্মার্ট অ্যালার্ট</span></> : <><span className="md:hidden block leading-tight">Smart<br />Alerts</span><span className="hidden md:block">Smart Alerts</span></>, Icon: BellRing,      iconColor: 'text-gray-500 dark:text-gray-400',   onClick: () => setActiveTab('smartAlerts'), showOn: 'all' },
+                ].map(({ id, label, Icon, iconColor, onClick, showOn }) => (
                   <button
-                    key={label}
+                    key={id}
                     type="button"
                     onClick={onClick}
                     className={`group min-w-0 w-full overflow-hidden flex-col items-center justify-start gap-[clamp(0.375rem,2vw,0.75rem)] px-[clamp(0.25rem,1.5vw,1.25rem)] py-[clamp(0.625rem,2.5vw,1.25rem)] rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300 ${showOn === 'mobile' ? 'flex md:hidden' : showOn === 'desktop' ? 'hidden md:flex' : 'flex'}`}
@@ -4960,14 +5360,14 @@ const HostDashboard = () => {
               </h3>
               <div className="grid grid-cols-4 gap-[clamp(0.375rem,2vw,1rem)] items-stretch">
                 {[
-                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">ভাড়াটিয়া<br />যোগ করুন</span><span className="hidden md:block">ভাড়াটিয়া যোগ করুন</span></> : <><span className="md:hidden block leading-tight">Add<br />Tenant</span><span className="hidden md:block">Add Tenant</span></>,       Icon: Calendar,      iconColor: 'text-gray-500 dark:text-gray-400',     onClick: () => setActiveTab('bookings'), showOn: 'all' },
-                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">ভাড়া<br />কালেকশন</span><span className="hidden md:block">ভাড়া কালেকশন</span></> : <><span className="md:hidden block leading-tight">Rent<br />Collection</span><span className="hidden md:block">Rent Collection</span></>, Icon: Wallet,        iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('rent'), showOn: 'all' },
-                  { label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => navigate('/messages'), showOn: 'desktop' },
-                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">পেমেন্ট<br />সেটিংস</span><span className="hidden md:block">পেমেন্ট সেটিংস</span></> : <><span className="md:hidden block leading-tight">Payment<br />Settings</span><span className="hidden md:block">Payment Settings</span></>, Icon: CreditCard, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('payments'), showOn: 'mobile' },
-                  { label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">স্মার্ট<br />অ্যালার্ট</span><span className="hidden md:block">স্মার্ট অ্যালার্ট</span></> : <><span className="md:hidden block leading-tight">Smart<br />Alerts</span><span className="hidden md:block">Smart Alerts</span></>, Icon: BellRing,      iconColor: 'text-gray-500 dark:text-gray-400',   onClick: () => setActiveTab('smartAlerts'), showOn: 'all' },
-                ].map(({ label, Icon, iconColor, onClick, showOn }) => (
+                  { id: 'add_tenant', label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">ভাড়াটিয়া<br />যোগ করুন</span><span className="hidden md:block">ভাড়াটিয়া যোগ করুন</span></> : <><span className="md:hidden block leading-tight">Add<br />Tenant</span><span className="hidden md:block">Add Tenant</span></>,       Icon: Calendar,      iconColor: 'text-gray-500 dark:text-gray-400',     onClick: () => setActiveTab('bookings'), showOn: 'all' },
+                  { id: 'rent_collection', label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">ভাড়া<br />কালেকশন</span><span className="hidden md:block">ভাড়া কালেকশন</span></> : <><span className="md:hidden block leading-tight">Rent<br />Collection</span><span className="hidden md:block">Rent Collection</span></>, Icon: Wallet,        iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('rent'), showOn: 'all' },
+                  { id: 'messages', label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => navigate('/messages'), showOn: 'desktop' },
+                  { id: 'payment_settings', label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">পেমেন্ট<br />সেটিংস</span><span className="hidden md:block">পেমেন্ট সেটিংস</span></> : <><span className="md:hidden block leading-tight">Payment<br />Settings</span><span className="hidden md:block">Payment Settings</span></>, Icon: CreditCard, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('payments'), showOn: 'mobile' },
+                  { id: 'smart_alerts', label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">স্মার্ট<br />অ্যালার্ট</span><span className="hidden md:block">স্মার্ট অ্যালার্ট</span></> : <><span className="md:hidden block leading-tight">Smart<br />Alerts</span><span className="hidden md:block">Smart Alerts</span></>, Icon: BellRing,      iconColor: 'text-gray-500 dark:text-gray-400',   onClick: () => setActiveTab('smartAlerts'), showOn: 'all' },
+                ].map(({ id, label, Icon, iconColor, onClick, showOn }) => (
                   <button
-                    key={label}
+                    key={id}
                     type="button"
                     onClick={onClick}
                     className={`group min-w-0 w-full overflow-hidden flex-col items-center justify-start gap-[clamp(0.375rem,2vw,0.75rem)] px-[clamp(0.25rem,1.5vw,1.25rem)] py-[clamp(0.625rem,2.5vw,1.25rem)] rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300 ${showOn === 'mobile' ? 'flex md:hidden' : showOn === 'desktop' ? 'hidden md:flex' : 'flex'}`}
@@ -5295,6 +5695,7 @@ const HostDashboard = () => {
             isOpenEndedLease={isOpenEndedLease}
             leaseMonthsRunning={leaseMonthsRunning}
             openTenantChangeLease={openTenantChangeLease}
+            openEditLease={openEditLease}
             formatBDT={formatBDT}
             daysUntilNextDue={daysUntilNextDue}
             computeBookingProgress={computeBookingProgress}
@@ -5444,6 +5845,19 @@ const HostDashboard = () => {
       {/* MEDIA LIGHTBOX */}
       <MediaLightbox open={!!lightbox} media={lightbox} onClose={() => setLightbox(null)} />
 
+      {/* Whose letterhead goes on this document — asked at download time. */}
+      {agreementFor && (
+        <AgreementBrandModal
+          booking={agreementFor}
+          brand={landlordProfile?.brand}
+          language={language}
+          onClose={() => setAgreementFor(null)}
+          onDownload={confirmAgreementDownload}
+          uploadLogo={uploadBrandLogo}
+          showToast={showToast}
+        />
+      )}
+
 
       {/* 🔴 DYNAMIC MODALS
           z-140, not z-100. These are SECOND modals: mark-paid is opened from
@@ -5462,9 +5876,11 @@ const HostDashboard = () => {
                 {activeModal === 'select_year' && (language === 'বাংলা' ? 'বছর নির্বাচন করুন' : 'Select Year')}
                 {activeModal === 'full_report' && (language === 'বাংলা' ? 'পূর্ণাঙ্গ রিপোর্ট' : 'Full Report')}
                 {activeModal === 'update_inquiry' && (language === 'বাংলা' ? 'ভিজিট যোগ করুন' : 'Add Visit')}
-                {activeModal === 'create_lease' && (leaseForm.replacesBookingId
-                  ? (language === 'বাংলা' ? 'নতুন ভাড়াটিয়া · নতুন লিজ' : 'New Tenant · New Lease')
-                  : (language === 'বাংলা' ? 'নতুন লিজ তৈরি করুন' : 'Create New Lease'))}
+                {activeModal === 'create_lease' && (leaseForm.editingBookingId
+                  ? (language === 'বাংলা' ? 'লিজ এডিট করুন' : 'Edit Lease')
+                  : leaseForm.replacesBookingId
+                    ? (language === 'বাংলা' ? 'নতুন ভাড়াটিয়া · নতুন লিজ' : 'New Tenant · New Lease')
+                    : (language === 'বাংলা' ? 'নতুন লিজ তৈরি করুন' : 'Create New Lease'))}
                 {activeModal === 'edit' && (t?.editPropertyTitle || (language === 'বাংলা' ? 'প্রপার্টি এডিট করুন' : 'Edit Property'))}
                 {activeModal === 'lease' && (t?.leaseAgreementTitle || (language === 'বাংলা' ? 'লিজ এগ্রিমেন্ট' : 'Lease Agreement'))}
                 {activeModal === 'settings' && (t?.accountSettingsTitle || (language === 'বাংলা' ? 'অ্যাকাউন্ট সেটিংস' : 'Account Settings'))}
@@ -5562,13 +5978,41 @@ const HostDashboard = () => {
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'কোন ভাড়াটিয়া? (ঐচ্ছিক)' : 'Which tenant? (optional)'}</label>
                     <select value={uploadForm.bookingId} onChange={e => setUploadForm(f => ({ ...f, bookingId: e.target.value }))} className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all cursor-pointer appearance-none">
                       <option value="">{language === 'বাংলা' ? '— কোনো ভাড়াটিয়া নয় —' : '— No tenant —'}</option>
-                      {bookings.filter(b => b.status !== 'cancelled').map(b => (
-                        <option key={b.id} value={b.id}>{(b.tenant || (language === 'বাংলা' ? 'ভাড়াটিয়া' : 'Tenant'))}{b.property ? ` — ${b.property}` : ''}</option>
-                      ))}
+                      {/* Named by the people actually in the unit, and by the
+                          ROOM. Reading booking.tenant here printed a bare
+                          "ভাড়াটিয়া — White-house" for every seat-rented room,
+                          so a hostel with ten rooms offered ten identical
+                          options and picking the right one was guesswork. */}
+                      {sortByBuildingOrder(bookings.filter(b => b.status !== 'cancelled')).map(b => {
+                        const who = occupantNames(b);
+                        const label = who.length
+                          ? who.slice(0, 2).join(', ') + (who.length > 2 ? ` +${who.length - 2}` : '')
+                          : (String(b.tenant || '').trim() || (language === 'বাংলা' ? 'ভাড়াটিয়া নেই' : 'No tenant'));
+                        const where = [
+                          b.roomNumber ? `${language === 'বাংলা' ? 'রুম' : 'Room'} ${b.roomNumber}` : '',
+                          b.property || '',
+                        ].filter(Boolean).join(' · ');
+                        return <option key={b.id} value={b.id}>{label}{where ? ` — ${where}` : ''}</option>;
+                      })}
                     </select>
                     {bookings.filter(b => b.status !== 'cancelled').length === 0 && (
                       <p className="text-[10px] font-bold text-gray-400 mt-1.5">{language === 'বাংলা' ? 'এখনো কোনো সক্রিয় ভাড়াটিয়া নেই — চাইলে ভাড়াটিয়া ছাড়াই আপলোড করুন।' : 'No active tenants yet — you can still upload without one.'}</p>
                     )}
+                  </div>
+
+                  {/* The name the landlord will look for later. Prefilled from
+                      the file when one is picked, but editable — "মামুনুর NID"
+                      is findable, "IMG_20260830.jpg" is not. */}
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'ডকুমেন্টের নাম' : 'Document name'}</label>
+                    <input
+                      type="text"
+                      value={uploadForm.docName}
+                      maxLength={120}
+                      onChange={e => setUploadForm(f => ({ ...f, docName: e.target.value }))}
+                      placeholder={language === 'বাংলা' ? 'যেমন: মামুনুরের NID কপি' : 'e.g. Mamunur — NID copy'}
+                      className="w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all placeholder:text-gray-400 placeholder:font-semibold"
+                    />
                   </div>
 
                   <div>
@@ -5586,7 +6030,14 @@ const HostDashboard = () => {
                            e.target.value = null;
                            return;
                          }
-                         setUploadForm(f => ({ ...f, file, error: null }));
+                         // Seed the name from the file, but never overwrite a
+                         // name the landlord has already typed.
+                         setUploadForm(f => ({
+                           ...f,
+                           file,
+                           error: null,
+                           docName: f.docName || file.name.replace(/\.[^.]+$/, ''),
+                         }));
                        }} />
                        <UploadCloud size={32} className={`${uploadForm.error ? 'text-red-400' : 'text-gray-400 group-hover:text-[#ba0036]'} mb-3 transition-colors`} />
                        {uploadForm.error ? (
@@ -5863,50 +6314,143 @@ const HostDashboard = () => {
               })()}
 
               {activeModal === 'download_user_document' && (() => {
-                // No hardcoded tenant. Use the modalData if the caller passed
-                // booking/property context, otherwise show a neutral header.
-                const tenantName = modalData?.tenant || modalData?.tenantName || (language === 'বাংলা' ? 'ভাড়াটিয়া' : 'Tenant');
-                const propTitle  = modalData?.propertyTitle || modalData?.title || (language === 'বাংলা' ? 'প্রপার্টি' : 'Property');
-                const initials   = (tenantName.split(/\s+/).map(w => w[0]).slice(0, 2).join('') || '—').toUpperCase();
+                // WHAT THIS USED TO BE
+                // Four hardcoded cards — "Lease Agreement PDF • 2.4 MB", "NID
+                // Copy JPG • 1.1 MB", a payment record, an inspection report —
+                // whose only action was a toast saying "Downloading…". Nothing
+                // existed behind any of them: the sizes were invented, no
+                // inspection-report feature exists at all, and the landlord was
+                // left waiting for a file that was never going to arrive.
+                //
+                // It now shows exactly two truthful things: the agreement, which
+                // this app really can generate, and whatever the landlord has
+                // actually uploaded to the Document Vault for this tenant.
+                const bk = modalData || null;
+                const occ = bk ? primaryOccupant(bk, language) : null;
+                const tenantName = occ?.name || (language === 'বাংলা' ? 'ভাড়াটিয়া' : 'Tenant');
+                const propTitle = bk?.property || (language === 'বাংলা' ? 'প্রপার্টি' : 'Property');
+                const roomLine = bk?.roomNumber
+                  ? `${language === 'বাংলা' ? 'রুম' : 'Room'} ${bk.roomNumber}${bk.floorNumber ? ` · ${language === 'বাংলা' ? 'ফ্লোর' : 'Floor'} ${bk.floorNumber}` : ''}`
+                  : '';
+                const initials = (tenantName.trim().charAt(0) || '?').toUpperCase();
+
+                // This tenant's files. Matched on bookingId where the upload
+                // recorded one, and on the occupant-name snapshot otherwise —
+                // the vault keeps that so a file survives its booking.
+                const bkId = String(bk?._id || bk?.id || '');
+                const lowerNames = occupantNames(bk).map(n => n.toLowerCase());
+                const mine = (documents || []).filter(d => {
+                  if (bkId && d.bookingId && String(d.bookingId) === bkId) return true;
+                  const dn = String(d.tenantName || '').trim().toLowerCase();
+                  return !!dn && lowerNames.includes(dn);
+                });
+
+                const FOLDER_LABEL = {
+                  agreements: language === 'বাংলা' ? 'এগ্রিমেন্ট' : 'Agreement',
+                  nids:       language === 'বাংলা' ? 'এনআইডি' : 'NID',
+                  payments:   language === 'বাংলা' ? 'পেমেন্ট' : 'Payment',
+                  legal:      language === 'বাংলা' ? 'লিগ্যাল' : 'Legal',
+                };
+                const typeLabel = (m) => (String(m || '').startsWith('image/') ? 'Image' : (String(m || '').includes('pdf') ? 'PDF' : 'File'));
+
                 return (
                   <div className="space-y-4">
-                    <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-center gap-3 mb-2">
-                      <div className="w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center font-black text-lg shadow-inner">{initials}</div>
-                      <div>
-                        <p className="text-sm font-black text-gray-900">{tenantName}</p>
-                        <p className="text-[10px] font-bold text-gray-500 mt-0.5">{propTitle}</p>
+                    <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-center gap-3">
+                      <div className="w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center font-black text-lg shadow-inner overflow-hidden shrink-0">
+                        {occ?.avatar ? <img src={occ.avatar} alt={tenantName} className="w-full h-full object-cover" /> : initials}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-gray-900 truncate">{tenantName}</p>
+                        <p className="text-[10px] font-bold text-gray-500 mt-0.5 truncate">
+                          {propTitle}{roomLine ? ` · ${roomLine}` : ''}
+                        </p>
                       </div>
                     </div>
 
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">
-                    {language === 'বাংলা' ? 'ডকুমেন্ট নির্বাচন করে ডাউনলোড করুন' : 'Select Document to Download'}
-                  </label>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => { showToast(language === 'বাংলা' ? 'লিজ এগ্রিমেন্ট ডাউনলোড হচ্ছে...' : 'Downloading Lease Agreement...'); setActiveModal(null); }} className="p-4 bg-gray-50 hover:bg-blue-50 border border-gray-100 hover:border-blue-200 rounded-xl text-left transition-all group active:scale-95">
-                      <FileText size={20} className="text-blue-500 mb-2 group-hover:scale-110 transition-transform" />
-                      <p className="text-xs font-black text-gray-900">{language === 'বাংলা' ? 'লিজ এগ্রিমেন্ট' : 'Lease Agreement'}</p>
-                      <p className="text-[9px] font-bold text-gray-500 mt-0.5">PDF • 2.4 MB</p>
+                    {/* Generated on demand — the one document this app builds itself. */}
+                    <div>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">
+                        {language === 'বাংলা' ? 'এখনই তৈরি করুন' : 'Generate now'}
+                      </label>
+                      <button
+                        type="button"
+                        disabled={!bk}
+                        onClick={() => { setActiveModal(null); downloadAgreement(bk); }}
+                        className="w-full p-4 bg-gray-50 hover:bg-blue-50 border border-gray-100 hover:border-blue-200 rounded-xl text-left transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
+                      >
+                        <FileText size={20} className="text-blue-500 shrink-0" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-xs font-black text-gray-900">{language === 'বাংলা' ? 'লিজ এগ্রিমেন্ট' : 'Lease Agreement'}</span>
+                          <span className="block text-[9px] font-bold text-gray-500 mt-0.5">
+                            {language === 'বাংলা' ? 'লিজের তথ্য থেকে PDF তৈরি হবে' : 'Built as a PDF from this lease'}
+                          </span>
+                        </span>
+                        <Download size={16} className="text-gray-400 shrink-0" />
+                      </button>
+                    </div>
+
+                    {/* Uploaded to the vault — real files, real sizes. */}
+                    <div>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">
+                        {language === 'বাংলা' ? 'আপলোড করা ফাইল' : 'Uploaded files'}
+                        {mine.length > 0 && <span className="ml-1 text-gray-300 tabular-nums">{mine.length}</span>}
+                      </label>
+
+                      {loadingDocs ? (
+                        <div className="py-8 flex items-center justify-center gap-2 text-gray-400">
+                          <RefreshCw size={14} className="animate-spin" />
+                          <span className="text-[11px] font-bold">{language === 'বাংলা' ? 'লোড হচ্ছে…' : 'Loading…'}</span>
+                        </div>
+                      ) : mine.length === 0 ? (
+                        <div className="bg-gray-50 rounded-2xl p-6 text-center border border-gray-100">
+                          <Folder className="text-gray-300 mx-auto mb-2" size={26} />
+                          <p className="text-xs font-black text-gray-600">
+                            {language === 'বাংলা' ? 'এই ভাড়াটিয়ার কোনো ফাইল আপলোড করা নেই।' : 'No files uploaded for this tenant.'}
+                          </p>
+                          <p className="text-[10px] font-bold text-gray-400 mt-1 leading-relaxed">
+                            {language === 'বাংলা'
+                              ? 'এনআইডি, চুক্তির স্ক্যান বা অন্য কাগজ ডকুমেন্ট ভল্টে আপলোড করলে এখানে দেখাবে।'
+                              : 'Upload an NID, a signed copy or any other paper to the Document Vault and it will appear here.'}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => { setActiveModal(null); setActiveTab('documents'); }}
+                            className="mt-4 px-4 py-2.5 rounded-xl bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#ba0036] transition-colors inline-flex items-center gap-1.5 active:scale-95"
+                          >
+                            <UploadCloud size={13} /> {language === 'বাংলা' ? 'ডকুমেন্ট ভল্টে যান' : 'Open Document Vault'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-[260px] overflow-y-auto custom-scrollbar pr-0.5">
+                          {mine.map(d => (
+                            <button
+                              key={d.id || d._id}
+                              type="button"
+                              onClick={() => handleDocDownload(d)}
+                              className="w-full p-3 bg-gray-50 hover:bg-blue-50 border border-gray-100 hover:border-blue-200 rounded-xl text-left transition-all active:scale-[0.99] flex items-center gap-3"
+                            >
+                              <div className="w-9 h-9 rounded-lg bg-white border border-gray-200 flex items-center justify-center shrink-0">
+                                {String(d.fileType || '').startsWith('image/')
+                                  ? <ImageIcon size={16} className="text-green-500" />
+                                  : <FileText size={16} className="text-blue-500" />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-black text-gray-900 truncate">{d.fileName}</p>
+                                <p className="text-[9px] font-bold text-gray-500 mt-0.5 tabular-nums">
+                                  {FOLDER_LABEL[d.folder] || d.folder} · {typeLabel(d.fileType)}
+                                  {d.fileSize > 0 && ` · ${prettyBytes(d.fileSize)}`}
+                                </p>
+                              </div>
+                              <Download size={15} className="text-gray-400 shrink-0" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <button onClick={() => setActiveModal(null)} className="w-full bg-gray-100 text-gray-600 hover:bg-gray-200 py-3.5 rounded-xl font-black transition-all text-xs uppercase tracking-widest">
+                      {language === 'বাংলা' ? 'বন্ধ করুন' : 'Close'}
                     </button>
-                    <button onClick={() => { showToast(language === 'বাংলা' ? 'NID কপি ডাউনলোড হচ্ছে...' : 'Downloading NID Copy...'); setActiveModal(null); }} className="p-4 bg-gray-50 hover:bg-green-50 border border-gray-100 hover:border-green-200 rounded-xl text-left transition-all group active:scale-95">
-                      <ScanFace size={20} className="text-green-500 mb-2 group-hover:scale-110 transition-transform" />
-                      <p className="text-xs font-black text-gray-900">{language === 'বাংলা' ? 'এনআইডি (NID) কপি' : 'NID Copy'}</p>
-                      <p className="text-[9px] font-bold text-gray-500 mt-0.5">JPG • 1.1 MB</p>
-                    </button>
-                    <button onClick={() => { showToast(language === 'বাংলা' ? 'পেমেন্ট রেকর্ড ডাউনলোড হচ্ছে...' : 'Downloading Payment Records...'); setActiveModal(null); }} className="p-4 bg-gray-50 hover:bg-orange-50 border border-gray-100 hover:border-orange-200 rounded-xl text-left transition-all group active:scale-95">
-                      <Receipt size={20} className="text-orange-500 mb-2 group-hover:scale-110 transition-transform" />
-                      <p className="text-xs font-black text-gray-900">{language === 'বাংলা' ? 'পেমেন্ট রেকর্ড' : 'Payment Records'}</p>
-                      <p className="text-[9px] font-bold text-gray-500 mt-0.5">PDF • 1.8 MB</p>
-                    </button>
-                    <button onClick={() => { showToast(language === 'বাংলা' ? 'ইন্সপেকশন রিপোর্ট ডাউনলোড হচ্ছে...' : 'Downloading Inspection Report...'); setActiveModal(null); }} className="p-4 bg-gray-50 hover:bg-purple-50 border border-gray-100 hover:border-purple-200 rounded-xl text-left transition-all group active:scale-95">
-                      <ClipboardCheck size={20} className="text-purple-500 mb-2 group-hover:scale-110 transition-transform" />
-                      <p className="text-xs font-black text-gray-900">{language === 'বাংলা' ? 'ইন্সপেকশন রিপোর্ট' : 'Inspection Report'}</p>
-                      <p className="text-[9px] font-bold text-gray-500 mt-0.5">PDF • 3.5 MB</p>
-                    </button>
-                  </div>
-                  <button onClick={() => setActiveModal(null)} className="w-full mt-2 bg-gray-100 text-gray-600 hover:bg-gray-200 py-3.5 rounded-xl font-black transition-all text-xs uppercase tracking-widest">
-                    {language === 'বাংলা' ? 'বন্ধ করুন' : 'Close'}
-                  </button>
                   </div>
                 );
               })()}
@@ -6005,12 +6549,17 @@ const HostDashboard = () => {
                 const isBn = language === 'বাংলা';
                 const isCommercial = leaseForm.dealType === 'commercial';
                 const isRelet = !!leaseForm.replacesBookingId;
+                const isEditing = !!leaseForm.editingBookingId;
                 const previousLease = isRelet
                   ? bookings.find(b => String(b.id) === String(leaseForm.replacesBookingId))
                   : null;
                 // The live lease sitting on the unit the host is filling in. Null
-                // once they've accepted the hand-over (replacesBookingId set).
-                const occupiedBy = findLiveLeaseForUnit(
+                // once they've accepted the hand-over (replacesBookingId set),
+                // and null while EDITING — the lease occupying the unit is the
+                // one being corrected, and telling the landlord "this unit
+                // already has a running lease" while they fix its rent would be
+                // the form arguing with itself.
+                const occupiedBy = isEditing ? null : findLiveLeaseForUnit(
                   bookings,
                   {
                     propertyId: leaseForm.propertyId,
@@ -6266,7 +6815,7 @@ const HostDashboard = () => {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setLeaseForm(f => ({ ...f, replacesBookingId: occupiedBy.id }));
+                                  setLeaseForm(f => ({ ...f, replacesBookingId: occupiedBy.id, editingBookingId: null }));
                                   showToast(isBn ? 'পুরোনো লিজ বন্ধ হবে — নতুন ভাড়াটিয়ার তথ্য দিন' : 'Old lease will be closed — fill in the new tenant');
                                 }}
                                 className="mt-2.5 px-3 py-2 rounded-xl bg-amber-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-amber-700 active:scale-95 transition-all inline-flex items-center justify-center gap-1.5"
@@ -6659,13 +7208,20 @@ const HostDashboard = () => {
                       <div className="bg-blue-50/80 p-3.5 rounded-2xl border border-blue-100">
                         <p className="text-[11px] font-bold text-blue-800 flex items-start gap-2 leading-relaxed">
                           <CheckCircle2 size={15} className="text-blue-600 shrink-0 mt-0.5" />
-                          {isRelet
+                          {/* The landlord's actual worry when they hit save on a
+                              lease that already has months of rent behind it.
+                              Say plainly that nothing is lost. */}
+                          {isEditing
                             ? (isBn
-                                ? 'সেভ করলে পুরোনো লিজ "সম্পন্ন" হবে এবং নতুন ভাড়াটিয়ার জন্য পরিষ্কার রেন্ট লেজার চালু হবে।'
-                                : 'On save the old lease is marked Done and a clean rent ledger starts for the new tenant.')
-                            : (isBn
-                                ? 'লিজ তৈরি হলে প্রপার্টিটি "Rented" মার্ক হবে এবং রেন্ট লেজার চালু হবে।'
-                                : 'On create, the property is marked "Rented" and a fresh rent ledger is initialised.')}
+                                ? 'শুধু এই তথ্যগুলো আপডেট হবে। রেন্ট লেজার, পেমেন্ট হিস্ট্রি, সিট ও ইনভাইট কোড অপরিবর্তিত থাকবে।'
+                                : 'Only these details change. The rent ledger, payment history, seats and invite code stay exactly as they are.')
+                            : isRelet
+                              ? (isBn
+                                  ? 'সেভ করলে পুরোনো লিজ "সম্পন্ন" হবে এবং নতুন ভাড়াটিয়ার জন্য পরিষ্কার রেন্ট লেজার চালু হবে।'
+                                  : 'On save the old lease is marked Done and a clean rent ledger starts for the new tenant.')
+                              : (isBn
+                                  ? 'লিজ তৈরি হলে প্রপার্টিটি "Rented" মার্ক হবে এবং রেন্ট লেজার চালু হবে।'
+                                  : 'On create, the property is marked "Rented" and a fresh rent ledger is initialised.')}
                         </p>
                       </div>
                     </div>
@@ -6698,14 +7254,19 @@ const HostDashboard = () => {
                         onClick={() => submitCreateLease(false)}
                         className="flex-1 bg-green-600 text-white py-3.5 rounded-xl font-black shadow-[0_8px_15px_rgba(22,163,74,0.2)] hover:-translate-y-0.5 hover:shadow-[0_12px_20px_rgba(22,163,74,0.3)] transition-all text-sm flex items-center justify-center gap-2"
                       >
-                        <Check size={18} /> {isRelet ? (isBn ? 'নতুন লিজ চালু করুন' : 'Start New Lease') : (isBn ? 'লিজ তৈরি করুন' : 'Create Lease')}
+                        <Check size={18} /> {isEditing
+                          ? (isBn ? 'পরিবর্তন সেভ করুন' : 'Save Changes')
+                          : isRelet
+                            ? (isBn ? 'নতুন লিজ চালু করুন' : 'Start New Lease')
+                            : (isBn ? 'লিজ তৈরি করুন' : 'Create Lease')}
                       </button>
                     )}
                   </div>
 
                   {/* Rapid multi-entry — only on the last step, and never during a
-                      tenant change (that's a one-off hand-over, not bulk entry). */}
-                  {leaseStep === 3 && !isRelet && (
+                      tenant change (a one-off hand-over) or an edit (there is
+                      one lease being corrected, not a queue to add). */}
+                  {leaseStep === 3 && !isRelet && !isEditing && (
                     <>
                       <button onClick={() => submitCreateLease(true)} className="w-full bg-white border-2 border-green-600 text-green-700 py-3 rounded-xl font-black hover:bg-green-50 active:scale-[0.99] transition-all text-xs uppercase tracking-widest flex items-center justify-center gap-2">
                         <Plus size={16} /> {isBn ? 'সেভ করে আরেকটি' : 'Save & Add Another'}

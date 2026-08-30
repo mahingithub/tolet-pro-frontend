@@ -42,7 +42,15 @@ export async function uploadDocument(formData, onProgress) {
   const file = formData.get('file');
   const folder = formData.get('folder');
   const fileName = formData.get('fileName');
-  
+  // Which tenant the file belongs to. These were being appended by the caller
+  // and then dropped on the floor right here — read out of the FormData and
+  // forwarded below, they are what makes a document show up on the tenant's
+  // own card instead of only in the vault.
+  const tenantId = formData.get('tenantId');
+  const bookingId = formData.get('bookingId');
+  const tenantName = formData.get('tenantName');
+  const tenantPhone = formData.get('tenantPhone');
+
   if (!(file instanceof Blob)) throw new Error('Invalid file.');
   
   const resourceType = file.type.startsWith('image/') ? 'image' : 'raw';
@@ -68,7 +76,11 @@ export async function uploadDocument(formData, onProgress) {
       fileName,
       folder,
       format: result.format || file.name.split('.').pop(),
-      bytes: result.bytes || file.size
+      bytes: result.bytes || file.size,
+      ...(tenantId ? { tenantId } : {}),
+      ...(bookingId ? { bookingId } : {}),
+      ...(tenantName ? { tenantName } : {}),
+      ...(tenantPhone ? { tenantPhone } : {}),
     })
   });
   
