@@ -30,6 +30,7 @@ const MAX_LOGO_BYTES = 3 * 1024 * 1024;
 
 export default function AgreementBrandModal({
   booking,
+  member,            // set when the agreement is for ONE seat of a shared room
   brand,             // { orgName, logoUrl, phone }
   language,
   onClose,
@@ -102,8 +103,13 @@ export default function AgreementBrandModal({
           <div className="shrink-0 px-5 py-4 border-b border-gray-100 flex items-center gap-3">
             <div className="min-w-0 flex-1">
               <h3 className="text-base font-black text-gray-900">{L('ডাউনলোডের আগে', 'Before you download')}</h3>
+              {/* Say WHOSE agreement this is. On a shared room the landlord is
+                  producing one paper per person, and the only thing that tells
+                  the two downloads apart is the name. */}
               <p className="text-[10px] font-bold text-gray-500 mt-0.5 truncate">
-                {L('আপনার প্রতিষ্ঠানের নাম ও লোগো ডকুমেন্টে বসবে', "Your business name and logo go on the document")}
+                {member
+                  ? `${member.name || L('ভাড়াটিয়া', 'Tenant')}${member.seatLabel ? ` · ${member.seatLabel}` : ''}${booking?.roomNumber ? ` · ${L('রুম', 'Room')} ${booking.roomNumber}` : ''}`
+                  : L('আপনার প্রতিষ্ঠানের নাম ও লোগো ডকুমেন্টে বসবে', 'Your business name and logo go on the document')}
               </p>
             </div>
             <button

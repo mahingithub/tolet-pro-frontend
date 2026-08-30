@@ -18,8 +18,9 @@ import {
 import MembersManager from "../MembersManager.jsx";
 import BuildingSetupWizard from "./BuildingSetupWizard.jsx";
 import UnitsManager from "./UnitsManager.jsx";
+import SeatTenantModal from "./SeatTenantModal.jsx";
 import { buildingTypeLabel, buildingTypeColor, normaliseSubCategory, unitNoun } from "../../utils/buildingTypes";
-import { updateBuilding, archiveBuilding } from "../../services/buildingService";
+import { updateBuilding, archiveBuilding, listUnits } from "../../services/buildingService";
 import AiLedgerScannerModal from "./AiLedgerScannerModal.jsx";
 import ModalPortal from "../shared/ModalPortal.jsx";
 import OnboardingApprovalsPanel from "./OnboardingApprovalsPanel.jsx";
@@ -97,6 +98,38 @@ export default function BookingsTab(props) {
             : null;
           const closeBookingDetail = () => { setExpandedBookingId(null); setActiveDropdownId(null); };
 
+          // ── Replacing the person in ONE seat ──────────────────────────────
+          // The seat form lives in the Rooms view because only a Unit knows how
+          // many seats a room has. It was therefore unreachable from the tenant
+          // card, where the landlord actually is when someone tells them they
+          // are leaving — so their only visible option was the booking-level
+          // hand-over, which replaces the WHOLE room and takes the roommate's
+          // tenancy with it. The unit is fetched here so the same seat-scoped
+          // form (and the same server rules) can open from this side too.
+          const [seatReplace, setSeatReplace] = useState(null);
+          const [loadingSeat, setLoadingSeat] = useState(false);
+
+          const openSeatReplace = async (booking, member, seatNumber) => {
+            if (!booking?.unitId || loadingSeat) return;
+            const bldg = (landlordProfile?.buildings || []).find(b => String(b.id) === String(booking.buildingId)) || activeBuilding;
+            setLoadingSeat(true);
+            try {
+              const units = await listUnits(booking.buildingId);
+              const unit = (units || []).find(u => String(u.id ?? u._id) === String(booking.unitId));
+              if (!unit) {
+                showToast?.(isBn ? 'রুমটি খুঁজে পাওয়া যায়নি' : 'Could not find that room');
+                return;
+              }
+              closeBookingDetail();
+              setSeatReplace({ unit, building: bldg, member, seatNumber });
+            } catch (err) {
+              console.warn('[bookings] seat replace load failed:', err?.message || err);
+              showToast?.(isBn ? 'রুমের তথ্য আনা যায়নি' : 'Could not load the room');
+            } finally {
+              setLoadingSeat(false);
+            }
+          };
+
           // Escape closes it, and the list behind doesn't scroll while it's open.
           useEffect(() => {
             if (!activeBookingDetail) return undefined;
@@ -154,7 +187,9 @@ export default function BookingsTab(props) {
           // The ⋮ menu for one lease. Lives in the DETAIL MODAL's header now —
           // a dropdown anchored to a list row would open behind the modal that
           // row summons.
-          const renderBookingActions = (booking) => (
+          const renderBookingActions = (booking) => {
+            const headCount = occupantCount(booking);
+            return (
             <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
@@ -180,7 +215,15 @@ export default function BookingsTab(props) {
                       were one keystroke apart in consequence — the hand-over
                       ends the tenancy and opens a fresh ledger. */}
                   <button onClick={() => { closeBookingDetail(); openEditLease(booking); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-indigo-50 text-xs font-bold text-gray-700 hover:text-indigo-700 transition-colors text-left"><FileEdit size={14}/> {isBn ? 'লিজ এডিট করুন' : 'Edit Lease'}</button>
-                  <button onClick={() => { closeBookingDetail(); openTenantChangeLease(booking); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-700 transition-colors text-left"><RefreshCw size={14}/> {isBn ? 'নতুন ভাড়াটিয়া · নতুন লিজ' : 'New Tenant · New Lease'}</button>
+                  {/* On a shared room this hands over EVERY seat, so it says so.
+                      One person leaving is the "বদলান" button on their own row
+                      in the members panel — this one ends the whole tenancy. */}
+                  <button onClick={() => { closeBookingDetail(); openTenantChangeLease(booking); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-700 transition-colors text-left">
+                    <RefreshCw size={14}/>
+                    {headCount > 1
+                      ? (isBn ? 'পুরো রুম হ্যান্ডওভার · নতুন লিজ' : 'Hand over whole room · New Lease')
+                      : (isBn ? 'নতুন ভাড়াটিয়া · নতুন লিজ' : 'New Tenant · New Lease')}
+                  </button>
                   <button onClick={() => { closeBookingDetail(); handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-indigo-50 text-xs font-bold text-gray-700 hover:text-indigo-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
                   <button onClick={() => { closeBookingDetail(); setActiveTab('rent'); setExpandedRentId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
                   <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
@@ -189,7 +232,8 @@ export default function BookingsTab(props) {
                 </div>
               )}
             </div>
-          );
+            );
+          };
 
           // ── ONE LEASE, in two shapes ───────────────────────────────────
           //   mode 'row'    → the compact list card: avatar + tenant + property
@@ -514,7 +558,21 @@ export default function BookingsTab(props) {
                         tenant fields), so flat · single room · sublet · hostel
                         seat all now name their occupants in the same place,
                         with the same invite code and QR beside them. */}
-                    <MembersManager booking={booking} language={language} onChange={handleBookingUpdated} today={todayDate} showLedger={false} />
+                    <MembersManager
+                      booking={booking}
+                      language={language}
+                      onChange={handleBookingUpdated}
+                      today={todayDate}
+                      showLedger={false}
+                      // Per-seat, so the second person in a shared room is
+                      // reachable at all: their own profile, their own paper.
+                      onOpenProfile={(m) => {
+                        closeBookingDetail();
+                        openTenantProfile(m.userId || null, { name: m.name, avatar: m.avatar });
+                      }}
+                      onDownloadAgreement={(bk, m) => { closeBookingDetail(); downloadAgreement(bk, m); }}
+                      onReplaceSeat={(m, seatNumber) => openSeatReplace(booking, m, seatNumber)}
+                    />
 
                     {/* ── Hand the unit to the next tenant ──────────────────
                         A landlord sets a unit up ONCE. When the tenancy ends —
@@ -1391,6 +1449,23 @@ export default function BookingsTab(props) {
                   </ModalPortal>
                 );
               })()}
+
+              {/* Seat-scoped tenant swap, opened from a member row. Same
+                  component and same endpoint the Rooms view uses, so a seat
+                  can only ever be replaced by one set of rules. */}
+              {seatReplace && (
+                <SeatTenantModal
+                  unit={seatReplace.unit}
+                  building={seatReplace.building}
+                  seatNumber={seatReplace.seatNumber}
+                  replacingMember={seatReplace.member}
+                  language={language}
+                  showToast={showToast}
+                  formatBDT={formatBDT}
+                  onClose={() => setSeatReplace(null)}
+                  onSaved={() => { setSeatReplace(null); refreshBookings?.(); }}
+                />
+              )}
 
               {/* Building Delete Confirmation Modal */}
               {deleteBuildingId && (

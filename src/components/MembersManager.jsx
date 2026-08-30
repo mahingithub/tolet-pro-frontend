@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   Users, UserPlus, Copy, Check, X, LogOut, Undo2, CheckCircle2, Plus, QrCode,
+  UserCircle, FileDown,
 } from 'lucide-react';
 import InviteShareSheet from './invite/InviteShareSheet';
 import {
@@ -124,7 +125,7 @@ function spaceLabel(m, isBn) {
 // in UnitsManager, because only a Unit knows how many seats a room has and what
 // details a new tenant must bring. Two components writing the same seat by
 // different rules is how a three-seat room ended up able to hold five people.
-export default function MembersManager({ booking, language = 'English', onChange, today = new Date(), showLedger = true, showManage = true }) {
+export default function MembersManager({ booking, language = 'English', onChange, today = new Date(), showLedger = true, showManage = true, onOpenProfile, onDownloadAgreement, onReplaceSeat }) {
   const isBn = language === 'বাংলা';
   const bookingId = booking._id || booking.id;
   const persistable = isMongoId(bookingId);
@@ -367,16 +368,61 @@ export default function MembersManager({ booking, language = 'English', onChange
                       single-tenant booking has no member row to remove — the
                       call would 404 — and the way that tenancy ends is the
                       "New Tenant · New Lease" panel below the card. */}
-                  {showManage && !m.__legacy && (
-                  <button
-                    type="button"
-                    onClick={() => moveOut(m)}
-                    disabled={busy}
-                    className="px-2 py-1 rounded-lg bg-gray-50 hover:bg-rose-50 text-gray-500 hover:text-rose-600 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1 shrink-0"
-                    title={isBn ? 'মুভ-আউট' : 'Move out'}
-                  >
-                    <LogOut size={11} /> {isBn ? 'মুভ-আউট' : 'Move out'}
-                  </button>
+                  {/* PER-SEAT ACTIONS.
+                      Two people in one room are two tenancies that share an
+                      address — different phone, different rent, different
+                      papers. These used to exist only at the BOOKING level, so
+                      "Profile" and "Download Agreement" always resolved to the
+                      first occupant and the second person was unreachable: the
+                      landlord could not produce their agreement at all. */}
+                  {showManage && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      {!m.__legacy && onDownloadAgreement && (
+                        <button
+                          type="button"
+                          onClick={() => onDownloadAgreement(booking, m)}
+                          className="px-2 py-1 rounded-lg bg-gray-50 hover:bg-blue-50 text-gray-500 hover:text-blue-600 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1"
+                          title={isBn ? 'এই সিটের অ্যাগ্রিমেন্ট' : "This seat's agreement"}
+                        >
+                          <FileDown size={11} /> {isBn ? 'অ্যাগ্রিমেন্ট' : 'Agreement'}
+                        </button>
+                      )}
+                      {/* Replace the person in THIS seat. The booking-level
+                          "New Tenant · New Lease" hands over the entire room,
+                          which for a shared room evicts the roommate too — so
+                          for a seat that action was never the right one. */}
+                      {!m.__legacy && onReplaceSeat && booking.unitId && (
+                        <button
+                          type="button"
+                          onClick={() => onReplaceSeat(m, activeMembers.indexOf(m) + 1)}
+                          className="px-2 py-1 rounded-lg bg-gray-50 hover:bg-emerald-50 text-gray-500 hover:text-emerald-700 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1"
+                          title={isBn ? 'এই সিটে নতুন ভাড়াটিয়া' : 'New tenant in this seat'}
+                        >
+                          <Undo2 size={11} /> {isBn ? 'বদলান' : 'Replace'}
+                        </button>
+                      )}
+                      {!m.__legacy && onOpenProfile && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenProfile(m)}
+                          className="px-2 py-1 rounded-lg bg-gray-50 hover:bg-indigo-50 text-gray-500 hover:text-indigo-600 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1"
+                          title={isBn ? 'প্রোফাইল' : 'Profile'}
+                        >
+                          <UserCircle size={11} /> {isBn ? 'প্রোফাইল' : 'Profile'}
+                        </button>
+                      )}
+                      {!m.__legacy && (
+                      <button
+                        type="button"
+                        onClick={() => moveOut(m)}
+                        disabled={busy}
+                        className="px-2 py-1 rounded-lg bg-gray-50 hover:bg-rose-50 text-gray-500 hover:text-rose-600 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1"
+                        title={isBn ? 'মুভ-আউট' : 'Move out'}
+                      >
+                        <LogOut size={11} /> {isBn ? 'মুভ-আউট' : 'Move out'}
+                      </button>
+                      )}
+                    </div>
                   )}
                 </div>
 
