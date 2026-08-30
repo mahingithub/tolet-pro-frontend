@@ -592,17 +592,26 @@ export default function BookingsTab(props) {
                         {/* For an ongoing tenancy this panel IS how a lease
                             ends, so it names the actual event — the tenant
                             moved out — rather than a vague "changed". */}
+                        {/* On a shared room this closes EVERYONE's tenancy, so
+                            it names them. One person leaving is the "বদলান"
+                            button on their own row in the members panel. */}
                         <p className="text-[11px] font-black text-gray-900 leading-tight">
                           {stage === 'done'
                             ? (isBn ? 'এই লিজ শেষ হয়েছে' : 'This lease has ended')
                             : endingSoon
                               ? (isBn ? 'লিজ শেষ হতে চলেছে' : 'Lease is ending soon')
-                              : (isBn ? 'ভাড়াটিয়া চলে গেছেন?' : 'Tenant moved out?')}
+                              : headCount > 1
+                                ? (isBn ? 'পুরো রুম হ্যান্ডওভার?' : 'Hand over the whole room?')
+                                : (isBn ? 'ভাড়াটিয়া চলে গেছেন?' : 'Tenant moved out?')}
                         </p>
                         <p className="text-[10px] font-bold text-gray-500 leading-tight mt-0.5">
-                          {isBn
-                            ? 'নতুন ভাড়াটিয়া এলে শুধু নাম ও নম্বর বদলে সেভ করুন — একই ইউনিটে নতুন লিজ ও নতুন রেন্ট লেজার চালু হবে।'
-                            : 'When the next tenant arrives, just change the name + number — the same unit gets a new lease and a fresh rent ledger.'}
+                          {headCount > 1
+                            ? (isBn
+                                ? `${people.join(', ')} — ${headCount} জনেরই লিজ বন্ধ হবে। একজন গেলে তার সারির "বদলান" চাপুন।`
+                                : `Closes all ${headCount} tenancies (${people.join(', ')}). For one person leaving, use "Replace" on their row.`)
+                            : (isBn
+                                ? 'নতুন ভাড়াটিয়া এলে শুধু নাম ও নম্বর বদলে সেভ করুন — একই ইউনিটে নতুন লিজ ও নতুন রেন্ট লেজার চালু হবে।'
+                                : 'When the next tenant arrives, just change the name + number — the same unit gets a new lease and a fresh rent ledger.')}
                         </p>
                       </div>
                       <button
@@ -610,7 +619,7 @@ export default function BookingsTab(props) {
                         onClick={() => { closeBookingDetail(); openTenantChangeLease(booking); }}
                         className={`shrink-0 px-2.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider active:scale-95 transition-all inline-flex items-center gap-1 ${stage === 'done' ? 'bg-gray-900 text-white hover:bg-black' : endingSoon ? 'bg-amber-600 text-white hover:bg-amber-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
                       >
-                        <Plus size={12} className="shrink-0" /> {isBn ? 'নতুন লিজ' : 'New Lease'}
+                        <Plus size={12} className="shrink-0" /> {headCount > 1 ? (isBn ? 'পুরো রুম' : 'Whole room') : (isBn ? 'নতুন লিজ' : 'New Lease')}
                       </button>
                     </div>
 

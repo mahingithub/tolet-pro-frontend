@@ -31,6 +31,7 @@ const MAX_LOGO_BYTES = 3 * 1024 * 1024;
 export default function AgreementBrandModal({
   booking,
   member,            // set when the agreement is for ONE seat of a shared room
+  people,            // the booking's occupants, for the picker when member is unset
   brand,             // { orgName, logoUrl, phone }
   language,
   onClose,
@@ -46,6 +47,14 @@ export default function AgreementBrandModal({
   const [logoUrl, setLogoUrl] = useState(brand?.logoUrl || '');
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
+
+  // WHOSE FORM. A room with one occupant has nothing to ask, so it is chosen
+  // already; a shared room must be asked, because a form that silently picks
+  // the first person is how the second one never gets their paperwork.
+  const occupants = (people || []).filter(p => p && p.status !== 'moved-out');
+  const needsPick = !member && occupants.length > 1;
+  const [picked, setPicked] = useState(member || (occupants.length === 1 ? occupants[0] : null));
+  const [format, setFormat] = useState('pdf');
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && !uploading) onClose?.(); };
@@ -84,7 +93,14 @@ export default function AgreementBrandModal({
 
   const submit = () => {
     if (uploading) return;
-    onDownload?.({ orgName: orgName.trim(), phone: phone.trim(), logoUrl });
+    if (needsPick && !picked) {
+      showToast?.(L('কার ফরম ডাউনলোড করবেন সেটা বেছে নিন', 'Choose whose form to download'));
+      return;
+    }
+    onDownload?.(
+      { orgName: orgName.trim(), phone: phone.trim(), logoUrl },
+      { member: picked || null, format },
+    );
   };
 
   const inputCls = 'w-full px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-[13px] font-bold text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#ba0036]/40 focus:bg-white transition-colors';
@@ -124,6 +140,69 @@ export default function AgreementBrandModal({
           </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar px-5 py-4 space-y-4">
+
+            {/* WHO — a card each, because two people in one room have two
+                separate records and the landlord has to say which one. */}
+            {needsPick && (
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">
+                  {L('কার তথ্য ডাউনলোড করবেন?', 'Whose record?')}
+                </label>
+                <div className="space-y-1.5">
+                  {occupants.map((p, i) => {
+                    const on = picked && (picked.id ? picked.id === p.id : picked === p);
+                    return (
+                      <button
+                        key={p.id || i}
+                        type="button"
+                        onClick={() => setPicked(p)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all ${
+                          on ? 'bg-[#ba0036]/5 border-[#ba0036]/40 shadow-[0_2px_10px_rgba(186,0,54,0.08)]' : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <span className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${on ? 'border-[#ba0036]' : 'border-gray-300'}`}>
+                          {on && <span className="w-2 h-2 rounded-full bg-[#ba0036]" />}
+                        </span>
+                        <span className="w-7 h-7 rounded-lg bg-gray-900 text-white flex items-center justify-center text-[11px] font-black shrink-0 overflow-hidden">
+                          {p.avatar ? <img src={p.avatar} alt="" className="w-full h-full object-cover" /> : (String(p.name || '?').trim().charAt(0) || '?').toUpperCase()}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[12px] font-black text-gray-900 truncate">{p.name || L('নামহীন', 'Unnamed')}</span>
+                          <span className="block text-[9px] font-bold text-gray-500 truncate">
+                            {[p.seatLabel, p.phone].filter(Boolean).join(' · ')}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* FORMAT — the same record, printed or as a spreadsheet. */}
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">
+                {L('ফরম্যাট', 'Format')}
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'pdf', label: 'PDF', hint: L('ছাপার উপযোগী ফরম', 'Printable form') },
+                  { id: 'excel', label: 'Excel', hint: L('স্প্রেডশিট (CSV)', 'Spreadsheet (CSV)') },
+                ].map(f => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setFormat(f.id)}
+                    className={`px-3 py-2.5 rounded-xl border text-left transition-all ${
+                      format === f.id ? 'bg-gray-900 border-gray-900 text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
+                    }`}
+                  >
+                    <span className="block text-[12px] font-black">{f.label}</span>
+                    <span className={`block text-[9px] font-bold mt-0.5 ${format === f.id ? 'text-white/70' : 'text-gray-400'}`}>{f.hint}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Logo */}
             <div>

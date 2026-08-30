@@ -351,9 +351,20 @@ export default function MembersManager({ booking, language = 'English', onChange
               <div key={m.id} className="rounded-xl border border-gray-100 p-2.5">
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-7 h-7 rounded-lg bg-gray-900 text-white flex items-center justify-center text-[11px] font-black shrink-0 overflow-hidden">
+                    {/* THE AVATAR IS THE PROFILE LINK.
+                        A separate "Profile" button was a fourth control on a
+                        row that has to fit a name on a phone — four buttons ate
+                        the name. Tapping a person's picture to open them is
+                        what everyone already expects, and it costs no width. */}
+                    <button
+                      type="button"
+                      onClick={() => (!m.__legacy && onOpenProfile) && onOpenProfile(m)}
+                      disabled={m.__legacy || !onOpenProfile}
+                      title={isBn ? 'প্রোফাইল দেখুন' : 'View profile'}
+                      className={`w-7 h-7 rounded-lg bg-gray-900 text-white flex items-center justify-center text-[11px] font-black shrink-0 overflow-hidden ${(!m.__legacy && onOpenProfile) ? 'cursor-pointer hover:ring-2 hover:ring-indigo-300 transition-all' : 'cursor-default'}`}
+                    >
                       {m.avatar ? <img src={m.avatar} alt={m.name} className="w-full h-full object-cover" /> : initials}
-                    </div>
+                    </button>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <p className="text-xs font-black text-gray-900 truncate">{m.name || (isBn ? 'নামহীন' : 'Unnamed')}</p>
@@ -375,53 +386,42 @@ export default function MembersManager({ booking, language = 'English', onChange
                       "Profile" and "Download Agreement" always resolved to the
                       first occupant and the second person was unreachable: the
                       landlord could not produce their agreement at all. */}
-                  {showManage && (
+                  {/* PER-SEAT ACTIONS — icon-only on a phone.
+                      Labels are what pushed the occupant's name off the row on
+                      mobile; the icons carry the same meaning in a quarter of
+                      the width, and the desktop keeps the words. Profile has
+                      moved onto the avatar (see above). */}
+                  {showManage && !m.__legacy && (
                     <div className="flex items-center gap-1 shrink-0">
-                      {!m.__legacy && onDownloadAgreement && (
+                      {onDownloadAgreement && (
                         <button
                           type="button"
                           onClick={() => onDownloadAgreement(booking, m)}
-                          className="px-2 py-1 rounded-lg bg-gray-50 hover:bg-blue-50 text-gray-500 hover:text-blue-600 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1"
-                          title={isBn ? 'এই সিটের অ্যাগ্রিমেন্ট' : "This seat's agreement"}
+                          className="px-1.5 sm:px-2 py-1 rounded-lg bg-gray-50 hover:bg-blue-50 text-gray-500 hover:text-blue-600 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1"
+                          title={isBn ? 'এই সিটের অ্যাগ্রিমেন্ট ডাউনলোড' : "Download this seat's agreement"}
                         >
-                          <FileDown size={11} /> {isBn ? 'অ্যাগ্রিমেন্ট' : 'Agreement'}
+                          <FileDown size={12} /> <span className="hidden sm:inline">{isBn ? 'অ্যাগ্রিমেন্ট' : 'Agreement'}</span>
                         </button>
                       )}
-                      {/* Replace the person in THIS seat. The booking-level
-                          "New Tenant · New Lease" hands over the entire room,
-                          which for a shared room evicts the roommate too — so
-                          for a seat that action was never the right one. */}
-                      {!m.__legacy && onReplaceSeat && booking.unitId && (
+                      {onReplaceSeat && booking.unitId && (
                         <button
                           type="button"
                           onClick={() => onReplaceSeat(m, activeMembers.indexOf(m) + 1)}
-                          className="px-2 py-1 rounded-lg bg-gray-50 hover:bg-emerald-50 text-gray-500 hover:text-emerald-700 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1"
+                          className="px-1.5 sm:px-2 py-1 rounded-lg bg-gray-50 hover:bg-emerald-50 text-gray-500 hover:text-emerald-700 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1"
                           title={isBn ? 'এই সিটে নতুন ভাড়াটিয়া' : 'New tenant in this seat'}
                         >
-                          <Undo2 size={11} /> {isBn ? 'বদলান' : 'Replace'}
+                          <Undo2 size={12} /> <span className="hidden sm:inline">{isBn ? 'বদলান' : 'Replace'}</span>
                         </button>
                       )}
-                      {!m.__legacy && onOpenProfile && (
-                        <button
-                          type="button"
-                          onClick={() => onOpenProfile(m)}
-                          className="px-2 py-1 rounded-lg bg-gray-50 hover:bg-indigo-50 text-gray-500 hover:text-indigo-600 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1"
-                          title={isBn ? 'প্রোফাইল' : 'Profile'}
-                        >
-                          <UserCircle size={11} /> {isBn ? 'প্রোফাইল' : 'Profile'}
-                        </button>
-                      )}
-                      {!m.__legacy && (
                       <button
                         type="button"
                         onClick={() => moveOut(m)}
                         disabled={busy}
-                        className="px-2 py-1 rounded-lg bg-gray-50 hover:bg-rose-50 text-gray-500 hover:text-rose-600 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1"
+                        className="px-1.5 sm:px-2 py-1 rounded-lg bg-gray-50 hover:bg-rose-50 text-gray-500 hover:text-rose-600 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1"
                         title={isBn ? 'মুভ-আউট' : 'Move out'}
                       >
-                        <LogOut size={11} /> {isBn ? 'মুভ-আউট' : 'Move out'}
+                        <LogOut size={12} /> <span className="hidden sm:inline">{isBn ? 'মুভ-আউট' : 'Move out'}</span>
                       </button>
-                      )}
                     </div>
                   )}
                 </div>

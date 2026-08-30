@@ -13,7 +13,7 @@ import {
   XCircle, AlertCircle, RefreshCw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, MinusCircle,
   Banknote, ArrowRight, ArrowUpRight, Clock, Smartphone,
   BellOff, CalendarRange, BarChart3,
-  Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Map, Leaf, HeartHandshake, BookOpen
+  Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Map, Leaf, HeartHandshake, BookOpen, ScanLine, Loader2,
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -64,7 +64,8 @@ import useTabHistory from '../hooks/useTabHistory';
 import useBackGuard, { useOverlayNavigate } from '../hooks/useBackGuard';
 import LandlordHomeChoiceModal from './shared/LandlordHomeChoiceModal';
 import TenantInfoForm from './host-dashboard/TenantInfoForm';
-import { emptyTenantProfile, validateTenantProfile, toTenantProfile } from '../utils/tenantFields';
+import { emptyTenantProfile, validateTenantProfile, toTenantProfile, tenantFieldReport } from '../utils/tenantFields';
+import { scanTenantForm } from '../services/aiScanService';
 import { scopeBookings, bookingInBuilding, sortByBuildingOrder } from '../utils/buildingScope';
 import { paidSoFar, remainingFor, applyPaymentToEntry } from '../utils/rentLedger';
 import { primaryOccupant, occupantNames, occupantCount, activeMembers } from '../utils/occupants';
@@ -609,6 +610,79 @@ const formatDate = (iso, lang) => {
   const day = String(d.getDate()).padStart(2, '0');
   return lang === 'বাংলা' ? `${day} ${m} ${d.getFullYear()}` : `${m} ${day}, ${d.getFullYear()}`;
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WHAT IS ON A TENANCY FORM — defined once.
+//
+// Modelled on the Dhaka Metropolitan Police tenant-information form the
+// landlord already has to keep. Rows the app holds no data for are marked
+// `blank`: the PDF prints them as ruled lines to complete by hand, and the
+// Excel export leaves the cell empty. Both outputs read this, so a field added
+// here appears in both or in neither.
+// ─────────────────────────────────────────────────────────────────────────────
+const agreementGroups = ({
+  booking, seatMember, occupant, seatRent, names, tp, govtId, job, roomLine, L,
+  landlord, formatDate, formatBDT, isOpenEnded,
+}) => [
+  {
+    side: 'left',
+    title: L('ভাড়াটিয়ার তথ্য', 'TENANT INFORMATION'),
+    rows: [
+      { label: L('নাম', 'Name'), value: occupant.name },
+      { label: L('পিতার নাম', "Father's name"), value: tp.fatherName, blank: !tp.fatherName },
+      { label: L('মাতার নাম', "Mother's name"), value: '', blank: true },
+      { label: L('স্বামী / স্ত্রীর নাম', 'Spouse name'), value: '', blank: true },
+      { label: L('জন্ম তারিখ', 'Date of birth'), value: tp.dob ? formatDate(tp.dob) : '', blank: !tp.dob },
+      { label: L('বৈবাহিক অবস্থা', 'Marital status'), value: tp.maritalStatus, blank: !tp.maritalStatus },
+      { label: L('জাতীয় পরিচয়পত্র / পাসপোর্ট', 'NID / Passport'), value: tp.govtIdNumber ? govtId : '', blank: !tp.govtIdNumber },
+      { label: L('মোবাইল', 'Mobile'), value: occupant.phone, blank: !occupant.phone },
+      { label: L('পেশা', 'Occupation'), value: job, blank: !job },
+      { label: L('কর্মস্থলের ঠিকানা', 'Workplace address'), value: '', blank: true },
+      { label: L('স্থায়ী ঠিকানা', 'Permanent address'), value: tp.permanentAddress, blank: !tp.permanentAddress },
+      { label: L('পূর্ববর্তী বাসার ঠিকানা', 'Previous address'), value: '', blank: true },
+    ],
+  },
+  {
+    side: 'left',
+    title: L('জরুরি যোগাযোগ', 'EMERGENCY CONTACT'),
+    rows: [
+      { label: L('নাম', 'Name'), value: tp.emergencyName, blank: !tp.emergencyName },
+      { label: L('সম্পর্ক', 'Relation'), value: tp.emergencyRelation, blank: !tp.emergencyRelation },
+      { label: L('মোবাইল', 'Mobile'), value: tp.emergencyPhone, blank: !tp.emergencyPhone },
+      { label: L('ঠিকানা', 'Address'), value: tp.emergencyAddress, blank: !tp.emergencyAddress },
+    ],
+  },
+  {
+    side: 'right',
+    title: L('বাসা ও ভাড়ার তথ্য', 'TENANCY DETAILS'),
+    rows: [
+      { label: L('বাড়ি / প্রতিষ্ঠান', 'Property'), value: booking.property },
+      { label: L('ঠিকানা', 'Address'), value: booking.location },
+      { label: L('ফ্লোর / রুম / সিট', 'Floor / Room / Seat'), value: roomLine },
+      { label: L('ভাড়া শুরুর তারিখ', 'Tenancy start'), value: formatDate(seatMember?.joinDate || booking.leaseStart) },
+      { label: L('মেয়াদ', 'Term'), value: isOpenEnded ? L('চলমান — নোটিশ সাপেক্ষে', 'Ongoing — subject to notice') : formatDate(booking.leaseEnd) },
+      { label: seatMember ? L('সিটের মাসিক ভাড়া', 'Monthly rent (seat)') : L('মাসিক ভাড়া', 'Monthly rent'),
+        value: formatBDT(seatMember ? seatRent : booking.monthlyRent) },
+      ...(seatMember ? [] : [{ label: L('সার্ভিস চার্জ', 'Service charge'), value: formatBDT(booking.serviceCharge || 0) }]),
+      { label: L('জামানত', 'Security deposit'), value: formatBDT((seatMember ? seatMember.securityDeposit : booking.securityDeposit) || 0) },
+      { label: L('ভাড়ার তারিখ', 'Rent due day'), value: L(`প্রতি মাসের ${booking.rentDueDay || 5} তারিখ`, `${booking.rentDueDay || 5} of each month`) },
+      { label: L('পেমেন্ট মাধ্যম', 'Payment method'), value: booking.paymentMethod, blank: !booking.paymentMethod },
+      ...(names.length
+        ? [{ label: seatMember ? L('রুমে আরও আছেন', 'Also in this room') : L('অন্যান্য বাসিন্দা', 'Other occupants'), value: names.join(', ') }]
+        : []),
+      { label: L('গাড়ির নম্বর', 'Vehicle no.'), value: '', blank: true },
+    ],
+  },
+  {
+    side: 'right',
+    title: L('বাড়িওয়ালার তথ্য', 'LANDLORD'),
+    rows: [
+      { label: L('নাম', 'Name'), value: landlord.name },
+      { label: L('মোবাইল', 'Mobile'), value: landlord.phone },
+      { label: L('ঠিকানা', 'Address'), value: landlord.address, blank: !landlord.address },
+    ],
+  },
+];
 
 // Where a generated document points people. The QR encodes the Play Store
 // listing (the app is what a tenant wants on a phone); the printed line names
@@ -1583,6 +1657,44 @@ const HostDashboard = () => {
     phone: f.tenantPhone || '',
     moveInDate: f.leaseStart || '',
   });
+  // ── Scanning the admission form into the LEASE form ────────────────────────
+  // The seat form in the Rooms view has had this since it was written; the
+  // lease form — the one a landlord reaches from "ভাড়াটিয়া যোগ করুন" — did
+  // not, so the same photo of the same admission slip could be read for a seat
+  // and had to be typed out by hand here. Same service, same patch shape; the
+  // only difference is that the result is routed through applyTenantPatch,
+  // because this form keeps name / phone / move-in on the lease itself.
+  const [leaseScanning, setLeaseScanning] = useState(false);
+  const [leaseScanned, setLeaseScanned] = useState(null);
+  const leaseScanInputRef = useRef(null);
+
+  const handleLeaseScan = async (file) => {
+    if (!file) return;
+    if (!file.type?.startsWith('image/')) {
+      showToast(language === 'বাংলা' ? 'ছবি ফাইল দিন' : 'Please choose an image file');
+      return;
+    }
+    setLeaseScanning(true);
+    try {
+      const result = await scanTenantForm(file);
+      if (!result || !Object.keys(result.patch || {}).length) {
+        showToast(language === 'বাংলা' ? 'ফরম থেকে কিছু পড়া গেল না — হাতে লিখুন' : 'Nothing readable on that page — fill it in by hand');
+        return;
+      }
+      // Blanks on the page never overwrite what is already typed: scanTenantForm
+      // only returns keys it actually read a value for.
+      applyTenantPatch(result.patch);
+      setLeaseScanned(Object.keys(result.patch));
+      showToast(language === 'বাংলা'
+        ? `${Object.keys(result.patch).length}টি ঘর ভরা হয়েছে — যাচাই করে নিন`
+        : `Filled ${Object.keys(result.patch).length} field(s) — please check them`);
+    } catch (err) {
+      showToast(err.message || (language === 'বাংলা' ? 'স্ক্যান ব্যর্থ' : 'Scan failed'));
+    } finally {
+      setLeaseScanning(false);
+    }
+  };
+
   // Route a patch from TenantInfoForm back to the right home: the three
   // canonical fields to the lease, everything else to tenantProfile.
   const applyTenantPatch = (patch) => setLeaseForm((f) => {
@@ -2918,9 +3030,13 @@ const HostDashboard = () => {
     const seatRent = seatMember ? seatShare(booking, seatMember, mems.length || 1) : null;
     // Co-occupants are named on a seat agreement as a fact about the room, not
     // as parties to this person's tenancy.
-    const names = seatMember
-      ? mems.filter(m => m !== seatMember).map(m => String(m.name || '').trim()).filter(Boolean)
-      : occupantNames(booking);
+    // Everyone in the room EXCEPT the person this form is about. Without the
+    // exclusion a whole-unit form listed its own subject under "other
+    // occupants" — the paper told রফিক আহমেদ that রফিক আহমেদ also lives there.
+    const subjectName = String((seatMember?.name) || primaryOccupant(booking, language).name || '').trim();
+    const names = mems
+      .map(m => String(m.name || '').trim())
+      .filter(n => n && n !== subjectName);
     const L = (bn, en) => (isBnDoc ? bn : en);
 
     const row = (k, v) => `
@@ -3050,10 +3166,15 @@ const HostDashboard = () => {
                    border-bottom:1px ${blank ? 'dashed #cbd5e1' : 'solid #e5e7eb'};">${esc(value || '')}&nbsp;</td>
       </tr>`;
 
+    // The black section bar. Bangla needs real vertical room: matras sit above
+    // the letter and ো / ৃ / ্য hang below it, so a box sized to Latin metrics
+    // cropped the bottom of every heading — the words sat half outside their
+    // own bar. An explicit line-height plus even padding gives the glyphs the
+    // full band they occupy.
     const BLOCK = (title, rows) => `
       <div style="margin-bottom:7px;">
         <div style="background:#111827;color:#fff;font-size:8.4px;font-weight:800;letter-spacing:.03em;
-                    padding:3px 7px;border-radius:3px;">${esc(title)}</div>
+                    line-height:1.9;padding:2px 8px;border-radius:3px;">${esc(title)}</div>
         <table style="width:100%;border-collapse:collapse;margin-top:3px;">${rows}</table>
       </div>`;
 
@@ -3067,47 +3188,25 @@ const HostDashboard = () => {
       seatMember?.seatLabel || '',
     ].filter(Boolean).join(' · ');
 
-    const leftCol = BLOCK(L('ভাড়াটিয়ার তথ্য', 'TENANT INFORMATION'),
-      F(L('নাম', 'Name'), occupant.name)
-      + F(L('পিতার নাম', "Father's name"), tp.fatherName, !tp.fatherName)
-      + F(L('মাতার নাম', "Mother's name"), '', true)
-      + F(L('স্বামী / স্ত্রীর নাম', 'Spouse name'), '', true)
-      + F(L('জন্ম তারিখ', 'Date of birth'), tp.dob ? formatDate(tp.dob, language) : '', !tp.dob)
-      + F(L('বৈবাহিক অবস্থা', 'Marital status'), tp.maritalStatus, !tp.maritalStatus)
-      + F(L('জাতীয় পরিচয়পত্র / পাসপোর্ট', 'NID / Passport'), tp.govtIdNumber ? govtId : '', !tp.govtIdNumber)
-      + F(L('মোবাইল', 'Mobile'), occupant.phone, !occupant.phone)
-      + F(L('পেশা', 'Occupation'), job, !job)
-      + F(L('কর্মস্থলের ঠিকানা', 'Workplace address'), '', true)
-      + F(L('স্থায়ী ঠিকানা', 'Permanent address'), tp.permanentAddress, !tp.permanentAddress)
-      + F(L('পূর্ববর্তী বাসার ঠিকানা', 'Previous address'), '', true))
-      + BLOCK(L('জরুরি যোগাযোগ', 'EMERGENCY CONTACT'),
-        F(L('নাম', 'Name'), tp.emergencyName, !tp.emergencyName)
-        + F(L('সম্পর্ক', 'Relation'), tp.emergencyRelation, !tp.emergencyRelation)
-        + F(L('মোবাইল', 'Mobile'), tp.emergencyPhone, !tp.emergencyPhone)
-        + F(L('ঠিকানা', 'Address'), tp.emergencyAddress, !tp.emergencyAddress));
+    // The field list lives in ONE place. The PDF renders it into black-barred
+    // blocks; the Excel export writes the same rows as CSV. Two hand-kept
+    // copies of "what is on a tenancy form" would drift the first time a field
+    // was added to only one of them.
+    const groups = agreementGroups({
+      booking, seatMember, occupant, seatRent, names, tp, govtId, job, roomLine, L,
+      landlord: {
+        name: orgName || userData?.fullName || authUser?.name || authUser?.fullName || '',
+        phone: orgPhone || userData?.phone || authUser?.phone || '',
+        address: landlordProfile?.address || booking.location || '',
+      },
+      formatDate: (d) => formatDate(d, language),
+      formatBDT,
+      isOpenEnded: isOpenEndedLease(booking),
+    });
 
-    const rightCol = BLOCK(L('বাসা ও ভাড়ার তথ্য', 'TENANCY DETAILS'),
-      F(L('বাড়ি / প্রতিষ্ঠান', 'Property'), booking.property)
-      + F(L('ঠিকানা', 'Address'), booking.location)
-      + F(L('ফ্লোর / রুম / সিট', 'Floor / Room / Seat'), roomLine)
-      + F(L('ভাড়া শুরুর তারিখ', 'Tenancy start'), formatDate(seatMember?.joinDate || booking.leaseStart, language))
-      + F(L('মেয়াদ', 'Term'), isOpenEndedLease(booking)
-          ? L('চলমান — নোটিশ সাপেক্ষে', 'Ongoing — subject to notice')
-          : formatDate(booking.leaseEnd, language))
-      + F(seatMember ? L('সিটের মাসিক ভাড়া', 'Monthly rent (seat)') : L('মাসিক ভাড়া', 'Monthly rent'),
-          formatBDT(seatMember ? seatRent : booking.monthlyRent))
-      + (seatMember ? '' : F(L('সার্ভিস চার্জ', 'Service charge'), formatBDT(booking.serviceCharge || 0)))
-      + F(L('জামানত', 'Security deposit'), formatBDT((seatMember ? seatMember.securityDeposit : booking.securityDeposit) || 0))
-      + F(L('ভাড়ার তারিখ', 'Rent due day'), L(`প্রতি মাসের ${booking.rentDueDay || 5} তারিখ`, `${booking.rentDueDay || 5} of each month`))
-      + F(L('পেমেন্ট মাধ্যম', 'Payment method'), booking.paymentMethod, !booking.paymentMethod)
-      + (names.length
-          ? F(seatMember ? L('রুমে আরও আছেন', 'Also in this room') : L('অন্যান্য বাসিন্দা', 'Other occupants'), names.join(', '))
-          : '')
-      + F(L('গাড়ির নম্বর', 'Vehicle no.'), '', true))
-      + BLOCK(L('বাড়িওয়ালার তথ্য', 'LANDLORD'),
-        F(L('নাম', 'Name'), orgName || userData?.fullName || authUser?.name || authUser?.fullName)
-        + F(L('মোবাইল', 'Mobile'), orgPhone || userData?.phone || authUser?.phone)
-        + F(L('ঠিকানা', 'Address'), landlordProfile?.address || booking.location, !(landlordProfile?.address || booking.location)));
+    const renderGroup = (g) => BLOCK(g.title, g.rows.map(r => F(r.label, r.value, r.blank)).join(''));
+    const leftCol = groups.filter(g => g.side === 'left').map(renderGroup).join('');
+    const rightCol = groups.filter(g => g.side === 'right').map(renderGroup).join('');
 
     host.innerHTML = `
       <div id="agreement-sheet" style="width:794px;box-sizing:border-box;padding:26px 30px;background:#fff;color:#111827;
@@ -3247,13 +3346,76 @@ const HostDashboard = () => {
     setAgreementFor({ booking, member });
   };
 
-  // Chosen in the modal: remember the letterhead, then build the PDF.
-  const confirmAgreementDownload = (brand) => {
+  // The same form as a spreadsheet. Built from agreementGroups(), so it holds
+  // exactly the fields the PDF does — a landlord who needs the data in Excel
+  // (to file, sort or hand to an office) gets the record, not a screenshot.
+  const generateAgreementCsv = (booking, brand = null, member = null) => {
+    const isBnDoc = language === 'বাংলা';
+    const L = (bn, en) => (isBnDoc ? bn : en);
+    const mems = activeMembers(booking);
+    const seatMember = member || null;
+    const occ = seatMember
+      ? { name: String(seatMember.name || '').trim(), phone: seatMember.phone || '' }
+      : primaryOccupant(booking, language);
+    const tp = (seatMember?.tenantProfile) || booking.tenantProfile || {};
+    const subjectName = String(occ.name || '').trim();
+
+    const groups = agreementGroups({
+      booking, seatMember, occupant: occ,
+      seatRent: seatMember ? seatShare(booking, seatMember, mems.length || 1) : null,
+      names: mems.map(m => String(m.name || '').trim()).filter(n => n && n !== subjectName),
+      tp,
+      govtId: [tp.govtIdType === 'passport' ? L('পাসপোর্ট', 'Passport') : L('এনআইডি', 'NID'), tp.govtIdNumber].filter(Boolean).join(' — '),
+      job: [tp.tenantType, tp.organization, tp.department].filter(Boolean).join(', '),
+      roomLine: [
+        booking.floorNumber ? `${L('ফ্লোর', 'Floor')} ${booking.floorNumber}` : '',
+        booking.roomNumber ? `${L('রুম', 'Room')} ${booking.roomNumber}` : '',
+        seatMember?.seatLabel || '',
+      ].filter(Boolean).join(' · '),
+      L,
+      landlord: {
+        name: String(brand?.orgName || '').trim() || userData?.fullName || authUser?.name || authUser?.fullName || '',
+        phone: String(brand?.phone || '').trim() || userData?.phone || authUser?.phone || '',
+        address: landlordProfile?.address || booking.location || '',
+      },
+      formatDate: (d) => formatDate(d, language),
+      formatBDT: (n) => Number(n) || 0,   // a spreadsheet wants a number, not "৳6,000"
+      isOpenEnded: isOpenEndedLease(booking),
+    });
+
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [[L('বিভাগ', 'Section'), L('ক্ষেত্র', 'Field'), L('তথ্য', 'Value')].map(esc).join(',')];
+    groups.forEach(g => g.rows.forEach(r => {
+      lines.push([g.title, r.label, r.blank ? '' : r.value].map(esc).join(','));
+    }));
+
+    // BOM first, or Excel opens Bangla as mojibake.
+    const blob = new Blob([`﻿${lines.join('\n')}`], { type: 'text/csv;charset=utf-8;' });
+    const latin = String(occ.name || '').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase();
+    const seatSlug = seatMember ? String(seatMember.seatLabel || '').replace(/[^a-z0-9]+/gi, '-').toLowerCase() : '';
+    const base = latin || String(booking.roomNumber || '').replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'tenant';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${[base, seatSlug].filter(Boolean).join('-').replace(/-+/g, '-')}-tenant-form.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    showToast(isBnDoc ? 'এক্সেল ফাইল ডাউনলোড হয়েছে ✓' : 'Excel file downloaded ✓');
+  };
+
+  // Chosen in the modal: who, what format, and the letterhead.
+  const confirmAgreementDownload = (brand, { member = null, format = 'pdf' } = {}) => {
     const target = agreementFor;
     setAgreementFor(null);
     if (!target?.booking) return;
     persistLandlordProfile({ ...landlordProfile, brand });
-    generateAgreementPdf(target.booking, brand, target.member);
+    // `member` from the modal's picker wins; a caller that already knew the
+    // seat (a member row) passed it in and the picker never appeared.
+    const who = member || target.member || null;
+    if (format === 'excel') generateAgreementCsv(target.booking, brand, who);
+    else generateAgreementPdf(target.booking, brand, who);
   };
 
   // Export the Rent Collection view (for the selected year) to a CSV file.
@@ -3842,7 +4004,17 @@ const HostDashboard = () => {
       businessName: '',
       advancePayment: '',
       paymentMethod: booking.paymentMethod || 'bKash',
-      seats: [],
+      // THE ROOM KEEPS ITS SEATS.
+      //
+      // This was `[]`, so handing over a two-seat room produced a ONE-seat
+      // lease and the rent stopped being split — the form opened saying
+      // "৳6,000 ÷ 1 = ৳6,000/seat" for a room that has always been two seats at
+      // ৳3,000. Seat 1 is the tenant typed at the top, so the carried-over rows
+      // are the seats after it.
+      seats: Array.from(
+        { length: Math.max(0, activeMembers(booking).length - 1) },
+        () => ({ name: '', phone: '', monthlyRent: '' }),
+      ),
       notes: '',
       leaseStart: iso(startDate),
       // Ongoing, like the lease it replaces.
@@ -5981,6 +6153,7 @@ const HostDashboard = () => {
         <AgreementBrandModal
           booking={agreementFor.booking}
           member={agreementFor.member}
+          people={activeMembers(agreementFor.booking)}
           brand={landlordProfile?.brand}
           language={language}
           onClose={() => setAgreementFor(null)}
@@ -6459,7 +6632,14 @@ const HostDashboard = () => {
                 // actually uploaded to the Document Vault for this tenant.
                 const bk = modalData || null;
                 const occ = bk ? primaryOccupant(bk, language) : null;
-                const tenantName = occ?.name || (language === 'বাংলা' ? 'ভাড়াটিয়া' : 'Tenant');
+                // Name EVERYONE in the room. Showing only the first occupant
+                // read as "these are that person's documents", when the vault
+                // for a shared room holds papers for all of them — and the
+                // landlord had no way to tell it was showing them a room.
+                const roomPeople = bk ? occupantNames(bk) : [];
+                const tenantName = roomPeople.length > 1
+                  ? roomPeople.join(', ')
+                  : (occ?.name || (language === 'বাংলা' ? 'ভাড়াটিয়া' : 'Tenant'));
                 const propTitle = bk?.property || (language === 'বাংলা' ? 'প্রপার্টি' : 'Property');
                 const roomLine = bk?.roomNumber
                   ? `${language === 'বাংলা' ? 'রুম' : 'Room'} ${bk.roomNumber}${bk.floorNumber ? ` · ${language === 'বাংলা' ? 'ফ্লোর' : 'Floor'} ${bk.floorNumber}` : ''}`
@@ -6740,26 +6920,63 @@ const HostDashboard = () => {
 
                   {/* Tenant-change banner — visible on every step so the host
                       never loses track of which lease they're replacing. */}
-                  {isRelet && (
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5 flex items-start gap-2.5">
-                      <RefreshCw size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700 mb-1">{isBn ? 'ভাড়াটিয়া পরিবর্তন' : 'Tenant Change'}</p>
-                        <p className="text-[11px] font-bold text-gray-700 leading-relaxed">
-                          {isBn
-                            ? `ইউনিটের সব তথ্য আগের লিজ (${previousLease?.tenant || 'পুরোনো ভাড়াটিয়া'}) থেকে নেওয়া হয়েছে। শুধু নতুন ভাড়াটিয়ার নাম ও নম্বর দিন — সেভ করলে পুরোনো লিজ বন্ধ হবে এবং নতুন রেন্ট লেজার চালু হবে।`
-                            : `The unit is carried over from the previous lease (${previousLease?.tenant || 'previous tenant'}). Just set the new tenant's name + number — on save the old lease closes and a fresh rent ledger starts.`}
-                        </p>
+                  {isRelet && (() => {
+                    // WHO IS ACTUALLY LEAVING. This read previousLease.tenant,
+                    // which a seat-rented room leaves empty — so a landlord
+                    // handing over a shared room was shown "পুরোনো ভাড়াটিয়া"
+                    // and no way to tell whose tenancies they were about to
+                    // close. Every outgoing occupant is named, with their seat.
+                    const outgoing = activeMembers(previousLease || {});
+                    const soloName = String(previousLease?.tenant || '').trim();
+                    return (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5">
+                      <div className="flex items-start gap-2.5">
+                        <RefreshCw size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700 mb-1">
+                            {outgoing.length > 1
+                              ? (isBn ? `পুরো রুম হ্যান্ডওভার · ${outgoing.length} জন` : `Whole-room handover · ${outgoing.length} people`)
+                              : (isBn ? 'ভাড়াটিয়া পরিবর্তন' : 'Tenant Change')}
+                          </p>
+                          <p className="text-[11px] font-bold text-gray-700 leading-relaxed">
+                            {isBn
+                              ? 'ইউনিটের সব তথ্য আগের লিজ থেকে নেওয়া হয়েছে। শুধু নতুন ভাড়াটিয়ার নাম ও নম্বর দিন — সেভ করলে পুরোনো লিজ বন্ধ হবে এবং নতুন রেন্ট লেজার চালু হবে।'
+                              : "The unit is carried over from the previous lease. Just set the new tenant's name + number — on save the old lease closes and a fresh rent ledger starts."}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setLeaseForm(f => ({ ...f, replacesBookingId: null }))}
+                          className="shrink-0 text-[10px] font-black text-emerald-700 hover:underline underline-offset-2 whitespace-nowrap"
+                        >
+                          {isBn ? 'বাতিল' : 'Undo'}
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setLeaseForm(f => ({ ...f, replacesBookingId: null }))}
-                        className="shrink-0 text-[10px] font-black text-emerald-700 hover:underline underline-offset-2 whitespace-nowrap"
-                      >
-                        {isBn ? 'বাতিল' : 'Undo'}
-                      </button>
+
+                      {/* The tenancies this save will close, by seat. */}
+                      <div className="mt-2.5 rounded-xl bg-white/70 border border-emerald-100 p-2">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-emerald-700/70 mb-1.5">
+                          {isBn ? 'যাঁদের লিজ বন্ধ হবে' : 'Tenancies being closed'}
+                        </p>
+                        {outgoing.length > 0 ? (
+                          <div className="space-y-1">
+                            {outgoing.map((m, i) => (
+                              <div key={m.id || i} className="flex items-center gap-2 min-w-0">
+                                <span className="w-5 h-5 rounded-md bg-emerald-600 text-white text-[9px] font-black flex items-center justify-center shrink-0">{i + 1}</span>
+                                <span className="text-[11px] font-black text-gray-900 truncate">{m.name || (isBn ? 'নামহীন' : 'Unnamed')}</span>
+                                <span className="text-[10px] font-bold text-gray-500 truncate">
+                                  {[m.seatLabel, m.phone].filter(Boolean).join(' · ')}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] font-black text-gray-900">{soloName || (isBn ? 'পুরোনো ভাড়াটিয়া' : 'Previous tenant')}</p>
+                        )}
+                      </div>
                     </div>
-                  )}
+                    );
+                  })()}
 
                   {/* ══════════════ STEP 1 — UNIT ══════════════ */}
                   {leaseStep === 1 && (
@@ -6987,6 +7204,67 @@ const HostDashboard = () => {
                         <button type="button" onClick={() => goLeaseStep(1)} className="shrink-0 text-[10px] font-black text-[#ba0036] hover:underline underline-offset-2">
                           {isBn ? 'এডিট' : 'Edit'}
                         </button>
+                      </div>
+
+                      {/* Scan the admission form instead of typing it — the same
+                          affordance the Rooms seat form has. It only prefills
+                          the boxes below; the landlord still corrects whatever
+                          the page did not say clearly. */}
+                      <div>
+                        <button
+                          type="button"
+                          disabled={leaseScanning}
+                          onClick={() => leaseScanInputRef.current?.click()}
+                          className="w-full px-3 py-3 rounded-2xl border-2 border-dashed border-[#ba0036]/30 bg-[#ba0036]/[0.03] text-[#ba0036] hover:bg-[#ba0036]/[0.06] active:scale-[0.99] transition-all inline-flex items-center justify-center gap-2 disabled:opacity-60"
+                        >
+                          {leaseScanning
+                            ? <><Loader2 size={15} className="animate-spin" /> <span className="text-[11px] font-black uppercase tracking-wider">{isBn ? 'পড়া হচ্ছে…' : 'Reading…'}</span></>
+                            : <>
+                                <ScanLine size={15} strokeWidth={2.5} />
+                                <span className="text-[11px] font-black uppercase tracking-wider">
+                                  {isBn ? 'ভর্তি ফরম স্ক্যান করুন' : 'Scan the admission form'}
+                                </span>
+                              </>}
+                        </button>
+                        <input
+                          ref={leaseScanInputRef}
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={(e) => { handleLeaseScan(e.target.files?.[0]); e.target.value = ''; }}
+                        />
+
+                        {/* What the scan got and what it missed. A bare count
+                            leaves the landlord to work out which boxes are
+                            still empty by opening the section and reading it. */}
+                        {leaseScanned && (() => {
+                          const { filled, missing } = tenantFieldReport(leaseTenantView(leaseForm), isBn);
+                          return (
+                            <div className="mt-2 rounded-xl border border-gray-200 overflow-hidden">
+                              <div className="px-2.5 py-2 bg-emerald-50 border-b border-emerald-100">
+                                <p className="text-[10px] font-black text-emerald-800 inline-flex items-center gap-1">
+                                  <Sparkles size={10} className="shrink-0" />
+                                  {isBn ? `ফরম থেকে পাওয়া গেছে — ${filled.length}টি` : `Read from the form — ${filled.length}`}
+                                </p>
+                                <p className="text-[10px] font-bold text-emerald-700/80 leading-relaxed mt-0.5">
+                                  {filled.map((f) => f.label).join(' · ')}
+                                </p>
+                              </div>
+                              {missing.length > 0 && (
+                                <div className="px-2.5 py-2 bg-amber-50">
+                                  <p className="text-[10px] font-black text-amber-800 inline-flex items-center gap-1">
+                                    <AlertCircle size={10} className="shrink-0" />
+                                    {isBn ? `পাওয়া যায়নি — ${missing.length}টি` : `Not found — ${missing.length}`}
+                                  </p>
+                                  <p className="text-[10px] font-bold text-amber-700/90 leading-relaxed mt-0.5">
+                                    {missing.map((f) => f.label).join(' · ')}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Name + mobile + move-in, then everything else folded
