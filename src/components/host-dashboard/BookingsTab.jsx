@@ -21,6 +21,7 @@ import UnitsManager from "./UnitsManager.jsx";
 import { buildingTypeLabel, buildingTypeColor, normaliseSubCategory, unitNoun } from "../../utils/buildingTypes";
 import { updateBuilding, archiveBuilding } from "../../services/buildingService";
 import AiLedgerScannerModal from "./AiLedgerScannerModal.jsx";
+import ModalPortal from "../shared/ModalPortal.jsx";
 import OnboardingApprovalsPanel from "./OnboardingApprovalsPanel.jsx";
 import { scopeBookings, bookingInBuilding, sortByBuildingOrder } from '../../utils/buildingScope';
 import { occupantCount, occupantNames, primaryOccupant } from '../../utils/occupants';
@@ -167,12 +168,18 @@ export default function BookingsTab(props) {
                   {/* Tenant change — the outgoing tenant left, so hand
                       this unit to the next one. Carries the whole unit
                       over; the host only edits name + phone. */}
-                  <button onClick={() => openTenantChangeLease(booking)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-700 transition-colors text-left"><RefreshCw size={14}/> {isBn ? 'নতুন ভাড়াটিয়া · নতুন লিজ' : 'New Tenant · New Lease'}</button>
-                  <button onClick={() => { handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-indigo-50 text-xs font-bold text-gray-700 hover:text-indigo-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
-                  <button onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
+                  {/* Every one of these either leaves this screen or opens a
+                      modal of its own, so each closes the detail modal first.
+                      Without that the lease form and the delete confirmation
+                      came up STACKED on top of an open tenant card, and
+                      "Rent Ledger" switched tabs while leaving the card
+                      hanging over the Bookings list to be found later. */}
+                  <button onClick={() => { closeBookingDetail(); openTenantChangeLease(booking); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-700 transition-colors text-left"><RefreshCw size={14}/> {isBn ? 'নতুন ভাড়াটিয়া · নতুন লিজ' : 'New Tenant · New Lease'}</button>
+                  <button onClick={() => { closeBookingDetail(); handleCallUser(resolveTenantUserId(booking), booking.tenant, booking.tenantAvatar); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-indigo-50 text-xs font-bold text-gray-700 hover:text-indigo-600 transition-colors text-left"><Phone size={14}/> {language === 'বাংলা' ? 'কল করুন' : 'Call Tenant'}</button>
+                  <button onClick={() => { closeBookingDetail(); setActiveTab('rent'); setExpandedRentId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-xs font-bold text-gray-700 hover:text-emerald-600 transition-colors text-left"><Receipt size={14}/> {language === 'বাংলা' ? 'রেন্ট লেজার' : 'Rent Ledger'}</button>
                   <button onClick={() => { downloadAgreement(booking); setActiveDropdownId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-xs font-bold text-gray-700 transition-colors text-left"><Download size={14}/> {language === 'বাংলা' ? 'অ্যাগ্রিমেন্ট ডাউনলোড' : 'Download Agreement'}</button>
                   <div className="h-px w-full bg-gray-100 my-1"></div>
-                  <button onClick={() => { setActiveDropdownId(null); setConfirmDeleteBookingId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
+                  <button onClick={() => { closeBookingDetail(); setConfirmDeleteBookingId(booking.id); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-xs font-bold text-red-600 transition-colors text-left"><Trash2 size={14}/> {t?.remove || (language === 'বাংলা' ? 'লিজ রিমুভ' : 'Remove Lease')}</button>
                 </div>
               )}
             </div>
@@ -536,7 +543,7 @@ export default function BookingsTab(props) {
                       </div>
                       <button
                         type="button"
-                        onClick={() => openTenantChangeLease(booking)}
+                        onClick={() => { closeBookingDetail(); openTenantChangeLease(booking); }}
                         className={`shrink-0 px-2.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider active:scale-95 transition-all inline-flex items-center gap-1 ${stage === 'done' ? 'bg-gray-900 text-white hover:bg-black' : endingSoon ? 'bg-amber-600 text-white hover:bg-amber-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
                       >
                         <Plus size={12} className="shrink-0" /> {isBn ? 'নতুন লিজ' : 'New Lease'}
@@ -561,7 +568,7 @@ export default function BookingsTab(props) {
                       <div className="flex flex-nowrap items-center gap-1 sm:gap-1.5">
                         {/* Profile — opens the tenant's trust card (/tenant/:id). */}
                         <button
-                          onClick={() => openTenantProfile(resolveTenantUserId(booking), { name: booking.tenant, avatar: booking.tenantAvatar })}
+                          onClick={() => { closeBookingDetail(); openTenantProfile(resolveTenantUserId(booking), { name: occupant.name, avatar: occupant.avatar }); }}
                           className="shrink-0 px-1.5 sm:px-2.5 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest active:scale-95 flex items-center gap-1"
                           title={language === 'বাংলা' ? 'টেন্যান্ট প্রোফাইল' : 'Tenant profile'}
                         >
@@ -571,21 +578,21 @@ export default function BookingsTab(props) {
                             lives in one place; ChatSystem hydrates the right thread from
                             location.state. */}
                         <button
-                          onClick={() => openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-bookings', peerUserId: resolveTenantUserId(booking), peerName: booking.tenant, peerAvatar: booking.tenantAvatar, tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property })}
+                          onClick={() => { closeBookingDetail(); openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-bookings', peerUserId: resolveTenantUserId(booking), peerName: occupant.name, peerAvatar: occupant.avatar, tenantName: occupant.name, tenantPhone: occupant.phone, propertyTitle: booking.property }); }}
                           className="shrink-0 px-2 sm:px-3 py-2 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest active:scale-95 shadow-md flex items-center gap-1"
                         >
                           <MessageCircle size={12} className="shrink-0"/> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
                         </button>
                         {/* Invoice — jumps to Rent Collection focused on this tenant. */}
                         <button
-                          onClick={() => { setActiveTab('rent'); setExpandedRentId(booking.id); }}
+                          onClick={() => { closeBookingDetail(); setActiveTab('rent'); setExpandedRentId(booking.id); }}
                           className="shrink-0 px-1.5 sm:px-2.5 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest active:scale-95 flex items-center gap-1"
                           title={language === 'বাংলা' ? 'রেন্ট কালেকশনে দেখুন' : 'Open in Rent Collection'}
                         >
                           <Wallet size={12} className="shrink-0"/> {language === 'বাংলা' ? 'ইনভয়েস' : 'Invoice'}
                         </button>
                         {/* Docs — agreement document vault */}
-                        <button onClick={() => openModal('download_user_document')} className="shrink-0 px-1.5 sm:px-2.5 py-2 bg-gray-50 text-gray-700 hover:bg-gray-100 transition-all rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest active:scale-95 flex items-center gap-1">
+                        <button onClick={() => { closeBookingDetail(); openModal('download_user_document'); }} className="shrink-0 px-1.5 sm:px-2.5 py-2 bg-gray-50 text-gray-700 hover:bg-gray-100 transition-all rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wide sm:tracking-widest active:scale-95 flex items-center gap-1">
                           <Folder size={12} className="shrink-0"/> {language === 'বাংলা' ? 'ডকস' : 'Docs'}
                         </button>
                       </div>
@@ -1317,6 +1324,7 @@ export default function BookingsTab(props) {
                 const detailTitle = detailIsHostel ? activeBookingDetail.property : detailOccupant.name;
                 const detailStage = computeLeaseStage(activeBookingDetail, todayDate);
                 return (
+                  <ModalPortal>
                   <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4">
                     <div className="absolute inset-0 bg-black/45 backdrop-blur-sm animate-in fade-in duration-200" onClick={closeBookingDetail} />
                     <div
@@ -1371,11 +1379,13 @@ export default function BookingsTab(props) {
                       </div>
                     </div>
                   </div>
+                  </ModalPortal>
                 );
               })()}
 
               {/* Building Delete Confirmation Modal */}
               {deleteBuildingId && (
+                <ModalPortal>
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                   <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteBuildingId(null)} />
                   <div className="relative bg-white w-full max-w-sm rounded-[1.5rem] shadow-2xl p-6 sm:p-7 overflow-hidden animate-in zoom-in-95 duration-200">
@@ -1421,6 +1431,7 @@ export default function BookingsTab(props) {
                     </div>
                   </div>
                 </div>
+                </ModalPortal>
               )}
 
             </div>

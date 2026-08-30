@@ -36,6 +36,7 @@ import SeatTenantModal from './SeatTenantModal';
 import ShiftTenantModal from './ShiftTenantModal';
 import { submitOnEnter } from '../../utils/submitOnEnter';
 import TenantDetailModal from './TenantDetailModal';
+import ModalPortal from '../shared/ModalPortal.jsx';
 import {
   SUITABLE_FOR, suitableForCardLabel, suitableForColor, unitNoun,
 } from '../../utils/buildingTypes';
@@ -783,6 +784,7 @@ export default function UnitsManager({
 
       {/* Delete confirmation — refused server-side while anyone lives here. */}
       {confirmDelete && (
+        <ModalPortal>
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setConfirmDelete(null)} />
           <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 animate-in zoom-in-95">
@@ -807,6 +809,7 @@ export default function UnitsManager({
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

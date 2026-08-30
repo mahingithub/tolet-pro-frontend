@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, LayoutGrid, Building, Building2, MessageSquare, Calendar,
@@ -18,7 +18,6 @@ import {
   // `new Map()` in this file then tries to construct an icon component.
   Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Leaf
 } from 'lucide-react';
-import MembersManager from "../MembersManager.jsx";
 import { scopeBookings, bookingInBuilding, sortRentUnits } from '../../utils/buildingScope';
 import { primaryOccupant, occupantCount } from '../../utils/occupants';
 import { buildingTypeLabel, buildingTypeColor, normaliseSubCategory } from '../../utils/buildingTypes';
@@ -73,6 +72,20 @@ export default function RentTab(props) {
     const [realId] = id.split('::');
     setRoomModal({ key: realId, focusUnitId: id.includes('::') ? id : null });
   }, [expandedRentId]);
+
+  // Leaving the building closes the room. Otherwise the modal for a room in
+  // Building A stayed on screen over Building B's list, or reappeared when the
+  // landlord came back — the state outlived the thing it was describing.
+  //
+  // Guarded by a ref rather than firing on mount: this effect runs AFTER the
+  // one above, so an unguarded version would clear the room that arriving from
+  // the Bookings tab's Invoice button had just opened.
+  const buildingRef = useRef(currentBuildingId);
+  useEffect(() => {
+    if (buildingRef.current === currentBuildingId) return;
+    buildingRef.current = currentBuildingId;
+    setRoomModal(null);
+  }, [currentBuildingId]);
 
           const todayDate = today;
           const isBn = language === 'বাংলা';
@@ -197,8 +210,21 @@ export default function RentTab(props) {
             ? visibleRooms.filter(g => g.bucket !== 'overdue' && g.bucket !== 'partial')
             : visibleRooms;
 
-          // The room on screen, resolved from the whole year's rooms.
-          const openRoom = roomModal ? allRooms.find(g => g.key === roomModal.key) : null;
+          // The room on screen. Resolved from the year's rooms first, and — if
+          // it isn't there — rebuilt from the booking directly.
+          //
+          // The fallback is not defensive padding: `rentRows` drops leases that
+          // have ENDED and leases outside the selected ledger year, but the
+          // Bookings tab's Invoice button, the overdue drawer and notification
+          // deep links all hand us ids without knowing that. Without this,
+          // tapping Invoice on a closed-out lease silently did nothing at all.
+          const openRoom = (() => {
+            if (!roomModal) return null;
+            const inYear = allRooms.find(g => g.key === roomModal.key);
+            if (inYear) return inYear;
+            const source = baseBookings.filter(b => String(b.id) === String(roomModal.key));
+            return roomsFrom(sortRentUnits(source.flatMap(rentUnitsOf)))[0] || null;
+          })();
           const closeRoomModal = () => { setRoomModal(null); setExpandedRentId?.(null); };
 
           // Coloured palette per current-month bucket — re-used across the
@@ -250,10 +276,20 @@ export default function RentTab(props) {
             const displayTenant = occupant.name;
             const displayAvatar = occupant.avatar;
             const displayInit = occupant.init;
-            const extraMembers = Math.max(0, occupantCount(booking) - 1);
+            // An expanded seat IS exactly one person — the room modal's header
+            // already says how many seats the room has. Only a whole-unit row
+            // (a flat the landlord recorded as housing a family) can stand for
+            // several occupants, and `__realId` is what tells the two apart.
+            const extraMembers = booking.__realId ? 0 : Math.max(0, occupantCount(booking) - 1);
 
+            // No DOM `id` on the root below, on purpose. The deep-link target
+            // `rent-<bookingId>` belongs to the ROOM CARD in the list — the
+            // thing that can be scrolled to. This card renders inside the
+            // modal, and on a single-tenant booking its id would have been
+            // character-for-character the card's, putting two elements with one
+            // id in the document and making getElementById a coin toss.
             return (
-              <div id={`rent-${booking.id}`} key={booking.id} className={`bg-white rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
+              <div key={booking.id} className={`bg-white rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-gray-100/80 overflow-hidden transition-all duration-300 ${isExpanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.08)]' : 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}>
 
                 {/* ── Compact row — always visible. Click-to-toggle suppressed in forceOpen mode. ── */}
                 <button

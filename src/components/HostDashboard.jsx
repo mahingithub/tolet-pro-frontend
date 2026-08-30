@@ -672,6 +672,16 @@ const rentUnitsOf = (booking) => {
     tenant: m.name || booking.tenant,
     tenantAvatar: m.avatar || booking.tenantAvatar,
     tenantInit: (String(m.name || booking.tenant || '?').trim().charAt(0) || '?').toUpperCase(),
+    // THIS SEAT'S PERSON, not the room's.
+    //
+    // The row inherited `tenantId` and `tenantPhone` from the booking through
+    // the spread above, and on a shared room those belong to whoever was
+    // entered FIRST. So Profile / Message / Call on Seat 2 opened Seat 1's
+    // account — the landlord would have rung the wrong tenant about rent.
+    // A member with no linked account resolves to null, which the callers
+    // already handle ("this tenant has no linked profile yet").
+    tenantId: m.userId || null,
+    tenantPhone: m.phone || '',
     monthlyRent: seatShare(booking, m, mems.length),
     serviceCharge: 0,   // service is already folded into the per-seat monthlyRent above
     ledger: m.ledger || {},
@@ -5435,9 +5445,16 @@ const HostDashboard = () => {
       <MediaLightbox open={!!lightbox} media={lightbox} onClose={() => setLightbox(null)} />
 
 
-      {/* 🔴 DYNAMIC MODALS */}
+      {/* 🔴 DYNAMIC MODALS
+          z-140, not z-100. These are SECOND modals: mark-paid is opened from
+          inside the Rent tab's room modal (z-110), and at z-100 it rendered
+          underneath it — the landlord tapped "Mark Paid", the form opened
+          behind the room they were looking at, and nothing appeared to happen.
+          A modal summoned by another modal has to stack above it. Still below
+          the delete confirmation (z-200) and the AI scanner (z-9999), which are
+          themselves opened from here. */}
       {activeModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-md animate-in fade-in">
+        <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-md animate-in fade-in">
           <div className="bg-white rounded-[2rem] w-full max-w-md shadow-[0_30px_60px_rgba(0,0,0,0.15)] overflow-hidden relative animate-in zoom-in-95 duration-300">
             
             <div className="px-6 py-5 flex justify-between items-center bg-gray-50">

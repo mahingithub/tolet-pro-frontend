@@ -27,6 +27,7 @@ import {
   Banknote, ChevronDown, ChevronUp, MinusCircle,
 } from 'lucide-react';
 import { remainingFor, paidSoFar } from '../../utils/rentLedger';
+import ModalPortal from '../shared/ModalPortal.jsx';
 
 const PAYMENT_METHODS = ['bKash', 'Nagad', 'Rocket', 'Bank Transfer', 'Cash'];
 
@@ -106,6 +107,7 @@ export default function RentRoomModal({
   };
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/45 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose} />
 
@@ -196,8 +198,12 @@ export default function RentRoomModal({
                 </p>
                 <p className="text-[11px] font-bold text-gray-600 leading-relaxed mb-3">
                   {isBn
-                    ? `${monthFullLabel(activeMonthKey, language)} এর বাকি ${formatBDT(outstanding)} — ${unpaidCount} জনের ভাড়া একসাথে পরিশোধ হিসেবে রেকর্ড হবে।`
-                    : `${formatBDT(outstanding)} outstanding for ${monthFullLabel(activeMonthKey, language)} will be recorded as paid across ${unpaidCount} tenant${unpaidCount > 1 ? 's' : ''}.`}
+                    ? (unpaidCount > 1
+                        ? `${monthFullLabel(activeMonthKey, language)} এর বাকি ${formatBDT(outstanding)} — ${unpaidCount} জনের ভাড়া একসাথে পরিশোধ হিসেবে রেকর্ড হবে।`
+                        : `${monthFullLabel(activeMonthKey, language)} এর বাকি ${formatBDT(outstanding)} পরিশোধ হিসেবে রেকর্ড হবে।`)
+                    : (unpaidCount > 1
+                        ? `${formatBDT(outstanding)} outstanding for ${monthFullLabel(activeMonthKey, language)} will be recorded as paid across ${unpaidCount} tenants.`
+                        : `${formatBDT(outstanding)} outstanding for ${monthFullLabel(activeMonthKey, language)} will be recorded as paid.`)}
                 </p>
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   <label className="block">
@@ -252,9 +258,11 @@ export default function RentRoomModal({
                     {isBn ? 'ফুল রুম পেমেন্ট' : 'Full Room Payment'}
                   </span>
                   <span className="block text-[10px] font-bold text-white/80 mt-0.5">
+                    {/* "একসাথে / at once" is only true when there is more than
+                        one person to settle. On a flat it read as nonsense. */}
                     {isBn
-                      ? `${unpaidCount} জনের বাকি একসাথে ক্লিয়ার করুন`
-                      : `Clear all ${unpaidCount} outstanding seat${unpaidCount > 1 ? 's' : ''} at once`}
+                      ? (unpaidCount > 1 ? `${unpaidCount} জনের বাকি একসাথে ক্লিয়ার করুন` : 'বাকি ভাড়াটা ক্লিয়ার করুন')
+                      : (unpaidCount > 1 ? `Clear all ${unpaidCount} outstanding seats at once` : 'Clear the outstanding rent')}
                   </span>
                 </span>
                 <span className="shrink-0 text-base font-black tabular-nums">{formatBDT(outstanding)}</span>
@@ -337,5 +345,6 @@ export default function RentRoomModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
