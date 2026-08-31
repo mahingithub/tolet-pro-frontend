@@ -21,7 +21,9 @@ import React, { useRef, useState } from 'react';
 import { X, Loader2, Check, RefreshCw, UserPlus, DoorOpen, ScanLine, Sparkles, AlertCircle } from 'lucide-react';
 import TenantInfoForm from './TenantInfoForm';
 import { emptyTenantProfile, validateTenantProfile, tenantFieldReport } from '../../utils/tenantFields';
-import { addTenantToUnit, replaceTenantInUnit } from '../../services/buildingService';
+import { replaceTenantInUnit } from '../../services/buildingService';
+import useHostSyncStore from '../../store/useHostSyncStore';
+import { newObjectId } from '../../store/hostOps';
 import { unitNoun } from '../../utils/buildingTypes';
 import { submitOnEnter } from '../../utils/submitOnEnter';
 import { scanTenantForm } from '../../services/aiScanService';
@@ -116,8 +118,59 @@ export default function SeatTenantModal({
         moveInDate: profile.moveInDate,
         tenantProfile: profile,
       };
-      if (replacing) await replaceTenantInUnit(unit.id, replacingMember.id, body);
-      else await addTenantToUnit(unit.id, body);
+      if (replacing) {
+        // Swapping the occupant of an OCCUPIED seat still waits for the server:
+        // it closes one tenancy and opens another on the same seat, and getting
+        // that pair half-applied is worse than asking for a connection.
+        await replaceTenantInUnit(unit.id, replacingMember.id, body);
+      } else {
+        // ── Moving someone in, with or without a network ──────────────────
+        // The ids are minted HERE, so this tenant is real the moment they are
+        // written down: rent can be collected against them, under their own
+        // name, before the record has ever reached the server. The queue
+        // delivers it when there is signal (store/useHostSyncStore.js).
+        //
+        // The one thing the server still decides is whether the seat is free.
+        // If someone else took the last seat while this phone was away, the
+        // placement comes back refused with the reason, and the Rent tab says
+        // so — rather than two people quietly holding one bed.
+        const memberId = newObjectId();
+        const existingBookingId = unit?.booking?.id || unit?.bookingId || null;
+        useHostSyncStore.getState().applyLive('addTenant', {
+          unitId: unit.id,
+          bookingId: existingBookingId || newObjectId(),
+          payload: body,
+          member: {
+            id: memberId,
+            name: profile.name,
+            phone: profile.phone,
+            rentType: capacity > 1 ? 'seat' : 'flat',
+            floor: String(unit.floor ?? ''),
+            roomLabel: unit.roomNumber || '',
+            seatsBooked: 1,
+            monthlyRent: capacity > 1 ? 0 : Number(unit.monthlyRent) || 0,
+            status: 'active',
+            joinDate: profile.moveInDate,
+            ledger: {},
+            tenantProfile: profile,
+          },
+          booking: {
+            property: unit.buildingName || '',
+            floorNumber: String(unit.floor ?? ''),
+            roomNumber: unit.roomNumber || '',
+            unitId: unit.id,
+            tenant: capacity > 1 ? '' : profile.name,
+            tenantPhone: profile.phone,
+            leaseStart: profile.moveInDate,
+            leaseEnd: null,
+            monthlyRent: Number(unit.monthlyRent) || 0,
+            serviceCharge: Number(unit.serviceCharge) || 0,
+            rentDueDay: Number(unit.rentDueDay) || 5,
+            status: 'active',
+            ledger: {},
+          },
+        });
+      }
 
       showToast?.(replacing
         ? (isBn ? 'নতুন ভাড়াটিয়া বসানো হয়েছে — রেন্ট লেজার চালু' : 'New tenant moved in — rent ledger is live')

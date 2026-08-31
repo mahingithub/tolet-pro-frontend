@@ -4,6 +4,7 @@ import 'driver.js/dist/driver.css';
 import { useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
 import { useNavigate, useLocation } from 'react-router-dom';
+import useLivingStore from '../store/useLivingStore';
 
 const TourContext = createContext();
 
@@ -1544,7 +1545,10 @@ export const TourProvider = ({ children }) => {
         },
         {
           anchor: '[data-tour="living-header"]',
-          stillValid: () => window.location.pathname === '/living',
+          // Re-checked after the anchor wait: a user who flips to the solo
+          // wallet in those few seconds should not get the roommate tour.
+          stillValid: () =>
+            window.location.pathname === '/living' && useLivingStore.getState().mode === 'joint',
           driverOptions: {
             onDestroyed: () => {
               // The tour can end mid-sheet (Finish, Esc, ×), so never leave a
@@ -1663,6 +1667,8 @@ export const TourProvider = ({ children }) => {
 
   const isLandlord = activeRole === 'landlord' || activeRole === 'host';
   const path = location.pathname;
+  // Which Living wallet is open ('solo' | 'joint' | null) — gates the Living tour below.
+  const livingMode = useLivingStore((s) => s.mode);
 
   // Home page. A landlord gets pointed at their dashboard, a tenant gets the
   // search walkthrough. `retryTick` is in the deps so a tour turned away by a
@@ -1678,10 +1684,16 @@ export const TourProvider = ({ children }) => {
     startHostDashboardTour();
   }, [path, activeTour, retryTick, startHostDashboardTour]);
 
+  // The Living tour teaches the SHARED wallet (meals, bazar, split expenses),
+  // so it only runs once that wallet is the one on screen. On the mode picker
+  // or the solo ledger its anchors don't exist — and re-running it there would
+  // burn the tour's start attempts pointing at things the user can't see.
+  // Reading the mode reactively means picking "যৌথ" starts it right away.
   useEffect(() => {
     if (path !== '/living' || activeTour) return;
+    if (livingMode !== 'joint') return;
     startLivingTour();
-  }, [path, activeTour, retryTick, startLivingTour]);
+  }, [path, activeTour, retryTick, startLivingTour, livingMode]);
 
   useEffect(() => {
     if (!path.startsWith('/properties') || activeTour) return;

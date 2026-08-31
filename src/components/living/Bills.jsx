@@ -3,8 +3,9 @@ import { Plus, Bell, Check, CircleDollarSign, RotateCcw, CalendarClock, Pencil, 
 
 import useLivingStore from '../../store/useLivingStore';
 import { taka, num, dateLabel, daysUntil, deriveBillStatus, billPaid, isSameMonth, roommateById } from './livingUtils';
+import { pendingKeys } from '../../store/livingOps';
 import { BILL_TYPES, BILL_ORDER, getBillType, BILL_STATUS } from './livingConfig';
-import { Card, SectionHeader, IconBadge, Avatar, Chip, Toggle, ProgressBar, PrimaryButton, Field, MoneyInput, Sheet, ConfirmDialog, cx } from './livingUI';
+import { Card, SectionHeader, IconBadge, Avatar, Chip, PendingChip, Toggle, ProgressBar, PrimaryButton, Field, MoneyInput, Sheet, ConfirmDialog, cx } from './livingUI';
 
 const todayInput = () => new Date().toISOString().slice(0, 10);
 
@@ -288,6 +289,8 @@ const Bills = ({ language }) => {
   const payBill = useLivingStore((s) => s.payBill);
   const markBillUnpaid = useLivingStore((s) => s.markBillUnpaid);
   const toggleBillReminder = useLivingStore((s) => s.toggleBillReminder);
+  const outbox = useLivingStore((s) => s.outbox);
+  const pending = useMemo(() => pendingKeys(outbox), [outbox]);
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -397,6 +400,7 @@ const Bills = ({ language }) => {
                     {b.recurring && (
                       <Chip tint="bg-violet-50" text="text-violet-600"><RotateCcw size={10} /> {isBn ? 'মাসিক' : 'Monthly'}</Chip>
                     )}
+                    {pending.has(b.id) && <PendingChip isBn={isBn} />}
                   </div>
                   <p className="text-[11px] font-semibold text-gray-400 mt-0.5">
                     {fullyPaid

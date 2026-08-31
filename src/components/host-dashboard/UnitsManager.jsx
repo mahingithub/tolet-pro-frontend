@@ -31,7 +31,9 @@ import {
   UserPlus, ChevronDown, ChevronUp, DoorOpen, Check, RefreshCw, QrCode,
 } from 'lucide-react';
 import InviteShareSheet from '../invite/InviteShareSheet';
-import { listUnits, createUnit, createUnitsBulk, archiveUnit, updateUnit } from '../../services/buildingService';
+import { listUnits, createUnitsBulk, archiveUnit, updateUnit } from '../../services/buildingService';
+import useHostSyncStore from '../../store/useHostSyncStore';
+import { applyOp, newObjectId } from '../../store/hostOps';
 import SeatTenantModal from './SeatTenantModal';
 import ShiftTenantModal from './ShiftTenantModal';
 import { submitOnEnter } from '../../utils/submitOnEnter';
@@ -147,14 +149,35 @@ export default function UnitsManager({
   const preview = expandRoomRange(range.from, range.to);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
+  // ── The room list, offline ────────────────────────────────────────────
+  // Rooms are read from a per-building cache first, so a landlord standing in
+  // the building with no signal still sees their rooms instead of an empty
+  // screen. A successful read refreshes the cache; a failed one leaves it
+  // alone. Rooms added while offline are replayed on top from the write queue,
+  // so a room created in a basement is on the list until it really is saved.
+  const cacheKey = building?.id ? `host_units_cache_${building.id}` : null;
+  const readCache = () => {
+    try { return cacheKey ? JSON.parse(localStorage.getItem(cacheKey) || '[]') : []; }
+    catch { return []; }
+  };
+  const withPending = useCallback(
+    (rows) => useHostSyncStore.getState().replay({ bookings: [], units: rows }).units,
+    [],
+  );
+
   const load = useCallback(async () => {
     if (!building?.id) return;
     setLoading(true);
+    const cached = readCache();
+    if (cached.length) setUnits(withPending(cached));
     try {
       const { units: rows } = await listUnits(building.id);
-      setUnits(rows);
+      try { localStorage.setItem(cacheKey, JSON.stringify(rows)); } catch { /* quota — the list still works */ }
+      setUnits(withPending(rows));
+      useHostSyncStore.getState().flush();
     } catch (err) {
-      showToast?.(err.message || (isBn ? 'রুম লোড ব্যর্থ' : 'Could not load rooms'));
+      // Offline with nothing cached is the only case worth saying out loud.
+      if (!cached.length) showToast?.(err.message || (isBn ? 'রুম লোড ব্যর্থ' : 'Could not load rooms'));
     } finally {
       setLoading(false);
     }
@@ -203,7 +226,7 @@ export default function UnitsManager({
     }
     setSaving(true);
     try {
-      await createUnit(building.id, {
+      const payload = {
         roomNumber: String(form.roomNumber).trim(),
         floor: Number(form.floor) || 0,
         // Seats only exist in a seat building; the server pins this too.
@@ -215,11 +238,26 @@ export default function UnitsManager({
         ...(form.monthlyRent !== '' ? { monthlyRent: Number(form.monthlyRent) } : {}),
         ...(form.serviceCharge !== '' ? { serviceCharge: Number(form.serviceCharge) } : {}),
         ...(form.rentDueDay !== '' ? { rentDueDay: Number(form.rentDueDay) } : {}),
-      });
+      };
+      // The room gets its real id here, so a tenant can be put in it and rent
+      // collected from them before this has ever reached the server. Nothing
+      // below waits for the network.
+      const unit = {
+        id: newObjectId(),
+        buildingId: building.id,
+        ...payload,
+        monthlyRent: payload.monthlyRent ?? building.defaultMonthlyRent ?? 0,
+        serviceCharge: payload.serviceCharge ?? building.defaultServiceCharge ?? 0,
+        rentDueDay: payload.rentDueDay ?? building.defaultRentDueDay ?? 5,
+        members: [],
+      };
+      // Queue once out here; apply purely in the updater (React can call an
+      // updater twice for one event, which would create the room twice).
+      const op = useHostSyncStore.getState().enqueue('createUnit', { buildingId: building.id, unit, payload });
+      setUnits((prev) => applyOp({ bookings: [], units: prev }, op).units);
       // Keep floor + money for the next one: a landlord adding a whole floor
       // changes only the number.
       setForm((f) => ({ ...blank, floor: f.floor, monthlyRent: f.monthlyRent, serviceCharge: f.serviceCharge, rentDueDay: f.rentDueDay, seatCapacity: f.seatCapacity, suitableFor: f.suitableFor }));
-      await load();
       showToast?.(isBn ? `${noun} যোগ হয়েছে` : `${noun} added`);
     } catch (err) {
       showToast?.(err.message || (isBn ? 'যোগ করা যায়নি' : 'Could not add it'));

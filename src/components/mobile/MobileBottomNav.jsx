@@ -41,6 +41,20 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   const navigate = useNavigate();
   const { user, isAuthenticated, isAdmin } = useAuth();
 
+  // Event-driven hide: HostDashboard dispatches 'hide-bottom-nav' when the
+  // user enters Bookings / Rent tabs, and 'show-bottom-nav' when they leave.
+  const [forceHide, setForceHide] = React.useState(false);
+  React.useEffect(() => {
+    const hide = () => setForceHide(true);
+    const show = () => setForceHide(false);
+    window.addEventListener('hide-bottom-nav', hide);
+    window.addEventListener('show-bottom-nav', show);
+    return () => {
+      window.removeEventListener('hide-bottom-nav', hide);
+      window.removeEventListener('show-bottom-nav', show);
+    };
+  }, []);
+
   const hides = hideOnRoutes ?? ['/login', '/admin', '/list-property'];
 
   // The property-detail page (/property/:id) has its own sticky contact /
@@ -51,6 +65,8 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   if (location.pathname.startsWith('/property/')) return null;
 
   if (hides.some((r) => location.pathname.startsWith(r))) return null;
+
+  if (forceHide) return null;
 
   // Tenants get the Living (Roommate Wallet) centre FAB; landlords/guests get
   // the "+ List" FAB. The four flat tabs are identical for everyone, so the

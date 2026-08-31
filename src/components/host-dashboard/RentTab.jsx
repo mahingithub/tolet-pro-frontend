@@ -18,6 +18,9 @@ import {
   // `new Map()` in this file then tries to construct an icon component.
   Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Leaf
 } from 'lucide-react';
+import { CloudOff } from 'lucide-react';
+import useHostSyncStore from '../../store/useHostSyncStore';
+import { pendingKeys } from '../../store/hostOps';
 import { scopeBookings, bookingInBuilding, sortRentUnits } from '../../utils/buildingScope';
 import { primaryOccupant, occupantCount } from '../../utils/occupants';
 import { buildingTypeLabel, buildingTypeColor, normaliseSubCategory } from '../../utils/buildingTypes';
@@ -43,6 +46,16 @@ export default function RentTab(props) {
     sendRentReminder, openTenantProfile, openChatPanel, setActiveModal, exportRentCsv, isPremium,
     landlordProfile, setLandlordProfile, currentBuildingId, setCurrentBuildingId
   } = props;
+
+  // Rent written on this phone that hasn't reached the server yet. Collecting
+  // on the stairs means half of it is recorded with no signal, so the register
+  // says out loud which rows the roommates' — and the tenants' — copies do not
+  // know about yet. See store/useHostSyncStore.js.
+  const syncQueue = useHostSyncStore((s) => s.queue);
+  const flushSync = useHostSyncStore((s) => s.flush);
+  const syncError = useHostSyncStore((s) => s.lastError);
+  const clearSyncError = useHostSyncStore((s) => s.clearError);
+  const pendingKeySet = React.useMemo(() => pendingKeys(syncQueue), [syncQueue]);
 
   const [showAllBuildings, setShowAllBuildings] = useState(false);
   // On a phone the ledger + reminder rail used to sit ON TOP of the list, so a
@@ -307,6 +320,14 @@ export default function RentTab(props) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 mb-0.5">
                       <h4 className="text-xs sm:text-[13px] font-black text-gray-900 truncate">{displayTenant}</h4>
+                      {pendingKeySet.has(`booking:${booking.id}`) && (
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200 shrink-0 inline-flex items-center gap-0.5"
+                          title={language === 'বাংলা' ? 'নেট এলে সার্ভারে চলে যাবে' : 'Goes to the server once you are back online'}
+                        >
+                          <CloudOff size={9} /> {language === 'বাংলা' ? 'অপেক্ষায়' : 'Pending'}
+                        </span>
+                      )}
                       {extraMembers > 0 && (
                         <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-gray-100 text-gray-600 border border-gray-200 shrink-0 tabular-nums" title={language === 'বাংলা' ? 'আরও সদস্য' : 'more members'}>+{extraMembers}</span>
                       )}
@@ -593,7 +614,7 @@ export default function RentTab(props) {
                 <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl lg:rounded-[2rem] p-3.5 lg:p-7 text-white shadow-[0_6px_20px_rgba(0,0,0,0.15)] lg:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-10 translate-x-10"></div>
                   <div className="flex items-center justify-between gap-2 mb-2.5 lg:mb-1 relative z-10">
-                    <h3 className="text-[13px] lg:text-2xl font-black truncate">{language === 'বাংলা' ? 'শেয়ার্ড লেজার' : 'Shared Ledger'}</h3>
+                    <h3 className="text-[13px] lg:text-2xl font-black truncate">{language === 'বাংলা' ? 'যৌথ হিসাব' : 'Shared Ledger'}</h3>
                     {isPremium ? (
                       <div className="bg-[#ba0036] text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md shrink-0">
                          <Crown size={10} /> PRO
@@ -608,6 +629,42 @@ export default function RentTab(props) {
                     {monthFullLabel(sm.key, language)} · {language === 'বাংলা' ? 'এই মাসের আদায়' : "This Month's Collection"}
                   </p>
                   <div className="space-y-2.5 xl:space-y-6 relative z-10">
+                    {/* ── Collected here, not yet at the server ────────────
+                        Rent taken in a stairwell is saved on this phone and
+                        goes out on its own when there is signal. Tapping tries
+                        it now, which is what a landlord reaches for the moment
+                        they see a bar come back. */}
+                    {syncQueue.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={flushSync}
+                        className="w-full flex items-center gap-2 rounded-xl bg-amber-400/15 border border-amber-300/30 px-3 py-2 text-left active:scale-[0.99] transition"
+                      >
+                        <CloudOff size={14} className="text-amber-200 shrink-0" />
+                        <span className="text-[11px] font-black text-amber-100 flex-1">
+                          {isBn
+                            ? `${syncQueue.length}টি হিসাব এখনো সার্ভারে যায়নি — ফোনে সেভ আছে`
+                            : `${syncQueue.length} entr${syncQueue.length === 1 ? 'y' : 'ies'} not sent yet — saved on this phone`}
+                        </span>
+                        <span className="text-[10px] font-black text-amber-200 uppercase tracking-wider shrink-0">
+                          {isBn ? 'আবার চেষ্টা' : 'Retry'}
+                        </span>
+                      </button>
+                    )}
+                    {/* A write the SERVER refused — the seat filled up, the row
+                        was deleted. Retrying for ever would be a lie, so it is
+                        said once, with the reason, and dismissed by the host. */}
+                    {syncError && (
+                      <div className="w-full flex items-start gap-2 rounded-xl bg-fuchsia-500/15 border border-fuchsia-300/30 px-3 py-2">
+                        <AlertCircle size={14} className="text-fuchsia-200 shrink-0 mt-0.5" />
+                        <span className="text-[11px] font-black text-fuchsia-100 flex-1 leading-relaxed">
+                          {syncError.subject ? `${syncError.subject} — ` : ''}{syncError.message}
+                        </span>
+                        <button type="button" onClick={clearSyncError} className="text-fuchsia-200 shrink-0" aria-label={isBn ? 'বন্ধ' : 'Dismiss'}>
+                          <X size={14} />
+                        </button>
+                      </div>
+                    )}
                     {(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) && (
                       <div className="hidden md:block space-y-3 mb-4">
                         {(landlordProfile.buildings || []).map((bldg, idx) => {

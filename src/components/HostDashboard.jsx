@@ -22,7 +22,10 @@ import { getDynamicFields } from '../constants/propertyFields';
 import { subscriptionService } from '../services/subscriptionService';
 import boostService from '../services/boostService';
 import { listHostInquiries, updateInquiryStatus, deleteInquiry, replyToInquiry, respondVisit, proposeVisit } from "../services/inquiryService.js";
-import { createBooking as createBookingApi, listHostBookings, updateLedger as updateLedgerApi, undoLedger as undoLedgerApi, cancelBooking as cancelBookingApi, updateBookingSettings as updateBookingSettingsApi, updateMember as updateMemberApi, updateMemberLedger as updateMemberLedgerApi, undoMemberLedger as undoMemberLedgerApi } from "../services/bookingService.js";
+// Ledger / member / lease writes no longer go straight out from here — they go
+// through the offline queue (hostSync below), which owns delivery. Only the
+// reads and the create call are still made directly.
+import { createBooking as createBookingApi, listHostBookings } from "../services/bookingService.js";
 import { getRoomTypes, firstRoomTypeId, roomLabel } from '../constants/roomCategories';
 import MembersManager from "./MembersManager.jsx";
 import DashboardTab from "./host-dashboard/DashboardTab";
@@ -75,6 +78,30 @@ import { directUpload } from '../services/cloudinaryUpload';
 import AgreementBrandModal from './host-dashboard/AgreementBrandModal.jsx';
 import { submitOnEnter } from '../utils/submitOnEnter';
 import { listBuildings } from '../services/buildingService';
+import useHostSyncStore from '../store/useHostSyncStore';
+import { applyOp } from '../store/hostOps';
+
+// The offline write queue (store/useHostSyncStore.js). Reached through
+// getState() rather than a hook so a write from anywhere in this file doesn't
+// re-render the whole dashboard; the pending COUNT is subscribed to separately,
+// where it is actually displayed.
+//
+// `enqueue` returns the operation and `applyOp` applies it. They are two steps
+// rather than one because React can call a `setState(prev => …)` updater twice
+// for a single event (it does in StrictMode) — queueing inside one recorded the
+// same rent payment twice. Queue once, out here; apply purely, in there.
+const hostSync = {
+  enqueue: (action, args) => useHostSyncStore.getState().enqueue(action, args),
+  replay: (world) => useHostSyncStore.getState().replay(world),
+};
+
+// Queue a write and fold it into the bookings list — the shape every call site
+// below uses.
+const queueBookingOp = (setBookings, action, args) => {
+  const op = hostSync.enqueue(action, args);
+  setBookings((prev) => applyOp({ bookings: prev, units: [] }, op).bookings);
+  return op;
+};
 
 // Every tab the dashboard can render, in sidebar order. This is the single
 // list the Back button and any ?tab= deep link are validated against — an id
@@ -588,8 +615,8 @@ const getLeaseSummary = (bookings, today = new Date()) => {
 // Map a stage back to its label — used in filter pills + status badges.
 const stageLabel = (stage, language) => {
   if (language === 'বাংলা') {
-    if (stage === 'active') return 'চলমান';
-    if (stage === 'done')   return 'সম্পন্ন';
+    if (stage === 'active') return 'থাকছে';
+    if (stage === 'done')   return 'চলে গেছে';
     return 'সকল';
   }
   return { active: 'Active', done: 'Done', all: 'All' }[stage] || stage;
@@ -894,6 +921,15 @@ const HostDashboard = () => {
       window.removeEventListener('close-home-choice-modal', closeHomeModal);
     };
   }, []);
+
+  // Hide the mobile bottom nav when the user is inside the Bookings or Rent
+  // tabs — these are full-screen workspaces with their own back button.
+  useEffect(() => {
+    const shouldHide = activeTab === 'bookings' || activeTab === 'rent';
+    window.dispatchEvent(new Event(shouldHide ? 'hide-bottom-nav' : 'show-bottom-nav'));
+    return () => window.dispatchEvent(new Event('show-bottom-nav'));
+  }, [activeTab]);
+
   const [showHomeChoice, setShowHomeChoice] = useState(false);
   // Persisted, not just component state. This was `useState(false)`, so the X
   // worked until the page reloaded and the card returned — the landlord had
@@ -1489,7 +1525,7 @@ const HostDashboard = () => {
   // Bookings tab — lease-stage pill filter (All / Draft / Active / Notice / Done).
   // Decoupled from rentPriorityFilter so navigating between Bookings and
   // Rent Collection never resets the other tab's filter.
-  const [leaseStageFilter, setLeaseStageFilter] = useState('all');
+  const [leaseStageFilter, setLeaseStageFilter] = useState('active');
 
   // Rent Collection tab — priority filter (All / Overdue / Partial-Upcoming / Cleared).
   // Filters the per-tenant ledger cards on the new Shared Ledger page.
@@ -1878,20 +1914,58 @@ const HostDashboard = () => {
   }, [propertyRefreshTick]);
 
   // ── Hydrate the host's bookings from the backend ────────────────────────
+  // Every snapshot from the server is put through the write queue before it
+  // reaches state. THIS is what stopped rent collected in a dead zone from
+  // disappearing: the poll used to overwrite an unsent payment with the
+  // server's older copy, thirty seconds after the landlord was told it saved.
+  // A failed read changes nothing at all — the cached register stays readable
+  // with no connection, which is most of what a landlord needs on the stairs.
   useEffect(() => {
     let cancelled = false;
     const hydrate = async () => {
       try {
         const rows = await listHostBookings();
         if (cancelled) return;
-        setBookings(rows);
+        setBookings(hostSync.replay({ bookings: rows, units: [] }).bookings);
       } catch (err) {
         console.warn('[host] failed to load bookings:', err.message || err);
+        return;
       }
+      // A successful read proves the network is back — send what is waiting.
+      useHostSyncStore.getState().flush();
     };
     hydrate();
     const interval = setInterval(hydrate, 30_000);
     return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
+  // ── The write queue's window into this screen ───────────────────────────
+  // The queue can run from anywhere — a reconnect, a timer, the app booting on
+  // another tab — so it cannot read React state directly. It gets a live reader
+  // for the current bookings, and a way to hand each server answer back.
+  // Registered once; the ref is what keeps it current.
+  const bookingsRef = useRef(bookings);
+  useEffect(() => { bookingsRef.current = bookings; }, [bookings]);
+  useEffect(() => {
+    useHostSyncStore.getState().configure({
+      getWorld: () => ({ bookings: bookingsRef.current, units: [] }),
+      setWorld: (world) => setBookings(world.bookings),
+      onServer: (result, op) => {
+        // Rooms are owned by the Units screen, which reconciles its own list.
+        if (op.action === 'createUnit' || op.action === 'updateUnitFields') return;
+        const booking = op.action === 'addTenant' ? result?.booking : result;
+        if (!booking || !booking.id) return;
+        setBookings((prev) => {
+          const exists = prev.some((b) => String(b.id) === String(booking.id));
+          const next = exists
+            ? prev.map((b) => (String(b.id) === String(booking.id) ? booking : b))
+            : [...prev, booking];
+          // Whatever is STILL queued goes back on top — the server's copy knows
+          // nothing about the payments behind this one in the queue.
+          return hostSync.replay({ bookings: next, units: [] }).bookings;
+        });
+      },
+    });
   }, []);
 
   // ── Real Building records ───────────────────────────────────────────────
@@ -1932,7 +2006,7 @@ const HostDashboard = () => {
   // freshly scanned tenants sit invisible until a reload.
   const refreshBookings = () => {
     listHostBookings()
-      .then(setBookings)
+      .then((rows) => setBookings(hostSync.replay({ bookings: rows, units: [] }).bookings))
       .catch((err) => console.warn('[host] booking refresh failed:', err.message || err));
   };
 
@@ -2431,7 +2505,9 @@ const HostDashboard = () => {
     setBookings(bookings.filter(b => b.id !== id));
     showToast(language === 'বাংলা' ? 'বুকিং বাদ দেওয়া হয়েছে।' : 'Booking removed.');
     if (/^[0-9a-fA-F]{24}$/.test(String(id))) {
-      cancelBookingApi(id).catch(err => console.warn('[host] booking cancel sync failed:', err.message || err));
+      // Queued: removing a lease with no signal used to look done and come back
+      // on the next poll.
+      hostSync.enqueue('cancelBooking', { bookingId: id });
     }
   };
 
@@ -2763,16 +2839,27 @@ const HostDashboard = () => {
       });
     const balance = entry.balance;
 
-    setBookings(prev => prev.map(b => {
-      if (b.id !== bookingId) return b;
-      if (payMember) {
-        return { ...b, members: (b.members || []).map(m => m.id === memberId ? { ...m, ledger: { ...(m.ledger || {}), [key]: entry } } : m) };
-      }
-      return { ...b, ledger: { ...(b.ledger || {}), [key]: entry } };
-    }));
-
-    // Receipt is created/updated (or cleared for 'due') server-side by the
-    // ledger API call below — no local receipt handling needed.
+    // ── One write, one path ────────────────────────────────────────────────
+    // The queue applies this to the screen AND owns getting it to the server.
+    // It used to be two separate things — a local setState plus a fire-and-
+    // forget API call whose failure went to console.warn — so collecting rent
+    // with no signal showed a receipt toast and then lost the payment on the
+    // next poll. Nothing here waits for the network; nothing here forgets it
+    // either. Receipts are still created server-side when the write lands.
+    queueBookingOp(setBookings, status === 'due' ? 'markDue' : 'payRent',
+      {
+        bookingId: booking._id || bookingId,
+        memberId: payMember ? memberId : null,
+        monthKey: key,
+        // The INCREMENT, never the running total: replayed on top of a fresh
+        // snapshot it has to add to whatever the month holds by then.
+        amount: status === 'due' ? 0 : amt,
+        expected,
+        meta: { paidOn, method, txnId },
+        dueNote: dueNote.trim(),
+        expectedPayBy,
+        monthLabel: monthFullLabel(key, language),
+      });
 
     // ── Toasts (Bn/En) ─────────────────────────────────────────────────────
     const monthLabel = monthFullLabel(key, language);
@@ -2789,24 +2876,6 @@ const HostDashboard = () => {
         ? `${monthLabel} বকেয়া হিসেবে চিহ্নিত করা হয়েছে`
         : `${monthLabel} marked as due`);
     }
-
-    const bookingMongoId = booking._id || bookingId;
-    // `amountReceived` is THIS payment; the server folds it into the month and
-    // derives the total itself, so the two sides cannot disagree about what has
-    // been collected. `amount` still carries the resulting total for any older
-    // client or reader that expects it.
-    const apiBody = {
-      ...entry,
-      amountReceived: status === 'due' ? 0 : amt,
-      monthLabel: monthFullLabel(key, language),
-      totalDue: expected,
-    };
-    (payMember
-      ? updateMemberLedgerApi(bookingMongoId, memberId, key, apiBody)
-      : updateLedgerApi(bookingMongoId, key, apiBody)
-    ).catch(err => {
-      console.warn('[host] mark paid sync failed:', err.message || err);
-    });
 
     setActiveModal(null);
   };
@@ -2859,43 +2928,31 @@ const HostDashboard = () => {
       return;
     }
 
-    setBookings(prev => prev.map(b => {
-      if (b.id !== bookingId) return b;
-      const next = { ...b };
-      const seatTargets = targets.filter(t => t.memberId);
-      if (seatTargets.length > 0) {
-        next.members = (b.members || []).map(m => {
-          const t = seatTargets.find(x => x.memberId === m.id);
-          return t ? { ...m, ledger: { ...(m.ledger || {}), [key]: t.entry } } : m;
-        });
-      }
-      // A room with no members is itself the tenancy — its ledger is the room's.
-      const roomTarget = targets.find(t => !t.memberId);
-      if (roomTarget) next.ledger = { ...(b.ledger || {}), [key]: roomTarget.entry };
-      return next;
-    }));
-
     const total = targets.reduce((n, t) => n + t.remaining, 0);
     const monthLabel = monthFullLabel(key, language);
+    const bookingMongoId = booking._id || bookingId;
+
+    // One queued payment per seat, exactly as a seat-by-seat collection would
+    // produce. Settling a room is a shortcut through the same door, so it
+    // survives a dead zone the same way — and each seat's money is folded into
+    // its own month by the same helper on both sides of the wire.
+    const roomOps = targets.map((t) => hostSync.enqueue('payRent', {
+      bookingId: bookingMongoId,
+      memberId: t.memberId,
+      monthKey: key,
+      amount: t.remaining,
+      expected: t.expected,
+      meta: { paidOn, method, txnId: '' },
+      monthLabel,
+    }));
+    setBookings(prev => roomOps.reduce(
+      (world, op) => applyOp(world, op),
+      { bookings: prev, units: [] },
+    ).bookings);
+
     showToast(language === 'বাংলা'
       ? `${monthLabel} — পুরো রুম ক্লিয়ার · ${formatBDT(total)} · ${targets.length} জন`
       : `${monthLabel} — whole room cleared · ${formatBDT(total)} from ${targets.length} tenant${targets.length > 1 ? 's' : ''}`);
-
-    const bookingMongoId = booking._id || bookingId;
-    targets.forEach((t) => {
-      const apiBody = {
-        ...t.entry,
-        amountReceived: t.remaining,
-        monthLabel,
-        totalDue: t.expected,
-      };
-      (t.memberId
-        ? updateMemberLedgerApi(bookingMongoId, t.memberId, key, apiBody)
-        : updateLedgerApi(bookingMongoId, key, apiBody)
-      ).catch(err => {
-        console.warn('[host] room mark paid sync failed:', err.message || err);
-      });
-    });
   };
 
   // Reverse a payment record — used when a payment was logged by mistake.
@@ -2906,30 +2963,15 @@ const HostDashboard = () => {
     const booking = bookings.find(b => b.id === bookingId);
     const activeMems = Array.isArray(booking?.members) ? booking.members.filter(m => m && m.status !== 'moved-out') : [];
     const undoMember = memberId ? activeMems.find(m => m.id === memberId) : null;
-    setBookings(prev => prev.map(b => {
-      if (b.id !== bookingId) return b;
-      if (undoMember) {
-        return { ...b, members: (b.members || []).map(m => {
-          if (m.id !== memberId) return m;
-          const nx = { ...(m.ledger || {}) };
-          delete nx[key];
-          return { ...m, ledger: nx };
-        }) };
-      }
-      const next = { ...(b.ledger || {}) };
-      delete next[key];
-      return { ...b, ledger: next };
-    }));
-    // The receipt is removed server-side by the undo API call below.
+    if (!booking) return;
+    queueBookingOp(setBookings, 'undoRent', {
+      bookingId: booking._id || bookingId,
+      memberId: undoMember ? memberId : null,
+      monthKey: key,
+    });
+    // The receipt is withdrawn server-side when the undo lands.
     showToast(language === 'বাংলা' ? 'পেমেন্ট রেকর্ড মুছে ফেলা হয়েছে — রিসিটও সরানো হয়েছে' : 'Payment record removed — receipt withdrawn');
     setActiveModal(null);
-
-    if (booking) {
-      const mongoId = booking._id || bookingId;
-      (undoMember ? undoMemberLedgerApi(mongoId, memberId, key) : undoLedgerApi(mongoId, key)).catch(err => {
-        console.warn('[host] undo ledger sync failed:', err.message || err);
-      });
-    }
   };
 
   // Send a manual rent reminder. The server cron handles the auto-reminders;
@@ -2968,8 +3010,7 @@ const HostDashboard = () => {
       return { ...b, autoReminder: nextVal };
     }));
     if (nextVal !== null && /^[0-9a-fA-F]{24}$/.test(String(bookingId))) {
-      updateBookingSettingsApi(bookingId, { autoReminder: nextVal })
-        .catch(err => console.warn('[host] autoReminder sync failed:', err.message || err));
+      hostSync.enqueue('updateBookingFields', { bookingId, patch: { autoReminder: nextVal } });
     }
     if (nextVal !== null) {
       showToast(nextVal
@@ -4171,15 +4212,18 @@ const HostDashboard = () => {
     setLeaseErrors([]);
     showToast(language === 'বাংলা' ? 'লিজ আপডেট হয়েছে ✓' : 'Lease updated ✓');
 
+    // Queued rather than fired and forgotten. A rent rate changed in a cellar
+    // with no bars is the landlord's decision either way; the queue carries it
+    // out when there is signal instead of losing it on the next poll.
     const mongoId = booking._id || bookingId;
     if (/^[0-9a-fA-F]{24}$/.test(String(mongoId))) {
-      updateBookingSettingsApi(mongoId, patch).catch(err => {
-        console.warn('[host] lease update sync failed:', err.message || err);
-        showToast(language === 'বাংলা' ? 'সার্ভারে সেভ হয়নি — আবার চেষ্টা করুন' : 'Could not save to the server — please try again');
-      });
+      hostSync.enqueue('updateBookingFields', { bookingId: mongoId, patch });
       if (renamePrimary && primaryMem.id) {
-        updateMemberApi(mongoId, primaryMem.id, { name: patch.tenant, phone: patch.tenantPhone })
-          .catch(err => console.warn('[host] member rename sync failed:', err.message || err));
+        hostSync.enqueue('updateMemberFields', {
+          bookingId: mongoId,
+          memberId: primaryMem.id,
+          patch: { name: patch.tenant, phone: patch.tenantPhone },
+        });
       }
     }
   };
@@ -4207,8 +4251,10 @@ const HostDashboard = () => {
         : b
     )));
     if (/^[0-9a-fA-F]{24}$/.test(String(bookingId))) {
-      updateBookingSettingsApi(bookingId, { status: 'completed', ...(effEnd ? { leaseEnd: effEnd } : {}) })
-        .catch(err => console.warn('[host] lease close-out sync failed:', err.message || err));
+      hostSync.enqueue('updateBookingFields', {
+        bookingId,
+        patch: { status: 'completed', ...(effEnd ? { leaseEnd: effEnd } : {}) },
+      });
     }
   };
 
@@ -5935,6 +5981,15 @@ const HostDashboard = () => {
             segmented switch pinned on top. */}
         {(activeTab === 'bookings' || activeTab === 'rent') && (
           <div className="w-full mb-3 md:mb-5 animate-in fade-in duration-300">
+            {/* Mobile back button — replaces bottom nav which is hidden on these tabs */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('dashboard')}
+              className="lg:hidden flex items-center gap-1.5 mb-3 px-1 py-1 text-xs font-black text-gray-500 hover:text-gray-900 transition-colors"
+            >
+              <ArrowLeft size={16} />
+              <span>{language === 'বাংলা' ? 'ড্যাশবোর্ডে ফিরুন' : 'Back to Dashboard'}</span>
+            </button>
             {/* Slim on mobile: this switch used to eat ~74px above the fold on a
                 phone. Tighter padding + a smaller label keeps a comfortable tap
                 target while handing those pixels back to the list below.

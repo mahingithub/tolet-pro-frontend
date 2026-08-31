@@ -6,9 +6,10 @@ import {
 
 import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
+import { pendingKeys } from '../../store/livingOps';
 import { messSummary, messWeeklyBreakdown, inDateRange, monthLabel, taka, takaSigned, num, dateLabel, roommateById } from './livingUtils';
 import {
-  Card, SectionHeader, IconBadge, Avatar, Stepper, PrimaryButton, Field, MoneyInput, TextInput,
+  Card, SectionHeader, IconBadge, Avatar, PendingChip, PendingDot, Stepper, PrimaryButton, Field, MoneyInput, TextInput,
   SegmentedControl, EmptyState, Sheet, ConfirmDialog, cx,
 } from './livingUI';
 
@@ -253,6 +254,8 @@ const MiniStat = ({ icon: Icon, label, value, valueClass = 'text-gray-900', sub 
 
 const MealManagement = ({ me, language, intent, clearIntent }) => {
   const isBn = language === 'বাংলা';
+  const outbox = useLivingStore((s) => s.outbox);
+  const pending = useMemo(() => pendingKeys(outbox), [outbox]);
   const roommates = useLivingStore((s) => s.roommates);
   const meals = useLivingStore((s) => s.meals);
   const groceries = useLivingStore((s) => s.groceries);
@@ -611,7 +614,10 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                       </p>
                     )}
                   </div>
-                  <span className="text-[11px] font-black text-gray-400 mt-1">{num(total, language)} {isBn ? 'মিল' : 'meals'}</span>
+                  <span className="flex items-center gap-1.5 text-[11px] font-black text-gray-400 mt-1">
+                    {pending.has(`meal:${iso.slice(0, 10)}:${r.id}`) && <PendingDot isBn={isBn} />}
+                    {num(total, language)} {isBn ? 'মিল' : 'meals'}
+                  </span>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {MEALS.map((meal) => {
@@ -659,6 +665,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                       </p>
                     )}
                   </div>
+                  {pending.has(d.id) && <PendingChip isBn={isBn} className="shrink-0" />}
                   <span className="text-[13px] font-black text-emerald-600 shrink-0">+{taka(d.amount, language)}</span>
                   <button onClick={() => setPendingDelete({ kind: 'deposit', id: d.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
                     <Trash2 size={14} />
@@ -718,6 +725,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                     <p className="text-[12.5px] font-bold text-gray-800 truncate">{g.note || (isBn ? 'বাজার' : 'Bazar')}</p>
                     <p className="text-[11px] font-medium text-gray-400 truncate">{payer.isMe ? (isBn ? 'আপনি' : 'You') : payer.name} · {dateLabel(g.date, language)}</p>
                   </div>
+                  {pending.has(g.id) && <PendingChip isBn={isBn} className="shrink-0" />}
                   <span className="text-[13px] font-black text-gray-900 shrink-0">{taka(g.amount, language)}</span>
                   <button onClick={() => setPendingDelete({ kind: 'grocery', id: g.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
                     <Trash2 size={14} />
@@ -814,6 +822,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                       </p>
                     )}
                   </div>
+                  {pending.has(d.id) && <PendingChip isBn={isBn} className="shrink-0" />}
                   <span className="text-[13px] font-black text-emerald-600 shrink-0">+{taka(d.amount, language)}</span>
                   <button onClick={() => setPendingDelete({ kind: 'deposit', id: d.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
                     <Trash2 size={14} />
@@ -873,6 +882,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                     <p className="text-[12.5px] font-bold text-gray-800 truncate">{g.note || (isBn ? 'বাজার' : 'Bazar')}</p>
                     <p className="text-[11px] font-medium text-gray-400 truncate">{payer.isMe ? (isBn ? 'আপনি' : 'You') : payer.name} · {dateLabel(g.date, language)}</p>
                   </div>
+                  {pending.has(g.id) && <PendingChip isBn={isBn} className="shrink-0" />}
                   <span className="text-[13px] font-black text-gray-900 shrink-0">{taka(g.amount, language)}</span>
                   <button onClick={() => setPendingDelete({ kind: 'grocery', id: g.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
                     <Trash2 size={14} />
@@ -924,6 +934,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                       </p>
                     )}
                   </div>
+                  {pending.has(d.id) && <PendingChip isBn={isBn} className="shrink-0" />}
                   <span className="text-[13px] font-black text-emerald-600 shrink-0">+{taka(d.amount, language)}</span>
                   <button onClick={() => setPendingDelete({ kind: 'deposit', id: d.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
                     <Trash2 size={14} />
@@ -983,6 +994,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                     <p className="text-[12.5px] font-bold text-gray-800 truncate">{g.note || (isBn ? 'বাজার' : 'Bazar')}</p>
                     <p className="text-[11px] font-medium text-gray-400 truncate">{payer.isMe ? (isBn ? 'আপনি' : 'You') : payer.name} · {dateLabel(g.date, language)}</p>
                   </div>
+                  {pending.has(g.id) && <PendingChip isBn={isBn} className="shrink-0" />}
                   <span className="text-[13px] font-black text-gray-900 shrink-0">{taka(g.amount, language)}</span>
                   <button onClick={() => setPendingDelete({ kind: 'grocery', id: g.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
                     <Trash2 size={14} />
@@ -1040,7 +1052,10 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                       </p>
                     )}
                   </div>
-                  <span className="text-[11px] font-black text-gray-400 mt-1">{num(total, language)} {isBn ? 'মিল' : 'meals'}</span>
+                  <span className="flex items-center gap-1.5 text-[11px] font-black text-gray-400 mt-1">
+                    {pending.has(`meal:${iso.slice(0, 10)}:${r.id}`) && <PendingDot isBn={isBn} />}
+                    {num(total, language)} {isBn ? 'মিল' : 'meals'}
+                  </span>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {MEALS.map((meal) => {
@@ -1106,7 +1121,10 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                       </p>
                     )}
                   </div>
-                  <span className="text-[11px] font-black text-gray-400 mt-1">{num(total, language)} {isBn ? 'মিল' : 'meals'}</span>
+                  <span className="flex items-center gap-1.5 text-[11px] font-black text-gray-400 mt-1">
+                    {pending.has(`meal:${iso.slice(0, 10)}:${r.id}`) && <PendingDot isBn={isBn} />}
+                    {num(total, language)} {isBn ? 'মিল' : 'meals'}
+                  </span>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {MEALS.map((meal) => {

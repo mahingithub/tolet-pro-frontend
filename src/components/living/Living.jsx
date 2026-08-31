@@ -2,13 +2,14 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useGoBack from '../../hooks/useGoBack';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
-import { ArrowLeft, Wallet, BellRing } from 'lucide-react';
+import { toast } from 'sonner';
+import { ArrowLeft, Wallet, BellRing, CloudOff } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext.jsx';
 import useLivingStore from '../../store/useLivingStore';
 import callProvider from '../../services/callProvider';
-import { buildReminders, initials } from './livingUtils';
+import { buildReminders, initials, num } from './livingUtils';
 import { MODULES } from './livingConfig';
 import { cx } from './livingUI';
 
@@ -21,6 +22,13 @@ import RoommateBalances from './RoommateBalances';
 import MonthlyReport from './MonthlyReport';
 import ActivityTimeline from './ActivityTimeline';
 import SmartReminder from './SmartReminder';
+
+import { SOLO_MODULES } from './soloConfig';
+import { ModeChooser, ModeSwitcher } from './LivingMode';
+import SoloOverview from './SoloOverview';
+import { SoloIncome, SoloSpending } from './SoloLedger';
+import SoloPeople from './SoloPeople';
+import SoloReport from './SoloReport';
 
 export const ME = 'me';
 
@@ -35,7 +43,15 @@ const MODULE_COMPONENTS = {
   reminders: SmartReminder,
 };
 
-const VALID = MODULES.map((m) => m.id);
+// The solo wallet is its own set of modules over its own store slice — same
+// shell, same navigation, entirely separate data.
+const SOLO_MODULE_COMPONENTS = {
+  overview: SoloOverview,
+  spending: SoloSpending,
+  income: SoloIncome,
+  people: SoloPeople,
+  report: SoloReport,
+};
 
 // Only the 5 daily-use modules live in the tab bar to keep it calm. Report,
 // Activity and Reminders are reached from the Overview cards + the header bell
@@ -61,8 +77,20 @@ const Living = () => {
   const connected = useLivingStore((s) => s.connected);
   const myId = useLivingStore((s) => s.myId);
   const hydrateHousehold = useLivingStore((s) => s.hydrateHousehold);
+  // 'solo' = my own খাতা, 'joint' = the shared roommate wallet, null = not asked yet.
+  const mode = useLivingStore((s) => s.mode);
+  const setLivingMode = useLivingStore((s) => s.setLivingMode);
+  // Writes made on this phone that the server hasn't confirmed yet.
+  const outbox = useLivingStore((s) => s.outbox);
+  const flushOutbox = useLivingStore((s) => s.flushOutbox);
   // Whole-state snapshot for reminder badge (recomputes on any store change).
   const state = useLivingStore();
+
+  const isSolo = mode === 'solo';
+  const modules = isSolo ? SOLO_MODULES : MODULES;
+  const navModules = isSolo ? SOLO_MODULES : NAV_MODULES;
+  const components = isSolo ? SOLO_MODULE_COMPONENTS : MODULE_COMPONENTS;
+  const validIds = useMemo(() => modules.map((m) => m.id), [modules]);
 
   // Identity used across every module: my member id when connected to a shared
   // household, else the local planner's 'me'.
@@ -100,12 +128,14 @@ const Living = () => {
     };
   }, [connected, hydrateHousehold]);
 
+  // A deep link written for the other wallet (…/living?m=meals while solo is on)
+  // simply lands on that wallet's Overview rather than a blank screen.
   const initialModule = useMemo(() => {
     const fromState = location.state?.module;
     const fromQuery = new URLSearchParams(location.search).get('m');
     const candidate = fromState || fromQuery;
-    return VALID.includes(candidate) ? candidate : 'overview';
-  }, [location.state, location.search]);
+    return validIds.includes(candidate) ? candidate : 'overview';
+  }, [location.state, location.search, validIds]);
 
   const [module, setModule] = useState(initialModule);
   // Cross-module "quick action" intent (e.g. Overview → open Add Expense).
@@ -120,7 +150,7 @@ const Living = () => {
 
   const go = useCallback(
     (id, nextIntent = null) => {
-      if (!VALID.includes(id)) return;
+      if (!validIds.includes(id)) return;
       setModule(id);
       setIntent(nextIntent);
       // keep the URL shareable without adding history spam
@@ -129,20 +159,48 @@ const Living = () => {
       navigate({ pathname: '/living', search: `?${params.toString()}` }, { replace: true });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
-    [location.search, navigate]
+    [location.search, navigate, validIds]
   );
 
   useEffect(() => {
     const handleTourTab = (e) => {
-      if (VALID.includes(e.detail)) {
+      if (validIds.includes(e.detail)) {
         go(e.detail);
       }
     };
     window.addEventListener('tour:tab', handleTourTab);
     return () => window.removeEventListener('tour:tab', handleTourTab);
-  }, [go]);
+  }, [go, validIds]);
 
-  const reminders = useMemo(() => buildReminders(state, ME), [state]);
+  // Picking (or switching) a wallet always lands on that wallet's Overview —
+  // the module ids differ between the two, so staying put isn't an option.
+  const switchMode = useCallback(
+    (next) => {
+      setLivingMode(next);
+      setModule('overview');
+      setIntent(null);
+      const params = new URLSearchParams(location.search);
+      params.set('m', 'overview');
+      navigate({ pathname: '/living', search: `?${params.toString()}` }, { replace: true });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    [location.search, navigate, setLivingMode]
+  );
+
+  // Manual "send it now". The queue retries on its own (on reconnect, on every
+  // poll, after each write), but when someone is standing still watching the
+  // signal bars come back, waiting for a timer feels broken.
+  const retrySync = useCallback(async () => {
+    const before = useLivingStore.getState().outbox.length;
+    await flushOutbox();
+    const after = useLivingStore.getState().outbox.length;
+    if (after === 0) toast.success(isBn ? 'সব সিঙ্ক হয়ে গেছে' : 'Everything is synced');
+    else if (after >= before) toast.error(isBn ? 'এখনো নেট পাওয়া যাচ্ছে না' : 'Still no connection');
+  }, [flushOutbox, isBn]);
+
+  // Reminders are derived from the shared household (bills, dues, budgets), so
+  // they only mean something on the joint side.
+  const reminders = useMemo(() => (isSolo || !mode ? [] : buildReminders(state, ME)), [state, isSolo, mode]);
   const back = useGoBack('/tenant-dashboard');
 
   const [isNavVisible, setIsNavVisible] = useState(true);
@@ -161,7 +219,7 @@ const Living = () => {
     }
   });
 
-  const ActiveModule = MODULE_COMPONENTS[module] || WalletSummary;
+  const ActiveModule = components[module] || components.overview;
 
   return (
     <div className="flex flex-col min-h-screen bg-[#eaeff5] font-sans relative text-gray-900 selection:bg-[#ba0036] selection:text-white">
@@ -197,29 +255,53 @@ const Living = () => {
               </div>
               <div className="min-w-0">
                 <h1 className="font-black text-base md:text-lg tracking-tight leading-none truncate">
-                  {isBn ? 'রুমমেট ওয়ালেট' : 'Roommate Wallet'}
+                  {!mode
+                    ? isBn ? 'লিভিং' : 'Living'
+                    : isSolo
+                    ? isBn ? 'আমার হিসাব' : 'My Wallet'
+                    : isBn ? 'রুমমেট ওয়ালেট' : 'Roommate Wallet'}
                 </h1>
                 <p className="text-[10px] font-bold text-[#ba0036] uppercase tracking-widest mt-1">
-                  {isBn ? 'লিভিং' : 'Living'}
+                  {!mode ? (isBn ? 'হিসাবের খাতা' : 'Your ledger') : isBn ? 'লিভিং' : 'Living'}
                 </p>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              data-tour="living-reminders"
-              onClick={() => go('reminders')}
-              className="relative p-2.5 bg-white/70 rounded-xl border border-white/80 shadow-sm text-gray-500 hover:text-[#ba0036] hover:bg-white active:scale-90 transition"
-              aria-label={isBn ? 'রিমাইন্ডার' : 'Reminders'}
-            >
-              <BellRing size={18} />
-              {reminders.length > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-[#ba0036] text-white text-[10px] font-black border-2 border-white">
-                  {reminders.length}
+            {/* Written here, not yet at the server. Tapping tries again now
+                rather than waiting for the next poll — the thing a user reaches
+                for the moment they see a bar of signal come back. */}
+            {!isSolo && outbox.length > 0 && (
+              <button
+                onClick={retrySync}
+                className="flex items-center gap-1.5 pl-2 pr-2.5 py-2 bg-amber-50 rounded-xl border border-amber-200 text-amber-700 active:scale-95 transition"
+                aria-label={isBn ? 'এখনো সিঙ্ক হয়নি — আবার চেষ্টা করুন' : 'Not synced yet — try again'}
+              >
+                <CloudOff size={15} />
+                <span className="text-[11px] font-black whitespace-nowrap">
+                  {isBn ? `${num(outbox.length, language)}টি অপেক্ষায়` : `${outbox.length} pending`}
                 </span>
-              )}
-            </button>
+              </button>
+            )}
+
+            {mode && <ModeSwitcher mode={mode} isBn={isBn} onSwitch={switchMode} />}
+
+            {!isSolo && mode && (
+              <button
+                data-tour="living-reminders"
+                onClick={() => go('reminders')}
+                className="relative p-2.5 bg-white/70 rounded-xl border border-white/80 shadow-sm text-gray-500 hover:text-[#ba0036] hover:bg-white active:scale-90 transition"
+                aria-label={isBn ? 'রিমাইন্ডার' : 'Reminders'}
+              >
+                <BellRing size={18} />
+                {reminders.length > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-[#ba0036] text-white text-[10px] font-black border-2 border-white">
+                    {reminders.length}
+                  </span>
+                )}
+              </button>
+            )}
 
             <button
               data-tour="living-profile"
@@ -243,7 +325,15 @@ const Living = () => {
         </div>
       </header>
 
+      {/* ── The fork: which wallet is this? Asked once, then remembered. ── */}
+      {!mode && (
+        <div className="w-full max-w-[1400px] xl:max-w-[1600px] mx-auto px-4 relative z-10 mt-3 pb-24 lg:pb-12">
+          <ModeChooser isBn={isBn} onPick={switchMode} />
+        </div>
+      )}
+
       {/* ── Body: desktop nav + content + featured rail · mobile pills + content ── */}
+      {mode && (
       <div className="w-full max-w-[1400px] xl:max-w-[1600px] mx-auto px-4 relative z-10 mt-3 lg:flex lg:gap-6 lg:items-start">
         {/* MOBILE: sticky segmented tab bar (5 primary modules) */}
         <div className={cx(
@@ -251,7 +341,7 @@ const Living = () => {
           isNavVisible ? "top-[56px] md:top-[64px]" : "top-0"
         )}>
           <div data-tour="living-mobile-nav" className="flex items-center gap-1 p-1 rounded-2xl bg-white/70 border border-white/80 shadow-[0_6px_20px_-14px_rgba(15,23,42,0.3)]">
-            {NAV_MODULES.map((m) => {
+            {navModules.map((m) => {
               const Icon = m.icon;
               const active = module === m.id;
               return (
@@ -278,7 +368,7 @@ const Living = () => {
           {/* Solid bg (no backdrop-blur): this rail is sticky, so blurring its
               backdrop every scroll frame was a desktop-jank source. */}
           <nav data-tour="living-desktop-nav" className="bg-[#1a1f2e] border border-[#2d3748] rounded-3xl p-2 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.5)] space-y-1 flex-1 overflow-y-auto scrollbar-hide">
-            {MODULES.map((m) => {
+            {modules.map((m) => {
               const Icon = m.icon;
               const active = module === m.id;
               const badge = m.id === 'reminders' ? reminders.length : 0;
@@ -326,13 +416,15 @@ const Living = () => {
         {/* DESKTOP (xl+): sticky "Featured" wallet snapshot — stays pinned while
             the module content scrolls. Hidden on Overview (which IS the summary,
             so a rail there just duplicates it); shown on the focused modules
-            where a persistent wallet snapshot genuinely helps. */}
-        {module !== 'overview' && module !== 'meals' && (
+            where a persistent wallet snapshot genuinely helps. Joint only — it
+            summarises roommate balances, which the solo wallet has none of. */}
+        {!isSolo && module !== 'overview' && module !== 'meals' && (
           <aside className="hidden xl:block w-72 shrink-0 xl:sticky xl:top-[80px] max-h-[calc(100vh-100px)] overflow-y-auto scrollbar-hide pb-12">
             <FeaturedRail go={go} me={me} language={language} />
           </aside>
         )}
       </div>
+      )}
     </div>
   );
 };

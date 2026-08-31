@@ -4,9 +4,10 @@ import { Plus, Receipt, Trash2, Pencil, Camera, X, Check } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
 import { expenseShares, taka, num, dateLabel, isSameMonth, roommateById } from './livingUtils';
+import { pendingKeys } from '../../store/livingOps';
 import { CATEGORIES, CATEGORY_ORDER, EXPENSE_CATEGORY_ORDER, getCategory, SPLIT_TYPES } from './livingConfig';
 import {
-  Card, SectionHeader, IconBadge, Avatar, AvatarStack, Chip, PrimaryButton, GhostButton,
+  Card, SectionHeader, IconBadge, Avatar, AvatarStack, Chip, PendingChip, PrimaryButton, GhostButton,
   Field, MoneyInput, TextArea, SegmentedControl, EmptyState, Sheet, ConfirmDialog, cx,
 } from './livingUI';
 
@@ -316,6 +317,8 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
   const addExpense = useLivingStore((s) => s.addExpense);
   const updateExpense = useLivingStore((s) => s.updateExpense);
   const deleteExpense = useLivingStore((s) => s.deleteExpense);
+  const outbox = useLivingStore((s) => s.outbox);
+  const pending = useMemo(() => pendingKeys(outbox), [outbox]);
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -439,6 +442,7 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
                   <div className="flex items-center gap-2 flex-wrap">
                     <AvatarStack roommates={roommates} ids={e.splitWith} size={24} />
                     <Chip tint="bg-gray-100" text="text-gray-500">{SPLIT_TYPES[e.splitType]?.[isBn ? 'bn' : 'en'] || e.splitType}</Chip>
+                    {pending.has(e.id) && <PendingChip isBn={isBn} />}
                     {e.receipt && (
                       <span className="inline-flex items-center gap-1 text-[10px] font-black text-gray-400">
                         <Camera size={12} /> {isBn ? 'রসিদ' : 'Receipt'}

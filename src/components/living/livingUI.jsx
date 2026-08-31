@@ -8,10 +8,31 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Minus, Plus, AlertTriangle } from 'lucide-react';
+import { X, Minus, Plus, AlertTriangle, CloudOff } from 'lucide-react';
 import { initials } from './livingUtils';
 
 export const cx = (...c) => c.filter(Boolean).join(' ');
+
+// ── "not sent yet" marker ────────────────────────────────────────────────────
+// Written on this phone, still waiting for the network. The row is real and the
+// numbers already count it — this only says the roommates can't see it yet.
+export const PendingChip = ({ isBn, className = '' }) => (
+  <span
+    className={cx('inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-black', className)}
+    title={isBn ? 'নেট এলে সবার কাছে চলে যাবে' : 'Goes to everyone once you are back online'}
+  >
+    <CloudOff size={11} strokeWidth={2.4} />
+    {isBn ? 'অপেক্ষায়' : 'Pending'}
+  </span>
+);
+
+// The same idea where there is no room for a chip (a meal cell).
+export const PendingDot = ({ isBn, className = '' }) => (
+  <span
+    className={cx('block w-1.5 h-1.5 rounded-full bg-amber-500', className)}
+    title={isBn ? 'এখনো সিঙ্ক হয়নি' : 'Not synced yet'}
+  />
+);
 
 // ── Card ─────────────────────────────────────────────────────────────────────
 export const Card = ({ className = '', children, as: Tag = 'div', ...rest }) => (

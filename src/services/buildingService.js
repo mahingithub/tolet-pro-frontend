@@ -15,21 +15,38 @@ const BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000')
   .replace(/\/+$/, '')
   .replace(/\/api$/, '');
 
-async function request(path, options = {}) {
+/**
+ * `opId` is the offline queue's idempotency key (see store/hostOps.js). Sent as
+ * a header so it works for DELETE too. The server applies each id once, so a
+ * room or a tenant placement replayed after a dead zone lands exactly once.
+ */
+async function request(path, options = {}, opId) {
   const token = getCurrentToken();
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
-    },
-  });
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(opId ? { 'X-Op-Id': opId } : {}),
+        ...(options.headers || {}),
+      },
+    });
+  } catch (cause) {
+    // No answer at all — the queue retries this later. A status code below
+    // means the server DID answer, and a refusal must not be retried forever.
+    const err = new Error('নেটওয়ার্কে পৌঁছানো যায়নি।');
+    err.offline = true;
+    err.cause = cause;
+    throw err;
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     const err = new Error(body.message || `HTTP ${res.status}`);
     err.status = res.status;
     err.code = body.code;
+    err.retryable = res.status >= 500 || res.status === 429;
     throw err;
   }
   return res.json();
@@ -83,11 +100,11 @@ export async function listUnits(buildingId) {
 }
 
 /** Create a room. No tenant needed — a room exists before anyone lives in it. */
-export async function createUnit(buildingId, data) {
+export async function createUnit(buildingId, data, opId) {
   const { unit } = await request(`/api/buildings/${buildingId}/units`, {
     method: 'POST',
     body: JSON.stringify(data),
-  });
+  }, opId);
   return unit;
 }
 
@@ -104,11 +121,11 @@ export async function createUnitsBulk(buildingId, data) {
   });
 }
 
-export async function updateUnit(unitId, data) {
+export async function updateUnit(unitId, data, opId) {
   const { unit } = await request(`/api/units/${unitId}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
-  });
+  }, opId);
   return unit;
 }
 
@@ -129,11 +146,11 @@ export async function archiveUnit(unitId) {
  * @param {string} unitId
  * @param {{name, phone, moveInDate, tenantProfile, monthlyRent?}} data
  */
-export async function addTenantToUnit(unitId, data) {
+export async function addTenantToUnit(unitId, data, opId) {
   return request(`/api/units/${unitId}/tenants`, {
     method: 'POST',
     body: JSON.stringify(data),
-  });
+  }, opId);
 }
 
 /**

@@ -8,18 +8,33 @@
 const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
 const getToken = () => window.localStorage.getItem('auth:token');
 
-const headers = () => ({
+const headers = (opId) => ({
   'Content-Type': 'application/json',
   ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+  // Idempotency key for the offline write queue. Sent as a HEADER (not in the
+  // body) so it works for DELETE too and can never be mistaken for a field of
+  // the entity being written. The server applies each id exactly once.
+  ...(opId ? { 'X-Op-Id': opId } : {}),
 });
 
-async function req(path, { method = 'GET', body, signal } = {}) {
-  const res = await fetch(`${API}/living${path}`, {
-    method,
-    headers: headers(),
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-    ...(signal ? { signal } : {}),
-  });
+async function req(path, { method = 'GET', body, signal, opId } = {}) {
+  let res;
+  try {
+    res = await fetch(`${API}/living${path}`, {
+      method,
+      headers: headers(opId),
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      ...(signal ? { signal } : {}),
+    });
+  } catch (cause) {
+    // fetch only rejects when the request never got an answer — no network, DNS
+    // failure, the server unreachable. The queue treats this as "try again
+    // later"; a 4xx/5xx below means the server DID answer and is a real refusal.
+    const err = new Error('নেটওয়ার্কে পৌঁছানো যায়নি।');
+    err.offline = true;
+    err.cause = cause;
+    throw err;
+  }
   let data = {};
   try {
     data = await res.json();
@@ -30,11 +45,15 @@ async function req(path, { method = 'GET', body, signal } = {}) {
     const err = new Error(data.message || 'অনুরোধ ব্যর্থ হয়েছে।');
     err.status = res.status;
     err.code = data.code;
+    // 5xx / 429 are the server having a bad moment, not a refusal of the write.
+    err.retryable = res.status >= 500 || res.status === 429;
     throw err;
   }
   return data;
 }
 
+// Every mutation takes a trailing `opId` — the queue's idempotency key. Calls
+// made outside the queue (household create/join/leave) simply pass nothing.
 export const livingService = {
   // household
   getHousehold: (signal) => req('/household', { signal }),
@@ -42,34 +61,34 @@ export const livingService = {
   joinHousehold: (code) => req('/household/join', { method: 'POST', body: { code } }),
   leaveHousehold: (password) => req('/household/leave', { method: 'POST', body: { password } }),
   regenerateCode: () => req('/household/regenerate-code', { method: 'POST' }),
-  updateConfig: (patch) => req('/household', { method: 'PATCH', body: patch }),
+  updateConfig: (patch, opId) => req('/household', { method: 'PATCH', body: patch, opId }),
 
   // members
   addMember: (name, color) => req('/members', { method: 'POST', body: { name, color } }),
   removeMember: (id) => req(`/members/${id}`, { method: 'DELETE' }),
 
   // expenses
-  addExpense: (e) => req('/expenses', { method: 'POST', body: e }),
-  updateExpense: (id, patch) => req(`/expenses/${id}`, { method: 'PATCH', body: patch }),
-  deleteExpense: (id) => req(`/expenses/${id}`, { method: 'DELETE' }),
+  addExpense: (e, opId) => req('/expenses', { method: 'POST', body: e, opId }),
+  updateExpense: (id, patch, opId) => req(`/expenses/${id}`, { method: 'PATCH', body: patch, opId }),
+  deleteExpense: (id, opId) => req(`/expenses/${id}`, { method: 'DELETE', opId }),
 
   // bills
-  addBill: (b) => req('/bills', { method: 'POST', body: b }),
-  updateBill: (id, patch) => req(`/bills/${id}`, { method: 'PATCH', body: patch }),
-  deleteBill: (id) => req(`/bills/${id}`, { method: 'DELETE' }),
+  addBill: (b, opId) => req('/bills', { method: 'POST', body: b, opId }),
+  updateBill: (id, patch, opId) => req(`/bills/${id}`, { method: 'PATCH', body: patch, opId }),
+  deleteBill: (id, opId) => req(`/bills/${id}`, { method: 'DELETE', opId }),
 
   // meals + groceries
-  setMeal: (p) => req('/meals', { method: 'PUT', body: p }),
-  addGrocery: (g) => req('/groceries', { method: 'POST', body: g }),
-  deleteGrocery: (id) => req(`/groceries/${id}`, { method: 'DELETE' }),
+  setMeal: (p, opId) => req('/meals', { method: 'PUT', body: p, opId }),
+  addGrocery: (g, opId) => req('/groceries', { method: 'POST', body: g, opId }),
+  deleteGrocery: (id, opId) => req(`/groceries/${id}`, { method: 'DELETE', opId }),
 
   // settlements
-  addSettlement: (s) => req('/settlements', { method: 'POST', body: s }),
-  deleteSettlement: (id) => req(`/settlements/${id}`, { method: 'DELETE' }),
+  addSettlement: (s, opId) => req('/settlements', { method: 'POST', body: s, opId }),
+  deleteSettlement: (id, opId) => req(`/settlements/${id}`, { method: 'DELETE', opId }),
 
   // mess deposits (জমা)
-  addDeposit: (d) => req('/deposits', { method: 'POST', body: d }),
-  deleteDeposit: (id) => req(`/deposits/${id}`, { method: 'DELETE' }),
+  addDeposit: (d, opId) => req('/deposits', { method: 'POST', body: d, opId }),
+  deleteDeposit: (id, opId) => req(`/deposits/${id}`, { method: 'DELETE', opId }),
 };
 
 export default livingService;

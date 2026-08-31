@@ -63,7 +63,7 @@ export default function BookingsTab(props) {
           const [showAiScanner, setShowAiScanner] = useState(false);
           // Spaces vs people — two views of the same building. Rooms first,
           // because a room is set up once and tenants come and go from it.
-          const [buildingView, setBuildingView] = useState('tenants');
+          const [buildingView, setBuildingView] = useState('units');
           const todayDate = today;
           
           // Scoped by buildingId, in one shared place — see utils/buildingScope.js.
@@ -289,8 +289,7 @@ export default function BookingsTab(props) {
             const cardTitle = hostelBooking ? booking.property : occupant.name;
             const cardAvatar = hostelBooking ? '' : occupant.avatar;
             const cardAvatarText = hostelBooking ? ((booking.property || 'H').trim()[0] || 'H').toUpperCase() : occupant.init;
-            const stageAvatar = stage !== 'active' ? 'bg-gradient-to-br from-indigo-500 to-purple-600'
-                              : endingSoon ? 'bg-gradient-to-br from-indigo-500 to-purple-600'
+            const stageAvatar = stage === 'done' ? 'bg-gray-300'
                               : 'bg-gradient-to-br from-indigo-500 to-purple-600';
 
             return (
@@ -305,7 +304,7 @@ export default function BookingsTab(props) {
                   tabIndex={0}
                   onClick={() => setExpandedBookingId(booking.id)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedBookingId(booking.id); } }}
-                  className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-3 text-left bg-white rounded-2xl border overflow-hidden transition-all duration-300 cursor-pointer ${isExpanded ? 'border-[#ba0036]/30 shadow-[0_6px_24px_rgba(186,0,54,0.10)]' : 'border-gray-100/80 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:border-gray-200 hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}
+                  className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-3 text-left rounded-2xl border overflow-hidden transition-all duration-300 cursor-pointer ${stage === 'done' ? 'bg-gray-50 opacity-70' : 'bg-white'} ${isExpanded ? 'border-[#ba0036]/30 shadow-[0_6px_24px_rgba(186,0,54,0.10)]' : 'border-gray-100/80 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:border-gray-200 hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)]'}`}
                 >
                   <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-black text-[11px] sm:text-xs shrink-0 ${stageAvatar} overflow-hidden`}>
                     {cardAvatar ? (
@@ -496,7 +495,7 @@ export default function BookingsTab(props) {
                             <p className={`text-[10px] sm:text-xs font-black mt-0.5 ${stage === 'active' ? 'text-green-700' : 'text-gray-900'}`}>
                               {stage === 'done'
                                 ? (isBn ? 'বন্ধ করা হয়েছে' : 'Closed out')
-                                : (isBn ? 'চলমান' : 'Ongoing')}
+                                : (isBn ? 'থাকছে' : 'Ongoing')}
                             </p>
                             <p className="text-[9px] font-bold text-gray-500 mt-0.5 tabular-nums leading-tight">
                               {stage === 'done' ? (isBn ? 'নতুন ভাড়াটিয়া দেওয়া হয়েছে' : 'unit handed over') : runningLabel}
@@ -877,12 +876,12 @@ export default function BookingsTab(props) {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:h-[calc(100vh-140px)] overflow-visible lg:overflow-hidden">
 
-              {/* ── LEFT RAIL — full Financial Overview ALWAYS visible (mobile + desktop) ── */}
+              {/* ── LEFT RAIL — Financial Overview (hidden on mobile at building list, visible inside building) ── */}
               <aside className="lg:col-span-4 w-full flex flex-col gap-3 lg:gap-5 lg:h-full lg:overflow-y-auto custom-scrollbar lg:pt-1 lg:pb-4 lg:pr-1">
-                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl lg:rounded-[2rem] p-3.5 lg:p-7 text-white shadow-[0_6px_20px_rgba(0,0,0,0.15)] lg:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0">
+                <div className={`${(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) ? 'hidden lg:block' : ''} bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl lg:rounded-[2rem] p-3.5 lg:p-7 text-white shadow-[0_6px_20px_rgba(0,0,0,0.15)] lg:shadow-[0_15px_40px_rgba(0,0,0,0.2)] relative overflow-hidden shrink-0`}>
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-10 translate-x-10"></div>
                   <div className="flex items-center justify-between gap-2 mb-2.5 lg:mb-1 relative z-10">
-                    <h3 className="text-[13px] lg:text-2xl font-black truncate">{isBn ? 'ফাইন্যান্সিয়াল ওভারভিউ' : 'Financial Overview'}</h3>
+                    <h3 className="text-[13px] lg:text-2xl font-black truncate">{isBn ? 'আর্থিক সারসংক্ষেপ' : 'Financial Overview'}</h3>
                     {isPremium ? (
                       <div className="bg-[#ba0036] text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md shrink-0">
                          <Crown size={10} /> PRO
@@ -935,7 +934,7 @@ export default function BookingsTab(props) {
                         <div className="min-w-0">
                           <p className="text-white/50 text-[8px] lg:text-[9px] font-black uppercase tracking-widest mb-0.5 lg:mb-1 leading-tight">{isBn ? 'মাসিক আয়' : 'Monthly Revenue'}</p>
                           <p className="text-xl sm:text-2xl lg:text-4xl font-black text-white tracking-tight tabular-nums break-words leading-none">{formatBDT(leaseSummary.totalMonthlyRevenue)}</p>
-                          <p className="text-[8px] lg:text-[9px] font-bold text-white/50 mt-1 leading-tight">{isBn ? 'চলমান লিজ (ভাড়া + সার্ভিস)' : 'live leases (rent + service)'}</p>
+                          <p className="text-[8px] lg:text-[9px] font-bold text-white/50 mt-1 leading-tight">{isBn ? 'যারা থাকছে (ভাড়া + সার্ভিস)' : 'live leases (rent + service)'}</p>
                         </div>
                         <div className="bg-white/5 rounded-xl lg:rounded-2xl p-2 lg:p-3 min-w-0">
                           <p className="text-white/50 text-[8px] lg:text-[9px] font-black uppercase tracking-widest mb-0.5 lg:mb-1 leading-tight">{isBn ? 'সিকিউরিটি ডিপোজিট' : 'Security Deposits'}</p>
@@ -979,8 +978,8 @@ export default function BookingsTab(props) {
                       </h4>
                       <div className="space-y-2 lg:space-y-3">
                         {[
-                          { stage: 'active', count: leaseSummary.activeCount, dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700', hint: isBn ? 'ভাড়াটিয়া আছেন' : 'unit is rented' },
-                          { stage: 'done',   count: leaseSummary.doneCount,   dot: 'bg-gray-400',  bg: 'bg-gray-100', text: 'text-gray-600',  hint: isBn ? 'শেষ · নতুন লিজ দেওয়া যাবে' : 'ended · ready to re-let' },
+                          { stage: 'active', count: leaseSummary.activeCount, dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700', hint: isBn ? 'ভাড়াটিয়া থাকছে' : 'unit is rented' },
+                          { stage: 'done',   count: leaseSummary.doneCount,   dot: 'bg-gray-400',  bg: 'bg-gray-100', text: 'text-gray-600',  hint: isBn ? 'চলে গেছে · নতুন লিজ দেওয়া যাবে' : 'moved out · ready to re-let' },
                         ].map(row => (
                           <button key={row.stage} onClick={() => setLeaseStageFilter(row.stage)} className="w-full flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-gray-50 transition-colors text-left">
                             <span className={`w-2 h-2 rounded-full ${row.dot}`}></span>
@@ -1241,8 +1240,8 @@ export default function BookingsTab(props) {
                     {activeBuilding && (
                       <div className="mb-3 flex items-center gap-1.5">
                         {[
-                          { id: 'tenants', en: 'Tenants', bn: 'ভাড়াটিয়া' },
                           { id: 'units',   en: unitNoun(activeBuilding, false) + 's', bn: unitNoun(activeBuilding, true) },
+                          { id: 'tenants', en: 'Tenants', bn: 'ভাড়াটিয়া' },
                         ].map(v => (
                           <button
                             key={v.id}

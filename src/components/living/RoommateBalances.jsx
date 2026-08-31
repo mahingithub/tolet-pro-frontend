@@ -4,8 +4,9 @@ import { HandCoins, ArrowRight, ArrowLeftRight, Check, Clock, Users, ArrowDownLe
 import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
 import { computeLedger, simplifyDebts, paymentBreakdown, taka, dateLabel, roommateById } from './livingUtils';
+import { pendingKeys } from '../../store/livingOps';
 import { PAYMENT_METHODS, METHOD_ORDER, getMethod, getCategory } from './livingConfig';
-import { Card, SectionHeader, IconBadge, Avatar, Chip, PrimaryButton, Field, MoneyInput, TextInput, EmptyState, Sheet, ConfirmDialog, cx } from './livingUI';
+import { Card, SectionHeader, IconBadge, Avatar, Chip, PendingChip, PrimaryButton, Field, MoneyInput, TextInput, EmptyState, Sheet, ConfirmDialog, cx } from './livingUI';
 
 const SettleSheet = ({ open, onClose, roommates, preset, onSave }) => {
   const { language } = useLanguage();
@@ -159,6 +160,8 @@ const RoommateBalances = ({ me, language, intent, clearIntent }) => {
   const connected = useLivingStore((s) => s.connected);
   const addSettlement = useLivingStore((s) => s.addSettlement);
   const deleteSettlement = useLivingStore((s) => s.deleteSettlement);
+  const outbox = useLivingStore((s) => s.outbox);
+  const pending = useMemo(() => pendingKeys(outbox), [outbox]);
 
   const [open, setOpen] = useState(false);
   const [preset, setPreset] = useState(null);
@@ -363,6 +366,7 @@ const RoommateBalances = ({ me, language, intent, clearIntent }) => {
                       {dateLabel(s.date, language)}
                     </p>
                   </div>
+                  {pending.has(s.id) && <PendingChip isBn={isBn} className="shrink-0" />}
                   <span className="text-[13px] font-black text-emerald-600 shrink-0">{taka(s.amount, language)}</span>
                   <button onClick={() => setPendingDelete(s)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90 shrink-0" aria-label="delete">
                     <Trash2 size={14} />
