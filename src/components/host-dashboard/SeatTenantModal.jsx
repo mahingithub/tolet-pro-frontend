@@ -50,7 +50,10 @@ export default function SeatTenantModal({
   language,
   showToast,
   onClose,
-  onSaved,              // () => void — parent reloads the units
+  // (placement | null) => void. ADD hands back the queued operation so the
+  // parent can seat the tenant without waiting for a server it has not been
+  // sent to yet; REPLACE passes null, having already waited.
+  onSaved,
   formatBDT,
 }) {
   const isBn = language === 'বাংলা';
@@ -124,6 +127,9 @@ export default function SeatTenantModal({
     }
     setErrors([]);
     setSaving(true);
+    // The operation the parent will paint with, on the add path. Null when the
+    // server has already been waited for.
+    let saved = null;
     try {
       const advancePayment = Math.max(0, Number(advance) || 0);
       const body = {
@@ -153,8 +159,16 @@ export default function SeatTenantModal({
         // placement comes back refused with the reason, and the Rent tab says
         // so — rather than two people quietly holding one bed.
         const memberId = newObjectId();
-        const existingBookingId = unit?.booking?.id || unit?.bookingId || null;
-        useHostSyncStore.getState().applyLive('addTenant', {
+        // WHICH BOOKING THIS SEAT BELONGS TO. A room's lease id is not a field
+        // on the unit — listUnits hangs it off each occupant — so reading it
+        // from `unit.booking` alone always came back empty and every tenant
+        // after the first minted a SECOND lease id for a room that already had
+        // one. The server was never fooled (it looks the room's live booking up
+        // itself), but this phone was: it drew a second booking for the same
+        // room until the next full refresh washed it away.
+        const existingBookingId = (unit?.occupants || []).find((o) => o.bookingId)?.bookingId
+          || unit?.booking?.id || unit?.bookingId || null;
+        const placement = {
           unitId: unit.id,
           bookingId: existingBookingId || newObjectId(),
           payload: body,
@@ -191,13 +205,23 @@ export default function SeatTenantModal({
             status: 'active',
             ledger: {},
           },
-        });
+        };
+        useHostSyncStore.getState().applyLive('addTenant', placement);
+        // Hand the placement to the Rooms screen so it can seat this person in
+        // the grid straight away. It cannot get there any other way: applyLive
+        // writes through the dashboard's world, which holds bookings only, and
+        // the room list belongs to UnitsManager. Re-reading it from the server
+        // instead is what made the tenant invisible until a reload — that GET
+        // goes out before the queue has even sent the placement.
+        saved = { action: 'addTenant', args: placement };
       }
 
       showToast?.(replacing
         ? (isBn ? 'নতুন ভাড়াটিয়া বসানো হয়েছে — রেন্ট লেজার চালু' : 'New tenant moved in — rent ledger is live')
         : (isBn ? 'ভাড়াটিয়া যোগ হয়েছে' : 'Tenant added'));
-      onSaved?.();
+      // No op on the replace path: that one waited for the server, so the
+      // parent can simply re-read the room and get the exact truth.
+      onSaved?.(saved);
       onClose?.();
     } catch (err) {
       showToast?.(err.message || (isBn ? 'সেভ ব্যর্থ' : 'Could not save'));

@@ -25,7 +25,7 @@
  * 110 sorts after 102). The server sorts; this renders the floor groups.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Plus, X, Loader2, Users, Home, BedDouble, Trash2, Pencil,
   UserPlus, ChevronDown, ChevronUp, DoorOpen, Check, RefreshCw, QrCode,
@@ -225,6 +225,28 @@ export default function UnitsManager({
   }, [building?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
+
+  // ── Re-read once the queue has actually delivered ─────────────────────────
+  // A placement is painted from its own operation (see the seat form's onSaved)
+  // and replay() keeps it on the grid across any reload while it is still
+  // queued. This closes the loop at the other end: when the last placement
+  // leaves the queue the room is read back, so the server's version of the seat
+  // replaces this phone's guess at it.
+  //
+  // It also covers the two cases the optimistic paint cannot:
+  //   • queued in a dead zone and delivered ten minutes later, with the
+  //     landlord still on this screen;
+  //   • REFUSED — someone else took the last seat while the phone was away. The
+  //     operation is dropped with an error, the queue drains, and this re-read
+  //     takes the tenant back off a room they never got into.
+  const pendingPlacements = useHostSyncStore(
+    (s) => s.queue.filter((o) => o.action === 'addTenant').length,
+  );
+  const hadPlacements = useRef(pendingPlacements);
+  useEffect(() => {
+    if (hadPlacements.current > 0 && pendingPlacements === 0) load();
+    hadPlacements.current = pendingPlacements;
+  }, [pendingPlacements, load]);
 
   const submitRange = async () => {
     if (preview.error || !preview.rooms.length) {
@@ -952,7 +974,19 @@ export default function UnitsManager({
           showToast={showToast}
           formatBDT={formatBDT}
           onClose={() => setSeatTarget(null)}
-          onSaved={() => { load(); onBookingsChanged?.(); }}
+          onSaved={(placement) => {
+            // ADD hands back the queued operation; seat them from it, exactly
+            // the way a new room is drawn from its own createUnit op above.
+            // Re-reading the room from the server here is what used to lose
+            // them: that GET goes out before the queue has sent the placement,
+            // so it answers with the room as it was a second ago and the
+            // tenant did not appear until the page was reloaded.
+            //
+            // REPLACE waited for the server, so there a re-read is the truth.
+            if (placement) setUnits((prev) => applyOp({ bookings: [], units: prev }, placement).units);
+            else load();
+            onBookingsChanged?.();
+          }}
         />
       )}
 

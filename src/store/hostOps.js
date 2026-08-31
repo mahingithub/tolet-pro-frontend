@@ -69,6 +69,52 @@ const mapMember = (world, bookingId, memberId, fn) =>
     members: (b.members || []).map((m) => (String(m.id) === String(memberId) ? fn(m) : m)),
   }));
 
+/**
+ * Seat a queued tenant in the room itself.
+ *
+ * The Rooms screen does not read occupants off the bookings list — it reads
+ * `unit.occupants`, in the shape GET /buildings/:id/units returns, and derives
+ * the seat grid from it. So a placement that only touched `bookings` was
+ * invisible there, and stayed invisible: the screen re-reads its rooms the
+ * moment the tenant form closes, which is BEFORE the queue has delivered the
+ * placement, and replay() put nothing back on top of that fresh empty room.
+ *
+ * Idempotent, like every LOCAL: replaying a placement already seated is a
+ * no-op, so the same tenant never appears twice.
+ */
+const seatInUnits = (units, { unitId, bookingId, member }) => {
+  if (!unitId || !member) return units || [];
+  return (units || []).map((u) => {
+    if (String(u.id) !== String(unitId)) return u;
+    if ((u.occupants || []).some((o) => String(o.memberId) === String(member.id))) return u;
+    const occupants = [
+      ...(u.occupants || []),
+      {
+        bookingId: bookingId ? String(bookingId) : '',
+        memberId: String(member.id),
+        name:  member.name  || '',
+        phone: member.phone || '',
+        // The server picks the real seat label ("Seat 3") when it takes the
+        // placement; the grid draws position from the array, not from this.
+        seatLabel: member.seatLabel || '',
+        seatsBooked: Math.max(1, Number(member.seatsBooked) || 1),
+        joinDate: member.joinDate || null,
+        avatar: member.avatar || member.tenantProfile?.photoUrl || '',
+        tenantProfile: member.tenantProfile || {},
+      },
+    ];
+    // SEATS held, not people listed — the same sum listUnits does, so a room
+    // with a pending tenant counts as full exactly when a saved one would.
+    const occupiedSeats = occupants.reduce((n, o) => n + (Number(o.seatsBooked) || 1), 0);
+    return {
+      ...u,
+      occupants,
+      occupiedSeats,
+      vacantSeats: Math.max(0, (Number(u.seatCapacity) || 1) - occupiedSeats),
+    };
+  });
+};
+
 // Where a month's money lives: a specific occupant's ledger, or the booking's
 // own for a single-tenant lease.
 const writeLedger = (world, { bookingId, memberId }, monthKey, entry) => {
@@ -136,21 +182,33 @@ export const LOCAL = {
    * A new tenant in a room. The room may already hold a lease (another seat in
    * the same hostel room) — then this is one more occupant on it; otherwise the
    * lease itself starts here, with the id this phone minted.
+   *
+   * It writes BOTH halves of the world, and the units half is not a nicety: the
+   * Rooms screen's seat grid comes from `unit.occupants` and nothing else. See
+   * seatInUnits() above for what went wrong when this only wrote bookings.
    */
   addTenant: (world, op) => {
     const { bookingId, member, booking } = op.args;
     const existing = (world.bookings || []).find((b) => isBooking(b, bookingId));
+    const seated = seatInUnits(world.units, op.args);
     if (existing) {
-      return mapBooking(world, bookingId, (b) => ({
-        ...b,
-        // Never twice: a replay of a placement we already hold must not seat
-        // the same person again.
-        members: (b.members || []).some((m) => String(m.id) === String(member.id))
-          ? b.members
-          : [...(b.members || []), member],
-      }));
+      return {
+        ...mapBooking(world, bookingId, (b) => ({
+          ...b,
+          // Never twice: a replay of a placement we already hold must not seat
+          // the same person again.
+          members: (b.members || []).some((m) => String(m.id) === String(member.id))
+            ? b.members
+            : [...(b.members || []), member],
+        })),
+        units: seated,
+      };
     }
-    return { ...world, bookings: [...(world.bookings || []), { ...booking, id: bookingId, members: [member] }] };
+    return {
+      ...world,
+      bookings: [...(world.bookings || []), { ...booking, id: bookingId, members: [member] }],
+      units: seated,
+    };
   },
 
   /** A room added to a building. */
