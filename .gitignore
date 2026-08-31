@@ -51,3 +51,9 @@ fixblob*.cjs
 grid.cjs
 
 .claude/
+
+# Custom Scripts
+extract.cjs
+fix-lang.cjs
+parseSafeNum.js
+patch-toast.js
