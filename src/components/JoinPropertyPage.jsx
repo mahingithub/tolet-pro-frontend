@@ -25,10 +25,16 @@
  *    their own idea of "required" they drifted, and a tenant valid on one
  *    screen was rejected on another. This is the third writer. It imports.
  *
- * 3. আছে / নেই IS A COMPLETE ANSWER HERE TOO.
- *    A tenant with no NID can finish this form. That is the whole design of the
- *    underlying record, and a self-service version that quietly demanded an ID
- *    would lock out exactly the people the paper খাতা never did.
+ * 3. THIS IS THE ONE FORM WHERE NOTHING IS OPTIONAL.
+ *    Everywhere else in the app আছে / নেই is a complete answer and a tenant with
+ *    no NID is a perfectly valid record — a landlord writing someone up from
+ *    memory saves whatever they actually know. Here the rule is the opposite,
+ *    and this is the one screen where asking for all of it is fair: the person
+ *    filling it in is the person whose NID it is, holding it, on their own
+ *    phone. So the আছে / নেই pair is not rendered at all, every box blocks the
+ *    submit, and the server refuses exactly what this screen refuses. The
+ *    landlord's own forms are untouched — see SELF_ONBOARD_REQUIRED in
+ *    tenantFields.js for the list and the reasoning.
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -45,7 +51,7 @@ import { resolveInvite, submitOnboarding } from '../services/inviteService';
 import { privateUpload } from '../services/cloudinaryUpload';
 import {
   TENANT_TYPES, GOVT_ID_TYPES, MARITAL_STATUSES, HAS_STATUS,
-  tenantTypeById, emptyTenantProfile, validateTenantProfile,
+  tenantTypeById, emptyTenantProfile, validateSelfOnboarding, tenantFieldLabel,
 } from '../utils/tenantFields';
 
 // Where a half-finished choice waits while the tenant goes and logs in.
@@ -98,36 +104,17 @@ const Section = ({ title, subtitle, children }) => (
   </div>
 );
 
-// The আছে / নেই pair. Identical semantics to the landlord's form, because it
-// writes the same fields into the same record.
-const HasToggle = ({ isBn, value, onPick, clearKeys = [] }) => (
-  <div className="grid grid-cols-2 gap-2">
-    {[{ id: HAS_STATUS.HAS, bn: 'আছে', en: 'Yes' }, { id: HAS_STATUS.NONE, bn: 'নেই', en: 'No' }].map((opt) => {
-      const on = value === opt.id;
-      return (
-        <button
-          key={opt.id}
-          type="button"
-          onClick={() => onPick({
-            status: opt.id,
-            ...(opt.id === HAS_STATUS.NONE
-              ? Object.fromEntries(clearKeys.map((k) => [k, '']))
-              : {}),
-          })}
-          className={`px-3 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider border transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 ${
-            on
-              ? (opt.id === HAS_STATUS.HAS
-                  ? 'bg-emerald-600 text-white border-emerald-600'
-                  : 'bg-gray-900 text-white border-gray-900')
-              : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-          }`}
-        >
-          {on && <Check size={12} strokeWidth={3.5} className="shrink-0" />}
-          {isBn ? opt.bn : opt.en}
-        </button>
-      );
-    })}
-  </div>
+// There is no আছে / নেই pair on this screen. The landlord's own forms still ask
+// it — a landlord who does not know whether a tenant has an NID must be able to
+// say so — but a person filling in their own record is not guessing about their
+// own documents, and the landlord requires them. See point 3 in the header.
+
+// The three boxes on this form that are genuinely optional say so, because
+// every other box is required and silence would read as "optional" out of habit.
+const Optional = ({ isBn }) => (
+  <span className="text-gray-300 normal-case tracking-normal font-bold">
+    {isBn ? '(ঐচ্ছিক)' : '(optional)'}
+  </span>
 );
 
 export default function JoinPropertyPage() {
@@ -145,7 +132,16 @@ export default function JoinPropertyPage() {
   // 'select' → pick a room (universal link only) · 'form' → details · 'done'
   const [step, setStep] = useState('select');
   const [unitId, setUnitId] = useState('');
-  const [form, setForm] = useState(() => ({ ...emptyTenantProfile(), moveInDate: todayIso() }));
+  // Both ID statuses start at "আছে" and stay there. The question is not asked
+  // on this form, but the field is what the rest of the app reads to know
+  // whether a blank number means "none" or "not filled in yet" — and the
+  // server's sanitiser drops any number whose status is not 'has'.
+  const [form, setForm] = useState(() => ({
+    ...emptyTenantProfile(),
+    moveInDate: todayIso(),
+    govtIdStatus: HAS_STATUS.HAS,
+    professionalIdStatus: HAS_STATUS.HAS,
+  }));
   const [touched, setTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -257,8 +253,22 @@ export default function JoinPropertyPage() {
     [invite, rooms, unitId],
   );
 
-  const missing = useMemo(() => validateTenantProfile(form), [form]);
+  // The strict rulebook — this screen, and only this screen. See tenantFields.js.
+  const missing = useMemo(() => validateSelfOnboarding(form), [form]);
   const isMissing = (k) => touched && missing.includes(k);
+
+  // A red border is useless advice when the empty box is three screens up. With
+  // nearly every field required, the tenant gets told WHICH ones by name.
+  // Two of the required fields have no box on screen until a profession is
+  // picked, and naming them before that sends the tenant hunting for an input
+  // that is not rendered yet. Profession is already on the list; choosing it
+  // makes both appear.
+  const missingLabels = useMemo(() => {
+    const hidden = form.tenantType ? [] : ['organization', 'professionalIdNumber'];
+    return missing
+      .filter((k) => !hidden.includes(k))
+      .map((k) => tenantFieldLabel(k, form, isBn));
+  }, [missing, form, isBn]);
 
   // ── Photo ─────────────────────────────────────────────────────────────────
   // Uploaded PRIVATELY (Cloudinary type:'authenticated'), the same handling the
@@ -292,7 +302,9 @@ export default function JoinPropertyPage() {
   const submit = async () => {
     setTouched(true);
     if (missing.length) {
-      setError(L('লাল দাগ দেওয়া ঘরগুলো পূরণ করুন।', 'Please complete the highlighted fields.'));
+      // The names of the fields are listed below the button, live, rather than
+      // frozen into this string — they tick away as the boxes get filled.
+      setError(L('বাড়িওয়ালার জন্য কিছু তথ্য এখনো বাকি আছে।', 'Your landlord requires a few more details.'));
       return;
     }
     if (!isAuthenticated) { requireLogin('form'); return; }
@@ -303,7 +315,19 @@ export default function JoinPropertyPage() {
     try {
       const { name, phone, moveInDate, ...tenantProfile } = form;
       const onboarding = await submitOnboarding(token, {
-        unitId, name, phone, moveInDate, tenantProfile,
+        unitId,
+        name,
+        phone,
+        moveInDate,
+        // The আছে/নেই question is not on this form, so the answer is stated
+        // here instead of relying on a status the tenant never saw. Without it
+        // a restored draft from before this change could arrive with a blank
+        // status, and the server's sanitiser drops any number that has one.
+        tenantProfile: {
+          ...tenantProfile,
+          govtIdStatus: HAS_STATUS.HAS,
+          professionalIdStatus: HAS_STATUS.HAS,
+        },
       });
       setResult(onboarding);
       setStep('done');
@@ -632,11 +656,21 @@ export default function JoinPropertyPage() {
         </div>
       )}
 
+      {/* Said once, at the top, before the scrolling starts — so the length of
+          the form is expected rather than discovered at the submit button. */}
+      <div className="rounded-2xl bg-gray-900 p-3.5 mb-4 flex items-start gap-2.5">
+        <ShieldCheck size={15} className="text-white/40 shrink-0 mt-0.5" />
+        <p className="text-[11px] font-bold text-white/80 leading-relaxed">
+          {L('বাড়িওয়ালা সব তথ্য পূরণ করতে বলেছেন — NID/পাসপোর্ট, পেশার আইডি, পিতার নাম ও জরুরি যোগাযোগসহ। যেগুলোতে (ঐচ্ছিক) লেখা নেই, সেগুলো ছাড়া জমা দেওয়া যাবে না।',
+             'Your landlord asks for every detail below — NID/passport, your professional ID, father’s name and an emergency contact. Anything not marked (optional) is required.')}
+        </p>
+      </div>
+
       <div className="space-y-3">
 
         <Section
-          title={L('আবশ্যক তথ্য', 'Required')}
-          subtitle={L('শুধু এই তিনটি ঘর অবশ্যই পূরণ করতে হবে।', 'Only these three fields are required.')}
+          title={L('আপনার পরিচয়', 'About you')}
+          subtitle={L('আপনার নিজের অ্যাকাউন্টের সাথে এই তথ্যগুলো যুক্ত থাকবে।', 'These are tied to your own account.')}
         >
           <Field label={L('আপনার পূর্ণ নাম', 'Your full name')} Icon={User}>
             <input
@@ -669,7 +703,9 @@ export default function JoinPropertyPage() {
 
         <Section title={L('আপনার ছবি', 'Your photo')}>
           <div className="flex items-center gap-3">
-            <div className="w-16 h-16 rounded-2xl bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center text-gray-300">
+            <div className={`w-16 h-16 rounded-2xl bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center text-gray-300 ${
+              isMissing('photoUrl') ? 'ring-2 ring-[#ba0036] ring-offset-2' : ''
+            }`}>
               {photoSrc ? <img src={photoSrc} alt="" className="w-full h-full object-cover" /> : <User size={24} />}
             </div>
             <div className="flex-1 min-w-0">
@@ -691,15 +727,25 @@ export default function JoinPropertyPage() {
           </div>
         </Section>
 
-        <Section title={L('ব্যক্তিগত তথ্য', 'Personal details')} subtitle={L('ঐচ্ছিক', 'Optional')}>
+        <Section title={L('ব্যক্তিগত তথ্য', 'Personal details')}>
           <Field label={L('পিতার নাম', "Father's name")}>
-            <input type="text" value={form.fatherName} onChange={(e) => set({ fatherName: e.target.value })} className={inputCls} />
+            <input
+              type="text"
+              value={form.fatherName}
+              onChange={(e) => set({ fatherName: e.target.value })}
+              className={`${inputCls} ${errCls('fatherName')}`}
+            />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label={L('জন্ম তারিখ', 'Date of birth')}>
-              <input type="date" value={form.dob} onChange={(e) => set({ dob: e.target.value })} className={inputCls} />
+              <input
+                type="date"
+                value={form.dob}
+                onChange={(e) => set({ dob: e.target.value })}
+                className={`${inputCls} ${errCls('dob')}`}
+              />
             </Field>
-            <Field label={L('বৈবাহিক অবস্থা', 'Marital status')}>
+            <Field label={<>{L('বৈবাহিক অবস্থা', 'Marital status')} <Optional isBn={isBn} /></>}>
               <select value={form.maritalStatus} onChange={(e) => set({ maritalStatus: e.target.value })} className={inputCls}>
                 <option value="">{L('নির্বাচন করুন', 'Select')}</option>
                 {MARITAL_STATUSES.map((m) => (
@@ -713,17 +759,21 @@ export default function JoinPropertyPage() {
               rows={2}
               value={form.permanentAddress}
               onChange={(e) => set({ permanentAddress: e.target.value })}
-              className={`${inputCls} resize-none`}
+              className={`${inputCls} resize-none ${errCls('permanentAddress')}`}
             />
           </Field>
         </Section>
 
-        <Section title={L('পেশা', 'Profession')} subtitle={L('ঐচ্ছিক', 'Optional')}>
+        <Section
+          title={L('পেশা', 'Profession')}
+          subtitle={L('আপনি কী করেন তার উপর নির্ভর করে পরের ঘরগুলো বদলে যাবে।',
+                     'What you do decides what the next two boxes ask for.')}
+        >
           <Field label={L('আপনি কী করেন', 'What do you do')} Icon={Briefcase}>
             <select
               value={form.tenantType}
               onChange={(e) => set({ tenantType: e.target.value, tenantTypeOther: '' })}
-              className={inputCls}
+              className={`${inputCls} ${errCls('tenantType')}`}
             >
               <option value="">{L('নির্বাচন করুন', 'Select')}</option>
               {TENANT_TYPES.map((t) => (
@@ -746,71 +796,64 @@ export default function JoinPropertyPage() {
           {type && (
             <>
               <Field label={isBn ? type.orgLabel.bn : type.orgLabel.en}>
-                <input type="text" value={form.organization} onChange={(e) => set({ organization: e.target.value })} className={inputCls} />
+                <input
+                  type="text"
+                  value={form.organization}
+                  onChange={(e) => set({ organization: e.target.value })}
+                  className={`${inputCls} ${errCls('organization')}`}
+                />
               </Field>
               {type.showDepartment && (
-                <Field label={L('ডিপার্টমেন্ট', 'Department')}>
+                <Field label={<>{L('ডিপার্টমেন্ট', 'Department')} <Optional isBn={isBn} /></>}>
                   <input type="text" value={form.department} onChange={(e) => set({ department: e.target.value })} className={inputCls} />
                 </Field>
               )}
-              <Field label={`${isBn ? type.idLabel.bn : type.idLabel.en} ${L('আছে?', 'available?')}`}>
-                <HasToggle
-                  isBn={isBn}
-                  value={form.professionalIdStatus}
-                  clearKeys={['professionalIdNumber']}
-                  onPick={({ status, ...clear }) => set({ professionalIdStatus: status, ...clear })}
+              {/* No আছে/নেই ahead of this one any more: the profession above has
+                  already been answered, and the landlord wants the ID that goes
+                  with it. */}
+              <Field label={isBn ? type.idLabel.bn : type.idLabel.en}>
+                <input
+                  type="text"
+                  value={form.professionalIdNumber}
+                  onChange={(e) => set({ professionalIdNumber: e.target.value })}
+                  className={`${inputCls} ${errCls('professionalIdNumber')}`}
                 />
               </Field>
-              {form.professionalIdStatus === HAS_STATUS.HAS && (
-                <Field label={isBn ? type.idLabel.bn : type.idLabel.en}>
-                  <input
-                    type="text"
-                    value={form.professionalIdNumber}
-                    onChange={(e) => set({ professionalIdNumber: e.target.value })}
-                    className={`${inputCls} ${errCls('professionalIdNumber')}`}
-                  />
-                </Field>
-              )}
             </>
           )}
         </Section>
 
-        {/* NID / passport. Gated entirely on আছে / নেই — "নেই" finishes the
-            question, it does not defer it. */}
-        <Section title={L('পরিচয়পত্র', 'Identity document')} subtitle={L('ঐচ্ছিক', 'Optional')}>
-          <Field label={L('NID বা পাসপোর্ট আছে?', 'Do you have an NID or passport?')} Icon={IdCard}>
-            <HasToggle
-              isBn={isBn}
-              value={form.govtIdStatus}
-              clearKeys={['govtIdType', 'govtIdNumber']}
-              onPick={({ status, ...clear }) => set({ govtIdStatus: status, ...clear })}
+        {/* NID / passport. The one section that changed shape: the আছে/নেই pair
+            used to stand in front of it and "নেই" finished the question. The
+            landlord requires the document, so the question is now which one and
+            what number — and a number that is not a real NID or passport shape
+            is refused, because a mistyped ID is worse than a blank one. */}
+        <Section
+          title={L('পরিচয়পত্র', 'Identity document')}
+          subtitle={L('NID না থাকলে পাসপোর্ট নম্বর দিন।', 'If you have no NID, give a passport number.')}
+        >
+          <Field label={L('কোনটি আছে', 'Which one you have')} Icon={IdCard}>
+            <select
+              value={form.govtIdType}
+              onChange={(e) => set({ govtIdType: e.target.value })}
+              className={`${inputCls} ${errCls('govtIdType')}`}
+            >
+              <option value="">{L('নির্বাচন করুন', 'Select')}</option>
+              {GOVT_ID_TYPES.map((g) => (
+                <option key={g.id} value={g.id}>{isBn ? g.bn : g.en}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label={L('নম্বর', 'Number')}>
+            <input
+              type="text"
+              inputMode={form.govtIdType === 'passport' ? 'text' : 'numeric'}
+              value={form.govtIdNumber}
+              onChange={(e) => set({ govtIdNumber: e.target.value })}
+              placeholder={form.govtIdType === 'passport' ? 'A01234567' : L('১০ / ১৩ / ১৭ সংখ্যা', '10 / 13 / 17 digits')}
+              className={`${inputCls} ${errCls('govtIdNumber')}`}
             />
           </Field>
-          {form.govtIdStatus === HAS_STATUS.HAS && (
-            <>
-              <Field label={L('কোনটি', 'Which one')}>
-                <select
-                  value={form.govtIdType}
-                  onChange={(e) => set({ govtIdType: e.target.value })}
-                  className={`${inputCls} ${errCls('govtIdType')}`}
-                >
-                  <option value="">{L('নির্বাচন করুন', 'Select')}</option>
-                  {GOVT_ID_TYPES.map((g) => (
-                    <option key={g.id} value={g.id}>{isBn ? g.bn : g.en}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label={L('নম্বর', 'Number')}>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={form.govtIdNumber}
-                  onChange={(e) => set({ govtIdNumber: e.target.value })}
-                  className={`${inputCls} ${errCls('govtIdNumber')}`}
-                />
-              </Field>
-            </>
-          )}
         </Section>
 
         <Section
@@ -819,7 +862,12 @@ export default function JoinPropertyPage() {
         >
           <div className="grid grid-cols-2 gap-3">
             <Field label={L('নাম', 'Name')} Icon={PhoneCall}>
-              <input type="text" value={form.emergencyName} onChange={(e) => set({ emergencyName: e.target.value })} className={inputCls} />
+              <input
+                type="text"
+                value={form.emergencyName}
+                onChange={(e) => set({ emergencyName: e.target.value })}
+                className={`${inputCls} ${errCls('emergencyName')}`}
+              />
             </Field>
             <Field label={L('সম্পর্ক', 'Relation')}>
               <input
@@ -827,7 +875,7 @@ export default function JoinPropertyPage() {
                 value={form.emergencyRelation}
                 onChange={(e) => set({ emergencyRelation: e.target.value })}
                 placeholder={L('যেমন: পিতা', 'e.g. Father')}
-                className={inputCls}
+                className={`${inputCls} ${errCls('emergencyRelation')}`}
               />
             </Field>
           </div>
@@ -841,7 +889,7 @@ export default function JoinPropertyPage() {
               className={`${inputCls} ${errCls('emergencyPhone')}`}
             />
           </Field>
-          <Field label={L('ঠিকানা', 'Address')}>
+          <Field label={<>{L('ঠিকানা', 'Address')} <Optional isBn={isBn} /></>}>
             <textarea
               rows={2}
               value={form.emergencyAddress}
@@ -850,6 +898,26 @@ export default function JoinPropertyPage() {
             />
           </Field>
         </Section>
+
+        {/* What is still blank, by name, next to the button they just pressed.
+            Live — a field leaves this list the moment it is filled in. */}
+        {touched && missingLabels.length > 0 && (
+          <div className="rounded-2xl bg-red-50 border border-red-100 p-3.5 space-y-2">
+            <p className="text-[10px] font-black text-[#ba0036] uppercase tracking-widest">
+              {L(`এখনো বাকি — ${missingLabels.length}টি`, `Still missing — ${missingLabels.length}`)}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {missingLabels.map((label) => (
+                <span
+                  key={label}
+                  className="px-2 py-1 rounded-lg bg-white border border-red-100 text-[10px] font-black text-red-900"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           {invite.scope === 'building' && (

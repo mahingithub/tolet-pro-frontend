@@ -99,3 +99,29 @@ export const occupantSummary = (booking, language, max = 2) => {
   if (names.length <= max) return names.join(', ');
   return `${names.slice(0, max).join(', ')} +${names.length - max}`;
 };
+
+/**
+ * The advance / deposit money actually collected against this booking.
+ *
+ * There are two places it can live, and they are set by two different flows
+ * that never overlap:
+ *
+ *   • members[].advancePayment — a tenant seated into an existing unit
+ *     (SeatTenantModal → placeTenantInUnit). Per occupant, because a seat room
+ *     is ONE booking with several people who each pay their own advance on
+ *     their own day. Writing it at booking level would let the second tenant's
+ *     advance overwrite the first one's.
+ *
+ *   • booking.advancePayment — a lease created through the New Lease wizard,
+ *     which predates the per-member field and only ever describes one tenant.
+ *
+ * So: the occupants' total when any of them carries one, and the booking-level
+ * figure otherwise. Summing both would double-count nothing today and quietly
+ * double-count tomorrow, the first time a flow writes to both.
+ */
+export const advanceCollected = (booking) => {
+  const fromMembers = activeMembers(booking)
+    .reduce((sum, m) => sum + (Number(m?.advancePayment) || 0), 0);
+  if (fromMembers > 0) return fromMembers;
+  return Number(booking?.advancePayment) || 0;
+};

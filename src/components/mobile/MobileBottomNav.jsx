@@ -9,6 +9,8 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useSettings } from '../../context/SettingsContext.jsx';
+import { resolveHome } from '../../utils/homeSurface';
 
 /**
  * MobileBottomNav — fixed-position bottom rail for the mobile app shell.
@@ -39,7 +41,9 @@ import { useAuth } from '../../context/AuthContext.jsx';
 const MobileBottomNav = ({ hideOnRoutes }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAuthenticated, isAdmin } = useAuth();
+  const { user, isAuthenticated, isAdmin, roles } = useAuth();
+  const { settings } = useSettings();
+  const defaultHome = settings?.app?.defaultHome || 'auto';
 
   // Event-driven hide: HostDashboard dispatches 'hide-bottom-nav' when the
   // user enters Bookings / Rent tabs, and 'show-bottom-nav' when they leave.
@@ -76,11 +80,18 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   // 'landlord' or 'host', so accept both.
   const isLandlord = isAuthenticated && (user?.role === 'landlord' || user?.role === 'host');
 
+  // "Home" is wherever the user's home actually is — the same answer the app
+  // uses when it opens (utils/homeSurface.js), not a second rule maintained
+  // here. `?tab=dashboard` on the landlord path guarantees a tap always lands
+  // on the overview, even if they were sitting on another dashboard tab.
+  const homeTo = (() => {
+    if (!isAuthenticated) return '/';
+    const to = resolveHome({ activeRole: user?.role, roles, defaultHome, hasBooking: true });
+    return to === '/host-dashboard' ? '/host-dashboard?tab=dashboard' : to;
+  })();
+
   const LEFT = [
-    // For a landlord, "Home" is their dashboard — not the public marketing
-    // page. `?tab=dashboard` guarantees a tap always lands on the overview,
-    // even if they were sitting on another dashboard tab.
-    { id: 'home', label: 'Home', icon: Home, to: isLandlord ? '/host-dashboard?tab=dashboard' : '/' },
+    { id: 'home', label: 'Home', icon: Home, to: homeTo },
     { id: 'explore', label: 'Explore', icon: Search, to: '/properties/all' },
   ];
 
@@ -115,9 +126,12 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
 
     if (item.id === 'home') {
       if (toPath === '/') return location.pathname === '/';
-      // Landlord home = the dashboard overview (no tab, or the dashboard tab).
       if (location.pathname !== toPath) return false;
-      return !currentTab || currentTab === 'dashboard';
+      // A home with no ?tab= (Living, which navigates with ?m= instead) is home
+      // on any of its sub-modules. One with a tab — the dashboards — is only
+      // home on its overview, so the other tabs don't light the Home button up.
+      if (!targetTab) return true;
+      return !currentTab || currentTab === targetTab;
     }
     // Tenant Saved + Profile both point at /tenant-dashboard —
     // disambiguate via the `tab` flag in location.state so only the

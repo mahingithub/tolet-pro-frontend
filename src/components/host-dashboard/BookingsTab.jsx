@@ -25,7 +25,7 @@ import AiLedgerScannerModal from "./AiLedgerScannerModal.jsx";
 import ModalPortal from "../shared/ModalPortal.jsx";
 import OnboardingApprovalsPanel from "./OnboardingApprovalsPanel.jsx";
 import { scopeBookings, bookingInBuilding, sortByBuildingOrder } from '../../utils/buildingScope';
-import { occupantCount, occupantNames, primaryOccupant } from '../../utils/occupants';
+import { occupantCount, occupantNames, primaryOccupant, advanceCollected } from '../../utils/occupants';
 
 
 
@@ -450,7 +450,7 @@ export default function BookingsTab(props) {
                       </div>
                       <div className="bg-white rounded-xl p-3 border border-gray-100 min-w-0">
                         <p className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest leading-tight">{language === 'বাংলা' ? 'ডিপোজিট (অগ্রিম)' : 'Deposit (Advance)'}</p>
-                        <p className="text-sm font-black text-gray-900 tabular-nums mt-1 leading-tight">{formatBDT(booking.advancePayment || 0)}</p>
+                        <p className="text-sm font-black text-gray-900 tabular-nums mt-1 leading-tight">{formatBDT(advanceCollected(booking))}</p>
                         {booking.paymentMethod ? (
                           <span className="mt-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 max-w-full">
                             <CreditCard size={10} strokeWidth={3} className="shrink-0"/> <span className="truncate">{booking.paymentMethod}</span>

@@ -31,6 +31,12 @@ import { isBdMobile } from './validators.js';
  * own idea of "required", they drifted — which is how a hostel tenant could be
  * rejected on one screen and accepted on another. Every writer imports
  * `validateTenantProfile()` from here, so there is one rulebook.
+ *
+ * THE ONE EXCEPTION, AND IT IS NOT A DRIFT
+ * A tenant filling in their OWN record through a QR / invite link answers to
+ * `validateSelfOnboarding()` further down, which requires nearly everything.
+ * That is not a fourth opinion about what a tenant record needs — it is the
+ * same rulebook plus a rule about who is typing. See the comment above it.
  */
 
 // ── Tenant type (পেশা) ──────────────────────────────────────────────────────
@@ -236,6 +242,79 @@ export const validateTenantProfile = (p = {}) => {
   return missing;
 };
 
+// ── The tenant's OWN form is stricter ───────────────────────────────────────
+// Everything above is about what a LANDLORD may save, and none of it changes:
+// a landlord typing a tenant up from memory still saves a name, a number and a
+// date, because the alternative is that they close the app and go back to the
+// খাতা. That rule is theirs, and it stays.
+//
+// A tenant filling in their own record through a QR / invite link is a
+// different situation with a different answer. They are not remembering
+// somebody else's details — they are holding their own NID in their own hand,
+// on their own phone, and collecting exactly the fields a landlord can never
+// get right second-hand is the entire reason the link exists. A half-filled
+// self-submission is worse than no submission: it arrives in the approval queue
+// looking finished, gets approved in one tap, and the empty NID is discovered
+// months later by whoever needed it.
+//
+// So this form asks for all of it, and "নেই" is not on offer — JoinPropertyPage
+// does not render the আছে/নেই pair at all. Two consequences worth being honest
+// about, because both were chosen rather than overlooked:
+//
+//   • Someone with no NID cannot join by link. That is the landlord's stated
+//     rule. They can still be added by the landlord's own form, which is
+//     exactly as permissive as it always was — so the door is narrower, not
+//     shut.
+//   • The list below is the floor for EVERY profession, including 'other'. A
+//     tenant whose work has no ID card has nothing true to type in that box.
+//     Softening it means dropping 'professionalIdNumber' from this array; the
+//     rest of the flow needs no other change.
+//
+// The server refuses precisely what this refuses. A validator that only runs in
+// the browser is a courtesy, not a rule — the mirror lives in the backend's
+// utils/tenantSelfOnboarding.js, and the two lists are meant to be read
+// side by side.
+export const SELF_ONBOARD_REQUIRED = [
+  // The same three the landlord owes, asked of the person who actually knows.
+  'name', 'phone', 'moveInDate',
+  // A face for the room. The landlord's own intake snapshot is retired the
+  // moment this person has an account, so this is the picture that survives.
+  'photoUrl',
+  'fatherName', 'dob', 'permanentAddress',
+  // Profession decides what the next two are CALLED — university and student
+  // ID, or company and employee ID. Asking for the ID without the profession
+  // would be asking for a number with no name on it.
+  'tenantType', 'organization', 'professionalIdNumber',
+  'govtIdType', 'govtIdNumber',
+  // Address is left out on purpose: in an emergency someone is phoned, not
+  // written to, and a wrong address is not what fails at that moment.
+  'emergencyName', 'emergencyRelation', 'emergencyPhone',
+];
+
+export const validateSelfOnboarding = (p = {}) => {
+  const blank = (k) => !String(p?.[k] ?? '').trim();
+  const missing = [
+    // Not a replacement for the shared rules — an addition to them. The phone
+    // and emergency-number shape checks, and the 'other' → write-it-in rule,
+    // all still apply here and are not repeated below.
+    ...validateTenantProfile(p),
+    ...SELF_ONBOARD_REQUIRED.filter(blank),
+  ];
+
+  // Shape-checked again rather than left to validateTenantProfile, because
+  // there the check hangs off govtIdStatus === 'has' — an answer this form
+  // never asks for, since not having one is not an option here.
+  if (!blank('govtIdType') && !blank('govtIdNumber')
+      && !isValidGovtId(p.govtIdType, p.govtIdNumber)) {
+    missing.push('govtIdNumber');
+  }
+
+  // A blank phone is missing twice over — once as a required field, once as an
+  // invalid number. The form highlights by key, and lists the labels for the
+  // ones off-screen, so each one is only wanted once.
+  return [...new Set(missing)];
+};
+
 // True when this tenant carries anything beyond the required minimum — drives
 // the "অতিরিক্ত তথ্য" summary chip so a landlord can see at a glance whether a
 // record is bare or filled in, without opening it.
@@ -245,6 +324,46 @@ export const hasExtraTenantInfo = (p = {}) => {
     k !== 'name' && k !== 'phone' && k !== 'moveInDate'
     && String(p?.[k] ?? '').trim() !== ''
   ));
+};
+
+// ── What each field is called ───────────────────────────────────────────────
+// One table, because two screens name the same boxes: the scanner's "what came
+// through and what didn't" report, and the invite form's list of what is still
+// blank. Two tables drift, and a tenant told to fill in a field under one name
+// on the form and another in the error above it is being sent looking for a box
+// that isn't there.
+//
+// It takes the profile because three of the labels are not fixed: what the
+// organization and the professional ID are CALLED is decided by the profession
+// — বিশ্ববিদ্যালয় and স্টুডেন্ট আইডি for a student, প্রতিষ্ঠানের নাম and এমপ্লয়ি আইডি for
+// an employee. That is the same mechanism TENANT_TYPES exists for.
+export const tenantFieldLabel = (key, p = {}, isBn = false) => {
+  const L = (bn, en) => (isBn ? bn : en);
+  const type = tenantTypeById(p?.tenantType);
+  switch (key) {
+    case 'name':             return L('নাম', 'Name');
+    case 'phone':            return L('মোবাইল নম্বর', 'Mobile number');
+    case 'moveInDate':       return L('মুভ-ইন তারিখ', 'Move-in date');
+    case 'photoUrl':         return L('আপনার ছবি', 'Your photo');
+    case 'fatherName':       return L('পিতার নাম', "Father's name");
+    case 'dob':              return L('জন্ম তারিখ', 'Date of birth');
+    case 'maritalStatus':    return L('বৈবাহিক অবস্থা', 'Marital status');
+    case 'permanentAddress': return L('স্থায়ী ঠিকানা', 'Permanent address');
+    case 'tenantType':       return L('পেশা', 'Profession');
+    case 'tenantTypeOther':  return L('আপনার পেশা', 'Your profession');
+    case 'organization':
+      return type ? (isBn ? type.orgLabel.bn : type.orgLabel.en) : L('প্রতিষ্ঠান', 'Organization');
+    case 'department':       return L('ডিপার্টমেন্ট', 'Department');
+    case 'professionalIdNumber':
+      return type ? (isBn ? type.idLabel.bn : type.idLabel.en) : L('আইডি', 'ID');
+    case 'govtIdType':       return L('পরিচয়পত্র — কোনটি', 'Identity document — which one');
+    case 'govtIdNumber':     return L('NID / পাসপোর্ট', 'NID / Passport');
+    case 'emergencyName':     return L('জরুরি যোগাযোগ — নাম', 'Emergency contact — name');
+    case 'emergencyRelation': return L('জরুরি যোগাযোগ — সম্পর্ক', 'Emergency contact — relation');
+    case 'emergencyAddress':  return L('জরুরি যোগাযোগ — ঠিকানা', 'Emergency contact — address');
+    case 'emergencyPhone':    return L('জরুরি যোগাযোগ — মোবাইল', 'Emergency contact — mobile');
+    default: return key;
+  }
 };
 
 // ── What a scan actually captured ───────────────────────────────────────────
@@ -257,40 +376,28 @@ export const hasExtraTenantInfo = (p = {}) => {
 // fields are reported as needing attention.
 export const tenantFieldReport = (p = {}, isBn = false) => {
   const has = (k) => String(p?.[k] ?? '').trim() !== '';
-  const L = (bn, en) => (isBn ? bn : en);
-  const type = tenantTypeById(p.tenantType);
 
   const rows = [
-    { key: 'name',             label: L('নাম', 'Name'), required: true },
-    { key: 'phone',            label: L('মোবাইল নম্বর', 'Mobile number'), required: true },
-    { key: 'moveInDate',       label: L('মুভ-ইন তারিখ', 'Move-in date'), required: true },
-    { key: 'fatherName',       label: L('পিতার নাম', "Father's name") },
-    { key: 'dob',              label: L('জন্ম তারিখ', 'Date of birth') },
-    { key: 'maritalStatus',    label: L('বৈবাহিক অবস্থা', 'Marital status') },
-    { key: 'permanentAddress', label: L('স্থায়ী ঠিকানা', 'Permanent address') },
-    { key: 'tenantType',       label: L('পেশা', 'Profession') },
-    {
-      key: 'organization',
-      label: type ? (isBn ? type.orgLabel.bn : type.orgLabel.en) : L('প্রতিষ্ঠান', 'Organization'),
-    },
+    { key: 'name',             required: true },
+    { key: 'phone',            required: true },
+    { key: 'moveInDate',       required: true },
+    { key: 'fatherName' },
+    { key: 'dob' },
+    { key: 'maritalStatus' },
+    { key: 'permanentAddress' },
+    { key: 'tenantType' },
+    { key: 'organization' },
     // Only meaningful once we know they are a student.
-    ...(p.tenantType === 'student'
-      ? [{ key: 'department', label: L('ডিপার্টমেন্ট', 'Department') }]
-      : []),
+    ...(p.tenantType === 'student' ? [{ key: 'department' }] : []),
     {
       key: 'professionalIdNumber',
-      label: type ? (isBn ? type.idLabel.bn : type.idLabel.en) : L('আইডি', 'ID'),
       // "নেই" is a complete answer — do not list it as missing.
       answered: p.professionalIdStatus === HAS_STATUS.NONE,
     },
-    {
-      key: 'govtIdNumber',
-      label: L('NID / পাসপোর্ট', 'NID / Passport'),
-      answered: p.govtIdStatus === HAS_STATUS.NONE,
-    },
-    { key: 'emergencyName',  label: L('জরুরি যোগাযোগ — নাম', 'Emergency contact — name') },
-    { key: 'emergencyPhone', label: L('জরুরি যোগাযোগ — মোবাইল', 'Emergency contact — mobile') },
-  ];
+    { key: 'govtIdNumber', answered: p.govtIdStatus === HAS_STATUS.NONE },
+    { key: 'emergencyName' },
+    { key: 'emergencyPhone' },
+  ].map((r) => ({ ...r, label: tenantFieldLabel(r.key, p, isBn) }));
 
   const filled = [];
   const missing = [];

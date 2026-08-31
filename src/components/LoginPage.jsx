@@ -7,7 +7,9 @@ import {
   Check, AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useSettings } from '../context/SettingsContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
+import { resolveHome } from '../utils/homeSurface';
 import {
   signupStart,
   signupVerify,
@@ -129,7 +131,8 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const goBack = useGoBack('/');
   const [searchParams] = useSearchParams();
-  const { login, refresh } = useAuth();
+  const { login, refresh, roles } = useAuth();
+  const { settings } = useSettings();
 
   // ─── Language ──────────────────────────────────────────────────────────────
   // We capture the whole context so we can update the GLOBAL app language on
@@ -255,9 +258,16 @@ const LoginPage = () => {
     }
     if (resolvedRole === 'admin') {
       navigate('/admin', { replace: true });
-    } else {
-      navigate(resolvedRole === 'landlord' ? '/host-dashboard' : '/tenant-dashboard', { replace: true });
+      return;
     }
+    // Same rules as a cold app open (utils/homeSurface.js) rather than a second
+    // hardcoded copy — signing in and reopening the app should not land you on
+    // two different screens. `hasBooking: true` on the 'auto' path because a
+    // tenant who just signed in deliberately is better served by their
+    // dashboard than by the marketing homepage; the cold-boot guard is the one
+    // that has to be careful not to move someone who was already browsing.
+    const defaultHome = settings?.app?.defaultHome || 'auto';
+    navigate(resolveHome({ activeRole: resolvedRole, roles, defaultHome, hasBooking: true }), { replace: true });
   };
 
   const handlePhoneChange = (e) =>

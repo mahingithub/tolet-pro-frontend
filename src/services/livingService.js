@@ -89,6 +89,25 @@ export const livingService = {
   // mess deposits (জমা)
   addDeposit: (d, opId) => req('/deposits', { method: 'POST', body: d, opId }),
   deleteDeposit: (id, opId) => req(`/deposits/${id}`, { method: 'DELETE', opId }),
+
+  // ── solo খাতা ─────────────────────────────────────────────────────────────
+  // The private single-user wallet. Same queue, same idempotency key; the only
+  // difference is that every row carries the id THIS phone minted, so an entry
+  // written offline never changes identity once it reaches the server.
+  // Resolves to `{ ledger }` — or `{ ledger: null }` when the server has never
+  // seen this খাতা, which is what triggers the one-time merge upload.
+  getSolo: (signal) => req('/solo', { signal }),
+  mergeSolo: (ledger, opId) => req('/solo/merge', { method: 'POST', body: ledger, opId }),
+  updateSolo: (patch, opId) => req('/solo', { method: 'PATCH', body: patch, opId }),
+  resetSolo: (opId) => req('/solo', { method: 'DELETE', opId }),
+
+  addSoloPerson: (p, opId) => req('/solo/people', { method: 'POST', body: p, opId }),
+  updateSoloPerson: (id, patch, opId) => req(`/solo/people/${id}`, { method: 'PATCH', body: patch, opId }),
+  deleteSoloPerson: (id, opId) => req(`/solo/people/${id}`, { method: 'DELETE', opId }),
+
+  addSoloEntry: (e, opId) => req('/solo/entries', { method: 'POST', body: e, opId }),
+  updateSoloEntry: (id, patch, opId) => req(`/solo/entries/${id}`, { method: 'PATCH', body: patch, opId }),
+  deleteSoloEntry: (id, opId) => req(`/solo/entries/${id}`, { method: 'DELETE', opId }),
 };
 
 export default livingService;

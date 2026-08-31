@@ -71,7 +71,8 @@ import { emptyTenantProfile, validateTenantProfile, toTenantProfile, tenantField
 import { scanTenantForm } from '../services/aiScanService';
 import { scopeBookings, bookingInBuilding, sortByBuildingOrder } from '../utils/buildingScope';
 import { paidSoFar, remainingFor, applyPaymentToEntry } from '../utils/rentLedger';
-import { primaryOccupant, occupantNames, occupantCount, activeMembers } from '../utils/occupants';
+import { primaryOccupant, occupantNames, occupantCount, activeMembers, advanceCollected } from '../utils/occupants';
+import { ADVANCE_PAYMENT_METHODS } from '../utils/tenantRent';
 import { PLAY_STORE_URL } from '../hooks/useAppInstall';
 import { SITE_URL } from '../seo/siteConfig';
 import { directUpload } from '../services/cloudinaryUpload';
@@ -130,7 +131,31 @@ const TOUR_TAB_ANCHORS = {
 
 // Payment channels offered when converting an inquiry into a booking / recording
 // an advance. Order matches the most-used mobile-money + bank rails in Bangladesh.
-const PAYMENT_METHODS = ['bKash', 'Nagad', 'Rocket', 'Bank Transfer', 'Cash'];
+// Shared with SeatTenantModal — see utils/tenantRent.js.
+const PAYMENT_METHODS = ADVANCE_PAYMENT_METHODS;
+
+/**
+ * How big a KPI figure can be printed without clipping.
+ *
+ * The money is the loudest thing on these tiles by design, but a half-width
+ * tile on a 375px phone only has ~115px of room: "৳ 12,34,567" at 22px needs
+ * 132px and was truncating to an ellipsis — the exact number the landlord came
+ * to read, replaced by three dots. Stepping down by length keeps the everyday
+ * four- and five-figure totals big, and keeps the rare six-figure one WHOLE.
+ */
+const kpiValueSize = (text) => {
+  const len = String(text ?? '').length;
+  if (len <= 8) return 'text-[22px] md:text-3xl';
+  if (len <= 11) return 'text-[19px] md:text-2xl';
+  return 'text-[16px] md:text-xl';
+};
+
+/**
+ * Same idea, for the narrower per-building tiles. `break-words` was the first
+ * attempt and it split "৳ 12,49,967" across three lines mid-digit, which is
+ * arguably less readable than the ellipsis it replaced.
+ */
+const bldgValueSize = (text) => (String(text ?? '').length > 9 ? 'text-[12.5px]' : 'text-[15px]');
 
 /**
  * Adapt a property record returned by propertyService (used by the public
@@ -606,7 +631,7 @@ const getLeaseSummary = (bookings, today = new Date()) => {
     // every live lease and drops off once done or cancelled.
     // (`securityDeposit` added too for any data that carries it separately.)
     if (b.status !== 'cancelled' && stage !== 'done') {
-      totalSecurityDeposits += Number(b.advancePayment || 0) + Number(b.securityDeposit || 0);
+      totalSecurityDeposits += advanceCollected(b) + Number(b.securityDeposit || 0);
     }
   });
   return { totalMonthlyRevenue, activeCount, doneCount, endingSoonCount, totalSecurityDeposits };
@@ -5481,34 +5506,41 @@ const HostDashboard = () => {
                     </div>
                   </div>
 
-                  {/* 4-KPI strip (Always Show) */}
+                  {/* 4-KPI strip (Always Show)
+                      These four numbers are the reason a landlord opens the app,
+                      and they used to be set in 8px labels on a transparent card
+                      — the money was the quietest thing on the screen. Now the
+                      figure leads at 22px on a tinted block, and the label and
+                      footnote are readable Bangla rather than a grey hairline.
+                      `truncate` keeps a six-figure total from breaking the grid
+                      on a narrow phone. */}
                   <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="bg-transparent border border-emerald-100/80 dark:border-emerald-800/50 rounded-2xl p-3 md:p-4">
-                      <p className="text-[8px] md:text-[9px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">{language === 'বাংলা' ? 'আদায়' : 'Collected'}</p>
-                      <p className="text-lg md:text-2xl font-black text-emerald-700 dark:text-emerald-400 tabular-nums mt-1 leading-none">{formatBDT(sm.collectedTotal)}</p>
-                      <p className="text-[8px] md:text-[9px] font-bold text-emerald-700/70 dark:text-emerald-400/70 mt-1.5 inline-flex items-center gap-1">
-                        <CheckCircle2 size={10} strokeWidth={3}/> {sm.paidCount} {language === 'বাংলা' ? 'ক্লিয়ার্ড' : 'cleared'}
+                    <div className="bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-800/50 rounded-2xl p-3.5 md:p-4">
+                      <p className="text-[10px] md:text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">{language === 'বাংলা' ? 'আদায়' : 'Collected'}</p>
+                      <p className={`${kpiValueSize(formatBDT(sm.collectedTotal))} font-black text-emerald-700 dark:text-emerald-400 tabular-nums mt-1.5 leading-none truncate`}>{formatBDT(sm.collectedTotal)}</p>
+                      <p className="text-[10px] md:text-[11px] font-bold text-emerald-700/80 dark:text-emerald-400/70 mt-2 inline-flex items-center gap-1">
+                        <CheckCircle2 size={12} strokeWidth={3}/> {sm.paidCount} {language === 'বাংলা' ? 'ক্লিয়ার্ড' : 'cleared'}
                       </p>
                     </div>
-                    <div className="bg-transparent border border-rose-100/80 dark:border-rose-800/50 rounded-2xl p-3 md:p-4">
-                      <p className="text-[8px] md:text-[9px] font-black text-rose-700 dark:text-rose-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বকেয়া' : 'Outstanding'}</p>
-                      <p className="text-lg md:text-2xl font-black text-rose-700 dark:text-rose-400 tabular-nums mt-1 leading-none">{formatBDT(sm.outstandingTotal)}</p>
-                      <p className="text-[8px] md:text-[9px] font-bold text-rose-700/70 dark:text-rose-400/70 mt-1.5 inline-flex items-center gap-1">
-                        <AlertCircle size={10} strokeWidth={3}/> {sm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'unpaid'}
+                    <div className="bg-rose-50/60 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-800/50 rounded-2xl p-3.5 md:p-4">
+                      <p className="text-[10px] md:text-[11px] font-black text-rose-700 dark:text-rose-400 uppercase tracking-wider">{language === 'বাংলা' ? 'বকেয়া' : 'Outstanding'}</p>
+                      <p className={`${kpiValueSize(formatBDT(sm.outstandingTotal))} font-black text-rose-700 dark:text-rose-400 tabular-nums mt-1.5 leading-none truncate`}>{formatBDT(sm.outstandingTotal)}</p>
+                      <p className="text-[10px] md:text-[11px] font-bold text-rose-700/80 dark:text-rose-400/70 mt-2 inline-flex items-center gap-1">
+                        <AlertCircle size={12} strokeWidth={3}/> {sm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'unpaid'}
                       </p>
                     </div>
-                    <div className="bg-transparent border border-amber-100/80 dark:border-amber-800/50 rounded-2xl p-3 md:p-4">
-                      <p className="text-[8px] md:text-[9px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest">{language === 'বাংলা' ? 'আংশিক' : 'Partial'}</p>
-                      <p className="text-lg md:text-2xl font-black text-amber-700 dark:text-amber-400 tabular-nums mt-1 leading-none">{sm.partialCount}</p>
-                      <p className="text-[8px] md:text-[9px] font-bold text-amber-700/70 dark:text-amber-400/70 mt-1.5 inline-flex items-center gap-1">
-                        <Hourglass size={10} strokeWidth={3}/> {language === 'বাংলা' ? 'আংশিক পেমেন্ট' : 'partially paid'}
+                    <div className="bg-amber-50/60 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-800/50 rounded-2xl p-3.5 md:p-4">
+                      <p className="text-[10px] md:text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider">{language === 'বাংলা' ? 'আংশিক' : 'Partial'}</p>
+                      <p className={`${kpiValueSize(sm.partialCount)} font-black text-amber-700 dark:text-amber-400 tabular-nums mt-1.5 leading-none truncate`}>{sm.partialCount}</p>
+                      <p className="text-[10px] md:text-[11px] font-bold text-amber-700/80 dark:text-amber-400/70 mt-2 inline-flex items-center gap-1">
+                        <Hourglass size={12} strokeWidth={3}/> {language === 'বাংলা' ? 'আংশিক পেমেন্ট' : 'partially paid'}
                       </p>
                     </div>
-                    <div className="bg-transparent border border-blue-100/80 dark:border-blue-800/50 rounded-2xl p-3 md:p-4">
-                      <p className="text-[8px] md:text-[9px] font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest">{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}</p>
-                      <p className="text-lg md:text-2xl font-black text-blue-700 dark:text-blue-400 tabular-nums mt-1 leading-none">{formatBDT(sm.expectedTotal)}</p>
-                      <p className="text-[8px] md:text-[9px] font-bold text-blue-700/70 dark:text-blue-400/70 mt-1.5 inline-flex items-center gap-1">
-                        <Calendar size={10} strokeWidth={3}/> {sm.totalDueCount} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}
+                    <div className="bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-3.5 md:p-4">
+                      <p className="text-[10px] md:text-[11px] font-black text-blue-700 dark:text-blue-400 uppercase tracking-wider">{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}</p>
+                      <p className={`${kpiValueSize(formatBDT(sm.expectedTotal))} font-black text-blue-700 dark:text-blue-400 tabular-nums mt-1.5 leading-none truncate`}>{formatBDT(sm.expectedTotal)}</p>
+                      <p className="text-[10px] md:text-[11px] font-bold text-blue-700/80 dark:text-blue-400/70 mt-2 inline-flex items-center gap-1">
+                        <Calendar size={12} strokeWidth={3}/> {sm.totalDueCount} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}
                       </p>
                     </div>
                   </div>
@@ -5537,12 +5569,24 @@ const HostDashboard = () => {
                                 )}
                               </h4>
                               
-                              <div className="flex items-end justify-between mb-2">
-                                <div>
-                                  <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-0.5">{language === 'বাংলা' ? 'আদায় / প্রত্যাশিত' : 'Collected / Expected'}</p>
-                                  <p className="text-xs font-black text-gray-900 dark:text-gray-100 tabular-nums">{formatBDT(bldgSm.collectedTotal)} <span className="text-gray-400 dark:text-gray-500">/ {formatBDT(bldgSm.expectedTotal)}</span></p>
+                              {/* Two rows, not "collected / expected" on one
+                                  line: these cards sit two-up on a phone, and at
+                                  a readable size a six-figure pair does not fit
+                                  across one. It was truncating the expected
+                                  figure to an ellipsis — the number the landlord
+                                  is measuring against, gone. */}
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <div className="min-w-0 space-y-1">
+                                  <div>
+                                    <p className="text-[10px] font-black text-emerald-700/80 dark:text-emerald-400/80 uppercase tracking-wider leading-none">{language === 'বাংলা' ? 'আদায়' : 'Collected'}</p>
+                                    <p className={`${bldgValueSize(formatBDT(bldgSm.collectedTotal))} font-black text-gray-900 dark:text-gray-100 tabular-nums leading-tight whitespace-nowrap`}>{formatBDT(bldgSm.collectedTotal)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider leading-none">{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}</p>
+                                    <p className={`${bldgValueSize(formatBDT(bldgSm.expectedTotal))} font-black text-gray-500 dark:text-gray-400 tabular-nums leading-tight whitespace-nowrap`}>{formatBDT(bldgSm.expectedTotal)}</p>
+                                  </div>
                                 </div>
-                                <span className="text-xs font-black text-[#ba0036] dark:text-rose-400 tabular-nums">{bldgPct}%</span>
+                                <span className="text-lg font-black text-[#ba0036] dark:text-rose-400 tabular-nums shrink-0">{bldgPct}%</span>
                               </div>
                               <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-3">
                                 <div className="h-full rounded-full bg-gradient-to-r from-[#ba0036] to-[#ff004c] dark:from-rose-500 dark:to-rose-400 transition-all duration-700" style={{ width: `${bldgPct}%` }} />
@@ -5619,34 +5663,41 @@ const HostDashboard = () => {
                     </div>
                   </div>
 
-                  {/* 4-KPI strip (Always Show) */}
+                  {/* 4-KPI strip (Always Show)
+                      These four numbers are the reason a landlord opens the app,
+                      and they used to be set in 8px labels on a transparent card
+                      — the money was the quietest thing on the screen. Now the
+                      figure leads at 22px on a tinted block, and the label and
+                      footnote are readable Bangla rather than a grey hairline.
+                      `truncate` keeps a six-figure total from breaking the grid
+                      on a narrow phone. */}
                   <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="bg-transparent border border-emerald-100/80 dark:border-emerald-800/50 rounded-2xl p-3 md:p-4">
-                      <p className="text-[8px] md:text-[9px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">{language === 'বাংলা' ? 'আদায়' : 'Collected'}</p>
-                      <p className="text-lg md:text-2xl font-black text-emerald-700 dark:text-emerald-400 tabular-nums mt-1 leading-none">{formatBDT(sm.collectedTotal)}</p>
-                      <p className="text-[8px] md:text-[9px] font-bold text-emerald-700/70 dark:text-emerald-400/70 mt-1.5 inline-flex items-center gap-1">
-                        <CheckCircle2 size={10} strokeWidth={3}/> {sm.paidCount} {language === 'বাংলা' ? 'ক্লিয়ার্ড' : 'cleared'}
+                    <div className="bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-800/50 rounded-2xl p-3.5 md:p-4">
+                      <p className="text-[10px] md:text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">{language === 'বাংলা' ? 'আদায়' : 'Collected'}</p>
+                      <p className={`${kpiValueSize(formatBDT(sm.collectedTotal))} font-black text-emerald-700 dark:text-emerald-400 tabular-nums mt-1.5 leading-none truncate`}>{formatBDT(sm.collectedTotal)}</p>
+                      <p className="text-[10px] md:text-[11px] font-bold text-emerald-700/80 dark:text-emerald-400/70 mt-2 inline-flex items-center gap-1">
+                        <CheckCircle2 size={12} strokeWidth={3}/> {sm.paidCount} {language === 'বাংলা' ? 'ক্লিয়ার্ড' : 'cleared'}
                       </p>
                     </div>
-                    <div className="bg-transparent border border-rose-100/80 dark:border-rose-800/50 rounded-2xl p-3 md:p-4">
-                      <p className="text-[8px] md:text-[9px] font-black text-rose-700 dark:text-rose-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বকেয়া' : 'Outstanding'}</p>
-                      <p className="text-lg md:text-2xl font-black text-rose-700 dark:text-rose-400 tabular-nums mt-1 leading-none">{formatBDT(sm.outstandingTotal)}</p>
-                      <p className="text-[8px] md:text-[9px] font-bold text-rose-700/70 dark:text-rose-400/70 mt-1.5 inline-flex items-center gap-1">
-                        <AlertCircle size={10} strokeWidth={3}/> {sm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'unpaid'}
+                    <div className="bg-rose-50/60 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-800/50 rounded-2xl p-3.5 md:p-4">
+                      <p className="text-[10px] md:text-[11px] font-black text-rose-700 dark:text-rose-400 uppercase tracking-wider">{language === 'বাংলা' ? 'বকেয়া' : 'Outstanding'}</p>
+                      <p className={`${kpiValueSize(formatBDT(sm.outstandingTotal))} font-black text-rose-700 dark:text-rose-400 tabular-nums mt-1.5 leading-none truncate`}>{formatBDT(sm.outstandingTotal)}</p>
+                      <p className="text-[10px] md:text-[11px] font-bold text-rose-700/80 dark:text-rose-400/70 mt-2 inline-flex items-center gap-1">
+                        <AlertCircle size={12} strokeWidth={3}/> {sm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'unpaid'}
                       </p>
                     </div>
-                    <div className="bg-transparent border border-amber-100/80 dark:border-amber-800/50 rounded-2xl p-3 md:p-4">
-                      <p className="text-[8px] md:text-[9px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest">{language === 'বাংলা' ? 'আংশিক' : 'Partial'}</p>
-                      <p className="text-lg md:text-2xl font-black text-amber-700 dark:text-amber-400 tabular-nums mt-1 leading-none">{sm.partialCount}</p>
-                      <p className="text-[8px] md:text-[9px] font-bold text-amber-700/70 dark:text-amber-400/70 mt-1.5 inline-flex items-center gap-1">
-                        <Hourglass size={10} strokeWidth={3}/> {language === 'বাংলা' ? 'আংশিক পেমেন্ট' : 'partially paid'}
+                    <div className="bg-amber-50/60 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-800/50 rounded-2xl p-3.5 md:p-4">
+                      <p className="text-[10px] md:text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider">{language === 'বাংলা' ? 'আংশিক' : 'Partial'}</p>
+                      <p className={`${kpiValueSize(sm.partialCount)} font-black text-amber-700 dark:text-amber-400 tabular-nums mt-1.5 leading-none truncate`}>{sm.partialCount}</p>
+                      <p className="text-[10px] md:text-[11px] font-bold text-amber-700/80 dark:text-amber-400/70 mt-2 inline-flex items-center gap-1">
+                        <Hourglass size={12} strokeWidth={3}/> {language === 'বাংলা' ? 'আংশিক পেমেন্ট' : 'partially paid'}
                       </p>
                     </div>
-                    <div className="bg-transparent border border-blue-100/80 dark:border-blue-800/50 rounded-2xl p-3 md:p-4">
-                      <p className="text-[8px] md:text-[9px] font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest">{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}</p>
-                      <p className="text-lg md:text-2xl font-black text-blue-700 dark:text-blue-400 tabular-nums mt-1 leading-none">{formatBDT(sm.expectedTotal)}</p>
-                      <p className="text-[8px] md:text-[9px] font-bold text-blue-700/70 dark:text-blue-400/70 mt-1.5 inline-flex items-center gap-1">
-                        <Calendar size={10} strokeWidth={3}/> {sm.totalDueCount} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}
+                    <div className="bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-3.5 md:p-4">
+                      <p className="text-[10px] md:text-[11px] font-black text-blue-700 dark:text-blue-400 uppercase tracking-wider">{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}</p>
+                      <p className={`${kpiValueSize(formatBDT(sm.expectedTotal))} font-black text-blue-700 dark:text-blue-400 tabular-nums mt-1.5 leading-none truncate`}>{formatBDT(sm.expectedTotal)}</p>
+                      <p className="text-[10px] md:text-[11px] font-bold text-blue-700/80 dark:text-blue-400/70 mt-2 inline-flex items-center gap-1">
+                        <Calendar size={12} strokeWidth={3}/> {sm.totalDueCount} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}
                       </p>
                     </div>
                   </div>
@@ -5675,12 +5726,24 @@ const HostDashboard = () => {
                                 )}
                               </h4>
                               
-                              <div className="flex items-end justify-between mb-2">
-                                <div>
-                                  <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-0.5">{language === 'বাংলা' ? 'আদায় / প্রত্যাশিত' : 'Collected / Expected'}</p>
-                                  <p className="text-xs font-black text-gray-900 dark:text-gray-100 tabular-nums">{formatBDT(bldgSm.collectedTotal)} <span className="text-gray-400 dark:text-gray-500">/ {formatBDT(bldgSm.expectedTotal)}</span></p>
+                              {/* Two rows, not "collected / expected" on one
+                                  line: these cards sit two-up on a phone, and at
+                                  a readable size a six-figure pair does not fit
+                                  across one. It was truncating the expected
+                                  figure to an ellipsis — the number the landlord
+                                  is measuring against, gone. */}
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <div className="min-w-0 space-y-1">
+                                  <div>
+                                    <p className="text-[10px] font-black text-emerald-700/80 dark:text-emerald-400/80 uppercase tracking-wider leading-none">{language === 'বাংলা' ? 'আদায়' : 'Collected'}</p>
+                                    <p className={`${bldgValueSize(formatBDT(bldgSm.collectedTotal))} font-black text-gray-900 dark:text-gray-100 tabular-nums leading-tight whitespace-nowrap`}>{formatBDT(bldgSm.collectedTotal)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider leading-none">{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}</p>
+                                    <p className={`${bldgValueSize(formatBDT(bldgSm.expectedTotal))} font-black text-gray-500 dark:text-gray-400 tabular-nums leading-tight whitespace-nowrap`}>{formatBDT(bldgSm.expectedTotal)}</p>
+                                  </div>
                                 </div>
-                                <span className="text-xs font-black text-[#ba0036] dark:text-rose-400 tabular-nums">{bldgPct}%</span>
+                                <span className="text-lg font-black text-[#ba0036] dark:text-rose-400 tabular-nums shrink-0">{bldgPct}%</span>
                               </div>
                               <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-3">
                                 <div className="h-full rounded-full bg-gradient-to-r from-[#ba0036] to-[#ff004c] dark:from-rose-500 dark:to-rose-400 transition-all duration-700" style={{ width: `${bldgPct}%` }} />

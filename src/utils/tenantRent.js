@@ -43,6 +43,18 @@
 export const PAYMENT_RAILS = ['bkash', 'nagad', 'rocket', 'bank'];
 
 /**
+ * The channels offered when RECORDING money that has already changed hands —
+ * an advance handed over at move-in, or an inquiry converted into a booking.
+ * Stored verbatim on the booking/member as a display string, which is why this
+ * list is capitalised and includes Cash, unlike PAYMENT_RAILS above (the
+ * landlord's own payout accounts).
+ *
+ * Lives here rather than inside HostDashboard because SeatTenantModal needs the
+ * same list, and importing it from its own parent would be a cycle.
+ */
+export const ADVANCE_PAYMENT_METHODS = ['bKash', 'Nagad', 'Rocket', 'Bank Transfer', 'Cash'];
+
+/**
  * Presentation for each rail — ONE definition, so bKash is pink and Nagad is
  * orange on every screen. Previously each component carried its own copy and
  * they had drifted (different labels, some missing Rocket entirely, which is

@@ -15,10 +15,18 @@
  *
  * The rent is shown, not asked for: a seat's share is the room rent divided by
  * its seats, and typing it again per tenant is how the numbers drift apart.
+ *
+ * The ADVANCE is the exception, and is asked for. It is not a property of the
+ * unit — it is what THIS person handed over on the day they moved in, it
+ * differs from tenant to tenant in the same room, and the booking card has
+ * always had a "ডিপোজিট (অগ্রিম)" tile to show it. Without a box here that
+ * tile read ৳0 for every tenant seated this way, which is what the landlord
+ * noticed.
  */
 
 import React, { useRef, useState } from 'react';
-import { X, Loader2, Check, RefreshCw, UserPlus, DoorOpen, ScanLine, Sparkles, AlertCircle } from 'lucide-react';
+import { X, Loader2, Check, RefreshCw, UserPlus, DoorOpen, ScanLine, Sparkles, AlertCircle, Banknote } from 'lucide-react';
+import { ADVANCE_PAYMENT_METHODS } from '../../utils/tenantRent';
 import TenantInfoForm from './TenantInfoForm';
 import { emptyTenantProfile, validateTenantProfile, tenantFieldReport } from '../../utils/tenantFields';
 import { replaceTenantInUnit } from '../../services/buildingService';
@@ -56,6 +64,11 @@ export default function SeatTenantModal({
   }));
   const [errors, setErrors] = useState([]);
   const [saving, setSaving] = useState(false);
+  // The up-front money this person handed over, and the rail it came through.
+  // Optional — plenty of tenancies start with nothing paid in advance, so an
+  // empty box saves as ৳0 rather than blocking the form.
+  const [advance, setAdvance] = useState('');
+  const [advanceMethod, setAdvanceMethod] = useState('');
   // Scanning the admission form the landlord is already holding, straight into
   // THIS form. Manual and scanned are not two flows — the scan just fills the
   // boxes, and the landlord corrects whatever the page did not say clearly.
@@ -112,11 +125,16 @@ export default function SeatTenantModal({
     setErrors([]);
     setSaving(true);
     try {
+      const advancePayment = Math.max(0, Number(advance) || 0);
       const body = {
         name: profile.name,
         phone: profile.phone,
         moveInDate: profile.moveInDate,
         tenantProfile: profile,
+        advancePayment,
+        // Only name a rail when money actually changed hands — "৳0 via bKash"
+        // is a payment that never happened.
+        paymentMethod: advancePayment > 0 ? advanceMethod : '',
       };
       if (replacing) {
         // Swapping the occupant of an OCCUPIED seat still waits for the server:
@@ -149,6 +167,10 @@ export default function SeatTenantModal({
             roomLabel: unit.roomNumber || '',
             seatsBooked: 1,
             monthlyRent: capacity > 1 ? 0 : Number(unit.monthlyRent) || 0,
+            // Written on the MEMBER, not the booking: a seat room is one
+            // booking with several occupants, each with their own advance.
+            advancePayment: body.advancePayment,
+            paymentMethod: body.paymentMethod,
             status: 'active',
             joinDate: profile.moveInDate,
             ledger: {},
@@ -299,6 +321,58 @@ export default function SeatTenantModal({
                 </div>
               );
             })()}
+          </div>
+
+          {/* Advance / deposit — the one money box on this form. The rent is
+              the unit's and never retyped; this is the person's, and the
+              booking card has a tile waiting for it. */}
+          <div className="bg-gradient-to-br from-emerald-50/70 to-white p-3.5 rounded-2xl border border-emerald-100 mb-3">
+            <div className="flex items-center gap-2 mb-2.5">
+              <Banknote size={14} className="text-emerald-600" />
+              <span className="text-[11px] font-black text-gray-900 uppercase tracking-widest">
+                {isBn ? 'অ্যাডভান্স / জামানত' : 'Advance / Deposit'}
+              </span>
+              <span className="text-[10px] font-bold text-gray-400 ml-auto">{isBn ? 'ঐচ্ছিক' : 'Optional'}</span>
+            </div>
+
+            <label htmlFor="seat-advance" className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              {isBn ? 'অ্যাডভান্স (৳)' : 'Advance Amount (৳)'}
+            </label>
+            <input
+              id="seat-advance"
+              type="number"
+              min="0"
+              inputMode="numeric"
+              value={advance}
+              onChange={(e) => setAdvance(e.target.value)}
+              placeholder="0"
+              className="w-full mt-1.5 p-3.5 bg-white rounded-xl text-sm font-bold text-gray-900 outline-none focus:shadow-[0_4px_15px_rgba(16,185,129,0.12)] border border-gray-100 focus:border-emerald-300 transition-all"
+            />
+
+            {/* The rail only matters once there is money to attribute to it. */}
+            {Number(advance) > 0 && (
+              <>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-3">
+                  {isBn ? 'কীভাবে পেয়েছেন' : 'Received via'}
+                </p>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {ADVANCE_PAYMENT_METHODS.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setAdvanceMethod((cur) => (cur === m ? '' : m))}
+                      className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all active:scale-95 ${
+                        advanceMethod === m
+                          ? 'bg-emerald-600 text-white shadow-[0_4px_12px_rgba(5,150,105,0.25)]'
+                          : 'bg-white text-gray-600 border border-gray-200 hover:border-emerald-300'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
           {/* The same tenant form as everywhere else: name, mobile, move-in,

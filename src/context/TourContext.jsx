@@ -532,16 +532,34 @@ export const TourProvider = ({ children }) => {
       };
 
       try {
-        // Some tours teach a page the user is not on yet. Signup drops a new
-        // tenant on /tenant-dashboard, but the search bar their tour is about
-        // only exists on the public home page.
-        if (ensurePath && window.location.pathname !== ensurePath) navigate(ensurePath);
+        // A tour teaches whatever screen the user is ALREADY on. It used to
+        // navigate to `ensurePath` when they were somewhere else — which was
+        // invisible while the app's boot destination was fixed, but is a fight
+        // it cannot win now that the user chooses their own home screen: the
+        // tenant tour's ensurePath ('/') dragged people straight back off the
+        // home they had picked. So `ensurePath` is now a CONDITION, not a
+        // destination.
+        //
+        // Bail SILENTLY — no refund, no retryTick. This is the one exit that
+        // must not re-drive the route effects: those effects read React
+        // Router's location, and during a boot redirect that still says "/"
+        // for a beat while window.location already says "/living". A standDown
+        // here would bump retryTick, the effect would call this again, we would
+        // mismatch again, and the refund means the attempt cap never bites — a
+        // spin that kept React too busy to ever commit the redirect, leaving
+        // the URL on the new route with the old page still rendered. The
+        // effects already re-run on a real route change, which is exactly when
+        // this tour deserves another go.
+        if (ensurePath && window.location.pathname !== ensurePath) {
+          refundAttempt(tourId);
+          return;
+        }
 
         // A navigate() issued in the same commit as this call (App.jsx sends
-        // landlords from "/" to the dashboard on boot) updates the history
-        // synchronously but React has not re-rendered yet. Settle first — which
-        // also lets the line above land — then read the route, so we validate
-        // against where we are actually going rather than where we came from.
+        // people from "/" to their chosen home on boot) updates the history
+        // synchronously but React has not re-rendered yet. Settle first, then
+        // read the route, so we validate against where we are actually going
+        // rather than where we came from.
         await sleep(START_SETTLE_MS);
 
         const route = window.location.pathname;
@@ -795,9 +813,9 @@ export const TourProvider = ({ children }) => {
           closingStep(),
         ],
         {
-          // The search bar only exists on the public home page, and signup drops
-          // a new tenant on /tenant-dashboard. Go there first, then confirm we
-          // actually arrived before spotlighting anything.
+          // The search bar this tour is about only exists on the public home
+          // page, so it only runs there. A tenant whose home is the Living খাতা
+          // or their dashboard simply gets it the first time they visit "/".
           ensurePath: '/',
           anchor: '[data-tour="mode-switcher"]',
           stillValid: () => window.location.pathname === '/',
@@ -1072,10 +1090,19 @@ export const TourProvider = ({ children }) => {
 
   /* ── Landlord on the public home page: get them to the dashboard ─────── */
   const startHostTour = useCallback(async () => {
-    // Not the home page? The dashboard tour is the one that matters.
+    // This tour's entire premise is "you are sitting on the public home page".
+    // If that is no longer true by the time it runs, it has nothing to say —
+    // so it stands down rather than steering.
+    //
+    // It used to navigate('/host-dashboard') here, which was invisible while
+    // the boot redirect sent every landlord to that same page anyway. Now that
+    // a landlord can choose the Living খাতা as their home, this line raced the
+    // redirect and dragged them off it. Dragging a user to another screen to be
+    // toured is the wrong behaviour regardless of who wins the race; the
+    // /host-dashboard route effect below already starts the dashboard tour for
+    // anyone actually there.
     if (window.location.pathname !== '/') {
-      if (window.location.pathname !== '/host-dashboard') navigate('/host-dashboard');
-      await startHostDashboardTour();
+      if (window.location.pathname === '/host-dashboard') await startHostDashboardTour();
       return;
     }
 

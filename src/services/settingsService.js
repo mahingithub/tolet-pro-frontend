@@ -66,6 +66,12 @@ export const DEFAULT_SETTINGS = {
     autoplayVideos: true,
     reduceMotion: false,
     defaultLandingRole: 'auto', // 'auto' | 'tenant' | 'landlord'
+    // Which SCREEN the app opens on — see utils/homeSurface.js. 'auto' is the
+    // behaviour that predates this setting, so an existing user notices nothing.
+    defaultHome: 'auto',  // 'auto' | 'living' | 'tenant' | 'host' | 'explore'
+    // Which Living wallet this person runs. Kept on the account rather than the
+    // phone so reinstalling doesn't ask "একা না যৌথ?" all over again.
+    livingMode: '',       // '' (never answered) | 'solo' | 'joint'
   },
 
   // Tenant-scope settings.
@@ -147,6 +153,17 @@ async function call(path, { method = 'GET', body } = {}) {
 export function getCachedSettings() {
   return mergeSettings(DEFAULT_SETTINGS, readJson(CACHE_KEY, null) || {});
 }
+
+/**
+ * Has this device ever stored the user's settings?
+ *
+ * getCachedSettings() can't answer this — it merges onto DEFAULT_SETTINGS, so
+ * "never fetched" and "fetched, and everything is at its default" come back
+ * identical. The difference matters exactly once, at boot: code deciding which
+ * screen to open has to know whether the preference it is reading is the user's
+ * answer or just a placeholder standing in for one.
+ */
+export const hasCachedSettings = () => readJson(CACHE_KEY, null) !== null;
 
 function cache(settings) {
   writeJson(CACHE_KEY, settings);

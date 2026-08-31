@@ -25,7 +25,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   User, Phone, Calendar, ChevronDown, ChevronUp, Camera, X, Loader2,
-  Briefcase, IdCard, MapPin, PhoneCall, Check, Lock,
+  Briefcase, IdCard, MapPin, PhoneCall, Check, Lock, ImagePlus,
 } from 'lucide-react';
 import { privateUpload } from '../../services/cloudinaryUpload';
 import {
@@ -50,6 +50,7 @@ export default function TenantInfoForm({
   const [open, setOpen] = useState(defaultExpanded);
   const [uploading, setUploading] = useState(false);
   const photoInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   // A just-picked file, shown from local memory. The stored photoUrl points at
   // an AUTHENTICATED Cloudinary asset, which an <img> cannot load until the
   // server signs it — so right after an upload we preview the local blob and
@@ -246,6 +247,18 @@ export default function TenantInfoForm({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
+                    {/* Camera — opens the device camera directly */}
+                    <button
+                      type="button"
+                      disabled={uploading}
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="px-3 py-2 rounded-xl bg-white border border-gray-200 text-[10px] font-black uppercase tracking-widest text-gray-700 hover:border-gray-300 active:scale-95 transition-all inline-flex items-center gap-1.5 disabled:opacity-60"
+                    >
+                      {uploading
+                        ? <><Loader2 size={12} className="animate-spin" /> {isBn ? 'আপলোড হচ্ছে' : 'Uploading'}</>
+                        : <><Camera size={12} /> {isBn ? 'ক্যামেরা' : 'Camera'}</>}
+                    </button>
+                    {/* Gallery — pick from photo library */}
                     <button
                       type="button"
                       disabled={uploading}
@@ -254,7 +267,7 @@ export default function TenantInfoForm({
                     >
                       {uploading
                         ? <><Loader2 size={12} className="animate-spin" /> {isBn ? 'আপলোড হচ্ছে' : 'Uploading'}</>
-                        : <><Camera size={12} /> {photoSrc ? (isBn ? 'বদলান' : 'Change') : (isBn ? 'ছবি যোগ করুন' : 'Add photo')}</>}
+                        : <><ImagePlus size={12} /> {isBn ? 'গ্যালারি' : 'Gallery'}</>}
                     </button>
                     {photoSrc && (
                       <button
@@ -277,10 +290,20 @@ export default function TenantInfoForm({
                   </p>
                 </div>
               </div>
+              {/* Gallery input — no capture, opens photo picker */}
               <input
                 ref={photoInputRef}
                 type="file"
                 accept="image/*"
+                className="hidden"
+                onChange={(e) => { handlePhoto(e.target.files?.[0]); e.target.value = ''; }}
+              />
+              {/* Camera input — capture="environment" opens the rear camera */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
                 className="hidden"
                 onChange={(e) => { handlePhoto(e.target.files?.[0]); e.target.value = ''; }}
               />

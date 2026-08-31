@@ -134,7 +134,104 @@ export const LOCAL = {
     if (p.budgets) out.budgets = { ...s.budgets, ...p.budgets };
     return out;
   },
+
+  // ── solo খাতা ─────────────────────────────────────────────────────────────
+  // The rows the solo wallet creates keep `op.newId` — a plain id, no `tmp_`
+  // prefix — because the server accepts the id this phone minted rather than
+  // issuing its own. That is what lets an entry written in a dead zone keep the
+  // same identity forever, and what makes merging two devices a union by id.
+  soloAddPerson: (s, op) => ({
+    solo: {
+      ...s.solo,
+      people: [
+        ...s.solo.people,
+        {
+          id: op.newId,
+          name: 'Friend',
+          color: '#64748b',
+          phone: '',
+          note: '',
+          createdAt: op.at,
+          ...op.args.person,
+        },
+      ],
+    },
+  }),
+  soloUpdatePerson: (s, op) => ({
+    solo: {
+      ...s.solo,
+      people: s.solo.people.map((p) => (p.id === op.args.id ? { ...p, ...op.args.patch } : p)),
+    },
+  }),
+  // Drops the person AND every entry tied to them — a ধার row is meaningless
+  // without the person it points at. The server does the same on its copy.
+  soloRemovePerson: (s, op) => ({
+    solo: {
+      ...s.solo,
+      people: s.solo.people.filter((p) => p.id !== op.args.id),
+      entries: s.solo.entries.filter((e) => e.personId !== op.args.id),
+    },
+  }),
+
+  soloAddEntry: (s, op) => ({
+    solo: {
+      ...s.solo,
+      entries: [
+        {
+          id: op.newId,
+          type: 'expense',
+          amount: 0,
+          category: 'other',
+          personId: null,
+          note: '',
+          method: 'cash',
+          date: op.at,
+          createdAt: op.at,
+          ...op.args.entry,
+        },
+        ...s.solo.entries,
+      ],
+    },
+  }),
+  soloUpdateEntry: (s, op) => ({
+    solo: {
+      ...s.solo,
+      entries: s.solo.entries.map((e) =>
+        e.id === op.args.id ? { ...e, ...op.args.patch, editedAt: op.at } : e,
+      ),
+    },
+  }),
+  soloDeleteEntry: (s, op) => ({
+    solo: { ...s.solo, entries: s.solo.entries.filter((e) => e.id !== op.args.id) },
+  }),
+
+  soloConfig: (s, op) => {
+    const p = op.args.patch || {};
+    const next = { ...s.solo };
+    // `opening` is cash already in hand and may legitimately be negative;
+    // `budget` is a cap and may not.
+    if (p.opening !== undefined) next.opening = Number(p.opening) || 0;
+    if (p.budget !== undefined) next.budget = num(p.budget);
+    return { solo: next };
+  },
+  soloReset: (s) => ({ solo: { opening: 0, budget: 0, people: [], entries: [] } }),
 };
+
+// The solo actions, as a set — the store asks "is this op for the private
+// খাতা?" on every write, replay and queue filter, and one list beats six
+// string comparisons scattered around.
+export const SOLO_ACTIONS = new Set([
+  'soloAddPerson',
+  'soloUpdatePerson',
+  'soloRemovePerson',
+  'soloAddEntry',
+  'soloUpdateEntry',
+  'soloDeleteEntry',
+  'soloConfig',
+  'soloReset',
+]);
+
+export const isSoloOp = (op) => SOLO_ACTIONS.has(op?.action);
 
 // ── what each operation says to the server ───────────────────────────────────
 export const SEND = {
@@ -160,6 +257,21 @@ export const SEND = {
   deleteDeposit: (op) => livingService.deleteDeposit(op.args.id, op.opId),
 
   updateConfig: (op) => livingService.updateConfig(op.args.patch, op.opId),
+
+  // ── solo খাতা ─────────────────────────────────────────────────────────────
+  // The create calls send `id: op.newId` in the body: the server stores the
+  // phone's id verbatim, so there is no id to swap back afterwards.
+  soloAddPerson: (op) => livingService.addSoloPerson({ ...op.args.person, id: op.newId }, op.opId),
+  soloUpdatePerson: (op) => livingService.updateSoloPerson(op.args.id, op.args.patch, op.opId),
+  soloRemovePerson: (op) => livingService.deleteSoloPerson(op.args.id, op.opId),
+
+  soloAddEntry: (op) =>
+    livingService.addSoloEntry({ ...op.args.entry, id: op.newId, date: op.args.entry.date || op.at }, op.opId),
+  soloUpdateEntry: (op) => livingService.updateSoloEntry(op.args.id, op.args.patch, op.opId),
+  soloDeleteEntry: (op) => livingService.deleteSoloEntry(op.args.id, op.opId),
+
+  soloConfig: (op) => livingService.updateSolo(op.args.patch, op.opId),
+  soloReset: (op) => livingService.resetSolo(op.opId),
 };
 
 // Activity lines are written by the server for a connected wallet; the local
@@ -286,6 +398,24 @@ export function mergeOp(outbox, op) {
     }
   }
 
+  // 6. Same, for the solo খাতা's opening / budget. Both are absolute values, so
+  //    the last instruction is the whole truth and dragging a budget slider
+  //    leaves one queued write rather than thirty.
+  if (op.action === 'soloConfig') {
+    const at = outbox.findIndex((o) => o.action === 'soloConfig');
+    if (at >= 0) {
+      const patch = { ...(outbox[at].args.patch || {}), ...(op.args.patch || {}) };
+      return outbox.map((o, i) => (i === at ? { ...o, args: { patch }, at: op.at } : o));
+    }
+  }
+
+  // 7. A reset wipes the খাতা, so every solo write still queued behind it is
+  //    about to be undone. Sending them first would be pure noise — and worse,
+  //    a create that lands AFTER the reset would survive it.
+  if (op.action === 'soloReset') {
+    return [...outbox.filter((o) => !SOLO_ACTIONS.has(o.action)), op];
+  }
+
   return [...outbox, op];
 }
 
@@ -298,6 +428,9 @@ export function pendingKeys(outbox = []) {
   const keys = new Set();
   outbox.forEach((op) => {
     if (op.tmpId && CREATES[op.action]) keys.add(op.tmpId);
+    // Solo creates keep a real id rather than a tmp_ one, so their pending
+    // marker is that id — the same one the row already carries on screen.
+    if (op.newId) keys.add(op.newId);
     const id = targetId(op);
     if (id) keys.add(id);
     if (op.action === 'setMeal') keys.add(`meal:${dayKey(op.args.date)}:${op.args.roommateId}`);

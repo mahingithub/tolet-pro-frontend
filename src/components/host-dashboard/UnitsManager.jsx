@@ -132,6 +132,47 @@ export default function UnitsManager({
   // universal one, or { scope:'unit', unit } for a single room. One piece of
   // state for both, because only ever one sheet is open.
   const [shareTarget, setShareTarget] = useState(null);
+  // Which unit is being edited inline. null = not editing any unit.
+  const [editingUnit, setEditingUnit] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
+
+  const startEdit = (u) => {
+    setEditingUnit(u.id);
+    setEditForm({
+      roomNumber: u.roomNumber || '',
+      floor: u.floor ?? 0,
+      seatCapacity: u.seatCapacity || 1,
+      monthlyRent: u.monthlyRent ?? '',
+      serviceCharge: u.serviceCharge ?? '',
+      rentDueDay: u.rentDueDay ?? 5,
+    });
+  };
+  const cancelEdit = () => { setEditingUnit(null); setEditForm({}); };
+  const setEdit = (patch) => setEditForm((f) => ({ ...f, ...patch }));
+
+  const saveEdit = async () => {
+    if (!editingUnit) return;
+    setEditSaving(true);
+    try {
+      const data = {};
+      if (editForm.roomNumber !== undefined) data.roomNumber = String(editForm.roomNumber).trim();
+      if (editForm.floor !== undefined) data.floor = Number(editForm.floor) || 0;
+      if (isSeat && editForm.seatCapacity !== undefined) data.seatCapacity = Number(editForm.seatCapacity) || 1;
+      if (editForm.monthlyRent !== undefined) data.monthlyRent = Number(editForm.monthlyRent) || 0;
+      if (editForm.serviceCharge !== undefined) data.serviceCharge = Number(editForm.serviceCharge) || 0;
+      if (editForm.rentDueDay !== undefined) data.rentDueDay = Number(editForm.rentDueDay) || 5;
+      await updateUnit(editingUnit, data);
+      cancelEdit();
+      await load();
+      onBookingsChanged?.();
+      showToast?.(isBn ? 'রুমের তথ্য আপডেট হয়েছে' : 'Room details updated');
+    } catch (err) {
+      showToast?.(err.message || (isBn ? 'আপডেট করা যায়নি' : 'Could not update'));
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   const isSeat = building?.rentedAs === 'seat';
   const isFlat = building?.rentedAs === 'flat';
@@ -733,6 +774,15 @@ export default function UnitsManager({
                             >
                               <QrCode size={13} />
                             </button>
+                            {/* Edit this room's details — rent, beds, floor etc. */}
+                            <button
+                              type="button"
+                              onClick={() => startEdit(u)}
+                              className="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+                              title={isBn ? 'রুম এডিট করুন' : 'Edit room'}
+                            >
+                              <Pencil size={13} />
+                            </button>
                             <button
                               type="button"
                               onClick={() => setConfirmDelete(u)}
@@ -742,6 +792,92 @@ export default function UnitsManager({
                               <Trash2 size={13} />
                             </button>
                           </div>
+
+                          {/* ── Inline edit form ── */}
+                          {editingUnit === u.id && (
+                            <div className="mt-3 bg-white rounded-2xl border border-indigo-100 p-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)] animate-in slide-in-from-top-2 duration-200">
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-[11px] font-black text-gray-900 uppercase tracking-widest flex items-center gap-1.5">
+                                  <Pencil size={12} className="text-indigo-600" />
+                                  {isBn ? 'রুম এডিট করুন' : 'Edit Room'}
+                                </h4>
+                                <button type="button" onClick={cancelEdit} className="p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all">
+                                  <X size={14} strokeWidth={3} />
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className={labelCls}>{isBn ? `${noun} নম্বর` : `${noun} No.`}</label>
+                                  <input
+                                    type="text"
+                                    value={editForm.roomNumber}
+                                    onChange={(e) => setEdit({ roomNumber: e.target.value })}
+                                    className={inputCls}
+                                  />
+                                </div>
+                                <div>
+                                  <label className={labelCls}>{isBn ? 'ফ্লোর' : 'Floor'}</label>
+                                  <input
+                                    type="number"
+                                    value={editForm.floor}
+                                    onChange={(e) => setEdit({ floor: e.target.value })}
+                                    className={inputCls}
+                                  />
+                                </div>
+                              </div>
+
+                              {isSeat && (
+                                <div className="mt-3">
+                                  <label className={labelCls}>{isBn ? 'সিট সংখ্যা' : 'Seat Capacity'}</label>
+                                  <input
+                                    type="number" min="1" max="60"
+                                    value={editForm.seatCapacity}
+                                    onChange={(e) => setEdit({ seatCapacity: e.target.value })}
+                                    className={inputCls}
+                                  />
+                                  <p className="text-[9px] font-bold text-gray-400 mt-1">
+                                    {isBn ? 'চলমান ভাড়াটিয়ার সিটের চেয়ে কম করা যাবে না' : 'Cannot reduce below occupied seats'}
+                                  </p>
+                                </div>
+                              )}
+
+                              <div className="grid grid-cols-3 gap-3 mt-3">
+                                <div>
+                                  <label className={labelCls}>{isBn ? 'ভাড়া (৳)' : 'Rent (৳)'}</label>
+                                  <input type="number" min="0" value={editForm.monthlyRent} onChange={(e) => setEdit({ monthlyRent: e.target.value })} className={inputCls} />
+                                </div>
+                                <div>
+                                  <label className={labelCls}>{isBn ? 'সার্ভিস (৳)' : 'Service (৳)'}</label>
+                                  <input type="number" min="0" value={editForm.serviceCharge} onChange={(e) => setEdit({ serviceCharge: e.target.value })} className={inputCls} />
+                                </div>
+                                <div>
+                                  <label className={labelCls}>{isBn ? 'ডিউ ডে' : 'Due Day'}</label>
+                                  <input type="number" min="1" max="28" value={editForm.rentDueDay} onChange={(e) => setEdit({ rentDueDay: e.target.value })} className={inputCls} />
+                                </div>
+                              </div>
+
+                              <div className="flex gap-2.5 mt-4">
+                                <button
+                                  type="button"
+                                  onClick={cancelEdit}
+                                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors"
+                                >
+                                  {isBn ? 'বাতিল' : 'Cancel'}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={editSaving}
+                                  onClick={saveEdit}
+                                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
+                                >
+                                  {editSaving
+                                    ? <><Loader2 size={12} className="animate-spin" /> {isBn ? 'সেভ হচ্ছে' : 'Saving'}</>
+                                    : <><Check size={12} strokeWidth={3} /> {isBn ? 'সেভ করুন' : 'Save Changes'}</>}
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

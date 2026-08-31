@@ -424,6 +424,16 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
       { value: 'tenant', label: bn ? 'ভাড়াটিয়া' : 'Tenant' },
       { value: 'landlord', label: bn ? 'বাড়িওয়ালা' : 'Landlord' },
     ],
+    // Which SCREEN the app opens on. Only offer the surfaces this account can
+    // actually reach — a tenant-only user pointed at the host dashboard would
+    // just be bounced straight back out by the route guard.
+    defaultHome: [
+      { value: 'auto', label: bn ? 'স্বয়ংক্রিয়' : 'Automatic' },
+      { value: 'living', label: bn ? 'লিভিং — হিসাবের খাতা' : 'Living — my ledger' },
+      ...(isTenant ? [{ value: 'tenant', label: bn ? 'ভাড়াটিয়া ড্যাশবোর্ড' : 'Tenant dashboard' }] : []),
+      ...(isLandlord ? [{ value: 'host', label: bn ? 'বাড়িওয়ালা ড্যাশবোর্ড' : 'Host dashboard' }] : []),
+      { value: 'explore', label: bn ? 'বাসা খুঁজুন' : 'Browse homes' },
+    ],
     visibility: [
       { value: 'public', label: bn ? 'পাবলিক' : 'Public' },
       { value: 'private', label: bn ? 'প্রাইভেট' : 'Private' },
@@ -443,7 +453,7 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
       { value: 'sublet', label: bn ? 'সাবলেট' : 'Sublet' },
       { value: 'commercial', label: bn ? 'বাণিজ্যিক' : 'Commercial' },
     ],
-  }), [bn]);
+  }), [bn, isTenant, isLandlord]);
 
   const phoneVerified = !!user?.phoneVerified;
 
@@ -577,6 +587,14 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
             label={bn ? 'প্রপার্টি ভিডিও অটোপ্লে' : 'Auto-play property videos'}
             sublabel={bn ? 'মোবাইল ডেটা বাঁচাতে বন্ধ করুন' : 'Turn off to save mobile data'}
             right={<Toggle checked={app.autoplayVideos} onChange={(v) => save({ app: { autoplayVideos: v } })} />}
+          />
+          {/* Shown to everyone, not just dual-role accounts: "which screen do I
+              want first?" is a question a tenant-only user has too — plenty of
+              them open the app to write down a খরচ, not to look at listings. */}
+          <Row
+            label={bn ? 'অ্যাপ খুললে যা দেখব' : 'Open the app on'}
+            sublabel={bn ? 'অ্যাপ চালু করলে প্রথমে কোন স্ক্রিন আসবে' : 'The first screen when you open the app'}
+            right={<SelectInput value={app.defaultHome} onChange={(v) => save({ app: { defaultHome: v } })} options={opts.defaultHome} />}
           />
           {(isTenant && isLandlord) && (
             <Row

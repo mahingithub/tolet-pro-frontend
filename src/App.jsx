@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { LanguageProvider } from "./context/LanguageContext";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
-import { SettingsProvider } from "./context/SettingsContext.jsx";
+import { SettingsProvider, useSettings } from "./context/SettingsContext.jsx";
 import { NotificationProvider } from "./context/NotificationContext.jsx";
 import { TourProvider } from "./context/TourContext.jsx";
 import callProvider from "./services/callProvider";
@@ -10,6 +10,8 @@ import { getCurrentToken } from "./services/authService";
 import { listTenantBookings } from "./services/bookingService";
 import fcmService from "./services/fcmService";
 import ErrorBoundary from './components/ErrorBoundary';
+import { needsBookingLookup, resolveHome } from './utils/homeSurface';
+import { hasCachedSettings } from './services/settingsService';
 
 // Existing Imports
 import Navbar from "./components/Navbar";
@@ -25,6 +27,7 @@ import TenantDashboard from "./components/TenantDashboard";
 import Living from "./components/living/Living";
 import GlobalAIAssistant from "./components/GlobalAIAssistant";
 import WelcomeRobotOverlay from "./components/WelcomeRobotOverlay";
+import HomeIntentModal from "./components/HomeIntentModal";
 import GlobalToaster from "./components/GlobalToaster";
 import SmartAlertsPage from "./components/Smartalertspage";
 import AIInsightsPage from "./components/Aiinsightspage";
@@ -112,7 +115,12 @@ const GlobalCallSocket = () => {
 const AppLayout = () => {
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { isAuthenticated, activeRole } = useAuth();
+	const { isAuthenticated, activeRole, roles } = useAuth();
+	const { settings, loading: settingsLoading } = useSettings();
+	const defaultHome = settings?.app?.defaultHome || 'auto';
+	// Captured once, at mount: did this device already have the user's settings?
+	// See the boot effect below for why the distinction matters.
+	const hadCachedPrefs = useRef(hasCachedSettings());
 
 	// Tell the instant boot splash (index.html) that React has painted, so it
 	// can fade itself out. rAF waits for the first real frame so we don't
@@ -124,63 +132,65 @@ const AppLayout = () => {
 		return () => cancelAnimationFrame(id);
 	}, []);
 
-	// ── Landlord: "the dashboard is home" ──────────────────────────────────
-	// A landlord's home base is their Host Dashboard, not the public marketing
-	// page. On each app open (fresh load / PWA reopen), an authenticated
-	// landlord who lands on "/" is sent straight to /host-dashboard.
+	// ── "Where does the app open?" ─────────────────────────────────────────
+	// One decision, taken once per app load, for every kind of user. The rules
+	// themselves live in utils/homeSurface.js so the post-login redirect and the
+	// bottom nav's Home button answer this question identically — they used to
+	// each carry their own copy, which is how they drifted apart.
 	//
 	// The guard ref makes this fire AT MOST ONCE per app load: later in-session
 	// visits to "/" — e.g. via the logo popup's "Go to main Home" — are honored
 	// because the guard is already tripped. A page reload resets the ref (it's
-	// in-memory), so reopening the app always lands on the dashboard again.
-	const landlordBootHandled = useRef(false);
-	useEffect(() => {
-		if (landlordBootHandled.current) return;
-		// Hold off until auth is actually resolved; acting on a null user would
-		// either no-op or fight the user's own navigation once /me resolves.
-		if (!isAuthenticated) return;
-		landlordBootHandled.current = true;
-		const isLandlord = activeRole === 'landlord' || activeRole === 'host';
-		if (isLandlord && location.pathname === '/') {
-			navigate('/host-dashboard', { replace: true });
-		}
-	}, [isAuthenticated, activeRole, location.pathname, navigate]);
-
-	// ── Tenant: "the dashboard is home ONCE there's a booking" ─────────────
-	// A tenant only gets the app to open on their Tenant Dashboard after they
-	// are connected to a booking (a landlord added them to a lease). Until
-	// then, opening the app keeps the normal public homepage — unchanged.
+	// in-memory), so reopening the app always lands on the chosen home again.
 	//
-	// Mirrors the landlord guard (fires at most once per app load) but needs an
-	// async lookup — listTenantBookings() — to know whether a booking exists.
-	// We only redirect if the tenant is STILL on "/" when it resolves, so we
-	// never yank them off a page they navigated to while the lookup was in
-	// flight. A failed lookup just leaves them on the homepage (safe default).
-	const tenantBootHandled = useRef(false);
+	// `defaultHome` normally comes off the settings CACHE, which SettingsProvider
+	// hydrates synchronously — so a returning user is redirected on the first
+	// frame, with no flash of the public homepage.
+	const bootHandled = useRef(false);
 	useEffect(() => {
-		if (tenantBootHandled.current) return;
-		// Wait until BOTH auth and the role are resolved so we don't trip the
-		// one-shot guard before we can tell this is a tenant.
+		if (bootHandled.current) return;
+		// Wait until BOTH auth and the role are resolved, so we don't trip the
+		// one-shot guard before we can tell who this is. Acting on a null user
+		// would fight the user's own navigation once /me resolves.
 		if (!isAuthenticated || !activeRole) return;
-		tenantBootHandled.current = true;
-		if (activeRole !== 'tenant' || location.pathname !== '/') return;
+		// A device with no cached settings has no idea what the user chose, and
+		// `defaultHome` is reading a placeholder 'auto'. Deciding now would ignore
+		// their choice every time they reinstall or sign in on a new phone — the
+		// exact moments the setting is meant to survive. Wait for the first load
+		// to settle; it can't hang, since getSettings() falls back to the cache
+		// rather than throwing when the network is gone.
+		if (!hadCachedPrefs.current && settingsLoading) return;
+		bootHandled.current = true;
+		if (location.pathname !== '/') return;
+
+		// An explicit preference is an answer — go, with no lookup at all.
+		if (!needsBookingLookup(defaultHome, activeRole)) {
+			const to = resolveHome({ activeRole, roles, defaultHome });
+			if (to !== '/') navigate(to, { replace: true });
+			return;
+		}
+
+		// 'auto' for a tenant is the one case that still needs asking: they only
+		// get their dashboard as home once a landlord has added them to a lease.
+		// We re-check the pathname when it resolves so we never yank someone off
+		// a page they navigated to while the lookup was in flight, and a failed
+		// lookup just leaves them on the homepage (the safe default).
 		let cancelled = false;
 		(async () => {
 			try {
 				const bookings = await listTenantBookings();
 				if (cancelled) return;
-				const connected = Array.isArray(bookings) && bookings.length > 0;
-				// Redirect only if connected to a booking AND the tenant hasn't
-				// navigated away from "/" while the lookup was in flight.
-				if (connected && window.location.pathname === '/') {
-					navigate('/tenant-dashboard?tab=overview', { replace: true });
+				const hasBooking = Array.isArray(bookings) && bookings.length > 0;
+				const to = resolveHome({ activeRole, roles, defaultHome, hasBooking });
+				if (to !== '/' && window.location.pathname === '/') {
+					navigate(to, { replace: true });
 				}
 			} catch {
 				/* network/auth hiccup — keep them on the public homepage */
 			}
 		})();
 		return () => { cancelled = true; };
-	}, [isAuthenticated, activeRole, location.pathname, navigate]);
+	}, [isAuthenticated, activeRole, defaultHome, settingsLoading, location.pathname, navigate]);
 
 	// Hide the marketing Navbar on dashboards, auth, admin, and the privacy center
 	// (the privacy center has its own header with a back button).
@@ -361,9 +371,15 @@ const AppLayout = () => {
 			<ThemeWidget />
 			<GlobalCallUI />
 			<WelcomeRobotOverlay />
+			<HomeIntentModal />
 			<GlobalToaster />
 			{!shouldHideAIAssistant && <GlobalAIAssistant />}
-			<MobileBottomNav hideOnRoutes={['/login', '/list-property', '/properties/', '/living']} />
+			{/* '/living' is deliberately NOT hidden any more. It can be a user's
+			    home screen now, and a home screen with no rail is a room with no
+			    door: no Explore, no Messages, no Profile from the first screen
+			    they see. Living's own module pills sit at the top, so the two
+			    navigations don't compete. */}
+			<MobileBottomNav hideOnRoutes={['/login', '/list-property', '/properties/']} />
 			<FeedbackButton />
 		</div>
 	);

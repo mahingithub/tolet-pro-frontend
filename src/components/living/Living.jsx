@@ -7,8 +7,10 @@ import { ArrowLeft, Wallet, BellRing, CloudOff } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useSettings } from '../../context/SettingsContext.jsx';
 import useLivingStore from '../../store/useLivingStore';
 import callProvider from '../../services/callProvider';
+import { isSoloOp } from '../../store/livingOps';
 import { buildReminders, initials, num } from './livingUtils';
 import { MODULES } from './livingConfig';
 import { cx } from './livingUI';
@@ -71,12 +73,17 @@ const Living = () => {
   const { t, language } = useLanguage();
   const isBn = language === 'বাংলা';
   const { user } = useAuth();
+  const { settings, update: updateSettings } = useSettings();
+  // Is Living this user's home screen? If so it must not offer a "back" that
+  // points at a page they never came from.
+  const isHome = (settings?.app?.defaultHome || 'auto') === 'living';
 
   const setMyName = useLivingStore((s) => s.setMyName);
   const roommates = useLivingStore((s) => s.roommates);
   const connected = useLivingStore((s) => s.connected);
   const myId = useLivingStore((s) => s.myId);
   const hydrateHousehold = useLivingStore((s) => s.hydrateHousehold);
+  const hydrateSolo = useLivingStore((s) => s.hydrateSolo);
   // 'solo' = my own খাতা, 'joint' = the shared roommate wallet, null = not asked yet.
   const mode = useLivingStore((s) => s.mode);
   const setLivingMode = useLivingStore((s) => s.setLivingMode);
@@ -87,6 +94,14 @@ const Living = () => {
   const state = useLivingStore();
 
   const isSolo = mode === 'solo';
+  // One queue holds both wallets' unsent work, so the header only counts the
+  // writes belonging to the wallet currently on screen — telling someone in
+  // their private খাতা that "৩টি অপেক্ষায়" when all three are mess entries is
+  // just confusing.
+  const pendingHere = useMemo(
+    () => outbox.filter((op) => isSoloOp(op) === isSolo).length,
+    [outbox, isSolo],
+  );
   const modules = isSolo ? SOLO_MODULES : MODULES;
   const navModules = isSolo ? SOLO_MODULES : NAV_MODULES;
   const components = isSolo ? SOLO_MODULE_COMPONENTS : MODULE_COMPONENTS;
@@ -96,13 +111,16 @@ const Living = () => {
   // household, else the local planner's 'me'.
   const me = connected ? myId : ME;
 
-  // On mount: sync with the server. If the user belongs to a household we flip
-  // into connected mode; otherwise we stay on the local planner. No-op for guests.
+  // On mount: sync BOTH wallets with the server. If the user belongs to a
+  // household we flip into connected mode; otherwise we stay on the local
+  // planner. The solo খাতা reconciles alongside it — uploading itself the first
+  // time, downloading after that. No-op for guests.
   useEffect(() => {
     const ctrl = new AbortController();
     hydrateHousehold(ctrl.signal);
+    hydrateSolo(ctrl.signal);
     return () => ctrl.abort();
-  }, [hydrateHousehold]);
+  }, [hydrateHousehold, hydrateSolo]);
 
   // Adopt the authenticated user's name for the LOCAL "You" roommate (connected
   // member names come from each user's real account, so skip it there).
@@ -172,11 +190,25 @@ const Living = () => {
     return () => window.removeEventListener('tour:tab', handleTourTab);
   }, [go, validIds]);
 
+  // The wallet choice belongs to the PERSON, not the phone. It used to live
+  // only in the local store, so reinstalling the app — or signing in on another
+  // device — asked "একা না যৌথ?" all over again on a ledger that was already
+  // restored. Adopt the account's answer whenever this device hasn't got one.
+  const savedMode = settings?.app?.livingMode || '';
+  useEffect(() => {
+    if (mode) return; // this device already has an answer; never override it
+    if (savedMode === 'solo' || savedMode === 'joint') setLivingMode(savedMode);
+  }, [mode, savedMode, setLivingMode]);
+
   // Picking (or switching) a wallet always lands on that wallet's Overview —
   // the module ids differ between the two, so staying put isn't an option.
   const switchMode = useCallback(
     (next) => {
       setLivingMode(next);
+      // Remember it on the account too. Fire-and-forget: the local store is
+      // what renders, so a failed write costs the user nothing today and is
+      // retried the next time they switch.
+      if (next !== savedMode) updateSettings({ app: { livingMode: next } }).catch(() => {});
       setModule('overview');
       setIntent(null);
       const params = new URLSearchParams(location.search);
@@ -184,7 +216,7 @@ const Living = () => {
       navigate({ pathname: '/living', search: `?${params.toString()}` }, { replace: true });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
-    [location.search, navigate, setLivingMode]
+    [location.search, navigate, setLivingMode, savedMode, updateSettings]
   );
 
   // Manual "send it now". The queue retries on its own (on reconnect, on every
@@ -242,13 +274,18 @@ const Living = () => {
       )}>
         <div className="w-full max-w-[1400px] xl:max-w-[1600px] mx-auto px-4 h-[56px] md:h-[64px] flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            <button
-              onClick={back}
-              className="p-2.5 bg-white/70 rounded-xl border border-white/80 shadow-sm text-gray-600 hover:text-gray-900 hover:bg-white active:scale-90 transition"
-              aria-label={isBn ? 'পেছনে' : 'Back'}
-            >
-              <ArrowLeft size={18} />
-            </button>
+            {/* No back arrow when this IS the home screen — there is nothing
+                behind it, and an arrow that jumps to a page the user never
+                opened reads as a bug. */}
+            {!isHome && (
+              <button
+                onClick={back}
+                className="p-2.5 bg-white/70 rounded-xl border border-white/80 shadow-sm text-gray-600 hover:text-gray-900 hover:bg-white active:scale-90 transition"
+                aria-label={isBn ? 'পেছনে' : 'Back'}
+              >
+                <ArrowLeft size={18} />
+              </button>
+            )}
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="bg-gradient-to-br from-[#ba0036] to-[#ff4d6d] p-2 rounded-xl shadow-[0_4px_15px_rgba(186,0,54,0.3)] shrink-0">
                 <Wallet className="text-white w-[18px] h-[18px]" />
@@ -272,7 +309,7 @@ const Living = () => {
             {/* Written here, not yet at the server. Tapping tries again now
                 rather than waiting for the next poll — the thing a user reaches
                 for the moment they see a bar of signal come back. */}
-            {!isSolo && outbox.length > 0 && (
+            {pendingHere > 0 && (
               <button
                 onClick={retrySync}
                 className="flex items-center gap-1.5 pl-2 pr-2.5 py-2 bg-amber-50 rounded-xl border border-amber-200 text-amber-700 active:scale-95 transition"
@@ -280,7 +317,7 @@ const Living = () => {
               >
                 <CloudOff size={15} />
                 <span className="text-[11px] font-black whitespace-nowrap">
-                  {isBn ? `${num(outbox.length, language)}টি অপেক্ষায়` : `${outbox.length} pending`}
+                  {isBn ? `${num(pendingHere, language)}টি অপেক্ষায়` : `${pendingHere} pending`}
                 </span>
               </button>
             )}
