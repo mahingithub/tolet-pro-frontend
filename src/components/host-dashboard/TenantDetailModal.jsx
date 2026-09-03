@@ -19,7 +19,7 @@
 
 import React from 'react';
 import {
-  X, Phone, Calendar, MapPin, Briefcase, IdCard, PhoneCall, User, Home, DoorOpen,
+  X, Phone, Calendar, MapPin, Briefcase, IdCard, PhoneCall, User, Pencil, Download,
 } from 'lucide-react';
 import {
   tenantTypeLabel, tenantTypeById, GOVT_ID_TYPES, MARITAL_STATUSES, HAS_STATUS,
@@ -39,8 +39,8 @@ export default function TenantDetailModal({
   building,
   language,
   onClose,
-  onReplace,       // optional — opens the replace flow for this person
-  onShift,         // optional — opens the "move them to another room" flow
+  onEdit,          // optional — corrects THIS record (name, NID, emergency…)
+  onDownload,      // optional — the tenant information form, as a file
 }) {
   const isBn = language === 'বাংলা';
   const p = tenant?.tenantProfile || {};
@@ -162,10 +162,17 @@ export default function TenantDetailModal({
             <Row label={isBn ? 'ঠিকানা' : 'Address'} value={p.emergencyAddress} />
           </Section>
 
-          {/* Two actions that are easy to confuse and mean opposite things, so
-              they are labelled for what CHANGES rather than what stays:
-                Move room — the same person, a different room (they shifted).
-                Replace   — the same room, a different person (they left). */}
+          {/* THIS CARD IS A READING SURFACE, and now a correcting one.
+              Everything on it is about the person in front of you: ring them,
+              fix what is wrong, or take the record away as a file.
+
+              Move room and Replace used to sit here too, and they do not
+              belong: both END this record — one moves the person out of the
+              room the card is titled by, the other closes their tenancy
+              altogether — and they sat one thumb-width from "Call" on a phone.
+              They now live behind the "বদলান" button on the seat itself, which
+              is the row the landlord touches when somebody is actually leaving.
+              (See UnitsManager's seat menu.) */}
           <div className="flex items-center gap-2 pt-1">
             {tenant?.phone && (
               <a
@@ -175,24 +182,29 @@ export default function TenantDetailModal({
                 <Phone size={14} /> {isBn ? 'কল করুন' : 'Call'}
               </a>
             )}
-            {onShift && (
+            {onEdit && (
               <button
                 type="button"
-                onClick={onShift}
-                className="shrink-0 px-4 py-3 rounded-xl bg-white border-2 border-gray-200 text-gray-600 font-black text-xs uppercase tracking-widest hover:border-blue-200 hover:text-blue-700 active:scale-95 transition-all inline-flex items-center gap-1.5"
-                title={isBn ? 'একই ভাড়াটিয়া, অন্য রুমে' : 'Same tenant, different room'}
+                onClick={onEdit}
+                className="shrink-0 px-4 py-3 rounded-xl bg-white border-2 border-gray-200 text-gray-600 font-black text-xs uppercase tracking-widest hover:border-indigo-200 hover:text-indigo-700 active:scale-95 transition-all inline-flex items-center gap-1.5"
+                title={isBn ? 'এই ভাড়াটিয়ার তথ্য ঠিক করুন' : "Correct this tenant's details"}
               >
-                <DoorOpen size={14} /> {isBn ? 'রুম বদলান' : 'Move room'}
+                <Pencil size={14} /> {isBn ? 'এডিট' : 'Edit'}
               </button>
             )}
-            {onReplace && (
+            {/* One file, both devices. It is produced in the browser (jsPDF /
+                CSV blob) and handed to whatever the device downloads with —
+                the desktop's Downloads folder, the phone's own download
+                handler — so there is nothing to install and no print dialog
+                standing between the landlord and the paper. */}
+            {onDownload && (
               <button
                 type="button"
-                onClick={onReplace}
-                className="shrink-0 px-4 py-3 rounded-xl bg-white border-2 border-gray-200 text-gray-600 font-black text-xs uppercase tracking-widest hover:border-amber-200 hover:text-amber-700 active:scale-95 transition-all inline-flex items-center gap-1.5"
-                title={isBn ? 'একই রুম, নতুন ভাড়াটিয়া' : 'Same room, new tenant'}
+                onClick={onDownload}
+                className="shrink-0 px-4 py-3 rounded-xl bg-white border-2 border-gray-200 text-gray-600 font-black text-xs uppercase tracking-widest hover:border-emerald-200 hover:text-emerald-700 active:scale-95 transition-all inline-flex items-center gap-1.5"
+                title={isBn ? 'ভাড়াটিয়া তথ্য ফরম ডাউনলোড (PDF / Excel)' : 'Download the tenant information form (PDF / Excel)'}
               >
-                <Home size={14} /> {isBn ? 'ভাড়াটিয়া বদলান' : 'Replace'}
+                <Download size={14} /> {isBn ? 'ডাউনলোড' : 'Download'}
               </button>
             )}
           </div>

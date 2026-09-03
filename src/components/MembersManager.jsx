@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   Users, UserPlus, Copy, Check, X, LogOut, Undo2, CheckCircle2, Plus, QrCode,
-  UserCircle, FileDown,
+  UserCircle, FileDown, Pencil, FolderDown,
 } from 'lucide-react';
 import InviteShareSheet from './invite/InviteShareSheet';
 import {
@@ -125,7 +125,18 @@ function spaceLabel(m, isBn) {
 // in UnitsManager, because only a Unit knows how many seats a room has and what
 // details a new tenant must bring. Two components writing the same seat by
 // different rules is how a three-seat room ended up able to hold five people.
-export default function MembersManager({ booking, language = 'English', onChange, today = new Date(), showLedger = true, showManage = true, onOpenProfile, onDownloadAgreement, onReplaceSeat }) {
+export default function MembersManager({
+  booking, language = 'English', onChange, today = new Date(),
+  showLedger = true, showManage = true,
+  onOpenProfile, onDownloadAgreement, onReplaceSeat,
+  // Correct one occupant's own record — (member) => void. The booking card is
+  // where a landlord already is when a tenant tells them their number changed,
+  // so making them go and find the room first was a journey with no purpose.
+  onEditMember,
+  // (booking) => void — every occupant's form in ONE download. A four-seat room
+  // is four papers a landlord needs together, not four separate errands.
+  onDownloadAll,
+}) {
   const isBn = language === 'বাংলা';
   const bookingId = booking._id || booking.id;
   const persistable = isMongoId(bookingId);
@@ -288,6 +299,24 @@ export default function MembersManager({ booking, language = 'English', onChange
             phone call, and for a legacy booking with no unitId it is the only
             invite there is. */}
         <div className="flex items-center gap-1.5">
+          {/* THE WHOLE ROOM, IN ONE FILE.
+              Each occupant's own form is on their row; this is the same paper
+              for everybody at once, because "print the room" is one errand and
+              doing it person by person means as many trips through the
+              download dialog as there are beds. Only shown when there is more
+              than one person — for a single tenant it would be the same file
+              under a second name. */}
+          {onDownloadAll && activeMembers.length > 1 && (
+            <button
+              type="button"
+              onClick={() => onDownloadAll(booking)}
+              className="px-2.5 py-1 rounded-lg bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 text-gray-700 hover:text-blue-700 text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 active:scale-95 transition-all"
+              title={isBn ? 'সব ভাড়াটিয়ার ফরম একসাথে ডাউনলোড' : "Download every tenant's form together"}
+            >
+              <FolderDown size={11} />
+              {isBn ? `সবার ফরম (${activeMembers.length})` : `All (${activeMembers.length})`}
+            </button>
+          )}
           {booking.unitId && (
             <button
               type="button"
@@ -375,56 +404,70 @@ export default function MembersManager({ booking, language = 'English', onChange
                       </p>
                     </div>
                   </div>
-                  {/* No move-out for the SYNTHETIC member. A legacy
-                      single-tenant booking has no member row to remove — the
-                      call would 404 — and the way that tenancy ends is the
-                      "New Tenant · New Lease" panel below the card. */}
-                  {/* PER-SEAT ACTIONS.
-                      Two people in one room are two tenancies that share an
-                      address — different phone, different rent, different
-                      papers. These used to exist only at the BOOKING level, so
-                      "Profile" and "Download Agreement" always resolved to the
-                      first occupant and the second person was unreachable: the
-                      landlord could not produce their agreement at all. */}
-                  {/* PER-SEAT ACTIONS — icon-only on a phone.
-                      Labels are what pushed the occupant's name off the row on
-                      mobile; the icons carry the same meaning in a quarter of
-                      the width, and the desktop keeps the words. Profile has
-                      moved onto the avatar (see above). */}
-                  {showManage && !m.__legacy && (
-                    <div className="flex items-center gap-1 shrink-0">
-                      {onDownloadAgreement && (
-                        <button
-                          type="button"
-                          onClick={() => onDownloadAgreement(booking, m)}
-                          className="px-1.5 sm:px-2 py-1 rounded-lg bg-gray-50 hover:bg-blue-50 text-gray-500 hover:text-blue-600 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1"
-                          title={isBn ? 'এই সিটের অ্যাগ্রিমেন্ট ডাউনলোড' : "Download this seat's agreement"}
-                        >
-                          <FileDown size={12} /> <span className="hidden sm:inline">{isBn ? 'অ্যাগ্রিমেন্ট' : 'Agreement'}</span>
-                        </button>
-                      )}
-                      {onReplaceSeat && booking.unitId && (
-                        <button
-                          type="button"
-                          onClick={() => onReplaceSeat(m, activeMembers.indexOf(m) + 1)}
-                          className="px-1.5 sm:px-2 py-1 rounded-lg bg-gray-50 hover:bg-emerald-50 text-gray-500 hover:text-emerald-700 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1"
-                          title={isBn ? 'এই সিটে নতুন ভাড়াটিয়া' : 'New tenant in this seat'}
-                        >
-                          <Undo2 size={12} /> <span className="hidden sm:inline">{isBn ? 'বদলান' : 'Replace'}</span>
-                        </button>
-                      )}
+                </div>
+
+                {/* No move-out for the SYNTHETIC member. A legacy
+                    single-tenant booking has no member row to remove — the
+                    call would 404 — and the way that tenancy ends is the
+                    "New Tenant · New Lease" panel below the card. */}
+                {/* PER-SEAT ACTIONS.
+                    Two people in one room are two tenancies that share an
+                    address — different phone, different rent, different
+                    papers. These used to exist only at the BOOKING level, so
+                    "Profile" and "Download Agreement" always resolved to the
+                    first occupant and the second person was unreachable: the
+                    landlord could not produce their agreement at all. */}
+                {/* EVERY BUTTON SAYS WHAT IT DOES, ON EVERY SCREEN.
+                    They used to share the name's line, which left no room for
+                    words on a phone — so the labels were hidden below `sm` and
+                    a landlord was left guessing between three grey glyphs, two
+                    of which end a tenancy. They have their own line now: the
+                    name keeps its full width above, the labels are always
+                    readable, and a narrow phone scrolls the row sideways
+                    instead of dropping the words. Profile is on the avatar. */}
+                {showManage && !m.__legacy && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 -mb-0.5">
+                    {onEditMember && (
                       <button
                         type="button"
-                        onClick={() => moveOut(m)}
-                        disabled={busy}
-                        className="px-1.5 sm:px-2 py-1 rounded-lg bg-gray-50 hover:bg-rose-50 text-gray-500 hover:text-rose-600 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1"
-                        title={isBn ? 'মুভ-আউট' : 'Move out'}
+                        onClick={() => onEditMember(m)}
+                        className="shrink-0 px-2 py-1.5 rounded-lg bg-gray-50 hover:bg-indigo-50 text-gray-600 hover:text-indigo-700 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1 active:scale-95 transition-all"
+                        title={isBn ? 'নাম, নম্বর, এনআইডি ঠিক করুন' : 'Fix the name, number or NID'}
                       >
-                        <LogOut size={12} /> <span className="hidden sm:inline">{isBn ? 'মুভ-আউট' : 'Move out'}</span>
+                        <Pencil size={11} /> {isBn ? 'এডিট' : 'Edit'}
                       </button>
-                    </div>
-                  )}
-                </div>
+                    )}
+                    {onDownloadAgreement && (
+                      <button
+                        type="button"
+                        onClick={() => onDownloadAgreement(booking, m)}
+                        className="shrink-0 px-2 py-1.5 rounded-lg bg-gray-50 hover:bg-blue-50 text-gray-600 hover:text-blue-700 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1 active:scale-95 transition-all"
+                        title={isBn ? 'এই ভাড়াটিয়ার ফরম ডাউনলোড (PDF / Excel)' : "Download this tenant's form (PDF / Excel)"}
+                      >
+                        <FileDown size={11} /> {isBn ? 'ডাউনলোড' : 'Download'}
+                      </button>
+                    )}
+                    {onReplaceSeat && booking.unitId && (
+                      <button
+                        type="button"
+                        onClick={() => onReplaceSeat(m, activeMembers.indexOf(m) + 1)}
+                        className="shrink-0 px-2 py-1.5 rounded-lg bg-gray-50 hover:bg-amber-50 text-gray-600 hover:text-amber-700 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1 active:scale-95 transition-all"
+                        title={isBn ? 'এই সিটে নতুন ভাড়াটিয়া' : 'New tenant in this seat'}
+                      >
+                        <Undo2 size={11} /> {isBn ? 'বদলান' : 'Replace'}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => moveOut(m)}
+                      disabled={busy}
+                      className="shrink-0 px-2 py-1.5 rounded-lg bg-gray-50 hover:bg-rose-50 text-gray-600 hover:text-rose-600 text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1 active:scale-95 transition-all disabled:opacity-50"
+                      title={isBn ? 'মুভ-আউট' : 'Move out'}
+                    >
+                      <LogOut size={11} /> {isBn ? 'মুভ-আউট' : 'Move out'}
+                    </button>
+                  </div>
+                )}
 
                 {/* Rent collection strip — only in the Rent Collection tab.
                     The Bookings tab hides it (member management only). */}

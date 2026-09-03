@@ -115,6 +115,34 @@ const seatInUnits = (units, { unitId, bookingId, member }) => {
   });
 };
 
+/**
+ * Correct one occupant inside the ROOM as well as inside the lease.
+ *
+ * Same reason as seatInUnits above: the Rooms screen reads `unit.occupants` and
+ * nothing else, so a name or a phone fixed while the operation was still queued
+ * came back wrong the moment the room list was re-read. Only the keys the patch
+ * actually carries are touched — the seat, the join date and the rent belong to
+ * whoever wrote them.
+ */
+const patchOccupantInUnits = (units, memberId, patch = {}) => {
+  if (!memberId) return units || [];
+  const fields = ['name', 'phone', 'avatar', 'joinDate', 'tenantProfile'];
+  const changed = Object.fromEntries(
+    fields.filter((k) => patch[k] !== undefined).map((k) => [k, patch[k]]),
+  );
+  if (!Object.keys(changed).length) return units || [];
+  return (units || []).map((u) => (
+    (u.occupants || []).some((o) => String(o.memberId) === String(memberId))
+      ? {
+        ...u,
+        occupants: u.occupants.map((o) => (
+          String(o.memberId) === String(memberId) ? { ...o, ...changed } : o
+        )),
+      }
+      : u
+  ));
+};
+
 // Where a month's money lives: a specific occupant's ledger, or the booking's
 // own for a single-tenant lease.
 const writeLedger = (world, { bookingId, memberId }, monthKey, entry) => {
@@ -169,9 +197,17 @@ export const LOCAL = {
   updateBookingFields: (world, op) =>
     mapBooking(world, op.args.bookingId, (b) => ({ ...b, ...op.args.patch })),
 
-  /** One occupant's own terms — their rent, their seat label, their status. */
-  updateMemberFields: (world, op) =>
-    mapMember(world, op.args.bookingId, op.args.memberId, (m) => ({ ...m, ...op.args.patch })),
+  /**
+   * One occupant's own terms — their rent, their seat label, their status, and
+   * the intake details a landlord goes back to correct (name, phone, NID,
+   * emergency contact). Written to BOTH halves of the world: the lease holds
+   * the member, the room holds the occupant, and the Rooms screen only reads
+   * the second one.
+   */
+  updateMemberFields: (world, op) => {
+    const next = mapMember(world, op.args.bookingId, op.args.memberId, (m) => ({ ...m, ...op.args.patch }));
+    return { ...next, units: patchOccupantInUnits(next.units, op.args.memberId, op.args.patch) };
+  },
 
   cancelBooking: (world, op) => ({
     ...world,

@@ -32,6 +32,17 @@
  * by itself; counting heads there reports free seats that do not exist.
  */
 
+/**
+ * "Every occupant of this room", said out loud.
+ *
+ * Documents are produced for ONE person — their name, their rent share, their
+ * NID — so every download surface takes a member. A landlord printing the whole
+ * room needs to say "all of them" through that same parameter, and the
+ * alternative was inventing a fake member object to stand for the group, which
+ * every reader of `member.name` would then have to defend itself against.
+ */
+export const ALL_TENANTS = 'all';
+
 /** Everyone still living here. A moved-out member is history, not an occupant. */
 export const activeMembers = (booking) => (Array.isArray(booking?.members)
   ? booking.members.filter((m) => m && m.status !== 'moved-out')

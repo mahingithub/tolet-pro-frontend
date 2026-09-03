@@ -23,8 +23,9 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Upload, Download, Trash2, Building2, ImageIcon, Loader2 } from 'lucide-react';
+import { X, Upload, Download, Trash2, Building2, ImageIcon, Loader2, Users } from 'lucide-react';
 import ModalPortal from '../shared/ModalPortal.jsx';
+import { ALL_TENANTS } from '../../utils/occupants';
 
 const MAX_LOGO_BYTES = 3 * 1024 * 1024;
 
@@ -55,6 +56,10 @@ export default function AgreementBrandModal({
   const needsPick = !member && occupants.length > 1;
   const [picked, setPicked] = useState(member || (occupants.length === 1 ? occupants[0] : null));
   const [format, setFormat] = useState('pdf');
+  // ALL_TENANTS is a sentinel, not a person — anything that reads a name off
+  // the choice has to check for it first.
+  const everyone = picked === ALL_TENANTS;
+  const named = member && member !== ALL_TENANTS ? member : null;
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && !uploading) onClose?.(); };
@@ -123,9 +128,11 @@ export default function AgreementBrandModal({
                   producing one paper per person, and the only thing that tells
                   the two downloads apart is the name. */}
               <p className="text-[10px] font-bold text-gray-500 mt-0.5 truncate">
-                {member
-                  ? `${member.name || L('ভাড়াটিয়া', 'Tenant')}${member.seatLabel ? ` · ${member.seatLabel}` : ''}${booking?.roomNumber ? ` · ${L('রুম', 'Room')} ${booking.roomNumber}` : ''}`
-                  : L('আপনার প্রতিষ্ঠানের নাম ও লোগো ডকুমেন্টে বসবে', 'Your business name and logo go on the document')}
+                {named
+                  ? `${named.name || L('ভাড়াটিয়া', 'Tenant')}${named.seatLabel ? ` · ${named.seatLabel}` : ''}${booking?.roomNumber ? ` · ${L('রুম', 'Room')} ${booking.roomNumber}` : ''}`
+                  : everyone
+                    ? `${L('সবাই', 'Everyone')} · ${occupants.length} ${L('জন', 'people')}${booking?.roomNumber ? ` · ${L('রুম', 'Room')} ${booking.roomNumber}` : ''}`
+                    : L('আপনার প্রতিষ্ঠানের নাম ও লোগো ডকুমেন্টে বসবে', 'Your business name and logo go on the document')}
               </p>
             </div>
             <button
@@ -149,8 +156,35 @@ export default function AgreementBrandModal({
                   {L('কার তথ্য ডাউনলোড করবেন?', 'Whose record?')}
                 </label>
                 <div className="space-y-1.5">
+                  {/* EVERYONE, in one file. Printing a four-seat room one
+                      person at a time is four trips through this modal and four
+                      files to keep track of — and the browser blocks the second
+                      download before the landlord has noticed the first. One
+                      page per tenant, one PDF; one row per tenant, one sheet. */}
+                  <button
+                    type="button"
+                    onClick={() => setPicked(ALL_TENANTS)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all ${
+                      everyone ? 'bg-[#ba0036]/5 border-[#ba0036]/40 shadow-[0_2px_10px_rgba(186,0,54,0.08)]' : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <span className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${everyone ? 'border-[#ba0036]' : 'border-gray-300'}`}>
+                      {everyone && <span className="w-2 h-2 rounded-full bg-[#ba0036]" />}
+                    </span>
+                    <span className="w-7 h-7 rounded-lg bg-[#ba0036] text-white flex items-center justify-center shrink-0">
+                      <Users size={14} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[12px] font-black text-gray-900 truncate">
+                        {L(`সবার ফরম একসাথে · ${occupants.length} জন`, `Everyone together · ${occupants.length}`)}
+                      </span>
+                      <span className="block text-[9px] font-bold text-gray-500 truncate">
+                        {L('একটি ফাইলে — প্রতি ভাড়াটিয়ার জন্য আলাদা পাতা', 'One file — a page each')}
+                      </span>
+                    </span>
+                  </button>
                   {occupants.map((p, i) => {
-                    const on = picked && (picked.id ? picked.id === p.id : picked === p);
+                    const on = picked && picked !== ALL_TENANTS && (picked.id ? picked.id === p.id : picked === p);
                     return (
                       <button
                         key={p.id || i}
@@ -300,7 +334,11 @@ export default function AgreementBrandModal({
               className="flex-[2] py-3 rounded-xl bg-[#ba0036] hover:bg-[#90002a] text-white text-[10px] font-black uppercase tracking-widest transition-colors active:scale-[0.98] shadow-[0_6px_18px_rgba(186,0,54,0.25)] inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
               <Download size={13} strokeWidth={3} />
-              {uploading ? L('অপেক্ষা করুন…', 'Please wait…') : L('ডাউনলোড করুন', 'Download')}
+              {uploading
+                ? L('অপেক্ষা করুন…', 'Please wait…')
+                : everyone
+                  ? L(`সবার ফরম (${occupants.length})`, `Download all (${occupants.length})`)
+                  : L('ডাউনলোড করুন', 'Download')}
             </button>
           </div>
         </div>

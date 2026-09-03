@@ -19,13 +19,15 @@ import MembersManager from "../MembersManager.jsx";
 import BuildingSetupWizard from "./BuildingSetupWizard.jsx";
 import UnitsManager from "./UnitsManager.jsx";
 import SeatTenantModal from "./SeatTenantModal.jsx";
+import EditTenantModal from "./EditTenantModal.jsx";
 import { buildingTypeLabel, buildingTypeColor, normaliseSubCategory, unitNoun } from "../../utils/buildingTypes";
 import { updateBuilding, archiveBuilding, listUnits } from "../../services/buildingService";
 import AiLedgerScannerModal from "./AiLedgerScannerModal.jsx";
 import ModalPortal from "../shared/ModalPortal.jsx";
 import OnboardingApprovalsPanel from "./OnboardingApprovalsPanel.jsx";
 import { scopeBookings, bookingInBuilding, sortByBuildingOrder } from '../../utils/buildingScope';
-import { occupantCount, occupantNames, primaryOccupant, advanceCollected } from '../../utils/occupants';
+import { occupantCount, occupantNames, primaryOccupant, advanceCollected, ALL_TENANTS } from '../../utils/occupants';
+import { applyOp } from '../../store/hostOps';
 
 
 
@@ -108,6 +110,10 @@ export default function BookingsTab(props) {
           // form (and the same server rules) can open from this side too.
           const [seatReplace, setSeatReplace] = useState(null);
           const [loadingSeat, setLoadingSeat] = useState(false);
+          // Which occupant of which lease is being corrected: { booking, member }.
+          // Editing does not touch the seat, the rent or the ledger — it is the
+          // record that was wrong, not the tenancy.
+          const [editMember, setEditMember] = useState(null);
 
           const openSeatReplace = async (booking, member, seatNumber) => {
             if (!booking?.unitId || loadingSeat) return;
@@ -579,6 +585,11 @@ export default function BookingsTab(props) {
                         openTenantProfile(m.userId || null, { name: m.name, avatar: m.avatar });
                       }}
                       onDownloadAgreement={(bk, m) => { closeBookingDetail(); downloadAgreement(bk, m); }}
+                      // The room's whole file: one page per tenant, one
+                      // download. Handled by the same branding step, so the
+                      // letterhead and the format choice are asked once.
+                      onDownloadAll={(bk) => { closeBookingDetail(); downloadAgreement(bk, ALL_TENANTS); }}
+                      onEditMember={(m) => { closeBookingDetail(); setEditMember({ booking, member: m }); }}
                       onReplaceSeat={(m, seatNumber) => openSeatReplace(booking, m, seatNumber)}
                     />
 
@@ -1262,6 +1273,22 @@ export default function BookingsTab(props) {
                         showToast={showToast}
                         formatBDT={formatBDT}
                         onBookingsChanged={refreshBookings}
+                        // The room list knows a seat's occupant; only the
+                        // dashboard can turn one into paper. The occupant row
+                        // carries the ids, so the lease and the exact seat are
+                        // resolved here rather than guessed from a room title.
+                        onDownloadTenant={(person) => {
+                          const bk = (bookings || []).find((b) => String(b.id ?? b._id) === String(person?.bookingId));
+                          if (!bk) {
+                            showToast?.(isBn ? 'এই ভাড়াটিয়ার লিজ পাওয়া যায়নি' : "Could not find this tenant's lease");
+                            return;
+                          }
+                          // Narrows the form to ONE seat of a shared room; a
+                          // legacy whole-unit tenancy has no member and gets
+                          // the whole-unit form, which is correct for it.
+                          const member = (bk.members || []).find((m) => String(m.id) === String(person?.memberId)) || null;
+                          downloadAgreement(bk, member);
+                        }}
                       />
                     ) : (
                     <>
@@ -1481,6 +1508,36 @@ export default function BookingsTab(props) {
                   formatBDT={formatBDT}
                   onClose={() => setSeatReplace(null)}
                   onSaved={() => { setSeatReplace(null); refreshBookings?.(); }}
+                />
+              )}
+
+              {/* Correcting an occupant from the LEASE CARD. The same form the
+                  Rooms view opens — one editor, so a record fixed from either
+                  screen is fixed the same way and by the same rules. */}
+              {editMember && (
+                <EditTenantModal
+                  person={{
+                    memberId: editMember.member.id,
+                    bookingId: editMember.booking.id,
+                    name: editMember.member.name,
+                    phone: editMember.member.phone,
+                    joinDate: editMember.member.joinDate || editMember.booking.leaseStart,
+                    seatLabel: editMember.member.seatLabel,
+                    tenantProfile: editMember.member.tenantProfile,
+                  }}
+                  unit={{ roomNumber: editMember.member.roomLabel || editMember.booking.roomNumber }}
+                  building={activeBuilding}
+                  language={language}
+                  showToast={showToast}
+                  onClose={() => setEditMember(null)}
+                  onSaved={(op) => {
+                    // The operation is already queued; painting the lease with
+                    // it here is what puts the corrected name on the card the
+                    // landlord is still looking at, network or no network.
+                    const next = applyOp({ bookings, units: [] }, op).bookings
+                      .find((b) => String(b.id) === String(editMember.booking.id));
+                    if (next) handleBookingUpdated(next);
+                  }}
                 />
               )}
 

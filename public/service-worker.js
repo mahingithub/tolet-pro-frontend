@@ -27,7 +27,7 @@ importScripts('/call-notification-sw.js');
 // Bump this on any release that changes a PRECACHED file (index.html, manifest,
 // icons, offline.html). Hashed build assets (index-*.js/css) already bust their
 // own cache via unique filenames, so they don't need a version bump.
-const CACHE_VERSION = 'tolet-pro-v4';
+const CACHE_VERSION = 'tolet-pro-v5';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 // Minimal app shell. Hashed build assets (index-*.js/css) are cached at runtime
@@ -103,8 +103,22 @@ self.addEventListener('fetch', (event) => {
     return; // let the browser handle it normally
   }
 
-  // Navigations (HTML page loads): network-first, fall back to offline shell.
-  // This keeps users on fresh HTML when online, but shows something when not.
+  // Navigations (HTML page loads): network-first, falling back to the APP SHELL.
+  //
+  // THE SHELL, NOT THE OFFLINE PAGE. This used to answer a failed navigation
+  // with `caches.match(req)` and then go straight to offline.html — and only
+  // '/' is ever stored under its own URL, so every other route missed and got
+  // the offline page. Opening the app with no connection on /living or
+  // /host-dashboard therefore showed "you are offline" and the app never
+  // booted: no React, no stores, nothing to write into. The wallet and the rent
+  // register only appeared to be offline-capable because the tab had already
+  // been opened online, with the whole app alive in memory, before the
+  // connection was cut.
+  //
+  // TO-LET PRO is a single-page app: the shell can render ANY route from
+  // localStorage on its own. So an offline navigation is served index.html and
+  // the router takes it from there. offline.html stays as the last resort, for
+  // a device that has genuinely never loaded the app.
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
@@ -117,13 +131,27 @@ self.addEventListener('fetch', (event) => {
           // NOTE: `url` is req.url (a string) — it needs parsing for the path.
           let isRoot = false;
           try { isRoot = new URL(url).pathname === '/'; } catch { isRoot = false; }
-          if (isRoot) {
-            const copy = res.clone();
-            caches.open(STATIC_CACHE).then((c) => c.put('/index.html', copy)).catch(() => {});
+          if (isRoot && res && res.status === 200) {
+            // BOTH keys, because both are read below and each is reached a
+            // different way: '/' is what the installed app launches (the
+            // manifest's start_url) and '/index.html' is what every other route
+            // now falls back to. Refreshing only one left the other frozen at
+            // whatever HTML the service worker first installed with, pointing
+            // at build assets that may be several releases old.
+            const forIndex = res.clone();
+            const forRoot = res.clone();
+            caches.open(STATIC_CACHE).then((c) => {
+              c.put('/index.html', forIndex).catch(() => {});
+              c.put('/', forRoot).catch(() => {});
+            }).catch(() => {});
           }
           return res;
         })
-        .catch(() => caches.match(req).then((r) => r || caches.match('/offline.html')).then((r) => r || new Response('Offline', { status: 503 })))
+        .catch(() => caches.match(req)
+          .then((r) => r || caches.match('/index.html'))
+          .then((r) => r || caches.match('/'))
+          .then((r) => r || caches.match('/offline.html'))
+          .then((r) => r || new Response('Offline', { status: 503 })))
     );
     return;
   }

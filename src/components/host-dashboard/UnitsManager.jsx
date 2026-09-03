@@ -29,13 +29,17 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Plus, X, Loader2, Users, Home, BedDouble, Trash2, Pencil,
   UserPlus, ChevronDown, ChevronUp, DoorOpen, Check, RefreshCw, QrCode,
+  ChevronRight,
 } from 'lucide-react';
 import InviteShareSheet from '../invite/InviteShareSheet';
-import { listUnits, createUnitsBulk, archiveUnit, updateUnit } from '../../services/buildingService';
+// updateUnit is no longer imported: room edits go through the write queue's
+// `updateUnitFields`, which calls that endpoint itself (store/hostOps.js).
+import { listUnits, createUnitsBulk, archiveUnit } from '../../services/buildingService';
 import useHostSyncStore from '../../store/useHostSyncStore';
 import { applyOp, newObjectId } from '../../store/hostOps';
 import SeatTenantModal from './SeatTenantModal';
 import ShiftTenantModal from './ShiftTenantModal';
+import EditTenantModal from './EditTenantModal';
 import { submitOnEnter } from '../../utils/submitOnEnter';
 import TenantDetailModal from './TenantDetailModal';
 import ModalPortal from '../shared/ModalPortal.jsx';
@@ -105,6 +109,10 @@ export default function UnitsManager({
   // only the room list left the Tenants tab and Rent Collection showing stale
   // data until the page was refreshed by hand.
   onBookingsChanged,
+  // (occupant, unit) => void — hands one seat's tenant to the dashboard's
+  // agreement/tenant-form download flow. Optional: the rooms list still works
+  // without it, the Download button simply isn't offered.
+  onDownloadTenant,
 }) {
   const isBn = language === 'বাংলা';
   const [units, setUnits] = useState([]);
@@ -120,6 +128,18 @@ export default function UnitsManager({
   // landlord's own button — see ShiftTenantModal for why this is theirs and not
   // the tenant's.
   const [shiftTarget, setShiftTarget] = useState(null);
+  // The seat row's "বদলান" no longer DOES anything by itself — it asks which
+  // kind of change this is: { unit, person, seatNumber }.
+  //
+  // It used to go straight to the replace form, and that was the only control
+  // on the row, so it absorbed every intention a landlord had about the person
+  // sitting there — including "their number is wrong", which replace answers by
+  // ending their tenancy and starting a new one on the same seat. Three
+  // different events now say their own name: they moved rooms, they left, or
+  // the record is simply wrong.
+  const [seatMenu, setSeatMenu] = useState(null);
+  // Correcting the person, not replacing them: { unit, person }.
+  const [editingTenant, setEditingTenant] = useState(null);
   // Reading back the eleven fields and the photo. Until this existed the intake
   // form wrote details nobody could ever look at again — which is exactly when
   // they matter: the moment something goes wrong and you need to reach someone.
@@ -162,9 +182,16 @@ export default function UnitsManager({
       if (editForm.monthlyRent !== undefined) data.monthlyRent = Number(editForm.monthlyRent) || 0;
       if (editForm.serviceCharge !== undefined) data.serviceCharge = Number(editForm.serviceCharge) || 0;
       if (editForm.rentDueDay !== undefined) data.rentDueDay = Number(editForm.rentDueDay) || 5;
-      await updateUnit(editingUnit, data);
+      // Queued, not awaited. `updateUnitFields` has existed in hostOps all
+      // along — LOCAL, SEND, its own merge rule — but nothing ever enqueued it:
+      // this form was the last writer still calling the endpoint directly, so
+      // correcting a room's rent with no signal failed outright while
+      // COLLECTING that rent in the same room worked fine. Same pattern as
+      // submit() above: queue out here, apply purely in the updater, and don't
+      // re-read the room from a server that has not been told yet.
+      const op = useHostSyncStore.getState().enqueue('updateUnitFields', { unitId: editingUnit, patch: data });
+      setUnits((prev) => applyOp({ bookings: [], units: prev }, op).units);
       cancelEdit();
-      await load();
       onBookingsChanged?.();
       showToast?.(isBn ? 'রুমের তথ্য আপডেট হয়েছে' : 'Room details updated');
     } catch (err) {
@@ -329,14 +356,13 @@ export default function UnitsManager({
     }
   };
 
-  const setSuitableFor = async (unit, value) => {
-    try {
-      await updateUnit(unit.id, { suitableFor: value });
-      setEditingSuitable(null);
-      await load();
-    } catch (err) {
-      showToast?.(err.message || (isBn ? 'বদলানো যায়নি' : 'Could not change it'));
-    }
+  // A label on a flat, through the same queue as the rest of the room's fields
+  // — "Family / Bachelor" is a correction a landlord makes standing in the
+  // doorway, which is exactly where the signal isn't.
+  const setSuitableFor = (unit, value) => {
+    const op = useHostSyncStore.getState().enqueue('updateUnitFields', { unitId: unit.id, patch: { suitableFor: value } });
+    setUnits((prev) => applyOp({ bookings: [], units: prev }, op).units);
+    setEditingSuitable(null);
   };
 
   const remove = async (unit) => {
@@ -714,16 +740,16 @@ export default function UnitsManager({
                                         )}
                                       </button>
                                       {person.phone && <span className="hidden sm:inline text-[10px] font-bold text-gray-400 shrink-0 tabular-nums">{person.phone}</span>}
-                                      {/* Same seat, new person — the room, its
-                                          rent and this seat all stay put. */}
+                                      {/* Something about this seat changed —
+                                          which of the three it is gets asked
+                                          in the menu below, not guessed here. */}
                                       <button
                                         type="button"
-                                        onClick={() => setSeatTarget({ unit: u, seatNumber: i + 1, member: { id: person.memberId, name: person.name } })}
-                                        disabled={!person.memberId}
-                                        className="shrink-0 px-2 py-1.5 rounded-lg bg-white border border-gray-200 text-[9px] font-black uppercase tracking-wider text-gray-600 hover:text-amber-700 hover:border-amber-200 active:scale-95 transition-all inline-flex items-center gap-1 disabled:opacity-40"
-                                        title={isBn ? 'ভাড়াটিয়া বদলান' : 'Replace tenant'}
+                                        onClick={() => setSeatMenu({ unit: u, person, seatNumber: i + 1 })}
+                                        className="shrink-0 px-2 py-1.5 rounded-lg bg-white border border-gray-200 text-[9px] font-black uppercase tracking-wider text-gray-600 hover:text-amber-700 hover:border-amber-200 active:scale-95 transition-all inline-flex items-center gap-1"
+                                        title={isBn ? 'রুম বদলান · ভাড়াটিয়া বদলান · এডিট' : 'Move room · Replace tenant · Edit'}
                                       >
-                                        <RefreshCw size={10} /> {isBn ? 'বদলান' : 'Replace'}
+                                        <RefreshCw size={10} /> {isBn ? 'বদলান' : 'Change'}
                                       </button>
                                     </>
                                   ) : (
@@ -930,18 +956,153 @@ export default function UnitsManager({
           building={building}
           language={language}
           onClose={() => setViewing(null)}
-          onReplace={viewing.person.memberId ? () => {
-            const seatNumber = (viewing.unit.occupants || []).findIndex(o => o.memberId === viewing.person.memberId) + 1;
-            setSeatTarget({ unit: viewing.unit, seatNumber: seatNumber || 1, member: { id: viewing.person.memberId, name: viewing.person.name } });
+          // Reading the record and CORRECTING it are the same errand: nobody
+          // opens this card, spots a wrong NID and then goes hunting for
+          // another screen to fix it on.
+          onEdit={() => {
+            setEditingTenant({ unit: viewing.unit, person: viewing.person });
             setViewing(null);
+          }}
+          // The tenant information form, as paper. Offered only where the
+          // dashboard gave us a way to produce it.
+          onDownload={onDownloadTenant ? () => {
+            const { person, unit } = viewing;
+            setViewing(null);
+            onDownloadTenant(person, unit);
           } : undefined}
-          // Unlike Replace, this is offered for LEGACY whole-unit tenancies
-          // too (memberId null → 'primary' server-side). A building that was
-          // set up before members[] existed is exactly the kind that has
-          // tenants who have been shuffling rooms for years.
-          onShift={() => {
-            setShiftTarget({ unit: viewing.unit, person: viewing.person });
-            setViewing(null);
+        />
+      )}
+
+      {/* ── What kind of change is this? ─────────────────────────────────────
+          Three things a landlord means by "বদলান", and they are not
+          interchangeable — one moves the person, one ends their tenancy, one
+          only fixes what was written down. Asking costs one tap and makes the
+          consequence readable BEFORE it happens; guessing cost a tenancy. */}
+      {seatMenu && (
+        <ModalPortal>
+        <div className="fixed inset-0 z-[118] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSeatMenu(null)} />
+          <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 animate-in slide-in-from-bottom-2 sm:zoom-in-95">
+            <div className="flex items-start gap-2 mb-4">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-black text-gray-900 truncate">
+                  {seatMenu.person.name || (isBn ? 'নামহীন' : 'Unnamed')}
+                </h3>
+                <p className="text-[11px] font-bold text-gray-500 mt-0.5 truncate">
+                  {noun} {seatMenu.unit.roomNumber}
+                  {isSeat && <> · {isBn ? `সিট ${seatMenu.seatNumber}` : `Seat ${seatMenu.seatNumber}`}</>}
+                </p>
+              </div>
+              <button type="button" onClick={() => setSeatMenu(null)} className="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {/* Same person, different room. Offered for LEGACY whole-unit
+                  tenancies too (memberId null → 'primary' server-side): a
+                  building set up before members[] existed is exactly the kind
+                  whose tenants have been shuffling rooms for years. */}
+              <button
+                type="button"
+                onClick={() => { setShiftTarget({ unit: seatMenu.unit, person: seatMenu.person }); setSeatMenu(null); }}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl bg-white border border-gray-200 hover:border-blue-200 hover:bg-blue-50/40 active:scale-[0.99] transition-all text-left"
+              >
+                <span className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><DoorOpen size={16} /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-black text-gray-900">{isBn ? 'রুম বদলান' : 'Move room'}</span>
+                  <span className="block text-[10px] font-bold text-gray-500 leading-tight mt-0.5">
+                    {isBn ? 'একই ভাড়াটিয়া, অন্য রুমে — ভাড়ার হিসাব সঙ্গে যাবে' : 'Same tenant, another room — the rent history moves with them'}
+                  </span>
+                </span>
+                <ChevronRight size={14} className="text-gray-300 shrink-0" />
+              </button>
+
+              {/* Ends this tenancy and opens the next one on the same seat, so
+                  it says what it costs rather than only what it does. */}
+              <button
+                type="button"
+                disabled={!seatMenu.person.memberId}
+                onClick={() => {
+                  setSeatTarget({
+                    unit: seatMenu.unit,
+                    seatNumber: seatMenu.seatNumber,
+                    member: { id: seatMenu.person.memberId, name: seatMenu.person.name },
+                  });
+                  setSeatMenu(null);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl bg-white border border-gray-200 hover:border-amber-200 hover:bg-amber-50/40 active:scale-[0.99] transition-all text-left disabled:opacity-40 disabled:hover:border-gray-200 disabled:hover:bg-white"
+              >
+                <span className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0"><RefreshCw size={16} /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-black text-gray-900">{isBn ? 'ভাড়াটিয়া বদলান' : 'Replace tenant'}</span>
+                  <span className="block text-[10px] font-bold text-gray-500 leading-tight mt-0.5">
+                    {isBn ? 'এই ভাড়াটিয়া চলে গেছেন — একই সিটে নতুন জন' : 'This tenant left — a new person on the same seat'}
+                  </span>
+                </span>
+                <ChevronRight size={14} className="text-gray-300 shrink-0" />
+              </button>
+
+              {/* Nothing about the tenancy changes — only the record does. */}
+              <button
+                type="button"
+                onClick={() => { setEditingTenant({ unit: seatMenu.unit, person: seatMenu.person }); setSeatMenu(null); }}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl bg-white border border-gray-200 hover:border-indigo-200 hover:bg-indigo-50/40 active:scale-[0.99] transition-all text-left"
+              >
+                <span className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0"><Pencil size={15} /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-black text-gray-900">{isBn ? 'এডিট করুন' : 'Edit details'}</span>
+                  <span className="block text-[10px] font-bold text-gray-500 leading-tight mt-0.5">
+                    {isBn ? 'নাম, নম্বর, এনআইডি, জরুরি যোগাযোগ ঠিক করুন' : 'Fix the name, number, NID or emergency contact'}
+                  </span>
+                </span>
+                <ChevronRight size={14} className="text-gray-300 shrink-0" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSeatMenu(null)}
+              className="w-full mt-3 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10px] font-black uppercase tracking-widest transition-colors"
+            >
+              {isBn ? 'বাতিল' : 'Cancel'}
+            </button>
+          </div>
+        </div>
+        </ModalPortal>
+      )}
+
+      {/* Same person, corrected. The seat, the rent and the ledger are not
+          touched — see EditTenantModal for why that distinction is the whole
+          point of it existing. */}
+      {editingTenant && (
+        <EditTenantModal
+          person={editingTenant.person}
+          unit={editingTenant.unit}
+          building={building}
+          language={language}
+          showToast={showToast}
+          onClose={() => setEditingTenant(null)}
+          onSaved={(op, patch) => {
+            const target = editingTenant;
+            setUnits((prev) => {
+              // A member is addressed by the operation itself, so the same
+              // correction is replayed on top of the server's copy on every
+              // re-read while it is still queued.
+              const rows = applyOp({ bookings: [], units: prev }, op).units;
+              if (target.person.memberId) return rows;
+              // A legacy whole-unit tenancy has no member row for the operation
+              // to address, so its occupant line is painted here instead.
+              return rows.map((u) => (String(u.id) !== String(target.unit.id) ? u : {
+                ...u,
+                occupants: (u.occupants || []).map((o) => (
+                  !o.memberId && String(o.bookingId) === String(target.person.bookingId)
+                    ? { ...o, name: patch.name, phone: patch.phone, joinDate: patch.joinDate, tenantProfile: patch.tenantProfile }
+                    : o
+                )),
+              }));
+            });
+            onBookingsChanged?.();
           }}
         />
       )}

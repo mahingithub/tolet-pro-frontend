@@ -71,7 +71,7 @@ import { emptyTenantProfile, validateTenantProfile, toTenantProfile, tenantField
 import { scanTenantForm } from '../services/aiScanService';
 import { scopeBookings, bookingInBuilding, sortByBuildingOrder } from '../utils/buildingScope';
 import { paidSoFar, remainingFor, applyPaymentToEntry } from '../utils/rentLedger';
-import { primaryOccupant, occupantNames, occupantCount, activeMembers, advanceCollected } from '../utils/occupants';
+import { primaryOccupant, occupantNames, occupantCount, activeMembers, advanceCollected, ALL_TENANTS } from '../utils/occupants';
 import { ADVANCE_PAYMENT_METHODS } from '../utils/tenantRent';
 import { PLAY_STORE_URL } from '../hooks/useAppInstall';
 import { SITE_URL } from '../seo/siteConfig';
@@ -1999,10 +1999,24 @@ const HostDashboard = () => {
   // landlord the API returns nothing, and we leave the old profile blob in
   // place — utils/buildingScope.js falls back to name matching for rows with no
   // buildingId yet, so nothing disappears mid-rollout.
-  const [serverBuildings, setServerBuildings] = useState(null);
+  // Cached like every other host collection on this screen (bookings,
+  // properties, inquiries). It was the one that wasn't, and it is the one the
+  // Rooms view hangs off: with no connection at boot this stayed null, the
+  // building list was empty, and a landlord could not drill into a building to
+  // reach the rooms — so the register and the room cache underneath it were
+  // both readable and both unreachable. `null` still means "nothing cached
+  // either", which keeps the pre-migration fallback in effectiveLandlordProfile
+  // working exactly as before.
+  const [serverBuildings, setServerBuildings] = useState(() => getCache('host_buildings_cache', null));
+  useEffect(() => {
+    if (!serverBuildings) return;
+    try { localStorage.setItem('host_buildings_cache', JSON.stringify(serverBuildings)); } catch { /* quota — the list still works */ }
+  }, [serverBuildings]);
   useEffect(() => {
     let cancelled = false;
     listBuildings()
+      // A failed read changes nothing: the cached list stays on screen, the
+      // same way a failed booking read leaves the register alone.
       .then((rows) => { if (!cancelled) setServerBuildings(rows); })
       .catch((err) => console.warn('[host] failed to load buildings:', err.message || err));
     return () => { cancelled = true; };
@@ -3066,7 +3080,6 @@ const HostDashboard = () => {
   const generateAgreementPdf = async (booking, brand = null, member = null) => {
     if (!booking) return;
     const isBnDoc = language === 'বাংলা';
-    showToast(isBnDoc ? 'অ্যাগ্রিমেন্ট তৈরি হচ্ছে…' : 'Generating agreement…');
 
     // Values are interpolated into markup, so they are escaped — a tenant
     // named with an angle bracket must not become a tag.
@@ -3083,27 +3096,21 @@ const HostDashboard = () => {
     // could download a paper for the first occupant and had no way at all to
     // produce one for the second. `member` narrows the whole document to that
     // person; without it, this stays the whole-unit agreement it always was.
+    //
+    // `member === 'all'` is the room's whole file: every occupant, one page
+    // each, in ONE download. Asking for "the room's forms" is a single errand —
+    // four separate downloads means four trips to the Downloads folder, and a
+    // browser that blocks the second one before the landlord notices.
     const mems = activeMembers(booking);
-    const seatMember = member || null;
-    const occupant = seatMember
-      ? {
-          name: String(seatMember.name || '').trim() || (isBnDoc ? 'ভাড়াটিয়া' : 'Tenant'),
-          phone: seatMember.phone || '',
-        }
-      : primaryOccupant(booking, language);
-    // A seat's rent is its share of the room, resolved the same way every other
-    // screen resolves it — never the whole room's rent on one person's paper.
-    const seatRent = seatMember ? seatShare(booking, seatMember, mems.length || 1) : null;
-    // Co-occupants are named on a seat agreement as a fact about the room, not
-    // as parties to this person's tenancy.
-    // Everyone in the room EXCEPT the person this form is about. Without the
-    // exclusion a whole-unit form listed its own subject under "other
-    // occupants" — the paper told রফিক আহমেদ that রফিক আহমেদ also lives there.
-    const subjectName = String((seatMember?.name) || primaryOccupant(booking, language).name || '').trim();
-    const names = mems
-      .map(m => String(m.name || '').trim())
-      .filter(n => n && n !== subjectName);
+    const everyone = member === ALL_TENANTS;
+    const subjects = everyone ? (mems.length ? mems : [null]) : [member || null];
     const L = (bn, en) => (isBnDoc ? bn : en);
+
+    // Four faces to fetch and four sheets to rasterise takes a few seconds, so
+    // the wait says how much work it is rather than leaving the screen still.
+    showToast(subjects.length > 1
+      ? L(`${subjects.length} জনের ফরম তৈরি হচ্ছে…`, `Generating ${subjects.length} forms…`)
+      : L('অ্যাগ্রিমেন্ট তৈরি হচ্ছে…', 'Generating agreement…'));
 
     const row = (k, v) => `
       <tr>
@@ -3138,50 +3145,33 @@ const HostDashboard = () => {
     const orgPhone = String(brand?.phone || '').trim();
     const branded = !!(orgName || brand?.logoUrl);
 
-    // The logo is inlined as a data URL before rendering. html2canvas draws
-    // remote images through the canvas, and a cross-origin one taints it —
-    // toDataURL() then throws and the whole download fails. A logo that can't
-    // be fetched is dropped; it must never take the agreement down with it.
-    let logoData = '';
-    if (brand?.logoUrl) {
+    // Remote images are inlined as data URLs before rendering. html2canvas draws
+    // them through the canvas, and a cross-origin one taints it — toDataURL()
+    // then throws and the whole download fails. An image that can't be fetched
+    // is dropped; it must never take the agreement down with it.
+    //
+    // One helper for the logo and the photos: printing four tenants fetches
+    // four faces and one letterhead, and two copies of this were already one
+    // copy too many.
+    const asDataUrl = async (url, what) => {
+      if (!url) return '';
       try {
-        const res = await fetch(brand.logoUrl, { mode: 'cors' });
-        if (res.ok) {
-          const blob = await res.blob();
-          logoData = await new Promise((resolve, reject) => {
-            const fr = new FileReader();
-            fr.onload = () => resolve(String(fr.result || ''));
-            fr.onerror = reject;
-            fr.readAsDataURL(blob);
-          });
-        }
+        const res = await fetch(url, { mode: 'cors' });
+        if (!res.ok) return '';
+        const blob = await res.blob();
+        return await new Promise((resolve, reject) => {
+          const fr = new FileReader();
+          fr.onload = () => resolve(String(fr.result || ''));
+          fr.onerror = reject;
+          fr.readAsDataURL(blob);
+        });
       } catch (err) {
-        console.warn('[host] agreement logo skipped:', err?.message || err);
+        console.warn(`[host] agreement ${what} skipped:`, err?.message || err);
+        return '';
       }
-    }
+    };
 
-    // The tenant's photo for the form's photo box. Same data-URL treatment as
-    // the logo — a cross-origin image would taint the canvas and take the whole
-    // download down. Missing or unreadable just leaves an empty box to paste a
-    // printed photo into, which is what these forms expect anyway.
-    let photoData = '';
-    const photoSrc = (seatMember?.tenantProfile?.photoUrl) || (seatMember ? seatMember.avatar : booking.tenantProfile?.photoUrl || booking.tenantAvatar) || '';
-    if (photoSrc) {
-      try {
-        const res = await fetch(photoSrc, { mode: 'cors' });
-        if (res.ok) {
-          const blob = await res.blob();
-          photoData = await new Promise((resolve, reject) => {
-            const fr = new FileReader();
-            fr.onload = () => resolve(String(fr.result || ''));
-            fr.onerror = reject;
-            fr.readAsDataURL(blob);
-          });
-        }
-      } catch (err) {
-        console.warn('[host] agreement photo skipped:', err?.message || err);
-      }
-    }
+    const logoData = await asDataUrl(brand?.logoUrl, 'logo');
 
     // Footer QR — where a tenant holding the paper can find the app.
     let qrData = '';
@@ -3211,10 +3201,6 @@ const HostDashboard = () => {
          </div>`
       : '';
 
-    // 794px = A4 width at 96dpi, so the capture maps 1:1 onto the page.
-    const host = document.createElement('div');
-    host.setAttribute('aria-hidden', 'true');
-    host.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;background:#ffffff;z-index:-1;';
     // ── The document ────────────────────────────────────────────────────────
     // A one-page, two-column intake form modelled on the Dhaka Metropolitan
     // Police tenant-information form a landlord already has to keep. The
@@ -3244,148 +3230,214 @@ const HostDashboard = () => {
         <table style="width:100%;border-collapse:collapse;margin-top:3px;">${rows}</table>
       </div>`;
 
-    const tp = (seatMember?.tenantProfile) || booking.tenantProfile || {};
-    const govtId = [tp.govtIdType === 'passport' ? L('পাসপোর্ট', 'Passport') : L('এনআইডি', 'NID'), tp.govtIdNumber]
-      .filter(Boolean).join(' — ');
-    const job = [tp.tenantType, tp.organization, tp.department].filter(Boolean).join(', ');
-    const roomLine = [
-      booking.floorNumber ? `${L('ফ্লোর', 'Floor')} ${booking.floorNumber}` : '',
-      booking.roomNumber ? `${L('রুম', 'Room')} ${booking.roomNumber}` : '',
-      seatMember?.seatLabel || '',
-    ].filter(Boolean).join(' · ');
+    // ── ONE SUBJECT, ONE SHEET ──────────────────────────────────────────────
+    // Called once per person when the whole room is being printed, so every
+    // fact that differs between two occupants of the same room — their photo,
+    // their share of the rent, their NID, the people they are listed beside —
+    // is resolved in HERE and not once for the whole file.
+    const renderSheet = async (seatMember) => {
+      const occupant = seatMember
+        ? {
+            name: String(seatMember.name || '').trim() || (isBnDoc ? 'ভাড়াটিয়া' : 'Tenant'),
+            phone: seatMember.phone || '',
+          }
+        : primaryOccupant(booking, language);
+      // A seat's rent is its share of the room, resolved the same way every other
+      // screen resolves it — never the whole room's rent on one person's paper.
+      const seatRent = seatMember ? seatShare(booking, seatMember, mems.length || 1) : null;
+      // Co-occupants are named on a seat agreement as a fact about the room, not
+      // as parties to this person's tenancy.
+      // Everyone in the room EXCEPT the person this form is about. Without the
+      // exclusion a whole-unit form listed its own subject under "other
+      // occupants" — the paper told রফিক আহমেদ that রফিক আহমেদ also lives there.
+      const subjectName = String((seatMember?.name) || primaryOccupant(booking, language).name || '').trim();
+      const names = mems
+        .map(m => String(m.name || '').trim())
+        .filter(n => n && n !== subjectName);
 
-    // The field list lives in ONE place. The PDF renders it into black-barred
-    // blocks; the Excel export writes the same rows as CSV. Two hand-kept
-    // copies of "what is on a tenancy form" would drift the first time a field
-    // was added to only one of them.
-    const groups = agreementGroups({
-      booking, seatMember, occupant, seatRent, names, tp, govtId, job, roomLine, L,
-      landlord: {
-        name: orgName || userData?.fullName || authUser?.name || authUser?.fullName || '',
-        phone: orgPhone || userData?.phone || authUser?.phone || '',
-        address: landlordProfile?.address || booking.location || '',
-      },
-      formatDate: (d) => formatDate(d, language),
-      formatBDT,
-      isOpenEnded: isOpenEndedLease(booking),
-    });
+      // This person's photo for the form's photo box. Missing or unreadable just
+      // leaves an empty box to paste a printed photo into, which is what these
+      // forms expect anyway.
+      const photoData = await asDataUrl(
+        (seatMember?.tenantProfile?.photoUrl)
+          || (seatMember ? seatMember.avatar : (booking.tenantProfile?.photoUrl || booking.tenantAvatar))
+          || '',
+        'photo',
+      );
 
-    const renderGroup = (g) => BLOCK(g.title, g.rows.map(r => F(r.label, r.value, r.blank)).join(''));
-    const leftCol = groups.filter(g => g.side === 'left').map(renderGroup).join('');
-    const rightCol = groups.filter(g => g.side === 'right').map(renderGroup).join('');
+      const tp = (seatMember?.tenantProfile) || booking.tenantProfile || {};
+      const govtId = [tp.govtIdType === 'passport' ? L('পাসপোর্ট', 'Passport') : L('এনআইডি', 'NID'), tp.govtIdNumber]
+        .filter(Boolean).join(' — ');
+      const job = [tp.tenantType, tp.organization, tp.department].filter(Boolean).join(', ');
+      const roomLine = [
+        booking.floorNumber ? `${L('ফ্লোর', 'Floor')} ${booking.floorNumber}` : '',
+        booking.roomNumber ? `${L('রুম', 'Room')} ${booking.roomNumber}` : '',
+        seatMember?.seatLabel || '',
+      ].filter(Boolean).join(' · ');
 
-    host.innerHTML = `
-      <div id="agreement-sheet" style="width:794px;box-sizing:border-box;padding:26px 30px;background:#fff;color:#111827;
-                  font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans Bengali','Hind Siliguri',sans-serif;">
+      // The field list lives in ONE place. The PDF renders it into black-barred
+      // blocks; the Excel export writes the same rows as CSV. Two hand-kept
+      // copies of "what is on a tenancy form" would drift the first time a field
+      // was added to only one of them.
+      const groups = agreementGroups({
+        booking, seatMember, occupant, seatRent, names, tp, govtId, job, roomLine, L,
+        landlord: {
+          name: orgName || userData?.fullName || authUser?.name || authUser?.fullName || '',
+          phone: orgPhone || userData?.phone || authUser?.phone || '',
+          address: landlordProfile?.address || booking.location || '',
+        },
+        formatDate: (d) => formatDate(d, language),
+        formatBDT,
+        isOpenEnded: isOpenEndedLease(booking),
+      });
 
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
-          ${headerLeft}
-          ${headerRight}
-        </div>
+      const renderGroup = (g) => BLOCK(g.title, g.rows.map(r => F(r.label, r.value, r.blank)).join(''));
+      const leftCol = groups.filter(g => g.side === 'left').map(renderGroup).join('');
+      const rightCol = groups.filter(g => g.side === 'right').map(renderGroup).join('');
 
-        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:10px;
-                    border-top:2px solid #111827;border-bottom:1px solid #111827;padding:6px 0;">
-          <div>
-            <div style="font-size:13px;font-weight:900;letter-spacing:.01em;">${esc(L('ভাড়াটিয়া তথ্য ফরম', 'TENANT INFORMATION FORM'))}</div>
-            <div style="font-size:8px;font-weight:700;color:#6b7280;margin-top:1px;">
-              ${esc(L('বাড়ি ভাড়া চুক্তি ও তথ্য নিবন্ধন', 'Tenancy agreement & information record'))}
+      // 794px = A4 width at 96dpi, so the capture maps 1:1 onto the page.
+      const host = document.createElement('div');
+      host.setAttribute('aria-hidden', 'true');
+      host.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;background:#ffffff;z-index:-1;';
+      host.innerHTML = `
+        <div id="agreement-sheet" style="width:794px;box-sizing:border-box;padding:26px 30px;background:#fff;color:#111827;
+                    font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans Bengali','Hind Siliguri',sans-serif;">
+
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+            ${headerLeft}
+            ${headerRight}
+          </div>
+
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:10px;
+                      border-top:2px solid #111827;border-bottom:1px solid #111827;padding:6px 0;">
+            <div>
+              <div style="font-size:13px;font-weight:900;letter-spacing:.01em;">${esc(L('ভাড়াটিয়া তথ্য ফরম', 'TENANT INFORMATION FORM'))}</div>
+              <div style="font-size:8px;font-weight:700;color:#6b7280;margin-top:1px;">
+                ${esc(L('বাড়ি ভাড়া চুক্তি ও তথ্য নিবন্ধন', 'Tenancy agreement & information record'))}
+              </div>
+            </div>
+            <div style="text-align:right;font-size:8px;font-weight:700;color:#6b7280;">
+              ${esc(L('তৈরি', 'Issued'))}: ${esc(formatDate(todayIso(), language))}
+              ${booking.roomNumber ? `<div style="font-size:11px;font-weight:900;color:#111827;margin-top:1px;">${esc(L('রুম', 'Room'))} ${esc(booking.roomNumber)}${seatMember?.seatLabel ? ` · ${esc(seatMember.seatLabel)}` : ''}</div>` : ''}
+            </div>
+            <div style="width:74px;height:88px;border:1px solid #9ca3af;border-radius:2px;flex:0 0 auto;
+                        display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f9fafb;">
+              ${photoData
+                ? `<img src="${photoData}" alt="" style="width:100%;height:100%;object-fit:cover;" />`
+                : `<span style="font-size:7.5px;font-weight:700;color:#9ca3af;text-align:center;line-height:1.3;">${esc(L('ছবি', 'PHOTO'))}</span>`}
             </div>
           </div>
-          <div style="text-align:right;font-size:8px;font-weight:700;color:#6b7280;">
-            ${esc(L('তৈরি', 'Issued'))}: ${esc(formatDate(todayIso(), language))}
-            ${booking.roomNumber ? `<div style="font-size:11px;font-weight:900;color:#111827;margin-top:1px;">${esc(L('রুম', 'Room'))} ${esc(booking.roomNumber)}${seatMember?.seatLabel ? ` · ${esc(seatMember.seatLabel)}` : ''}</div>` : ''}
+
+          <!-- Two columns, the way an office form is read: the person on the
+               left, the tenancy on the right. -->
+          <div style="display:flex;gap:16px;margin-top:9px;align-items:flex-start;">
+            <div style="flex:1 1 0;min-width:0;">${leftCol}</div>
+            <div style="flex:1 1 0;min-width:0;">${rightCol}</div>
           </div>
-          <div style="width:74px;height:88px;border:1px solid #9ca3af;border-radius:2px;flex:0 0 auto;
-                      display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f9fafb;">
-            ${photoData
-              ? `<img src="${photoData}" alt="" style="width:100%;height:100%;object-fit:cover;" />`
-              : `<span style="font-size:7.5px;font-weight:700;color:#9ca3af;text-align:center;line-height:1.3;">${esc(L('ছবি', 'PHOTO'))}</span>`}
+
+          <div style="margin-top:2px;border:1px solid #e5e7eb;border-radius:3px;padding:6px 8px;">
+            <div style="font-size:8.2px;font-weight:800;color:#374151;margin-bottom:2px;">${esc(L('ঘোষণা ও শর্তাবলি', 'DECLARATION & TERMS'))}</div>
+            <ol style="margin:0;padding-left:12px;font-size:7.6px;line-height:1.5;color:#4b5563;font-weight:600;">
+              ${terms.map(tx => `<li>${esc(tx)}</li>`).join('')}
+              <li>${esc(L('উপরের তথ্য সঠিক বলে ভাড়াটিয়া ঘোষণা করছেন; তথ্য পরিবর্তিত হলে বাড়িওয়ালাকে জানাবেন।', 'The tenant declares the above information is correct and will report any change to the landlord.'))}</li>
+            </ol>
           </div>
-        </div>
 
-        <!-- Two columns, the way an office form is read: the person on the
-             left, the tenancy on the right. -->
-        <div style="display:flex;gap:16px;margin-top:9px;align-items:flex-start;">
-          <div style="flex:1 1 0;min-width:0;">${leftCol}</div>
-          <div style="flex:1 1 0;min-width:0;">${rightCol}</div>
-        </div>
-
-        <div style="margin-top:2px;border:1px solid #e5e7eb;border-radius:3px;padding:6px 8px;">
-          <div style="font-size:8.2px;font-weight:800;color:#374151;margin-bottom:2px;">${esc(L('ঘোষণা ও শর্তাবলি', 'DECLARATION & TERMS'))}</div>
-          <ol style="margin:0;padding-left:12px;font-size:7.6px;line-height:1.5;color:#4b5563;font-weight:600;">
-            ${terms.map(tx => `<li>${esc(tx)}</li>`).join('')}
-            <li>${esc(L('উপরের তথ্য সঠিক বলে ভাড়াটিয়া ঘোষণা করছেন; তথ্য পরিবর্তিত হলে বাড়িওয়ালাকে জানাবেন।', 'The tenant declares the above information is correct and will report any change to the landlord.'))}</li>
-          </ol>
-        </div>
-
-        <div style="display:flex;justify-content:space-between;gap:20px;margin-top:30px;">
-          <div style="flex:1 1 0;"><div style="height:1px;background:#9ca3af;"></div>
-            <div style="font-size:8px;font-weight:700;color:#6b7280;margin-top:4px;">${esc(L('বাড়িওয়ালার স্বাক্ষর ও তারিখ', 'Landlord signature & date'))}</div></div>
-          <div style="flex:1 1 0;"><div style="height:1px;background:#9ca3af;"></div>
-            <div style="font-size:8px;font-weight:700;color:#6b7280;margin-top:4px;">${esc(L('ভাড়াটিয়ার স্বাক্ষর ও তারিখ', 'Tenant signature & date'))}</div></div>
-        </div>
-
-        <div style="margin-top:14px;padding-top:6px;border-top:1px solid #e5e7eb;
-                    display:flex;align-items:center;justify-content:space-between;gap:14px;">
-          <div style="min-width:0;">
-            <div style="font-size:7.5px;font-weight:700;color:#9ca3af;">${esc(L('তৈরি হয়েছে TO-LET PRO দিয়ে', 'Generated with TO-LET PRO'))}</div>
-            <div style="font-size:7.5px;font-weight:700;color:#9ca3af;margin-top:1px;">${esc(APP_LINK_LABEL)}</div>
+          <div style="display:flex;justify-content:space-between;gap:20px;margin-top:30px;">
+            <div style="flex:1 1 0;"><div style="height:1px;background:#9ca3af;"></div>
+              <div style="font-size:8px;font-weight:700;color:#6b7280;margin-top:4px;">${esc(L('বাড়িওয়ালার স্বাক্ষর ও তারিখ', 'Landlord signature & date'))}</div></div>
+            <div style="flex:1 1 0;"><div style="height:1px;background:#9ca3af;"></div>
+              <div style="font-size:8px;font-weight:700;color:#6b7280;margin-top:4px;">${esc(L('ভাড়াটিয়ার স্বাক্ষর ও তারিখ', 'Tenant signature & date'))}</div></div>
           </div>
-          ${qrData ? `<img src="${qrData}" alt="" style="width:42px;height:42px;flex:0 0 auto;" />` : ''}
-        </div>
-      </div>`;
-    document.body.appendChild(host);
+
+          <div style="margin-top:14px;padding-top:6px;border-top:1px solid #e5e7eb;
+                      display:flex;align-items:center;justify-content:space-between;gap:14px;">
+            <div style="min-width:0;">
+              <div style="font-size:7.5px;font-weight:700;color:#9ca3af;">${esc(L('তৈরি হয়েছে TO-LET PRO দিয়ে', 'Generated with TO-LET PRO'))}</div>
+              <div style="font-size:7.5px;font-weight:700;color:#9ca3af;margin-top:1px;">${esc(APP_LINK_LABEL)}</div>
+            </div>
+            ${qrData ? `<img src="${qrData}" alt="" style="width:42px;height:42px;flex:0 0 auto;" />` : ''}
+          </div>
+        </div>`;
+      return { host, occupant };
+    };
+
+    const slugify = (v) => String(v || '').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase();
 
     try {
       const { default: html2canvas } = await import('html2canvas');
-      const canvas = await html2canvas(host.firstElementChild, {
-        scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
-      });
-
       const doc = new jsPDF({ unit: 'pt', format: 'a4' });
       const pageW = doc.internal.pageSize.getWidth();
       const pageH = doc.internal.pageSize.getHeight();
+      // The first subject's name is what the file is called; on a whole-room
+      // download the room takes over (see below).
+      let firstOccupant = null;
 
-      // ONE PAGE, ALWAYS.
-      //
-      // This used to paginate: anything past A4 was sliced onto a second sheet,
-      // and with a letterhead on top the form did exactly that — a two-page
-      // "form", cut mid-field, which no office will take. A form is one page by
-      // definition, so overflow is fitted by scaling the sheet down (and
-      // centred) rather than cut in half. The layout is sized to fit at 100%;
-      // this only ever engages for an unusually long address or a big logo.
-      const fitScale = Math.min(pageW / canvas.width, pageH / canvas.height);
-      const drawW = canvas.width * fitScale;
-      const drawH = canvas.height * fitScale;
+      for (const [i, subject] of subjects.entries()) {
+        const { host, occupant } = await renderSheet(subject);
+        document.body.appendChild(host);
+        try {
+          const canvas = await html2canvas(host.firstElementChild, {
+            scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
+          });
 
-      // JPEG, not PNG. The same sheet was 12.6 MB as PNG — unusable to email or
-      // to keep one per tenant. A form is flat colour and text; at quality 0.92
-      // it is visually identical and roughly twenty times smaller.
-      doc.addImage(
-        canvas.toDataURL('image/jpeg', 0.92), 'JPEG',
-        (pageW - drawW) / 2, (pageH - drawH) / 2,
-        drawW, drawH,
-      );
+          // ONE PAGE PER PERSON, ALWAYS.
+          //
+          // This used to paginate: anything past A4 was sliced onto a second
+          // sheet, and with a letterhead on top the form did exactly that — a
+          // two-page "form", cut mid-field, which no office will take. A form is
+          // one page by definition, so overflow is fitted by scaling the sheet
+          // down (and centred) rather than cut in half. The layout is sized to
+          // fit at 100%; this only ever engages for an unusually long address or
+          // a big logo. A room's file is several such pages, never a split one.
+          const fitScale = Math.min(pageW / canvas.width, pageH / canvas.height);
+          const drawW = canvas.width * fitScale;
+          const drawH = canvas.height * fitScale;
 
-      // The name on the file is the name on the agreement. Non-Latin names have
-      // no safe filename form, so those fall back to the room or a plain label
-      // rather than to a string of dashes.
-      const latin = occupant.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase();
-      // Two seats in one room with Bangla names both fall through to the room
-      // number, so the second download would silently overwrite the first in
-      // the Downloads folder. The seat keeps them apart.
-      const seatSlug = seatMember
-        ? String(seatMember.seatLabel || `seat-${mems.indexOf(seatMember) + 1}`).replace(/[^a-z0-9]+/gi, '-').toLowerCase()
-        : '';
-      const base = latin || String(booking.roomNumber || '').replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'tenant';
-      const slug = [base, seatSlug].filter(Boolean).join('-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-      doc.save(`lease-agreement-${slug}.pdf`);
-      showToast(isBnDoc ? 'অ্যাগ্রিমেন্ট ডাউনলোড হয়েছে ✓' : 'Agreement downloaded ✓');
+          if (i > 0) doc.addPage();
+          // JPEG, not PNG. The same sheet was 12.6 MB as PNG — unusable to email
+          // or to keep one per tenant. A form is flat colour and text; at
+          // quality 0.92 it is visually identical and roughly twenty times
+          // smaller.
+          doc.addImage(
+            canvas.toDataURL('image/jpeg', 0.92), 'JPEG',
+            (pageW - drawW) / 2, (pageH - drawH) / 2,
+            drawW, drawH,
+          );
+          if (!firstOccupant) firstOccupant = occupant;
+        } finally {
+          // Removed as each page is captured, so printing a full room never
+          // leaves several A4 sheets parked off-screen in the DOM.
+          host.remove();
+        }
+      }
+
+      if (everyone) {
+        // Named for the ROOM, because that is what the file is: one document
+        // holding every tenancy in it.
+        doc.save(`tenant-forms-${slugify(booking.roomNumber) || slugify(booking.property) || 'room'}.pdf`);
+        showToast(isBnDoc
+          ? `${subjects.length}টি ফরম একসাথে ডাউনলোড হয়েছে ✓`
+          : `${subjects.length} forms downloaded together ✓`);
+      } else {
+        // The name on the file is the name on the agreement. Non-Latin names
+        // have no safe filename form, so those fall back to the room or a plain
+        // label rather than to a string of dashes.
+        const seatMember = subjects[0];
+        // Two seats in one room with Bangla names both fall through to the room
+        // number, so the second download would silently overwrite the first in
+        // the Downloads folder. The seat keeps them apart.
+        const seatSlug = seatMember
+          ? slugify(seatMember.seatLabel || `seat-${mems.indexOf(seatMember) + 1}`)
+          : '';
+        const base = slugify(firstOccupant?.name) || slugify(booking.roomNumber) || 'tenant';
+        const slug = [base, seatSlug].filter(Boolean).join('-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+        doc.save(`lease-agreement-${slug}.pdf`);
+        showToast(isBnDoc ? 'অ্যাগ্রিমেন্ট ডাউনলোড হয়েছে ✓' : 'Agreement downloaded ✓');
+      }
     } catch (err) {
       console.warn('[host] agreement generation failed:', err?.message || err);
       showToast(isBnDoc ? 'অ্যাগ্রিমেন্ট তৈরি ব্যর্থ' : 'Could not generate agreement');
-    } finally {
-      host.remove();
     }
   };
 
@@ -3419,56 +3471,84 @@ const HostDashboard = () => {
     const isBnDoc = language === 'বাংলা';
     const L = (bn, en) => (isBnDoc ? bn : en);
     const mems = activeMembers(booking);
-    const seatMember = member || null;
-    const occ = seatMember
-      ? { name: String(seatMember.name || '').trim(), phone: seatMember.phone || '' }
-      : primaryOccupant(booking, language);
-    const tp = (seatMember?.tenantProfile) || booking.tenantProfile || {};
-    const subjectName = String(occ.name || '').trim();
+    // Same rule as the PDF: 'all' is the whole room in one file. A spreadsheet
+    // is the one place that is genuinely better together — four tenants in four
+    // CSVs cannot be sorted, filtered or handed to an office as one list.
+    const everyone = member === ALL_TENANTS;
+    const subjects = everyone ? (mems.length ? mems : [null]) : [member || null];
 
-    const groups = agreementGroups({
-      booking, seatMember, occupant: occ,
-      seatRent: seatMember ? seatShare(booking, seatMember, mems.length || 1) : null,
-      names: mems.map(m => String(m.name || '').trim()).filter(n => n && n !== subjectName),
-      tp,
-      govtId: [tp.govtIdType === 'passport' ? L('পাসপোর্ট', 'Passport') : L('এনআইডি', 'NID'), tp.govtIdNumber].filter(Boolean).join(' — '),
-      job: [tp.tenantType, tp.organization, tp.department].filter(Boolean).join(', '),
-      roomLine: [
-        booking.floorNumber ? `${L('ফ্লোর', 'Floor')} ${booking.floorNumber}` : '',
-        booking.roomNumber ? `${L('রুম', 'Room')} ${booking.roomNumber}` : '',
-        seatMember?.seatLabel || '',
-      ].filter(Boolean).join(' · '),
-      L,
-      landlord: {
-        name: String(brand?.orgName || '').trim() || userData?.fullName || authUser?.name || authUser?.fullName || '',
-        phone: String(brand?.phone || '').trim() || userData?.phone || authUser?.phone || '',
-        address: landlordProfile?.address || booking.location || '',
-      },
-      formatDate: (d) => formatDate(d, language),
-      formatBDT: (n) => Number(n) || 0,   // a spreadsheet wants a number, not "৳6,000"
-      isOpenEnded: isOpenEndedLease(booking),
-    });
+    const rowsFor = (seatMember) => {
+      const occ = seatMember
+        ? { name: String(seatMember.name || '').trim(), phone: seatMember.phone || '' }
+        : primaryOccupant(booking, language);
+      const tp = (seatMember?.tenantProfile) || booking.tenantProfile || {};
+      const subjectName = String(occ.name || '').trim();
+
+      const groups = agreementGroups({
+        booking, seatMember, occupant: occ,
+        seatRent: seatMember ? seatShare(booking, seatMember, mems.length || 1) : null,
+        names: mems.map(m => String(m.name || '').trim()).filter(n => n && n !== subjectName),
+        tp,
+        govtId: [tp.govtIdType === 'passport' ? L('পাসপোর্ট', 'Passport') : L('এনআইডি', 'NID'), tp.govtIdNumber].filter(Boolean).join(' — '),
+        job: [tp.tenantType, tp.organization, tp.department].filter(Boolean).join(', '),
+        roomLine: [
+          booking.floorNumber ? `${L('ফ্লোর', 'Floor')} ${booking.floorNumber}` : '',
+          booking.roomNumber ? `${L('রুম', 'Room')} ${booking.roomNumber}` : '',
+          seatMember?.seatLabel || '',
+        ].filter(Boolean).join(' · '),
+        L,
+        landlord: {
+          name: String(brand?.orgName || '').trim() || userData?.fullName || authUser?.name || authUser?.fullName || '',
+          phone: String(brand?.phone || '').trim() || userData?.phone || authUser?.phone || '',
+          address: landlordProfile?.address || booking.location || '',
+        },
+        formatDate: (d) => formatDate(d, language),
+        formatBDT: (n) => Number(n) || 0,   // a spreadsheet wants a number, not "৳6,000"
+        isOpenEnded: isOpenEndedLease(booking),
+      });
+      return { occ, groups };
+    };
 
     const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const lines = [[L('বিভাগ', 'Section'), L('ক্ষেত্র', 'Field'), L('তথ্য', 'Value')].map(esc).join(',')];
-    groups.forEach(g => g.rows.forEach(r => {
-      lines.push([g.title, r.label, r.blank ? '' : r.value].map(esc).join(','));
-    }));
+    // The tenant's name leads every row when the file holds more than one of
+    // them — a column, not a heading between blocks, so the sheet still sorts
+    // and filters as a single table.
+    const header = [
+      ...(everyone ? [L('ভাড়াটিয়া', 'Tenant')] : []),
+      L('বিভাগ', 'Section'), L('ক্ষেত্র', 'Field'), L('তথ্য', 'Value'),
+    ];
+    const lines = [header.map(esc).join(',')];
+    let firstName = '';
+    subjects.forEach((seatMember) => {
+      const { occ, groups } = rowsFor(seatMember);
+      if (!firstName) firstName = String(occ.name || '');
+      groups.forEach(g => g.rows.forEach(r => {
+        lines.push([
+          ...(everyone ? [occ.name || L('নামহীন', 'Unnamed')] : []),
+          g.title, r.label, r.blank ? '' : r.value,
+        ].map(esc).join(','));
+      }));
+    });
 
+    const slugify = (v) => String(v || '').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase();
     // BOM first, or Excel opens Bangla as mojibake.
     const blob = new Blob([`﻿${lines.join('\n')}`], { type: 'text/csv;charset=utf-8;' });
-    const latin = String(occ.name || '').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase();
-    const seatSlug = seatMember ? String(seatMember.seatLabel || '').replace(/[^a-z0-9]+/gi, '-').toLowerCase() : '';
-    const base = latin || String(booking.roomNumber || '').replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'tenant';
+    const roomSlug = slugify(booking.roomNumber);
+    const seatSlug = (!everyone && subjects[0]) ? slugify(subjects[0].seatLabel) : '';
+    const base = everyone
+      ? (roomSlug || slugify(booking.property) || 'room')
+      : (slugify(firstName) || roomSlug || 'tenant');
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${[base, seatSlug].filter(Boolean).join('-').replace(/-+/g, '-')}-tenant-form.csv`;
+    a.download = `${[base, seatSlug].filter(Boolean).join('-').replace(/-+/g, '-')}-tenant-form${everyone ? 's' : ''}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
-    showToast(isBnDoc ? 'এক্সেল ফাইল ডাউনলোড হয়েছে ✓' : 'Excel file downloaded ✓');
+    showToast(everyone
+      ? L(`${subjects.length} জনের তথ্য একসাথে ডাউনলোড হয়েছে ✓`, `${subjects.length} tenants exported together ✓`)
+      : L('এক্সেল ফাইল ডাউনলোড হয়েছে ✓', 'Excel file downloaded ✓'));
   };
 
   // Chosen in the modal: who, what format, and the letterhead.
