@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { LanguageProvider } from "./context/LanguageContext";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
@@ -13,60 +13,88 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { needsBookingLookup, resolveHome } from './utils/homeSurface';
 import { hasCachedSettings } from './services/settingsService';
 
-// Existing Imports
+// ─── CRITICAL SHELL — static, loads with the entry chunk ────────────────────
+// What the user sees immediately, or what has to run before first paint. There
+// is nothing to gain by deferring these: splitting them would only add a round
+// trip in front of the thing the page is waiting on anyway.
 import Navbar from "./components/Navbar";
-import PropertyListing from "./components/PropertyListing";
-import PropertyDetails from "./components/PropertyDetails";
-import InquiryPage from "./components/InquiryModal";
-import LoginPage from "./components/LoginPage";
-import HostDashboard from "./components/HostDashboard";
-import AddProperty from "./components/AddProperty";
-import HomePage from "./components/HomePage";
-import ChatSystem from "./components/ChatSystem";
-import TenantDashboard from "./components/TenantDashboard";
-import Living from "./components/living/Living";
-import GlobalAIAssistant from "./components/GlobalAIAssistant";
-import WelcomeRobotOverlay from "./components/WelcomeRobotOverlay";
-import HomeIntentModal from "./components/HomeIntentModal";
-import GlobalToaster from "./components/GlobalToaster";
-import SmartAlertsPage from "./components/Smartalertspage";
-import AIInsightsPage from "./components/Aiinsightspage";
-import LandlordProfile from "./components/LandlordProfile";
-import TenantProfile from "./components/TenantProfile";
-import PrivacyCenter from "./components/PrivacyCenter.jsx";
-import SubscriptionPage from "./components/SubscriptionPage";
-import CheckoutPage from "./components/CheckoutPage";
-import SupportPage from "./components/SupportPage";
-import ServicesPage from "./components/ServicesPage";
-import HowItWorks from "./components/HowItWorks";
-import JoinPropertyPage from "./components/JoinPropertyPage";
 import DeepLinkHandler from "./components/DeepLinkHandler";
+import RouteSeoGuard from "./components/seo/RouteSeoGuard";
+import MobileBottomNav from "./components/mobile/MobileBottomNav";
+import AppDownloadBanner from "./components/AppDownloadBanner";
+
+// ─── OVERLAYS — deferred, rendered above the page rather than in it ─────────
+// Widgets that float on top of whatever route is showing: the AI assistant, the
+// welcome robot, the theme switcher, toasts, the call UI. Together they were
+// ~2,300 lines sitting in the entry chunk, delaying first paint for UI that by
+// definition is not what the user came for. They mount a moment after the page
+// does, behind `<Suspense fallback={null}>` (see the render tree below).
+const GlobalAIAssistant = lazy(() => import("./components/GlobalAIAssistant"));
+const WelcomeRobotOverlay = lazy(() => import("./components/WelcomeRobotOverlay"));
+const HomeIntentModal = lazy(() => import("./components/HomeIntentModal"));
+const GlobalToaster = lazy(() => import("./components/GlobalToaster"));
+const FeedbackButton = lazy(() => import("./components/FeedbackButton"));
+const GlobalCallUI = lazy(() => import("./components/GlobalCallUI"));
+const ThemeWidget = lazy(() => import("./components/shared/ThemeWidget"));
+
+// ─── ROUTE COMPONENTS — code-split, one chunk each ──────────────────────────
+// WHY THIS IS lazy() AND NOT A PLAIN IMPORT.
+//
+// Every one of these used to be a static import, which meant Vite emitted the
+// entire app as ONE 4.4MB JavaScript file (1.17MB over the wire, brotli). A
+// visitor opening a single property listing downloaded the host dashboard, the
+// checkout flow, the AI insights screen, the chat system and the living wallet
+// before anything at all could render — and rendered NOTHING until all of it
+// had arrived and parsed.
+//
+// On a good connection that is merely wasteful. On the connection a lot of this
+// app's users actually have — a congested mobile network on a mid-range Android
+// — 1.17MB is tens of seconds before first paint, and Chrome gives up first:
+// that is the ERR_CONNECTION_TIMED_OUT people were reporting, and it is why it
+// hit "some devices sometimes" rather than everyone always. It is a function of
+// the network you happen to be on at that moment.
+//
+// lazy() makes each route its own chunk, fetched when that route is opened. The
+// initial download becomes the shell plus ONE route.
+//
+// RULE FOR ANYONE ADDING A ROUTE: put it here, not in the static block above.
+// A static import silently folds the whole component tree back into the entry
+// chunk, which is exactly how this regressed to 4.4MB in the first place.
+const PropertyListing  = lazy(() => import("./components/PropertyListing"));
+const PropertyDetails  = lazy(() => import("./components/PropertyDetails"));
+const InquiryPage      = lazy(() => import("./components/InquiryModal"));
+const LoginPage        = lazy(() => import("./components/LoginPage"));
+const HostDashboard    = lazy(() => import("./components/HostDashboard"));
+const AddProperty      = lazy(() => import("./components/AddProperty"));
+const HomePage         = lazy(() => import("./components/HomePage"));
+const ChatSystem       = lazy(() => import("./components/ChatSystem"));
+const TenantDashboard  = lazy(() => import("./components/TenantDashboard"));
+const Living           = lazy(() => import("./components/living/Living"));
+const SmartAlertsPage  = lazy(() => import("./components/Smartalertspage"));
+const AIInsightsPage   = lazy(() => import("./components/Aiinsightspage"));
+const LandlordProfile  = lazy(() => import("./components/LandlordProfile"));
+const TenantProfile    = lazy(() => import("./components/TenantProfile"));
+const PrivacyCenter    = lazy(() => import("./components/PrivacyCenter.jsx"));
+const SubscriptionPage = lazy(() => import("./components/SubscriptionPage"));
+const CheckoutPage     = lazy(() => import("./components/CheckoutPage"));
+const SupportPage      = lazy(() => import("./components/SupportPage"));
+const ServicesPage     = lazy(() => import("./components/ServicesPage"));
+const HowItWorks       = lazy(() => import("./components/HowItWorks"));
+const JoinPropertyPage = lazy(() => import("./components/JoinPropertyPage"));
 
 // --- SEO landing pages ---
 // Public, content-rich pages for the half of the product that lives behind a
 // login (meal manager, roommate wallet, tenant/house management) plus the
 // /to-let hub that links out to all 8 divisions and 64 districts. A crawler
 // could not see any of this before — see src/seo/featurePages.js.
-import ToLetHub from "./components/seo/ToLetHub";
-import FeatureLanding from "./components/seo/FeatureLanding";
-import RouteSeoGuard from "./components/seo/RouteSeoGuard";
-
-// --- Mobile Shell ---
-import MobileBottomNav from "./components/mobile/MobileBottomNav";
-
-import AppDownloadBanner from "./components/AppDownloadBanner";
+const ToLetHub       = lazy(() => import("./components/seo/ToLetHub"));
+const FeatureLanding = lazy(() => import("./components/seo/FeatureLanding"));
 
 // --- Legal pages (Phase 7) ---
-import PrivacyPolicy from "./components/legal/PrivacyPolicy";
-import TermsOfService from "./components/legal/TermsOfService";
-import RefundPolicy from "./components/legal/RefundPolicy";
-import TrustSafety from "./components/legal/TrustSafety";
-
-// --- Beta feedback button (Phase 7) ---
-import FeedbackButton from "./components/FeedbackButton";
-import GlobalCallUI from "./components/GlobalCallUI";
-
-import ThemeWidget from "./components/shared/ThemeWidget";
+const PrivacyPolicy   = lazy(() => import("./components/legal/PrivacyPolicy"));
+const TermsOfService  = lazy(() => import("./components/legal/TermsOfService"));
+const RefundPolicy    = lazy(() => import("./components/legal/RefundPolicy"));
+const TrustSafety     = lazy(() => import("./components/legal/TrustSafety"));
 
 // --- Admin panel ---
 // The admin panel is now a SEPARATE React app (see ../tolet-pro-admin),
@@ -252,6 +280,29 @@ const AppLayout = () => {
 				</div>
 			)}
 
+			{/* Every route below is lazy(), so a Suspense boundary is REQUIRED —
+			    without one React throws the moment a route chunk is still in
+			    flight. The fallback is deliberately a bare branded panel and not
+			    a spinner component: it has to be part of the entry chunk (it is
+			    what shows WHILE the real chunk downloads), so anything richer
+			    would put weight back into the file this change exists to shrink.
+
+			    It matches the app's splash colour so a slow route transition
+			    reads as the app loading rather than as a blank white failure —
+			    which is what a lot of "the site didn't load" reports actually
+			    were. */}
+			<Suspense
+				fallback={
+					<div
+						className="flex min-h-[60vh] w-full items-center justify-center bg-white dark:bg-slate-950"
+						role="status"
+						aria-live="polite"
+					>
+						<span className="sr-only">লোড হচ্ছে…</span>
+						<span className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-rose-700 dark:border-slate-700 dark:border-t-rose-500" />
+					</div>
+				}
+			>
 			<Routes>
 				{/* Public Routes */}
 				<Route path="/" element={<HomePage />} />
@@ -367,20 +418,34 @@ const AppLayout = () => {
 
 				<Route path="*" element={<Navigate to="/" replace />} />
 			</Routes>
+			</Suspense>
 
-			<ThemeWidget />
-			<GlobalCallUI />
-			<WelcomeRobotOverlay />
-			<HomeIntentModal />
-			<GlobalToaster />
-			{!shouldHideAIAssistant && <GlobalAIAssistant />}
+			{/* OVERLAYS — deferred on purpose, with fallback={null}.
+			    None of these is part of the page: they are widgets that sit ON
+			    TOP of it (theme switcher, call UI, welcome robot, AI assistant,
+			    feedback button). Loading them in the entry chunk meant the user
+			    waited on ~2,300 lines of overlay code before the page they
+			    actually asked for could paint.
+			    fallback={null} because "not there yet" is the correct look for
+			    an overlay — a spinner for a floating button would be worse than
+			    the button simply appearing a moment later. */}
+			<Suspense fallback={null}>
+				<ThemeWidget />
+				<GlobalCallUI />
+				<WelcomeRobotOverlay />
+				<HomeIntentModal />
+				<GlobalToaster />
+				{!shouldHideAIAssistant && <GlobalAIAssistant />}
+			</Suspense>
 			{/* '/living' is deliberately NOT hidden any more. It can be a user's
 			    home screen now, and a home screen with no rail is a room with no
 			    door: no Explore, no Messages, no Profile from the first screen
 			    they see. Living's own module pills sit at the top, so the two
 			    navigations don't compete. */}
 			<MobileBottomNav hideOnRoutes={['/login', '/list-property', '/properties/']} />
-			<FeedbackButton />
+			<Suspense fallback={null}>
+				<FeedbackButton />
+			</Suspense>
 		</div>
 	);
 };

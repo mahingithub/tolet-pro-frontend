@@ -57,3 +57,8 @@ extract.cjs
 fix-lang.cjs
 parseSafeNum.js
 patch-toast.js
+
+# Internal docs & diagnostics
+docs/
+*.md
+!README.md

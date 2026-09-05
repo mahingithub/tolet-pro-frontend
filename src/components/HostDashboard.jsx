@@ -220,6 +220,47 @@ const initialBookings = [];
 // pre-seeded — the inbox is empty until a real tenant messages.
 const initialInquiries = [];
 
+// Seed for the /api/host-stats card — also the reset value when the signed-in
+// account changes, so it lives next to the other empty starting points.
+const EMPTY_HOST_STATS = { responseRate: 0, avgResponseTime: 0, conversionRate: 0 };
+
+// ─── PER-ACCOUNT DASHBOARD CACHE ──────────────────────────────────────────
+// Every localStorage bucket this screen paints from before the network answers.
+// The keys used to be these bare strings, i.e. one bucket shared by every
+// account on the browser: when landlord B signed in after landlord A, B's first
+// paint rendered A's property counts, bookings and inquiries — A's tenants and
+// rent figures, on B's screen — until the fetch resolved and overwrote them.
+// Each key now carries the signed-in landlord's id (`host_props_cache:<uid>`),
+// so a bucket is only ever read by the account that wrote it.
+const HOST_CACHE_NAMES = [
+  'host_props_cache',
+  'host_bookings_cache',
+  'host_inquiries_cache',
+  'host_payment_methods_cache',
+  'host_buildings_cache',
+  'host_stats_cache',
+];
+
+// Namespacing stops us READING another landlord's cache; this stops it sitting
+// in storage at all. Removes the legacy un-suffixed keys left by the previous
+// build plus any bucket belonging to a different account. Called with no uid
+// (signed out) it clears the lot.
+const purgeForeignHostCaches = (uid) => {
+  const own = uid ? String(uid) : null;
+  try {
+    const doomed = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      const name = HOST_CACHE_NAMES.find((n) => k === n || k.startsWith(`${n}:`));
+      if (!name) continue;                       // not one of ours
+      if (own && k === `${name}:${own}`) continue; // the signed-in landlord's own bucket
+      doomed.push(k);
+    }
+    doomed.forEach((k) => { try { localStorage.removeItem(k); } catch { /* ignore */ } });
+  } catch { /* storage unavailable — nothing cached to leak either */ }
+};
+
 // Maps a raw inquiry from inquiryService.listHostInquiries() into the shape the
 // dashboard renders. The backend already stamps most fields (user/init/timeAgo),
 // so this normalises defensively with fallbacks. (This mapper had gone missing,
@@ -1358,24 +1399,47 @@ const HostDashboard = () => {
   const toastTimerRef = useRef(null);
 
   // 🟢 DATA STATES
-  const getCache = (key, fallback) => {
-  try {
-    const v = localStorage.getItem(key);
-    return v ? JSON.parse(v) : fallback;
-  } catch { return fallback; }
-};
+  // Whose cache are we allowed to touch? See HOST_CACHE_NAMES above. `null`
+  // means the signed-in account isn't known yet (or we're mid-logout), and in
+  // that state we neither read nor write: an unidentified session falling back
+  // to the shared bucket is exactly how one landlord's data reached another's
+  // first paint.
+  const hostCacheUid = authUser?.id || authUser?._id || null;
+  const hostCacheKey = (name) => (hostCacheUid ? `${name}:${hostCacheUid}` : null);
+  const getCache = (name, fallback) => {
+    const key = hostCacheKey(name);
+    if (!key) return fallback;
+    try {
+      const v = localStorage.getItem(key);
+      return v ? JSON.parse(v) : fallback;
+    } catch { return fallback; }
+  };
+  // No key = no write. This is also what keeps a logout from leaving a readable
+  // cache behind: authService.clearAllAppData() wipes storage synchronously,
+  // and by then authUser is null, so a trailing render can't re-create a bucket
+  // for the next account to find.
+  const setCache = (name, value) => {
+    const key = hostCacheKey(name);
+    if (!key) return;
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* quota — state still works */ }
+  };
+
+  // Sweep the browser the moment we know who is signed in, so another
+  // landlord's (or the pre-namespace build's) buckets don't linger in storage.
+  useEffect(() => { purgeForeignHostCaches(hostCacheUid); }, [hostCacheUid]);
+
   const [properties, setProperties] = useState(() => getCache('host_props_cache', initialPortfolio));
-  useEffect(() => { localStorage.setItem('host_props_cache', JSON.stringify(properties)); }, [properties]);
+  useEffect(() => { setCache('host_props_cache', properties); }, [properties]);
   const [isPropertiesLoading, setIsPropertiesLoading] = useState(true);
   const [propertyLoadError, setPropertyLoadError] = useState('');
   const [propertyRefreshTick, setPropertyRefreshTick] = useState(0);
   const [bookings, setBookings] = useState(() => getCache('host_bookings_cache', initialBookings));
-  useEffect(() => { localStorage.setItem('host_bookings_cache', JSON.stringify(bookings)); }, [bookings]);
+  useEffect(() => { setCache('host_bookings_cache', bookings); }, [bookings]);
   const [inquiries, setInquiries] = useState(() => getCache('host_inquiries_cache', initialInquiries));
-  useEffect(() => { localStorage.setItem('host_inquiries_cache', JSON.stringify(inquiries)); }, [inquiries]);
+  useEffect(() => { setCache('host_inquiries_cache', inquiries); }, [inquiries]);
   // 🟢 V1 manual rent — landlord payment accounts + pending tenant claims.
   const [paymentMethods, setPaymentMethods] = useState(() => getCache('host_payment_methods_cache', []));
-  useEffect(() => { localStorage.setItem('host_payment_methods_cache', JSON.stringify(paymentMethods)); }, [paymentMethods]);
+  useEffect(() => { setCache('host_payment_methods_cache', paymentMethods); }, [paymentMethods]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
   const [pendingRentCount, setPendingRentCount] = useState(0);
   const [inquiryTab, setInquiryTab] = useState('pending'); // 'pending' | 'accepted' | 'rejected' | 'rented'
@@ -2010,7 +2074,7 @@ const HostDashboard = () => {
   const [serverBuildings, setServerBuildings] = useState(() => getCache('host_buildings_cache', null));
   useEffect(() => {
     if (!serverBuildings) return;
-    try { localStorage.setItem('host_buildings_cache', JSON.stringify(serverBuildings)); } catch { /* quota — the list still works */ }
+    setCache('host_buildings_cache', serverBuildings);
   }, [serverBuildings]);
   useEffect(() => {
     let cancelled = false;
@@ -2154,8 +2218,8 @@ const HostDashboard = () => {
   // Response rate, avg response time, conversion rate — all server-computed
   // from live inquiries / bookings / chat threads. Replaces the old hardcoded
   // 98% / 15min / 24% card.
-  const [hostStats, setHostStats] = useState(() => getCache('host_stats_cache', { responseRate: 0, avgResponseTime: 0, conversionRate: 0 }));
-  useEffect(() => { localStorage.setItem('host_stats_cache', JSON.stringify(hostStats)); }, [hostStats]);
+  const [hostStats, setHostStats] = useState(() => getCache('host_stats_cache', EMPTY_HOST_STATS));
+  useEffect(() => { setCache('host_stats_cache', hostStats); }, [hostStats]);
   useEffect(() => {
     let cancelled = false;
     const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -2179,6 +2243,44 @@ const HostDashboard = () => {
     const interval = setInterval(hydrate, 60_000);
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
+
+  // ── The signed-in account changed under a mounted dashboard ──────────────
+  // A login in another tab, a logout, or /me resolving to somebody else. The
+  // cache keys have already flipped to the new id, so re-seed every cached
+  // slice from the new landlord's buckets: otherwise the previous account's
+  // rows stay on screen until the fetches land, and the first state change
+  // after the switch writes them back under the new landlord's key.
+  //
+  // Declared here, below every slice it re-seeds. Only a switch BETWEEN two
+  // known accounts (or to signed-out) resets — going from "not identified yet"
+  // to a known id must not clobber rows a fetch has already delivered.
+  const prevCacheUidRef = useRef(hostCacheUid);
+  useEffect(() => {
+    const prev = prevCacheUidRef.current;
+    if (prev === hostCacheUid) return undefined;
+    prevCacheUidRef.current = hostCacheUid;
+    if (prev === null) return undefined;
+
+    setProperties(getCache('host_props_cache', initialPortfolio));
+    setBookings(getCache('host_bookings_cache', initialBookings));
+    setInquiries(getCache('host_inquiries_cache', initialInquiries));
+    setPaymentMethods(getCache('host_payment_methods_cache', []));
+    setServerBuildings(getCache('host_buildings_cache', null));
+    setHostStats(getCache('host_stats_cache', EMPTY_HOST_STATS));
+
+    if (!hostCacheUid) return undefined;
+    // Bookings, inquiries and stats poll on their own timers; properties,
+    // buildings and payment accounts are read once on mount, so re-read them
+    // for the new account instead of leaving the screen on whatever it cached.
+    let cancelled = false;
+    setPropertyRefreshTick((t) => t + 1);
+    listBuildings()
+      .then((rows) => { if (!cancelled) setServerBuildings(rows); })
+      .catch((err) => console.warn('[host] building refresh failed:', err.message || err));
+    refreshPaymentMethods();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hostCacheUid]);
 
   useEffect(() => {
     let cancelled = false;
@@ -3111,17 +3213,6 @@ const HostDashboard = () => {
     showToast(subjects.length > 1
       ? L(`${subjects.length} জনের ফরম তৈরি হচ্ছে…`, `Generating ${subjects.length} forms…`)
       : L('অ্যাগ্রিমেন্ট তৈরি হচ্ছে…', 'Generating agreement…'));
-
-    const row = (k, v) => `
-      <tr>
-        <td style="padding:7px 0;width:210px;vertical-align:top;font-size:11px;font-weight:700;color:#6b7280;letter-spacing:.04em;">${esc(k)}</td>
-        <td style="padding:7px 0;vertical-align:top;font-size:13px;font-weight:600;color:#111827;">${esc(v || '—')}</td>
-      </tr>`;
-
-    const section = (title, rowsHtml) => `
-      <h2 style="margin:26px 0 6px;font-size:14px;font-weight:800;color:#111827;">${esc(title)}</h2>
-      <div style="height:1px;background:#e5e7eb;margin-bottom:4px;"></div>
-      <table style="width:100%;border-collapse:collapse;">${rowsHtml}</table>`;
 
     const terms = isBnDoc ? [
       'ভাড়াটিয়া প্রতি মাসের নির্ধারিত তারিখ বা তার আগে ভাড়া পরিশোধ করবেন।',
@@ -4669,6 +4760,24 @@ const HostDashboard = () => {
 
   // 🟢 100% FIXED: Moved logic inside the component to prevent White Screen Error!
   const retryLoadProperties = () => setPropertyRefreshTick((tick) => tick + 1);
+
+  // ── Dashboard → one building's ledger ───────────────────────────────────
+  // A card in "বিল্ডিং অনুযায়ী কালেকশন" names a building and shows that
+  // building's numbers, so tapping it should land on that building. It used
+  // to have no handler of its own: the click bubbled to the ledger card that
+  // wraps the whole block, which only does setActiveTab('rent') — dropping
+  // the landlord on the all-buildings overview and asking them to pick the
+  // same building a second time.
+  //
+  // Selecting the building is what drills Rent Collection in; RentTab renders
+  // its buildings grid only while `currentBuildingId` is null, and shows the
+  // per-building tenants view (with an "All Buildings" crumb back out) once
+  // it is set. Both screens map over effectiveLandlordProfile.buildings, so
+  // the id handed over here is the one RentTab looks up.
+  const openBuildingLedger = (buildingId) => {
+    setCurrentBuildingId(buildingId);
+    setActiveTab('rent');
+  };
   const filteredProperties = properties.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()) || p.location.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredPropertiesByStatus = filteredProperties.filter(p => propertyFilter === 'all' || p.status === propertyFilter);
 
@@ -5440,7 +5549,18 @@ const HostDashboard = () => {
                 );
               })() : null}
             </div>
-            {(isPropertiesLoading || properties.length > 0) ? (
+            {/* This whole branch is the "you have listings" dashboard, so it asks
+                whether a listing exists — not whether a fetch is in flight. The
+                old `isPropertiesLoading ||` forced it open on every reload, and
+                since the flag starts true on mount, a landlord with no listings
+                got three KPI boxes reading "..." for the length of the request
+                and then watched the row — plus the Quick Actions that sit above
+                the ledger here — vanish as the layout swapped to the branch
+                below. `properties` is hydrated from the localStorage cache in
+                the initial useState, so a landlord who does have listings still
+                lands here on the first paint, now with real counts rather than
+                a placeholder. */}
+            {properties.length > 0 ? (
               <>
 
             {/* ১. Stats Bento Grid */}
@@ -5449,13 +5569,16 @@ const HostDashboard = () => {
                 {
                   icon: Building, bg: 'bg-gradient-to-br from-red-50 to-rose-100/60', iconColor: 'text-[#ba0036]',
                   label: language === 'বাংলা' ? 'মোট বাসা' : 'PROPERTIES',
-                  value: isPropertiesLoading && properties.length === 0 ? '...' : properties.length, shadow: 'shadow-[0_4px_20px_rgba(186,0,54,0.08)]',
+                  // No `...` placeholder: the branch guard above means there is
+                  // at least one listing in hand by the time this renders, so a
+                  // real count is always available.
+                  value: properties.length, shadow: 'shadow-[0_4px_20px_rgba(186,0,54,0.08)]',
                   indicator: 'bg-[#ba0036]'
                 },
                 {
                   icon: TrendingUp, bg: 'bg-gradient-to-br from-emerald-50 to-green-100/60', iconColor: 'text-emerald-600',
                   label: language === 'বাংলা' ? 'অ্যাক্টিভ' : 'ACTIVE',
-                  value: isPropertiesLoading && properties.length === 0 ? '...' : properties.filter(p => p.status === 'active').length, shadow: 'shadow-[0_4px_20px_rgba(16,185,129,0.08)]',
+                  value: properties.filter(p => p.status === 'active').length, shadow: 'shadow-[0_4px_20px_rgba(16,185,129,0.08)]',
                   indicator: 'bg-emerald-500'
                 },
                 {
@@ -5639,7 +5762,18 @@ const HostDashboard = () => {
                           const bldgPct = bldgSm.expectedTotal > 0 ? Math.min(100, Math.round((bldgSm.collectedTotal / bldgSm.expectedTotal) * 100)) : 0;
                           
                           return (
-                            <div key={bldg.id} className="bg-gray-50/80 dark:bg-gray-800/30 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 hover:border-[#ba0036]/30 hover:shadow-md transition-all">
+                            <div
+                              key={bldg.id}
+                              // stopPropagation so the wrapping ledger card's
+                              // own "open the rent tab" click cannot also run —
+                              // it carries no building and would be answering a
+                              // more general question than the one asked here.
+                              onClick={(e) => { e.stopPropagation(); openBuildingLedger(bldg.id); }}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openBuildingLedger(bldg.id); } }}
+                              className="bg-gray-50/80 dark:bg-gray-800/30 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 hover:border-[#ba0036]/30 hover:shadow-md transition-all cursor-pointer active:scale-[0.99]"
+                            >
                               <h4 className="text-sm font-black text-gray-900 dark:text-white mb-3 flex items-center justify-between">
                                 <span className="truncate pr-2">{bldg.name}</span>
                                 {bldgSm.overdueCount > 0 && (
@@ -5796,7 +5930,18 @@ const HostDashboard = () => {
                           const bldgPct = bldgSm.expectedTotal > 0 ? Math.min(100, Math.round((bldgSm.collectedTotal / bldgSm.expectedTotal) * 100)) : 0;
                           
                           return (
-                            <div key={bldg.id} className="bg-gray-50/80 dark:bg-gray-800/30 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 hover:border-[#ba0036]/30 hover:shadow-md transition-all">
+                            <div
+                              key={bldg.id}
+                              // stopPropagation so the wrapping ledger card's
+                              // own "open the rent tab" click cannot also run —
+                              // it carries no building and would be answering a
+                              // more general question than the one asked here.
+                              onClick={(e) => { e.stopPropagation(); openBuildingLedger(bldg.id); }}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openBuildingLedger(bldg.id); } }}
+                              className="bg-gray-50/80 dark:bg-gray-800/30 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 hover:border-[#ba0036]/30 hover:shadow-md transition-all cursor-pointer active:scale-[0.99]"
+                            >
                               <h4 className="text-sm font-black text-gray-900 dark:text-white mb-3 flex items-center justify-between">
                                 <span className="truncate pr-2">{bldg.name}</span>
                                 {bldgSm.overdueCount > 0 && (
