@@ -23,8 +23,8 @@ const DISMISS_KEY = PAYMENT_PROMO_DISMISS_KEY;
  * landlord with no tenant has nobody to collect rent from, so a modal demanding
  * a payment account is a dead end on their first visit. It becomes useful the
  * moment there IS someone to be paid by. This mirrors the inline promo card in
- * HostDashboard / DashboardTab, which has always required `bookings.length > 0`
- * — the two surfaces now agree instead of one firing on day zero.
+ * HostDashboard, which has always required `bookings.length > 0` — the two
+ * surfaces now agree instead of one firing on day zero.
  *
  * Props:
  *   hasPaymentMethod : boolean  — landlord already has ≥1 method

@@ -12,7 +12,7 @@
  */
 
 export const LISTING_COUNTS_OK = false;
-export const LISTING_COUNTS_FETCHED_AT = "2026-09-05T15:19:36.050Z";
+export const LISTING_COUNTS_FETCHED_AT = "2026-09-06T16:10:18.693Z";
 export const LISTING_COUNTS = {};
 
 /**

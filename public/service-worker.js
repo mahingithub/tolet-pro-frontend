@@ -27,7 +27,11 @@ importScripts('/call-notification-sw.js');
 // Bump this on any release that changes a PRECACHED file (index.html, manifest,
 // icons, offline.html). Hashed build assets (index-*.js/css) already bust their
 // own cache via unique filenames, so they don't need a version bump.
-const CACHE_VERSION = 'tolet-pro-v5';
+// v6: the cache-first branch below used to swallow HTML too, so route URLs like
+// '/host-dashboard?tab=dashboard' were stored in here permanently. Bumping the
+// version is what evicts those poisoned entries from clients that already have
+// them — the fix alone would leave them sitting in the old cache forever.
+const CACHE_VERSION = 'tolet-pro-v6';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 // Minimal app shell. Hashed build assets (index-*.js/css) are cached at runtime
@@ -77,6 +81,28 @@ self.addEventListener('activate', (event) => {
 // Helper: should this request bypass the cache entirely?
 function isNetworkOnly(url) {
   return NETWORK_ONLY.some((frag) => url.includes(frag));
+}
+
+// Helper: is this a BUILD ASSET — the kind of file that is safe to keep
+// forever because its name changes whenever its contents do?
+//
+// `destination` is the browser telling us what the request is FOR, which is
+// what we actually care about: a <script src> is 'script', a stylesheet is
+// 'style', an <img> is 'image'. A page load is 'document', and — the case that
+// caused the bug — a plain `fetch('/host-dashboard?tab=dashboard')` is ''.
+// Neither is an asset, so neither may enter the static cache.
+//
+// The extension check is a backstop for the same reason the destination check
+// exists: it keeps a request that reports no destination from being cached on
+// the strength of its URL alone.
+const ASSET_DESTINATIONS = ['script', 'style', 'image', 'font', 'audio', 'video', 'worker'];
+const ASSET_EXT = /\.(?:js|mjs|css|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf|mp3|mp4|webm)$/i;
+
+function isStaticAsset(req) {
+  if (ASSET_DESTINATIONS.includes(req.destination)) return true;
+  // Extension is read from the PATH only — '?tab=dashboard' must never make a
+  // route look like a file, and a query string must never hide one.
+  try { return ASSET_EXT.test(new URL(req.url).pathname); } catch { return false; }
 }
 
 // ─── Fetch ─────────────────────────────────────────────────────────────────
@@ -174,18 +200,50 @@ self.addEventListener('fetch', (event) => {
 
   // Same-origin static assets (built JS/CSS, icons, images): cache-first, then
   // populate the cache on first hit. Fast repeat loads, works offline.
+  //
+  // ONLY ASSETS. This branch used to take every same-origin GET that wasn't a
+  // navigation, and an HTML route reached it easily — anything doing
+  // `fetch('/host-dashboard?tab=dashboard')` rather than navigating to it. Two
+  // things then went wrong, and both were seen in production:
+  //
+  //   1. If that fetch failed, the catch below answered with a MADE-UP 503
+  //      ('Offline or missing resource'), so a network blip surfaced as a
+  //      server error against a server that was fine.
+  //   2. If it succeeded, the HTML was written into STATIC_CACHE under the
+  //      route's own URL and kept — this cache is only ever emptied by a
+  //      CACHE_VERSION bump. A later failed navigation reads `caches.match(req)`
+  //      FIRST (see the navigate branch), so it would be served that frozen
+  //      HTML, pointing at '/assets/index-<hash>.js' files that a redeploy had
+  //      already deleted. Cache-first is only ever safe for content-hashed
+  //      names; HTML has none.
+  if (isStaticAsset(req)) {
+    event.respondWith(
+      caches.match(req).then((cached) => {
+        if (cached) return cached;
+        return fetch(req).then((res) => {
+          // Only cache successful, basic (same-origin) responses.
+          if (res && res.status === 200 && res.type === 'basic') {
+            const copy = res.clone();
+            caches.open(STATIC_CACHE).then((c) => c.put(req, copy)).catch(() => {});
+          }
+          return res;
+        }).catch(() => cached || new Response('Offline or missing resource', { status: 503 }));
+      })
+    );
+    return;
+  }
+
+  // Everything else same-origin (HTML routes fetched by script, and anything
+  // without an asset shape): network-first, and NOTHING is written to the cache.
+  // Offline, it falls back to the app shell for the same reason the navigate
+  // branch does — the SPA can render any route from localStorage, so handing it
+  // the shell beats handing it an error. The shell is only reached if it is
+  // already cached; if it isn't, the real network error is allowed through so
+  // the caller sees a failure it can retry, not a fabricated 503.
   event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req).then((res) => {
-        // Only cache successful, basic (same-origin) responses.
-        if (res && res.status === 200 && res.type === 'basic') {
-          const copy = res.clone();
-          caches.open(STATIC_CACHE).then((c) => c.put(req, copy)).catch(() => {});
-        }
-        return res;
-      }).catch(() => cached || new Response('Offline or missing resource', { status: 503 }));
-    })
+    fetch(req).catch((err) => caches.match('/index.html')
+      .then((r) => r || caches.match('/'))
+      .then((r) => { if (r) return r; throw err; }))
   );
 });
 

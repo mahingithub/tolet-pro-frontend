@@ -5,8 +5,8 @@
  * looking at".
  *
  * THE BUG THIS FILE REPLACES
- * The same six-line filter was copy-pasted into BookingsTab, RentTab,
- * DashboardTab (twice) and HostDashboard (twice), and every copy joined on the
+ * The same six-line filter was copy-pasted into BookingsTab, RentTab and
+ * HostDashboard (several times over), and every copy joined on the
  * property NAME:
  *
  *     bookings.filter(b => b.property === bldg.name)
