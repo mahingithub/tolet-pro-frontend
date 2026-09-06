@@ -5714,22 +5714,29 @@ const HostDashboard = () => {
               <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white mb-4">
                 {language === 'বাংলা' ? 'জরুরী কাজ' : 'Quick Actions'}
               </h3>
-              <div className="grid grid-cols-4 gap-[clamp(0.375rem,2vw,1rem)] items-stretch">
+              {/* TWO ACROSS, ICON BESIDE THE LABEL.
+                  Four to a row left each tile about 80px wide, which is why
+                  every Bangla label carried a hand-placed <br /> — the two
+                  words of "ভাড়াটিয়া যোগ করুন" could not sit side by side.
+                  Half the row each, laid out horizontally, and the same words
+                  fit on one line without being broken by hand. Exactly the
+                  same four actions going to exactly the same places. */}
+              <div className="grid grid-cols-2 gap-2.5 md:gap-3">
                 {[
-                  { id: 'add_tenant', label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">ভাড়াটিয়া<br />যোগ করুন</span><span className="hidden md:block">ভাড়াটিয়া যোগ করুন</span></> : <><span className="md:hidden block leading-tight">Add<br />Tenant</span><span className="hidden md:block">Add Tenant</span></>,       Icon: Calendar,      iconColor: 'text-gray-500 dark:text-gray-400',     onClick: () => setActiveTab('bookings'), showOn: 'all' },
-                  { id: 'rent_collection', label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">ভাড়া<br />কালেকশন</span><span className="hidden md:block">ভাড়া কালেকশন</span></> : <><span className="md:hidden block leading-tight">Rent<br />Collection</span><span className="hidden md:block">Rent Collection</span></>, Icon: Wallet,        iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('rent'), showOn: 'all' },
+                  { id: 'add_tenant', label: language === 'বাংলা' ? 'ভাড়াটিয়া যোগ' : 'Add Tenant',       Icon: Calendar,      iconColor: 'text-gray-500 dark:text-gray-400',     onClick: () => setActiveTab('bookings'), showOn: 'all' },
+                  { id: 'rent_collection', label: language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent Collection', Icon: Wallet,        iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('rent'), showOn: 'all' },
                   { id: 'messages', label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => navigate('/messages'), showOn: 'desktop' },
-                  { id: 'payment_settings', label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">পেমেন্ট<br />সেটিংস</span><span className="hidden md:block">পেমেন্ট সেটিংস</span></> : <><span className="md:hidden block leading-tight">Payment<br />Settings</span><span className="hidden md:block">Payment Settings</span></>, Icon: CreditCard, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('payments'), showOn: 'mobile' },
-                  { id: 'smart_alerts', label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">স্মার্ট<br />অ্যালার্ট</span><span className="hidden md:block">স্মার্ট অ্যালার্ট</span></> : <><span className="md:hidden block leading-tight">Smart<br />Alerts</span><span className="hidden md:block">Smart Alerts</span></>, Icon: BellRing,      iconColor: 'text-gray-500 dark:text-gray-400',   onClick: () => setActiveTab('smartAlerts'), showOn: 'all' },
+                  { id: 'payment_settings', label: language === 'বাংলা' ? 'পেমেন্ট সেটিংস' : 'Payment Settings', Icon: CreditCard, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('payments'), showOn: 'mobile' },
+                  { id: 'smart_alerts', label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts', Icon: BellRing,      iconColor: 'text-gray-500 dark:text-gray-400',   onClick: () => setActiveTab('smartAlerts'), showOn: 'all' },
                 ].map(({ id, label, Icon, iconColor, onClick, showOn }) => (
                   <button
                     key={id}
                     type="button"
                     onClick={onClick}
-                    className={`group min-w-0 w-full overflow-hidden flex-col items-center justify-start gap-[clamp(0.375rem,2vw,0.75rem)] px-[clamp(0.25rem,1.5vw,1.25rem)] py-[clamp(0.625rem,2.5vw,1.25rem)] rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300 ${showOn === 'mobile' ? 'flex md:hidden' : showOn === 'desktop' ? 'hidden md:flex' : 'flex'}`}
+                    className={`group min-w-0 w-full items-center gap-2.5 px-3 py-3 md:px-4 md:py-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300 text-left ${showOn === 'mobile' ? 'flex md:hidden' : showOn === 'desktop' ? 'hidden md:flex' : 'flex'}`}
                   >
-                    <Icon strokeWidth={2.2} className={`shrink-0 w-[clamp(20px,5.5vw,26px)] h-[clamp(20px,5.5vw,26px)] ${iconColor} group-hover:scale-110 transition-transform duration-300`} />
-                    <span className="w-full block text-[clamp(9px,2.6vw,0.875rem)] font-bold text-gray-700 dark:text-gray-300 text-center leading-snug break-words hyphens-auto">
+                    <Icon strokeWidth={2.2} className={`shrink-0 w-[22px] h-[22px] md:w-6 md:h-6 ${iconColor} group-hover:scale-110 transition-transform duration-300`} />
+                    <span className="min-w-0 flex-1 text-[13px] md:text-sm font-bold text-gray-700 dark:text-gray-300 leading-snug">
                       {label}
                     </span>
                   </button>
@@ -5836,13 +5843,21 @@ const HostDashboard = () => {
                       <h4 className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-4">
                         {language === 'বাংলা' ? 'বিল্ডিং অনুযায়ী কালেকশন' : 'Collection by Building'}
                       </h4>
-                      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3">
+                      {/* ONE BUILDING PER ROW, FULL WIDTH.
+                          These were half-width cards two-up, which is what made
+                          "Ma-bhila" render as "Ma…" and forced the collected and
+                          expected figures onto separate stacked lines. Given the
+                          whole width a building says its name in full and its
+                          two figures fit on one line — the same numbers, the
+                          same labels, the same tap target, in about half the
+                          vertical space. */}
+                      <div className="divide-y divide-gray-100 dark:divide-gray-800">
                         {(effectiveLandlordProfile.buildings || []).map(bldg => {
                           const bldgBookings = bookings.filter(b => bookingInBuilding(b, bldg));
                           const bldgRentUnits = bldgBookings.flatMap(rentUnitsOf);
                           const bldgSm = getMonthCollectionSummary(bldgRentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
                           const bldgPct = bldgSm.expectedTotal > 0 ? Math.min(100, Math.round((bldgSm.collectedTotal / bldgSm.expectedTotal) * 100)) : 0;
-                          
+
                           return (
                             <div
                               key={bldg.id}
@@ -5854,43 +5869,35 @@ const HostDashboard = () => {
                               role="button"
                               tabIndex={0}
                               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openBuildingLedger(bldg.id); } }}
-                              className="bg-gray-50/80 dark:bg-gray-800/30 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 hover:border-[#ba0036]/30 hover:shadow-md transition-all cursor-pointer active:scale-[0.99]"
+                              className="group py-3 first:pt-0 last:pb-0 -mx-1 px-1 rounded-xl hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition-colors cursor-pointer active:scale-[0.995]"
                             >
-                              <h4 className="text-sm font-black text-gray-900 dark:text-white mb-3 flex items-center justify-between">
-                                <span className="truncate pr-2">{bldg.name}</span>
-                                {bldgSm.overdueCount > 0 && (
-                                  <span className="text-[9px] font-black bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0">
-                                    {bldgSm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'Overdue'}
-                                  </span>
-                                )}
-                              </h4>
-                              
-                              {/* Two rows, not "collected / expected" on one
-                                  line: these cards sit two-up on a phone, and at
-                                  a readable size a six-figure pair does not fit
-                                  across one. It was truncating the expected
-                                  figure to an ellipsis — the number the landlord
-                                  is measuring against, gone. */}
-                              <div className="flex items-start justify-between gap-2 mb-2">
-                                <div className="min-w-0 space-y-1">
-                                  <div>
-                                    <p className="text-[10px] font-black text-emerald-700/80 dark:text-emerald-400/80 uppercase tracking-wider leading-none">{language === 'বাংলা' ? 'আদায়' : 'Collected'}</p>
-                                    <p className={`${bldgValueSize(formatBDT(bldgSm.collectedTotal))} font-black text-gray-900 dark:text-gray-100 tabular-nums leading-tight whitespace-nowrap`}>{formatBDT(bldgSm.collectedTotal)}</p>
+                              <div className="flex items-center gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="text-sm font-black text-gray-900 dark:text-white truncate">{bldg.name}</h4>
+                                    {bldgSm.overdueCount > 0 && (
+                                      <span className="text-[9px] font-black bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0">
+                                        {bldgSm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'Overdue'}
+                                      </span>
+                                    )}
                                   </div>
-                                  <div>
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider leading-none">{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}</p>
-                                    <p className={`${bldgValueSize(formatBDT(bldgSm.expectedTotal))} font-black text-gray-500 dark:text-gray-400 tabular-nums leading-tight whitespace-nowrap`}>{formatBDT(bldgSm.expectedTotal)}</p>
+                                  <p className="mt-1 flex items-baseline flex-wrap gap-x-1.5 text-[10px] font-black uppercase tracking-wider leading-none">
+                                    <span className="text-emerald-700/80 dark:text-emerald-400/80">{language === 'বাংলা' ? 'আদায়' : 'Collected'}</span>
+                                    <span className="text-[13px] font-black text-gray-900 dark:text-gray-100 tabular-nums normal-case tracking-normal">{formatBDT(bldgSm.collectedTotal)}</span>
+                                    <span className="text-gray-300 dark:text-gray-600">·</span>
+                                    <span className="text-gray-400">{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}</span>
+                                    <span className="text-[13px] font-black text-gray-500 dark:text-gray-400 tabular-nums normal-case tracking-normal">{formatBDT(bldgSm.expectedTotal)}</span>
+                                  </p>
+                                  <div className="mt-1.5 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
+                                    <span className="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 px-1.5 py-0.5 rounded">{bldgSm.paidCount} {language === 'বাংলা' ? 'ক্লিয়ার' : 'Cleared'}</span>
+                                    <span className="bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 px-1.5 py-0.5 rounded">{bldgSm.totalDueCount - bldgSm.paidCount} {language === 'বাংলা' ? 'বাকি' : 'Due'}</span>
                                   </div>
                                 </div>
-                                <span className="text-lg font-black text-[#ba0036] dark:text-rose-400 tabular-nums shrink-0">{bldgPct}%</span>
+                                <span className="text-sm font-black text-[#ba0036] dark:text-rose-400 tabular-nums shrink-0 whitespace-nowrap">{bldgPct}%</span>
+                                <ChevronRight size={16} className="shrink-0 text-gray-300 dark:text-gray-600 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all" />
                               </div>
-                              <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-3">
+                              <div className="mt-2 h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                 <div className="h-full rounded-full bg-gradient-to-r from-[#ba0036] to-[#ff004c] dark:from-rose-500 dark:to-rose-400 transition-all duration-700" style={{ width: `${bldgPct}%` }} />
-                              </div>
-
-                              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
-                                <span className="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 px-1.5 py-0.5 rounded">{bldgSm.paidCount} {language === 'বাংলা' ? 'ক্লিয়ার' : 'Cleared'}</span>
-                                <span className="bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 px-1.5 py-0.5 rounded">{bldgSm.totalDueCount - bldgSm.paidCount} {language === 'বাংলা' ? 'বাকি' : 'Due'}</span>
                               </div>
                             </div>
                           );
@@ -6004,13 +6011,21 @@ const HostDashboard = () => {
                       <h4 className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-4">
                         {language === 'বাংলা' ? 'বিল্ডিং অনুযায়ী কালেকশন' : 'Collection by Building'}
                       </h4>
-                      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3">
+                      {/* ONE BUILDING PER ROW, FULL WIDTH.
+                          These were half-width cards two-up, which is what made
+                          "Ma-bhila" render as "Ma…" and forced the collected and
+                          expected figures onto separate stacked lines. Given the
+                          whole width a building says its name in full and its
+                          two figures fit on one line — the same numbers, the
+                          same labels, the same tap target, in about half the
+                          vertical space. */}
+                      <div className="divide-y divide-gray-100 dark:divide-gray-800">
                         {(effectiveLandlordProfile.buildings || []).map(bldg => {
                           const bldgBookings = bookings.filter(b => bookingInBuilding(b, bldg));
                           const bldgRentUnits = bldgBookings.flatMap(rentUnitsOf);
                           const bldgSm = getMonthCollectionSummary(bldgRentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
                           const bldgPct = bldgSm.expectedTotal > 0 ? Math.min(100, Math.round((bldgSm.collectedTotal / bldgSm.expectedTotal) * 100)) : 0;
-                          
+
                           return (
                             <div
                               key={bldg.id}
@@ -6022,43 +6037,35 @@ const HostDashboard = () => {
                               role="button"
                               tabIndex={0}
                               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openBuildingLedger(bldg.id); } }}
-                              className="bg-gray-50/80 dark:bg-gray-800/30 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 hover:border-[#ba0036]/30 hover:shadow-md transition-all cursor-pointer active:scale-[0.99]"
+                              className="group py-3 first:pt-0 last:pb-0 -mx-1 px-1 rounded-xl hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition-colors cursor-pointer active:scale-[0.995]"
                             >
-                              <h4 className="text-sm font-black text-gray-900 dark:text-white mb-3 flex items-center justify-between">
-                                <span className="truncate pr-2">{bldg.name}</span>
-                                {bldgSm.overdueCount > 0 && (
-                                  <span className="text-[9px] font-black bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0">
-                                    {bldgSm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'Overdue'}
-                                  </span>
-                                )}
-                              </h4>
-                              
-                              {/* Two rows, not "collected / expected" on one
-                                  line: these cards sit two-up on a phone, and at
-                                  a readable size a six-figure pair does not fit
-                                  across one. It was truncating the expected
-                                  figure to an ellipsis — the number the landlord
-                                  is measuring against, gone. */}
-                              <div className="flex items-start justify-between gap-2 mb-2">
-                                <div className="min-w-0 space-y-1">
-                                  <div>
-                                    <p className="text-[10px] font-black text-emerald-700/80 dark:text-emerald-400/80 uppercase tracking-wider leading-none">{language === 'বাংলা' ? 'আদায়' : 'Collected'}</p>
-                                    <p className={`${bldgValueSize(formatBDT(bldgSm.collectedTotal))} font-black text-gray-900 dark:text-gray-100 tabular-nums leading-tight whitespace-nowrap`}>{formatBDT(bldgSm.collectedTotal)}</p>
+                              <div className="flex items-center gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="text-sm font-black text-gray-900 dark:text-white truncate">{bldg.name}</h4>
+                                    {bldgSm.overdueCount > 0 && (
+                                      <span className="text-[9px] font-black bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0">
+                                        {bldgSm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'Overdue'}
+                                      </span>
+                                    )}
                                   </div>
-                                  <div>
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider leading-none">{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}</p>
-                                    <p className={`${bldgValueSize(formatBDT(bldgSm.expectedTotal))} font-black text-gray-500 dark:text-gray-400 tabular-nums leading-tight whitespace-nowrap`}>{formatBDT(bldgSm.expectedTotal)}</p>
+                                  <p className="mt-1 flex items-baseline flex-wrap gap-x-1.5 text-[10px] font-black uppercase tracking-wider leading-none">
+                                    <span className="text-emerald-700/80 dark:text-emerald-400/80">{language === 'বাংলা' ? 'আদায়' : 'Collected'}</span>
+                                    <span className="text-[13px] font-black text-gray-900 dark:text-gray-100 tabular-nums normal-case tracking-normal">{formatBDT(bldgSm.collectedTotal)}</span>
+                                    <span className="text-gray-300 dark:text-gray-600">·</span>
+                                    <span className="text-gray-400">{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}</span>
+                                    <span className="text-[13px] font-black text-gray-500 dark:text-gray-400 tabular-nums normal-case tracking-normal">{formatBDT(bldgSm.expectedTotal)}</span>
+                                  </p>
+                                  <div className="mt-1.5 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
+                                    <span className="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 px-1.5 py-0.5 rounded">{bldgSm.paidCount} {language === 'বাংলা' ? 'ক্লিয়ার' : 'Cleared'}</span>
+                                    <span className="bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 px-1.5 py-0.5 rounded">{bldgSm.totalDueCount - bldgSm.paidCount} {language === 'বাংলা' ? 'বাকি' : 'Due'}</span>
                                   </div>
                                 </div>
-                                <span className="text-lg font-black text-[#ba0036] dark:text-rose-400 tabular-nums shrink-0">{bldgPct}%</span>
+                                <span className="text-sm font-black text-[#ba0036] dark:text-rose-400 tabular-nums shrink-0 whitespace-nowrap">{bldgPct}%</span>
+                                <ChevronRight size={16} className="shrink-0 text-gray-300 dark:text-gray-600 group-hover:text-[#ba0036] group-hover:translate-x-0.5 transition-all" />
                               </div>
-                              <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-3">
+                              <div className="mt-2 h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                 <div className="h-full rounded-full bg-gradient-to-r from-[#ba0036] to-[#ff004c] dark:from-rose-500 dark:to-rose-400 transition-all duration-700" style={{ width: `${bldgPct}%` }} />
-                              </div>
-
-                              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
-                                <span className="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 px-1.5 py-0.5 rounded">{bldgSm.paidCount} {language === 'বাংলা' ? 'ক্লিয়ার' : 'Cleared'}</span>
-                                <span className="bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 px-1.5 py-0.5 rounded">{bldgSm.totalDueCount - bldgSm.paidCount} {language === 'বাংলা' ? 'বাকি' : 'Due'}</span>
                               </div>
                             </div>
                           );
@@ -6077,22 +6084,29 @@ const HostDashboard = () => {
               <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white mb-4">
                 {language === 'বাংলা' ? 'জরুরী কাজ' : 'Quick Actions'}
               </h3>
-              <div className="grid grid-cols-4 gap-[clamp(0.375rem,2vw,1rem)] items-stretch">
+              {/* TWO ACROSS, ICON BESIDE THE LABEL.
+                  Four to a row left each tile about 80px wide, which is why
+                  every Bangla label carried a hand-placed <br /> — the two
+                  words of "ভাড়াটিয়া যোগ করুন" could not sit side by side.
+                  Half the row each, laid out horizontally, and the same words
+                  fit on one line without being broken by hand. Exactly the
+                  same four actions going to exactly the same places. */}
+              <div className="grid grid-cols-2 gap-2.5 md:gap-3">
                 {[
-                  { id: 'add_tenant', label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">ভাড়াটিয়া<br />যোগ করুন</span><span className="hidden md:block">ভাড়াটিয়া যোগ করুন</span></> : <><span className="md:hidden block leading-tight">Add<br />Tenant</span><span className="hidden md:block">Add Tenant</span></>,       Icon: Calendar,      iconColor: 'text-gray-500 dark:text-gray-400',     onClick: () => setActiveTab('bookings'), showOn: 'all' },
-                  { id: 'rent_collection', label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">ভাড়া<br />কালেকশন</span><span className="hidden md:block">ভাড়া কালেকশন</span></> : <><span className="md:hidden block leading-tight">Rent<br />Collection</span><span className="hidden md:block">Rent Collection</span></>, Icon: Wallet,        iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('rent'), showOn: 'all' },
+                  { id: 'add_tenant', label: language === 'বাংলা' ? 'ভাড়াটিয়া যোগ' : 'Add Tenant',       Icon: Calendar,      iconColor: 'text-gray-500 dark:text-gray-400',     onClick: () => setActiveTab('bookings'), showOn: 'all' },
+                  { id: 'rent_collection', label: language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent Collection', Icon: Wallet,        iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('rent'), showOn: 'all' },
                   { id: 'messages', label: language === 'বাংলা' ? 'মেসেজ' : 'Messages',     Icon: MessageCircle, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => navigate('/messages'), showOn: 'desktop' },
-                  { id: 'payment_settings', label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">পেমেন্ট<br />সেটিংস</span><span className="hidden md:block">পেমেন্ট সেটিংস</span></> : <><span className="md:hidden block leading-tight">Payment<br />Settings</span><span className="hidden md:block">Payment Settings</span></>, Icon: CreditCard, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('payments'), showOn: 'mobile' },
-                  { id: 'smart_alerts', label: language === 'বাংলা' ? <><span className="md:hidden block leading-tight">স্মার্ট<br />অ্যালার্ট</span><span className="hidden md:block">স্মার্ট অ্যালার্ট</span></> : <><span className="md:hidden block leading-tight">Smart<br />Alerts</span><span className="hidden md:block">Smart Alerts</span></>, Icon: BellRing,      iconColor: 'text-gray-500 dark:text-gray-400',   onClick: () => setActiveTab('smartAlerts'), showOn: 'all' },
+                  { id: 'payment_settings', label: language === 'বাংলা' ? 'পেমেন্ট সেটিংস' : 'Payment Settings', Icon: CreditCard, iconColor: 'text-gray-500 dark:text-gray-400', onClick: () => setActiveTab('payments'), showOn: 'mobile' },
+                  { id: 'smart_alerts', label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts', Icon: BellRing,      iconColor: 'text-gray-500 dark:text-gray-400',   onClick: () => setActiveTab('smartAlerts'), showOn: 'all' },
                 ].map(({ id, label, Icon, iconColor, onClick, showOn }) => (
                   <button
                     key={id}
                     type="button"
                     onClick={onClick}
-                    className={`group min-w-0 w-full overflow-hidden flex-col items-center justify-start gap-[clamp(0.375rem,2vw,0.75rem)] px-[clamp(0.25rem,1.5vw,1.25rem)] py-[clamp(0.625rem,2.5vw,1.25rem)] rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300 ${showOn === 'mobile' ? 'flex md:hidden' : showOn === 'desktop' ? 'hidden md:flex' : 'flex'}`}
+                    className={`group min-w-0 w-full items-center gap-2.5 px-3 py-3 md:px-4 md:py-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-transparent dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 active:scale-95 transition-all duration-300 text-left ${showOn === 'mobile' ? 'flex md:hidden' : showOn === 'desktop' ? 'hidden md:flex' : 'flex'}`}
                   >
-                    <Icon strokeWidth={2.2} className={`shrink-0 w-[clamp(20px,5.5vw,26px)] h-[clamp(20px,5.5vw,26px)] ${iconColor} group-hover:scale-110 transition-transform duration-300`} />
-                    <span className="w-full block text-[clamp(9px,2.6vw,0.875rem)] font-bold text-gray-700 dark:text-gray-300 text-center leading-snug break-words hyphens-auto">
+                    <Icon strokeWidth={2.2} className={`shrink-0 w-[22px] h-[22px] md:w-6 md:h-6 ${iconColor} group-hover:scale-110 transition-transform duration-300`} />
+                    <span className="min-w-0 flex-1 text-[13px] md:text-sm font-bold text-gray-700 dark:text-gray-300 leading-snug">
                       {label}
                     </span>
                   </button>
