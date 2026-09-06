@@ -28,7 +28,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Plus, X, Loader2, Users, Home, BedDouble, Trash2, Pencil,
-  UserPlus, ChevronDown, ChevronUp, DoorOpen, Check, RefreshCw, QrCode,
+  UserPlus, ChevronDown, ChevronUp, DoorOpen, Check, RefreshCw, QrCode, MoreVertical,
   ChevronRight,
 } from 'lucide-react';
 import InviteShareSheet from '../invite/InviteShareSheet';
@@ -395,14 +395,14 @@ export default function UnitsManager({
 
       {/* ── Header — what this building holds right now ── */}
       <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
-          <DoorOpen size={12} className="text-[#ba0036]" />
+        <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white text-[14px] font-black text-gray-700 shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
+          <DoorOpen size={16} className="text-[#ba0036]" />
           {isBn ? `${noun}` : `${noun}s`}
           <span className="text-gray-400 tabular-nums">{units.length}</span>
         </span>
         {isSeat && (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
-            <Users size={12} className="text-[#ba0036]" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white text-[14px] font-black text-gray-700 shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
+            <Users size={16} className="text-[#ba0036]" />
             {isBn ? 'সিট' : 'Seats'}
             <span className="tabular-nums text-emerald-600">{totalTaken}</span>
             <span className="text-gray-300">/</span>
@@ -421,22 +421,26 @@ export default function UnitsManager({
           <button
             type="button"
             onClick={() => setShareTarget({ scope: 'building' })}
-            className="ml-auto shrink-0 inline-flex items-center gap-1.5 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-900 text-gray-600 hover:text-gray-900 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95"
+            className="sm:ml-auto shrink-0 inline-flex items-center gap-1.5 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-900 text-gray-600 hover:text-gray-900 px-3 py-2 rounded-xl text-[14px] font-black transition-all active:scale-95"
             title={isBn ? 'সবাইকে ইনভাইট করুন' : 'Invite everyone'}
           >
-            <QrCode size={13} />
+            <QrCode size={16} />
             {isBn ? 'সবাইকে ইনভাইট' : 'Invite all'}
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => setAdding((a) => !a)}
-          className={`${units.length > 0 ? '' : 'ml-auto '}shrink-0 inline-flex items-center gap-1.5 bg-[#ba0036] hover:bg-[#a0002f] text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-[0_4px_12px_rgba(186,0,54,0.25)] active:scale-95`}
-        >
-          {adding ? <X size={13} strokeWidth={3} /> : <Plus size={13} strokeWidth={3} />}
-          {adding ? (isBn ? 'বাতিল' : 'Cancel') : (isBn ? `${noun} যোগ` : `Add ${noun}`)}
-        </button>
       </div>
+
+      {/* The one thing a landlord comes to this screen to do, so it is the full
+          width of the screen and says what it does. As a small chip wedged
+          beside the counters it read as one more badge among four. */}
+      <button
+        type="button"
+        onClick={() => setAdding((a) => !a)}
+        className="w-full mb-3 inline-flex items-center justify-center gap-2 bg-[#ba0036] hover:bg-[#a0002f] text-white px-4 py-3.5 rounded-2xl text-[16px] font-black transition-all shadow-[0_4px_12px_rgba(186,0,54,0.25)] active:scale-[0.99]"
+      >
+        {adding ? <X size={19} strokeWidth={3} /> : <Plus size={19} strokeWidth={3} />}
+        {adding ? (isBn ? 'বাতিল' : 'Cancel') : (isBn ? `${noun} যোগ করুন` : `Add ${noun}`)}
+      </button>
 
       {/* ── Add form — shaped by how this building is let ── */}
       {adding && (
@@ -742,14 +746,19 @@ export default function UnitsManager({
                                       {person.phone && <span className="hidden sm:inline text-[10px] font-bold text-gray-400 shrink-0 tabular-nums">{person.phone}</span>}
                                       {/* Something about this seat changed —
                                           which of the three it is gets asked
-                                          in the menu below, not guessed here. */}
+                                          in the menu below, not guessed here.
+                                          So it is a kebab, not a labelled
+                                          button: "Change" promised one action
+                                          and opened a list of three. */}
                                       <button
                                         type="button"
                                         onClick={() => setSeatMenu({ unit: u, person, seatNumber: i + 1 })}
-                                        className="shrink-0 px-2 py-1.5 rounded-lg bg-white border border-gray-200 text-[9px] font-black uppercase tracking-wider text-gray-600 hover:text-amber-700 hover:border-amber-200 active:scale-95 transition-all inline-flex items-center gap-1"
+                                        className="shrink-0 p-2 rounded-lg bg-white border border-gray-200 text-gray-500 hover:text-amber-700 hover:border-amber-200 hover:bg-amber-50/40 active:scale-95 transition-all inline-flex items-center justify-center"
+                                        aria-haspopup="menu"
+                                        aria-label={isBn ? `${person.name || 'এই ভাড়াটিয়ার'} — অপশন` : `Options for ${person.name || 'this tenant'}`}
                                         title={isBn ? 'রুম বদলান · ভাড়াটিয়া বদলান · এডিট' : 'Move room · Replace tenant · Edit'}
                                       >
-                                        <RefreshCw size={10} /> {isBn ? 'বদলান' : 'Change'}
+                                        <MoreVertical size={18} />
                                       </button>
                                     </>
                                   ) : (
@@ -820,7 +829,7 @@ export default function UnitsManager({
                               className="ml-auto shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-all"
                               title={isBn ? 'এই রুমের ইনভাইট লিংক' : "This room's invite link"}
                             >
-                              <QrCode size={13} />
+                              <QrCode size={16} />
                             </button>
                             {/* Edit this room's details — rent, beds, floor etc. */}
                             <button

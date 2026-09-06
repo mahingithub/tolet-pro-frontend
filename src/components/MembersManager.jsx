@@ -74,11 +74,13 @@ function memberRentStatus(booking, ledger, key, today) {
     return 'paid';
   }
   if (entry && entry.status === 'due') return 'due-marked';
+  const isRunningMonth = key === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   const due = dueDateOf(key, booking.rentDueDay);
-  if (!due) return 'upcoming';
+  if (!due) return isRunningMonth ? 'current' : 'upcoming';
   const lead = new Date(due);
   lead.setDate(lead.getDate() - (booking.reminderLeadDays || 3));
   if (today > due) return 'overdue';
+  if (isRunningMonth) return 'current';
   if (today >= lead) return 'due-soon';
   return 'upcoming';
 }
@@ -89,6 +91,9 @@ const CELL_STYLE = {
   'due-marked': 'bg-rose-500 text-white border-rose-500',
   overdue:      'bg-rose-500 text-white border-rose-500',
   'due-soon':   'bg-orange-100 text-orange-700 border-orange-200',
+  // The month being lived in, nothing owed yet — tinted, so it can never be
+  // mistaken for a month that hasn't started.
+  current:      'bg-sky-100 text-sky-700 border-sky-300',
   upcoming:     'bg-gray-50 text-gray-400 border-gray-200',
 };
 
@@ -101,6 +106,7 @@ const CELL_STATUS_LABEL = {
   'due-marked': { en: 'Due',      bn: 'বকেয়া' },
   overdue:      { en: 'Overdue',  bn: 'বকেয়া' },
   'due-soon':   { en: 'Soon',     bn: 'শীঘ্রই' },
+  current:      { en: 'Running',  bn: 'চলতি' },
   upcoming:     { en: 'Upcoming', bn: 'আসন্ন' },
 };
 

@@ -66,11 +66,11 @@ export default function RentRoomCard({
     .filter(Boolean);
 
   const theme = {
-    cleared:  { chip: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle2 size={15}/>, iconBg: 'bg-emerald-50 text-emerald-600', label: isBn ? 'ক্লিয়ার্ড' : 'CLEARED', money: 'text-emerald-600' },
-    partial:  { chip: 'bg-amber-50 text-amber-700 border-amber-200',      icon: <Hourglass size={15}/>,    iconBg: 'bg-amber-50 text-amber-600',     label: isBn ? 'আংশিক' : 'PARTIAL',    money: 'text-amber-600' },
-    overdue:  { chip: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200', icon: <AlertCircle size={15}/>, iconBg: 'bg-fuchsia-50 text-fuchsia-600', label: isBn ? 'বকেয়া' : 'OVERDUE',    money: 'text-fuchsia-600' },
-    upcoming: { chip: 'bg-orange-50 text-orange-700 border-orange-200',   icon: <Clock size={15}/>,        iconBg: 'bg-orange-50 text-orange-600',   label: isBn ? 'আসন্ন' : 'UPCOMING',   money: 'text-orange-600' },
-    none:     { chip: 'bg-gray-100 text-gray-600 border-gray-200',        icon: <DoorOpen size={15}/>,     iconBg: 'bg-gray-100 text-gray-500',      label: isBn ? 'লিজের বাইরে' : 'OUTSIDE', money: 'text-gray-400' },
+    cleared:  { chip: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle2 size={18}/>, iconBg: 'bg-emerald-50 text-emerald-600', label: isBn ? 'ক্লিয়ার্ড' : 'CLEARED', money: 'text-emerald-600' },
+    partial:  { chip: 'bg-amber-50 text-amber-700 border-amber-200',      icon: <Hourglass size={18}/>,    iconBg: 'bg-amber-50 text-amber-600',     label: isBn ? 'আংশিক' : 'PARTIAL',    money: 'text-amber-600' },
+    overdue:  { chip: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200', icon: <AlertCircle size={18}/>, iconBg: 'bg-fuchsia-50 text-fuchsia-600', label: isBn ? 'বকেয়া' : 'OVERDUE',    money: 'text-fuchsia-600' },
+    upcoming: { chip: 'bg-orange-50 text-orange-700 border-orange-200',   icon: <Clock size={18}/>,        iconBg: 'bg-orange-50 text-orange-600',   label: isBn ? 'আসন্ন' : 'UPCOMING',   money: 'text-orange-600' },
+    none:     { chip: 'bg-gray-100 text-gray-600 border-gray-200',        icon: <DoorOpen size={18}/>,     iconBg: 'bg-gray-100 text-gray-500',      label: isBn ? 'লিজের বাইরে' : 'OUTSIDE', money: 'text-gray-400' },
   }[bucket] || {};
 
   // A room number is the honest title. Without one (a whole flat, a legacy row)
@@ -84,39 +84,39 @@ export default function RentRoomCard({
       type="button"
       id={`rent-${first.__realId || first.id}`}
       onClick={onOpen}
-      className={`w-full text-left bg-white rounded-xl border overflow-hidden transition-all flex items-center gap-2.5 px-3 py-2.5 ${
+      className={`w-full text-left bg-white rounded-xl border overflow-hidden transition-all flex items-center gap-3 px-3.5 py-3 ${
         isOpen
           ? 'border-[#ba0036]/30 shadow-[0_6px_24px_rgba(186,0,54,0.10)]'
           : 'border-gray-100/80 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:border-gray-200'
       }`}
     >
-      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${theme.iconBg}`}>
+      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${theme.iconBg}`}>
         {theme.icon}
       </div>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-          <h4 className="text-xs sm:text-[13px] font-black text-gray-900 truncate">{title}</h4>
+          <h4 className="text-[15px] sm:text-base font-black text-gray-900 truncate">{title}</h4>
           {floorNumber !== '' && floorNumber != null && (
-            <span className="px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
+            <span className="px-1.5 py-0.5 rounded-md text-[11px] font-black tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
               {isBn ? 'ফ্লোর' : 'Floor'} {floorNumber}
             </span>
           )}
           {seatCount > 1 && (
-            <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border bg-gray-50 text-gray-600 border-gray-200 inline-flex items-center gap-0.5 tabular-nums shrink-0">
-              <Users size={9}/> {seatCount} {isBn ? 'সিট' : 'seats'}
+            <span className="px-1.5 py-0.5 rounded text-[11px] font-black tracking-wide border bg-gray-50 text-gray-600 border-gray-200 inline-flex items-center gap-0.5 tabular-nums shrink-0">
+              <Users size={13}/> {seatCount} {isBn ? 'সিট' : 'seats'}
             </span>
           )}
           {/* The mixed-status summary: "১ পরিশোধ · ১ বাকি" on one room, so a
               half-paid room reads as a half-paid room instead of two rows in
               two different lists. */}
-          <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border tabular-nums shrink-0 ${theme.chip}`}>
+          <span className={`px-1.5 py-0.5 rounded text-[11px] font-black tracking-wide border tabular-nums shrink-0 ${theme.chip}`}>
             {seatCount > 1
               ? `${paidCount} ${isBn ? 'পরিশোধ' : 'paid'} · ${dueCount} ${isBn ? 'বাকি' : 'due'}`
               : theme.label}
           </span>
         </div>
-        <p className="text-[10px] font-bold text-gray-500 truncate">
+        <p className="text-[13.5px] font-bold text-gray-600 truncate">
           <span className="text-emerald-600 font-black tabular-nums">{formatBDT(expected)}</span>
           <span className="text-gray-400">{isBn ? ' /মাস' : ' /mo'}</span>
           <span className="mx-1 text-gray-300">·</span>
@@ -131,16 +131,16 @@ export default function RentRoomCard({
       </div>
 
       <div className="shrink-0 text-right hidden sm:block mr-0.5">
-        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-tight">
+        <p className="text-[12px] font-black text-gray-500 leading-tight">
           {outstanding > 0 ? (isBn ? 'বাকি' : 'Outstanding') : (isBn ? 'পরিশোধিত' : 'Settled')}
         </p>
-        <p className={`text-xs font-black tabular-nums leading-tight ${outstanding > 0 ? theme.money : 'text-emerald-600'}`}>
+        <p className={`text-base font-black tabular-nums leading-tight mt-0.5 ${outstanding > 0 ? theme.money : 'text-emerald-600'}`}>
           {formatBDT(outstanding)}
         </p>
       </div>
 
       <div className="shrink-0 p-1 rounded-lg bg-gray-50 text-gray-400">
-        <ChevronRight size={14}/>
+        <ChevronRight size={18}/>
       </div>
     </button>
   );

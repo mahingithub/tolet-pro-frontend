@@ -11,7 +11,7 @@ import {
   File, Eye, FileEdit, Megaphone, FileSpreadsheet, Phone, Bot, CheckCheck, Video,
   Activity, TrendingUp, Crown, Lock, Sparkles, DollarSign, Wallet,
   XCircle, AlertCircle, RefreshCw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, MinusCircle,
-  Banknote, ArrowRight, ArrowUpRight, Clock, Smartphone,
+  Banknote, ArrowRight, Clock, Smartphone,
   BellOff, CalendarRange, BarChart3, ScanLine,
   Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Map, Leaf
 } from 'lucide-react';
@@ -1010,21 +1010,11 @@ export default function BookingsTab(props) {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => setActiveTab('rent')}
-                      className="bg-white dark:bg-gray-900/50 hover:bg-gray-50 dark:hover:bg-gray-800 border border-gray-100 dark:border-gray-800/60 rounded-2xl lg:rounded-[2rem] p-4 lg:p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center justify-between gap-3 transition-colors shrink-0 group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-400 shrink-0">
-                          <Wallet size={16} />
-                        </div>
-                        <div className="text-left">
-                          <p className="text-xs font-black text-gray-900 dark:text-white">{language === 'বাংলা' ? 'ভাড়া কালেকশন' : 'Rent Collection'}</p>
-                          <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 leading-tight">{language === 'বাংলা' ? '১২ মাসের লেজার, পেমেন্ট আপডেট' : '12-month ledger, mark paid, reminders'}</p>
-                        </div>
-                      </div>
-                      <ArrowUpRight size={16} className="text-gray-400 dark:text-gray-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                    </button>
+                    {/* The "Rent Collection · 12-month ledger" shortcut used to
+                        sit here, under the financial summary. It was a third
+                        door to a tab the header already offers by name, one
+                        screenful above — removed rather than kept as a card the
+                        landlord scrolls past on the way to the rooms. */}
                   </>
                 )}
               </aside>
@@ -1036,16 +1026,19 @@ export default function BookingsTab(props) {
                     {/* BUILDINGS OVERVIEW */}
                     <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:-mx-4 lg:-mx-3 px-3 sm:px-4 lg:px-6 pt-2 pb-3 mb-2 lg:pt-1">
                       <div className="flex items-center justify-between">
-                        <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
-                          <Building2 size={12} className="text-[#ba0036]"/>
+                        <span className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white text-[14px] font-black text-gray-700 shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
+                          <Building2 size={17} className="text-[#ba0036]"/>
                           <span className="hidden sm:inline">{isBn ? 'আপনার বিল্ডিংসমূহ' : 'Your Buildings'}</span>
                           <span className="text-gray-400 tabular-nums">{landlordProfile.buildings?.length || 0}</span>
                         </span>
-                        <button 
+                        {/* Says what it adds, at every width. On a phone this
+                            button read "যোগ করুন" — add WHAT — which is the one
+                            question a button label exists to answer. */}
+                        <button
                           onClick={() => setShowBuildingForm(true)}
-                          className="shrink-0 inline-flex items-center justify-center gap-1.5 bg-[#ba0036] hover:bg-[#a0002f] text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all shadow-[0_4px_12px_rgba(186,0,54,0.25)] hover:shadow-[0_6px_16px_rgba(186,0,54,0.35)] active:scale-95"
+                          className="shrink-0 inline-flex items-center justify-center gap-2 bg-[#ba0036] hover:bg-[#a0002f] text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-[15px] sm:text-base font-black transition-all shadow-[0_4px_12px_rgba(186,0,54,0.25)] hover:shadow-[0_6px_16px_rgba(186,0,54,0.35)] active:scale-95 whitespace-nowrap"
                         >
-                          <Plus size={14} strokeWidth={3} className="shrink-0"/> <span className="hidden sm:inline">{isBn ? 'নতুন বিল্ডিং' : 'Add Building'}</span><span className="sm:hidden">{isBn ? 'যোগ করুন' : 'Add'}</span>
+                          <Plus size={19} strokeWidth={3} className="shrink-0"/> {isBn ? 'নতুন বিল্ডিং' : 'Add Building'}
                         </button>
                       </div>
                     </div>

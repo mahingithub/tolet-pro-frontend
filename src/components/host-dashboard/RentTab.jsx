@@ -243,11 +243,11 @@ export default function RentTab(props) {
           // Coloured palette per current-month bucket — re-used across the
           // avatar gradient, status pill, and progress bar.
           const bucketTheme = {
-            cleared:  { cls: 'bg-emerald-50 text-emerald-700 border-emerald-100', label: language === 'বাংলা' ? 'ক্লিয়ার্ড' : 'CLEARED', icon: <CheckCircle2 size={10} strokeWidth={3}/>, bar: 'bg-emerald-500', avatar: 'bg-gradient-to-br from-indigo-500 to-purple-600' },
-            partial:  { cls: 'bg-amber-50 text-amber-700 border-amber-100',       label: language === 'বাংলা' ? 'আংশিক' : 'PARTIAL',     icon: <Hourglass size={10} strokeWidth={3}/>,    bar: 'bg-amber-500',   avatar: 'bg-gradient-to-br from-indigo-500 to-purple-600' },
-            overdue:  { cls: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100',          label: language === 'বাংলা' ? 'বকেয়া' : 'OVERDUE',     icon: <AlertCircle size={10} strokeWidth={3}/>,  bar: 'bg-fuchsia-500',    avatar: 'bg-gradient-to-br from-fuchsia-500 to-pink-600' },
-            upcoming: { cls: 'bg-orange-50 text-orange-700 border-orange-100',    label: language === 'বাংলা' ? 'আসন্ন' : 'UPCOMING',    icon: <Clock size={10} strokeWidth={3}/>,        bar: 'bg-orange-400',  avatar: 'bg-gradient-to-br from-indigo-500 to-purple-600' },
-            none:     { cls: 'bg-gray-100 text-gray-600 border-gray-200',         label: language === 'বাংলা' ? 'লিজের বাইরে' : 'OUTSIDE', icon: <MinusCircle size={10} strokeWidth={3}/>, bar: 'bg-gray-300',    avatar: 'bg-gradient-to-br from-indigo-500 to-purple-600' },
+            cleared:  { cls: 'bg-emerald-50 text-emerald-700 border-emerald-100', label: language === 'বাংলা' ? 'ক্লিয়ার্ড' : 'CLEARED', icon: <CheckCircle2 size={13} strokeWidth={3}/>, bar: 'bg-emerald-500', avatar: 'bg-gradient-to-br from-indigo-500 to-purple-600' },
+            partial:  { cls: 'bg-amber-50 text-amber-700 border-amber-100',       label: language === 'বাংলা' ? 'আংশিক' : 'PARTIAL',     icon: <Hourglass size={13} strokeWidth={3}/>,    bar: 'bg-amber-500',   avatar: 'bg-gradient-to-br from-indigo-500 to-purple-600' },
+            overdue:  { cls: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100',          label: language === 'বাংলা' ? 'বকেয়া' : 'OVERDUE',     icon: <AlertCircle size={13} strokeWidth={3}/>,  bar: 'bg-fuchsia-500',    avatar: 'bg-gradient-to-br from-fuchsia-500 to-pink-600' },
+            upcoming: { cls: 'bg-orange-50 text-orange-700 border-orange-100',    label: language === 'বাংলা' ? 'আসন্ন' : 'UPCOMING',    icon: <Clock size={13} strokeWidth={3}/>,        bar: 'bg-orange-400',  avatar: 'bg-gradient-to-br from-indigo-500 to-purple-600' },
+            none:     { cls: 'bg-gray-100 text-gray-600 border-gray-200',         label: language === 'বাংলা' ? 'লিজের বাইরে' : 'OUTSIDE', icon: <MinusCircle size={13} strokeWidth={3}/>, bar: 'bg-gray-300',    avatar: 'bg-gradient-to-br from-indigo-500 to-purple-600' },
           };
 
           // ── ONE TENANT'S RENT CARD ─────────────────────────────────────
@@ -310,7 +310,7 @@ export default function RentTab(props) {
                   onClick={forceOpen ? undefined : () => setExpandedRentId(isExpanded ? null : booking.id)}
                   className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-3 py-2 sm:py-2.5 text-left transition-colors ${forceOpen ? 'cursor-default' : 'hover:bg-gray-50/50'}`}
                 >
-                  <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center text-white font-black text-[10px] sm:text-[11px] shrink-0 ${theme.avatar} overflow-hidden`}>
+                  <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center text-white font-black text-[13px] sm:text-[14px] shrink-0 ${theme.avatar} overflow-hidden`}>
                     {displayAvatar ? (
                       <img src={displayAvatar} alt={displayTenant} className="w-full h-full object-cover" />
                     ) : (
@@ -318,37 +318,41 @@ export default function RentTab(props) {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <h4 className="text-xs sm:text-[13px] font-black text-gray-900 truncate">{displayTenant}</h4>
+                    {/* Wraps rather than squeezes. At the old 8px the badges
+                        cost nothing; at a readable size they would have eaten
+                        the tenant's name down to an ellipsis, and the name is
+                        the one thing on this row that must survive. */}
+                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mb-1">
+                      <h4 className="text-[15px] sm:text-base font-black text-gray-900 truncate">{displayTenant}</h4>
                       {pendingKeySet.has(`booking:${booking.id}`) && (
                         <span
-                          className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200 shrink-0 inline-flex items-center gap-0.5"
+                          className="px-1.5 py-0.5 rounded text-[11px] font-black tracking-wide bg-amber-50 text-amber-700 border border-amber-200 shrink-0 inline-flex items-center gap-0.5"
                           title={language === 'বাংলা' ? 'নেট এলে সার্ভারে চলে যাবে' : 'Goes to the server once you are back online'}
                         >
-                          <CloudOff size={9} /> {language === 'বাংলা' ? 'অপেক্ষায়' : 'Pending'}
+                          <CloudOff size={13} /> {language === 'বাংলা' ? 'অপেক্ষায়' : 'Pending'}
                         </span>
                       )}
                       {extraMembers > 0 && (
-                        <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-gray-100 text-gray-600 border border-gray-200 shrink-0 tabular-nums" title={language === 'বাংলা' ? 'আরও সদস্য' : 'more members'}>+{extraMembers}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[11px] font-black bg-gray-100 text-gray-600 border border-gray-200 shrink-0 tabular-nums" title={language === 'বাংলা' ? 'আরও সদস্য' : 'more members'}>+{extraMembers}</span>
                       )}
                       {booking.floorNumber && (
-                        <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 border border-indigo-200 shrink-0 inline-flex items-center gap-0.5">
+                        <span className="px-1.5 py-0.5 rounded-md text-[12px] font-black tracking-wide bg-indigo-100 text-indigo-700 border border-indigo-200 shrink-0 inline-flex items-center gap-0.5">
                           {language === 'বাংলা' ? 'ফ্লোর' : 'Floor'} {booking.floorNumber}
                         </span>
                       )}
                       {/* Residential / Commercial / Hostel property badge */}
-                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 inline-flex items-center gap-0.5 ${booking.dealType === 'commercial' ? 'bg-violet-50 text-violet-700 border-violet-200' : booking.propertyType === 'hostel' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-indigo-50 text-indigo-700 border-blue-200'}`}>
+                      <span className={`px-1.5 py-0.5 rounded text-[11px] font-black tracking-wide border shrink-0 inline-flex items-center gap-0.5 ${booking.dealType === 'commercial' ? 'bg-violet-50 text-violet-700 border-violet-200' : booking.propertyType === 'hostel' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-indigo-50 text-indigo-700 border-blue-200'}`}>
                         {booking.dealType === 'commercial'
                           ? (<>🏢<span> {language === 'বাংলা' ? 'কমার্শিয়াল' : 'Commercial'}</span></>)
                           : booking.propertyType === 'hostel'
                             ? (<>🛏️<span> {language === 'বাংলা' ? 'হোস্টেল' : 'Hostel'}</span></>)
                             : (<>🏠<span> {language === 'বাংলা' ? 'আবাসিক' : 'Residential'}</span></>)}
                       </span>
-                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 inline-flex items-center gap-0.5 ${theme.cls}`}>
+                      <span className={`px-1.5 py-0.5 rounded text-[11px] font-black tracking-wide border shrink-0 inline-flex items-center gap-0.5 ${theme.cls}`}>
                         {theme.icon} <span className="hidden sm:inline">{theme.label}</span>
                       </span>
                     </div>
-                    <p className="text-[10px] font-bold text-gray-500 truncate">
+                    <p className="text-[13px] font-bold text-gray-500 truncate">
                       <span className="text-emerald-600 font-black">{booking.property}</span>
                       {booking.roomNumber && (
                         <>
@@ -379,14 +383,14 @@ export default function RentTab(props) {
                     </p>
                   </div>
                   <div className="hidden sm:flex flex-col items-end gap-1 shrink-0 mr-1">
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest tabular-nums">{paidThisYear}/{monthsThisYearInLease || 12}</span>
-                    <div className="w-12 h-1 bg-gray-100 rounded-full overflow-hidden">
+                    <span className="text-[13px] font-black text-gray-500 tracking-wide tabular-nums">{paidThisYear}/{monthsThisYearInLease || 12}</span>
+                    <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div className={`h-full rounded-full ${theme.bar}`} style={{ width: `${collectedPctRow}%` }}/>
                     </div>
                   </div>
                   {!forceOpen && (
                     <div className="shrink-0 p-1 rounded-lg bg-gray-50 text-gray-400">
-                      {isExpanded ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}
+                      {isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
                     </div>
                   )}
                 </button>
@@ -400,35 +404,35 @@ export default function RentTab(props) {
                         uniform. Per-seat management stays on the Bookings tab. */}
 
                     {/* This-month ledger panel — totals + progress + edit */}
-                    <div className="bg-white rounded-xl p-3 border border-gray-100">
-                      <div className="flex items-center justify-between mb-2 gap-2">
-                        <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest truncate">
+                    <div className="bg-white rounded-xl p-3.5 border border-gray-100">
+                      <div className="flex items-center justify-between mb-3 gap-2">
+                        <p className="text-[14px] font-black text-gray-600 truncate">
                           {language === 'বাংলা' ? 'এই মাস' : 'This Month'} · {monthFullLabel(sm.key, language)}
                         </p>
                         {monthInLease && (
                           <button
                             onClick={() => openMarkPaid(booking, sm.key)}
-                            className="px-2.5 py-1 rounded-lg bg-[#ba0036] text-white text-[9px] font-black uppercase tracking-widest hover:bg-[#90002a] transition-colors flex items-center gap-1 shrink-0"
+                            className="px-3 py-1.5 rounded-lg bg-[#ba0036] text-white text-[13px] font-black tracking-wide hover:bg-[#90002a] transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap"
                           >
-                            <Edit3 size={10} strokeWidth={3}/> {monthEntry?.paid ? (language === 'বাংলা' ? 'এডিট' : 'Edit') : (language === 'বাংলা' ? 'মার্ক পেইড' : 'Mark Paid')}
+                            <Edit3 size={13} strokeWidth={3}/> {monthEntry?.paid ? (language === 'বাংলা' ? 'এডিট' : 'Edit') : (language === 'বাংলা' ? 'মার্ক পেইড' : 'Mark Paid')}
                           </button>
                         )}
                       </div>
                       <div className="grid grid-cols-3 gap-2 sm:gap-3">
                         <div>
-                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'মোট ডিউ' : 'Due'}</p>
-                          <p className="text-xs sm:text-sm font-black text-gray-900 tabular-nums mt-0.5">{formatBDT(expectedThisMonth)}</p>
+                          <p className="text-[13px] font-black text-gray-500">{language === 'বাংলা' ? 'মোট ডিউ' : 'Due'}</p>
+                          <p className="text-[17px] sm:text-lg font-black text-gray-900 tabular-nums mt-1 leading-none">{formatBDT(expectedThisMonth)}</p>
                         </div>
                         <div>
-                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'পেইড' : 'Paid'}</p>
-                          <p className="text-xs sm:text-sm font-black text-emerald-600 tabular-nums mt-0.5">{formatBDT(paidThisMonth)}</p>
+                          <p className="text-[13px] font-black text-gray-500">{language === 'বাংলা' ? 'পেইড' : 'Paid'}</p>
+                          <p className="text-[17px] sm:text-lg font-black text-emerald-600 tabular-nums mt-1 leading-none">{formatBDT(paidThisMonth)}</p>
                         </div>
                         <div>
-                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বাকি' : 'Balance'}</p>
-                          <p className={`text-xs sm:text-sm font-black tabular-nums mt-0.5 ${balanceThisMonth > 0 ? 'text-fuchsia-600' : 'text-gray-400'}`}>{formatBDT(balanceThisMonth)}</p>
+                          <p className="text-[13px] font-black text-gray-500">{language === 'বাংলা' ? 'বাকি' : 'Balance'}</p>
+                          <p className={`text-[17px] sm:text-lg font-black tabular-nums mt-1 leading-none ${balanceThisMonth > 0 ? 'text-fuchsia-600' : 'text-gray-400'}`}>{formatBDT(balanceThisMonth)}</p>
                         </div>
                       </div>
-                      <div className="mt-2.5 h-1 w-full bg-gray-100 rounded-full overflow-hidden">
+                      <div className="mt-3 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
                         <div className={`h-full rounded-full transition-all duration-700 ${theme.bar}`}
                              style={{ width: expectedThisMonth > 0 ? `${(paidThisMonth / expectedThisMonth) * 100}%` : '0%' }} />
                       </div>
@@ -438,19 +442,25 @@ export default function RentTab(props) {
                     <div className="mt-2.5 flex items-center justify-between gap-2">
                       <div className="flex bg-white p-1 rounded-xl shadow-[0_1px_4px_rgba(0,0,0,0.03)] items-center gap-0.5">
                         <button onClick={() => setLedgerYear(y => y - 1)} className="p-1 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50" aria-label="Prev year">
-                          <ArrowLeft size={10} />
+                          <ArrowLeft size={13} />
                         </button>
-                        <span className="px-1.5 text-[10px] font-black text-gray-900 tabular-nums">{ledgerYear}</span>
+                        <span className="px-2 text-[15px] font-black text-gray-900 tabular-nums">{ledgerYear}</span>
                         <button onClick={() => setLedgerYear(y => y + 1)} className="p-1 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50" aria-label="Next year">
-                          <ArrowRight size={10} />
+                          <ArrowRight size={13} />
                         </button>
                       </div>
-                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest tabular-nums">{paidThisYear}/{monthsThisYearInLease || 12} {language === 'বাংলা' ? 'মাস' : 'months'}</span>
+                      <span className="text-[13px] font-black text-gray-500 tabular-nums">{paidThisYear}/{monthsThisYearInLease || 12} {language === 'বাংলা' ? 'মাস' : 'months'}</span>
                     </div>
 
                     {/* 12-month rent grid — the headline feature */}
-                    <div className="mt-1.5 bg-white p-2 rounded-xl border border-gray-100">
-                      <div className="grid grid-cols-12 gap-1">
+                    {/* Six across on a phone, twelve on a tablet up.
+                        Twelve cells across a 360px screen leaves ~24px each —
+                        at that width the month can only be named in 7px type,
+                        which is the size the landlord said he cannot read. Two
+                        rows of six give each month a ~52px box that holds a
+                        13px "সেপ্ট" and is a comfortable tap target besides. */}
+                    <div className="mt-1.5 bg-white p-2.5 rounded-xl border border-gray-100">
+                      <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5">
                         {yearMonths.map(k => {
                           const inLease = leaseMonths.includes(k);
                           const cellStatus = inLease ? getRentStatus(booking, k, todayDate) : 'before-lease';
@@ -464,15 +474,22 @@ export default function RentTab(props) {
                                     : `${monthFullLabel(k, language)} · Paid ${formatBDT(entry.amount)} ${formatDate(entry.paidOn, language)}${entry.method ? ' (' + entry.method + ')' : ''}`)
                                 : (cellStatus === 'due-marked'
                                     ? `${monthFullLabel(k, language)} · Marked due${entry?.dueNote ? ' — ' + entry.dueNote : ''}`
-                                    : `${monthFullLabel(k, language)} · ${cellStatus.replace('-', ' ')} · due ${formatDate(getDueDate(k, booking.rentDueDay)?.toISOString(), language)}`))
+                                    : `${monthFullLabel(k, language)} · ${cellStatus === 'current' ? (language === 'বাংলা' ? 'চলতি মাস' : 'running month') : cellStatus.replace('-', ' ')} · due ${formatDate(getDueDate(k, booking.rentDueDay)?.toISOString(), language)}`))
                             : `${monthFullLabel(k, language)} · ${language === 'বাংলা' ? 'লিজের বাইরে' : 'outside lease'}`;
                           // Colour vocabulary — matches the legend + tenant receipts.
+                          //
+                          // `current` is the month being lived in while its due
+                          // date is still ahead. It is TINTED, not filled: no
+                          // money is late, so it must not shout like overdue —
+                          // but it must not read as the same empty grey as a
+                          // month that hasn't started either.
                           const colorClass =
                             cellStatus === 'paid' ? 'bg-indigo-500 text-white hover:bg-blue-600 shadow-[0_2px_8px_rgba(59,130,246,0.35)]' :
                             cellStatus === 'partial' ? 'bg-amber-400 text-white hover:bg-amber-500' :
                             cellStatus === 'due-marked' ? 'bg-red-500 text-white hover:bg-red-600' :
                             cellStatus === 'overdue' ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse' :
                             cellStatus === 'due-soon' ? 'bg-orange-400 text-white hover:bg-orange-500' :
+                            cellStatus === 'current' ? 'bg-sky-100 text-sky-700 border border-sky-300 hover:bg-sky-200' :
                             cellStatus === 'upcoming' ? 'bg-gray-100 text-gray-500 hover:bg-gray-200' :
                             'bg-gray-50 text-gray-300 cursor-not-allowed border border-dashed border-gray-200';
                           return (
@@ -482,20 +499,23 @@ export default function RentTab(props) {
                               title={tooltip}
                               disabled={!inLease}
                               onClick={(e) => { e.stopPropagation(); inLease && openMarkPaid(booking, k); }}
-                              className={`relative aspect-square rounded-md text-[7px] sm:text-[8px] font-black uppercase tracking-tight transition-all flex flex-col items-center justify-center ${colorClass} ${isCurrent ? 'ring-[1.5px] ring-offset-[1px] ring-gray-900' : ''}`}
+                              className={`relative aspect-square rounded-lg text-[12px] font-black tracking-tight transition-all flex flex-col items-center justify-center ${colorClass} ${isCurrent ? 'ring-[1.5px] ring-offset-[1px] ring-gray-900' : ''}`}
                             >
                               <span className="leading-none">{(language === 'বাংলা' ? MONTH_NAMES_BN_SHORT : MONTH_NAMES_EN_SHORT)[parseMonthKey(k).month - 1]}</span>
-                              {cellStatus === 'paid' && <CheckCheck size={8} className="mt-0.5" strokeWidth={3} />}
-                              {cellStatus === 'partial' && <Hourglass size={7} className="mt-0.5" strokeWidth={3} />}
-                              {cellStatus === 'due-marked' && <AlertCircle size={7} className="mt-0.5" strokeWidth={3} />}
+                              {cellStatus === 'paid' && <CheckCheck size={14} className="mt-1" strokeWidth={3} />}
+                              {cellStatus === 'partial' && <Hourglass size={14} className="mt-1" strokeWidth={3} />}
+                              {cellStatus === 'due-marked' && <AlertCircle size={14} className="mt-1" strokeWidth={3} />}
+                              {/* A live dot, the way a running clock is drawn — the
+                                  month is in progress, not yet owed. */}
+                              {cellStatus === 'current' && <span className="mt-1 w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />}
                             </button>
                           );
                         })}
                       </div>
                       {nextDue && status !== 'completed' && (
                         <div className="mt-2 flex items-center justify-end">
-                          <p className={`text-[8px] font-black tracking-wide whitespace-nowrap shrink-0 px-1.5 py-0.5 rounded-md ${nextDue.daysFromNow < 0 ? 'bg-red-50 text-red-600' : nextDue.daysFromNow <= (booking.reminderLeadDays || 3) ? 'bg-orange-50 text-orange-600' : 'bg-gray-100 text-gray-600'}`}>
-                            <Clock size={8} className="inline -mt-0.5 mr-1" />
+                          <p className={`text-[13px] font-black whitespace-nowrap shrink-0 px-2.5 py-1 rounded-md ${nextDue.daysFromNow < 0 ? 'bg-red-50 text-red-600' : nextDue.daysFromNow <= (booking.reminderLeadDays || 3) ? 'bg-orange-50 text-orange-600' : 'bg-gray-100 text-gray-600'}`}>
+                            <Clock size={12} className="inline -mt-0.5 mr-1" />
                             {nextDue.daysFromNow < 0
                               ? `${Math.abs(nextDue.daysFromNow)}d ${language === 'বাংলা' ? 'দেরি' : 'late'} · ${monthShortLabel(nextDue.key, language)}`
                               : nextDue.daysFromNow === 0
@@ -507,20 +527,20 @@ export default function RentTab(props) {
                     </div>
 
                     {/* Action row — payment-focused */}
-                    <div className="mt-2.5 flex flex-nowrap items-center justify-between gap-1.5 overflow-x-auto no-scrollbar pb-1 -mb-1">
+                    <div className="mt-3 flex flex-nowrap items-center justify-between gap-2 overflow-x-auto no-scrollbar pb-1 -mb-1">
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           onClick={() => {
                             const k = nextDue?.key || monthKey(todayDate.getFullYear(), todayDate.getMonth() + 1);
                             openMarkPaid(booking, k);
                           }}
-                          className="px-2 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 transition-all rounded-lg text-[9px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1 shrink-0"
+                          className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 transition-all rounded-lg text-[13px] font-black active:scale-95 flex items-center gap-1.5 shrink-0 whitespace-nowrap"
                         >
-                          <CheckCircle2 size={10} className="shrink-0"/> {language === 'বাংলা' ? 'পেইড মার্ক' : 'Mark Paid'}
+                          <CheckCircle2 size={13} className="shrink-0"/> {language === 'বাংলা' ? 'পেইড মার্ক' : 'Mark Paid'}
                         </button>
                         {nextDue && nextDue.daysFromNow <= (booking.reminderLeadDays || 3) && (
-                          <button onClick={() => sendRentReminder(booking, nextDue.key)} className="px-2 py-1.5 bg-orange-50 text-orange-700 hover:bg-orange-100 transition-all rounded-lg text-[9px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1 shrink-0">
-                            <BellRing size={10} className="shrink-0"/> {language === 'বাংলা' ? 'রিমাইন্ডার' : 'Remind'}
+                          <button onClick={() => sendRentReminder(booking, nextDue.key)} className="px-3 py-2 bg-orange-50 text-orange-700 hover:bg-orange-100 transition-all rounded-lg text-[13px] font-black active:scale-95 flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+                            <BellRing size={13} className="shrink-0"/> {language === 'বাংলা' ? 'রিমাইন্ডার' : 'Remind'}
                           </button>
                         )}
                       </div>
@@ -528,16 +548,16 @@ export default function RentTab(props) {
                         {/* Profile — opens the tenant's trust card (/tenant/:id). */}
                         <button
                           onClick={() => openTenantProfile(resolveTenantUserId(booking), { name: booking.tenant, avatar: booking.tenantAvatar })}
-                          className="px-2 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all rounded-lg text-[9px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1 shrink-0"
+                          className="px-3 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all rounded-lg text-[13px] font-black active:scale-95 flex items-center gap-1.5 shrink-0 whitespace-nowrap"
                           title={language === 'বাংলা' ? 'টেন্যান্ট প্রোফাইল' : 'Tenant profile'}
                         >
-                          <UserCircle size={10} className="shrink-0"/> {language === 'বাংলা' ? 'প্রোফাইল' : 'Profile'}
+                          <UserCircle size={13} className="shrink-0"/> {language === 'বাংলা' ? 'প্রোফাইল' : 'Profile'}
                         </button>
                         <button
                           onClick={() => openChatPanel(booking.chatId || `chat-${booking.id}`, { source: 'host-rent', peerUserId: resolveTenantUserId(booking), peerName: booking.tenant, peerAvatar: booking.tenantAvatar, tenantName: booking.tenant, tenantPhone: booking.tenantPhone, propertyTitle: booking.property })}
-                          className="px-2 py-1.5 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-lg text-[9px] font-black uppercase tracking-widest active:scale-95 shadow-md flex items-center gap-1.5 shrink-0"
+                          className="px-3 py-2 bg-gray-900 text-white hover:bg-[#ba0036] transition-all rounded-lg text-[13px] font-black active:scale-95 shadow-md flex items-center gap-1.5 shrink-0 whitespace-nowrap"
                         >
-                          <MessageCircle size={10} className="shrink-0"/> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
+                          <MessageCircle size={13} className="shrink-0"/> {language === 'বাংলা' ? 'মেসেজ' : 'Message'}
                         </button>
                       </div>
                     </div>
@@ -545,8 +565,8 @@ export default function RentTab(props) {
                     {/* Per-month ledger detail rows — collapsible secondary view */}
                     <details className="mt-2.5 group">
                       <summary className="cursor-pointer list-none flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-gray-100/60 transition-colors">
-                        <ChevronDown size={10} className="text-gray-400 group-open:rotate-180 transition-transform"/>
-                        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">
+                        <ChevronDown size={13} className="text-gray-400 group-open:rotate-180 transition-transform"/>
+                        <span className="text-[14px] font-black text-gray-600">
                           {language === 'বাংলা' ? `${ledgerYear} সালের বিবরণ` : `${ledgerYear} Ledger Details`}
                         </span>
                       </summary>
@@ -560,30 +580,32 @@ export default function RentTab(props) {
                             cellStatus === 'partial' ? 'bg-amber-400' :
                             cellStatus === 'due-marked' ? 'bg-red-500' :
                             cellStatus === 'overdue' ? 'bg-red-500' :
-                            cellStatus === 'due-soon' ? 'bg-orange-400' : 'bg-gray-300';
+                            cellStatus === 'due-soon' ? 'bg-orange-400' :
+                            cellStatus === 'current' ? 'bg-sky-500' : 'bg-gray-300';
                           return (
-                            <div key={k} className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-white border border-gray-100">
-                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`}></span>
-                              <span className="text-[10px] font-black text-gray-900 w-14 sm:w-16 shrink-0 truncate">{monthShortLabel(k, language)}</span>
-                              <span className="text-[9px] font-bold text-gray-500 hidden sm:inline w-20 shrink-0 truncate">{formatDate(due?.toISOString(), language)}</span>
-                              <span className="text-[10px] font-bold flex-1 truncate">
+                            <div key={k} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-white border border-gray-100">
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`}></span>
+                              <span className="text-[14px] font-black text-gray-900 w-16 sm:w-20 shrink-0 truncate">{monthShortLabel(k, language)}</span>
+                              <span className="text-[12px] font-bold text-gray-500 hidden sm:inline w-20 shrink-0 truncate">{formatDate(due?.toISOString(), language)}</span>
+                              <span className="text-[13px] font-bold flex-1 truncate">
                                 {cellStatus === 'paid' && (
-                                  <span className="text-indigo-700 inline-flex items-center gap-1"><CheckCheck size={10} strokeWidth={3}/> {formatBDT(entry.amount || booking.monthlyRent)}{entry.method ? ` · ${entry.method}` : ''}</span>
+                                  <span className="text-indigo-700 inline-flex items-center gap-1"><CheckCheck size={13} strokeWidth={3}/> {formatBDT(entry.amount || booking.monthlyRent)}{entry.method ? ` · ${entry.method}` : ''}</span>
                                 )}
                                 {cellStatus === 'partial' && (
-                                  <span className="text-amber-700 inline-flex items-center gap-1"><Hourglass size={10} strokeWidth={3}/> {language === 'বাংলা' ? 'বাকি' : 'Bal'} {formatBDT(entry.balance)}</span>
+                                  <span className="text-amber-700 inline-flex items-center gap-1"><Hourglass size={13} strokeWidth={3}/> {language === 'বাংলা' ? 'বাকি' : 'Bal'} {formatBDT(entry.balance)}</span>
                                 )}
                                 {cellStatus === 'due-marked' && (
-                                  <span className="text-red-600 inline-flex items-center gap-1"><AlertCircle size={10} strokeWidth={3}/> {language === 'বাংলা' ? 'বকেয়া' : 'Marked Due'}</span>
+                                  <span className="text-red-600 inline-flex items-center gap-1"><AlertCircle size={13} strokeWidth={3}/> {language === 'বাংলা' ? 'বকেয়া' : 'Marked Due'}</span>
                                 )}
                                 {cellStatus === 'overdue' && (<span className="text-red-600">{language === 'বাংলা' ? 'বকেয়া' : 'Overdue'}</span>)}
                                 {cellStatus === 'due-soon' && (<span className="text-orange-600">{language === 'বাংলা' ? 'শীঘ্রই' : 'Soon'}</span>)}
+                                {cellStatus === 'current' && (<span className="text-sky-700">{language === 'বাংলা' ? 'চলতি মাস' : 'This month'}</span>)}
                                 {cellStatus === 'upcoming' && (<span className="text-gray-500">{language === 'বাংলা' ? 'আসন্ন' : 'Upcoming'}</span>)}
                               </span>
                               {entry?.paid ? (
-                                <button onClick={(e) => { e.stopPropagation(); openMarkPaid(booking, k); }} className="p-1 rounded-md hover:bg-gray-100 text-gray-500 shrink-0" title="Edit"><Edit3 size={11}/></button>
+                                <button onClick={(e) => { e.stopPropagation(); openMarkPaid(booking, k); }} className="p-1 rounded-md hover:bg-gray-100 text-gray-500 shrink-0" title="Edit"><Edit3 size={14}/></button>
                               ) : (
-                                <button onClick={(e) => { e.stopPropagation(); openMarkPaid(booking, k); }} className={`px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-wider shrink-0 ${cellStatus === 'due-marked' ? 'bg-red-50 hover:bg-red-100 text-red-700' : 'bg-green-50 hover:bg-green-100 text-green-700'}`}>
+                                <button onClick={(e) => { e.stopPropagation(); openMarkPaid(booking, k); }} className={`px-2 py-1 rounded-md text-[12px] font-black tracking-wide shrink-0 ${cellStatus === 'due-marked' ? 'bg-red-50 hover:bg-red-100 text-red-700' : 'bg-green-50 hover:bg-green-100 text-green-700'}`}>
                                   {cellStatus === 'due-marked' ? (language === 'বাংলা' ? 'এডিট' : 'Update') : (language === 'বাংলা' ? 'রেকর্ড' : 'Record')}
                                 </button>
                               )}
@@ -616,16 +638,16 @@ export default function RentTab(props) {
                   <div className="flex items-center justify-between gap-2 mb-2.5 lg:mb-1 relative z-10">
                     <h3 className="text-[13px] lg:text-2xl font-black truncate">{language === 'বাংলা' ? 'যৌথ হিসাব' : 'Shared Ledger'}</h3>
                     {isPremium ? (
-                      <div className="bg-[#ba0036] text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md shrink-0">
-                         <Crown size={10} /> PRO
+                      <div className="bg-[#ba0036] text-white px-2 py-1 rounded-md text-[11px] font-black tracking-wide flex items-center gap-1 shadow-md shrink-0">
+                         <Crown size={13} /> PRO
                       </div>
                     ) : (
-                      <button onClick={() => setActiveModal('premium_gate')} className="bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 transition-colors shrink-0">
-                         <Lock size={10} /> Free
+                      <button onClick={() => setActiveModal('premium_gate')} className="bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded-md text-[11px] font-black tracking-wide flex items-center gap-1 transition-colors shrink-0">
+                         <Lock size={13} /> Free
                       </button>
                     )}
                   </div>
-                  <p className="hidden xl:block text-white/50 text-[10px] font-bold uppercase tracking-widest mb-7 relative z-10">
+                  <p className="hidden xl:block text-white/50 text-[13px] font-bold tracking-wide mb-7 relative z-10">
                     {monthFullLabel(sm.key, language)} · {language === 'বাংলা' ? 'এই মাসের আদায়' : "This Month's Collection"}
                   </p>
                   <div className="space-y-2.5 xl:space-y-6 relative z-10">
@@ -641,12 +663,12 @@ export default function RentTab(props) {
                         className="w-full flex items-center gap-2 rounded-xl bg-amber-400/15 border border-amber-300/30 px-3 py-2 text-left active:scale-[0.99] transition"
                       >
                         <CloudOff size={14} className="text-amber-200 shrink-0" />
-                        <span className="text-[11px] font-black text-amber-100 flex-1">
+                        <span className="text-[14px] font-black text-amber-100 flex-1">
                           {isBn
                             ? `${syncQueue.length}টি হিসাব এখনো সার্ভারে যায়নি — ফোনে সেভ আছে`
                             : `${syncQueue.length} entr${syncQueue.length === 1 ? 'y' : 'ies'} not sent yet — saved on this phone`}
                         </span>
-                        <span className="text-[10px] font-black text-amber-200 uppercase tracking-wider shrink-0">
+                        <span className="text-[13px] font-black text-amber-200 tracking-wide shrink-0">
                           {isBn ? 'আবার চেষ্টা' : 'Retry'}
                         </span>
                       </button>
@@ -657,7 +679,7 @@ export default function RentTab(props) {
                     {syncError && (
                       <div className="w-full flex items-start gap-2 rounded-xl bg-fuchsia-500/15 border border-fuchsia-300/30 px-3 py-2">
                         <AlertCircle size={14} className="text-fuchsia-200 shrink-0 mt-0.5" />
-                        <span className="text-[11px] font-black text-fuchsia-100 flex-1 leading-relaxed">
+                        <span className="text-[14px] font-black text-fuchsia-100 flex-1 leading-relaxed">
                           {syncError.subject ? `${syncError.subject} — ` : ''}{syncError.message}
                         </span>
                         <button type="button" onClick={clearSyncError} className="text-fuchsia-200 shrink-0" aria-label={isBn ? 'বন্ধ' : 'Dismiss'}>
@@ -673,23 +695,23 @@ export default function RentTab(props) {
                           const bldgSm = getMonthCollectionSummary(bldgRentUnits, todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate);
                           return (
                             <div key={bldg.id} className={`bg-white/5 rounded-xl p-3 ${!showAllBuildings && idx >= 5 ? 'hidden' : ''}`}>
-                              <h4 className="text-xs font-black text-white mb-2 flex items-center justify-between">
+                              <h4 className="text-[15px] font-black text-white mb-2.5 flex items-center justify-between gap-2">
                                 <span>{bldg.name}</span>
                                 {bldgSm.overdueCount > 0 && (
-                                  <span className="text-[8px] font-black bg-fuchsia-500/20 text-fuchsia-200 px-1.5 py-0.5 rounded uppercase tracking-wider">{bldgSm.overdueCount} {isBn ? 'বকেয়া' : 'Overdue'}</span>
+                                  <span className="text-[11px] font-black bg-fuchsia-500/20 text-fuchsia-200 px-1.5 py-0.5 rounded tracking-wide">{bldgSm.overdueCount} {isBn ? 'বকেয়া' : 'Overdue'}</span>
                                 )}
                               </h4>
                               <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                  <p className="text-white/50 text-[8px] font-black uppercase tracking-widest mb-0.5">{isBn ? 'প্রত্যাশিত' : 'Expected'}</p>
+                                  <p className="text-white/50 text-[11px] font-black tracking-wide mb-0.5">{isBn ? 'প্রত্যাশিত' : 'Expected'}</p>
                                   <p className="text-sm font-black text-white tabular-nums">{formatBDT(bldgSm.expectedTotal)}</p>
                                 </div>
                                 <div>
-                                  <p className="text-white/50 text-[8px] font-black uppercase tracking-widest mb-0.5">{isBn ? 'আদায়' : 'Collected'}</p>
+                                  <p className="text-white/50 text-[11px] font-black tracking-wide mb-0.5">{isBn ? 'আদায়' : 'Collected'}</p>
                                   <p className="text-sm font-black text-emerald-400 tabular-nums">{formatBDT(bldgSm.collectedTotal)}</p>
                                 </div>
                               </div>
-                              <div className="mt-2.5 flex items-center gap-3 border-t border-white/10 pt-2.5 text-[9px] font-black uppercase tracking-widest">
+                              <div className="mt-2.5 flex items-center gap-3 border-t border-white/10 pt-2.5 text-[12px] font-black tracking-wide">
                                 <span className="text-emerald-400">{bldgSm.paidCount} {isBn ? 'ক্লিয়ার' : 'Cleared'}</span>
                                 <span className="text-orange-400">{bldgSm.totalDueCount - bldgSm.paidCount} {isBn ? 'বাকি' : 'Due'}</span>
                               </div>
@@ -699,7 +721,7 @@ export default function RentTab(props) {
                         {(landlordProfile.buildings || []).length > 5 && (
                           <button
                             onClick={() => setShowAllBuildings(!showAllBuildings)}
-                            className="w-full py-2 text-[10px] font-black uppercase tracking-widest text-white/70 hover:text-white bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+                            className="w-full py-2 text-[13px] font-black tracking-wide text-white/70 hover:text-white bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
                           >
                             {showAllBuildings ? (isBn ? 'কম দেখুন' : 'See Less') : (isBn ? 'সি মোর' : 'See More')}
                           </button>
@@ -710,26 +732,26 @@ export default function RentTab(props) {
                     <div className={(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) ? "block md:hidden" : "block"}>
                       <div className="flex items-end justify-between gap-3 xl:block">
                         <div className="min-w-0">
-                          <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">
+                          <p className="text-white/70 text-[12px] xl:text-[13px] font-black tracking-wide mb-0.5 xl:mb-1 leading-tight">
                             <span className="xl:hidden">{monthFullLabel(sm.key, language)} · </span>{language === 'বাংলা' ? 'প্রত্যাশিত' : 'Expected'}
                           </p>
                           <p className="text-2xl xl:text-4xl font-black text-white tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.expectedTotal)}</p>
                         </div>
                         <div className="shrink-0 text-right xl:hidden">
-                          <p className="text-white/50 text-[8px] font-black uppercase tracking-widest leading-tight">{language === 'বাংলা' ? 'রেট' : 'Rate'}</p>
+                          <p className="text-white/70 text-[12px] font-black leading-tight">{language === 'বাংলা' ? 'রেট' : 'Rate'}</p>
                           <p className="text-lg font-black text-white tabular-nums leading-none">{collectedPct}%</p>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2 xl:gap-4 mt-2 xl:mt-4">
                         <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2 xl:p-3 min-w-0">
-                          <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">{language === 'বাংলা' ? 'আদায় হয়েছে' : 'Collected'}</p>
+                          <p className="text-white/70 text-[12px] xl:text-[13px] font-black tracking-wide mb-0.5 xl:mb-1 leading-tight">{language === 'বাংলা' ? 'আদায় হয়েছে' : 'Collected'}</p>
                           <p className="text-base xl:text-xl font-black text-green-400 tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.collectedTotal)}</p>
-                          <p className="text-[8px] xl:text-[9px] text-white/60 font-bold mt-1 leading-tight">{sm.paidCount}/{sm.totalDueCount} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}</p>
+                          <p className="text-[12px] xl:text-[13px] text-white/70 font-bold mt-1 leading-tight">{sm.paidCount}/{sm.totalDueCount} {language === 'বাংলা' ? 'ভাড়াটিয়া' : 'tenants'}</p>
                         </div>
                         <div className="bg-white/5 rounded-xl xl:rounded-2xl p-2 xl:p-3 min-w-0">
-                          <p className="text-white/50 text-[8px] xl:text-[9px] font-black uppercase tracking-widest mb-0.5 xl:mb-1 leading-tight">{language === 'বাংলা' ? 'বাকি' : 'Outstanding'}</p>
+                          <p className="text-white/70 text-[12px] xl:text-[13px] font-black tracking-wide mb-0.5 xl:mb-1 leading-tight">{language === 'বাংলা' ? 'বাকি' : 'Outstanding'}</p>
                           <p className="text-base xl:text-xl font-black text-orange-400 tracking-tight tabular-nums leading-none break-words">{formatBDT(sm.outstandingTotal)}</p>
-                          <p className="text-[8px] xl:text-[9px] text-white/60 font-bold mt-1 leading-tight">
+                          <p className="text-[12px] xl:text-[13px] text-white/70 font-bold mt-1 leading-tight">
                             <span className={sm.overdueCount > 0 ? 'text-red-300' : 'text-white/60'}>
                               {sm.overdueCount} {language === 'বাংলা' ? 'বকেয়া' : 'overdue'}
                             </span>
@@ -738,8 +760,8 @@ export default function RentTab(props) {
                       </div>
                       <div className="mt-2 xl:mt-4">
                         <div className="hidden xl:flex items-center justify-between mb-1.5">
-                          <span className="text-white/50 text-[9px] font-black uppercase tracking-widest">{language === 'বাংলা' ? 'কালেকশন রেট' : 'Collection Rate'}</span>
-                          <span className="text-xs font-black text-white tabular-nums">{collectedPct}%</span>
+                          <span className="text-white/70 text-[13px] font-black">{language === 'বাংলা' ? 'কালেকশন রেট' : 'Collection Rate'}</span>
+                          <span className="text-base font-black text-white tabular-nums">{collectedPct}%</span>
                         </div>
                         <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
                           <div className="h-full rounded-full bg-gradient-to-r from-green-400 to-emerald-300 transition-all duration-700"
@@ -760,14 +782,15 @@ export default function RentTab(props) {
                     xl sidebar layout so it doesn't crowd the smaller screens. */}
                 {!(landlordProfile?.buildingMode === 'multi' && !currentBuildingId) && (
                   <div className="hidden lg:block bg-white rounded-2xl lg:rounded-[2rem] p-4 lg:p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border-none shrink-0">
-                  <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">{language === 'বাংলা' ? 'লেজেন্ড' : 'Legend'}</h4>
-                  <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-[10px] font-bold text-gray-600">
-                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-indigo-500 inline-block"></span>{language === 'বাংলা' ? 'পেইড' : 'Paid'}</span>
-                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-amber-400 inline-block"></span>{language === 'বাংলা' ? 'আংশিক' : 'Partial'}</span>
-                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-red-500 inline-block"></span>{language === 'বাংলা' ? 'বকেয়া' : 'Overdue'}</span>
-                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-orange-400 inline-block"></span>{language === 'বাংলা' ? 'শীঘ্রই' : 'Due soon'}</span>
-                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-gray-100 inline-block"></span>{language === 'বাংলা' ? 'আসন্ন' : 'Upcoming'}</span>
-                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-gray-50 inline-block border border-dashed border-gray-300"></span>{language === 'বাংলা' ? 'লিজের বাইরে' : 'Outside'}</span>
+                  <h4 className="text-[15px] font-black text-gray-600 mb-3">{language === 'বাংলা' ? 'লেজেন্ড' : 'Legend'}</h4>
+                  <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-[13.5px] font-bold text-gray-700">
+                    <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-md bg-indigo-500 inline-block"></span>{language === 'বাংলা' ? 'পেইড' : 'Paid'}</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-md bg-amber-400 inline-block"></span>{language === 'বাংলা' ? 'আংশিক' : 'Partial'}</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-md bg-red-500 inline-block"></span>{language === 'বাংলা' ? 'বকেয়া' : 'Overdue'}</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-md bg-orange-400 inline-block"></span>{language === 'বাংলা' ? 'শীঘ্রই' : 'Due soon'}</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-md bg-sky-100 border border-sky-300 inline-block"></span>{language === 'বাংলা' ? 'চলতি মাস' : 'This month'}</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-md bg-gray-100 inline-block"></span>{language === 'বাংলা' ? 'আসন্ন' : 'Upcoming'}</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-md bg-gray-50 inline-block border border-dashed border-gray-300"></span>{language === 'বাংলা' ? 'লিজের বাইরে' : 'Outside'}</span>
                   </div>
                 </div>
                 )}
@@ -782,8 +805,8 @@ export default function RentTab(props) {
                     {/* BUILDINGS OVERVIEW */}
                     <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:-mx-4 lg:-mx-3 px-3 sm:px-4 lg:px-6 pt-2 pb-3 mb-2 lg:pt-1">
                       <div className="flex items-center justify-between">
-                        <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
-                          <Building2 size={12} className="text-[#ba0036]"/>
+                        <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white text-[13px] font-black text-gray-700 tracking-wide shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
+                          <Building2 size={14} className="text-[#ba0036]"/>
                           <span className="hidden sm:inline">{isBn ? 'আপনার বিল্ডিংসমূহ' : 'Your Buildings'}</span>
                           <span className="text-gray-400 tabular-nums">{landlordProfile.buildings?.length || 0}</span>
                         </span>
@@ -811,31 +834,31 @@ export default function RentTab(props) {
                                <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0`}>
                                  {subCat === 'hostel' ? <Users size={18}/> : subCat === 'single_room' ? <BedDouble size={18}/> : bldg.category === 'commercial' ? <Building2 size={18}/> : <Home size={18}/>}
                                </div>
-                               <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border ${typeColor}`}>{typeLabel}</span>
+                               <span className={`px-2 py-0.5 rounded-lg text-[12px] font-black tracking-wide border ${typeColor}`}>{typeLabel}</span>
                              </div>
                              <h4 className="text-sm font-black text-gray-900 group-hover:text-[#ba0036] transition-colors mb-1">{bldg.name}</h4>
-                             <p className="text-[11px] font-bold text-gray-400 flex items-center gap-1 mb-3"><MapPin size={10}/> {bldg.address || bldg.location}</p>
+                             <p className="text-[14px] font-bold text-gray-400 flex items-center gap-1 mb-3"><MapPin size={13}/> {bldg.address || bldg.location}</p>
                              
                              <div className="grid grid-cols-2 gap-2 mb-3">
                                <div className="bg-gray-50 rounded-xl p-2.5 min-w-0">
-                                 <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-0.5">{isBn ? 'প্রত্যাশিত' : 'Expected'}</p>
-                                 <p className="text-xs font-black text-gray-900 tabular-nums leading-none truncate">{formatBDT(bldgSm.expectedTotal)}</p>
+                                 <p className="text-[12px] font-black text-gray-500 tracking-wide mb-0.5">{isBn ? 'প্রত্যাশিত' : 'Expected'}</p>
+                                 <p className="text-[15px] font-black text-gray-900 tabular-nums leading-none truncate">{formatBDT(bldgSm.expectedTotal)}</p>
                                </div>
                                <div className="bg-gray-50 rounded-xl p-2.5 min-w-0">
-                                 <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-0.5">{isBn ? 'আদায়' : 'Collected'}</p>
-                                 <p className="text-xs font-black text-green-600 tabular-nums leading-none truncate">{formatBDT(bldgSm.collectedTotal)}</p>
+                                 <p className="text-[12px] font-black text-gray-500 tracking-wide mb-0.5">{isBn ? 'আদায়' : 'Collected'}</p>
+                                 <p className="text-[15px] font-black text-green-600 tabular-nums leading-none truncate">{formatBDT(bldgSm.collectedTotal)}</p>
                                </div>
                              </div>
 
                              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                                <div className="flex items-center gap-2">
-                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 tabular-nums">{bldgSm.paidCount} {isBn ? 'ক্লিয়ার' : 'Cleared'}</span>
-                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-orange-50 text-orange-600 tabular-nums">{bldgSm.totalDueCount - bldgSm.paidCount} {isBn ? 'বাকি' : 'Due'}</span>
-                                 {bldgSm.overdueCount > 0 && <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[9px] font-black uppercase tracking-widest tabular-nums ml-1">{bldgSm.overdueCount} {isBn ? 'বকেয়া' : 'Overdue'}</span>}
+                                 <span className="px-1.5 py-0.5 rounded text-[12px] font-black tracking-wide bg-emerald-50 text-emerald-600 tabular-nums">{bldgSm.paidCount} {isBn ? 'ক্লিয়ার' : 'Cleared'}</span>
+                                 <span className="px-1.5 py-0.5 rounded text-[12px] font-black tracking-wide bg-orange-50 text-orange-600 tabular-nums">{bldgSm.totalDueCount - bldgSm.paidCount} {isBn ? 'বাকি' : 'Due'}</span>
+                                 {bldgSm.overdueCount > 0 && <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[12px] font-black tracking-wide tabular-nums ml-1">{bldgSm.overdueCount} {isBn ? 'বকেয়া' : 'Overdue'}</span>}
                                </div>
                                <div className="flex items-center gap-2">
-                                 <span className="text-[10px] font-black text-gray-500 tabular-nums">{bldgBookings.length} {isBn ? 'ভাড়াটিয়া' : 'Tenants'}</span>
-                                 <ArrowRight size={12} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-1 transition-all"/>
+                                 <span className="text-[13px] font-black text-gray-500 tabular-nums">{bldgBookings.length} {isBn ? 'ভাড়াটিয়া' : 'Tenants'}</span>
+                                 <ArrowRight size={14} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-1 transition-all"/>
                                </div>
                              </div>
                            </div>
@@ -845,7 +868,7 @@ export default function RentTab(props) {
                         <div className="text-center py-12 px-5 bg-white rounded-2xl shadow-sm sm:col-span-2">
                           <Building2 className="text-gray-300 mx-auto mb-3" size={32} />
                           <h3 className="text-sm font-black text-gray-900">{isBn ? 'কোনো বিল্ডিং নেই' : 'No buildings yet'}</h3>
-                          <p className="text-xs font-bold text-gray-500 mt-1">{isBn ? 'টেন্যান্ট ট্যাবে গিয়ে প্রথম বিল্ডিং যোগ করুন' : 'Go to the Add Tenant tab to add your first building'}</p>
+                          <p className="text-[13.5px] font-bold text-gray-600 mt-1.5">{isBn ? 'টেন্যান্ট ট্যাবে গিয়ে প্রথম বিল্ডিং যোগ করুন' : 'Go to the Add Tenant tab to add your first building'}</p>
                         </div>
                       )}
                     </div>
@@ -854,7 +877,7 @@ export default function RentTab(props) {
                         <button onClick={() => {
                           setLandlordProfile({...landlordProfile, buildingMode: 'single'});
                           setCurrentBuildingId(null);
-                        }} className="flex items-center gap-1.5 text-[10px] font-black text-gray-500 hover:text-gray-900 transition-colors uppercase tracking-widest bg-white/50 hover:bg-white px-3 py-2 rounded-lg w-fit shadow-sm border border-gray-100">
+                        }} className="flex items-center gap-1.5 text-[13px] font-black text-gray-500 hover:text-gray-900 transition-colors tracking-wide bg-white/50 hover:bg-white px-3 py-2 rounded-lg w-fit shadow-sm border border-gray-100">
                           <Home size={14}/> {isBn ? 'সিঙ্গেল বিল্ডিং মোডে ফিরে যান' : 'Switch to Single Building Mode'}
                         </button>
                       </div>
@@ -867,17 +890,17 @@ export default function RentTab(props) {
                       const bldg = landlordProfile.buildings?.find(b => b.id === currentBuildingId);
                       return (
                         <div className="mb-2 flex items-center gap-2">
-                          <button onClick={() => setCurrentBuildingId(null)} className="flex items-center gap-1 text-[10px] font-black text-gray-500 hover:text-[#ba0036] transition-colors uppercase tracking-widest bg-white/50 px-3 py-1.5 rounded-lg w-fit">
-                            <ChevronLeft size={12}/> {isBn ? 'সব বিল্ডিং' : 'All Buildings'}
+                          <button onClick={() => setCurrentBuildingId(null)} className="flex items-center gap-1 text-[13px] font-black text-gray-500 hover:text-[#ba0036] transition-colors tracking-wide bg-white/50 px-3 py-1.5 rounded-lg w-fit">
+                            <ChevronLeft size={14}/> {isBn ? 'সব বিল্ডিং' : 'All Buildings'}
                           </button>
-                          {bldg && <span className="text-xs font-black text-gray-700">· {bldg.name}</span>}
+                          {bldg && <span className="text-[14px] font-black text-gray-700">· {bldg.name}</span>}
                         </div>
                       );
                     })()}
                     {landlordProfile?.buildingMode === 'single' && (
                       <div className="mb-2 flex justify-end">
-                        <button onClick={() => setLandlordProfile({...landlordProfile, buildingMode: 'multi'})} className="flex items-center gap-1.5 text-[10px] font-black text-[#ba0036] hover:bg-red-50 transition-colors uppercase tracking-widest bg-white px-3 py-1.5 rounded-lg w-fit shadow-sm border border-gray-100">
-                          <Plus size={12}/> {isBn ? 'আরও বিল্ডিং যোগ করুন' : 'Add Another Building'}
+                        <button onClick={() => setLandlordProfile({...landlordProfile, buildingMode: 'multi'})} className="flex items-center gap-1.5 text-[13px] font-black text-[#ba0036] hover:bg-red-50 transition-colors tracking-wide bg-white px-3 py-1.5 rounded-lg w-fit shadow-sm border border-gray-100">
+                          <Plus size={14}/> {isBn ? 'আরও বিল্ডিং যোগ করুন' : 'Add Another Building'}
                         </button>
                       </div>
                     )}
@@ -890,16 +913,16 @@ export default function RentTab(props) {
                       nothing needs horizontal scrolling on mobile / iPad. */}
                   <div className="flex items-center gap-1.5 sm:gap-2">
                     {/* Title corner chip — small, gray, with live count. */}
-                    <span className="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/70 text-[9px] xl:text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-                      <Wallet size={11} className="text-emerald-600"/>
+                    <span className="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/70 text-[12px] xl:text-[13px] font-black text-gray-700 tracking-wide shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                      <Wallet size={14} className="text-emerald-600"/>
                       <span className="hidden sm:inline">{language === 'বাংলা' ? 'রুম' : 'Rooms'}</span>
                       <span className="text-gray-400 tabular-nums">{visibleRooms.length}</span>
                     </span>
                     {/* Year stepper. */}
                     <div className="shrink-0 flex items-center gap-1 bg-white rounded-xl px-1 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                      <button onClick={() => setLedgerYear(y => y - 1)} className="p-1 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-gray-700 transition-colors"><ChevronLeft size={12}/></button>
-                      <span className="text-[11px] font-black text-gray-900 tabular-nums w-10 text-center">{ledgerYear}</span>
-                      <button onClick={() => setLedgerYear(y => y + 1)} className="p-1 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-gray-700 transition-colors"><ChevronRight size={12}/></button>
+                      <button onClick={() => setLedgerYear(y => y - 1)} className="p-1 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-gray-700 transition-colors"><ChevronLeft size={14}/></button>
+                      <span className="text-[14px] font-black text-gray-900 tabular-nums w-10 text-center">{ledgerYear}</span>
+                      <button onClick={() => setLedgerYear(y => y + 1)} className="p-1 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-gray-700 transition-colors"><ChevronRight size={14}/></button>
                     </div>
                     {/* Search input — grows to fill the rest of the row. Same
                         field treatment as the Add Tenant tab (clear button,
@@ -912,7 +935,7 @@ export default function RentTab(props) {
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder={language === 'বাংলা' ? 'ভাড়াটিয়া খুঁজুন...' : 'Search tenants...'}
                         aria-label={language === 'বাংলা' ? 'ভাড়াটিয়া খুঁজুন' : 'Search tenants'}
-                        className="w-full pl-8 pr-8 py-2.5 rounded-xl bg-white text-[11px] font-bold text-gray-900 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-transparent focus:border-[#ba0036]/25 focus:shadow-[0_4px_14px_rgba(186,0,54,0.08)] focus:outline-none placeholder:text-gray-400 transition-all"
+                        className="w-full pl-8 pr-8 py-2.5 rounded-xl bg-white text-[14px] font-bold text-gray-900 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-transparent focus:border-[#ba0036]/25 focus:shadow-[0_4px_14px_rgba(186,0,54,0.08)] focus:outline-none placeholder:text-gray-400 transition-all"
                       />
                       {searchQuery && (
                         <button
@@ -921,17 +944,17 @@ export default function RentTab(props) {
                           aria-label={language === 'বাংলা' ? 'সার্চ মুছুন' : 'Clear search'}
                           className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
                         >
-                          <X size={12} strokeWidth={3} />
+                          <X size={14} strokeWidth={3} />
                         </button>
                       )}
                     </div>
                     {/* Export action. */}
                     <button
                       onClick={() => exportRentCsv(filteredBookings, ledgerYear)}
-                      className="shrink-0 px-3 py-2 bg-white text-gray-700 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all flex items-center gap-1.5 active:scale-95"
+                      className="shrink-0 px-3 py-2 bg-white text-gray-700 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-[13px] font-black tracking-wide hover:bg-gray-50 transition-all flex items-center gap-1.5 active:scale-95"
                       title={language === 'বাংলা' ? `${ledgerYear} সালের রেন্ট CSV` : `Export ${ledgerYear} rent as CSV`}
                     >
-                      <FileSpreadsheet size={12}/> <span className="hidden sm:inline">{language === 'বাংলা' ? 'এক্সপোর্ট' : 'Export'}</span>
+                      <FileSpreadsheet size={14}/> <span className="hidden sm:inline">{language === 'বাংলা' ? 'এক্সপোর্ট' : 'Export'}</span>
                     </button>
                   </div>
                   {/* Row 2 — priority filter pills on their own row. They scroll horizontally on small screens. */}
@@ -946,7 +969,7 @@ export default function RentTab(props) {
                       <button
                         key={pill.k}
                         onClick={() => setRentPriorityFilter(pill.k)}
-                        className={`shrink-0 px-2.5 sm:px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap inline-flex items-center gap-1 ${rentPriorityFilter === pill.k ? `${pill.cls} shadow-[0_2px_8px_rgba(0,0,0,0.15)]` : 'bg-white text-gray-500 hover:text-gray-900 shadow-[0_2px_6px_rgba(0,0,0,0.03)]'}`}
+                        className={`shrink-0 px-2.5 sm:px-3 py-2 rounded-xl text-[13px] font-black tracking-wide transition-all whitespace-nowrap inline-flex items-center gap-1 ${rentPriorityFilter === pill.k ? `${pill.cls} shadow-[0_2px_8px_rgba(0,0,0,0.15)]` : 'bg-white text-gray-500 hover:text-gray-900 shadow-[0_2px_6px_rgba(0,0,0,0.03)]'}`}
                       >
                         {pill.label}
                         {pill.k !== 'all' && counts[pill.k] > 0 && <span className={`tabular-nums ${rentPriorityFilter === pill.k ? 'opacity-90' : 'opacity-60'}`}>·{counts[pill.k]}</span>}
@@ -976,7 +999,7 @@ export default function RentTab(props) {
                             ? (isBn ? 'এখনো কোনো ভাড়াটিয়া নেই।' : 'No tenants yet.')
                             : (isBn ? 'এই ফিল্টারে কোনো ভাড়াটিয়া পাওয়া যায়নি।' : 'No tenants match this filter.')}
                         </h3>
-                        <p className="text-[11px] font-bold text-gray-500 mt-1.5 max-w-[320px] mx-auto leading-relaxed">
+                        <p className="text-[14px] font-bold text-gray-500 mt-1.5 max-w-[320px] mx-auto leading-relaxed">
                           {noLeasesAtAll
                             ? (isBn ? 'লিজ তৈরি করলেই এখানে ১২ মাসের রেন্ট লেজার চালু হবে।' : 'Create a lease and a 12-month rent ledger opens up here.')
                             : (isBn ? '"সকল" ফিল্টার দেখুন।' : 'Try the "All" filter.')}
@@ -985,14 +1008,14 @@ export default function RentTab(props) {
                           {noLeasesAtAll ? (
                             <button
                               onClick={() => setActiveTab('bookings')}
-                              className="w-full sm:w-auto bg-[#ba0036] hover:bg-[#90002a] text-white px-5 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-[0_6px_18px_rgba(186,0,54,0.28)] transition-all inline-flex items-center justify-center gap-2 active:scale-95"
+                              className="w-full sm:w-auto bg-[#ba0036] hover:bg-[#90002a] text-white px-5 py-3 rounded-xl font-black text-[14px] shadow-[0_6px_18px_rgba(186,0,54,0.28)] transition-all inline-flex items-center justify-center gap-2 active:scale-95"
                             >
                               <Plus size={15} /> {isBn ? 'নতুন লিজ' : 'New Lease'}
                             </button>
                           ) : (
                             <button
                               onClick={() => setRentPriorityFilter('all')}
-                              className="w-full sm:w-auto bg-white border-2 border-gray-200 text-gray-600 px-4 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-gray-50 transition-all inline-flex items-center justify-center gap-1.5 active:scale-95"
+                              className="w-full sm:w-auto bg-white border-2 border-gray-200 text-gray-600 px-4 py-3 rounded-xl font-black text-[14px] hover:bg-gray-50 transition-all inline-flex items-center justify-center gap-1.5 active:scale-95"
                             >
                               {isBn ? 'সকল দেখুন' : 'Show all'}
                             </button>
@@ -1019,8 +1042,8 @@ export default function RentTab(props) {
                       {rentPriorityFilter === 'all' && attentionRooms.length > 0 ? (
                         <>
                           <div className="flex items-center gap-2 mt-1 px-1 pt-1">
-                            <AlertCircle size={12} className="text-fuchsia-600 shrink-0"/>
-                            <span className="text-[10px] font-black text-fuchsia-700 uppercase tracking-widest">
+                            <AlertCircle size={14} className="text-fuchsia-600 shrink-0"/>
+                            <span className="text-[13px] font-black text-fuchsia-700 tracking-wide">
                               {language === 'বাংলা' ? 'এখনই দরকার' : 'Needs Attention'} · {attentionRooms.length}
                             </span>
                             <div className="flex-1 h-px bg-fuchsia-200/60"/>
@@ -1028,7 +1051,7 @@ export default function RentTab(props) {
                           {attentionRooms.map(roomCard)}
                           {otherRooms.length > 0 && (
                             <div className="flex items-center gap-2 px-1 pt-3 pb-1">
-                              <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                              <span className="text-[13px] font-black text-gray-500 tracking-wide">
                                 {language === 'বাংলা' ? 'অন্যান্য রুম' : 'All Other Rooms'} · {otherRooms.length}
                               </span>
                               <div className="flex-1 h-px bg-gray-200"/>
