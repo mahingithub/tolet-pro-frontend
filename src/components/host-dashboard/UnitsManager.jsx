@@ -395,14 +395,14 @@ export default function UnitsManager({
 
       {/* ── Header — what this building holds right now ── */}
       <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white text-[14px] font-black text-gray-700 shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
-          <DoorOpen size={16} className="text-[#ba0036]" />
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
+          <DoorOpen size={12} className="text-[#ba0036]" />
           {isBn ? `${noun}` : `${noun}s`}
           <span className="text-gray-400 tabular-nums">{units.length}</span>
         </span>
         {isSeat && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white text-[14px] font-black text-gray-700 shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
-            <Users size={16} className="text-[#ba0036]" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
+            <Users size={12} className="text-[#ba0036]" />
             {isBn ? 'সিট' : 'Seats'}
             <span className="tabular-nums text-emerald-600">{totalTaken}</span>
             <span className="text-gray-300">/</span>
@@ -421,10 +421,10 @@ export default function UnitsManager({
           <button
             type="button"
             onClick={() => setShareTarget({ scope: 'building' })}
-            className="sm:ml-auto shrink-0 inline-flex items-center gap-1.5 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-900 text-gray-600 hover:text-gray-900 px-3 py-2 rounded-xl text-[14px] font-black transition-all active:scale-95"
+            className="ml-auto shrink-0 inline-flex items-center gap-1.5 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-900 text-gray-600 hover:text-gray-900 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95"
             title={isBn ? 'সবাইকে ইনভাইট করুন' : 'Invite everyone'}
           >
-            <QrCode size={16} />
+            <QrCode size={13} />
             {isBn ? 'সবাইকে ইনভাইট' : 'Invite all'}
           </button>
         )}
@@ -829,7 +829,7 @@ export default function UnitsManager({
                               className="ml-auto shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-all"
                               title={isBn ? 'এই রুমের ইনভাইট লিংক' : "This room's invite link"}
                             >
-                              <QrCode size={16} />
+                              <QrCode size={13} />
                             </button>
                             {/* Edit this room's details — rent, beds, floor etc. */}
                             <button

@@ -99,11 +99,11 @@ export default function RentRoomModal({
   const unpaidCount = units.filter((u, i) => covered(i) && remainingFor(u.ledger?.[activeMonthKey], expectedOf(u)) > 0).length;
 
   const seatTheme = {
-    cleared:  { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle2 size={13} strokeWidth={3}/>, label: isBn ? 'পরিশোধিত' : 'PAID' },
-    partial:  { cls: 'bg-amber-50 text-amber-700 border-amber-200',       icon: <Hourglass size={13} strokeWidth={3}/>,    label: isBn ? 'আংশিক' : 'PARTIAL' },
-    overdue:  { cls: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200', icon: <AlertCircle size={13} strokeWidth={3}/>,  label: isBn ? 'বকেয়া' : 'OVERDUE' },
-    upcoming: { cls: 'bg-orange-50 text-orange-700 border-orange-200',    icon: <Clock size={13} strokeWidth={3}/>,        label: isBn ? 'আসন্ন' : 'UPCOMING' },
-    none:     { cls: 'bg-gray-100 text-gray-600 border-gray-200',         icon: <MinusCircle size={13} strokeWidth={3}/>,  label: isBn ? 'লিজের বাইরে' : 'OUTSIDE' },
+    cleared:  { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle2 size={10} strokeWidth={3}/>, label: isBn ? 'পরিশোধিত' : 'PAID' },
+    partial:  { cls: 'bg-amber-50 text-amber-700 border-amber-200',       icon: <Hourglass size={10} strokeWidth={3}/>,    label: isBn ? 'আংশিক' : 'PARTIAL' },
+    overdue:  { cls: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200', icon: <AlertCircle size={10} strokeWidth={3}/>,  label: isBn ? 'বকেয়া' : 'OVERDUE' },
+    upcoming: { cls: 'bg-orange-50 text-orange-700 border-orange-200',    icon: <Clock size={10} strokeWidth={3}/>,        label: isBn ? 'আসন্ন' : 'UPCOMING' },
+    none:     { cls: 'bg-gray-100 text-gray-600 border-gray-200',         icon: <MinusCircle size={10} strokeWidth={3}/>,  label: isBn ? 'লিজের বাইরে' : 'OUTSIDE' },
   };
 
   return (
@@ -118,25 +118,25 @@ export default function RentRoomModal({
         className="relative bg-gray-50 w-full sm:max-w-2xl rounded-t-[1.75rem] sm:rounded-[1.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.28)] max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
       >
         {/* ── Header — which room, and nothing else ── */}
-        <div className="shrink-0 bg-white border-b border-gray-100 px-4 py-3.5 flex items-center gap-3">
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${outstanding > 0 ? 'bg-fuchsia-50 text-fuchsia-600' : 'bg-emerald-50 text-emerald-600'}`}>
-            {outstanding > 0 ? <DoorOpen size={22}/> : <CheckCircle2 size={22}/>}
+        <div className="shrink-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-2.5">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${outstanding > 0 ? 'bg-fuchsia-50 text-fuchsia-600' : 'bg-emerald-50 text-emerald-600'}`}>
+            {outstanding > 0 ? <DoorOpen size={19}/> : <CheckCircle2 size={19}/>}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <h3 className="text-lg sm:text-xl font-black text-gray-900 truncate">{title}</h3>
+              <h3 className="text-base font-black text-gray-900 truncate">{title}</h3>
               {floorNumber !== '' && floorNumber != null && (
-                <span className="px-1.5 py-0.5 rounded-md text-[12px] font-black tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
+                <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
                   {isBn ? 'ফ্লোর' : 'Floor'} {floorNumber}
                 </span>
               )}
               {seatCount > 1 && (
-                <span className="px-1.5 py-0.5 rounded text-[12px] font-black tracking-wide border bg-gray-50 text-gray-600 border-gray-200 inline-flex items-center gap-0.5 tabular-nums shrink-0">
-                  <Users size={13}/> {seatCount} {isBn ? 'সিট' : 'seats'}
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border bg-gray-50 text-gray-600 border-gray-200 inline-flex items-center gap-0.5 tabular-nums shrink-0">
+                  <Users size={10}/> {seatCount} {isBn ? 'সিট' : 'seats'}
                 </span>
               )}
             </div>
-            <p className="text-[14px] font-bold text-gray-600 truncate mt-1">
+            <p className="text-[10px] font-bold text-gray-500 truncate mt-0.5">
               <span className="text-emerald-600 font-black">{first.property}</span>
               <span className="mx-1 text-gray-300">·</span>
               {monthFullLabel(activeMonthKey, language)}
@@ -148,7 +148,7 @@ export default function RentRoomModal({
             aria-label={isBn ? 'বন্ধ করুন' : 'Close'}
             className="shrink-0 p-2 rounded-xl text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
           >
-            <X size={22}/>
+            <X size={18}/>
           </button>
         </div>
 
@@ -156,19 +156,19 @@ export default function RentRoomModal({
         <div className="flex-1 overflow-y-auto custom-scrollbar px-3 sm:px-4 py-3 space-y-3">
 
           {/* The room's month in three numbers. */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-3.5 sm:p-4">
-            <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+          <div className="bg-white rounded-2xl border border-gray-100 p-3">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
               <div>
-                <p className="text-[13px] font-black text-gray-500">{isBn ? 'রুমের ভাড়া' : 'Room Rent'}</p>
-                <p className="text-[17px] sm:text-lg font-black text-gray-900 tabular-nums mt-1 leading-none">{formatBDT(expected)}</p>
+                <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{isBn ? 'রুমের ভাড়া' : 'Room Rent'}</p>
+                <p className="text-sm font-black text-gray-900 tabular-nums mt-0.5">{formatBDT(expected)}</p>
               </div>
               <div>
-                <p className="text-[13px] font-black text-gray-500">{isBn ? 'আদায়' : 'Collected'}</p>
-                <p className="text-[17px] sm:text-lg font-black text-emerald-600 tabular-nums mt-1 leading-none">{formatBDT(collected)}</p>
+                <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{isBn ? 'আদায়' : 'Collected'}</p>
+                <p className="text-sm font-black text-emerald-600 tabular-nums mt-0.5">{formatBDT(collected)}</p>
               </div>
               <div>
-                <p className="text-[13px] font-black text-gray-500">{isBn ? 'বাকি' : 'Outstanding'}</p>
-                <p className={`text-[17px] sm:text-lg font-black tabular-nums mt-1 leading-none ${outstanding > 0 ? 'text-fuchsia-600' : 'text-gray-400'}`}>{formatBDT(outstanding)}</p>
+                <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{isBn ? 'বাকি' : 'Outstanding'}</p>
+                <p className={`text-sm font-black tabular-nums mt-0.5 ${outstanding > 0 ? 'text-fuchsia-600' : 'text-gray-400'}`}>{formatBDT(outstanding)}</p>
               </div>
             </div>
             <div className="mt-2.5 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
@@ -178,7 +178,7 @@ export default function RentRoomModal({
               />
             </div>
             {seatCount > 1 && (
-              <p className="mt-3 text-[14px] font-bold text-gray-600">
+              <p className="mt-2 text-[10px] font-bold text-gray-500">
                 <span className="text-emerald-600 font-black tabular-nums">{paidCount}</span> {isBn ? 'জন পরিশোধ করেছেন' : 'paid'}
                 <span className="mx-1 text-gray-300">·</span>
                 <span className={`font-black tabular-nums ${unpaidCount > 0 ? 'text-fuchsia-600' : 'text-gray-400'}`}>{unpaidCount}</span> {isBn ? 'জনের বাকি আছে' : 'still due'}
@@ -193,10 +193,10 @@ export default function RentRoomModal({
           {outstanding > 0 && (
             confirming ? (
               <div className="bg-white rounded-2xl border border-[#ba0036]/20 p-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                <p className="text-[13px] font-black text-gray-500 tracking-wide mb-2">
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">
                   {isBn ? 'ফুল রুম পেমেন্ট নিশ্চিত করুন' : 'Confirm full room payment'}
                 </p>
-                <p className="text-[14px] font-bold text-gray-600 leading-relaxed mb-3">
+                <p className="text-[11px] font-bold text-gray-600 leading-relaxed mb-3">
                   {isBn
                     ? (unpaidCount > 1
                         ? `${monthFullLabel(activeMonthKey, language)} এর বাকি ${formatBDT(outstanding)} — ${unpaidCount} জনের ভাড়া একসাথে পরিশোধ হিসেবে রেকর্ড হবে।`
@@ -207,20 +207,20 @@ export default function RentRoomModal({
                 </p>
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   <label className="block">
-                    <span className="text-[13px] font-black text-gray-500">{isBn ? 'তারিখ' : 'Paid on'}</span>
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{isBn ? 'তারিখ' : 'Paid on'}</span>
                     <input
                       type="date"
                       value={paidOn}
                       onChange={(e) => setPaidOn(e.target.value)}
-                      className="mt-1 w-full px-2.5 py-2 rounded-xl bg-gray-50 border border-gray-200 text-[14px] font-bold text-gray-900 focus:outline-none focus:border-[#ba0036]/30"
+                      className="mt-1 w-full px-2.5 py-2 rounded-xl bg-gray-50 border border-gray-200 text-[11px] font-bold text-gray-900 focus:outline-none focus:border-[#ba0036]/30"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-[13px] font-black text-gray-500">{isBn ? 'মাধ্যম' : 'Method'}</span>
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{isBn ? 'মাধ্যম' : 'Method'}</span>
                     <select
                       value={method}
                       onChange={(e) => setMethod(e.target.value)}
-                      className="mt-1 w-full px-2.5 py-2 rounded-xl bg-gray-50 border border-gray-200 text-[14px] font-bold text-gray-900 focus:outline-none focus:border-[#ba0036]/30"
+                      className="mt-1 w-full px-2.5 py-2 rounded-xl bg-gray-50 border border-gray-200 text-[11px] font-bold text-gray-900 focus:outline-none focus:border-[#ba0036]/30"
                     >
                       {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
@@ -230,14 +230,14 @@ export default function RentRoomModal({
                   <button
                     type="button"
                     onClick={() => setConfirming(false)}
-                    className="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-[15px] font-black transition-colors active:scale-[0.98]"
+                    className="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10px] font-black uppercase tracking-widest transition-colors active:scale-[0.98]"
                   >
                     {isBn ? 'বাতিল' : 'Cancel'}
                   </button>
                   <button
                     type="button"
                     onClick={() => { markRoomPaid?.(units, activeMonthKey, { paidOn, method }); setConfirming(false); }}
-                    className="flex-[2] py-2.5 rounded-xl bg-[#ba0036] hover:bg-[#90002a] text-white text-[13px] font-black tracking-wide transition-colors active:scale-[0.98] shadow-[0_6px_18px_rgba(186,0,54,0.25)] inline-flex items-center justify-center gap-1.5"
+                    className="flex-[2] py-2.5 rounded-xl bg-[#ba0036] hover:bg-[#90002a] text-white text-[10px] font-black uppercase tracking-widest transition-colors active:scale-[0.98] shadow-[0_6px_18px_rgba(186,0,54,0.25)] inline-flex items-center justify-center gap-1.5"
                   >
                     <CheckCircle2 size={13} strokeWidth={3}/>
                     {isBn ? `${formatBDT(outstanding)} রেকর্ড করুন` : `Record ${formatBDT(outstanding)}`}
@@ -254,10 +254,10 @@ export default function RentRoomModal({
                   <Banknote size={18}/>
                 </span>
                 <span className="min-w-0 flex-1 text-left">
-                  <span className="block text-[15px] font-black">
+                  <span className="block text-xs font-black uppercase tracking-widest">
                     {isBn ? 'ফুল রুম পেমেন্ট' : 'Full Room Payment'}
                   </span>
-                  <span className="block text-[13.5px] font-bold text-white/80 mt-1">
+                  <span className="block text-[10px] font-bold text-white/80 mt-0.5">
                     {/* "একসাথে / at once" is only true when there is more than
                         one person to settle. On a flat it read as nonsense. */}
                     {isBn
@@ -271,9 +271,9 @@ export default function RentRoomModal({
           )}
 
           {outstanding <= 0 && (
-            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3.5 flex items-center gap-3">
+            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3 flex items-center gap-2.5">
               <CheckCircle2 size={18} className="text-emerald-600 shrink-0"/>
-              <p className="text-[14px] font-black text-emerald-800">
+              <p className="text-[11px] font-black text-emerald-800">
                 {isBn
                   ? `${monthFullLabel(activeMonthKey, language)} — পুরো রুমের ভাড়া পরিশোধিত`
                   : `${monthFullLabel(activeMonthKey, language)} — the whole room is settled`}
@@ -283,7 +283,7 @@ export default function RentRoomModal({
 
           {/* ── Seats. Tap one to open that tenant's ledger. ── */}
           <div className="space-y-1.5">
-            <p className="px-1 text-[14px] font-black text-gray-600">
+            <p className="px-1 text-[9px] font-black text-gray-400 uppercase tracking-widest">
               {seatCount > 1 ? (isBn ? 'সিট ও ভাড়াটিয়া' : 'Seats & tenants') : (isBn ? 'ভাড়াটিয়া' : 'Tenant')}
             </p>
             {units.map((u, i) => {
@@ -304,18 +304,18 @@ export default function RentRoomModal({
                     }`}
                   >
                     {seatCount > 1 && (
-                      <span className="w-7 h-7 rounded-lg bg-[#ba0036] text-white text-[13px] font-black flex items-center justify-center shrink-0 tabular-nums">
+                      <span className="w-6 h-6 rounded-lg bg-[#ba0036] text-white text-[9px] font-black flex items-center justify-center shrink-0 tabular-nums">
                         {u.__seatIndex || i + 1}
                       </span>
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[15px] font-black text-gray-900 truncate">{u.tenant}</span>
-                        <span className={`px-1.5 py-0.5 rounded text-[11px] font-black tracking-wide border inline-flex items-center gap-0.5 shrink-0 ${th.cls}`}>
+                        <span className="text-[12px] font-black text-gray-900 truncate">{u.tenant}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border inline-flex items-center gap-0.5 shrink-0 ${th.cls}`}>
                           {th.icon} {th.label}
                         </span>
                       </div>
-                      <p className="text-[13.5px] font-bold text-gray-600 truncate mt-1">
+                      <p className="text-[10px] font-bold text-gray-500 truncate mt-0.5">
                         {u.__seatLabel && <>{u.__seatLabel}<span className="mx-1 text-gray-300">·</span></>}
                         <span className="tabular-nums">{formatBDT(seatExpected)}</span>
                         {seatDue > 0 && (
@@ -327,7 +327,7 @@ export default function RentRoomModal({
                       </p>
                     </div>
                     <span className="shrink-0 p-1 rounded-lg bg-gray-50 text-gray-400">
-                      {isSelected ? <ChevronUp size={17}/> : <ChevronDown size={17}/>}
+                      {isSelected ? <ChevronUp size={13}/> : <ChevronDown size={13}/>}
                     </span>
                   </button>
 

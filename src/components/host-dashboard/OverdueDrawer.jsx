@@ -62,11 +62,11 @@ export default function OverdueDrawer({
         {open && (
           <div className="ml-1 w-[76vw] max-w-[300px] max-h-[70vh] flex flex-col">
             <div className="flex items-center gap-2 px-1 pb-2 shrink-0">
-              <span className="text-[14px] font-black text-gray-400 dark:text-gray-500 tracking-wide flex items-center gap-1.5">
+              <span className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
                 <BellRing size={13} className="text-rose-500" />
                 {isBn ? 'বকেয়া ভাড়াটিয়া' : 'Overdue Tenants'}
               </span>
-              <span className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 text-[13px] font-black tabular-nums">
+              <span className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 text-[10px] font-black tabular-nums">
                 {count}
               </span>
               <button
@@ -81,7 +81,7 @@ export default function OverdueDrawer({
 
             <div className="overflow-y-auto space-y-1.5 pr-0.5">
               {count === 0 ? (
-                <p className="px-2 py-6 text-center text-[14px] font-bold text-gray-500 dark:text-gray-400 leading-relaxed">
+                <p className="px-2 py-6 text-center text-[11px] font-bold text-gray-500 dark:text-gray-400 leading-relaxed">
                   {isBn ? 'কারও ভাড়া বকেয়া নেই।' : 'Nobody is overdue.'}
                 </p>
               ) : tenants.map((u) => (
@@ -94,14 +94,14 @@ export default function OverdueDrawer({
                     onClick={() => onOpenTenant?.(u)}
                     className="flex items-center gap-2 min-w-0 flex-1 text-left"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center text-[13px] font-black shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center text-[10px] font-black shrink-0">
                       {(u.tenantInit || (u.tenant || '?').trim().charAt(0)).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[14px] font-black text-gray-900 dark:text-white truncate">
+                      <p className="text-[11px] font-black text-gray-900 dark:text-white truncate">
                         {u.tenant || (isBn ? 'নামহীন' : 'Unnamed')}
                       </p>
-                      <p className="text-[12px] font-bold text-gray-500 dark:text-gray-400 truncate tabular-nums">
+                      <p className="text-[9px] font-bold text-gray-500 dark:text-gray-400 truncate tabular-nums">
                         {formatBDT ? formatBDT((Number(u.monthlyRent) || 0) + (Number(u.serviceCharge) || 0)) : u.monthlyRent}
                         {u.roomNumber ? ` · ${isBn ? 'রুম' : 'Room'} ${u.roomNumber}` : (u.property ? ` · ${u.property}` : '')}
                       </p>
@@ -141,7 +141,7 @@ export default function OverdueDrawer({
         >
           <BellRing size={18} />
           {count > 0 && (
-            <span className="text-[13px] font-black tabular-nums leading-none mt-0.5">{count}</span>
+            <span className="text-[10px] font-black tabular-nums leading-none mt-0.5">{count}</span>
           )}
         </button>
       )}

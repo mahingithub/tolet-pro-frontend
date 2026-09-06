@@ -1026,8 +1026,8 @@ export default function BookingsTab(props) {
                     {/* BUILDINGS OVERVIEW */}
                     <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:-mx-4 lg:-mx-3 px-3 sm:px-4 lg:px-6 pt-2 pb-3 mb-2 lg:pt-1">
                       <div className="flex items-center justify-between">
-                        <span className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white text-[14px] font-black text-gray-700 shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
-                          <Building2 size={17} className="text-[#ba0036]"/>
+                        <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
+                          <Building2 size={12} className="text-[#ba0036]"/>
                           <span className="hidden sm:inline">{isBn ? 'আপনার বিল্ডিংসমূহ' : 'Your Buildings'}</span>
                           <span className="text-gray-400 tabular-nums">{landlordProfile.buildings?.length || 0}</span>
                         </span>
@@ -1220,42 +1220,50 @@ export default function BookingsTab(props) {
                   </div>
                 ) : (
                   <div className="w-full">
-                    {/* TENANTS VIEW (Current normal view, optionally with Back button) */}
-                    {landlordProfile?.buildingMode === 'multi' && currentBuildingId && (
-                      <div className="mb-2">
-                        <button onClick={() => setCurrentBuildingId(null)} className="flex items-center gap-1 text-[10px] font-black text-gray-500 hover:text-[#ba0036] transition-colors uppercase tracking-widest bg-white/50 px-3 py-1.5 rounded-lg w-fit">
-                          <ChevronLeft size={12}/> {isBn ? 'সব বিল্ডিং-এ ফিরে যান' : 'Back to Buildings'}
-                        </button>
-                      </div>
-                    )}
-                    {landlordProfile?.buildingMode === 'single' && (
-                      <div className="mb-2 flex justify-end">
-                        <button onClick={() => setLandlordProfile({...landlordProfile, buildingMode: 'multi'})} className="flex items-center gap-1.5 text-[10px] font-black text-[#ba0036] hover:bg-red-50 transition-colors uppercase tracking-widest bg-white px-3 py-1.5 rounded-lg w-fit shadow-sm border border-gray-100">
-                          <Plus size={12}/> {isBn ? 'আরও বিল্ডিং যোগ করুন' : 'Add Another Building'}
-                        </button>
-                      </div>
-                    )}
-                    {/* ── Rooms / Flats ──────────────────────────────────
+                    {/* ── One row: where you are, and how to leave ──────────
                         Two views of the same building: the SPACES it holds,
                         and the PEOPLE renting them. Rooms come first because
                         a room is created once and outlives every tenant who
                         passes through it — you set the building up here, then
-                        add people to seats from the room itself. */}
-                    {activeBuilding && (
-                      <div className="mb-3 flex items-center gap-1.5">
-                        {[
-                          { id: 'units',   en: unitNoun(activeBuilding, false) + 's', bn: unitNoun(activeBuilding, true) },
-                          { id: 'tenants', en: 'Tenants', bn: 'ভাড়াটিয়া' },
-                        ].map(v => (
-                          <button
-                            key={v.id}
-                            type="button"
-                            onClick={() => { setBuildingView(v.id); closeBookingDetail(); }}
-                            className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${buildingView === v.id ? 'bg-gray-900 text-white shadow-[0_3px_10px_rgba(0,0,0,0.18)]' : 'bg-white text-gray-500 hover:text-gray-900 shadow-[0_2px_6px_rgba(0,0,0,0.03)]'}`}
-                          >
-                            {isBn ? v.bn : v.en}
+                        add people to seats from the room itself.
+
+                        The view toggle and the way out of this building used to
+                        be stacked as two full-width rows, which spent a third
+                        of a phone screen on two small controls. They sit on one
+                        line now: the toggle left, the exit pushed right by
+                        `ml-auto` so it stays put whether or not the toggle is
+                        there. Only one exit can ever show — Back to Buildings
+                        in multi mode, Add Another Building in single. */}
+                    {(activeBuilding || landlordProfile?.buildingMode === 'single'
+                      || (landlordProfile?.buildingMode === 'multi' && currentBuildingId)) && (
+                      <div className="mb-3 flex items-center gap-2">
+                        {activeBuilding && (
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {[
+                              { id: 'units',   en: unitNoun(activeBuilding, false) + 's', bn: unitNoun(activeBuilding, true) },
+                              { id: 'tenants', en: 'Tenants', bn: 'ভাড়াটিয়া' },
+                            ].map(v => (
+                              <button
+                                key={v.id}
+                                type="button"
+                                onClick={() => { setBuildingView(v.id); closeBookingDetail(); }}
+                                className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${buildingView === v.id ? 'bg-gray-900 text-white shadow-[0_3px_10px_rgba(0,0,0,0.18)]' : 'bg-white text-gray-500 hover:text-gray-900 shadow-[0_2px_6px_rgba(0,0,0,0.03)]'}`}
+                              >
+                                {isBn ? v.bn : v.en}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {landlordProfile?.buildingMode === 'multi' && currentBuildingId && (
+                          <button onClick={() => setCurrentBuildingId(null)} className="ml-auto shrink-0 flex items-center gap-1 text-[10px] font-black text-gray-500 hover:text-[#ba0036] transition-colors uppercase tracking-widest bg-white/50 px-3 py-1.5 rounded-lg">
+                            <ChevronLeft size={12}/> {isBn ? 'সব বিল্ডিং-এ ফিরে যান' : 'Back to Buildings'}
                           </button>
-                        ))}
+                        )}
+                        {landlordProfile?.buildingMode === 'single' && (
+                          <button onClick={() => setLandlordProfile({...landlordProfile, buildingMode: 'multi'})} className="ml-auto shrink-0 flex items-center gap-1.5 text-[10px] font-black text-[#ba0036] hover:bg-red-50 transition-colors uppercase tracking-widest bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-100">
+                            <Plus size={12}/> {isBn ? 'আরও বিল্ডিং যোগ করুন' : 'Add Another Building'}
+                          </button>
+                        )}
                       </div>
                     )}
 
