@@ -12,15 +12,19 @@
  * existing খাত, not a new খাত. So each folder carries its own "add another"
  * button, which opens the entry sheet with the category already chosen and only
  * the amount and the note left to fill in.
+ *
+ * The drawer itself is `CategoryFolder` in livingUI — the joint wallet reads its
+ * shared খরচ the same way (ExpenseCategoryView), so only the lines inside it are
+ * written here.
  */
-import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Pencil, Trash2 } from 'lucide-react';
 
 import { dateLabel, num, taka } from './livingUtils';
 import { getMethod } from './livingConfig';
 import { getEntryType, getIncomeCategory, getSpendCategory } from './soloConfig';
 import { groupByCategory, toDateInput } from './soloUtils';
-import { Card, IconBadge, ProgressBar, cx } from './livingUI';
+import { CategoryFolder, TodayTag, cx, todayRowTint, useOpenFolders } from './livingUI';
 
 /** The icon/colour/name a folder is drawn with: its category, or its own type. */
 const bucketMeta = (bucket, flow) => {
@@ -38,7 +42,7 @@ const CategoryLine = ({ entry, people, language, onEdit, onDelete }) => {
   const isToday = toDateInput(entry.date) === toDateInput();
 
   return (
-    <div className={cx('flex items-center gap-2.5 px-3.5 py-2.5', isToday && 'bg-[#ba0036]/[0.045]')}>
+    <div className={cx('flex items-center gap-2.5 px-3.5 py-2.5', isToday && todayRowTint)}>
       {/* the date column — this is the "কোন তারিখে" a category খাতা is read by */}
       <div className="w-[42px] shrink-0 text-center">
         <p className={cx('text-[11px] font-black tabular-nums leading-none', isToday ? 'text-[#ba0036]' : 'text-gray-500')}>
@@ -95,57 +99,38 @@ const CategoryCard = ({ bucket, flow, max, people, language, open, onToggle, onA
   const hasToday = bucket.entries.some((e) => toDateInput(e.date) === toDateInput());
 
   return (
-    <Card className="overflow-hidden">
-      <button onClick={onToggle} className="w-full flex items-center gap-3 p-3.5 text-left active:scale-[0.995] transition">
-        <IconBadge icon={meta.icon} tint={meta.tint} text={meta.text} size={42} iconSize={19} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <p className="text-[13.5px] font-black text-gray-900 truncate">{name}</p>
-            {hasToday && (
-              <span className="shrink-0 text-[9px] font-black uppercase tracking-wider text-[#ba0036] bg-[#ba0036]/10 px-1.5 py-0.5 rounded-full">
-                {isBn ? 'আজ' : 'Today'}
-              </span>
-            )}
-          </div>
-          <p className="text-[11px] font-semibold text-gray-400 mt-0.5 truncate">
-            {isBn
-              ? `${num(bucket.count, language)}টি লেখা · সর্বশেষ ${dateLabel(bucket.last, language)}`
-              : `${bucket.count} ${bucket.count === 1 ? 'entry' : 'entries'} · last ${dateLabel(bucket.last, language)}`}
-          </p>
-        </div>
-        <div className="text-right shrink-0">
-          <p className="text-[15px] font-black text-gray-900 tabular-nums leading-none">{taka(bucket.total, language)}</p>
-          <p className="text-[10px] font-black text-gray-400 mt-1">{num(Math.round(bucket.pct), language)}%</p>
-        </div>
-        <ChevronDown size={17} className={cx('shrink-0 text-gray-300 transition-transform', open && 'rotate-180')} />
-      </button>
-
-      <div className="px-3.5 pb-3">
-        <ProgressBar value={bucket.total} max={max} color={meta.hex} />
-      </div>
-
-      {open && (
-        <div className="border-t border-gray-100 divide-y divide-gray-50">
-          {bucket.entries.map((e) => (
-            <CategoryLine
-              key={e.id}
-              entry={e}
-              people={people}
-              language={language}
-              onEdit={() => onEdit(e)}
-              onDelete={() => onDelete(e)}
-            />
-          ))}
-          <button
-            onClick={() => onAdd(bucket)}
-            className="w-full flex items-center justify-center gap-1.5 py-3 text-[12px] font-black text-[#ba0036] bg-[#ba0036]/[0.03] active:scale-[0.99] transition"
-          >
-            <Plus size={14} />
-            {isBn ? `${name}-এ আরেকটি লিখুন` : `Add to ${name.toLowerCase()}`}
-          </button>
-        </div>
-      )}
-    </Card>
+    <CategoryFolder
+      icon={meta.icon}
+      tint={meta.tint}
+      text={meta.text}
+      hex={meta.hex}
+      name={name}
+      badge={hasToday && <TodayTag>{isBn ? 'আজ' : 'Today'}</TodayTag>}
+      meta={
+        isBn
+          ? `${num(bucket.count, language)}টি লেখা · সর্বশেষ ${dateLabel(bucket.last, language)}`
+          : `${bucket.count} ${bucket.count === 1 ? 'entry' : 'entries'} · last ${dateLabel(bucket.last, language)}`
+      }
+      total={taka(bucket.total, language)}
+      totalSub={<span className="text-[10px] font-black text-gray-400">{num(Math.round(bucket.pct), language)}%</span>}
+      value={bucket.total}
+      max={max}
+      open={open}
+      onToggle={onToggle}
+      onAdd={() => onAdd(bucket)}
+      addLabel={isBn ? `${name}-এ আরেকটি লিখুন` : `Add to ${name.toLowerCase()}`}
+    >
+      {bucket.entries.map((e) => (
+        <CategoryLine
+          key={e.id}
+          entry={e}
+          people={people}
+          language={language}
+          onEdit={() => onEdit(e)}
+          onDelete={() => onDelete(e)}
+        />
+      ))}
+    </CategoryFolder>
   );
 };
 
@@ -156,18 +141,7 @@ const CategoryCard = ({ bucket, flow, max, people, language, open, onToggle, onA
 const SoloCategoryView = ({ entries = [], flow = 'out', people = [], language, onAdd, onEdit, onDelete, resetKey }) => {
   const buckets = useMemo(() => groupByCategory(entries), [entries]);
   const max = buckets[0]?.total || 0;
-
-  // The biggest folder opens by itself — on a month with nine খাত, a wall of
-  // shut drawers is not a ledger. Everything else is one tap away, and changing
-  // month starts the same way rather than remembering last month's drawers.
-  const [openKeys, setOpenKeys] = useState([]);
-  useEffect(() => {
-    setOpenKeys(buckets[0] ? [buckets[0].key] : []);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetKey]);
-
-  const toggle = (key) =>
-    setOpenKeys((keys) => (keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]));
+  const [isOpen, toggle] = useOpenFolders(buckets, resetKey);
 
   return (
     <div className="space-y-2.5">
@@ -179,7 +153,7 @@ const SoloCategoryView = ({ entries = [], flow = 'out', people = [], language, o
           max={max}
           people={people}
           language={language}
-          open={openKeys.includes(b.key)}
+          open={isOpen(b.key)}
           onToggle={() => toggle(b.key)}
           onAdd={onAdd}
           onEdit={onEdit}

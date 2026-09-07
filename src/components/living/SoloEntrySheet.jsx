@@ -56,6 +56,10 @@ const SoloEntrySheet = ({
   const [note, setNote] = useState('');
   const [newName, setNewName] = useState(null); // null = the inline add row is closed
   const [newCat, setNewCat] = useState(null); // null = "নিজের খাত" not being typed
+  // খাত made in THIS sitting. They have no entry behind them yet, so nothing
+  // else can remember them — and a name that vanishes because you tapped
+  // another tile to compare would be maddening.
+  const [draftCats, setDraftCats] = useState([]);
 
   // (re)initialise every time it opens — an edit loads the row, a fresh add
   // starts from today with the caller's locked type / person.
@@ -80,6 +84,7 @@ const SoloEntrySheet = ({
     }
     setNewName(null);
     setNewCat(null);
+    setDraftCats([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editing, lockType, lockPersonId, presetCategory, flow]);
 
@@ -103,9 +108,11 @@ const SoloEntrySheet = ({
   const tiles = useMemo(() => {
     const mine = customCategoriesUsed(entries, type);
     const all = [...order, ...mine];
-    if (isCustomCategory(category) && !all.includes(category)) all.push(category);
+    [...draftCats, category].forEach((k) => {
+      if (isCustomCategory(k) && !all.includes(k)) all.push(k);
+    });
     return all;
-  }, [entries, type, order, category]);
+  }, [entries, type, order, category, draftCats]);
 
   const createCategory = () => {
     const clean = cleanCategoryName(newCat);
@@ -113,7 +120,9 @@ const SoloEntrySheet = ({
     // Typing the name of a খাত that already exists picks THAT one — the whole
     // point is fewer heads to read, not a second বাজার beside the first.
     const existing = matchDefaultCategory(clean, type === 'income' ? 'in' : 'out');
-    setCategory(existing || customCategoryKey(clean));
+    const key = existing || customCategoryKey(clean);
+    if (!existing) setDraftCats((list) => (list.includes(key) ? list : [...list, key]));
+    setCategory(key);
     setNewCat(null);
   };
 

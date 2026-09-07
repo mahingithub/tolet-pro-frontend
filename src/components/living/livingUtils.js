@@ -52,6 +52,110 @@ export const timeAgo = (d, lang) => {
   return dateLabel(d, lang);
 };
 
+// ── month & grouping primitives (used by BOTH wallets) ──────────────────────
+// These were written for the solo খাতা, but the joint wallet now reads its
+// months exactly the same way — one strip of months, one folder per খাত — so
+// they live here, in the module both sides already import, instead of being
+// copied. soloUtils re-exports them so the solo files keep their old imports.
+
+/** `YYYY-MM-DD` for a date input, in LOCAL time (never the UTC shift). */
+export const toDateInput = (d = new Date()) => {
+  const x = new Date(d);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+};
+
+/** Back to an ISO timestamp, pinned to midday so timezones can't shift the day. */
+export const fromDateInput = (value) =>
+  value ? new Date(`${value}T12:00:00`).toISOString() : new Date().toISOString();
+
+export const inMonth = (date, offset = 0) => monthKey(date) === monthKey(monthStart(offset));
+
+export const monthEntries = (entries = [], offset = 0) => entries.filter((e) => inMonth(e.date, offset));
+
+/** Newest first; ties broken by when the row was written, so same-day edits keep their order. */
+export const byNewest = (a, b) =>
+  new Date(b.date) - new Date(a.date) || new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+
+/**
+ * The month offsets worth putting in the month strip: from the oldest month
+ * that has anything written in it (or the month currently open, whichever
+ * reaches further back) up to this month — so every month is on screen at once,
+ * with no gaps where a quiet month was skipped.
+ */
+export function monthSpan(entries = [], current = 0, max = 18) {
+  let oldest = Math.min(0, current);
+  for (let o = -1; o >= -(max - 1); o--) {
+    if (entries.some((e) => inMonth(e.date, o))) oldest = Math.min(oldest, o);
+  }
+  const out = [];
+  for (let o = oldest; o <= 0; o++) out.push(o);
+  return out;
+}
+
+/**
+ * Group rows into খাত (folders) instead of days — the way a category খাতা is
+ * kept: one heading per খাত, every line written underneath it, biggest folder
+ * first. Each bucket carries its own total, count, last date and share of the
+ * month, so the caller only has to draw it.
+ *
+ * A row with a category files under it; a row without one (a solo ধার) files
+ * under its own type rather than being swept into "অন্যান্য" — a transfer is a
+ * folder of its own, never a spending head.
+ */
+export function groupByCategory(entries = []) {
+  const amountOf = (e) => Math.max(0, Number(e?.amount) || 0);
+  const buckets = new Map();
+  [...entries].sort(byNewest).forEach((e) => {
+    const isCat = !!e.category;
+    const key = isCat ? `cat:${e.category}` : `type:${e.type}`;
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        key,
+        kind: isCat ? 'category' : 'type',
+        ref: isCat ? e.category : e.type,
+        entries: [],
+        total: 0,
+        last: null,
+      });
+    }
+    const b = buckets.get(key);
+    b.entries.push(e);
+    b.total += amountOf(e);
+    if (!b.last || new Date(e.date) > new Date(b.last)) b.last = e.date;
+  });
+
+  const list = [...buckets.values()];
+  const grand = list.reduce((s, b) => s + b.total, 0);
+  return list
+    .map((b) => ({ ...b, count: b.entries.length, pct: grand > 0 ? (b.total / grand) * 100 : 0 }))
+    .sort((a, b) => b.total - a.total);
+}
+
+/**
+ * Notes already written under a given খাত, newest first and de-duplicated.
+ * Offered back as one-tap chips so "রিকশা ভাড়া" (or "সাপ্তাহিক বাজার") is typed
+ * once and reused for the rest of the month — the same category, one line
+ * richer each time.
+ *
+ * @param {object} match Partial row whose keys must all match (e.g. `{ type,
+ *   category }`). Keys with a nullish value are ignored.
+ */
+export function recentNotes(entries = [], match = {}, limit = 6) {
+  const keys = Object.keys(match).filter((k) => match[k] != null);
+  const seen = new Set();
+  const out = [];
+  [...entries].sort(byNewest).some((e) => {
+    const note = (e.note || '').trim();
+    if (!note || !keys.every((k) => e[k] === match[k])) return false;
+    const dedupe = note.toLowerCase();
+    if (seen.has(dedupe)) return false;
+    seen.add(dedupe);
+    out.push(note);
+    return out.length >= limit;
+  });
+  return out;
+}
+
 // ── expense splitting ────────────────────────────────────────────────────────
 /**
  * Resolve how much each participant owes for a single expense.

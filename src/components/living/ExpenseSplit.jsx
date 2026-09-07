@@ -1,15 +1,25 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Receipt, Trash2, Pencil, Camera, X, Check } from 'lucide-react';
+import { Plus, Receipt, Trash2, Pencil, Camera, Layers, List, X, Check } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
-import { expenseShares, taka, num, dateLabel, isSameMonth, roommateById } from './livingUtils';
+import {
+  byNewest, expenseShares, taka, num, dateLabel, monthEntries, monthLabel, monthSpan, monthStart,
+  recentNotes, roommateById,
+} from './livingUtils';
 import { pendingKeys } from '../../store/livingOps';
 import { CATEGORIES, CATEGORY_ORDER, EXPENSE_CATEGORY_ORDER, getCategory, SPLIT_TYPES } from './livingConfig';
 import {
   Card, SectionHeader, IconBadge, Avatar, AvatarStack, Chip, PendingChip, PrimaryButton, GhostButton,
-  Field, MoneyInput, TextArea, SegmentedControl, EmptyState, Sheet, ConfirmDialog, cx,
+  Field, MoneyInput, MonthStrip, TextArea, SegmentedControl, EmptyState, Sheet, ConfirmDialog, cx,
+  rememberView, rememberedView,
 } from './livingUI';
+import ExpenseCategoryView from './ExpenseCategoryView';
+
+// Which way the খরচ were last read. Remembered because it is a *habit*, not a
+// setting: someone who reads the month by খাত wants that view every time.
+const VIEW_KEY = 'tp:expense-view';
+const readView = () => rememberedView(VIEW_KEY, ['list', 'category'], 'list');
 
 const ROUND = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -31,7 +41,7 @@ function seedShares(type, members, amount, prev = {}) {
   return {};
 }
 
-const ExpenseSheet = ({ open, onClose, roommates, editing, onSave }) => {
+const ExpenseSheet = ({ open, onClose, roommates, expenses = [], editing, presetCategory = null, onSave }) => {
   const { language } = useLanguage();
   const isBn = language === 'বাংলা';
   const [amount, setAmount] = useState('');
@@ -58,7 +68,9 @@ const ExpenseSheet = ({ open, onClose, roommates, editing, onSave }) => {
       setReceipt(editing.receipt || null);
     } else {
       setAmount('');
-      setCategory('groceries');
+      // Opened from inside a খাত folder — start in that folder, so only the
+      // টাকা and the note are left to fill in.
+      setCategory(presetCategory || 'groceries');
       setPaidBy('me');
       setSplitWith(roommates.map((r) => r.id));
       setSplitType('equal');
@@ -67,7 +79,7 @@ const ExpenseSheet = ({ open, onClose, roommates, editing, onSave }) => {
       setReceipt(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editing]);
+  }, [open, editing, presetCategory]);
 
   // keep shares consistent with mode/members/amount
   useEffect(() => {
@@ -86,6 +98,11 @@ const ExpenseSheet = ({ open, onClose, roommates, editing, onSave }) => {
   const catOptions = EXPENSE_CATEGORY_ORDER.includes(category)
     ? EXPENSE_CATEGORY_ORDER
     : [category, ...EXPENSE_CATEGORY_ORDER];
+
+  // Notes already written under this খাত, offered back as one-tap chips —
+  // "সাপ্তাহিক বাজার" is typed once and reused all month. This is what keeps the
+  // list readable: the note carries the detail, the খাত stays one of the four.
+  const suggestions = useMemo(() => recentNotes(expenses, { category }, 6), [expenses, category]);
 
   const toggleMember = (id) =>
     setSplitWith((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -280,6 +297,37 @@ const ExpenseSheet = ({ open, onClose, roommates, editing, onSave }) => {
 
         <Field label={isBn ? 'নোট' : 'Notes'}>
           <TextArea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder={isBn ? 'যেমন: সাপ্তাহিক বাজার' : 'e.g. Weekly bazaar'} />
+
+          {/* What was written under this খাত before, one tap away. The same
+              three or four lines repeat all month, and typing them out every
+              time is exactly why the list stops being kept. */}
+          {suggestions.length > 0 && (
+            <div className="mt-2">
+              <span className="block text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1.5">
+                {isBn ? 'আগে যা লিখেছেন' : 'Written before'}
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {suggestions.map((s) => {
+                  const active = note.trim() === s;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setNote(active ? '' : s)}
+                      className={cx(
+                        'max-w-full truncate px-2.5 py-1.5 rounded-full border text-[11.5px] font-bold transition active:scale-95',
+                        active
+                          ? 'border-[#ba0036] bg-[#ba0036]/5 text-[#ba0036]'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-[#ba0036]/40'
+                      )}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </Field>
 
         <Field label={isBn ? 'রসিদ' : 'Receipt'}>
@@ -320,50 +368,75 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
   const outbox = useLivingStore((s) => s.outbox);
   const pending = useMemo(() => pendingKeys(outbox), [outbox]);
 
+  const [off, setOff] = useState(0);
+  const [view, setView] = useState(readView);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [presetCategory, setPresetCategory] = useState(null);
   const [filter, setFilter] = useState('all');
   const [pendingDelete, setPendingDelete] = useState(null);
 
   useEffect(() => {
     if (intent === 'add') {
       setEditing(null);
+      setPresetCategory(null);
       setOpen(true);
       clearIntent?.();
     }
   }, [intent, clearIntent]);
 
-  const sorted = useMemo(() => [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date)), [expenses]);
-  const filtered = filter === 'all' ? sorted : sorted.filter((e) => e.category === filter);
+  const pickView = (next) => {
+    setView(next);
+    // The খাত folders ARE the filter, so a chip left on from the list view
+    // would silently hide most of them.
+    if (next === 'category') setFilter('all');
+    rememberView(VIEW_KEY, next);
+  };
 
-  const monthTotal = useMemo(
-    () => expenses.filter((e) => isSameMonth(e.date)).reduce((s, e) => s + (Number(e.amount) || 0), 0),
-    [expenses]
-  );
+  const rows = useMemo(() => monthEntries(expenses, off).sort(byNewest), [expenses, off]);
+  const filtered = filter === 'all' ? rows : rows.filter((e) => e.category === filter);
+
+  const monthTotal = useMemo(() => rows.reduce((s, e) => s + (Number(e.amount) || 0), 0), [rows]);
   const myMonthShare = useMemo(
-    () =>
-      expenses
-        .filter((e) => isSameMonth(e.date))
-        .reduce((s, e) => s + (expenseShares(e, roommates)[me] || 0), 0),
-    [expenses, roommates, me]
+    () => rows.reduce((s, e) => s + (expenseShares(e, roommates)[me] || 0), 0),
+    [rows, roommates, me]
   );
+
+  // Every month the list reaches back to, each with its own headline figure, so
+  // the strip doubles as a year at a glance.
+  const months = useMemo(() => monthSpan(expenses, off), [expenses, off]);
+  const monthTotals = useMemo(() => {
+    const totals = {};
+    months.forEach((o) => {
+      totals[o] = monthEntries(expenses, o).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    });
+    return totals;
+  }, [months, expenses]);
 
   const usedCategories = useMemo(() => {
-    const set = new Set(expenses.map((e) => e.category));
+    const set = new Set(rows.map((e) => e.category));
     return CATEGORY_ORDER.filter((c) => set.has(c));
-  }, [expenses]);
+  }, [rows]);
 
-  const openAdd = () => {
+  const openAdd = (category = null) => {
     setEditing(null);
+    setPresetCategory(category);
     setOpen(true);
   };
   const openEdit = (exp) => {
     setEditing(exp);
+    setPresetCategory(null);
     setOpen(true);
   };
   const handleSave = (data) => {
-    if (editing) updateExpense(editing.id, data);
-    else addExpense(data);
+    if (editing) {
+      updateExpense(editing.id, data);
+      return;
+    }
+    addExpense(data);
+    // A new expense is stamped with "now", so it lands in THIS month whichever
+    // month is open — jump back to it rather than saving into a void.
+    setOff(0);
   };
 
   return (
@@ -372,16 +445,52 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
         title={isBn ? 'খরচ ভাগাভাগি' : 'Expense Split'}
         subtitle={isBn ? 'শেয়ার্ড খরচ যোগ ও ভাগ করুন' : 'Add and split shared expenses'}
         right={
-          <button onClick={openAdd} className="flex items-center gap-1 bg-[#ba0036] text-white pl-2.5 pr-3.5 py-2 rounded-xl text-[12px] font-black shadow-[0_8px_20px_-8px_rgba(186,0,54,0.55)] active:scale-95 transition">
+          <button onClick={() => openAdd()} className="flex items-center gap-1 bg-[#ba0036] text-white pl-2.5 pr-3.5 py-2 rounded-xl text-[12px] font-black shadow-[0_8px_20px_-8px_rgba(186,0,54,0.55)] active:scale-95 transition">
             <Plus size={15} /> {isBn ? 'যোগ' : 'Add'}
           </button>
         }
       />
 
+      {/* every month in a row, the open one lit up */}
+      <MonthStrip
+        offsets={months}
+        value={off}
+        onChange={setOff}
+        language={language}
+        totalFor={(o) => monthTotals[o] ?? 0}
+      />
+
+      {/* how to read the month: line by line, or খাত by খাত */}
+      <SegmentedControl
+        value={view}
+        onChange={pickView}
+        options={[
+          {
+            value: 'list',
+            label: (
+              <span className="inline-flex items-center gap-1.5">
+                <List size={13} /> {isBn ? 'তালিকা' : 'By list'}
+              </span>
+            ),
+          },
+          {
+            value: 'category',
+            label: (
+              <span className="inline-flex items-center gap-1.5">
+                <Layers size={13} /> {isBn ? 'খাত অনুযায়ী' : 'By category'}
+              </span>
+            ),
+          },
+        ]}
+      />
+
       {/* summary */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-4">
-          <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">{isBn ? 'এ মাসে মোট' : 'This month'}</p>
+          {/* the strip can be parked on an older month — say which one */}
+          <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+            {off === 0 ? (isBn ? 'এ মাসে মোট' : 'This month') : monthLabel(monthStart(off), language)}
+          </p>
           <p className="text-xl font-black text-gray-900 tracking-tight mt-1">{taka(monthTotal, language)}</p>
         </Card>
         <Card className="p-4">
@@ -390,8 +499,8 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
         </Card>
       </div>
 
-      {/* category filter */}
-      {usedCategories.length > 0 && (
+      {/* category filter — only in the list view; in the খাত view the folders are the filter */}
+      {view === 'list' && usedCategories.length > 0 && (
         <div className="flex gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
           <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} label={isBn ? 'সব' : 'All'} />
           {usedCategories.map((c) => (
@@ -400,16 +509,28 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
         </div>
       )}
 
-      {/* list */}
+      {/* the খরচ themselves */}
       {filtered.length === 0 ? (
         <Card>
           <EmptyState
             icon={Receipt}
-            title={isBn ? 'কোনো খরচ নেই' : 'No expenses yet'}
+            title={isBn ? 'এ মাসে কোনো খরচ নেই' : 'No expenses this month'}
             subtitle={isBn ? 'প্রথম শেয়ার্ড খরচ যোগ করুন' : 'Add your first shared expense to start splitting'}
-            action={<PrimaryButton onClick={openAdd}><Plus size={16} /> {isBn ? 'খরচ যোগ' : 'Add expense'}</PrimaryButton>}
+            action={<PrimaryButton onClick={() => openAdd()}><Plus size={16} /> {isBn ? 'খরচ যোগ' : 'Add expense'}</PrimaryButton>}
           />
         </Card>
+      ) : view === 'category' ? (
+        <ExpenseCategoryView
+          expenses={filtered}
+          roommates={roommates}
+          me={me}
+          language={language}
+          pending={pending}
+          resetKey={String(off)}
+          onAdd={openAdd}
+          onEdit={openEdit}
+          onDelete={setPendingDelete}
+        />
       ) : (
         <div className="space-y-2.5">
           {filtered.map((e) => {
@@ -469,7 +590,15 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
         </div>
       )}
 
-      <ExpenseSheet open={open} onClose={() => setOpen(false)} roommates={roommates} editing={editing} onSave={handleSave} />
+      <ExpenseSheet
+        open={open}
+        onClose={() => { setOpen(false); setEditing(null); setPresetCategory(null); }}
+        roommates={roommates}
+        expenses={expenses}
+        editing={editing}
+        presetCategory={editing ? null : presetCategory}
+        onSave={handleSave}
+      />
       <ConfirmDialog
         open={!!pendingDelete}
         onClose={() => setPendingDelete(null)}

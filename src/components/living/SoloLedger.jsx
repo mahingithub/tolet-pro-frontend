@@ -26,23 +26,14 @@ import {
 } from './soloUtils';
 import {
   Card, Chip, ConfirmDialog, EmptyState, IconBadge, MonthStrip, PrimaryButton,
-  SectionHeader, SegmentedControl, cx,
+  SectionHeader, SegmentedControl, cx, rememberView, rememberedView,
 } from './livingUI';
 import SoloCategoryView from './SoloCategoryView';
 import SoloEntrySheet from './SoloEntrySheet';
 
-// Which way the খাতা was last read. Remembered because it is a *habit*, not a
-// setting: someone who keeps accounts by খাত wants that view every time they
-// open the page, not a day list they have to re-toggle.
+// Which way the খাতা was last read — a habit, not a setting (see rememberedView).
 const VIEW_KEY = 'tp:solo-ledger-view';
-const readView = () => {
-  try {
-    const v = localStorage.getItem(VIEW_KEY);
-    return v === 'category' || v === 'day' ? v : 'day';
-  } catch {
-    return 'day';
-  }
-};
+const readView = () => rememberedView(VIEW_KEY, ['day', 'category'], 'day');
 
 // Day headings are computed in LOCAL time (toDateInput), so "আজ" flips at
 // midnight here rather than at midnight UTC.
@@ -87,11 +78,7 @@ const SoloLedger = ({ flow = 'out', language, intent, clearIntent }) => {
     // The খাত folders ARE the filter, so a chip left on from the day view would
     // silently hide most of them.
     if (next === 'category') setFilter('all');
-    try {
-      localStorage.setItem(VIEW_KEY, next);
-    } catch {
-      /* private mode — the view just won't be remembered */
-    }
+    rememberView(VIEW_KEY, next);
   };
 
   const summary = useMemo(() => soloSummary(solo, off), [solo, off]);

@@ -8,7 +8,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Minus, Plus, AlertTriangle, ChevronLeft, ChevronRight, CloudOff } from 'lucide-react';
+import { X, Minus, Plus, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, CloudOff } from 'lucide-react';
 import { initials, monthStart, taka } from './livingUtils';
 
 export const cx = (...c) => c.filter(Boolean).join(' ');
@@ -183,6 +183,28 @@ export const SegmentedControl = ({ options, value, onChange, className = '' }) =
   </div>
 );
 
+// ── Remembered view ─────────────────────────────────────────────────────────────
+// Which way a list was last read (দিন অনুযায়ী / খাত অনুযায়ী). Remembered because
+// it is a *habit*, not a setting: someone who keeps accounts by খাত wants that
+// view every time they open the page, not a list they have to re-toggle. In
+// private mode the write throws — the view simply won't be remembered.
+export const rememberedView = (key, allowed = [], fallback = allowed[0]) => {
+  try {
+    const v = localStorage.getItem(key);
+    return allowed.includes(v) ? v : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+export const rememberView = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* private mode — nothing to do */
+  }
+};
+
 // ── Month strip ─────────────────────────────────────────────────────────────────────
 // Every month the খাতা covers, side by side, with the open one lit up. A paper
 // খাতা is read by flipping straight to a month — not by nudging a stepper one
@@ -277,6 +299,91 @@ export const MonthStrip = ({ offsets = [0], value = 0, onChange, language, total
       </button>
     </div>
   );
+};
+
+// ── Category folder ─────────────────────────────────────────────────────────────────
+// One খাত, read as a folder: its icon and name on the face, the month's total
+// beside it, a bar for how big it is next to the biggest folder, and every line
+// filed inside once it's open. Both wallets read a month this way — the solo
+// খাতা and the shared খরচ list — so the drawer itself lives here and each side
+// only supplies its own rows and its own "add another" label.
+
+// The "this folder was written in today" pill, and the tint its rows carry.
+export const TodayTag = ({ children }) => (
+  <span className="shrink-0 text-[9px] font-black uppercase tracking-wider text-[#ba0036] bg-[#ba0036]/10 px-1.5 py-0.5 rounded-full">
+    {children}
+  </span>
+);
+
+export const todayRowTint = 'bg-[#ba0036]/[0.045]';
+
+export const CategoryFolder = ({
+  icon, tint, text, hex = '#ba0036', // the খাত's own look
+  name, badge, meta,                 // heading, optional pill, the small grey line
+  total, totalSub,                   // the headline figure and whatever sits under it
+  value = 0, max = 0,                // how this folder measures against the biggest
+  open, onToggle, addLabel, onAdd, children,
+}) => (
+  <Card className="overflow-hidden">
+    <button onClick={onToggle} className="w-full flex items-center gap-3 p-3.5 text-left active:scale-[0.995] transition">
+      <IconBadge icon={icon} tint={tint} text={text} size={42} iconSize={19} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <p className="text-[13.5px] font-black text-gray-900 truncate">{name}</p>
+          {badge}
+        </div>
+        <p className="text-[11px] font-semibold text-gray-400 mt-0.5 truncate">{meta}</p>
+      </div>
+      <div className="text-right shrink-0">
+        <p className="text-[15px] font-black text-gray-900 tabular-nums leading-none">{total}</p>
+        {totalSub && <div className="mt-1">{totalSub}</div>}
+      </div>
+      <ChevronDown size={17} className={cx('shrink-0 text-gray-300 transition-transform', open && 'rotate-180')} />
+    </button>
+
+    <div className="px-3.5 pb-3">
+      <ProgressBar value={value} max={max} color={hex} />
+    </div>
+
+    {open && (
+      <div className="border-t border-gray-100 divide-y divide-gray-50">
+        {children}
+        {onAdd && (
+          <button
+            onClick={onAdd}
+            className="w-full flex items-center justify-center gap-1.5 py-3 text-[12px] font-black text-[#ba0036] bg-[#ba0036]/[0.03] active:scale-[0.99] transition"
+          >
+            <Plus size={14} />
+            {addLabel}
+          </button>
+        )}
+      </div>
+    )}
+  </Card>
+);
+
+/**
+ * Which folders are open — the one piece of state a folder list needs. The
+ * biggest folder opens by itself, because on a month with nine খাত a wall of
+ * shut drawers is not a ledger; everything else is one tap away. Changing month
+ * (or side of the খাতা) starts the same way rather than remembering the drawers
+ * that were open in a month you are no longer looking at.
+ *
+ * @param {object[]} buckets Folders, biggest first (groupByCategory's output).
+ * @param {string} resetKey Change it and the drawers go back to their default.
+ */
+export const useOpenFolders = (buckets = [], resetKey) => {
+  const [openKeys, setOpenKeys] = React.useState([]);
+
+  React.useEffect(() => {
+    setOpenKeys(buckets[0] ? [buckets[0].key] : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
+
+  const toggle = (key) =>
+    setOpenKeys((keys) => (keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]));
+
+  return [(key) => openKeys.includes(key), toggle];
 };
 
 // ── Toggle switch ───────────────────────────────────────────────────────────────────
