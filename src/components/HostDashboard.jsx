@@ -5002,7 +5002,7 @@ const HostDashboard = () => {
             separate element below, and MobileBottomNav (App.jsx) keeps Home,
             Messages and Profile reachable. It returns on every other tab and
             on desktop, where the space is not scarce. */}
-        <header className={`mx-4 md:mx-8 mt-4 bg-white/60 backdrop-blur-3xl border border-white/80 rounded-[2rem] px-4 md:px-8 py-3.5 items-center justify-between shadow-[0_8px_30px_rgb(0,0,0,0.04)] ${(activeTab === 'rent' || activeTab === 'bookings') ? 'hidden lg:flex' : 'flex'}`}>
+        <header className={`px-4 md:px-8 py-3 items-center justify-between bg-white/80 backdrop-blur-3xl border-b border-gray-100/80 shadow-[0_2px_12px_rgba(0,0,0,0.04)] ${(activeTab === 'rent' || activeTab === 'bookings') ? 'hidden lg:flex' : 'flex'}`}>
           {/* Logo → opens the "where to?" popup instead of jumping straight to
               the public homepage, because the dashboard is the landlord's home. */}
           <button

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { driver } from 'driver.js';
 import 'driver.js/dist/driver.css';
+import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -334,6 +335,74 @@ const pruneSteps = (steps) =>
     .map(({ [REVEAL_FLAG]: _ignored, ...step }) => step);
 
 /* ══════════════════════════════════════════════════════════════════════════
+   4b. "NOW YOU DO IT" STEPS
+   ──────────────────────────────────────────────────────────────────────────
+   Reading a card and pressing Next teaches nothing about where a button is —
+   the finger never went there. A `mustClick` step therefore has NO Next
+   button at all: the only way forward is to tap the thing the tour is
+   pointing at, the way a game tutorial makes you take the shot yourself.
+
+   driver.js ships `advanceOnClick`, and it is not usable here. It listens on
+   `document` and then asks whether the still-highlighted element CONTAINS the
+   click target — but our targets navigate, open sheets and re-render, so by
+   the time the event has bubbled to document the target is frequently already
+   detached and the tour silently refuses to move. Listening on the element
+   itself puts us in the target phase, before React's root handler and before
+   any unmount, which is the only place the answer is always yes.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+// How long a tap's own consequence (a sheet opening, a route change) is given
+// before the tour moves to the step that talks about it.
+const TAP_ADVANCE_MS = 380;
+// A tap that changes route needs the blocker watch held for longer than a tap
+// that opens a sheet — the destination page mounts its own popups.
+const TAP_HOLD_MS = 2600;
+
+const armTapTarget = (el, driverObj, { delay, holdMs, hold }) => {
+  if (!el) return () => {};
+  el.classList.add('tp-tour-tap-target');
+
+  let fired = false;
+  const onTap = () => {
+    if (fired) return;
+    fired = true;
+    // Whatever they just tapped is about to put something on screen — a sheet,
+    // a modal, a whole new page. Tell the running blocker watch to look away
+    // until driver.js has caught up, or the tour treats its own lesson as a
+    // popup barging in and stands itself down.
+    hold?.(holdMs);
+    window.setTimeout(() => {
+      if (driverObj?.isActive()) driverObj.moveNext();
+    }, delay);
+  };
+
+  el.addEventListener('click', onTap);
+  return () => {
+    el.classList.remove('tp-tour-tap-target');
+    el.removeEventListener('click', onTap);
+  };
+};
+
+// Belt and braces for the pulsing ring: every step disarms itself, but a tour
+// torn down mid-transition must never leave a permanent halo on a real button.
+const clearTapTargets = () => {
+  document.querySelectorAll('.tp-tour-tap-target').forEach((el) => {
+    el.classList.remove('tp-tour-tap-target');
+  });
+};
+
+/* ── Living's module rails ───────────────────────────────────────────────
+   Both rails are always mounted — the breakpoint only hides one — so resolve
+   lazily and pick whichever one the user can actually see, even after a
+   resize. Shared by the shared-wallet and solo-wallet tours, which walk the
+   same rail over different module lists. */
+const livingTabAnchor = (id) => () =>
+  visibleAnchor(`[data-tour="living-mobile-nav"] [data-tour="living-tab-${id}"]`) ||
+  visibleAnchor(`[data-tour="living-desktop-nav"] [data-tour="living-tab-${id}"]`);
+
+const livingTabSide = () => (window.innerWidth < 1024 ? 'bottom' : 'right');
+
+/* ══════════════════════════════════════════════════════════════════════════
    5. THE COPY
    ──────────────────────────────────────────────────────────────────────────
    Most landlords on TO-LET PRO are not young, and plenty are using an app like
@@ -375,6 +444,10 @@ export const TourProvider = ({ children }) => {
 
   useEffect(() => {
     adoptEarlierProgress(accountId);
+    // A different person is now signed in on this browser, so the "you stepped
+    // out of the training, we will ask again next time" note from the previous
+    // account must not silently deny them their own first run.
+    postponedRef.current = {};
   }, [accountId]);
 
   const isTourDone = useCallback((tourId) => !!readBucket(bucketRef.current)[tourId], []);
@@ -395,6 +468,16 @@ export const TourProvider = ({ children }) => {
   const lockRef = useRef(null);
   const liveDriverRef = useRef(null);
   const unmountingRef = useRef(false);
+  // The running tour's `holdBlockerWatch`. A `mustClick` step needs it the
+  // instant the user taps, and the step is built long before the driver exists,
+  // so it reaches for it through here rather than being handed it.
+  const activeHoldRef = useRef(null);
+  // Required trainings the user has stepped out of during THIS app session.
+  // Not persisted on purpose: a training that was not finished is not done, so
+  // the next time the app opens it is offered again — but it must not spring
+  // straight back up the moment they press ×, which would be a trap rather
+  // than a lesson.
+  const postponedRef = useRef({});
 
   // A start attempt that is turned away for a recoverable reason (a popup was
   // up, the route changed under us) must be retried, otherwise the tour is lost
@@ -423,7 +506,16 @@ export const TourProvider = ({ children }) => {
   // is held in a ref rather than state on purpose: as state, this cleanup would
   // re-run when a finished tour set it back to null and call destroy() a second
   // time on an instance driver.js had already destroyed.
+  //
+  // The flag is CLEARED on the way in as well as set on the way out, and that
+  // is not defensive noise: React 18's StrictMode mounts every component,
+  // unmounts it and mounts it again in development. The cleanup below therefore
+  // runs once during startup, and with no reset the flag stayed true for the
+  // whole session — so in dev `onDestroyed` treated every finished tour as "the
+  // provider is going away" and never recorded a single one. Every tour, the
+  // first-run training included, repeated on every page visit forever.
   useEffect(() => {
+    unmountingRef.current = false;
     return () => {
       unmountingRef.current = true;
       liveDriverRef.current?.destroy();
@@ -443,6 +535,13 @@ export const TourProvider = ({ children }) => {
       body,
       action,
       reveal = false,
+      // `mustClick` turns the step into a "now you do it": no Next button, and
+      // the tour only moves on once the user has tapped the highlighted thing
+      // for real. `tapDelay` is how long its consequence gets to land, `tapHold`
+      // how long the blocker watch looks away for.
+      mustClick = false,
+      tapDelay = TAP_ADVANCE_MS,
+      tapHold,
       onNext,
       onPrev,
       onDone,
@@ -454,7 +553,7 @@ export const TourProvider = ({ children }) => {
           description: describe(
             L(body[0], body[1]),
             action ? L(action[0], action[1]) : null,
-            L('Do this', 'করণীয়'),
+            mustClick ? L('Tap it yourself', 'নিজে চাপ দিন') : L('Do this', 'করণীয়'),
           ),
           side,
           align,
@@ -468,6 +567,37 @@ export const TourProvider = ({ children }) => {
       if (onPrev) built.popover.onPrevClick = onPrev;
       if (onDone) built.popover.onDoneClick = onDone;
       if (onHighlighted) built.onHighlighted = onHighlighted;
+
+      if (mustClick) {
+        // Only the × survives. Leaving Next in place would let someone walk the
+        // whole training without ever touching the app, which is the exact
+        // failure this step type exists to prevent. `previous` goes too: the
+        // tap usually navigates, so "Back" would point at a screen that is no
+        // longer underneath us.
+        built.popover.showButtons = ['close'];
+        built.popover.popoverClass = 'tp-tour-must-click';
+
+        let disarm = null;
+        // Armed on *Started*, not on *Highlighted*: driver.js only fires the
+        // latter once its 400ms spotlight animation has finished, and a step
+        // whose whole instruction is "tap this" must not ignore the first tap
+        // because the halo was still sliding into place.
+        built.onHighlightStarted = (el, s, opts) => {
+          disarm?.();
+          disarm = armTapTarget(el, opts?.driver, {
+            delay: tapDelay,
+            holdMs: tapHold,
+            hold: activeHoldRef.current,
+          });
+        };
+        // Fires both when the tour moves on and when it is torn down, so the
+        // listener and the halo never outlive the step.
+        built.onDeselected = () => {
+          disarm?.();
+          disarm = null;
+        };
+      }
+
       return built;
     },
     [L],
@@ -484,6 +614,23 @@ export const TourProvider = ({ children }) => {
         action: [
           'Press Next to begin. You can stop any time with the × in the corner.',
           'শুরু করতে পরবর্তী চাপুন। কোণার × চেপে যেকোনো সময় থামাতে পারবেন।',
+        ],
+      }),
+    [step],
+  );
+
+  // The opening card of a REQUIRED training. It says three things the ordinary
+  // opening does not: this one is expected of you, it is short, and you will be
+  // doing the tapping yourself. People who are told up front that they have to
+  // act stop waiting for the card to do it for them.
+  const trainingOpeningStep = useCallback(
+    (bodyEn, bodyBn) =>
+      step({
+        title: ['Your first lesson', 'আপনার প্রথম প্রশিক্ষণ'],
+        body: [bodyEn, bodyBn],
+        action: [
+          'Press Next, then simply tap whatever is lit up. It is your real account — nothing here can break.',
+          'পরবর্তী চাপুন, তারপর যেটিতে আলো জ্বলবে শুধু সেটিতেই চাপ দিন। এটি আপনার আসল অ্যাকাউন্ট — এখানে কিছু নষ্ট হবে না।',
         ],
       }),
     [step],
@@ -513,9 +660,12 @@ export const TourProvider = ({ children }) => {
 
   const runTour = useCallback(
     async (tourId, buildSteps, options = {}) => {
-      const { ensurePath, anchor, alsoWaitFor, stillValid, driverOptions = {} } = options;
+      const { ensurePath, anchor, alsoWaitFor, stillValid, driverOptions = {}, required = false } = options;
 
       if (isTourDone(tourId)) return;
+      // A required training that was stepped out of waits for the next app
+      // open rather than re-arming behind the user's back.
+      if (required && postponedRef.current[tourId]) return;
       if (lockRef.current) return;
       if (!claimAttempt(tourId)) return;
 
@@ -604,6 +754,9 @@ export const TourProvider = ({ children }) => {
             watchHeldUntil = Date.now() + ms;
           },
         };
+        // Published for `mustClick` steps, which are built below and have to
+        // reach the hold from inside a DOM event handler.
+        activeHoldRef.current = box.holdBlockerWatch;
         const steps = pruneSteps(buildSteps(box) || []);
         if (!steps.length) return standDown('blocked');
 
@@ -616,6 +769,11 @@ export const TourProvider = ({ children }) => {
         // NOT completed, so it must not be recorded as seen and must be offered
         // again once the screen is free.
         let yieldedToPopup = false;
+        // Required trainings only: did the user actually get to the last card?
+        // "A step was painted" is enough for an ordinary tour — it was offered,
+        // they saw it, their call. A training is the opposite promise: it is
+        // not done until it is finished, so leaving halfway must not retire it.
+        let reachedEnd = false;
         let stopBlockerWatch = null;
 
         const driverObj = driver({
@@ -630,10 +788,17 @@ export const TourProvider = ({ children }) => {
           ...driverOptions,
           onPopoverRender: () => {
             shown = true;
+            // driver.js sets activeIndex before it paints, so "there is nothing
+            // after this one" is a reliable read of "the user reached the end"
+            // at the moment the final card appears. Cheaper and less invasive
+            // than an onDestroyStarted hook, which would change the teardown
+            // contract for every tour in this file.
+            if (required && !driverObj.hasNextStep()) reachedEnd = true;
           },
           onDestroyed: () => {
             stopBlockerWatch?.();
             stopBlockerWatch = null;
+            clearTapTargets();
             // Let the tour put the page back the way it found it (Living closes
             // any sheet it opened) before we touch shared state.
             try {
@@ -644,7 +809,20 @@ export const TourProvider = ({ children }) => {
             // `yieldedToPopup` matters here: by the time a popup interrupts, a
             // step HAS painted, so the `shown` test alone would retire a tour
             // the user never got to finish.
-            if (shown && !yieldedToPopup && !unmountingRef.current) markTourDone(tourId);
+            const ranProperly = shown && !yieldedToPopup && !unmountingRef.current;
+            if (ranProperly && (!required || reachedEnd)) markTourDone(tourId);
+            // Walked out of a training. It stays un-recorded so it comes back
+            // the next time the app opens, and is held off for the rest of this
+            // session so pressing × does not immediately reopen it.
+            if (ranProperly && required && !reachedEnd) {
+              postponedRef.current[tourId] = true;
+              toast(
+                L(
+                  'Training paused — it will start again next time you open the app.',
+                  'প্রশিক্ষণ থামানো হলো — পরেরবার অ্যাপ খুললে আবার শুরু হবে।',
+                ),
+              );
+            }
             // Everything below is guarded on identity: only the instance that is
             // actually live may release the lock or clear the shared state. A
             // stale instance being cleaned up must never disturb the tour that
@@ -652,6 +830,7 @@ export const TourProvider = ({ children }) => {
             if (liveDriverRef.current !== driverObj) return;
             liveDriverRef.current = null;
             lockRef.current = null;
+            activeHoldRef.current = null;
             setActiveTour(null);
             // Destroyed without ever painting a step, or stood aside for a
             // popup — either way the one chance to run was not used, so let the
@@ -698,7 +877,10 @@ export const TourProvider = ({ children }) => {
       } finally {
         // Held for the lifetime of a running tour (released in onDestroyed);
         // released here on every abort path.
-        if (!handedOff) lockRef.current = null;
+        if (!handedOff) {
+          lockRef.current = null;
+          activeHoldRef.current = null;
+        }
       }
     },
     [isTourDone, markTourDone, L, navigate],
@@ -819,6 +1001,210 @@ export const TourProvider = ({ children }) => {
           ensurePath: '/',
           anchor: '[data-tour="mode-switcher"]',
           stillValid: () => window.location.pathname === '/',
+        },
+      ),
+    [runTour, step, openingStep, closingStep],
+  );
+
+  /* ── Tenant: the required first training — HOW TO GET AROUND ───────────
+     The one thing nobody had been taught. A tenant signs up, taps something,
+     lands on their own pages, and then cannot find the way back to the site
+     they came from: the dashboard has no visible "home" link, only a logo that
+     asks a question. Every other tour explains a screen; this one explains the
+     doors between screens, and it does it by making the user open them.
+
+     It runs on the dashboard and walks a full round trip —
+     dashboard → the logo's "where to?" → the public home → back to the
+     dashboard — so both directions are practised once, in order, by hand.
+
+     Marked `required`: leaving halfway does not record it, so it comes back
+     the next time the app opens (see runTour).                              */
+  const startTrainingTour = useCallback(
+    () =>
+      runTour(
+        'training-tenant',
+        () => {
+          const isPhone = window.innerWidth < 768;
+          // Out on the public site, "my pages" is the rail's Profile tab on a
+          // phone and the account chip in the navbar on a desktop. Chosen here,
+          // not by a comma-selector, so the copy and the target can never
+          // disagree about which one the user is looking at.
+          const profileAnchor = isPhone
+            ? '[data-tour="mobile-nav-profile"]'
+            : '[data-tour="navbar-profile"]';
+
+          return [
+            trainingOpeningStep(
+              'Before anything else, one short lesson: how to move between your own pages and the main website. About a minute, and you only have to tap twice.',
+              'সবার আগে ছোট্ট একটি শিক্ষা: আপনার নিজের পাতা আর মূল ওয়েবসাইটের মধ্যে কীভাবে যাওয়া-আসা করবেন। প্রায় এক মিনিট, আর আপনাকে মাত্র দুইবার চাপ দিতে হবে।',
+            ),
+            step({
+              element: '[data-tour="tenant-logo"]',
+              side: 'bottom',
+              align: 'start',
+              mustClick: true,
+              tapHold: TAP_HOLD_MS,
+              title: ['This is your way out', 'বাইরে যাওয়ার পথ এটিই'],
+              body: [
+                'This page is yours — your rent, your payments, your receipts. The TO-LET PRO name at the top left is the door back out to the main website.',
+                'এই পাতাটি আপনার নিজের — আপনার ভাড়া, পেমেন্ট, রসিদ। উপরে বাঁ দিকের TO-LET PRO লেখাটিই মূল ওয়েবসাইটে ফেরার দরজা।',
+              ],
+              action: [
+                'Tap TO-LET PRO now.',
+                'এখন TO-LET PRO লেখাটিতে চাপ দিন।',
+              ],
+            }),
+            step({
+              element: '[data-tour="host-home-option"]',
+              side: 'bottom',
+              align: 'start',
+              reveal: true,
+              mustClick: true,
+              tapHold: TAP_HOLD_MS,
+              title: ['It asks where you want to go', 'জিজ্ঞেস করবে কোথায় যাবেন'],
+              body: [
+                'Two choices, every time. The top one is the main website where the to-let ads are; the one below it keeps you on your own page.',
+                'প্রতিবারই দুটি অপশন। উপরেরটি মূল ওয়েবসাইট, যেখানে ভাড়ার বিজ্ঞাপনগুলো আছে; নিচেরটি আপনাকে নিজের পাতাতেই রাখে।',
+              ],
+              action: [
+                'Tap "Go to main Home" to see it.',
+                '"মূল হোমে যান"-এ চাপ দিন, দেখে নিই।',
+              ],
+            }),
+            step({
+              element: '[data-tour="search-button"]',
+              side: 'top',
+              reveal: true,
+              title: ['This is the main home page', 'এটাই মূল হোম পেজ'],
+              body: [
+                'You made it. This is where every to-let ad is searched from — area, rent, and what kind of place you want.',
+                'পৌঁছে গেছেন। ভাড়ার সব বিজ্ঞাপন এখান থেকেই খোঁজা হয় — এলাকা, ভাড়া আর কেমন জায়গা চান।',
+              ],
+              action: [
+                'Nothing to do here yet — press Next.',
+                'এখানে এখনই কিছু করতে হবে না — পরবর্তী চাপুন।',
+              ],
+            }),
+            isPhone &&
+              step({
+                element: '[data-tour="mobile-nav-living"]',
+                side: 'top',
+                reveal: true,
+                title: ['The red button is your ledger', 'লাল বাটনটি আপনার খাতা'],
+                body: [
+                  'Meals, bazar, bills and monthly spending are kept in there. It sits at the bottom of every screen, so you can reach it from anywhere.',
+                  'মিল, বাজার, বিল আর মাসের খরচ ওখানেই থাকে। এটি প্রতিটি পর্দার নিচেই থাকে, তাই যেকোনো জায়গা থেকে যেতে পারবেন।',
+                ],
+              }),
+            step({
+              element: profileAnchor,
+              side: isPhone ? 'top' : 'bottom',
+              align: isPhone ? 'center' : 'end',
+              reveal: true,
+              mustClick: true,
+              tapHold: TAP_HOLD_MS,
+              title: ['And this is the way back in', 'আর ভেতরে ফেরার পথ এটি'],
+              body: [
+                'Your own page is always behind this one button, from anywhere on the site. That is the whole trick: the logo takes you out, this brings you back.',
+                'সাইটের যেকোনো জায়গা থেকে এই একটি বাটনের পেছনেই আপনার নিজের পাতা। পুরো ব্যাপারটা এটুকুই: লোগো আপনাকে বাইরে নেয়, আর এটি ভেতরে ফিরিয়ে আনে।',
+              ],
+              action: [
+                'Tap it and go back to your page.',
+                'এতে চাপ দিয়ে নিজের পাতায় ফিরে যান।',
+              ],
+            }),
+            step({
+              title: ['That is the training done', 'প্রশিক্ষণ শেষ'],
+              body: [
+                'You went out to the website and came back on your own. Two buttons — the name at the top, and your picture — and you will never be stuck again.',
+                'আপনি নিজেই ওয়েবসাইটে গিয়ে আবার ফিরে এসেছেন। দুটি বাটন — উপরের নাম আর আপনার ছবি — এই দুটো মনে রাখলে আর কখনো আটকাবেন না।',
+              ],
+              action: [
+                'Each screen will explain itself the first time you open it.',
+                'প্রতিটি পর্দা প্রথমবার খুললে নিজেই বুঝিয়ে দেবে।',
+              ],
+            }),
+          ];
+        },
+        {
+          required: true,
+          anchor: '[data-tour="tenant-logo"]',
+          stillValid: () => window.location.pathname === '/tenant-dashboard',
+          driverOptions: {
+            // The training opens the logo popup and then leaves the page. If it
+            // is abandoned in between, the popup must not be left behind.
+            onDestroyed: () => {
+              window.dispatchEvent(new Event('close-home-choice-modal'));
+            },
+          },
+        },
+      ),
+    [runTour, step, trainingOpeningStep],
+  );
+
+  /* ── Tenant: what is on the dashboard itself ─────────────────────────── */
+  const startTenantDashboardTour = useCallback(
+    () =>
+      runTour(
+        'tenant-dashboard',
+        (box) => {
+          const isPhone = window.innerWidth < 768;
+          return [
+            openingStep(
+              'This is your own page. Your rent, the people you rent from, and everything you have paid so far live here.',
+              'এটি আপনার নিজের পাতা। আপনার ভাড়া, যাদের কাছ থেকে ভাড়া নিয়েছেন, আর এ পর্যন্ত যা যা দিয়েছেন সব এখানে।',
+            ),
+            step({
+              element: isPhone
+                ? '[data-tour="mobile-nav-living"]'
+                : '[data-tour="tenant-living-link"]',
+              side: isPhone ? 'top' : 'bottom',
+              align: isPhone ? 'center' : 'end',
+              title: ['Meals, bazar and bills', 'মিল, বাজার আর বিল'],
+              body: [
+                'The Living ledger is separate from your rent. Whether you live alone or share a mess, the day-to-day money is written down in there.',
+                'লিভিং খাতা আপনার ভাড়া থেকে আলাদা। একা থাকুন বা মেসে, প্রতিদিনের টাকা-পয়সা ওখানেই লেখা হয়।',
+              ],
+            }),
+            step({
+              element: '[data-tour="tenant-profile-menu"]',
+              side: 'bottom',
+              align: 'end',
+              mustClick: true,
+              title: ['Everything else is behind your picture', 'বাকি সবকিছু আপনার ছবির পেছনে'],
+              body: [
+                'Your profile, saved homes, receipts, settings — one button holds the lot, so the page itself stays simple.',
+                'আপনার প্রোফাইল, সেভ করা বাসা, রসিদ, সেটিংস — সব একটি বাটনের ভেতরে, তাই পাতাটি সহজ থাকে।',
+              ],
+              action: ['Tap your picture to open it.', 'আপনার ছবিতে চাপ দিয়ে খুলুন।'],
+            }),
+            step({
+              element: '[data-tour="tenant-drawer-menu"]',
+              side: 'left',
+              align: 'start',
+              reveal: true,
+              title: ['The full list', 'পুরো তালিকা'],
+              body: [
+                'Rent and bookings, payments and receipts, saved homes, settings and help — every part of your account is one tap from here.',
+                'ভাড়া ও বুকিং, পেমেন্ট ও রসিদ, সেভ করা বাসা, সেটিংস আর সাহায্য — আপনার অ্যাকাউন্টের প্রতিটি অংশ এখান থেকে এক চাপ দূরে।',
+              ],
+              onNext: () => {
+                box.holdBlockerWatch?.();
+                window.dispatchEvent(new Event('close-tenant-drawer'));
+                window.setTimeout(() => box.driver?.moveNext(), 300);
+              },
+            }),
+            closingStep(),
+          ];
+        },
+        {
+          anchor: '[data-tour="tenant-profile-menu"]',
+          stillValid: () => window.location.pathname === '/tenant-dashboard',
+          driverOptions: {
+            onDestroyed: () => {
+              window.dispatchEvent(new Event('close-tenant-drawer'));
+            },
+          },
         },
       ),
     [runTour, step, openingStep, closingStep],
@@ -1344,13 +1730,8 @@ export const TourProvider = ({ children }) => {
       runTour(
         'living',
         (box) => {
-          // Both tab rails are always mounted — the breakpoint only hides one —
-          // so resolve lazily and pick whichever one the user can actually see,
-          // even after a resize.
-          const tabAnchor = (id) => () =>
-            visibleAnchor(`[data-tour="living-mobile-nav"] [data-tour="living-tab-${id}"]`) ||
-            visibleAnchor(`[data-tour="living-desktop-nav"] [data-tour="living-tab-${id}"]`);
-          const tabSide = () => (window.innerWidth < 1024 ? 'bottom' : 'right');
+          const tabAnchor = livingTabAnchor;
+          const tabSide = livingTabSide;
 
           // Held for the same reason as the host tour's emit — a sheet this tour
           // opens itself must not read as a popup barging in.
@@ -1386,6 +1767,34 @@ export const TourProvider = ({ children }) => {
                 'Meals, groceries, bills, rent — everything you split with the people you live with is added up here, so nobody has to remember who paid for what.',
                 'মিল, বাজার, বিল, বাড়িভাড়া — যাদের সাথে থাকেন তাদের সাথে যা যা ভাগ করেন সব এখানে যোগ হয়, তাই কে কী দিয়েছে কারও মনে রাখতে হয় না।',
               ],
+            }),
+            // The two wallets, and how to get from one to the other. This was
+            // the biggest hole in the training: the switch is a small pill in
+            // the corner, people never found it, and the ones who did were
+            // afraid to press it in case the mess accounts were wiped.
+            step({
+              element: '[data-tour="living-mode-switch"]',
+              side: 'bottom',
+              align: 'end',
+              title: ['There are two ledgers, not one', 'খাতা কিন্তু দুটি, একটি নয়'],
+              body: [
+                'You are in the shared one — the mess. The other is your own private ledger for when you live alone. This little button in the corner is how you move between them.',
+                'আপনি এখন যৌথটিতে আছেন — মেসের খাতা। অন্যটি আপনার নিজের ব্যক্তিগত খাতা, একা থাকলে যেটি লাগে। কোণার এই ছোট বাটনটি দিয়েই এক খাতা থেকে অন্যটিতে যাবেন।',
+              ],
+              action: ['Press Next and we will open it.', 'পরবর্তী চাপুন, আমরা খুলে দিচ্ছি।'],
+              onNext: () => actThenNext('tour:action', 'open-mode', 260),
+            }),
+            step({
+              element: '[data-tour="mode-sheet"]',
+              side: 'top',
+              reveal: true,
+              title: ['Pick a ledger, any time', 'যখন খুশি খাতা বেছে নিন'],
+              body: [
+                'Tap "Living alone" for your own খাতা, "Living with roommates" for the mess. Nothing is deleted either way — the two are kept completely apart, so what you wrote in one is still there when you come back to it.',
+                '"একা থাকি"-তে চাপলে নিজের খাতা, "মেসে থাকি"-তে চাপলে মেসের খাতা। কোনোটিতেই কিছু মুছে যায় না — দুটি সম্পূর্ণ আলাদা থাকে, তাই একটিতে যা লিখেছেন ফিরে এলে তা ঠিক তেমনই পাবেন।',
+              ],
+              onNext: () => actThenNext('tour:action', 'close-mode', SHEET_EXIT_MS),
+              onPrev: () => actThenPrev('tour:action', 'close-mode'),
             }),
           ];
 
@@ -1467,6 +1876,41 @@ export const TourProvider = ({ children }) => {
               ],
               action: ['Let us look inside.', 'চলুন ভেতরে দেখি।'],
               onNext: () => actThenNext('tour:tab', 'meals'),
+            }),
+            // The sum itself, spelled out. Every mess argues about the meal
+            // rate, and a screen full of numbers does not explain WHERE the
+            // rate came from — so the tour does the arithmetic out loud with a
+            // round example before pointing at any of the buttons.
+            step({
+              element: '[data-tour="meal-summary"]',
+              side: 'bottom',
+              align: 'start',
+              reveal: true,
+              onHighlighted: settle,
+              title: ['How the meal rate is worked out', 'মিল রেট কীভাবে বের হয়'],
+              body: [
+                'One sum, all month: total bazar ÷ total meals = the meal rate. Say the bazar came to ৳6,000 and the mess ate 200 meals — the rate is ৳30 a meal. Eat 40 meals and your share is 40 × ৳30 = ৳1,200.',
+                'সারা মাসে একটাই হিসাব: মোট বাজার ÷ মোট মিল = মিল রেট। ধরুন বাজার হয়েছে ৬,০০০৳ আর মেসে মোট মিল হয়েছে ২০০টি — তাহলে রেট প্রতি মিলে ৩০৳। আপনি ৪০ মিল খেলে আপনার হিসাব ৪০ × ৩০ = ১,২০০৳।',
+              ],
+              action: [
+                'Your balance is what you deposited minus that. Minus means you owe the mess; plus means the mess owes you.',
+                'আপনার ব্যালেন্স = আপনার জমা − ওই খরচ। মাইনাস মানে আপনি মেসকে দেবেন, প্লাস মানে মেস আপনাকে দেবে।',
+              ],
+            }),
+            step({
+              element: '[data-tour="meal-log"]',
+              side: 'top',
+              align: 'start',
+              reveal: true,
+              title: ['Where the meal count comes from', 'মিলের সংখ্যা আসে এখান থেকে'],
+              body: [
+                'Breakfast, lunch and dinner for each person, day by day. These little numbers are the "total meals" in the sum above, so a day nobody fills in is a day the rate is wrong for everyone.',
+                'প্রত্যেকের সকাল, দুপুর আর রাতের মিল — দিনে দিনে। উপরের হিসাবের "মোট মিল" এই ছোট সংখ্যাগুলো থেকেই আসে, তাই যেদিন কেউ লেখে না সেদিনের রেট সবার জন্যই ভুল হয়।',
+              ],
+              action: [
+                'Fill it in each evening — it takes a few seconds.',
+                'প্রতিদিন সন্ধ্যায় লিখে ফেলুন — কয়েক সেকেন্ডের কাজ।',
+              ],
             }),
             step({
               element: '[data-tour="add-deposit-btn"]',
@@ -1586,6 +2030,154 @@ export const TourProvider = ({ children }) => {
         },
       ),
     [runTour, step],
+  );
+
+  /* ── Living: the fork itself ──────────────────────────────────────────
+     Shown on the "how do you want to keep accounts?" screen, before either
+     wallet exists. Until now this screen had no tour at all: the shared-wallet
+     tour is gated on `mode === 'joint'`, so a first-time visitor met the
+     biggest decision in Living with no help, and whichever card they guessed
+     at decided which app they got.
+
+     The last step is a `mustClick` on the chooser itself — the user picks a
+     wallet with their own finger, and the wallet's own tour takes over the
+     moment the screen changes.                                              */
+  const startLivingModeTour = useCallback(
+    () =>
+      runTour(
+        'living-mode',
+        () => [
+          step({
+            element: '[data-tour="mode-card-solo"]',
+            side: 'bottom',
+            align: 'start',
+            title: ['If you live on your own', 'যদি একা থাকেন'],
+            body: [
+              'A private ledger nobody else can see: what you spent, what came in, who owes you and whom you owe. It keeps working with no internet.',
+              'একটি ব্যক্তিগত খাতা, যা আর কেউ দেখতে পায় না: কী খরচ করলেন, কী আয় হলো, কার কাছে পাবেন আর কাকে দেবেন। নেট না থাকলেও এটি চলে।',
+            ],
+          }),
+          step({
+            element: '[data-tour="mode-card-joint"]',
+            side: 'bottom',
+            align: 'start',
+            title: ['If you share a mess or a flat', 'যদি মেসে বা শেয়ার ফ্ল্যাটে থাকেন'],
+            body: [
+              'The shared one: meals and the meal rate, the bazar, the bills, and who owes what at the end of the month — all of it visible to everyone in the house.',
+              'যৌথ খাতা: মিল আর মিল রেট, বাজার, বিল, আর মাস শেষে কার কত — সব কিছু বাসার সবাই দেখতে পাবে।',
+            ],
+          }),
+          step({
+            element: '[data-tour="living-mode-chooser"]',
+            side: 'top',
+            mustClick: true,
+            tapHold: TAP_HOLD_MS,
+            title: ['Choose one — it is not final', 'একটি বেছে নিন — এটি চূড়ান্ত নয়'],
+            body: [
+              'Whichever you pick, the other one stays waiting for you behind the small switch in the top corner, and nothing you write in one ever touches the other.',
+              'যেটিই বেছে নিন, অন্যটি উপরের কোণার ছোট সুইচের পেছনে আপনার জন্য থেকেই যাবে, আর একটিতে যা লিখবেন তা কখনো অন্যটিতে গিয়ে পড়বে না।',
+            ],
+            action: [
+              'Tap the card that matches how you live.',
+              'আপনি যেভাবে থাকেন, সেই কার্ডটিতে চাপ দিন।',
+            ],
+          }),
+        ],
+        {
+          anchor: '[data-tour="living-mode-chooser"]',
+          stillValid: () =>
+            window.location.pathname === '/living' && !useLivingStore.getState().mode,
+        },
+      ),
+    [runTour, step],
+  );
+
+  /* ── Living: the solo খাতা ───────────────────────────────────────────── */
+  const startSoloLivingTour = useCallback(
+    () =>
+      runTour(
+        'living-solo',
+        (box) => [
+          openingStep(
+            'This is your own ledger — nobody else can see it. Let us walk through where each kind of money goes.',
+            'এটি আপনার নিজের খাতা — আর কেউ এটি দেখতে পায় না। চলুন দেখে নিই কোন টাকা কোথায় লিখবেন।',
+          ),
+          step({
+            element: '[data-tour="solo-hero"]',
+            side: 'bottom',
+            align: 'start',
+            title: ['What you actually have in hand', 'হাতে আসলে কত আছে'],
+            body: [
+              'The big number is everything that came in minus everything that went out. Below it, this month\'s spending and this month\'s income, so you can see which way the month is going.',
+              'বড় সংখ্যাটি হলো যত টাকা এসেছে তা থেকে যত গেছে বাদ দিয়ে। তার নিচে এ মাসের খরচ আর এ মাসের আয়, যাতে বোঝেন মাসটা কোন দিকে যাচ্ছে।',
+            ],
+          }),
+          step({
+            element: '[data-tour="solo-quick-add"]',
+            side: 'bottom',
+            align: 'start',
+            title: ['Four kinds of entry', 'চার ধরনের এন্ট্রি'],
+            body: [
+              'Spent, received, lent out, borrowed. Keeping lending separate matters: money you lent a friend is not spent — it is still yours, just not in your pocket, so it never gets counted as an expense.',
+              'খরচ, আয়, ধার দিলাম, ধার নিলাম। ধারকে আলাদা রাখা জরুরি: বন্ধুকে ধার দেওয়া টাকা খরচ নয় — সেটি এখনো আপনারই, শুধু পকেটে নেই, তাই সেটি কখনো খরচ হিসেবে গোনা হয় না।',
+            ],
+            action: [
+              'Pick whichever one matches what just happened.',
+              'যা ঘটেছে তার সাথে যেটি মেলে, সেটিই বেছে নিন।',
+            ],
+          }),
+          step({
+            element: livingTabAnchor('spending'),
+            side: livingTabSide(),
+            title: ['Every taka, by category', 'কোন খাতে কত, প্রতিটি টাকা'],
+            body: [
+              'Food, bazar, rent, transport, mobile, money sent home — the list is written for how a month here actually goes, so you rarely need "other".',
+              'খাওয়া, বাজার, বাসা ভাড়া, যাতায়াত, মোবাইল, বাসায় পাঠানো — তালিকাটি এখানকার মাস যেভাবে কাটে সেভাবেই সাজানো, তাই "অন্যান্য" খুব একটা লাগে না।',
+            ],
+            onNext: () => {
+              box.holdBlockerWatch?.();
+              window.dispatchEvent(new CustomEvent('tour:tab', { detail: 'spending' }));
+              window.setTimeout(() => box.driver?.moveNext(), MODULE_SETTLE_MS);
+            },
+          }),
+          step({
+            element: livingTabAnchor('people'),
+            side: livingTabSide(),
+            title: ['Who owes you, whom you owe', 'কার কাছে পাবেন, কাকে দেবেন'],
+            body: [
+              'Every lend and every repayment adds up per person, so you never have to ask a friend how much is left — the number is already here.',
+              'প্রতিটি ধার আর প্রতিটি শোধ ব্যক্তি অনুযায়ী যোগ হয়ে থাকে, তাই কারও কাছে কত বাকি আছে জিজ্ঞেস করতে হয় না — সংখ্যাটি এখানেই আছে।',
+            ],
+            onNext: () => {
+              box.holdBlockerWatch?.();
+              window.dispatchEvent(new CustomEvent('tour:tab', { detail: 'people' }));
+              window.setTimeout(() => box.driver?.moveNext(), MODULE_SETTLE_MS);
+            },
+          }),
+          step({
+            element: '[data-tour="living-mode-switch"]',
+            side: 'bottom',
+            align: 'end',
+            title: ['Moving into a mess later?', 'পরে মেসে উঠলে?'],
+            body: [
+              'This corner button takes you to the shared ledger — meals, bazar and the meal rate with your roommates. Your private খাতা stays exactly as it is, waiting here.',
+              'কোণার এই বাটনটি আপনাকে যৌথ খাতায় নিয়ে যাবে — রুমমেটদের সাথে মিল, বাজার আর মিল রেট। আপনার ব্যক্তিগত খাতা ঠিক যেমন আছে তেমনই এখানে থেকে যাবে।',
+            ],
+          }),
+          closingStep(),
+        ],
+        {
+          anchor: '[data-tour="solo-hero"]',
+          stillValid: () =>
+            window.location.pathname === '/living' && useLivingStore.getState().mode === 'solo',
+          driverOptions: {
+            onDestroyed: () => {
+              window.dispatchEvent(new CustomEvent('tour:action', { detail: 'close-all' }));
+            },
+          },
+        },
+      ),
+    [runTour, step, openingStep, closingStep],
   );
 
   /* ── Search results ─────────────────────────────────────────────────── */
@@ -1711,16 +2303,36 @@ export const TourProvider = ({ children }) => {
     startHostDashboardTour();
   }, [path, activeTour, retryTick, startHostDashboardTour]);
 
-  // The Living tour teaches the SHARED wallet (meals, bazar, split expenses),
-  // so it only runs once that wallet is the one on screen. On the mode picker
-  // or the solo ledger its anchors don't exist — and re-running it there would
-  // burn the tour's start attempts pointing at things the user can't see.
-  // Reading the mode reactively means picking "যৌথ" starts it right away.
+  // The tenant's own page, and the one screen where "how do I get back out?"
+  // is worth more than anything else on it. The required training runs FIRST
+  // and teaches exactly that; only once it is finished does the tour that
+  // explains the page itself get a turn. Both are per-account, so this is a
+  // once-ever sequence, not something that greets them every visit.
+  useEffect(() => {
+    if (path !== '/tenant-dashboard' || activeTour) return;
+    if (!isTourDone('training-tenant')) startTrainingTour();
+    else startTenantDashboardTour();
+  }, [path, activeTour, retryTick, isTourDone, startTrainingTour, startTenantDashboardTour]);
+
+  // Living has three different screens behind one route, and each gets its own
+  // tour: the fork (no wallet chosen yet), the private খাতা, and the shared
+  // one. Pointing the wrong tour at the wrong screen would spend its start
+  // attempts highlighting things that are not there, so the mode decides.
+  // Reading it reactively means picking a wallet starts its tour right away.
   useEffect(() => {
     if (path !== '/living' || activeTour) return;
-    if (livingMode !== 'joint') return;
-    startLivingTour();
-  }, [path, activeTour, retryTick, startLivingTour, livingMode]);
+    if (!livingMode) startLivingModeTour();
+    else if (livingMode === 'solo') startSoloLivingTour();
+    else startLivingTour();
+  }, [
+    path,
+    activeTour,
+    retryTick,
+    livingMode,
+    startLivingTour,
+    startLivingModeTour,
+    startSoloLivingTour,
+  ]);
 
   useEffect(() => {
     if (!path.startsWith('/properties') || activeTour) return;
@@ -1730,10 +2342,14 @@ export const TourProvider = ({ children }) => {
   const value = {
     activeTour,
     startTenantTour,
+    startTrainingTour,
+    startTenantDashboardTour,
     startHostTour,
     startHostDashboardTour,
     startAddPropertyTour,
     startLivingTour,
+    startLivingModeTour,
+    startSoloLivingTour,
     startSearchTour,
     hasTourCompleted: isTourDone,
   };

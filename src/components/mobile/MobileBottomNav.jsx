@@ -188,7 +188,11 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
         className="flex-1 h-full flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform select-none"
         aria-label={item.label}
         aria-current={active ? 'page' : undefined}
-        data-tour={item.id === 'home' ? 'mobile-nav-home' : undefined}
+        // Every flat tab carries an anchor, not just Home. The first-run
+        // training walks a tenant around the app by making them TAP these —
+        // "how do I get back to the main home page from my profile?" has no
+        // answer a tour can point at unless each target is addressable.
+        data-tour={`mobile-nav-${item.id}`}
       >
         <span
           className={`relative w-11 h-7 flex items-center justify-center transition-all duration-300 ${
@@ -248,6 +252,10 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
               <>
                 <button
                   onClick={() => navigate('/living')}
+                  // The tenant's centre action, and the only way into the
+                  // খাতা from a phone once the header pill is hidden — so the
+                  // Living training points here on mobile.
+                  data-tour="mobile-nav-living"
                   className={`absolute -top-5 w-14 h-14 rounded-2xl bg-gradient-to-br from-[#ba0036] via-[#d4143a] to-[#ff4d6d] text-white flex items-center justify-center shadow-[0_12px_30px_-8px_rgba(186,0,54,0.55)] active:scale-95 transition-transform ring-4 ring-white ${
                     location.pathname === '/living' ? 'scale-105' : ''
                   }`}

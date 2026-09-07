@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import useGoBack from '../hooks/useGoBack';
 import {
@@ -12,7 +12,6 @@ import { useLanguage } from '../context/LanguageContext.jsx';
 import { resolveHome } from '../utils/homeSurface';
 import {
   signupStart,
-  signupVerify,
   forgotPassword,
   resetPassword,
 } from '../services/authService.js';
@@ -127,11 +126,28 @@ const STEPS = {
   OTP: 'otp', // signup: verify code · forgot: verify code + set new password
 };
 
+// How the six boxes look in each state. Green and red are the whole point of
+// the feature, so they are strong enough to read at a glance on a cheap phone
+// in daylight — but they are never the only signal (see the status line).
+const OTP_BOX_STYLES = {
+  idle:     'text-brandRed bg-gray-50 border-gray-200 focus:border-brandRed focus:bg-white',
+  checking: 'text-gray-500 bg-gray-50 border-gray-300 opacity-70 cursor-wait',
+  success:  'text-emerald-700 bg-emerald-50 border-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]',
+  wrong:    'text-red-600 bg-red-50 border-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.15)]',
+};
+
+const OTP_STATUS_TEXT = {
+  idle:     'text-gray-400',
+  checking: 'text-gray-500',
+  success:  'text-emerald-600',
+  wrong:    'text-red-600',
+};
+
 const LoginPage = () => {
   const navigate = useNavigate();
   const goBack = useGoBack('/');
   const [searchParams] = useSearchParams();
-  const { login, refresh, roles } = useAuth();
+  const { login, completeSignup, roles } = useAuth();
   const { settings } = useSettings();
 
   // ─── Language ──────────────────────────────────────────────────────────────
@@ -221,6 +237,55 @@ const LoginPage = () => {
   const [newPassword, setNewPassword] = useState('');
   const [resendIn, setResendIn] = useState(0);
 
+  // What the six boxes are currently saying:
+  //   'idle'     — waiting for digits
+  //   'checking' — the code is with the server
+  //   'success'  — green: the server accepted it
+  //   'wrong'    — red: the server rejected THIS code (not a network wobble)
+  const [otpStatus, setOtpStatus] = useState('idle');
+  const otpCode = otp.join('');
+  const otpComplete = otpCode.length === 6;
+  const otpLocked = otpStatus === 'checking' || otpStatus === 'success';
+
+  const focusOtpBox = (i) => {
+    const el = document.getElementById(`otp-${i}`);
+    if (!el) return;
+    el.focus();
+    // Select what's there so the next keystroke overwrites it. maxLength=1
+    // otherwise swallows typing into a box that already holds a digit, which
+    // reads as a dead keyboard.
+    el.select?.();
+  };
+
+  const resetOtp = (status = 'idle') => {
+    setOtp(['', '', '', '', '', '']);
+    setOtpStatus(status);
+  };
+
+  // A rejected code stays on screen in red for a beat — you can't learn what you
+  // mistyped from an empty row of boxes — and is then cleared for you.
+  //
+  // The timer is cancellable because the boxes stay editable while they're red:
+  // someone who spots the bad digit and starts retyping immediately must not
+  // have that work wiped out from under them 900ms later.
+  const wrongTimerRef = useRef(null);
+  const cancelWrongTimer = () => {
+    if (!wrongTimerRef.current) return;
+    clearTimeout(wrongTimerRef.current);
+    wrongTimerRef.current = null;
+  };
+  useEffect(() => cancelWrongTimer, []);
+
+  const flagWrongOtp = () => {
+    setOtpStatus('wrong');
+    cancelWrongTimer();
+    wrongTimerRef.current = setTimeout(() => {
+      wrongTimerRef.current = null;
+      resetOtp('idle');
+      focusOtpBox(0);
+    }, 900);
+  };
+
   // Field-level feedback. We only surface a phone error once the user has left
   // the field or pressed submit, so we're not nagging them at the 3rd digit.
   // The password checklist, by contrast, is visible from the start — the rules
@@ -301,7 +366,7 @@ const LoginPage = () => {
     setErrorMsg('');
     setInfoMsg('');
     setRoleMismatch(null);
-    setOtp(['', '', '', '', '', '']);
+    resetOtp();
     setFormData({ name: '', phone: '', password: '' });
     setNewPassword('');
     setPhoneTouched(false);
@@ -392,29 +457,79 @@ const LoginPage = () => {
     }
   };
 
-  const submitSignupOtp = async (e) => {
-    e.preventDefault();
-    setIsLoading(true); setErrorMsg(''); setInfoMsg('');
-    const code = otp.join('');
+  // Verifying the code is the last step of signup — the new account is signed
+  // in and goes straight to its dashboard. Nobody is sent back to type the
+  // password they chose ninety seconds ago.
+  //
+  // Both the sixth digit landing and the button press come through here, so
+  // there is one description of what verifying means.
+  const runSignupVerify = async (code) => {
+    if (isLoading || otpLocked) return;
+    setIsLoading(true); setErrorMsg(''); setInfoMsg(''); setOtpStatus('checking');
     try {
-      await signupVerify({ phoneNumber: toE164(formData.phone), otp: code });
-      const newUser = refresh ? await refresh() : null;
-      window.dispatchEvent(
-        new CustomEvent('triggerWelcomeRobot', {
-          detail: {
-            role: newUser?.role || role,
-            name: newUser?.name || formData.name,
-            type: 'signup',
-          },
-        }),
-      );
-      goToNextOrDashboard(role);
+      const newUser = await completeSignup({
+        phoneNumber: toE164(formData.phone),
+        otp: code,
+      });
+      setOtpStatus('success');
+      // Hold the green for a beat. The account is already made and the session
+      // is already live — this pause only exists so the person who just typed
+      // six digits gets told they got them right, instead of the screen
+      // vanishing out from under them.
+      await new Promise((resolve) => { setTimeout(resolve, 550); });
+      goToNextOrDashboard(newUser?.role || role);
     } catch (err) {
       handleError(err, 'অ্যাকাউন্ট তৈরি করা যায়নি। কোডটি দেখে আবার দিন।', 'Could not create your account. Check the code and try again.');
+      // Red means "this code is wrong" and nothing else. A 429, an expired
+      // signup session, an account that already exists — none of those are the
+      // user mistyping, and wiping six correct digits over a rate limit would
+      // be its own small cruelty. Those keep the digits and just show the
+      // server's message.
+      if (err?.code === 'otp_invalid') flagWrongOtp();
+      else setOtpStatus('idle');
     } finally {
       setIsLoading(false);
     }
   };
+
+  const submitSignupOtp = (e) => {
+    e.preventDefault();
+    runSignupVerify(otpCode);
+  };
+
+  // ─── Auto-verify ──────────────────────────────────────────────────────────
+  // The sixth digit is the whole message — there is nothing else on this screen
+  // to fill in, so making the user then reach for a button is a step that only
+  // ever costs time.
+  //
+  // It fires on the TRANSITION into a complete code, never on a re-render, so
+  // one code is one request. That matters: /signup/verify is rate limited to 10
+  // calls per IP per hour and repeated failures trip the OTP abuse guard, so a
+  // loop here would lock a real user out of their own signup. Correcting a digit
+  // takes the code back through "incomplete" and re-arms it, which is exactly
+  // when a fresh check is wanted.
+  //
+  // The ref keeps the effect off the identity of runSignupVerify, which is
+  // rebuilt every render and would otherwise re-run this on every keystroke.
+  const runSignupVerifyRef = useRef(runSignupVerify);
+  runSignupVerifyRef.current = runSignupVerify;
+
+  const wasOtpCompleteRef = useRef(false);
+  useEffect(() => {
+    const wasComplete = wasOtpCompleteRef.current;
+    wasOtpCompleteRef.current = otpComplete;
+
+    if (step !== STEPS.OTP || !otpComplete || wasComplete) return;
+    // Forgot-password can't auto-verify: the server checks the code and sets
+    // the new password in ONE call (there is no verify-only endpoint), so the
+    // code alone isn't a complete request. Move to the password field instead —
+    // that IS the next thing to do.
+    if (mode === MODES.FORGOT) {
+      document.getElementById('reset-new-password')?.focus();
+      return;
+    }
+    runSignupVerifyRef.current(otpCode);
+  }, [otpCode, otpComplete, mode, step]);
 
   // ─── FORGOT-PASSWORD flow (with OTP) ──────────────────────────────────────
   const submitForgotStart = async (e) => {
@@ -444,19 +559,25 @@ const LoginPage = () => {
       ));
       return;
     }
-    setIsLoading(true); setErrorMsg(''); setInfoMsg('');
+    setIsLoading(true); setErrorMsg(''); setInfoMsg(''); setOtpStatus('checking');
     try {
       await resetPassword({
         phoneNumber: toE164(formData.phone),
-        otp: otp.join(''),
+        otp: otpCode,
         newPassword,
       });
+      setOtpStatus('success');
       switchMode(MODES.LOGIN);
       setInfoMsg(isBn
         ? 'পাসওয়ার্ড বদলে গেছে। এখন নতুন পাসওয়ার্ড দিয়ে লগইন করুন।'
         : 'Your password is changed. Log in with the new one.');
     } catch (err) {
       handleError(err, 'পাসওয়ার্ড বদলানো যায়নি। কোডটি দেখে আবার চেষ্টা করুন।', 'Could not change the password. Check the code and try again.');
+      // Same rule as signup: red is reserved for a code the server actually
+      // rejected, so a wrong code is visibly different from a weak password or
+      // a rate limit — both of which leave the six digits alone.
+      if (err?.code === 'otp_invalid') flagWrongOtp();
+      else setOtpStatus('idle');
     } finally {
       setIsLoading(false);
     }
@@ -478,7 +599,8 @@ const LoginPage = () => {
       } else {
         await forgotPassword({ phoneNumber: toE164(formData.phone) });
       }
-      setOtp(['', '', '', '', '', '']);
+      resetOtp();
+      focusOtpBox(0);
       setResendIn(RESEND_COOLDOWN_S);
       setInfoMsg(isBn ? 'নতুন কোড পাঠানো হয়েছে।' : 'A new code is on its way.');
     } catch (err) {
@@ -489,29 +611,72 @@ const LoginPage = () => {
   };
 
   // ─── OTP box helpers (type / backspace / paste) ───────────────────────────
+  // Any edit clears a previous red — the code on screen is no longer the code
+  // the server rejected.
+  const writeOtp = (next) => {
+    cancelWrongTimer();
+    setOtp(next);
+    setOtpStatus((s) => (s === 'wrong' ? 'idle' : s));
+  };
+
   const handleOtpChange = (index, value) => {
+    if (otpLocked) return;
     const digit = value.replace(/\D/g, '').slice(-1); // keep only the last digit typed
     if (value !== '' && digit === '') return;         // ignore non-numeric input
     const next = [...otp];
     next[index] = digit;
-    setOtp(next);
-    if (digit && index < 5) document.getElementById(`otp-${index + 1}`)?.focus();
+    writeOtp(next);
+    if (digit && index < 5) focusOtpBox(index + 1);
   };
 
+  /**
+   * Backspace deletes one digit per press, wherever the caret happens to be.
+   *
+   * It used to delete nothing and only move focus back when the box was already
+   * empty — so clearing a full code took two presses per box, and the first
+   * press of each pair looked like the key was broken. People worked around it
+   * by clicking box to box. We now own the key outright (preventDefault) rather
+   * than half-owning it and letting the browser do the other half, which is
+   * where the off-by-one came from: whether the native delete fired at all
+   * depended on which side of the digit the caret had landed on.
+   */
   const handleOtpKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      document.getElementById(`otp-${index - 1}`)?.focus();
+    if (otpLocked) {
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      const next = [...otp];
+      if (next[index]) {
+        next[index] = '';          // clear this box, stay put
+        writeOtp(next);
+      } else if (index > 0) {
+        next[index - 1] = '';      // already empty → clear the one before it
+        writeOtp(next);
+        focusOtpBox(index - 1);
+      }
+      return;
+    }
+    if (e.key === 'ArrowLeft' && index > 0) {
+      e.preventDefault();
+      focusOtpBox(index - 1);
+    }
+    if (e.key === 'ArrowRight' && index < 5) {
+      e.preventDefault();
+      focusOtpBox(index + 1);
     }
   };
 
   const handleOtpPaste = (e) => {
     e.preventDefault();
+    if (otpLocked) return;
     const digits = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
     if (!digits) return;
     const next = ['', '', '', '', '', ''];
     for (let i = 0; i < digits.length; i += 1) next[i] = digits[i];
-    setOtp(next);
-    document.getElementById(`otp-${Math.min(digits.length, 5)}`)?.focus();
+    writeOtp(next);
+    focusOtpBox(Math.min(digits.length, 5));
   };
 
   // ─── Render ──────────────────────────────────────────────────────────────
@@ -948,7 +1113,10 @@ const LoginPage = () => {
                 </p>
 
                 <form noValidate onSubmit={mode === MODES.FORGOT ? submitReset : submitSignupOtp} className="flex flex-col items-center">
-                  <div className="flex justify-center gap-2 sm:gap-4 mb-4" onPaste={handleOtpPaste}>
+                  <div
+                    className={`flex justify-center gap-2 sm:gap-4 mb-3 ${otpStatus === 'wrong' ? 'animate-[shake_0.4s_ease-in-out]' : ''}`}
+                    onPaste={handleOtpPaste}
+                  >
                     {otp.map((digit, index) => (
                       <input
                         key={index}
@@ -960,9 +1128,40 @@ const LoginPage = () => {
                         value={digit}
                         onChange={(e) => handleOtpChange(index, e.target.value)}
                         onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                        className="w-10 h-12 sm:w-14 sm:h-14 text-center text-lg sm:text-xl font-black text-brandRed bg-gray-50 border-2 border-gray-200 rounded-xl outline-none focus:border-brandRed focus:bg-white transition-all shadow-sm"
+                        onFocus={(e) => e.target.select()}
+                        readOnly={otpLocked}
+                        aria-invalid={otpStatus === 'wrong' ? 'true' : 'false'}
+                        className={`w-10 h-12 sm:w-14 sm:h-14 text-center text-lg sm:text-xl font-black rounded-xl border-2 outline-none transition-all shadow-sm ${OTP_BOX_STYLES[otpStatus]}`}
                       />
                     ))}
+                  </div>
+
+                  {/* One line that always says where the code stands, right under
+                      the boxes. The colour alone can't carry this — it is invisible
+                      to a screen reader and to the ~8% of men here who won't read
+                      red against green — so the state is written out too. */}
+                  <div
+                    className={`mb-4 h-5 flex items-center gap-1.5 text-xs font-bold ${OTP_STATUS_TEXT[otpStatus]}`}
+                    aria-live="polite"
+                  >
+                    {otpStatus === 'checking' && (
+                      <><Loader2 size={13} className="animate-spin" />{L('Checking your code…', 'কোড মিলিয়ে দেখছি…')}</>
+                    )}
+                    {otpStatus === 'success' && (
+                      <><CheckCircle2 size={13} />{mode === MODES.FORGOT
+                        ? L('Code accepted', 'কোড মিলে গেছে')
+                        : L('Verified — signing you in', 'মিলে গেছে — লগইন করা হচ্ছে')}</>
+                    )}
+                    {otpStatus === 'wrong' && (
+                      <><AlertCircle size={13} />{L('That code is not right', 'কোডটি ঠিক নয়')}</>
+                    )}
+                    {otpStatus === 'idle' && !otpComplete && (
+                      <span className="text-gray-400">
+                        {mode === MODES.FORGOT
+                          ? L('Enter the 6 digits, then your new password', '৬ সংখ্যার কোড, তারপর নতুন পাসওয়ার্ড দিন')
+                          : L('We check the code as soon as you finish typing', 'কোড লেখা শেষ হলেই আমরা নিজে থেকে মিলিয়ে নেবো')}
+                      </span>
+                    )}
                   </div>
 
                   {/* Forgot flow: the new password lives on the same screen as the OTP. */}
@@ -976,6 +1175,7 @@ const LoginPage = () => {
                           <Lock size={16} />
                         </div>
                         <input
+                          id="reset-new-password"
                           type="password"
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
@@ -1007,21 +1207,27 @@ const LoginPage = () => {
 
                   {/* The six boxes make an incomplete code self-evident, so
                       gating on that is fair. The password is NOT gated here —
-                      submitReset names the unmet rule instead. */}
+                      submitReset names the unmet rule instead.
+                      On signup this is now a fallback rather than the way
+                      through — the code is checked the moment it's complete —
+                      but it stays: Enter must still submit the form, and a
+                      form whose only action is invisible is a worse form. */}
                   <button
                     type="submit"
-                    disabled={isLoading || otp.join('').length < 6}
-                    className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_6px_15px_rgba(0,0,0,0.15)] hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-70"
+                    disabled={isLoading || otpLocked || !otpComplete}
+                    className={`w-full flex items-center justify-center gap-2 text-white py-3.5 rounded-xl font-bold text-sm shadow-[0_6px_15px_rgba(0,0,0,0.15)] hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-70 disabled:hover:translate-y-0 ${otpStatus === 'success' ? 'bg-emerald-600' : 'bg-gray-900'}`}
                   >
-                    {isLoading ? <Loader2 className="animate-spin" size={18} />
+                    {otpStatus === 'success' ? <><CheckCircle2 size={18} /> {L('Verified', 'মিলে গেছে')}</>
+                      : isLoading ? <Loader2 className="animate-spin" size={18} />
                       : mode === MODES.FORGOT ? L('Save new password', 'নতুন পাসওয়ার্ড সেভ করুন')
                       : <><CheckCircle2 size={18} /> {L('Verify', 'যাচাই করুন')}</>}
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => { setStep(STEPS.FORM); setOtp(['', '', '', '', '', '']); setNewPassword(''); setErrorMsg(''); }}
-                    className="mt-4 text-sm font-bold text-gray-400 hover:text-brandRed transition-colors"
+                    disabled={otpLocked}
+                    onClick={() => { setStep(STEPS.FORM); resetOtp(); setNewPassword(''); setErrorMsg(''); }}
+                    className="mt-4 text-sm font-bold text-gray-400 hover:text-brandRed transition-colors disabled:opacity-50"
                   >
                     ← {L('Use a different number', 'অন্য নম্বর দিন')}
                   </button>
@@ -1044,6 +1250,14 @@ const LoginPage = () => {
         @keyframes slowPan {
           from { transform: scale(1.05) translate(0, 0); }
           to { transform: scale(1.12) translate(-1.5%, -1.5%); }
+        }
+        /* A wrong code moves, so it registers even before the colour is read. */
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20%      { transform: translateX(-6px); }
+          40%      { transform: translateX(6px); }
+          60%      { transform: translateX(-4px); }
+          80%      { transform: translateX(4px); }
         }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 9999px; }

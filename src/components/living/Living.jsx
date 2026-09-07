@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useGoBack from '../../hooks/useGoBack';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
@@ -166,18 +166,54 @@ const Living = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialModule]);
 
+  // Did drilling into this module push a history entry? If so, "back" can pop
+  // it, which keeps the phone's own back button and our arrow in agreement
+  // instead of stacking two Overview entries on top of each other.
+  const drilled = useRef(false);
+
+  // Land on the wallet's home. If we got here by drilling in, pop that entry
+  // instead of pushing/replacing a second Overview on top of the first —
+  // otherwise the phone's back button would seem to do nothing the next time.
+  // Returns true when it popped, because a pop lands asynchronously: setting
+  // `module` ourselves before the popstate arrives makes the module we just
+  // left flash back on screen for a frame.
+  const toOverview = useCallback(() => {
+    if (module !== 'overview' && drilled.current) {
+      drilled.current = false;
+      navigate(-1);
+      return true;
+    }
+    const params = new URLSearchParams(location.search);
+    params.set('m', 'overview');
+    navigate({ pathname: '/living', search: `?${params.toString()}` }, { replace: true });
+    return false;
+  }, [location.search, module, navigate]);
+
   const go = useCallback(
     (id, nextIntent = null) => {
       if (!validIds.includes(id)) return;
+      if (id === 'overview') {
+        if (toOverview()) {
+          setIntent(nextIntent);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+      } else {
+        const params = new URLSearchParams(location.search);
+        params.set('m', id);
+        // Overview → module is the one hop worth a history entry: it makes the
+        // browser's (and Android's) back button land on the wallet's own home
+        // rather than walking straight out of Living. Module → module replaces,
+        // so the stack never fills up with tab hops.
+        const drilling = module === 'overview';
+        navigate({ pathname: '/living', search: `?${params.toString()}` }, { replace: !drilling });
+        if (drilling) drilled.current = true;
+      }
       setModule(id);
       setIntent(nextIntent);
-      // keep the URL shareable without adding history spam
-      const params = new URLSearchParams(location.search);
-      params.set('m', id);
-      navigate({ pathname: '/living', search: `?${params.toString()}` }, { replace: true });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
-    [location.search, navigate, validIds]
+    [location.search, module, navigate, toOverview, validIds]
   );
 
   useEffect(() => {
@@ -211,12 +247,10 @@ const Living = () => {
       if (next !== savedMode) updateSettings({ app: { livingMode: next } }).catch(() => {});
       setModule('overview');
       setIntent(null);
-      const params = new URLSearchParams(location.search);
-      params.set('m', 'overview');
-      navigate({ pathname: '/living', search: `?${params.toString()}` }, { replace: true });
+      toOverview();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
-    [location.search, navigate, setLivingMode, savedMode, updateSettings]
+    [toOverview, setLivingMode, savedMode, updateSettings]
   );
 
   // Manual "send it now". The queue retries on its own (on reconnect, on every
@@ -233,7 +267,23 @@ const Living = () => {
   // Reminders are derived from the shared household (bills, dues, budgets), so
   // they only mean something on the joint side.
   const reminders = useMemo(() => (isSolo || !mode ? [] : buildReminders(state, ME)), [state, isSolo, mode]);
-  const back = useGoBack('/tenant-dashboard');
+  const leaveLiving = useGoBack('/tenant-dashboard');
+
+  // ── Back: one step at a time, not one step out of the app ────────────────
+  // The arrow used to close Living from wherever you stood, so a tap meant on
+  // the খরচ page threw away the whole wallet and the totals with it. Now a
+  // single tap climbs one level — module → the wallet's own home — and only
+  // the home itself hands you back to the page you came from. A double tap is
+  // the express lane out for people who know where they're going.
+  const lastBackAt = useRef(0);
+  const atWalletHome = !mode || module === 'overview';
+  const handleBack = useCallback(() => {
+    const now = Date.now();
+    const doubleTap = now - lastBackAt.current < 420;
+    lastBackAt.current = now;
+    if (doubleTap || atWalletHome) leaveLiving();
+    else go('overview');
+  }, [atWalletHome, go, leaveLiving]);
 
   const [isNavVisible, setIsNavVisible] = useState(true);
   const { scrollY } = useScroll();
@@ -274,14 +324,22 @@ const Living = () => {
       )}>
         <div className="w-full max-w-[1400px] xl:max-w-[1600px] mx-auto px-4 h-[56px] md:h-[64px] flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            {/* No back arrow when this IS the home screen — there is nothing
-                behind it, and an arrow that jumps to a page the user never
-                opened reads as a bug. */}
-            {!isHome && (
+            {/* No back arrow on the wallet's home when Living IS the home
+                screen — there is nothing behind it, and an arrow that jumps to
+                a page the user never opened reads as a bug. Inside a module
+                there is always somewhere to climb to, so it appears there. */}
+            {(!isHome || !atWalletHome) && (
               <button
-                onClick={back}
+                onClick={handleBack}
                 className="p-2.5 bg-white/70 rounded-xl border border-white/80 shadow-sm text-gray-600 hover:text-gray-900 hover:bg-white active:scale-90 transition"
-                aria-label={isBn ? 'পেছনে' : 'Back'}
+                aria-label={atWalletHome ? (isBn ? 'পেছনে' : 'Back') : isBn ? 'হিসাবের হোমে' : 'Back to overview'}
+                title={
+                  atWalletHome
+                    ? undefined
+                    : isBn
+                    ? 'একবার চাপলে হিসাবের হোম · দুইবার চাপলে লিভিং থেকে বেরিয়ে যাবে'
+                    : 'One tap for the wallet home · double-tap to leave Living'
+                }
               >
                 <ArrowLeft size={18} />
               </button>

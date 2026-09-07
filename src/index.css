@@ -1040,3 +1040,74 @@ body.driver-active .tp-sheet-panel,
 body.driver-active .tp-sheet-panel * {
   pointer-events: auto;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   "NOW YOU DO IT" STEPS
+   ──────────────────────────────────────────────────────────────────────────
+   A step that has no Next button and waits for the user to press the real
+   thing (TourContext's `mustClick`). Two jobs for the styling, and they are
+   both about removing doubt:
+
+     • the target has to look pressable — not merely lit, but asking to be
+       tapped, because the tour has just told the user to tap it and nothing
+       else on the screen will respond;
+     • the card has to look different from the cards that only need Next, or
+       people sit and wait for a button that is never coming.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* A slow halo that grows and fades out of the target. Deliberately one ring at
+   a time and 1.6s long: fast blinking reads as an error state, and these
+   targets are often sitting under someone's thumb already. */
+@keyframes tp-tour-tap-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(186, 0, 54, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(186, 0, 54, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(186, 0, 54, 0);
+  }
+}
+
+.tp-tour-tap-target {
+  /* No border-radius of our own — the halo follows whatever the button
+     already has, so a pill stays a pill and a card stays a card. */
+  animation: tp-tour-tap-ring 1.6s ease-out infinite;
+  cursor: pointer !important;
+}
+
+/* The halo is the "press me" signal, so a reader who cannot see it gets the
+   instruction in the card instead — which every mustClick step spells out in
+   its action row ("Tap it yourself"). Nothing is lost by dropping the motion. */
+@media (prefers-reduced-motion: reduce) {
+  .tp-tour-tap-target {
+    animation: none;
+    box-shadow: 0 0 0 4px rgba(186, 0, 54, 0.35);
+  }
+}
+
+/* The card for those steps: the action row turns into the whole point of the
+   card rather than a footnote under it. */
+.driver-popover.tp-tour-must-click .tp-tour-do {
+  border-left-color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.driver-popover.tp-tour-must-click .tp-tour-do-label {
+  color: #86efac;
+}
+
+.driver-popover.tp-tour-must-click .tp-tour-do::after {
+  content: '👆';
+  display: inline-block;
+  margin-left: 6px;
+}
+
+/* Nothing to press in the footer on these steps — driver.js still renders the
+   row for the "2 of 6" counter, so tighten it up rather than leaving a band of
+   empty space where the buttons used to be. */
+.driver-popover.tp-tour-must-click .driver-popover-footer {
+  margin-top: 16px !important;
+  padding-top: 12px !important;
+}

@@ -3,23 +3,46 @@
  * tabs: `flow="out"` is the money-out page (খরচ, ধার দেওয়া, ধার শোধ) and
  * `flow="in"` is the money-in page (আয়, ধার নেওয়া, পাওনা ফেরত).
  *
- * Rows are grouped by day with a per-day total, which is how a paper খাতা is
- * read — and the header keeps খরচ and ধার apart, so a month where a lot of
- * money moved never reads as a month where a lot of money was spent.
+ * Rows can be read two ways, because two different questions get asked of the
+ * same খাতা: `view="day"` groups them by day with a per-day total (what a paper
+ * খাতা looks like), `view="category"` groups them by খাত with every line filed
+ * inside it (how people actually track where the money goes). The header keeps
+ * খরচ and ধার apart in both, so a month where a lot of money moved never reads
+ * as a month where a lot of money was spent.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2, Wallet } from 'lucide-react';
+import { CalendarDays, Layers, Pencil, Plus, Trash2, Wallet } from 'lucide-react';
 
 import useLivingStore from '../../store/useLivingStore';
-import { dateLabel, monthLabel, taka } from './livingUtils';
+import { dateLabel, taka } from './livingUtils';
 import { getMethod } from './livingConfig';
 import {
-  INCOME_CATEGORIES, INCOME_ORDER, SPEND_CATEGORIES, SPEND_ORDER,
-  getEntryType, IN_TYPES, OUT_TYPES,
+  INCOME_ORDER, SPEND_ORDER, categoryOfFlow, getEntryType, getIncomeCategory,
+  getSpendCategory, isCustomCategory, IN_TYPES, OUT_TYPES,
 } from './soloConfig';
-import { entriesOfFlow, groupByDay, monthEntries, soloSummary, toDateInput } from './soloUtils';
-import { Card, Chip, ConfirmDialog, EmptyState, IconBadge, PrimaryButton, SectionHeader, cx } from './livingUI';
+import {
+  entriesOfFlow, groupByDay, isEarning, isSpending, monthEntries, monthSpan,
+  soloSummary, toDateInput,
+} from './soloUtils';
+import {
+  Card, Chip, ConfirmDialog, EmptyState, IconBadge, MonthStrip, PrimaryButton,
+  SectionHeader, SegmentedControl, cx,
+} from './livingUI';
+import SoloCategoryView from './SoloCategoryView';
 import SoloEntrySheet from './SoloEntrySheet';
+
+// Which way the খাতা was last read. Remembered because it is a *habit*, not a
+// setting: someone who keeps accounts by খাত wants that view every time they
+// open the page, not a day list they have to re-toggle.
+const VIEW_KEY = 'tp:solo-ledger-view';
+const readView = () => {
+  try {
+    const v = localStorage.getItem(VIEW_KEY);
+    return v === 'category' || v === 'day' ? v : 'day';
+  } catch {
+    return 'day';
+  }
+};
 
 // Day headings are computed in LOCAL time (toDateInput), so "আজ" flips at
 // midnight here rather than at midnight UTC.
@@ -40,9 +63,11 @@ const SoloLedger = ({ flow = 'out', language, intent, clearIntent }) => {
   const deleteSoloEntry = useLivingStore((s) => s.deleteSoloEntry);
 
   const [off, setOff] = useState(0);
+  const [view, setView] = useState(readView);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [lockType, setLockType] = useState(null);
+  const [presetCategory, setPresetCategory] = useState(null);
   const [filter, setFilter] = useState('all');
   const [pendingDelete, setPendingDelete] = useState(null);
 
@@ -52,9 +77,22 @@ const SoloLedger = ({ flow = 'out', language, intent, clearIntent }) => {
     if (!intent) return;
     setEditing(null);
     setLockType(getEntryType(intent).key === intent ? intent : null);
+    setPresetCategory(null);
     setOpen(true);
     clearIntent?.();
   }, [intent, clearIntent]);
+
+  const pickView = (next) => {
+    setView(next);
+    // The খাত folders ARE the filter, so a chip left on from the day view would
+    // silently hide most of them.
+    if (next === 'category') setFilter('all');
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      /* private mode — the view just won't be remembered */
+    }
+  };
 
   const summary = useMemo(() => soloSummary(solo, off), [solo, off]);
 
@@ -71,12 +109,12 @@ const SoloLedger = ({ flow = 'out', language, intent, clearIntent }) => {
 
   const days = useMemo(() => groupByDay(filtered), [filtered]);
 
-  // Only offer filters that would actually return something.
-  const table = flow === 'in' ? INCOME_CATEGORIES : SPEND_CATEGORIES;
+  // Only offer filters that would actually return something. The defaults keep
+  // their canonical order; the খাত the user made themselves follow after them.
   const order = flow === 'in' ? INCOME_ORDER : SPEND_ORDER;
   const usedCategories = useMemo(() => {
     const set = new Set(rows.filter((e) => e.category).map((e) => e.category));
-    return order.filter((c) => set.has(c));
+    return [...order.filter((c) => set.has(c)), ...[...set].filter(isCustomCategory)];
   }, [rows, order]);
   const usedTransfers = useMemo(() => {
     const types = (flow === 'in' ? IN_TYPES : OUT_TYPES).filter((k) => getEntryType(k).needsPerson);
@@ -87,10 +125,38 @@ const SoloLedger = ({ flow = 'out', language, intent, clearIntent }) => {
   const main = flow === 'in' ? summary.earned : summary.spent;
   const transfers = flow === 'in' ? summary.borrowed + summary.gotBack : summary.lent + summary.paidBack;
 
-  const openAdd = (type = null) => {
+  // Every month the খাতা reaches back to, each with its own headline figure, so
+  // the strip doubles as a year at a glance.
+  const months = useMemo(() => monthSpan(solo.entries, off), [solo.entries, off]);
+  const monthTotals = useMemo(() => {
+    const pick = flow === 'in' ? isEarning : isSpending;
+    const totals = {};
+    months.forEach((o) => {
+      totals[o] = monthEntries(solo.entries, o).filter(pick).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    });
+    return totals;
+  }, [months, solo.entries, flow]);
+
+  const openAdd = (type = null, category = null) => {
     setEditing(null);
     setLockType(type);
+    setPresetCategory(category);
     setOpen(true);
+  };
+
+  const openEdit = (entry) => {
+    setEditing(entry);
+    setLockType(null);
+    setPresetCategory(null);
+    setOpen(true);
+  };
+
+  // "Add another to this খাত" — the folder already answers "কোন খাতে", so the
+  // sheet opens with that filled in and only the টাকা and the note to write. A
+  // transfer folder (ধার) has no category, so it locks the type instead.
+  const addToBucket = (bucket) => {
+    if (bucket.kind === 'category') openAdd(flow === 'in' ? 'income' : 'expense', bucket.ref);
+    else openAdd(bucket.ref);
   };
 
   const save = (data) => {
@@ -117,16 +183,38 @@ const SoloLedger = ({ flow = 'out', language, intent, clearIntent }) => {
         }
       />
 
-      {/* month picker */}
-      <div className="flex items-center justify-between gap-2">
-        <button onClick={() => setOff((o) => o - 1)} className="p-2 rounded-xl bg-white border border-gray-200 text-gray-500 active:scale-90 transition" aria-label={isBn ? 'আগের মাস' : 'Previous month'}>
-          <ChevronLeft size={16} />
-        </button>
-        <span className="text-[12px] font-black text-gray-700">{monthLabel(summary.ref, language)}</span>
-        <button onClick={() => setOff((o) => Math.min(0, o + 1))} disabled={off === 0} className="p-2 rounded-xl bg-white border border-gray-200 text-gray-500 active:scale-90 transition disabled:opacity-40" aria-label={isBn ? 'পরের মাস' : 'Next month'}>
-          <ChevronRight size={16} />
-        </button>
-      </div>
+      {/* every month in a row, the open one lit up */}
+      <MonthStrip
+        offsets={months}
+        value={off}
+        onChange={setOff}
+        language={language}
+        totalFor={(o) => monthTotals[o] ?? 0}
+      />
+
+      {/* how to read the month: day by day, or খাত by খাত */}
+      <SegmentedControl
+        value={view}
+        onChange={pickView}
+        options={[
+          {
+            value: 'day',
+            label: (
+              <span className="inline-flex items-center gap-1.5">
+                <CalendarDays size={13} /> {isBn ? 'দিন অনুযায়ী' : 'By day'}
+              </span>
+            ),
+          },
+          {
+            value: 'category',
+            label: (
+              <span className="inline-flex items-center gap-1.5">
+                <Layers size={13} /> {isBn ? 'খাত অনুযায়ী' : 'By category'}
+              </span>
+            ),
+          },
+        ]}
+      />
 
       {/* the month at a glance — real spending kept apart from transfers */}
       <div className="grid grid-cols-2 gap-3">
@@ -147,13 +235,16 @@ const SoloLedger = ({ flow = 'out', language, intent, clearIntent }) => {
         </Card>
       </div>
 
-      {/* filters */}
-      {(usedCategories.length > 0 || usedTransfers.length > 0) && (
+      {/* filters — only in the day view; in the খাত view the folders are the filter */}
+      {view === 'day' && (usedCategories.length > 0 || usedTransfers.length > 0) && (
         <div className="flex gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
           <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} label={isBn ? 'সব' : 'All'} />
-          {usedCategories.map((c) => (
-            <FilterChip key={c} active={filter === c} onClick={() => setFilter(c)} label={isBn ? table[c].bn : table[c].en} />
-          ))}
+          {usedCategories.map((c) => {
+            const meta = categoryOfFlow(c, flow);
+            return (
+              <FilterChip key={c} active={filter === c} onClick={() => setFilter(c)} label={isBn ? meta.bn : meta.en} />
+            );
+          })}
           {usedTransfers.map((tk) => (
             <FilterChip
               key={tk}
@@ -183,6 +274,17 @@ const SoloLedger = ({ flow = 'out', language, intent, clearIntent }) => {
             }
           />
         </Card>
+      ) : view === 'category' ? (
+        <SoloCategoryView
+          entries={filtered}
+          flow={flow}
+          people={solo.people}
+          language={language}
+          resetKey={`${off}|${flow}`}
+          onAdd={addToBucket}
+          onEdit={openEdit}
+          onDelete={setPendingDelete}
+        />
       ) : (
         <div className="space-y-4">
           {days.map((day) => (
@@ -200,7 +302,7 @@ const SoloLedger = ({ flow = 'out', language, intent, clearIntent }) => {
                     entry={e}
                     people={solo.people}
                     language={language}
-                    onEdit={() => { setEditing(e); setLockType(null); setOpen(true); }}
+                    onEdit={() => openEdit(e)}
                     onDelete={() => setPendingDelete(e)}
                   />
                 ))}
@@ -212,10 +314,11 @@ const SoloLedger = ({ flow = 'out', language, intent, clearIntent }) => {
 
       <SoloEntrySheet
         open={open}
-        onClose={() => { setOpen(false); setEditing(null); setLockType(null); }}
+        onClose={() => { setOpen(false); setEditing(null); setLockType(null); setPresetCategory(null); }}
         flow={flow}
         editing={editing}
         lockType={editing ? null : lockType}
+        presetCategory={editing ? null : presetCategory}
         onSave={save}
       />
       <ConfirmDialog
@@ -237,7 +340,11 @@ const EntryRow = ({ entry, people, language, onEdit, onDelete }) => {
   const type = getEntryType(entry.type);
   // A transfer is identified by its type (ধার দিলাম), a real খরচ/আয় by its
   // category (খাওয়া-দাওয়া) — that is the fastest way to read the list.
-  const cat = entry.type === 'income' ? INCOME_CATEGORIES[entry.category] : SPEND_CATEGORIES[entry.category];
+  const cat = entry.category
+    ? entry.type === 'income'
+      ? getIncomeCategory(entry.category)
+      : getSpendCategory(entry.category)
+    : null;
   const visual = type.needsPerson || !cat ? type : cat;
   const person = people.find((p) => p.id === entry.personId);
   const method = getMethod(entry.method);

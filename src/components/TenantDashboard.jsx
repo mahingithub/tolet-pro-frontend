@@ -523,7 +523,31 @@ const TenantDashboard = () => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLangOpen, setIsLangOpen] = useState(false);
-  
+
+  // 🟢 TOUR SUPPORT — same contract the host dashboard honours (see
+  // HostDashboard.jsx): the guided tour opens the drawer and the logo's
+  // "where to?" popup itself so it can explain what is INSIDE them, and puts
+  // both back the way it found them when it ends. Without these listeners the
+  // tenant training could only ever point at the closed buttons.
+  useEffect(() => {
+    const openDrawer = () => setIsProfileDrawerOpen(true);
+    const closeDrawer = () => setIsProfileDrawerOpen(false);
+    const openHomeModal = () => setShowHomeChoice(true);
+    const closeHomeModal = () => setShowHomeChoice(false);
+
+    window.addEventListener('open-tenant-drawer', openDrawer);
+    window.addEventListener('close-tenant-drawer', closeDrawer);
+    window.addEventListener('open-home-choice-modal', openHomeModal);
+    window.addEventListener('close-home-choice-modal', closeHomeModal);
+
+    return () => {
+      window.removeEventListener('open-tenant-drawer', openDrawer);
+      window.removeEventListener('close-tenant-drawer', closeDrawer);
+      window.removeEventListener('open-home-choice-modal', openHomeModal);
+      window.removeEventListener('close-home-choice-modal', closeHomeModal);
+    };
+  }, []);
+
   const getCache = (key, fallback) => {
   try {
     const v = localStorage.getItem(key);
@@ -1805,6 +1829,11 @@ const handleWizardSubmit = async (payload) => {
           type="button"
           onClick={() => setShowHomeChoice(true)}
           aria-label={language === 'বাংলা' ? 'নেভিগেশন মেনু' : 'Navigation menu'}
+          // "I clicked Find a Home, ended up on my profile, and now I cannot
+          // find the way back to the main site" was the single most common
+          // thing tenants got stuck on. This button is the answer, so the
+          // training makes them tap it themselves.
+          data-tour="tenant-logo"
           className="flex items-center gap-2 md:gap-2.5 cursor-pointer group shrink-0 z-10"
         >
           <div className="bg-[#ba0036] p-1.5 md:p-2 rounded-xl shadow-[0_4px_15px_rgba(186,0,54,0.3)] group-hover:scale-105 transition-transform duration-300">
@@ -1826,6 +1855,7 @@ const handleWizardSubmit = async (payload) => {
               full pill on md+ so the small header never overflows. */}
           <Link
             to="/living"
+            data-tour="tenant-living-link"
             className="group hidden md:flex items-center gap-2 p-2 md:pr-3.5 bg-white/60 rounded-xl border border-white/80 shadow-sm hover:shadow-md hover:bg-white transition-all active:scale-95"
             title={language === 'বাংলা' ? 'রুমমেট ওয়ালেট' : 'Roommate Wallet'}
           >
@@ -1920,7 +1950,7 @@ const handleWizardSubmit = async (payload) => {
           </div>
 
           {/* Avatar — opens right-drawer (replaces dropdown menu). */}
-          <button onClick={() => setIsProfileDrawerOpen(true)} className="flex items-center gap-2 p-1 pr-3 bg-white/60 rounded-xl border border-white/80 shadow-sm hover:shadow-md hover:bg-white transition-all active:scale-95">
+          <button data-tour="tenant-profile-menu" onClick={() => setIsProfileDrawerOpen(true)} className="flex items-center gap-2 p-1 pr-3 bg-white/60 rounded-xl border border-white/80 shadow-sm hover:shadow-md hover:bg-white transition-all active:scale-95">
             <div className="relative">
               <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm border border-blue-100 overflow-hidden">
                 {authUser?.avatar ? (
@@ -1992,7 +2022,7 @@ const handleWizardSubmit = async (payload) => {
         </div>
 
         {/* Menu items */}
-        <nav className="flex-1 px-3 space-y-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <nav data-tour="tenant-drawer-menu" className="flex-1 px-3 space-y-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {menuItems.map((item) => {
             const isActive = activeTab === item.id && !item.isLink;
             // desktopOnly = hide from the drawer on mobile widths. Messaging

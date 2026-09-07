@@ -8,8 +8,8 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Minus, Plus, AlertTriangle, CloudOff } from 'lucide-react';
-import { initials } from './livingUtils';
+import { X, Minus, Plus, AlertTriangle, ChevronLeft, ChevronRight, CloudOff } from 'lucide-react';
+import { initials, monthStart, taka } from './livingUtils';
 
 export const cx = (...c) => c.filter(Boolean).join(' ');
 
@@ -182,6 +182,102 @@ export const SegmentedControl = ({ options, value, onChange, className = '' }) =
     })}
   </div>
 );
+
+// ── Month strip ─────────────────────────────────────────────────────────────────────
+// Every month the খাতা covers, side by side, with the open one lit up. A paper
+// খাতা is read by flipping straight to a month — not by nudging a stepper one
+// step at a time — and seeing the months in a row is what tells you at a glance
+// which ones actually have writing in them. The chevrons stay, because reaching
+// past the oldest written month has to remain possible.
+const monthChipLabel = (offset, language) => {
+  const isBn = language === 'বাংলা';
+  if (offset === 0) return isBn ? 'এ মাস' : 'This month';
+  const d = monthStart(offset);
+  const locale = isBn ? 'bn-BD' : 'en-US';
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString(locale, sameYear ? { month: 'short' } : { month: 'short', year: '2-digit' });
+};
+
+export const MonthStrip = ({ offsets = [0], value = 0, onChange, language, totalFor, className = '' }) => {
+  const isBn = language === 'বাংলা';
+  const wrapRef = React.useRef(null);
+  const activeRef = React.useRef(null);
+
+  // Centre the open month. Done by moving the rail's own scrollLeft rather than
+  // scrollIntoView, which would also drag the whole page around on mount.
+  React.useEffect(() => {
+    const wrap = wrapRef.current;
+    const el = activeRef.current;
+    if (!wrap || !el) return;
+    wrap.scrollTo({
+      left: Math.max(0, el.offsetLeft - (wrap.clientWidth - el.clientWidth) / 2),
+      behavior: 'smooth',
+    });
+  }, [value, offsets.length]);
+
+  return (
+    <div className={cx('flex items-center gap-1.5', className)}>
+      <button
+        type="button"
+        onClick={() => onChange(value - 1)}
+        className="shrink-0 p-2 rounded-xl bg-white border border-gray-200 text-gray-500 active:scale-90 transition"
+        aria-label={isBn ? 'আগের মাস' : 'Previous month'}
+      >
+        <ChevronLeft size={16} />
+      </button>
+
+      <div
+        ref={wrapRef}
+        className="flex-1 flex items-center gap-1.5 overflow-x-auto scroll-smooth [&::-webkit-scrollbar]:hidden"
+        style={{ scrollbarWidth: 'none' }}
+      >
+        {offsets.map((o) => {
+          const active = o === value;
+          const total = totalFor ? totalFor(o) : null;
+          return (
+            <button
+              key={o}
+              type="button"
+              ref={active ? activeRef : null}
+              onClick={() => onChange(o)}
+              aria-current={active ? 'true' : undefined}
+              className={cx(
+                'shrink-0 px-3 py-1.5 rounded-2xl border text-center transition active:scale-95',
+                active
+                  ? 'bg-[#ba0036] border-[#ba0036] text-white shadow-[0_8px_18px_-10px_rgba(186,0,54,0.65)]'
+                  : 'bg-white border-gray-200 text-gray-500'
+              )}
+            >
+              <span className="block text-[11.5px] font-black leading-none whitespace-nowrap">
+                {monthChipLabel(o, language)}
+              </span>
+              {total != null && (
+                <span
+                  className={cx(
+                    'block text-[10px] font-bold leading-none mt-1 tabular-nums whitespace-nowrap',
+                    active ? 'text-white/80' : 'text-gray-400'
+                  )}
+                >
+                  {taka(total, language)}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onChange(Math.min(0, value + 1))}
+        disabled={value === 0}
+        className="shrink-0 p-2 rounded-xl bg-white border border-gray-200 text-gray-500 active:scale-90 transition disabled:opacity-40"
+        aria-label={isBn ? 'পরের মাস' : 'Next month'}
+      >
+        <ChevronRight size={16} />
+      </button>
+    </div>
+  );
+};
 
 // ── Toggle switch ───────────────────────────────────────────────────────────────────
 export const Toggle = ({ checked, onChange, label }) => (

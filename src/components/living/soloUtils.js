@@ -12,7 +12,7 @@
  * paper খাতা's doesn't.
  */
 import { monthKey, monthStart, taka } from './livingUtils';
-import { ENTRY_TYPES, getEntryType } from './soloConfig';
+import { ENTRY_TYPES, getEntryType, isCustomCategory } from './soloConfig';
 
 const amountOf = (e) => Math.max(0, Number(e?.amount) || 0);
 
@@ -172,6 +172,100 @@ export function groupByDay(entries = []) {
     else day.out += amountOf(e);
   });
   return [...days.values()];
+}
+
+/**
+ * Group entries into খাত (folders) instead of days — the way a category খাতা is
+ * kept: one heading per খাত, every line written underneath it, biggest folder
+ * first.
+ *
+ * A real খরচ/আয় files under its category; a ধার has no category, so it files
+ * under its own type ("ধার দিলাম") rather than being swept into "অন্যান্য" —
+ * a transfer is a folder of its own, never a spending head.
+ */
+export function groupByCategory(entries = []) {
+  const buckets = new Map();
+  [...entries].sort(byNewest).forEach((e) => {
+    const isCat = !!e.category;
+    const key = isCat ? `cat:${e.category}` : `type:${e.type}`;
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        key,
+        kind: isCat ? 'category' : 'type',
+        ref: isCat ? e.category : e.type,
+        entries: [],
+        total: 0,
+        last: null,
+      });
+    }
+    const b = buckets.get(key);
+    b.entries.push(e);
+    b.total += amountOf(e);
+    if (!b.last || new Date(e.date) > new Date(b.last)) b.last = e.date;
+  });
+
+  const list = [...buckets.values()];
+  const grand = list.reduce((s, b) => s + b.total, 0);
+  return list
+    .map((b) => ({ ...b, count: b.entries.length, pct: grand > 0 ? (b.total / grand) * 100 : 0 }))
+    .sort((a, b) => b.total - a.total);
+}
+
+/**
+ * The user's own খাত that actually have something written in them, newest
+ * first. Derived from the entries rather than kept in a list of its own — see
+ * the custom-category note in soloConfig.jsx — so it needs no sync and a খাত
+ * quietly disappears once its last row is deleted.
+ *
+ * @param {string} type Only count entries of this type ('expense' / 'income').
+ */
+export function customCategoriesUsed(entries = [], type, limit = 24) {
+  const seen = new Set();
+  [...entries].sort(byNewest).forEach((e) => {
+    if (e.type !== type || !isCustomCategory(e.category)) return;
+    seen.add(e.category);
+  });
+  return [...seen].slice(0, limit);
+}
+
+/**
+ * Notes already written under a given খাত, newest first and de-duplicated.
+ * Offered back as one-tap chips so "রিকশা ভাড়া" is typed once and reused for
+ * the rest of the month — the same category, one line richer each time.
+ *
+ * @param {object} match Partial entry whose keys must all match (e.g. `{ type,
+ *   category }`). Keys with a nullish value are ignored.
+ */
+export function recentNotes(entries = [], match = {}, limit = 6) {
+  const keys = Object.keys(match).filter((k) => match[k] != null);
+  const seen = new Set();
+  const out = [];
+  [...entries].sort(byNewest).some((e) => {
+    const note = (e.note || '').trim();
+    if (!note || !keys.every((k) => e[k] === match[k])) return false;
+    const dedupe = note.toLowerCase();
+    if (seen.has(dedupe)) return false;
+    seen.add(dedupe);
+    out.push(note);
+    return out.length >= limit;
+  });
+  return out;
+}
+
+/**
+ * The month offsets worth putting in the month strip: from the oldest month
+ * that has anything written in it (or the month currently open, whichever
+ * reaches further back) up to this month — so every month of the খাতা is on
+ * screen at once, with no gaps where a quiet month was skipped.
+ */
+export function monthSpan(entries = [], current = 0, max = 18) {
+  let oldest = Math.min(0, current);
+  for (let o = -1; o >= -(max - 1); o--) {
+    if (entries.some((e) => inMonth(e.date, o))) oldest = Math.min(oldest, o);
+  }
+  const out = [];
+  for (let o = oldest; o <= 0; o++) out.push(o);
+  return out;
 }
 
 /** `YYYY-MM-DD` for a date input, in LOCAL time (never the UTC shift). */

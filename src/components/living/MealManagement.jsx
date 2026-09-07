@@ -426,7 +426,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
         {/* COL 1 */}
         <div className="space-y-4 min-w-0">
       {/* mess summary */}
-      <div id="mm-summary" className="scroll-mt-24">
+      <div id="mm-summary" data-tour="meal-summary" className="scroll-mt-24">
       <Card className="p-5">
         <div className="text-center">
           <span className="flex items-center justify-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-gray-400">
@@ -579,7 +579,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
           {isMobile && (
             <>
       {/* daily meal editor */}
-      <div id="mm-log" className="scroll-mt-24">
+      <div id="mm-log" data-tour="meal-log" className="scroll-mt-24">
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[14px] font-black text-gray-900 tracking-tight flex items-center gap-1.5">
@@ -1017,7 +1017,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
       </div>
 
       {/* daily meal editor */}
-      <div id="mm-log" className="scroll-mt-24">
+      <div id="mm-log" data-tour="meal-log" className="scroll-mt-24">
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[14px] font-black text-gray-900 tracking-tight flex items-center gap-1.5">
@@ -1086,7 +1086,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
         {isDesktop && (
           <div className="space-y-4 min-w-0">
       {/* daily meal editor */}
-      <div id="mm-log" className="scroll-mt-24">
+      <div id="mm-log" data-tour="meal-log" className="scroll-mt-24">
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[14px] font-black text-gray-900 tracking-tight flex items-center gap-1.5">

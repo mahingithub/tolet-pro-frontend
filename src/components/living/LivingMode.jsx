@@ -10,7 +10,7 @@
  * personal ledger. That promise is stated on screen, because a user who fears
  * losing data will never press the button.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ArrowLeftRight, Check, HandCoins, PieChart, ShieldCheck, User, Users,
   UtensilsCrossed, Wallet, WifiOff,
@@ -61,6 +61,9 @@ const ModeCard = ({ mode, isBn, active, onPick }) => {
   return (
     <button
       onClick={() => onPick(mode)}
+      // The chooser and the switcher sheet share this card, and they are never
+      // on screen together — so one anchor per mode serves both tours.
+      data-tour={`mode-card-${mode}`}
       className={cx(
         'group w-full text-left rounded-[2rem] border bg-white p-5 transition active:scale-[0.99]',
         active
@@ -155,6 +158,19 @@ export const ModeSwitcher = ({ mode, isBn, onSwitch }) => {
   const Icon = meta.icon;
   const other = mode === 'solo' ? 'joint' : 'solo';
 
+  // The guided tour opens this sheet itself to show what switching wallets
+  // actually looks like — "how do I get to the other খাতা?" cannot be answered
+  // by pointing at a closed pill. Same `tour:action` contract the meal and
+  // wallet sheets already honour (see MealManagement.jsx).
+  useEffect(() => {
+    const onTourAction = (e) => {
+      if (e.detail === 'open-mode') setOpen(true);
+      if (e.detail === 'close-mode' || e.detail === 'close-all') setOpen(false);
+    };
+    window.addEventListener('tour:action', onTourAction);
+    return () => window.removeEventListener('tour:action', onTourAction);
+  }, []);
+
   const pick = (next) => {
     setOpen(false);
     if (next !== mode) onSwitch(next);
@@ -186,7 +202,7 @@ export const ModeSwitcher = ({ mode, isBn, onSwitch }) => {
           </PrimaryButton>
         }
       >
-        <div className="space-y-3 py-1">
+        <div data-tour="mode-sheet" className="space-y-3 py-1">
           <ModeCard mode="solo" isBn={isBn} active={mode === 'solo'} onPick={pick} />
           <ModeCard mode="joint" isBn={isBn} active={mode === 'joint'} onPick={pick} />
 

@@ -125,7 +125,7 @@ const SoloOverview = ({ go, language }) => {
   return (
     <div className="space-y-4">
       {/* ── Hero: what is actually in hand ─────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#ba0036] via-[#d11147] to-[#ff4d6d] text-white p-5 shadow-[0_20px_45px_-18px_rgba(186,0,54,0.7)]">
+      <div data-tour="solo-hero" className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#ba0036] via-[#d11147] to-[#ff4d6d] text-white p-5 shadow-[0_20px_45px_-18px_rgba(186,0,54,0.7)]">
         <div className="absolute -top-10 -right-8 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <div className="relative">
           <div className="flex items-center justify-between gap-2">
@@ -166,7 +166,7 @@ const SoloOverview = ({ go, language }) => {
       </div>
 
       {/* ── Write the next row ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-2.5">
+      <div data-tour="solo-quick-add" className="grid grid-cols-4 gap-2.5">
         {QUICK.map(({ type, module }) => {
           const t = getEntryType(type);
           const Icon = t.icon;

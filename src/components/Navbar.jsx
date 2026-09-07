@@ -490,6 +490,9 @@ useEffect(() => {
           <a
             href="/"
             onClick={(e) => { e.preventDefault(); handleLogoClick(); }}
+            // On a desktop there is no bottom rail, so the logo is THE way back
+            // to the main home page. The training points at it by name.
+            data-tour="navbar-logo"
             className="flex items-center gap-2 md:gap-2.5 cursor-pointer group shrink-0"
           >
             <div className="bg-[#ba0036] p-1.5 md:p-2 rounded-xl shadow-[0_4px_15px_rgba(186,0,54,0.3)] group-hover:scale-105 transition-transform duration-300">

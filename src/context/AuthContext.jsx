@@ -4,6 +4,7 @@ import {
   getCurrentToken,
   fetchMe,
   login as svcLogin,
+  signupVerify as svcSignupVerify,
   loginAsDemoAdmin as svcLoginAsDemoAdmin,
   logout as svcLogout,
   updateMe as svcUpdateMe,
@@ -108,14 +109,29 @@ export const AuthProvider = ({ children }) => {
     return subscribe('auth:user', refresh);
   }, []);
 
+  // Re-read the account from the server. This is a DATA refresh, not a session
+  // check: callers use it to pick up a just-saved profile change.
+  //
+  // It used to `setUser(null)` on any thrown error, which quietly turned every
+  // hiccup — offline, a 5xx, a rate-limited moment — into a logout, since a null
+  // user sends every <RequireAuth> straight to /login. Signup was where that hurt
+  // most: the account was created, the token was stored, and one unlucky /me call
+  // still dumped the new user on the login screen. The rule here is the same one
+  // the boot effect above follows — only the SERVER ends a session.
   const refresh = useCallback(async () => {
     try {
       const u = await fetchMe();
       setUser(u);
       return u;
-    } catch {
-      setUser(null);
-      return null;
+    } catch (err) {
+      if (err?.status === 401 && isSessionTerminated()) {
+        svcLogout();
+        setUser(null);
+        return null;
+      }
+      // Transient. Keep the session we have; the caller just doesn't get fresher
+      // data this time.
+      return getCurrentUser();
     }
   }, []);
 
@@ -183,6 +199,31 @@ export const AuthProvider = ({ children }) => {
           window.dispatchEvent(
             new CustomEvent('triggerWelcomeRobot', {
               detail: { role: u.role, name: u.name, type: 'login' },
+            }),
+          );
+        }
+        return u;
+      },
+      // Finish signup: verify the OTP and START THE SESSION. Verifying the code
+      // texted to your own phone IS the proof of identity — there is nothing a
+      // login screen could ask afterwards that the user hasn't just answered,
+      // so a new account lands signed in, exactly like login below.
+      //
+      // The session comes from the /signup/verify response itself. An extra
+      // round trip to /me to "confirm" it only adds a second thing that can
+      // fail between a successful signup and the dashboard, and the account is
+      // one request old — there is nothing newer to fetch.
+      completeSignup: async ({ phoneNumber, otp }) => {
+        const u = await svcSignupVerify({ phoneNumber, otp });
+        setUser(u);
+
+        const newRoles = Array.isArray(u?.roles) && u.roles.length
+          ? u.roles
+          : (u?.role ? [u.role] : []);
+        if (u && !newRoles.some(isAdminRole)) {
+          window.dispatchEvent(
+            new CustomEvent('triggerWelcomeRobot', {
+              detail: { role: u.role, name: u.name, type: 'signup' },
             }),
           );
         }
