@@ -3,9 +3,10 @@ import {
   X, CreditCard, ArrowUpRight, Crown, LayoutGrid, ChevronUp, ChevronDown,
   FileText, FileEdit, Megaphone, Download, BellRing, AlertCircle, Building2,
   Plus, MapPin, Wallet, Calendar, RefreshCw, Search, ChevronRight,
+  CheckCircle2, Hourglass,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { scopeBookings, bookingInBuilding } from '../../utils/buildingScope';
+import { bookingInBuilding } from '../../utils/buildingScope';
 
 export default function DashboardTab({
   language,
@@ -40,7 +41,6 @@ export default function DashboardTab({
   monthFullLabel,
   formatBDT,
   landlordProfile,
-  currentBuildingId,
   openBuildingLedger,
   rentUnitsOf,
 }) {
@@ -50,18 +50,20 @@ export default function DashboardTab({
 
   const allBuildings = landlordProfile?.buildings || [];
 
-  // Portfolio totals. Scoped by buildingId through the shared helper — the
-  // name-equality filters that used to live per screen are why hostel and
-  // single-room leases vanished from the totals after a successful save.
-  const sm = useMemo(() => {
-    const scoped = scopeBookings(bookings, allBuildings, currentBuildingId);
-    return getMonthCollectionSummary(
-      scoped.flatMap(rentUnitsOf),
-      today.getFullYear(),
-      today.getMonth() + 1,
-      today,
-    );
-  }, [bookings, allBuildings, currentBuildingId, getMonthCollectionSummary, rentUnitsOf, today]);
+  // PORTFOLIO TOTALS — every building, always.
+  //
+  // These used to be scoped by `currentBuildingId`, which survives a drill-in:
+  // open a building from the table, come back to the dashboard, and the header
+  // still read that one building's money while the table underneath listed all
+  // of them. Two numbers for the same question, and only a page reload — which
+  // resets the id to null — put it right. The drill-in belongs to Rent
+  // Collection; the dashboard is the view from above.
+  const sm = useMemo(() => getMonthCollectionSummary(
+    bookings.flatMap(rentUnitsOf),
+    today.getFullYear(),
+    today.getMonth() + 1,
+    today,
+  ), [bookings, getMonthCollectionSummary, rentUnitsOf, today]);
 
   const collectedPct = sm.expectedTotal > 0
     ? Math.min(100, Math.round((sm.collectedTotal / sm.expectedTotal) * 100))
@@ -103,51 +105,67 @@ export default function DashboardTab({
   const barTone = (row) => (row.noRent ? 'bg-transparent' : row.pct >= 70 ? 'bg-emerald-500' : 'bg-[#ba0036]');
   const pctTone = (row) => (row.pct >= 70 ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#ba0036] dark:text-rose-400');
 
+  // Each figure sits on its own tinted card, the way the landlord reads them
+  // today: colour carries the meaning, the number leads, and a small icon marks
+  // the footnote. `tint`/`ink` are the card and the text of one colour family.
   const kpis = [
     {
       key: 'collected',
-      label: bn ? 'আদায়' : 'Collected',
+      Icon: CheckCircle2,
+      label: bn ? 'আদায়' : 'Collected',
       value: formatBDT(sm.collectedTotal),
-      note: `${sm.paidCount} ${bn ? 'ক্লিয়ার্ড' : 'cleared'}`,
-      tone: 'text-emerald-600 dark:text-emerald-400',
+      note: `${sm.paidCount} ${bn ? 'ক্লিয়ার্ড' : 'cleared'}`,
+      tint: 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-800/50',
+      ink: 'text-emerald-700 dark:text-emerald-400',
     },
     {
       key: 'outstanding',
-      label: bn ? 'বকেয়া' : 'Outstanding',
+      Icon: AlertCircle,
+      label: bn ? 'বকেয়া' : 'Outstanding',
       value: formatBDT(sm.outstandingTotal),
-      note: `${sm.overdueCount} ${bn ? 'বকেয়া' : 'due'}`,
-      tone: 'text-[#ba0036] dark:text-rose-400',
+      note: `${sm.overdueCount} ${bn ? 'বকেয়া' : 'due'}`,
+      tint: 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-100 dark:border-rose-800/50',
+      ink: 'text-rose-700 dark:text-rose-400',
     },
     {
       key: 'partial',
+      Icon: Hourglass,
       label: bn ? 'আংশিক' : 'Partial',
       value: String(sm.partialCount),
       note: bn ? 'আংশিক পরিশোধ' : 'Partially paid',
-      tone: 'text-gray-900 dark:text-white',
+      tint: 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-100 dark:border-amber-800/50',
+      ink: 'text-amber-700 dark:text-amber-400',
     },
     {
       key: 'expected',
+      Icon: Calendar,
       label: bn ? 'প্রত্যাশিত' : 'Expected',
       value: formatBDT(sm.expectedTotal),
-      note: `${sm.totalDueCount} ${bn ? 'ভাড়াটিয়া' : 'tenants'}`,
-      tone: 'text-gray-900 dark:text-white',
+      note: `${sm.totalDueCount} ${bn ? 'ভাড়াটিয়া' : 'tenants'}`,
+      tint: 'bg-blue-50/60 dark:bg-blue-950/20 border-blue-100 dark:border-blue-800/50',
+      ink: 'text-blue-700 dark:text-blue-400',
     },
   ];
 
-  // 2×2 on a phone, 1×4 on the desktop column — the dividers have to change
-  // direction with it, so each cell carries the edges it owns per breakpoint.
-  const cellEdges = [
-    'border-b border-r lg:border-b-0',
-    'border-b lg:border-b-0 lg:border-r',
-    'border-r',
-    '',
-  ];
+  /**
+   * How big the figure can be printed without clipping. A half-width tinted
+   * card on a 375px phone has ~130px of room: "৳ 12,34,567" at 26px needs more
+   * than that and truncates to an ellipsis — the exact number the landlord came
+   * to read. Stepping down by length keeps the everyday four- and five-figure
+   * totals big and keeps the rare six-figure one whole.
+   */
+  const kpiValueSize = (text) => {
+    const len = String(text ?? '').length;
+    if (len <= 8) return 'text-[24px] lg:text-[30px]';
+    if (len <= 11) return 'text-[21px] lg:text-[26px]';
+    return 'text-[17px] lg:text-[21px]';
+  };
 
   // `onMobile` — a phone shows only the two everyday jobs; the other two stay
   // on the desktop rail, and are still reachable on a phone from the sidebar.
   const quickActions = [
     { id: 'add_tenant', Icon: Calendar, label: bn ? 'ভাড়াটিয়া যোগ করুন' : 'Add Tenant', onClick: () => setActiveTab('bookings'), onMobile: true },
-    { id: 'rent_collection', Icon: Wallet, label: bn ? 'ভাড়া কালেকশন' : 'Rent Collection', onClick: () => setActiveTab('rent'), primary: true, onMobile: true },
+    { id: 'rent_collection', Icon: Wallet, label: bn ? 'ভাড়া কালেকশন' : 'Rent Collection', onClick: () => setActiveTab('rent'), onMobile: true },
     { id: 'payment_settings', Icon: CreditCard, label: bn ? 'পেমেন্ট সেটিংস' : 'Payment Settings', onClick: () => setActiveTab('payments') },
     { id: 'smart_alerts', Icon: BellRing, label: bn ? 'স্মার্ট অ্যালার্ট' : 'Smart Alerts', onClick: () => setActiveTab('smartAlerts') },
   ];
@@ -337,21 +355,22 @@ export default function DashboardTab({
               {bn ? 'জরুরী কাজ' : 'Quick Actions'}
             </h3>
             <div className="grid grid-cols-2 lg:grid-cols-1 gap-2.5">
-              {quickActions.map(({ id, Icon, label, onClick, primary, onMobile }) => (
+              {/* One face for all four, no odd one out. A raised fill, a real
+                  border and a pressed state are what make these read as buttons
+                  on a white card — singling one out in crimson made the other
+                  three look like list rows beside it. */}
+              {quickActions.map(({ id, Icon, label, onClick, onMobile }) => (
                 <button
                   key={id}
                   type="button"
                   onClick={onClick}
-                  className={`w-full min-w-0 items-center gap-2.5 lg:gap-3 px-3 lg:px-4 py-3 rounded-xl text-[12px] lg:text-xs font-bold transition-all active:scale-[0.98] ${
+                  className={`group w-full min-w-0 items-center gap-2.5 lg:gap-3 px-3 lg:px-4 py-3 rounded-xl text-[12px] lg:text-xs font-bold text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 shadow-[0_1px_2px_rgba(0,0,0,0.05)] hover:bg-white dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-[0_4px_12px_rgba(0,0,0,0.07)] active:scale-[0.98] active:shadow-none transition-all ${
                     onMobile ? 'flex' : 'hidden lg:flex'
-                  } ${
-                    primary
-                      ? 'bg-[#ba0036] hover:bg-[#9e002e] text-white shadow-md shadow-red-500/20'
-                      : 'border border-gray-200/80 dark:border-gray-700/80 bg-white dark:bg-gray-800/60 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 shadow-sm'
                   }`}
                 >
-                  <Icon size={18} className={`shrink-0 ${primary ? 'text-white' : 'text-gray-700 dark:text-gray-300'}`} />
+                  <Icon size={18} className="shrink-0 text-gray-600 dark:text-gray-300" />
                   <span className="text-left leading-tight lg:truncate">{label}</span>
+                  <ChevronRight size={15} className="hidden lg:block ml-auto shrink-0 text-gray-300 dark:text-gray-600 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all" />
                 </button>
               ))}
             </div>
@@ -421,15 +440,15 @@ export default function DashboardTab({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 my-4 lg:my-5">
-            {kpis.map(({ key, label, value, note, tone }, i) => (
-              <div
-                key={key}
-                className={`min-w-0 py-3.5 lg:py-2 border-gray-100 dark:border-gray-800 ${i === 0 ? 'pr-3 lg:pr-5' : 'px-3 lg:px-5'} ${cellEdges[i]}`}
-              >
-                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 leading-none">{label}</p>
-                <p className={`text-xl lg:text-2xl font-black ${tone} tabular-nums mt-1.5 leading-tight truncate`}>{value}</p>
-                <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500 mt-1 leading-none truncate">{note}</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 my-4 lg:my-5">
+            {kpis.map(({ key, Icon, label, value, note, tint, ink }) => (
+              <div key={key} className={`min-w-0 rounded-2xl border p-3.5 lg:p-4 ${tint}`}>
+                <p className={`text-[13px] lg:text-sm font-black ${ink} leading-none`}>{label}</p>
+                <p className={`${kpiValueSize(value)} font-black ${ink} tabular-nums mt-2 leading-none truncate`}>{value}</p>
+                <p className={`text-[12px] lg:text-[13px] font-bold ${ink} opacity-80 mt-2 flex items-center gap-1.5 leading-none truncate`}>
+                  <Icon size={14} strokeWidth={3} className="shrink-0" />
+                  <span className="truncate">{note}</span>
+                </p>
               </div>
             ))}
           </div>

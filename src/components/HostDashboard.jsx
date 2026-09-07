@@ -5279,7 +5279,7 @@ const HostDashboard = () => {
       </div>
 
       {/* --- MAIN CONTENT --- */}
-      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-8 lg:px-12 pt-3 md:pt-4 relative z-10 custom-scrollbar overflow-y-auto pb-24">
+      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-8 lg:px-12 pt-1 md:pt-2 relative z-10 custom-scrollbar overflow-y-auto pb-24">
         
         {activeDropdownId && <div className="fixed inset-0 z-20" onClick={() => setActiveDropdownId(null)}></div>}
 
@@ -5469,7 +5469,6 @@ const HostDashboard = () => {
             monthFullLabel={monthFullLabel}
             formatBDT={formatBDT}
             landlordProfile={effectiveLandlordProfile}
-            currentBuildingId={currentBuildingId}
             openBuildingLedger={openBuildingLedger}
             rentUnitsOf={rentUnitsOf}
           />
