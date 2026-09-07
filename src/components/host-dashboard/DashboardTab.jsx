@@ -45,6 +45,7 @@ export default function DashboardTab({
   rentUnitsOf,
 }) {
   const [buildingSearch, setBuildingSearch] = useState('');
+  const [showAllBuildings, setShowAllBuildings] = useState(false);
   const bn = language === 'বাংলা';
 
   const allBuildings = landlordProfile?.buildings || [];
@@ -87,6 +88,15 @@ export default function DashboardTab({
 
   const q = buildingSearch.trim().toLowerCase();
   const displayedRows = q ? buildingRows.filter((r) => r.name.toLowerCase().includes(q)) : buildingRows;
+
+  // Five buildings, then "See more" — same cut on desktop and mobile. A
+  // twenty-building portfolio otherwise pushes the properties section off the
+  // bottom of the dashboard on every visit.
+  const COLLAPSED_BUILDINGS = 5;
+  const canCollapse = displayedRows.length > COLLAPSED_BUILDINGS;
+  const visibleRows = canCollapse && !showAllBuildings
+    ? displayedRows.slice(0, COLLAPSED_BUILDINGS)
+    : displayedRows;
 
   // A building that is 70%+ collected is "on track" and reads green; anything
   // less is the landlord's problem for the month and reads crimson.
@@ -486,7 +496,7 @@ export default function DashboardTab({
                       {bn ? 'কোনো বিল্ডিং পাওয়া যায়নি' : 'No buildings found'}
                     </td>
                   </tr>
-                ) : displayedRows.map((row) => (
+                ) : visibleRows.map((row) => (
                   <tr
                     key={row.id}
                     onClick={() => openBuildingLedger(row.id)}
@@ -522,7 +532,7 @@ export default function DashboardTab({
               <p className="py-8 text-center text-xs font-semibold text-gray-400">
                 {bn ? 'কোনো বিল্ডিং পাওয়া যায়নি' : 'No buildings found'}
               </p>
-            ) : displayedRows.map((row) => (
+            ) : visibleRows.map((row) => (
               <button
                 key={row.id}
                 type="button"
@@ -558,12 +568,30 @@ export default function DashboardTab({
             ))}
           </div>
 
-          <div className="hidden lg:flex mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 items-center justify-between text-xs text-gray-400">
-            <span>
-              {bn
-                ? `সকল ${displayedRows.length}টি বিল্ডিং প্রদর্শিত`
-                : `Showing all ${displayedRows.length} buildings`}
+          {/* The count stays desktop-only as before; the See more toggle shows on
+              both, so the row only collapses away when there is neither. */}
+          <div className={`mt-3 lg:mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 items-center justify-between gap-3 text-xs text-gray-400 ${canCollapse ? 'flex' : 'hidden lg:flex'}`}>
+            <span className="hidden lg:inline">
+              {canCollapse && !showAllBuildings
+                ? (bn
+                    ? `${displayedRows.length}টির মধ্যে ${visibleRows.length}টি বিল্ডিং প্রদর্শিত`
+                    : `Showing ${visibleRows.length} of ${displayedRows.length} buildings`)
+                : (bn
+                    ? `সকল ${displayedRows.length}টি বিল্ডিং প্রদর্শিত`
+                    : `Showing all ${displayedRows.length} buildings`)}
             </span>
+            {canCollapse && (
+              <button
+                type="button"
+                onClick={() => setShowAllBuildings((v) => !v)}
+                className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 hover:bg-gray-50 dark:hover:bg-gray-800 text-[#ba0036] dark:text-rose-400 text-xs font-bold transition-all active:scale-[0.98]"
+              >
+                {showAllBuildings
+                  ? (bn ? 'কম দেখুন' : 'See less')
+                  : (bn ? `আরও দেখুন (${displayedRows.length - visibleRows.length})` : `See more (${displayedRows.length - visibleRows.length})`)}
+                <ChevronDown size={14} className={`transition-transform ${showAllBuildings ? 'rotate-180' : ''}`} />
+              </button>
+            )}
           </div>
         </div>
 
