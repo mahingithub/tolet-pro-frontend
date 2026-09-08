@@ -1,7 +1,43 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
+// A production build that still points at localhost is not a broken build — it
+// is a build that SUCCEEDS and ships a dead app. That is exactly how an AAB got
+// to the point of upload with `http://localhost:5000/api` baked in 41 times:
+// there was no `.env.production`, so `vite build` fell through to `.env.local`,
+// printed a clean green summary, and produced a bundle whose every API call
+// resolved to the phone's own loopback.
+//
+// The website never showed the fault because Vercel injects its env vars at
+// build time. Only the Android bundle, built from this machine's `dist/`, was
+// affected — which is the one place nobody reloads to check.
+//
+// So the check has to be here, at the point of no return, and it has to be
+// fatal. A warning scrolls past in a 200-line build log.
+const assertProductionEnv = (mode) => {
+  if (mode !== 'production') return
+  const env = loadEnv(mode, process.cwd(), 'VITE_')
+  const api = env.VITE_API_BASE_URL
+  const fail = (why) => {
+    throw new Error(
+      `\n\n  Refusing to build for production: ${why}\n` +
+        `  VITE_API_BASE_URL = ${api ?? '(unset)'}\n\n` +
+        `  Create .env.production with the production API base, e.g.\n` +
+        `    VITE_API_BASE_URL=https://api.toletpro.rent/api\n\n` +
+        `  (.env.production is gitignored, so a fresh clone will not have it.)\n`,
+    )
+  }
+  if (!api) fail('VITE_API_BASE_URL is not set')
+  if (/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(api)) fail('VITE_API_BASE_URL points at localhost')
+  // Android 9+ blocks cleartext HTTP by default, so an http:// API is not just
+  // insecure here — it silently fails inside the Capacitor WebView.
+  if (!/^https:\/\//.test(api)) fail('VITE_API_BASE_URL is not https://')
+}
+
+export default defineConfig(({ mode }) => {
+  assertProductionEnv(mode)
+
+  return {
   plugins: [react()],
   base: '/',
 
@@ -57,4 +93,5 @@ export default defineConfig({
     // browser fetches them only when devtools is open.
     sourcemap: true,
   },
+  }
 })

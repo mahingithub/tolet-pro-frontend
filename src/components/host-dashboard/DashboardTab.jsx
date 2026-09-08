@@ -23,8 +23,6 @@ export default function DashboardTab({
   subStatus,
   navigate,
   isPropertiesLoading,
-  properties,
-  setPropertyFilter,
   moreActionsOpen,
   setMoreActionsOpen,
   isPremium,
@@ -48,7 +46,18 @@ export default function DashboardTab({
   const [showAllBuildings, setShowAllBuildings] = useState(false);
   const bn = language === 'বাংলা';
 
-  const allBuildings = landlordProfile?.buildings || [];
+  // Both lists are normalised once, here. `rows` used to be guarded by
+  // scopeBookings (`Array.isArray(...) ? ... : []`) — dropping that helper took
+  // the guard with it, and a corrupt host_bookings_cache that parses to
+  // anything but an array would take the whole dashboard down on .flatMap.
+  // `blds` is memoised because `?? []` hands back a NEW array every render,
+  // which defeated the per-building memo below and re-ran the month summary
+  // once per building on every keystroke in the search box.
+  const rows = Array.isArray(bookings) ? bookings : [];
+  const allBuildings = useMemo(
+    () => (Array.isArray(landlordProfile?.buildings) ? landlordProfile.buildings : []),
+    [landlordProfile?.buildings],
+  );
 
   // PORTFOLIO TOTALS — every building, always.
   //
@@ -59,11 +68,11 @@ export default function DashboardTab({
   // resets the id to null — put it right. The drill-in belongs to Rent
   // Collection; the dashboard is the view from above.
   const sm = useMemo(() => getMonthCollectionSummary(
-    bookings.flatMap(rentUnitsOf),
+    rows.flatMap(rentUnitsOf),
     today.getFullYear(),
     today.getMonth() + 1,
     today,
-  ), [bookings, getMonthCollectionSummary, rentUnitsOf, today]);
+  ), [rows, getMonthCollectionSummary, rentUnitsOf, today]);
 
   const collectedPct = sm.expectedTotal > 0
     ? Math.min(100, Math.round((sm.collectedTotal / sm.expectedTotal) * 100))
@@ -73,8 +82,8 @@ export default function DashboardTab({
   // desktop column, stacked rows on a phone) so the two layouts can never drift
   // apart on the numbers — only on how they are set.
   const buildingRows = useMemo(() => allBuildings.map((bldg) => {
-    const rows = bookings.filter((b) => bookingInBuilding(b, bldg)).flatMap(rentUnitsOf);
-    const s = getMonthCollectionSummary(rows, today.getFullYear(), today.getMonth() + 1, today);
+    const units = rows.filter((b) => bookingInBuilding(b, bldg)).flatMap(rentUnitsOf);
+    const s = getMonthCollectionSummary(units, today.getFullYear(), today.getMonth() + 1, today);
     return {
       id: bldg.id,
       name: bldg.name || '',
@@ -86,7 +95,7 @@ export default function DashboardTab({
       pct: s.expectedTotal > 0 ? Math.min(100, Math.round((s.collectedTotal / s.expectedTotal) * 100)) : 0,
       noRent: s.expectedTotal === 0,
     };
-  }), [allBuildings, bookings, getMonthCollectionSummary, rentUnitsOf, today]);
+  }), [allBuildings, rows, getMonthCollectionSummary, rentUnitsOf, today]);
 
   const q = buildingSearch.trim().toLowerCase();
   const displayedRows = q ? buildingRows.filter((r) => r.name.toLowerCase().includes(q)) : buildingRows;
@@ -189,7 +198,7 @@ export default function DashboardTab({
 
         {!paymentMethodsLoading && (
           !hasActivePaymentMethod ? (
-            bookings.length > 0 && !hidePaymentPromo && (
+            rows.length > 0 && !hidePaymentPromo && (
               <div
                 onClick={() => setActiveTab('payments')}
                 className="relative group cursor-pointer bg-gradient-to-br from-emerald-50 to-green-50/60 dark:from-emerald-950/30 dark:to-green-950/20 border border-emerald-200 dark:border-emerald-800/50 rounded-2xl md:rounded-[1.5rem] p-3.5 md:p-4 shadow-[0_4px_25px_rgba(16,185,129,0.12)] hover:shadow-[0_12px_35px_rgba(16,185,129,0.20)] hover:-translate-y-0.5 transition-all flex flex-col h-full"
@@ -470,7 +479,7 @@ export default function DashboardTab({
         </div>
 
         {/* 3. Collection by building — table on desktop, stacked rows on a phone */}
-        <div className={`order-3 lg:col-start-1 lg:col-span-8 lg:row-start-2 ${card} p-4 lg:p-5`}>
+        <div data-tour="host-collection" className={`order-3 lg:col-start-1 lg:col-span-8 lg:row-start-2 ${card} p-4 lg:p-5`}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 lg:mb-4">
             <div className="flex items-baseline gap-2 min-w-0">
               <h3 className="text-base lg:text-lg font-black text-gray-900 dark:text-white truncate">
@@ -615,7 +624,7 @@ export default function DashboardTab({
         </div>
 
         {/* 5. Your properties — full width, below everything */}
-        <div className="order-5 lg:col-start-1 lg:col-span-12 lg:row-start-3">
+        <div data-tour="host-properties" className="order-5 lg:col-start-1 lg:col-span-12 lg:row-start-3">
           <div className="flex justify-between items-center mb-4 px-1">
             <h3 className="text-lg lg:text-2xl font-black text-gray-900 dark:text-white tracking-tight">{dashboardPropTitle}</h3>
             <button

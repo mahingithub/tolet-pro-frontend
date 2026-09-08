@@ -14,7 +14,10 @@
     "seo:sitemap": "node scripts/generate-sitemap.mjs",
     "seo:prerender": "node scripts/prerender-seo.mjs",
     "seo:areas": "node scripts/generate-dhaka-areas.mjs",
-    "seo:counts": "node scripts/fetch-listing-counts.mjs"
+    "seo:counts": "node scripts/fetch-listing-counts.mjs",
+    "android:sync": "npm run build && cap sync android && npm run android:strip-maps",
+    "android:strip-maps": "find android/app/src/main/assets/public -name '*.map' -delete && echo 'stripped sourcemaps from android assets'",
+    "android:aab": "npm run android:sync && cd android && ./gradlew bundleRelease"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",

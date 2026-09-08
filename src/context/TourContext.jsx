@@ -1240,16 +1240,6 @@ export const TourProvider = ({ children }) => {
               'এখান থেকেই আপনি সবকিছু চালাবেন — আপনার প্রপার্টি, ভাড়াটিয়া আর ভাড়া। চলুন একসাথে দেখে নিই।',
             ),
             step({
-              element: '[data-tour="host-stats-grid"]',
-              side: 'bottom',
-              align: 'start',
-              title: ['Your numbers at a glance', 'এক নজরে আপনার হিসাব'],
-              body: [
-                'How many properties you have listed, and how many people have asked about them. These update on their own.',
-                'আপনি কতগুলো প্রপার্টি দিয়েছেন, আর কতজন সেগুলোর খোঁজ করেছেন। এগুলো নিজে থেকেই আপডেট হয়।',
-              ],
-            }),
-            step({
               element: '[data-tour="host-quick-actions"]',
               side: 'top',
               align: 'start',
@@ -1268,6 +1258,20 @@ export const TourProvider = ({ children }) => {
                 'Your total rent collected and what is still outstanding, kept in one running record. No notebook needed.',
                 'কত ভাড়া উঠেছে আর কত বাকি আছে, সব একটি চলমান হিসাবে। আলাদা খাতার দরকার নেই।',
               ],
+            }),
+            step({
+              element: '[data-tour="host-collection"]',
+              side: 'top',
+              align: 'start',
+              title: ['The same thing, building by building', 'একই হিসাব, বিল্ডিং ধরে ধরে'],
+              body: [
+                'For each building: what was due this month, what has come in, and what is still outstanding. When only one place is behind, this is where you see which one.',
+                'প্রতিটি বিল্ডিংয়ের জন্য: এ মাসে কত পাওয়ার কথা ছিল, কত এসেছে, আর কত বাকি রয়ে গেল। কোনো একটি বাসা পিছিয়ে থাকলে এখানেই ধরা পড়ে কোনটি।',
+              ],
+              action: [
+                'Tap a row to open that building\'s own rent register.',
+                'কোনো সারিতে চাপ দিলে সেই বিল্ডিংয়ের নিজের ভাড়ার খাতা খুলবে।',
+              ],
               onNext: () => {
                 const btn = document.getElementById('host-more-actions-btn');
                 const dropdown = document.getElementById('host-more-actions-dropdown');
@@ -1284,6 +1288,20 @@ export const TourProvider = ({ children }) => {
               body: [
                 'Reports, a new rent agreement, or a message to every tenant at once. Tucked in here so the main screen stays simple.',
                 'রিপোর্ট, নতুন ভাড়ার চুক্তি, অথবা একবারে সব ভাড়াটিয়াকে মেসেজ। মূল পর্দা সহজ রাখতে এগুলো এখানে রাখা।',
+              ],
+            }),
+            step({
+              element: '[data-tour="host-properties"]',
+              side: 'top',
+              align: 'start',
+              title: ['The places you have put up', 'আপনি যে বাসাগুলো দিয়েছেন'],
+              body: [
+                'Your own listings, the newest first, shown the way a tenant sees them. Tap one to open it and change anything — the rent, the photos, whether it is still available.',
+                'আপনার নিজের বিজ্ঞাপনগুলো, নতুনটি আগে, ভাড়াটিয়ারা যেভাবে দেখে ঠিক সেভাবে। কোনোটিতে চাপ দিয়ে খুলে যা খুশি বদলাতে পারবেন — ভাড়া, ছবি, এখনো খালি আছে কি না।',
+              ],
+              action: [
+                'Only a few show here. "View All" opens the full list.',
+                'এখানে কয়েকটিই দেখায়। পুরো তালিকা দেখতে "সব দেখুন"-এ চাপ দিন।',
               ],
             }),
             step({
@@ -1386,6 +1404,17 @@ export const TourProvider = ({ children }) => {
               ],
             }),
             step({
+              element: '[data-tour="properties-tab"]',
+              side: 'right',
+              align: 'start',
+              reveal: true,
+              title: ['All your properties', 'আপনার সব বাসা'],
+              body: [
+                'The full list, not just the few on the dashboard. Edit a listing, take one off the market when it is rented, or put it back up when it is free again.',
+                'পুরো তালিকা, ড্যাশবোর্ডের কয়েকটি নয়। বিজ্ঞাপন বদলান, ভাড়া হয়ে গেলে নামিয়ে রাখুন, আবার খালি হলে আবার দিয়ে দিন।',
+              ],
+            }),
+            step({
               element: '[data-tour="inquiries-tab"]',
               side: 'right',
               align: 'start',
@@ -1394,6 +1423,17 @@ export const TourProvider = ({ children }) => {
               body: [
                 'Every enquiry lands here. Replying quickly is the single biggest thing you can do to rent a place faster.',
                 'সব খোঁজখবর এখানে আসে। দ্রুত উত্তর দেওয়াই বাসা তাড়াতাড়ি ভাড়া হওয়ার সবচেয়ে বড় উপায়।',
+              ],
+            }),
+            step({
+              element: '[data-tour="messages-tab"]',
+              side: 'right',
+              align: 'start',
+              reveal: true,
+              title: ['Talking to them', 'তাদের সাথে কথা'],
+              body: [
+                'Once you answer an enquiry the conversation carries on here, with your tenants too. Everything stays written down, so there is no argument later about what was agreed.',
+                'কোনো খোঁজের উত্তর দিলে সেই কথাবার্তা এখানেই চলতে থাকে, ভাড়াটিয়াদের সাথেও। সব লেখা থেকে যায়, তাই কী কথা হয়েছিল তা নিয়ে পরে আর তর্ক হয় না।',
               ],
             }),
             step({
@@ -1441,6 +1481,17 @@ export const TourProvider = ({ children }) => {
               ],
             }),
             step({
+              element: '[data-tour="settings-tab"]',
+              side: 'right',
+              align: 'start',
+              reveal: true,
+              title: ['Your own details', 'আপনার নিজের তথ্য'],
+              body: [
+                'Your name and phone number, the language the app speaks to you in, and what you get notified about. Set once, and you rarely need to come back.',
+                'আপনার নাম আর ফোন নম্বর, অ্যাপ কোন ভাষায় কথা বলবে, আর কীসের খবর আপনাকে জানানো হবে। একবার ঠিক করে দিলে বারবার আসতে হয় না।',
+              ],
+            }),
+            step({
               element: '[data-tour="add-property-button"]',
               side: 'right',
               align: 'start',
@@ -1455,7 +1506,13 @@ export const TourProvider = ({ children }) => {
           ];
         },
         {
-          anchor: '[data-tour="host-stats-grid"]',
+          // Quick actions is the first card in the dashboard body at every
+          // breakpoint, so it is the earliest reliable "the page is really
+          // here" signal. It replaced `host-stats-grid`, which was removed
+          // when the body was rebuilt — and because the START anchor is what
+          // runTour polls for, its disappearance did not just drop one step,
+          // it stopped this entire tour from ever opening.
+          anchor: '[data-tour="host-quick-actions"]',
           stillValid: () => window.location.pathname === '/host-dashboard',
           driverOptions: {
             // This tour opens the logo modal and the profile drawer to talk
@@ -1494,59 +1551,36 @@ export const TourProvider = ({ children }) => {
 
     const isMobile = window.innerWidth < 768;
 
+    // One step at both breakpoints, and it used to be two on desktop: the
+    // account chip opened a dropdown, and the tour opened it (via an
+    // `open-navbar-profile` event) to point at the "Host Dashboard" row inside.
+    // That dropdown has been removed — the chip now navigates straight to the
+    // dashboard — so the second step pointed at nothing, driver.js waited the
+    // full anchor timeout and then dropped it, and the tour ended having never
+    // taken the landlord anywhere. The chip IS the lesson now.
     await runTour(
       'host',
-      (box) =>
-        isMobile
-          ? [
-              step({
-                element: '[data-tour="mobile-nav-home"]',
-                side: 'top',
-                title: ['Your dashboard is the control room', 'ড্যাশবোর্ডই আপনার নিয়ন্ত্রণ কক্ষ'],
-                body: [
-                  'Everything to do with your properties — tenants, rent, messages, papers — is kept together in one place.',
-                  'আপনার প্রপার্টির সব কিছু — ভাড়াটিয়া, ভাড়া, মেসেজ, কাগজপত্র — এক জায়গায় একসাথে রাখা।',
-                ],
-                action: ['Press Next and we will open it.', 'পরবর্তী চাপুন, আমরা খুলে দিচ্ছি।'],
-                onNext: () => {
-                  box.driver?.destroy();
-                  navigate('/host-dashboard');
-                },
-              }),
-            ]
-          : [
-              step({
-                element: '[data-tour="navbar-profile"]',
-                side: 'bottom',
-                align: 'end',
-                title: ['Your menu lives here', 'আপনার মেনু এখানে'],
-                body: [
-                  'This button opens everything to do with your account, including your dashboard.',
-                  'এই বাটনটি আপনার অ্যাকাউন্টের সব কিছু খোলে, ড্যাশবোর্ডসহ।',
-                ],
-                action: ['Press Next to open it.', 'খুলতে পরবর্তী চাপুন।'],
-                onNext: () => {
-                  window.dispatchEvent(new Event('open-navbar-profile'));
-                  window.setTimeout(() => box.driver?.moveNext(), 300);
-                },
-              }),
-              step({
-                element: '[data-tour="host-dashboard-link"]',
-                side: 'left',
-                align: 'start',
-                reveal: true,
-                title: ['Your dashboard is the control room', 'ড্যাশবোর্ডই আপনার নিয়ন্ত্রণ কক্ষ'],
-                body: [
-                  'Everything to do with your properties — tenants, rent, messages, papers — is kept together in one place.',
-                  'আপনার প্রপার্টির সব কিছু — ভাড়াটিয়া, ভাড়া, মেসেজ, কাগজপত্র — এক জায়গায় একসাথে রাখা।',
-                ],
-                action: ['Press Next and we will open it.', 'পরবর্তী চাপুন, আমরা খুলে দিচ্ছি।'],
-                onNext: () => {
-                  box.driver?.destroy();
-                  navigate('/host-dashboard');
-                },
-              }),
-            ],
+      (box) => [
+        step({
+          // Phone: the Home tab in the bottom rail, which for a landlord
+          // resolves to the dashboard. Desktop: the account chip.
+          element: isMobile
+            ? '[data-tour="mobile-nav-home"]'
+            : '[data-tour="navbar-profile"]',
+          side: isMobile ? 'top' : 'bottom',
+          align: isMobile ? 'center' : 'end',
+          title: ['Your dashboard is the control room', 'ড্যাশবোর্ডই আপনার নিয়ন্ত্রণ কক্ষ'],
+          body: [
+            'Everything to do with your properties — tenants, rent, messages, papers — is kept together in one place, and this button is the way in.',
+            'আপনার প্রপার্টির সব কিছু — ভাড়াটিয়া, ভাড়া, মেসেজ, কাগজপত্র — এক জায়গায় একসাথে রাখা, আর এই বাটনটিই সেখানে যাওয়ার পথ।',
+          ],
+          action: ['Press Next and we will open it.', 'পরবর্তী চাপুন, আমরা খুলে দিচ্ছি।'],
+          onNext: () => {
+            box.driver?.destroy();
+            navigate('/host-dashboard');
+          },
+        }),
+      ],
       {
         anchor: isMobile ? '[data-tour="mobile-nav-home"]' : '[data-tour="navbar-profile"]',
         // App.jsx sends an authenticated landlord from "/" to /host-dashboard on
@@ -1866,6 +1900,19 @@ export const TourProvider = ({ children }) => {
           }
 
           steps.push(
+            // No `tour:tab` switch on this one, unlike every other rail step
+            // below. Overview is the module Living opens on, so the tour is
+            // already standing on it — dispatching a switch would only push a
+            // spurious history entry (see `drilling` in Living.jsx's go()).
+            step({
+              element: tabAnchor('overview'),
+              side: tabSide(),
+              title: ['Start here, every time', 'প্রতিবার শুরু হবে এখান থেকে'],
+              body: [
+                'The first tab is the wallet\'s front page: what is in the fund right now, what the mess has spent this month, and what just happened. When you are not sure where to look, look here.',
+                'প্রথম ট্যাবটিই ওয়ালেটের প্রথম পাতা: এই মুহূর্তে ফান্ডে কত আছে, এ মাসে মেসে কত খরচ হলো, আর সদ্য কী কী হয়েছে। কোথায় দেখবেন বুঝতে না পারলে এখানেই দেখুন।',
+              ],
+            }),
             step({
               element: tabAnchor('meals'),
               side: tabSide(),
@@ -2002,13 +2049,44 @@ export const TourProvider = ({ children }) => {
                 'বাড়িভাড়া, গ্যাস, বিদ্যুৎ, পানি — যেগুলো প্রতি মাসে আসে। দেওয়ার সাথে সাথে পরিশোধিত চিহ্ন দিয়ে রাখলে কী বাকি আছে সবসময় জানা থাকবে।',
               ],
               onNext: () => actThenNext('tour:tab', 'bills'),
-              // Last step. driver.js prefers onDoneClick here, and any popover
-              // click handler *replaces* the built-in advance — so this one has
-              // to land the user on Bills and tear the tour down itself.
-              onDone: () => {
-                emit('tour:tab', 'bills');
-                box.driver?.destroy();
-              },
+            }),
+            step({
+              element: tabAnchor('balances'),
+              side: tabSide(),
+              title: ['So who owes whom?', 'তাহলে কে কাকে কত দেবে?'],
+              body: [
+                'Everything above — meals, bazar, the shared expenses, the bills — comes together as one number per person. Plus means the mess owes them, minus means they owe the mess.',
+                'উপরের সবকিছু — মিল, বাজার, শেয়ার্ড খরচ, বিল — মিলে প্রত্যেকের জন্য একটি করে সংখ্যা দাঁড়ায়। প্লাস মানে মেস তাকে দেবে, মাইনাস মানে সে মেসকে দেবে।',
+              ],
+              action: [
+                'At month end this is the only screen you need to settle up.',
+                'মাস শেষে হিসাব মেলাতে এই একটি পর্দাই যথেষ্ট।',
+              ],
+              onNext: () => actThenNext('tour:tab', 'balances'),
+            }),
+            step({
+              element: '[data-tour="living-reminders"]',
+              side: 'bottom',
+              align: 'end',
+              title: ['Nudging people, without the awkwardness', 'তাগাদা দিন, অস্বস্তি ছাড়াই'],
+              body: [
+                'Asking a roommate for money face to face is the worst part of running a mess. The bell keeps the reminders — a bill coming due, a share still unpaid — so the app does the asking instead of you.',
+                'রুমমেটের কাছে মুখোমুখি টাকা চাওয়াই মেস চালানোর সবচেয়ে কঠিন কাজ। ঘণ্টার ভেতরে মনে করিয়ে দেওয়াগুলো জমা থাকে — কোন বিলের সময় হয়েছে, কার ভাগ এখনো বাকি — তাই আপনার বদলে অ্যাপই কথাটা বলে দেয়।',
+              ],
+            }),
+            // Last step. Deliberately the way OUT: Living is a full-screen
+            // surface of its own, and a tenant who cannot find the door back to
+            // their rent and receipts is the same complaint the tenant training
+            // exists to answer.
+            step({
+              element: '[data-tour="living-profile"]',
+              side: 'bottom',
+              align: 'end',
+              title: ['And back to your own pages', 'আর নিজের পাতায় ফেরা'],
+              body: [
+                'This ledger is only the day-to-day money. Your rent, your landlord and your receipts are on your own page, and your picture up here is the way back to it.',
+                'এই খাতায় শুধু প্রতিদিনের টাকা-পয়সা। আপনার ভাড়া, বাড়িওয়ালা আর রসিদ আছে আপনার নিজের পাতায় — উপরের এই ছবিটিই সেখানে ফেরার পথ।',
+              ],
             }),
           );
 
@@ -2141,6 +2219,20 @@ export const TourProvider = ({ children }) => {
             },
           }),
           step({
+            element: livingTabAnchor('income'),
+            side: livingTabSide(),
+            title: ['And what came in', 'আর কী কী এলো'],
+            body: [
+              'Salary, money from home, tuition, freelance, a gift — written down the same way as spending. Without this side the balance at the top is only half the story.',
+              'বেতন, বাসা থেকে আসা টাকা, টিউশনি, ফ্রিল্যান্স, উপহার — খরচের মতো করেই এখানে লেখা হয়। এই দিকটা না লিখলে উপরের ব্যালেন্সটা অর্ধেক সত্যি।',
+            ],
+            onNext: () => {
+              box.holdBlockerWatch?.();
+              window.dispatchEvent(new CustomEvent('tour:tab', { detail: 'income' }));
+              window.setTimeout(() => box.driver?.moveNext(), MODULE_SETTLE_MS);
+            },
+          }),
+          step({
             element: livingTabAnchor('people'),
             side: livingTabSide(),
             title: ['Who owes you, whom you owe', 'কার কাছে পাবেন, কাকে দেবেন'],
@@ -2155,6 +2247,20 @@ export const TourProvider = ({ children }) => {
             },
           }),
           step({
+            element: livingTabAnchor('report'),
+            side: livingTabSide(),
+            title: ['Where the month actually went', 'মাসটা আসলে কোথায় গেল'],
+            body: [
+              'One page for the whole month: which খাত took the most, what came in against what went out, and how this month sits beside the last six. You write nothing here — it is built from the rows you already put in.',
+              'পুরো মাসের জন্য একটি পাতা: কোন খাতে সবচেয়ে বেশি গেল, কত এলো আর কত গেল, আর গত ছয় মাসের পাশে এই মাসটা কেমন। এখানে কিছু লিখতে হয় না — আপনার লেখা সারিগুলো থেকেই এটি তৈরি হয়।',
+            ],
+            onNext: () => {
+              box.holdBlockerWatch?.();
+              window.dispatchEvent(new CustomEvent('tour:tab', { detail: 'report' }));
+              window.setTimeout(() => box.driver?.moveNext(), MODULE_SETTLE_MS);
+            },
+          }),
+          step({
             element: '[data-tour="living-mode-switch"]',
             side: 'bottom',
             align: 'end',
@@ -2162,6 +2268,16 @@ export const TourProvider = ({ children }) => {
             body: [
               'This corner button takes you to the shared ledger — meals, bazar and the meal rate with your roommates. Your private খাতা stays exactly as it is, waiting here.',
               'কোণার এই বাটনটি আপনাকে যৌথ খাতায় নিয়ে যাবে — রুমমেটদের সাথে মিল, বাজার আর মিল রেট। আপনার ব্যক্তিগত খাতা ঠিক যেমন আছে তেমনই এখানে থেকে যাবে।',
+            ],
+          }),
+          step({
+            element: '[data-tour="living-profile"]',
+            side: 'bottom',
+            align: 'end',
+            title: ['And back to your own pages', 'আর নিজের পাতায় ফেরা'],
+            body: [
+              'This খাতা is only your day-to-day money. Your rent, your landlord and your receipts are on your own page, and your picture up here is the way back to it.',
+              'এই খাতায় শুধু আপনার প্রতিদিনের টাকা-পয়সা। আপনার ভাড়া, বাড়িওয়ালা আর রসিদ আছে আপনার নিজের পাতায় — উপরের এই ছবিটিই সেখানে ফেরার পথ।',
             ],
           }),
           closingStep(),

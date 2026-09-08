@@ -43,10 +43,29 @@ export default function NotificationBell({ isAuthed, className = '' }) {
     }
   };
 
+  // Re-register the push subscription once the user is logged in.
+  //
+  // `Notification.permission === 'granted'` is the right gate on the WEB — it
+  // means "already allowed, so re-subscribing is silent and won't pop a prompt
+  // at a random moment". It is the WRONG gate inside the Android WebView: the
+  // permission that matters there is the app's POST_NOTIFICATIONS, which the
+  // WebView's `Notification.permission` knows nothing about and which therefore
+  // reads 'default' forever. The effect never fired, so a native user only ever
+  // registered for push if they happened to tap the bell.
+  //
+  // subscribeToPushNotifications() handles the native branch itself, including
+  // asking for permission, and is a no-op when the user declines.
   useEffect(() => {
-    if (isAuthed && 'Notification' in window && Notification.permission === 'granted') {
-      subscribeToPushNotifications();
-    }
+    if (!isAuthed) return;
+    let cancelled = false;
+    (async () => {
+      const { Capacitor } = await import('@capacitor/core');
+      if (cancelled) return;
+      const canSubscribe = Capacitor.isNativePlatform()
+        || ('Notification' in window && Notification.permission === 'granted');
+      if (canSubscribe) subscribeToPushNotifications();
+    })();
+    return () => { cancelled = true; };
   }, [isAuthed]);
 
   if (!isAuthed) {

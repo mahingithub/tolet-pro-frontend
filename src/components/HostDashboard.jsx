@@ -122,14 +122,21 @@ const HOST_ROOT_TAB = 'dashboard';
 // `data-tour` anchors for the guided onboarding tour (see context/TourContext).
 // Only the tabs the host tour actually walks through are listed; anything else
 // resolves to undefined, which React drops from the DOM entirely.
+//
+// Every id here must exist in `menuItems` below — an anchor for an entry that
+// has since been renamed or removed silently resolves to nothing, and the tour
+// step pointing at it is dropped without a word. Keep the two lists together.
 const TOUR_TAB_ANCHORS = {
   dashboard:   'dashboard-tab',
   documents:   'documents-tab',
+  properties:  'properties-tab',
   inquiries:   'inquiries-tab',
+  messages:    'messages-tab',
   bookings:    'bookings-tab',
   payments:    'payments-tab',
   smartAlerts: 'smart-alerts-tab',
   aiInsights:  'ai-insights-tab',
+  settings:    'settings-tab',
 };
 
 // Payment channels offered when converting an inquiry into a booking / recording
@@ -5451,8 +5458,6 @@ const HostDashboard = () => {
             subStatus={subStatus}
             navigate={navigate}
             isPropertiesLoading={isPropertiesLoading}
-            properties={properties}
-            setPropertyFilter={setPropertyFilter}
             moreActionsOpen={moreActionsOpen}
             setMoreActionsOpen={setMoreActionsOpen}
             isPremium={isPremium}

@@ -23,7 +23,12 @@ export async function registerNativePush() {
     const token = getCurrentToken();
     if (!token) return;
     try {
-      await fetch(`${API_BASE}/api/notifications/register-device`, {
+      // VITE_API_BASE_URL ALREADY ENDS IN "/api" — every other caller in the
+      // codebase treats it that way (`${API}/notifications/...`). This line used
+      // to add a second one and POST to `/api/api/notifications/register-device`,
+      // which is a 404, so the device token was never stored and the phone could
+      // not receive a push even once the rest of the native setup was in place.
+      await fetch(`${API_BASE}/notifications/register-device`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

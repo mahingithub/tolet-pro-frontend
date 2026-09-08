@@ -217,7 +217,6 @@ const Navbar = () => {
   const [showHomeChoice,    setShowHomeChoice]    = useState(false);
   const [isLangMenuOpen,    setIsLangMenuOpen]    = useState(false);
   const [isMobileMenuOpen,  setIsMobileMenuOpen]  = useState(false);
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [expandedDiv,       setExpandedDiv]       = useState(null);
 
   // "What are you looking for?" popup state — shown after clicking a district
@@ -245,7 +244,6 @@ const Navbar = () => {
   // closed on every click and never actually toggled languages.
   const langRef       = useRef(null);
   const mobileLangRef = useRef(null);
-  const profileRef = useRef(null);
 
   // ⚠️  IDs must match `rentalCategory` values in propertyService.js
   const navPropertyTypes = [
@@ -266,7 +264,6 @@ const Navbar = () => {
         (langRef.current       && langRef.current.contains(e.target)) ||
         (mobileLangRef.current && mobileLangRef.current.contains(e.target));
       if (!insideLang) setIsLangMenuOpen(false);
-      if (profileRef.current && !profileRef.current.contains(e.target)) setIsProfileMenuOpen(false);
       if (navLocRef.current  && !navLocRef.current.contains(e.target))  setNavLocOpen(false);
       if (navTypeRef.current && !navTypeRef.current.contains(e.target)) setNavTypeOpen(false);
       if (mobileNavLocRef.current && !mobileNavLocRef.current.contains(e.target)) setMobileNavLocOpen(false);
@@ -417,12 +414,11 @@ useEffect(() => {
     }, 300);
     return () => clearTimeout(timer);
   }, [mobileNavLoc]);
-  // 🟢 TOUR SUPPORT: listen for global event to open profile dropdown
-  useEffect(() => {
-    const handleOpenProfile = () => setIsProfileMenuOpen(true);
-    window.addEventListener('open-navbar-profile', handleOpenProfile);
-    return () => window.removeEventListener('open-navbar-profile', handleOpenProfile);
-  }, []);
+  // The account chip used to open a dropdown, and the landlord tour opened it
+  // with an `open-navbar-profile` event to point at the "Host Dashboard" row
+  // inside. The chip now navigates straight to the dashboard, so the dropdown,
+  // its open state and that listener are all gone — the tour points at the chip
+  // itself instead (see the desktop branch of startHostTour).
 
   const hiddenPaths = ['/inquire', '/success', '/login', '/host-dashboard', '/tenant-dashboard', '/list-property', '/services'];
   if (hiddenPaths.some(p => location.pathname.includes(p))) return null;
@@ -693,7 +689,7 @@ useEffect(() => {
               )}
             </div>
 
-            <div className="relative pl-2 border-l border-gray-200" ref={profileRef}>
+            <div className="relative pl-2 border-l border-gray-200">
               {isLoggedIn ? (
                 <>
                   <div onClick={() => navigate(userRole === 'landlord' ? '/host-dashboard' : '/tenant-dashboard')}

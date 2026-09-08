@@ -19,6 +19,28 @@ const urlBase64ToUint8Array = (base64String) => {
 };
 
 export const subscribeToPushNotifications = async () => {
+  // NATIVE FIRST. Inside the Android WebView this function used to run its full
+  // web path and quietly achieve nothing: `serviceWorker` and `PushManager` are
+  // present, so neither guard below trips, but a Capacitor WebView never
+  // receives a Web Push — delivery goes through FCM to the app process, not to
+  // a service worker. The app therefore appeared to subscribe, stored nothing
+  // the server could push to, and no notification ever arrived.
+  //
+  // Routing to the FCM registration here rather than at the call sites keeps the
+  // two existing callers (NotificationBell) platform-agnostic — they ask for
+  // "push", and the platform decides what that means.
+  //
+  // Imported dynamically to break a cycle: authService imports this module for
+  // unsubscribe, and nativePush imports authService for the bearer token. A
+  // static import would close that loop. It also keeps the Capacitor plugins out
+  // of the web bundle, where they are dead code.
+  const { Capacitor } = await import('@capacitor/core');
+  if (Capacitor.isNativePlatform()) {
+    const { registerNativePush } = await import('../services/nativePush.js');
+    await registerNativePush();
+    return null;
+  }
+
   if (!('serviceWorker' in navigator)) return null;
   if (!('PushManager' in window)) return null;
 
