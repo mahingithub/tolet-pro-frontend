@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, lazy, Suspense } from "react";
+import React, { useEffect, useRef, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { LanguageProvider } from "./context/LanguageContext";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
@@ -10,6 +10,11 @@ import { getCurrentToken } from "./services/authService";
 import { listTenantBookings } from "./services/bookingService";
 import fcmService from "./services/fcmService";
 import ErrorBoundary from './components/ErrorBoundary';
+// Every code-split component below goes through this instead of React's bare
+// lazy(). A route chunk that fails to download is the difference between "the
+// app is offline" and "the app is broken", and lazy() alone cannot tell them
+// apart — nor recover from either. See utils/lazyRoute.js.
+import lazyRoute from './utils/lazyRoute';
 import { needsBookingLookup, resolveHome } from './utils/homeSurface';
 import { hasCachedSettings } from './services/settingsService';
 
@@ -29,16 +34,16 @@ import AppDownloadBanner from "./components/AppDownloadBanner";
 // ~2,300 lines sitting in the entry chunk, delaying first paint for UI that by
 // definition is not what the user came for. They mount a moment after the page
 // does, behind `<Suspense fallback={null}>` (see the render tree below).
-const GlobalAIAssistant = lazy(() => import("./components/GlobalAIAssistant"));
-const WelcomeRobotOverlay = lazy(() => import("./components/WelcomeRobotOverlay"));
-const HomeIntentModal = lazy(() => import("./components/HomeIntentModal"));
-const GlobalToaster = lazy(() => import("./components/GlobalToaster"));
-const FeedbackButton = lazy(() => import("./components/FeedbackButton"));
-const GlobalCallUI = lazy(() => import("./components/GlobalCallUI"));
-const ThemeWidget = lazy(() => import("./components/shared/ThemeWidget"));
+const GlobalAIAssistant = lazyRoute(() => import("./components/GlobalAIAssistant"), "GlobalAIAssistant");
+const WelcomeRobotOverlay = lazyRoute(() => import("./components/WelcomeRobotOverlay"), "WelcomeRobotOverlay");
+const HomeIntentModal = lazyRoute(() => import("./components/HomeIntentModal"), "HomeIntentModal");
+const GlobalToaster = lazyRoute(() => import("./components/GlobalToaster"), "GlobalToaster");
+const FeedbackButton = lazyRoute(() => import("./components/FeedbackButton"), "FeedbackButton");
+const GlobalCallUI = lazyRoute(() => import("./components/GlobalCallUI"), "GlobalCallUI");
+const ThemeWidget = lazyRoute(() => import("./components/shared/ThemeWidget"), "ThemeWidget");
 
 // ─── ROUTE COMPONENTS — code-split, one chunk each ──────────────────────────
-// WHY THIS IS lazy() AND NOT A PLAIN IMPORT.
+// WHY THIS IS lazyRoute() AND NOT A PLAIN IMPORT.
 //
 // Every one of these used to be a static import, which meant Vite emitted the
 // entire app as ONE 4.4MB JavaScript file (1.17MB over the wire, brotli). A
@@ -54,47 +59,53 @@ const ThemeWidget = lazy(() => import("./components/shared/ThemeWidget"));
 // hit "some devices sometimes" rather than everyone always. It is a function of
 // the network you happen to be on at that moment.
 //
-// lazy() makes each route its own chunk, fetched when that route is opened. The
-// initial download becomes the shell plus ONE route.
+// lazyRoute() makes each route its own chunk, fetched when that route is
+// opened. The initial download becomes the shell plus ONE route.
+//
+// The cost of splitting is that a route can now fail to load on its own, which
+// is what "the app opens without internet but no page does" was: the chunk was
+// never in the cache. Two things pay for it — the service worker precaches
+// every chunk in the build (scripts/inject-sw-precache.mjs), and lazyRoute
+// retries and recovers when one still doesn't arrive.
 //
 // RULE FOR ANYONE ADDING A ROUTE: put it here, not in the static block above.
 // A static import silently folds the whole component tree back into the entry
 // chunk, which is exactly how this regressed to 4.4MB in the first place.
-const PropertyListing  = lazy(() => import("./components/PropertyListing"));
-const PropertyDetails  = lazy(() => import("./components/PropertyDetails"));
-const InquiryPage      = lazy(() => import("./components/InquiryModal"));
-const LoginPage        = lazy(() => import("./components/LoginPage"));
-const HostDashboard    = lazy(() => import("./components/HostDashboard"));
-const AddProperty      = lazy(() => import("./components/AddProperty"));
-const HomePage         = lazy(() => import("./components/HomePage"));
-const ChatSystem       = lazy(() => import("./components/ChatSystem"));
-const TenantDashboard  = lazy(() => import("./components/TenantDashboard"));
-const Living           = lazy(() => import("./components/living/Living"));
-const SmartAlertsPage  = lazy(() => import("./components/Smartalertspage"));
-const AIInsightsPage   = lazy(() => import("./components/Aiinsightspage"));
-const LandlordProfile  = lazy(() => import("./components/LandlordProfile"));
-const TenantProfile    = lazy(() => import("./components/TenantProfile"));
-const PrivacyCenter    = lazy(() => import("./components/PrivacyCenter.jsx"));
-const SubscriptionPage = lazy(() => import("./components/SubscriptionPage"));
-const CheckoutPage     = lazy(() => import("./components/CheckoutPage"));
-const SupportPage      = lazy(() => import("./components/SupportPage"));
-const ServicesPage     = lazy(() => import("./components/ServicesPage"));
-const HowItWorks       = lazy(() => import("./components/HowItWorks"));
-const JoinPropertyPage = lazy(() => import("./components/JoinPropertyPage"));
+const PropertyListing  = lazyRoute(() => import("./components/PropertyListing"), "PropertyListing");
+const PropertyDetails  = lazyRoute(() => import("./components/PropertyDetails"), "PropertyDetails");
+const InquiryPage      = lazyRoute(() => import("./components/InquiryModal"), "InquiryPage");
+const LoginPage        = lazyRoute(() => import("./components/LoginPage"), "LoginPage");
+const HostDashboard    = lazyRoute(() => import("./components/HostDashboard"), "HostDashboard");
+const AddProperty      = lazyRoute(() => import("./components/AddProperty"), "AddProperty");
+const HomePage         = lazyRoute(() => import("./components/HomePage"), "HomePage");
+const ChatSystem       = lazyRoute(() => import("./components/ChatSystem"), "ChatSystem");
+const TenantDashboard  = lazyRoute(() => import("./components/TenantDashboard"), "TenantDashboard");
+const Living           = lazyRoute(() => import("./components/living/Living"), "Living");
+const SmartAlertsPage  = lazyRoute(() => import("./components/Smartalertspage"), "SmartAlertsPage");
+const AIInsightsPage   = lazyRoute(() => import("./components/Aiinsightspage"), "AIInsightsPage");
+const LandlordProfile  = lazyRoute(() => import("./components/LandlordProfile"), "LandlordProfile");
+const TenantProfile    = lazyRoute(() => import("./components/TenantProfile"), "TenantProfile");
+const PrivacyCenter    = lazyRoute(() => import("./components/PrivacyCenter.jsx"), "PrivacyCenter");
+const SubscriptionPage = lazyRoute(() => import("./components/SubscriptionPage"), "SubscriptionPage");
+const CheckoutPage     = lazyRoute(() => import("./components/CheckoutPage"), "CheckoutPage");
+const SupportPage      = lazyRoute(() => import("./components/SupportPage"), "SupportPage");
+const ServicesPage     = lazyRoute(() => import("./components/ServicesPage"), "ServicesPage");
+const HowItWorks       = lazyRoute(() => import("./components/HowItWorks"), "HowItWorks");
+const JoinPropertyPage = lazyRoute(() => import("./components/JoinPropertyPage"), "JoinPropertyPage");
 
 // --- SEO landing pages ---
 // Public, content-rich pages for the half of the product that lives behind a
 // login (meal manager, roommate wallet, tenant/house management) plus the
 // /to-let hub that links out to all 8 divisions and 64 districts. A crawler
 // could not see any of this before — see src/seo/featurePages.js.
-const ToLetHub       = lazy(() => import("./components/seo/ToLetHub"));
-const FeatureLanding = lazy(() => import("./components/seo/FeatureLanding"));
+const ToLetHub       = lazyRoute(() => import("./components/seo/ToLetHub"), "ToLetHub");
+const FeatureLanding = lazyRoute(() => import("./components/seo/FeatureLanding"), "FeatureLanding");
 
 // --- Legal pages (Phase 7) ---
-const PrivacyPolicy   = lazy(() => import("./components/legal/PrivacyPolicy"));
-const TermsOfService  = lazy(() => import("./components/legal/TermsOfService"));
-const RefundPolicy    = lazy(() => import("./components/legal/RefundPolicy"));
-const TrustSafety     = lazy(() => import("./components/legal/TrustSafety"));
+const PrivacyPolicy   = lazyRoute(() => import("./components/legal/PrivacyPolicy"), "PrivacyPolicy");
+const TermsOfService  = lazyRoute(() => import("./components/legal/TermsOfService"), "TermsOfService");
+const RefundPolicy    = lazyRoute(() => import("./components/legal/RefundPolicy"), "RefundPolicy");
+const TrustSafety     = lazyRoute(() => import("./components/legal/TrustSafety"), "TrustSafety");
 
 // --- Admin panel ---
 // The admin panel is now a SEPARATE React app (see ../tolet-pro-admin),

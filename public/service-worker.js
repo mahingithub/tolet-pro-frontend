@@ -2,40 +2,45 @@ importScripts('/call-notification-sw.js');
 
 /* TO-LET PRO — Service Worker
  * ───────────────────────────────────────────────────────────────────────────
- * Makes the app installable + gives a basic offline shell. Written DEFENSIVELY
- * because TO-LET PRO is real-time (Socket.IO signaling, peer-to-peer WebRTC
- * media, live chat polling). If the SW cached those, calls would silently break
- * and users would see stale messages — bugs that are miserable to trace.
+ * Makes the app installable and lets the WHOLE app open with no connection —
+ * not just the homepage. Written DEFENSIVELY because TO-LET PRO is real-time
+ * (Socket.IO signaling, peer-to-peer WebRTC media, live chat polling). If the
+ * SW cached those, calls would silently break and users would see stale
+ * messages — bugs that are miserable to trace.
  *
  * The rule here is simple and strict:
- *   • STATIC assets (the built JS/CSS/images, icons, manifest) → cache-first.
+ *   • STATIC assets (the built JS/CSS/images, icons, manifest) → cache-first,
+ *     and PRECACHED, so a route works offline before it has ever been opened.
  *   • EVERYTHING dynamic (API, socket, cross-origin) → NETWORK-ONLY,
  *     never touched by the cache.
  *
  * ► TO CHANGE LATER:
- *   - Bump CACHE_VERSION whenever you want every client to drop the old cache
- *     and re-fetch fresh assets (e.g. after a big release).
- *   - The version below is a STATIC string, so it only invalidates caches when
- *     YOU change it by hand (audit 6.5). For automatic per-deploy invalidation,
- *     inject the build hash here at build time — e.g. a post-`vite build` script
- *     that replaces a `__BUILD_ID__` placeholder in dist/service-worker.js with
- *     `Date.now()` or the git short SHA, or adopt vite-plugin-pwa.
+ *   - This file is a TEMPLATE. `scripts/inject-sw-precache.mjs` runs after
+ *     `vite build` and writes the real dist/service-worker.js: it fills in the
+ *     build id and the two precache lists. Editing dist/ directly is pointless
+ *     — edit here and rebuild (`npm run build`, or `npm run sw:precache` on an
+ *     existing build).
+ *   - There is no CACHE_VERSION to bump any more. The id is derived from the
+ *     build's asset hashes AND this file's own contents, so any real change
+ *     gives every client a fresh cache and drops the old one on activate.
  *   - NEVER add /api, socket.io, or media hosts to precache or to the
  *     cache-first branch. Keep them on the network-only path below.
  */
 
-// Bump this on any release that changes a PRECACHED file (index.html, manifest,
-// icons, offline.html). Hashed build assets (index-*.js/css) already bust their
-// own cache via unique filenames, so they don't need a version bump.
-// v6: the cache-first branch below used to swallow HTML too, so route URLs like
-// '/host-dashboard?tab=dashboard' were stored in here permanently. Bumping the
-// version is what evicts those poisoned entries from clients that already have
-// them — the fix alone would leave them sitting in the old cache forever.
-const CACHE_VERSION = 'tolet-pro-v6';
+// ─── Build identity ────────────────────────────────────────────────────────
+// `__BUILD_ID__` is replaced at build time by scripts/inject-sw-precache.mjs,
+// so every deploy gets its own cache and the previous one is dropped on
+// activate. It used to be a hand-maintained 'v6', which meant a release only
+// invalidated caches if somebody remembered to edit this line — and the file
+// this cache holds that ISN'T content-hashed is index.html, the one file that
+// must never go stale. If the placeholder is still here we're running the
+// unprocessed source (dev, or a copy served straight out of public/), so fall
+// back to a fixed name.
+const BUILD_ID = '__BUILD_ID__';
+const CACHE_VERSION = BUILD_ID.indexOf('__') === 0 ? 'tolet-pro-dev' : `tolet-pro-${BUILD_ID}`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
-// Minimal app shell. Hashed build assets (index-*.js/css) are cached at runtime
-// on first fetch — we don't list them here because their names change per build.
+// The shell: everything that isn't emitted by the bundler.
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -44,6 +49,36 @@ const PRECACHE_URLS = [
   '/icons/icon-192.png',
   '/icons/icon-512.png',
 ];
+
+// ─── Build assets, injected at build time ──────────────────────────────────
+// WHY THIS EXISTS — this is the fix for "the app opens offline but no page
+// does". Every route in this app is a lazy() chunk, so /living is a SEPARATE
+// file from /host-dashboard, which is separate again from the shell. Nothing
+// below used to be precached: chunks only entered the cache when the user
+// happened to open that route WHILE ONLINE. So a phone that had been to the
+// homepage and nothing else had exactly one route cached, and opening the app
+// with no connection gave:
+//
+//     Failed to fetch dynamically imported module: /assets/Living-<hash>.js
+//
+// which React lazy() throws, which the ErrorBoundary catches — the "Something
+// went wrong" screen. The app booted fine; it simply had no page to show.
+//
+// Two tiers, because the whole build is ~5MB raw and a first-time visitor
+// should not wait on the landlord dashboard to see the homepage:
+//   • CRITICAL — the entry script + stylesheet + preloaded vendor chunks, read
+//     straight out of dist/index.html. Cached during install, before the SW is
+//     allowed to activate.
+//   • ROUTES — every other chunk. Warmed in the background AFTER the app is on
+//     screen (the page posts WARM_CACHE when it goes idle). Resumable: already
+//     cached URLs are skipped, so an interrupted warm picks up where it left
+//     off on the next launch.
+//
+// Both lists are regenerated on every build. Do not edit them by hand.
+// __PRECACHE_START__
+const PRECACHE_CRITICAL = [];
+const PRECACHE_ROUTES = [];
+// __PRECACHE_END__
 
 // Requests we must NEVER serve from cache. If any of these substrings appear in
 // the URL, the SW gets out of the way and lets the network handle it directly.
@@ -57,25 +92,146 @@ const NETWORK_ONLY = [
   'identitytoolkit',       // Firebase auth
 ];
 
-// ─── Install: precache the shell ───────────────────────────────────────────
-self.addEventListener('install', (event) => {
+// ─── Cache filling ─────────────────────────────────────────────────────────
+// Deliberately NOT cache.addAll(). addAll is all-or-nothing: one 404 among a
+// hundred and forty files and the entire precache rejects, leaving the user
+// with nothing cached at all — which is the worst possible failure mode for
+// the thing that exists to make the app work offline. This fills the cache one
+// file at a time, tolerates individual failures, and skips what's already
+// there so a warm can resume after being interrupted.
+async function cacheUrls(cache, urls, options) {
+  const opts = options || {};
+  const concurrency = opts.concurrency || 6;
+  const queue = urls.slice();
+
+  const worker = async () => {
+    while (queue.length) {
+      const url = queue.shift();
+      try {
+        if (!opts.revalidate) {
+          const hit = await cache.match(url, { ignoreVary: true });
+          if (hit) continue;
+        }
+        // `cache: 'reload'` for the shell only. index.html is the one precached
+        // file with no content hash, so the browser's own HTTP cache is allowed
+        // to hand back a copy from the PREVIOUS deploy — which would then point
+        // at build assets this deploy has already deleted. Hashed assets can
+        // safely come from the HTTP cache; their names change when they do.
+        const req = opts.revalidate ? new Request(url, { cache: 'reload' }) : new Request(url);
+        const res = await fetch(req);
+        if (res && res.status === 200 && res.type !== 'opaque') {
+          await cache.put(url, res.clone());
+        }
+      } catch {
+        /* best effort — a missing file must not abort the rest */
+      }
+    }
+  };
+
+  const lanes = Math.min(concurrency, Math.max(queue.length, 1));
+  await Promise.all(Array.from({ length: lanes }, worker));
+}
+
+// Background warm of the route chunks. Runs at most once per SW lifetime and
+// is safe to call from anywhere — the promise is memoised.
+let warmPromise = null;
+function warmRouteAssets() {
+  if (warmPromise) return warmPromise;
+  // Respect Data Saver. Someone who has explicitly asked the browser to spend
+  // less data should not silently receive 5MB of route chunks; they still get
+  // the shell and whatever they actually open.
+  const conn = self.navigator && self.navigator.connection;
+  if (conn && conn.saveData) return Promise.resolve();
+  warmPromise = caches.open(STATIC_CACHE)
+    .then((cache) => cacheUrls(cache, PRECACHE_ROUTES, { concurrency: 4 }))
+    .catch(() => {/* best effort */});
+  return warmPromise;
+}
+
+// Safety net for the launch where the page never asks. That happens for one
+// load after a release: the tab is still running the PREVIOUS build's entry
+// chunk, which has no idea WARM_CACHE exists, while this worker is already the
+// one serving it. Without this, such a device would sit on a shell-only cache
+// until its next launch — and the next launch might be the one with no signal.
+let warmScheduled = false;
+function scheduleWarmFallback(event) {
+  if (warmScheduled) return;
+  warmScheduled = true;
+  // Long enough that the page has certainly finished loading whatever it
+  // opened with, and that a page which DOES send WARM_CACHE has already been
+  // served (warmRouteAssets is memoised, so the later call is a no-op).
   event.waitUntil(
-    caches.open(STATIC_CACHE)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting()) // activate the new SW immediately
-      .catch(() => {/* precache failure shouldn't block install */})
+    new Promise((resolve) => setTimeout(resolve, 20000)).then(warmRouteAssets)
   );
+}
+
+// ─── Install: precache the shell + the critical chunks ─────────────────────
+self.addEventListener('install', (event) => {
+  event.waitUntil((async () => {
+    try {
+      const cache = await caches.open(STATIC_CACHE);
+      await cacheUrls(cache, PRECACHE_URLS, { revalidate: true, concurrency: 4 });
+      await cacheUrls(cache, PRECACHE_CRITICAL, { concurrency: 6 });
+    } catch {
+      /* precache failure shouldn't block install */
+    }
+    await self.skipWaiting(); // activate the new SW immediately
+    // The route chunks are deliberately NOT started here. Install runs while
+    // the user is waiting on their first screen, and 5MB of background
+    // downloads competing with the route they actually opened is a slow app
+    // today in exchange for an offline app tomorrow. The page asks for the
+    // warm itself once it has painted and gone idle (see main.jsx).
+  })());
 });
 
-// ─── Activate: drop old caches ─────────────────────────────────────────────
+// ─── Activate: drop old caches, but only once the new one can stand alone ──
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(
+  event.waitUntil((async () => {
+    // GUARD. Install fetches over the network, so a worker that installs on a
+    // failing connection ends up with an EMPTY cache. Deleting the previous
+    // cache at that point takes a phone that worked offline five minutes ago
+    // and leaves it with nothing — the exact failure this whole change exists
+    // to prevent, caused by the cleanup step.
+    //
+    // So the old cache is only dropped when the new one actually holds the
+    // files needed to boot. Until then both are kept: cacheGet() prefers the
+    // new cache and falls back to the old, so the app keeps working from the
+    // previous build's assets, and the next successful activation cleans up.
+    let complete = false;
+    try {
+      const cache = await caches.open(STATIC_CACHE);
+      const required = ['/index.html'].concat(PRECACHE_CRITICAL);
+      const hits = await Promise.all(
+        required.map((u) => cache.match(u, { ignoreVary: true }))
+      );
+      complete = hits.every(Boolean);
+    } catch {
+      complete = false;
+    }
+
+    if (complete) {
+      const keys = await caches.keys();
+      await Promise.all(
         keys.filter((k) => k !== STATIC_CACHE).map((k) => caches.delete(k))
-      ))
-      .then(() => self.clients.claim())
-  );
+      );
+    }
+
+    await self.clients.claim();
+  })());
+});
+
+// ─── Messages from the page ────────────────────────────────────────────────
+// WARM_CACHE is sent by main.jsx once the app is on screen and the main thread
+// is idle. Going through event.waitUntil() here is the point: it tells the
+// browser to keep this worker alive until the warm finishes, which a bare
+// call from install() cannot promise.
+self.addEventListener('message', (event) => {
+  const type = event.data && event.data.type;
+  if (type === 'WARM_CACHE') {
+    event.waitUntil(warmRouteAssets());
+  } else if (type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // Helper: should this request bypass the cache entirely?
@@ -103,6 +259,41 @@ function isStaticAsset(req) {
   // Extension is read from the PATH only — '?tab=dashboard' must never make a
   // route look like a file, and a query string must never hide one.
   try { return ASSET_EXT.test(new URL(req.url).pathname); } catch { return false; }
+}
+
+// Every cache read in this file goes through here, for ONE reason: ignoreVary.
+//
+// A cache lookup normally honours the stored response's `Vary` header, and
+// static hosts (vite preview, Vercel, and Capacitor's asset server) answer
+// build assets with `Vary: Origin`. The precache stores those responses under
+// a plain `new Request(url)`, which carries no Origin header — but the entry
+// script and stylesheet are requested by the browser with `crossorigin` on the
+// tag, so THEIR request does carry one. Different Origin ⇒ Vary mismatch ⇒
+// miss, on the four files the app cannot start without.
+//
+// That is precisely how the app came to boot offline into a blank white page:
+// index.html was served from the cache, then '/assets/index-<hash>.js' missed
+// despite sitting right there in that same cache, fell through to a dead
+// network, and the fetch handler answered its own 503. React never ran.
+//
+// These are same-origin, content-hashed build files. Which Origin header the
+// request happened to carry tells us nothing about whether the bytes are
+// right, so the Vary check has no job to do here.
+// THIS build's cache is asked first, and only then the global lookup, which
+// searches every cache this origin owns. Order matters: activate() keeps the
+// previous build's cache around when the new one failed to fill (see the guard
+// there), and `caches.match()` on its own resolves from the OLDEST cache
+// first — so without the explicit first look, one bad install would pin every
+// user to the previous release's index.html for good.
+async function cacheGet(request) {
+  try {
+    const cache = await caches.open(STATIC_CACHE);
+    const hit = await cache.match(request, { ignoreVary: true });
+    if (hit) return hit;
+    return await caches.match(request, { ignoreVary: true });
+  } catch {
+    return undefined;
+  }
 }
 
 // ─── Fetch ─────────────────────────────────────────────────────────────────
@@ -146,6 +337,7 @@ self.addEventListener('fetch', (event) => {
   // the router takes it from there. offline.html stays as the last resort, for
   // a device that has genuinely never loaded the app.
   if (req.mode === 'navigate') {
+    scheduleWarmFallback(event);
     event.respondWith(
       fetch(req)
         .then((res) => {
@@ -173,10 +365,10 @@ self.addEventListener('fetch', (event) => {
           }
           return res;
         })
-        .catch(() => caches.match(req)
-          .then((r) => r || caches.match('/index.html'))
-          .then((r) => r || caches.match('/'))
-          .then((r) => r || caches.match('/offline.html'))
+        .catch(() => cacheGet(req)
+          .then((r) => r || cacheGet('/index.html'))
+          .then((r) => r || cacheGet('/'))
+          .then((r) => r || cacheGet('/offline.html'))
           .then((r) => r || new Response('Offline', { status: 503 })))
     );
     return;
@@ -193,7 +385,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(STATIC_CACHE).then((c) => c.put(req, copy)).catch(() => {});
           return res;
         })
-        .catch(() => caches.match(req))
+        .catch(() => cacheGet(req))
     );
     return;
   }
@@ -218,7 +410,7 @@ self.addEventListener('fetch', (event) => {
   //      names; HTML has none.
   if (isStaticAsset(req)) {
     event.respondWith(
-      caches.match(req).then((cached) => {
+      cacheGet(req).then((cached) => {
         if (cached) return cached;
         return fetch(req).then((res) => {
           // Only cache successful, basic (same-origin) responses.
@@ -241,8 +433,8 @@ self.addEventListener('fetch', (event) => {
   // already cached; if it isn't, the real network error is allowed through so
   // the caller sees a failure it can retry, not a fabricated 503.
   event.respondWith(
-    fetch(req).catch((err) => caches.match('/index.html')
-      .then((r) => r || caches.match('/'))
+    fetch(req).catch((err) => cacheGet('/index.html')
+      .then((r) => r || cacheGet('/'))
       .then((r) => { if (r) return r; throw err; }))
   );
 });
