@@ -94,6 +94,7 @@ let failures = 0;
 
 try {
   const results = await mapPool(pages, CONCURRENCY, async (p) => {
+    if (failures > 5) return [p.path, null]; // Fast fail if backend is unreachable
     try {
       return [p.path, await countFor(p)];
     } catch {
