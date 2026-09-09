@@ -83,10 +83,15 @@ const PRECACHE_ROUTES = [];
 // Requests we must NEVER serve from cache. If any of these substrings appear in
 // the URL, the SW gets out of the way and lets the network handle it directly.
 // (Covers your Render API and Socket.IO signaling endpoints.)
+// Belt and braces, not the real gate: the fetch handler returns on any
+// cross-origin request before it consults this list, and the backend is a
+// different origin (api.toletpro.rent). Both backend hosts are named anyway so
+// the list stays true to its stated intent if that origin check ever moves.
 const NETWORK_ONLY = [
   '/api/',
   '/socket.io/',
-  'onrender.com',          // backend host (API + socket)
+  'api.toletpro.rent',     // backend host (API + socket)
+  'onrender.com',          // …and the Render origin behind that domain
   'googleapis.com',        // Firebase / Google auth
   'firebaseio.com',
   'identitytoolkit',       // Firebase auth

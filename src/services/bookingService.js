@@ -156,6 +156,63 @@ export async function undoMemberLedger(bookingId, memberId, monthKey, opId) {
   return booking;
 }
 
+/**
+ * What the "Remind" confirm dialog shows before anything is sent: who, which
+ * month, how much, and the default wording the landlord can then edit.
+ *
+ * The message text comes from the SERVER on purpose — it is the same builder
+ * the 09:00 cron uses, so the dialog can never show wording that differs from
+ * what actually goes out.
+ *
+ * @returns {Promise<{ok, monthKey, tenantName, amountDue, milestone, message,
+ *                    alreadySent, alreadySentAt, channels}>}
+ *          channels: { whatsapp: boolean, inApp: boolean } — what we can reach
+ *          them on. `alreadySent` means this month's single manual reminder is
+ *          already spent.
+ */
+export async function previewRentReminder(bookingId, { monthKey, memberId } = {}) {
+  const qs = new URLSearchParams({
+    ...(monthKey ? { monthKey } : {}),
+    ...(memberId ? { memberId } : {}),
+  }).toString();
+  return request(`/api/bookings/${bookingId}/remind/preview${qs ? `?${qs}` : ''}`);
+}
+
+/**
+ * Send a rent reminder to one occupant right now — the landlord's "Remind"
+ * button, after they confirmed the dialog.
+ *
+ * Goes out on WhatsApp and the in-app notification ONLY. Never SMS: the app is
+ * free to landlords, so a per-message cost cannot be triggered by a button.
+ *
+ * Allowed ONCE per tenant per rent month, forever — not a cooldown. A second
+ * attempt comes back 429 `already_sent_this_month`.
+ *
+ * No `opId`: this is not a queued offline write. Sending needs the network by
+ * definition, so a failure here is a real refusal to report, never something
+ * to replay later.
+ *
+ * @param {string} bookingId
+ * @param {{ monthKey?: string, memberId?: string|null, message?: string }} opts
+ *        monthKey omitted → server picks the earliest unpaid month
+ *        memberId omitted → the booking-level tenant (flat / single tenancy)
+ *        message  omitted → the default wording from the preview
+ * @returns {Promise<{ok, monthKey, milestone, tenantName, amountDue, customised, channels}>}
+ *          channels: { inApp, whatsapp, sms } each 'sent' | 'queued' | 'failed' | 'skipped'
+ * @throws  {Error} with `.status` and `.code` ('already_sent_this_month') — the
+ *          message is Bengali and safe to show the landlord as-is.
+ */
+export async function sendRentReminder(bookingId, { monthKey, memberId, message } = {}) {
+  return request(`/api/bookings/${bookingId}/remind`, {
+    method: 'POST',
+    body: JSON.stringify({
+      ...(monthKey ? { monthKey } : {}),
+      ...(memberId ? { memberId } : {}),
+      ...(message ? { message } : {}),
+    }),
+  });
+}
+
 /** A tenant self-joins a booking with an invite code. Returns { booking, memberId }. */
 export async function joinByInvite(inviteCode) {
   return request('/api/bookings/join', {

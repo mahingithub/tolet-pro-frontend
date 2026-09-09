@@ -19,8 +19,20 @@
     appId: '1:100291826945:web:78671cae8a8eb831a27700',
   };
 
-  const FALLBACK_CALL_ACTION_URL =
-    'https://tolet-pro-backend.onrender.com/api/calls/push-action';
+  // Where the decline button POSTs when the push payload carried neither
+  // callActionUrl nor apiBaseUrl (a malformed payload, or a token minted by an
+  // older backend). Normally unused — the backend sends both — which is exactly
+  // why it rotted unnoticed: it named `tolet-pro-backend.onrender.com`, a host
+  // that has never existed (the Render service is `toletpro-backend`) and 404s
+  // on every path.
+  //
+  // scripts/inject-sw-precache.mjs rewrites the line below with the build's
+  // VITE_API_BASE_URL, so the shipped value tracks the bundle instead of drifting
+  // from it. Vite copies this file to dist/ verbatim, so keep the literal
+  // pointing at production — it is what ships if that postbuild step is skipped.
+  const API_BASE_URL = 'https://api.toletpro.rent/api';
+
+  const FALLBACK_CALL_ACTION_URL = `${API_BASE_URL.replace(/\/$/, '')}/calls/push-action`;
 
   function asString(value, fallback = '') {
     return value === undefined || value === null ? fallback : String(value);

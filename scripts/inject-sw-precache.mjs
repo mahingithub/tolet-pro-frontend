@@ -38,18 +38,29 @@
  * Source maps are excluded on purpose: they are the largest files in dist/ and
  * are only ever fetched with devtools open.
  *
+ * It also writes dist/call-notification-sw.js, substituting that worker's
+ * API_BASE_URL with this build's VITE_API_BASE_URL. The worker POSTs a declined
+ * call to `<API_BASE_URL>/calls/push-action` when the push payload didn't name
+ * an endpoint itself, and it had a production host hardcoded — one that 404s,
+ * and that nothing about a green build would ever have told you about. Reading
+ * it out of the same env the bundle is compiled from means the two cannot drift.
+ *
  * ── Keep in sync ──
  * The markers this script writes between — '__PRECACHE_START__' /
  * '__PRECACHE_END__' — and the '__BUILD_ID__' placeholder live in
- * public/service-worker.js. If you rename them there, rename them here.
+ * public/service-worker.js. The `const API_BASE_URL = '…';` line this script
+ * rewrites lives in public/call-notification-sw.js. If you rename any of them
+ * there, rename them here.
  */
 
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { dirname, resolve, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { loadEnv } from 'vite';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(HERE, '..');
 const DIST = resolve(HERE, '../dist');
 // Read the TEMPLATE from public/, write the result to dist/. Reading dist/'s
 // own copy would work exactly once — the second run would find a file whose
@@ -58,6 +69,8 @@ const DIST = resolve(HERE, '../dist');
 // is how you check a change to the worker without a full rebuild.
 const SW_SRC = resolve(HERE, '../public/service-worker.js');
 const SW_OUT = join(DIST, 'service-worker.js');
+const CALL_SW_SRC = resolve(HERE, '../public/call-notification-sw.js');
+const CALL_SW_OUT = join(DIST, 'call-notification-sw.js');
 const SHELL = join(DIST, 'index.html');
 
 const fail = (msg) => {
@@ -66,6 +79,7 @@ const fail = (msg) => {
 };
 
 if (!existsSync(SW_SRC)) fail('public/service-worker.js not found.');
+if (!existsSync(CALL_SW_SRC)) fail('public/call-notification-sw.js not found.');
 if (!existsSync(SHELL)) fail('dist/index.html not found — run `vite build` first.');
 
 // ── Which files are worth caching ──────────────────────────────────────────
@@ -124,6 +138,28 @@ const routes = allAssets.filter((u) => !criticalSet.has(u));
 // ── Rewrite the worker ─────────────────────────────────────────────────────
 let sw = readFileSync(SW_SRC, 'utf8');
 
+// ── The call worker's API base ─────────────────────────────────────────────
+// loadEnv, not process.env: on Vercel the var is a real process env var, but the
+// Android release is built on a developer's machine where it only exists in
+// .env.production. loadEnv resolves both, in the same order Vite itself does, so
+// the worker gets exactly the base URL that was compiled into the bundle.
+let callSw = readFileSync(CALL_SW_SRC, 'utf8');
+
+const API_BASE_LINE = /^(\s*)const API_BASE_URL = '[^']*';$/m;
+if (!API_BASE_LINE.test(callSw)) {
+  fail("public/call-notification-sw.js no longer has a `const API_BASE_URL = '…';` line.");
+}
+
+const apiBaseUrl = (loadEnv('production', ROOT, 'VITE_').VITE_API_BASE_URL || '').replace(/\/$/, '');
+if (apiBaseUrl) {
+  callSw = callSw.replace(API_BASE_LINE, `$1const API_BASE_URL = ${JSON.stringify(apiBaseUrl)};`);
+} else {
+  // Not fatal: the literal in the template is a working production value, and a
+  // build that dies here helps nobody. vite.config.js is the gate that already
+  // refuses a production build pointed at localhost.
+  console.warn('⚠ VITE_API_BASE_URL unset — call worker keeps its built-in API base.');
+}
+
 // ── Build id ───────────────────────────────────────────────────────────────
 // Derived from the asset names (which are content hashes) AND the worker's own
 // source. An identical build keeps its cache, so redeploying unchanged code
@@ -131,9 +167,16 @@ let sw = readFileSync(SW_SRC, 'utf8');
 // cached, OR to the rules for caching it, gets a fresh cache and drops the old
 // one. Leaving the worker out was a trap: fixing a caching bug would ship the
 // fix while leaving every existing user on the cache the bug had filled.
+//
+// The call worker is hashed in for the same reason, one level down. It reaches
+// users only via importScripts() from service-worker.js, and the browser decides
+// whether to install a new worker by byte-comparing service-worker.js alone — so
+// a fix confined to call-notification-sw.js would sit in dist/ and never reach
+// anyone already running the app. Folding it into the id changes those bytes.
 const buildId = createHash('sha1')
   .update([...criticalSet, ...routes].join('\n'))
   .update(sw)
+  .update(callSw)
   .digest('hex')
   .slice(0, 12);
 
@@ -163,6 +206,7 @@ sw =
   sw.slice(to);
 
 writeFileSync(SW_OUT, sw, 'utf8');
+writeFileSync(CALL_SW_OUT, callSw, 'utf8');
 
 const bytes = [...criticalSet, ...routes]
   .map((u) => statSync(join(DIST, u.slice(1))).size)
@@ -172,3 +216,4 @@ console.log(
   `✓ service worker precache: ${criticalSet.size} critical + ${routes.length} route assets ` +
     `(${(bytes / 1048576).toFixed(1)}MB raw), build ${buildId}`,
 );
+console.log(`✓ call worker API base: ${apiBaseUrl || '(template default)'}`);

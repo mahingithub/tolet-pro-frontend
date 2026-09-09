@@ -25,7 +25,7 @@ import { listHostInquiries, updateInquiryStatus, deleteInquiry, replyToInquiry, 
 // Ledger / member / lease writes no longer go straight out from here — they go
 // through the offline queue (hostSync below), which owns delivery. Only the
 // reads and the create call are still made directly.
-import { createBooking as createBookingApi, listHostBookings } from "../services/bookingService.js";
+import { createBooking as createBookingApi, listHostBookings, sendRentReminder as sendRentReminderApi, previewRentReminder as previewRentReminderApi } from "../services/bookingService.js";
 import { getRoomTypes, firstRoomTypeId, roomLabel } from '../constants/roomCategories';
 import MembersManager from "./MembersManager.jsx";
 import DashboardTab from "./host-dashboard/DashboardTab";
@@ -3176,14 +3176,123 @@ const HostDashboard = () => {
     setActiveModal(null);
   };
 
-  // Send a manual rent reminder. The server cron handles the auto-reminders;
-  // this endpoint is for "send now" buttons. Both go through the same channel.
-  // TODO(backend): POST /api/host/bookings/{bookingId}/remind  body: { monthKey, channel }
-  const sendRentReminder = (booking, key) => {
-    const monthLabel = monthFullLabel(key, language);
-    showToast(language === 'বাংলা'
-      ? `${booking.tenant} কে ${monthLabel} এর রিমাইন্ডার পাঠানো হয়েছে`
-      : `Reminder sent to ${booking.tenant} for ${monthLabel}`);
+  // ── Manual rent reminder ("Remind" button) ────────────────────────────────
+  // Two steps on purpose. Pressing the button no longer SENDS — it opens a
+  // confirm dialog holding the exact message, which the landlord can rewrite
+  // before it goes. A tap that fires a WhatsApp at a real tenant with no way to
+  // look at it first is how you send the wrong person the wrong month.
+  //
+  // Each tenant gets ONE of these per rent month, so there is no undo: the
+  // dialog is the only chance to get it right.
+  //
+  // `unit` is a rent UNIT (see rentUnitsOf), not always a booking: on a shared
+  // room it carries __realId (the booking) and __memberId (the seat), and
+  // reminding the booking instead of the member would nudge whoever was entered
+  // first about somebody else's rent.
+  const [remindTarget, setRemindTarget]   = useState(null); // { bookingId, memberId, monthKey, who }
+  const [remindPreview, setRemindPreview] = useState(null); // server's preview payload
+  const [remindText, setRemindText]       = useState('');
+  const [remindLoading, setRemindLoading] = useState(false);
+  const [remindSending, setRemindSending] = useState(false);
+  const [remindError, setRemindError]     = useState('');
+  const [remindProRequired, setRemindProRequired] = useState(false);
+
+  const sendRentReminder = async (unit, key) => {
+    const bookingId = unit?.__realId || unit?.id;
+    const memberId  = unit?.__memberId || null;
+    if (!bookingId) return;
+    const bn = language === 'বাংলা';
+
+    setRemindTarget({
+      bookingId, memberId, monthKey: key,
+      who: unit?.tenant || (bn ? 'ভাড়াটিয়া' : 'the tenant'),
+    });
+    setRemindPreview(null);
+    setRemindText('');
+    setRemindError('');
+    setRemindProRequired(false);
+
+    // Rent reminders are Smart Alerts, which only Pro unlocks (free AND plus are
+    // locked — see subscriptionService.getLockedFeatures). Answered here rather
+    // than by letting the request come back 403, so a landlord who cannot use
+    // this sees why instantly. The server enforces it regardless; this is the
+    // courtesy, not the control.
+    if (isFeatureLocked('smartAlerts')) {
+      setRemindProRequired(true);
+      setRemindLoading(false);
+      setActiveModal('remind_tenant');
+      return;
+    }
+
+    setRemindLoading(true);
+    setActiveModal('remind_tenant');
+
+    try {
+      // The wording comes from the server — the same builder the cron uses — so
+      // what the landlord edits is genuinely what will be delivered.
+      const preview = await previewRentReminderApi(bookingId, { monthKey: key, memberId });
+      setRemindPreview(preview);
+      setRemindText(preview.message || '');
+    } catch (err) {
+      // Smart Alerts is Pro-only, and the preview is gated too — so a free
+      // landlord is told here, before writing anything, not after pressing Send.
+      setRemindProRequired(err?.code === 'pro_required');
+      setRemindError(
+        err?.offline
+          ? (bn ? 'ইন্টারনেট নেই।' : 'No connection.')
+          : (err?.message || (bn ? 'রিমাইন্ডার তৈরি করা যায়নি।' : 'Could not prepare the reminder.')),
+      );
+    } finally {
+      setRemindLoading(false);
+    }
+  };
+
+  const confirmSendRentReminder = async () => {
+    if (!remindTarget || remindSending) return;
+    const bn = language === 'বাংলা';
+    const { bookingId, memberId, monthKey: key, who } = remindTarget;
+
+    setRemindSending(true);
+    setRemindError('');
+    try {
+      const res = await sendRentReminderApi(bookingId, {
+        monthKey: remindPreview?.monthKey || key,
+        memberId,
+        // Only send text when the landlord actually changed it; otherwise let
+        // the server use its own default so the two can't drift.
+        message: remindText.trim() && remindText.trim() !== (remindPreview?.message || '').trim()
+          ? remindText.trim()
+          : undefined,
+      });
+
+      const monthLabel = monthFullLabel(res.monthKey || key, language);
+      // Name the channel that actually delivered — "sent" meaning an in-app
+      // notification the tenant may never open is how the old toast misled.
+      const via = res.channels?.whatsapp === 'sent' ? 'WhatsApp'
+        : res.channels?.inApp === 'queued' ? (bn ? 'অ্যাপে' : 'in-app')
+        : null;
+
+      setActiveModal(null);
+      setRemindTarget(null);
+      if (!via) {
+        showToast(bn ? `${who} কে রিমাইন্ডার পাঠানো যায়নি।` : `Could not send a reminder to ${who}.`, { type: 'error' });
+      } else {
+        showToast(bn
+          ? `${who} কে ${monthLabel} এর রিমাইন্ডার ${via} পাঠানো হয়েছে ✓`
+          : `${monthLabel} reminder sent to ${who} via ${via} ✓`);
+      }
+    } catch (err) {
+      // The server's refusals are already written in Bengali for the landlord
+      // (no WhatsApp number, month already paid, already sent this month) —
+      // shown in the dialog rather than flattened to "something went wrong".
+      setRemindError(
+        err?.offline
+          ? (bn ? 'ইন্টারনেট নেই — রিমাইন্ডার পাঠানো যায়নি।' : 'No connection — reminder not sent.')
+          : (err?.message || (bn ? 'রিমাইন্ডার পাঠানো যায়নি।' : 'Could not send the reminder.')),
+      );
+    } finally {
+      setRemindSending(false);
+    }
   };
 
   // Replace a booking in local state after a member action (add / mark paid /
@@ -3875,6 +3984,20 @@ const HostDashboard = () => {
   // delivered as an in-app chat message stating the outstanding amount. Tenants
   // without a linked account are counted as "skipped" and reported to the host.
   const handleSendReminders = async () => {
+    // Same Pro gate as the single "Remind" button. This path delivers over the
+    // in-app chat rather than the reminder service, so no server endpoint
+    // refuses it on its own — but it is the same rent-reminder facility from
+    // the landlord's point of view, and Smart Alerts is Pro-only.
+    if (isFeatureLocked('smartAlerts')) {
+      setActiveModal(null);
+      showToast(
+        language === 'বাংলা'
+          ? 'রিমাইন্ডার পাঠাতে Pro প্ল্যান লাগবে।'
+          : 'Sending reminders needs the Pro plan.',
+        { type: 'error' },
+      );
+      return;
+    }
     const { rows, monthLabel } = buildReminderRows();
     const chosen = rows.filter((r) => reminderSelected.has(r.booking.id));
     if (chosen.length === 0) {
@@ -5695,6 +5818,10 @@ const HostDashboard = () => {
             ledgerYear={ledgerYear}
             setLedgerYear={setLedgerYear}
             rentUnitsOf={rentUnitsOf}
+            // Rent reminders are Smart Alerts (Pro only). The button still shows
+            // for everyone — it is how a free landlord discovers the feature —
+            // but wears a lock so the paywall isn't a surprise after tapping.
+            remindLocked={isFeatureLocked('smartAlerts')}
             getMonthCollectionSummary={getMonthCollectionSummary}
             enumerateLeaseMonths={enumerateLeaseMonths}
             getRentStatus={getRentStatus}
@@ -5839,6 +5966,7 @@ const HostDashboard = () => {
                 {activeModal === 'message_all' && (language === 'বাংলা' ? 'ব্রডকাস্ট মেসেজ' : 'Broadcast Message')}
                 {activeModal === 'export_report' && (language === 'বাংলা' ? 'রিপোর্ট এক্সপোর্ট' : 'Export Report')}
                 {activeModal === 'send_reminders' && (language === 'বাংলা' ? 'পেমেন্ট রিমাইন্ডার' : 'Payment Reminders')}
+                {activeModal === 'remind_tenant' && (language === 'বাংলা' ? 'রিমাইন্ডার পাঠান' : 'Send Reminder')}
                 {activeModal === 'download_user_document' && (language === 'বাংলা' ? 'ভাড়াটিয়ার ডকুমেন্ট' : 'Tenant Documents')}
                 {activeModal === 'confirm_delete' && (language === 'বাংলা' ? 'প্রপার্টি মুছুন' : 'Delete Property')}
               </h3>
@@ -6017,6 +6145,134 @@ const HostDashboard = () => {
                   ))}
                 </div>
               )}
+
+              {/* Confirm-before-send for ONE tenant. The textarea holds the exact
+                  text that will be delivered — server-built, landlord-editable.
+                  Sending is capped at once per tenant per rent month, so this
+                  dialog is the only chance to change it. */}
+              {activeModal === 'remind_tenant' && (() => {
+                const bn = language === 'বাংলা';
+                const p = remindPreview;
+                const spent = !!p?.alreadySent;
+                const canSend = !!p && !spent && !remindSending && remindText.trim().length > 0;
+
+                if (remindLoading) {
+                  return (
+                    <div className="p-8 flex flex-col items-center gap-3 text-gray-500">
+                      <Loader2 size={22} className="animate-spin" />
+                      <span className="text-xs font-bold">{bn ? 'রিমাইন্ডার তৈরি হচ্ছে…' : 'Preparing reminder…'}</span>
+                    </div>
+                  );
+                }
+
+                // Smart Alerts is a Pro feature — an upgrade prompt, not an
+                // error the landlord could have done anything about.
+                if (remindProRequired) {
+                  return (
+                    <div className="p-6 space-y-4">
+                      <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl space-y-1.5">
+                        <p className="text-sm font-black text-amber-900">
+                          {bn ? 'রিমাইন্ডার পাঠাতে Pro প্ল্যান লাগবে' : 'Sending reminders needs the Pro plan'}
+                        </p>
+                        <p className="text-xs font-bold text-amber-800 leading-relaxed">
+                          {bn
+                            ? 'স্মার্ট অ্যালার্টস — ভাড়ার অটো রিমাইন্ডার আর এই "পাঠান" বাটন — Pro প্ল্যানের সুবিধা।'
+                            : 'Smart Alerts — automatic rent reminders and this Send button — are part of Pro.'}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => { setActiveModal(null); setRemindTarget(null); }} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 rounded-2xl text-xs font-black uppercase tracking-widest transition-all">
+                          {bn ? 'বন্ধ করুন' : 'Close'}
+                        </button>
+                        <button
+                          onClick={() => { setActiveModal(null); setRemindTarget(null); navigate('/subscription'); }}
+                          className="flex-1 py-3 bg-[#ba0036] hover:bg-[#9c002e] text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
+                        >
+                          {bn ? 'Pro নিন' : 'Get Pro'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (!p) {
+                  return (
+                    <div className="p-6 space-y-4">
+                      <p className="text-sm font-bold text-red-600">{remindError || (bn ? 'রিমাইন্ডার তৈরি করা যায়নি।' : 'Could not prepare the reminder.')}</p>
+                      <button onClick={() => setActiveModal(null)} className="w-full py-3 bg-gray-100 hover:bg-gray-200 rounded-2xl text-xs font-black uppercase tracking-widest transition-all">
+                        {bn ? 'বন্ধ করুন' : 'Close'}
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="p-6 space-y-4">
+                    {/* Who / which month / how much — the three things that make
+                        this the wrong send if any of them is off. */}
+                    <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl space-y-1">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="text-sm font-black text-gray-900">{p.tenantName}</span>
+                        <span className="text-sm font-black text-[#ba0036] tabular-nums">৳{Number(p.amountDue || 0).toLocaleString('en-BD')}</span>
+                      </div>
+                      <div className="text-[11px] font-bold text-gray-500">
+                        {monthFullLabel(p.monthKey, language)}
+                        {p.channels?.whatsapp
+                          ? ` · ${bn ? 'WhatsApp-এ যাবে' : 'via WhatsApp'}`
+                          : ` · ${bn ? 'শুধু অ্যাপে যাবে (WhatsApp নম্বর নেই)' : 'in-app only (no WhatsApp number)'}`}
+                      </div>
+                    </div>
+
+                    {spent ? (
+                      <p className="text-xs font-bold text-orange-700 bg-orange-50 border border-orange-100 rounded-2xl p-3">
+                        {bn
+                          ? 'এই মাসে এই ভাড়াটিয়াকে একবার রিমাইন্ডার পাঠানো হয়ে গেছে। পরের মাসে আবার পাঠাতে পারবেন।'
+                          : 'This tenant has already had their one reminder for this month. The allowance resets next month.'}
+                      </p>
+                    ) : (
+                      <label className="block space-y-1.5">
+                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                          {bn ? 'মেসেজ (ইচ্ছেমতো বদলাতে পারেন)' : 'Message (edit as you like)'}
+                        </span>
+                        <textarea
+                          value={remindText}
+                          onChange={(e) => setRemindText(e.target.value.slice(0, 1000))}
+                          rows={6}
+                          className="w-full p-3 border border-gray-200 rounded-2xl text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#ba0036]/30 resize-none"
+                        />
+                        <span className="block text-right text-[10px] font-bold text-gray-400 tabular-nums">{remindText.length}/1000</span>
+                      </label>
+                    )}
+
+                    {/* Said plainly, because it cannot be undone. */}
+                    <p className="text-[11px] font-bold text-gray-400 leading-relaxed">
+                      {bn
+                        ? 'মাসে একজন ভাড়াটিয়াকে একবারই পাঠানো যাবে। SMS যাবে না — শুধু WhatsApp আর অ্যাপে।'
+                        : 'One reminder per tenant per month. No SMS — WhatsApp and the app only.'}
+                    </p>
+
+                    {remindError && <p className="text-xs font-bold text-red-600">{remindError}</p>}
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setActiveModal(null); setRemindTarget(null); }}
+                        className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
+                      >
+                        {bn ? 'বাতিল' : 'Cancel'}
+                      </button>
+                      <button
+                        onClick={confirmSendRentReminder}
+                        disabled={!canSend}
+                        className="flex-1 py-3 bg-[#ba0036] hover:bg-[#9c002e] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                      >
+                        {remindSending
+                          ? <><Loader2 size={13} className="animate-spin" />{bn ? 'পাঠানো হচ্ছে…' : 'Sending…'}</>
+                          : <><BellRing size={13} />{bn ? 'পাঠান' : 'Send'}</>}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {activeModal === 'send_reminders' && (() => {
                 // Overdue + partial tenants for the CURRENT month, derived from

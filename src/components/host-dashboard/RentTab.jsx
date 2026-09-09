@@ -44,6 +44,7 @@ export default function RentTab(props) {
     monthFullLabel, monthShortLabel, getDueDate, parseMonthKey, formatBDT, formatDate,
     computeBookingStatus, daysUntilNextDue, computeLeaseStage, isOpenEndedLease,
     sendRentReminder, openTenantProfile, openChatPanel, setActiveModal, exportRentCsv, isPremium,
+    remindLocked,
     landlordProfile, setLandlordProfile, currentBuildingId, setCurrentBuildingId
   } = props;
 
@@ -523,8 +524,21 @@ export default function RentTab(props) {
                           <CheckCircle2 size={10} className="shrink-0"/> {language === 'বাংলা' ? 'পেইড মার্ক' : 'Mark Paid'}
                         </button>
                         {nextDue && nextDue.daysFromNow <= (booking.reminderLeadDays || 3) && (
-                          <button onClick={() => sendRentReminder(booking, nextDue.key)} className="px-2 py-1.5 bg-orange-50 text-orange-700 hover:bg-orange-100 transition-all rounded-lg text-[9px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1 shrink-0">
-                            <BellRing size={10} className="shrink-0"/> {language === 'বাংলা' ? 'রিমাইন্ডার' : 'Remind'}
+                          <button
+                            onClick={() => sendRentReminder(booking, nextDue.key)}
+                            title={remindLocked
+                              ? (language === 'বাংলা' ? 'Pro প্ল্যানের সুবিধা' : 'Pro plan feature')
+                              : undefined}
+                            className={`px-2 py-1.5 transition-all rounded-lg text-[9px] font-black uppercase tracking-widest active:scale-95 flex items-center gap-1 shrink-0 ${
+                              remindLocked
+                                ? 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
+                            }`}
+                          >
+                            {remindLocked
+                              ? <Lock size={10} className="shrink-0"/>
+                              : <BellRing size={10} className="shrink-0"/>}
+                            {language === 'বাংলা' ? 'রিমাইন্ডার' : 'Remind'}
                           </button>
                         )}
                       </div>
