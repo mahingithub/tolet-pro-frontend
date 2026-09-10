@@ -43,7 +43,15 @@ import { useNavigate } from 'react-router-dom';
 // in-app navigation is how a link ends up driving someone to a screen they did
 // not ask for. /join is what the invite system needs; add to this list
 // deliberately, not by loosening it to a catch-all.
-const ROUTABLE = [/^\/join\/[A-Za-z0-9]{8,64}\/?$/];
+// /r/<code> is a campaign short link (see CampaignRedirect.jsx). It belongs
+// here for the same reason /join does: the phone that opens a promotional SMS
+// is very often the one with the app installed, and bouncing that tap into a
+// logged-out browser throws away the session the app already holds — which is
+// most of what the campaign was trying to reach.
+const ROUTABLE = [
+  /^\/join\/[A-Za-z0-9]{8,64}\/?$/,
+  /^\/r\/[A-Za-z0-9]{4,24}\/?$/,
+];
 
 /**
  * Reduce a deep link to an in-app path, or null when we won't handle it.

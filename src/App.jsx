@@ -92,6 +92,7 @@ const SupportPage      = lazyRoute(() => import("./components/SupportPage"), "Su
 const ServicesPage     = lazyRoute(() => import("./components/ServicesPage"), "ServicesPage");
 const HowItWorks       = lazyRoute(() => import("./components/HowItWorks"), "HowItWorks");
 const JoinPropertyPage = lazyRoute(() => import("./components/JoinPropertyPage"), "JoinPropertyPage");
+const CampaignRedirect = lazyRoute(() => import("./components/CampaignRedirect"), "CampaignRedirect");
 
 // --- SEO landing pages ---
 // Public, content-rich pages for the half of the product that lives behind a
@@ -147,6 +148,27 @@ const GlobalCallSocket = () => {
 			cleanupPushGesture?.();
 		};
 	}, [isAuthenticated, user?.id, user?._id]);
+
+	return null;
+};
+
+// ─── "This account has the app" ─────────────────────────────────────────────
+// One fire-and-forget report per app load. It is what the admin console's
+// installed/not-installed segment is built on — see services/appClientService.js
+// for why a push token could not answer that question.
+//
+// Runs on every surface, not just the native shell: an installed PWA is also an
+// install, and a plain browser session is the baseline the other two are
+// distinguished from.
+const AppOpenReporter = () => {
+	const { isAuthenticated } = useAuth();
+
+	useEffect(() => {
+		if (!isAuthenticated) return;
+		import("./services/appClientService")
+			.then((m) => m.reportAppOpen())
+			.catch(() => {});
+	}, [isAuthenticated]);
 
 	return null;
 };
@@ -284,6 +306,7 @@ const AppLayout = () => {
 			    useSeo() still wins. */}
 			<RouteSeoGuard />
 			<GlobalCallSocket />
+			<AppOpenReporter />
 			<AppDownloadBanner />
 			{!shouldHideNavbar && (
 				<div className={`sticky top-0 z-[60] ${isPropertyListingRoute ? "hidden lg:block" : ""}`}>
@@ -328,6 +351,14 @@ const AppLayout = () => {
 				    shared link dies in a group chat. The page asks for a login itself
 				    at the point it needs one — see JoinPropertyPage.jsx. */}
 				<Route path="/join/:token" element={<JoinPropertyPage />} />
+
+				{/* Campaign short link from a promotional SMS / WhatsApp.
+				    PUBLIC for the same reason /join is: the recipient is usually
+				    signed out on the phone that opened it, and that is who the
+				    campaign is for. It resolves the code and forwards to the real
+				    destination, which asks for a login itself if it needs one
+				    (RequireAuth → /login?next=…). See CampaignRedirect.jsx. */}
+				<Route path="/r/:code" element={<CampaignRedirect />} />
 
 				{/* Help & Support — public; ticket features handle auth internally */}
 				<Route path="/support" element={<SupportPage />} />

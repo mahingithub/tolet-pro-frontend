@@ -45,6 +45,10 @@ const PRIVATE_PREFIXES = [
   { prefix: '/ai-insights', title: 'AI insights' },
   // Invite links. Never index — see the note at the top of this file.
   { prefix: '/join/', title: 'Join your property' },
+  // Campaign short links. A redirect stub with no content of its own, and
+  // indexing one would put a promotional code into search results and count a
+  // crawler's fetch as a customer click.
+  { prefix: '/r/', title: 'Opening…' },
   { prefix: '/inquire/', title: 'Send an inquiry' },
   // Individual people's profiles. Thin for search, and not ours to publish.
   { prefix: '/landlord/', title: 'Landlord profile' },

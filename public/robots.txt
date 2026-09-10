@@ -29,6 +29,10 @@ Disallow: /api/
 # walls. An indexed token is a stranger with a key to someone's building record.
 Disallow: /join/
 Disallow: /inquire/
+# /r/<code> are campaign short links from promotional SMS and WhatsApp. Each
+# fetch counts as a click, so a crawler walking them would report a campaign as
+# a success it never had.
+Disallow: /r/
 # Individual people's profiles — thin for search, and not ours to publish.
 Disallow: /landlord/
 Disallow: /tenant/

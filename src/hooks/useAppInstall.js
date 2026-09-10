@@ -23,11 +23,19 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { isStandalonePwa } from '../utils/platform';
+import { PLAY_STORE_URL as PLAY_STORE_LISTING } from '../seo/siteConfig';
 
 // ── Store URLs ─────────────────────────────────────────────────────────────
 // When the iOS / macOS apps are published, set these URLs and every Apple
 // device automatically switches from the PWA guide to the store link.
-export const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.tolet.pro';
+//
+// RE-EXPORTED FROM siteConfig, NOT WRITTEN OUT AGAIN. This file used to carry
+// its own copy pointing at `id=com.tolet.pro`, while the real package — in
+// android/app/build.gradle, in public/.well-known/assetlinks.json and in
+// siteConfig — is `com.toletpro.app`. Play has no listing under the old id, so
+// every Android visitor who tapped Download landed on "item not found": the
+// one button whose entire job is installing the app.
+export const PLAY_STORE_URL = PLAY_STORE_LISTING;
 export const APP_STORE_URL = null;  // e.g. 'https://apps.apple.com/app/id…'
 export const MAC_APP_URL = null;    // macOS download / Mac App Store, if ever
 
