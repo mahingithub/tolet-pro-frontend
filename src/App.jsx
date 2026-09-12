@@ -90,6 +90,9 @@ const SubscriptionPage = lazyRoute(() => import("./components/SubscriptionPage")
 const CheckoutPage     = lazyRoute(() => import("./components/CheckoutPage"), "CheckoutPage");
 const SupportPage      = lazyRoute(() => import("./components/SupportPage"), "SupportPage");
 const ServicesPage     = lazyRoute(() => import("./components/ServicesPage"), "ServicesPage");
+const CategoryProviders = lazyRoute(() => import("./components/services/CategoryProviders"), "CategoryProviders");
+const ProviderDetail    = lazyRoute(() => import("./components/services/ProviderDetail"), "ProviderDetail");
+const MyServiceOrders   = lazyRoute(() => import("./components/services/MyServiceOrders"), "MyServiceOrders");
 const HowItWorks       = lazyRoute(() => import("./components/HowItWorks"), "HowItWorks");
 const JoinPropertyPage = lazyRoute(() => import("./components/JoinPropertyPage"), "JoinPropertyPage");
 const CampaignRedirect = lazyRoute(() => import("./components/CampaignRedirect"), "CampaignRedirect");
@@ -363,8 +366,21 @@ const AppLayout = () => {
 				{/* Help & Support — public; ticket features handle auth internally */}
 				<Route path="/support" element={<SupportPage />} />
 
-				{/* Services hub — tenant home-services catalogue (icon boxes) */}
+				{/* ── Service marketplace ─────────────────────────────────────
+				    PUBLIC, all of it. Browsing and ringing a shop is exactly
+				    what a signed-out visitor should be able to do — the gate
+				    sits on ORDERING, inside the screens, because an order
+				    creates an obligation between two named people.
+
+				    '/services/orders' is declared before '/services/p/:id' and
+				    '/services/c/:category' would ever be asked to match it. The
+				    prefixes differ today, so this is not strictly required —
+				    but a future '/services/:something' would swallow all three
+				    if it sat above them. */}
 				<Route path="/services" element={<ServicesPage />} />
+				<Route path="/services/orders" element={<MyServiceOrders />} />
+				<Route path="/services/c/:category" element={<CategoryProviders />} />
+				<Route path="/services/p/:id" element={<ProviderDetail />} />
 
 				{/* How it Works — public marketing page */}
 				<Route path="/how-it-works" element={<HowItWorks />} />

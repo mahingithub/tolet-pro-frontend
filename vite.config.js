@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -38,6 +39,21 @@ export default defineConfig(({ mode }) => {
   assertProductionEnv(mode)
 
   return {
+  // ─── Tests ────────────────────────────────────────────────────────────────
+  // `jsdom` rather than the default node environment: almost everything worth
+  // testing here touches localStorage, geolocation or the DOM.
+  //
+  // `include` is narrow on purpose. The default glob picks up anything under
+  // node_modules that happens to match, which turns a two-second run into a
+  // minute of somebody else's tests.
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.js'],
+    include: ['src/**/*.{test,spec}.{js,jsx}'],
+    css: false,
+  },
+
   plugins: [react()],
   base: '/',
 

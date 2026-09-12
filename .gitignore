@@ -67,3 +67,6 @@ docs/
 ledger-preview.html
 src/dev/
 patch.mjs
+src/test/
+*.test.js
+*.test.jsx
