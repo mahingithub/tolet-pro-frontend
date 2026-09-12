@@ -164,6 +164,27 @@ export const ENTRY_TYPES = {
 
 export const getEntryType = (key) => ENTRY_TYPES[key] || ENTRY_TYPES.expense;
 
+/**
+ * The four ধার types, resolved from the only two things a person actually
+ * knows: which way the টাকা moved, and where the balance already stands.
+ *
+ * Asking someone to choose between ধার দিলাম / ধার নিলাম / পাওনা পেলাম / ধার
+ * শোধ is asking them to do the bookkeeping themselves — four near-identical
+ * Bengali phrases, three of them containing the word ধার, and picking the wrong
+ * one silently moves the balance the wrong way. But the answer was never a
+ * choice: given a friend who already owes ৳৫০০, টাকা দিলাম can only be a fresh
+ * ধার, and টাকা পেলাম can only be that পাওনা coming back. So the sheet asks the
+ * one question a human can answer without thinking — টাকা গেল, না এলো? — and
+ * derives the rest.
+ *
+ * @param {'out'|'in'} direction  'out' = I handed money over, 'in' = I received it
+ * @param {number} net            that person's balance now (+ they owe me)
+ */
+export const typeForDirection = (direction, net = 0) =>
+  direction === 'out'
+    ? (net >= 0 ? 'lend' : 'repay-out')   // they owe me → lending more; I owe them → paying back
+    : (net > 0 ? 'repay-in' : 'borrow');  // they owe me → getting it back; else → borrowing
+
 // The type choices offered on each side of the খাতা, in the order they appear
 // in the add sheet's segmented control.
 export const OUT_TYPES = ['expense', 'lend', 'repay-out'];

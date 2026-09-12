@@ -422,7 +422,7 @@ const Living = () => {
 
       {/* ── The fork: which wallet is this? Asked once, then remembered. ── */}
       {!mode && (
-        <div className="w-full max-w-[1400px] xl:max-w-[1600px] mx-auto px-4 relative z-10 mt-3 pb-24 lg:pb-12">
+        <div className="w-full max-w-[1400px] xl:max-w-[1600px] mx-auto px-4 relative z-10 mt-3 pb-10 lg:pb-12">
           <ModeChooser isBn={isBn} onPick={switchMode} />
         </div>
       )}
@@ -494,7 +494,9 @@ const Living = () => {
         </aside>
 
         {/* Main Content Area */}
-        <main id="living-scroll" data-tour="living-content" className="flex-1 min-w-0 pb-24 lg:pb-12 mt-3 lg:mt-0 relative z-20">
+        {/* pb-10 (not pb-24): MobileBottomNav is hidden on /living, so the tail
+            only has to clear the home indicator, not a 64px rail. */}
+        <main id="living-scroll" data-tour="living-content" className="flex-1 min-w-0 pb-10 lg:pb-12 mt-3 lg:mt-0 relative z-20">
           <AnimatePresence mode="wait">
             <motion.div
               key={module}

@@ -7,17 +7,47 @@
  * day, and what the running balance is right now.
  */
 import React, { useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, Check, Pencil, Phone, Trash2, UserPlus, Users } from 'lucide-react';
+import {
+  ArrowDownLeft, ArrowUpRight, BellRing, CalendarClock, Check,
+  Pencil, Phone, Trash2, UserPlus, Users,
+} from 'lucide-react';
 
 import useLivingStore from '../../store/useLivingStore';
-import { dateLabel, taka } from './livingUtils';
-import { getEntryType, PERSON_SWATCHES } from './soloConfig';
-import { personDetail, personRows } from './soloUtils';
+import { dateLabel, num, taka } from './livingUtils';
+import { getEntryType, typeForDirection, PERSON_SWATCHES } from './soloConfig';
+import { daysToDue, personDetail, personRows } from './soloUtils';
 import {
   Avatar, Card, Chip, ConfirmDialog, EmptyState, Field, PrimaryButton,
   SectionHeader, Sheet, TextArea, TextInput, cx,
 } from './livingUI';
 import SoloEntrySheet from './SoloEntrySheet';
+
+// ── the repayment-date badge ─────────────────────────────────────────────────
+// Same words everywhere a date shows up, so "৩ দিন বাকি" in the list and in the
+// profile can never disagree about what day it is.
+const dueText = (days, isBn, language) => {
+  if (days === null || days === undefined) return '';
+  if (days < 0) return isBn ? `${num(-days, language)} দিন পার` : `${-days}d overdue`;
+  if (days === 0) return isBn ? 'আজই ফেরতের দিন' : 'due today';
+  if (days === 1) return isBn ? 'আগামীকাল ফেরত' : 'due tomorrow';
+  return isBn ? `${num(days, language)} দিনে ফেরত` : `due in ${days}d`;
+};
+
+const DueChip = ({ due, isBn, language, withReminder = false }) => {
+  if (!due) return null;
+  const soon = due.overdue || due.days <= 2;
+  return (
+    <span
+      className={cx(
+        'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black',
+        soon ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500',
+      )}
+    >
+      {withReminder ? <BellRing size={10} strokeWidth={2.6} /> : <CalendarClock size={10} strokeWidth={2.6} />}
+      {dueText(due.days, isBn, language)}
+    </span>
+  );
+};
 
 // ── add / edit a friend ──────────────────────────────────────────────────────
 const PersonSheet = ({ open, onClose, isBn, editing, onSave }) => {
@@ -66,7 +96,17 @@ const PersonSheet = ({ open, onClose, isBn, editing, onSave }) => {
           </div>
         </Field>
 
-        <Field label={`${isBn ? 'ফোন' : 'Phone'} · ${isBn ? 'ইচ্ছা হলে' : 'optional'}`}>
+        <Field
+          label={`${isBn ? 'ফোন' : 'Phone'} · ${isBn ? 'ইচ্ছা হলে' : 'optional'}`}
+          // Not decoration any more: the repayment reminder is sent to this
+          // number, so a friend profile without one can hold a deadline but
+          // can never have it chased.
+          hint={
+            isBn
+              ? 'ধার ফেরতের তারিখ দিলে এই নম্বরেই আগের দিন মনে করিয়ে দেওয়া হবে।'
+              : 'A loan with a due date gets its reminder sent to this number.'
+          }
+        >
           <TextInput value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="01XXXXXXXXX" inputMode="tel" />
         </Field>
 
@@ -82,8 +122,16 @@ const PersonSheet = ({ open, onClose, isBn, editing, onSave }) => {
 const PersonDetailSheet = ({ personId, onClose, isBn, language, onEditProfile, onDeleteProfile }) => {
   const solo = useLivingStore((s) => s.solo);
   const addSoloEntry = useLivingStore((s) => s.addSoloEntry);
+  const updateSoloEntry = useLivingStore((s) => s.updateSoloEntry);
+  const deleteSoloEntry = useLivingStore((s) => s.deleteSoloEntry);
   const [entryOpen, setEntryOpen] = useState(false);
   const [lockType, setLockType] = useState('lend');
+  // An existing row being corrected. The sheet opens with the type picker
+  // showing, which is the escape hatch for anything the two-button shortcut
+  // below filed under the wrong heading.
+  const [editingEntry, setEditingEntry] = useState(null);
+  const [pendingEntryDelete, setPendingEntryDelete] = useState(null);
+  const [confirmSettle, setConfirmSettle] = useState(false);
   // The sheet keeps rendering the person it was CLOSED on, so it can slide out
   // with their name and balance still on it instead of vanishing mid-animation.
   const [lastPerson, setLastPerson] = useState(null);
@@ -94,15 +142,29 @@ const PersonDetailSheet = ({ personId, onClose, isBn, language, onEditProfile, o
   }, [selected]);
   const person = selected || lastPerson;
 
-  const { entries, net } = useMemo(() => personDetail(solo, person?.id), [solo, person]);
+  const { entries, net, due } = useMemo(() => personDetail(solo, person?.id), [solo, person]);
 
   if (!person) return null;
 
   const owed = net > 0; // they owe me
-  const quick = ['lend', 'repay-in', 'borrow', 'repay-out'];
 
-  // "Settle it all" writes the single repayment that zeroes the balance —
-  // the moment when a friendship stops keeping accounts.
+  // Two buttons, not four. The user says which way the টাকা went; which of the
+  // four ধার types that is follows from the balance (see typeForDirection).
+  const openDirection = (direction) => {
+    setEditingEntry(null);
+    setLockType(typeForDirection(direction, net));
+    setEntryOpen(true);
+  };
+
+  const openEditEntry = (entry) => {
+    setEditingEntry(entry);
+    setEntryOpen(true);
+  };
+
+  // "Settle it all" writes the single repayment that zeroes the balance — the
+  // moment when a friendship stops keeping accounts. It is also the one tap in
+  // this sheet that can silently erase a real debt, so it is asked twice: the
+  // button opens a dialog that spells out the row about to be written.
   const settle = () => {
     if (Math.abs(net) < 0.5) return;
     addSoloEntry({
@@ -114,6 +176,12 @@ const PersonDetailSheet = ({ personId, onClose, isBn, language, onEditProfile, o
     });
   };
 
+  const saveEntry = (data) => {
+    if (editingEntry) updateSoloEntry(editingEntry.id, data);
+    else addSoloEntry(data);
+    setEditingEntry(null);
+  };
+
   return (
     <>
       <Sheet
@@ -123,7 +191,7 @@ const PersonDetailSheet = ({ personId, onClose, isBn, language, onEditProfile, o
         subtitle={person.phone || (isBn ? 'লেনদেনের হিসাব' : 'Your running ledger')}
         footer={
           Math.abs(net) >= 0.5 ? (
-            <PrimaryButton className="w-full" onClick={() => { settle(); onClose(); }}>
+            <PrimaryButton className="w-full" onClick={() => setConfirmSettle(true)}>
               <Check size={17} />
               {net > 0
                 ? isBn ? `পুরো ${taka(net, language)} পেয়ে গেছি` : `Got the full ${taka(net, language)} back`
@@ -141,33 +209,60 @@ const PersonDetailSheet = ({ personId, onClose, isBn, language, onEditProfile, o
             <p className={cx('text-[30px] leading-none font-black tracking-tight mt-1.5', Math.abs(net) < 0.5 ? 'text-gray-500' : owed ? 'text-emerald-600' : 'text-red-600')}>
               {Math.abs(net) < 0.5 ? (isBn ? 'সব মেটানো' : 'All settled') : taka(Math.abs(net), language)}
             </p>
+            {due && (
+              <div className="mt-2.5">
+                <DueChip due={due} isBn={isBn} language={language} />
+              </div>
+            )}
             {person.note && <p className="text-[11.5px] font-semibold text-gray-500 mt-2">{person.note}</p>}
           </div>
 
-          {/* quick actions */}
+          {/* ── the only two questions ────────────────────────────────────────
+              This used to be a 2×2 of ধার দিলাম / পাওনা পেলাম / ধার নিলাম / ধার
+              শোধ — four phrases, three of them containing the word ধার, and
+              picking the wrong one moves the balance backwards. Nobody standing
+              in front of a friend thinks in those terms; they think "I gave him
+              money" or "he gave me money". So that is what is asked, and
+              typeForDirection() does the bookkeeping underneath. The small grey
+              line on each button is that translation, said out loud, so the
+              খাতা is never doing something the user cannot see. */}
           <div className="grid grid-cols-2 gap-2">
-            {quick.map((type) => {
-              const t = getEntryType(type);
-              const Icon = t.icon;
+            {[
+              { dir: 'out', icon: ArrowUpRight, bn: 'টাকা দিলাম', en: 'I gave money', tint: 'bg-rose-50', text: 'text-red-600' },
+              { dir: 'in', icon: ArrowDownLeft, bn: 'টাকা পেলাম', en: 'I got money', tint: 'bg-emerald-50', text: 'text-emerald-600' },
+            ].map(({ dir, icon: Icon, bn, en, tint, text }) => {
+              const t = getEntryType(typeForDirection(dir, net));
               return (
                 <button
-                  key={type}
-                  onClick={() => { setLockType(type); setEntryOpen(true); }}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-gray-50 border border-gray-100 active:scale-[0.97] transition"
+                  key={dir}
+                  onClick={() => openDirection(dir)}
+                  className="flex items-start gap-2.5 px-3 py-3 rounded-2xl bg-gray-50 border border-gray-100 active:scale-[0.97] transition text-left"
                 >
-                  <span className={cx('w-8 h-8 rounded-xl flex items-center justify-center shrink-0', t.tint, t.text)}>
-                    <Icon size={16} strokeWidth={2.3} />
+                  <span className={cx('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', tint, text)}>
+                    <Icon size={18} strokeWidth={2.4} />
                   </span>
-                  <span className="text-[11.5px] font-black text-gray-700 text-left leading-tight">{isBn ? t.bn : t.en}</span>
+                  <span className="min-w-0">
+                    <span className="block text-[12.5px] font-black text-gray-900 leading-tight">{isBn ? bn : en}</span>
+                    <span className="block text-[10px] font-bold text-gray-400 leading-tight mt-1 truncate">
+                      {isBn ? t.bn : t.en}
+                    </span>
+                  </span>
                 </button>
               );
             })}
           </div>
 
-          {/* history */}
+          {/* ── history ───────────────────────────────────────────────────────
+              Every row here is now correctable in place. It used to be a
+              read-only list, which meant a mistyped amount — or a "পুরো টাকা
+              পেয়ে গেছি" tapped by accident — could only be undone by deleting
+              the whole friend and every transaction with them. */}
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">
               {isBn ? 'সব লেনদেন' : 'Every transaction'} ({entries.length})
+              <span className="normal-case tracking-normal font-bold text-gray-400/90 ml-1.5">
+                · {isBn ? 'ভুল হলে সারিতে চাপ দিন' : 'tap a row to fix it'}
+              </span>
             </p>
             {entries.length === 0 ? (
               <p className="text-[12px] font-semibold text-gray-400 py-4 text-center">
@@ -178,18 +273,43 @@ const PersonDetailSheet = ({ personId, onClose, isBn, language, onEditProfile, o
                 {entries.map((e) => {
                   const t = getEntryType(e.type);
                   const Icon = t.icon;
+                  const days = e.type === 'lend' && e.dueDate ? daysToDue(e.dueDate) : null;
                   return (
-                    <div key={e.id} className="flex items-center gap-2.5 py-2.5">
-                      <span className={cx('w-8 h-8 rounded-xl flex items-center justify-center shrink-0', t.tint, t.text)}>
-                        <Icon size={15} strokeWidth={2.3} />
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[12.5px] font-black text-gray-900 truncate">{e.note?.trim() || (isBn ? t.bn : t.en)}</p>
-                        <p className="text-[10.5px] font-semibold text-gray-400">{dateLabel(e.date, language)}</p>
-                      </div>
-                      <span className={cx('text-[13px] font-black tabular-nums', t.person > 0 ? 'text-emerald-600' : 'text-red-600')}>
-                        {t.person > 0 ? '+' : '−'}{taka(e.amount, language)}
-                      </span>
+                    <div key={e.id} className="flex items-center gap-2 py-2">
+                      <button
+                        onClick={() => openEditEntry(e)}
+                        className="flex-1 min-w-0 flex items-center gap-2.5 text-left py-0.5 rounded-xl active:scale-[0.98] transition"
+                      >
+                        <span className={cx('w-8 h-8 rounded-xl flex items-center justify-center shrink-0', t.tint, t.text)}>
+                          <Icon size={15} strokeWidth={2.3} />
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-[12.5px] font-black text-gray-900 truncate">
+                            {e.note?.trim() || (isBn ? t.bn : t.en)}
+                          </span>
+                          <span className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            <span className="text-[10.5px] font-semibold text-gray-400">{dateLabel(e.date, language)}</span>
+                            {days !== null && net >= 0.5 && (
+                              <DueChip
+                                due={{ days, overdue: days < 0 }}
+                                isBn={isBn}
+                                language={language}
+                                withReminder={e.remind !== false && !!person.phone}
+                              />
+                            )}
+                          </span>
+                        </span>
+                        <span className={cx('text-[13px] font-black tabular-nums shrink-0', t.person > 0 ? 'text-emerald-600' : 'text-red-600')}>
+                          {t.person > 0 ? '+' : '−'}{taka(e.amount, language)}
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => setPendingEntryDelete(e)}
+                        className="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-rose-50 transition active:scale-90"
+                        aria-label={isBn ? 'সারিটি মুছুন' : 'Delete this row'}
+                      >
+                        <Trash2 size={15} />
+                      </button>
                     </div>
                   );
                 })}
@@ -216,11 +336,58 @@ const PersonDetailSheet = ({ personId, onClose, isBn, language, onEditProfile, o
 
       <SoloEntrySheet
         open={entryOpen}
-        onClose={() => setEntryOpen(false)}
-        flow={getEntryType(lockType).flow}
-        lockType={lockType}
+        onClose={() => { setEntryOpen(false); setEditingEntry(null); }}
+        // An edit opens on the side of the খাতা its own type lives on, with the
+        // type picker visible (lockType null) — that is where a row filed the
+        // wrong way round gets put right.
+        flow={getEntryType(editingEntry ? editingEntry.type : lockType).flow}
+        editing={editingEntry}
+        lockType={editingEntry ? null : lockType}
         lockPersonId={person.id}
-        onSave={addSoloEntry}
+        onSave={saveEntry}
+      />
+
+      <ConfirmDialog
+        open={!!pendingEntryDelete}
+        onClose={() => setPendingEntryDelete(null)}
+        onConfirm={() => deleteSoloEntry(pendingEntryDelete.id)}
+        title={isBn ? 'সারিটি মুছবেন?' : 'Delete this row?'}
+        message={
+          pendingEntryDelete
+            ? isBn
+              ? `${taka(pendingEntryDelete.amount, language)}-এর সারিটি খাতা থেকে মুছে যাবে, আর ${person.name}-এর হিসাবও সেই অনুযায়ী বদলে যাবে।`
+              : `The ${taka(pendingEntryDelete.amount, language)} row goes from your ledger, and ${person.name}'s balance moves with it.`
+            : ''
+        }
+        confirmLabel={isBn ? 'মুছে ফেলুন' : 'Delete'}
+        cancelLabel={isBn ? 'বাতিল' : 'Cancel'}
+      />
+
+      {/* The guard on the one tap that can wipe a real balance. It is the
+          full-width button at the bottom of a sheet people scroll — easy to hit
+          on the way past, and until rows became editable there was no way back
+          from it at all. */}
+      <ConfirmDialog
+        open={confirmSettle}
+        onClose={() => setConfirmSettle(false)}
+        onConfirm={() => { settle(); onClose(); }}
+        tone="info"
+        title={
+          net > 0
+            ? isBn ? 'পুরো টাকা পেয়ে গেছেন?' : 'Got all of it back?'
+            : isBn ? 'পুরোটা শোধ করেছেন?' : 'Paid all of it back?'
+        }
+        message={
+          net > 0
+            ? isBn
+              ? `${taka(Math.abs(net), language)} ফেরত পাওয়ার একটি সারি লেখা হবে, আর ${person.name}-এর হিসাব শূন্য হয়ে যাবে। ভুল হলে সারিতে চাপ দিয়ে বদলানো বা মুছে ফেলা যাবে।`
+              : `A ${taka(Math.abs(net), language)} repayment gets written and ${person.name}'s balance goes to zero. If that's wrong, tap the row afterwards to change or delete it.`
+            : isBn
+              ? `${taka(Math.abs(net), language)} শোধ করার একটি সারি লেখা হবে, আর ${person.name}-এর হিসাব শূন্য হয়ে যাবে। ভুল হলে সারিতে চাপ দিয়ে বদলানো বা মুছে ফেলা যাবে।`
+              : `A ${taka(Math.abs(net), language)} payment gets written and ${person.name}'s balance goes to zero. If that's wrong, tap the row afterwards to change or delete it.`
+        }
+        confirmLabel={isBn ? 'হ্যাঁ, লিখুন' : 'Yes, record it'}
+        cancelLabel={isBn ? 'বাতিল' : 'Cancel'}
       />
     </>
   );
@@ -312,6 +479,11 @@ const SoloPeople = ({ language }) => {
                         ? `${p.count} ${isBn ? 'টি লেনদেন' : p.count === 1 ? 'transaction' : 'transactions'} · ${dateLabel(p.lastDate, language)}`
                         : isBn ? 'এখনো লেনদেন হয়নি' : 'No transactions yet'}
                     </p>
+                    {p.due && (
+                      <div className="mt-1">
+                        <DueChip due={p.due} isBn={isBn} language={language} withReminder={!!p.phone} />
+                      </div>
+                    )}
                   </div>
                   <div className="text-right shrink-0">
                     {settled ? (

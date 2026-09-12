@@ -12,11 +12,11 @@
  * never dead-end into "go to another tab and add them first".
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, Plus, Tag, UserPlus, X } from 'lucide-react';
+import { BellRing, CalendarClock, Check, Plus, Tag, UserPlus, X } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
-import { taka } from './livingUtils';
+import { dateLabel, num, taka } from './livingUtils';
 import { METHOD_ORDER, PAYMENT_METHODS } from './livingConfig';
 import {
   SPEND_CATEGORIES, SPEND_ORDER, INCOME_CATEGORIES, INCOME_ORDER,
@@ -25,10 +25,20 @@ import {
   OUT_TYPES, IN_TYPES, PERSON_SWATCHES,
 } from './soloConfig';
 import { toDateInput, fromDateInput, customCategoriesUsed, recentNotes } from './soloUtils';
-import { Avatar, Field, MoneyInput, PrimaryButton, Sheet, TextArea, TextInput, cx } from './livingUI';
+import { Avatar, Field, MoneyInput, PrimaryButton, Sheet, TextArea, TextInput, Toggle, cx } from './livingUI';
 
 const dateInputClass =
   'w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ba0036]/30';
+
+// The repayment windows people actually agree on out loud. Typing a date is
+// still there underneath; these just save the arithmetic for the common case.
+const DUE_PRESETS = [7, 15, 30];
+
+const datePlusDays = (n) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return toDateInput(d);
+};
 
 const SoloEntrySheet = ({
   open,
@@ -54,6 +64,11 @@ const SoloEntrySheet = ({
   const [date, setDate] = useState(toDateInput());
   const [method, setMethod] = useState('cash');
   const [note, setNote] = useState('');
+  // ধার দিলাম only: the day it was promised back, and whether we may remind the
+  // borrower the day before. '' = no date agreed, which is the honest default —
+  // plenty of ধার is lent with no deadline at all.
+  const [due, setDue] = useState('');
+  const [remind, setRemind] = useState(true);
   const [newName, setNewName] = useState(null); // null = the inline add row is closed
   const [newCat, setNewCat] = useState(null); // null = "নিজের খাত" not being typed
   // খাত made in THIS sitting. They have no entry behind them yet, so nothing
@@ -73,6 +88,8 @@ const SoloEntrySheet = ({
       setDate(toDateInput(editing.date));
       setMethod(editing.method || 'cash');
       setNote(editing.note || '');
+      setDue(editing.dueDate ? toDateInput(editing.dueDate) : '');
+      setRemind(editing.remind !== false);
     } else {
       setType(lockType || typeOptions[0]);
       setAmount('');
@@ -81,6 +98,8 @@ const SoloEntrySheet = ({
       setDate(toDateInput());
       setMethod('cash');
       setNote('');
+      setDue('');
+      setRemind(true);
     }
     setNewName(null);
     setNewCat(null);
@@ -148,6 +167,13 @@ const SoloEntrySheet = ({
     setNewName(null);
   };
 
+  // A repayment date belongs to a ধার দিলাম and nothing else: there is no one to
+  // remind about a খরচ, and reminding somebody that *I* owe *them* is their job,
+  // not ours. Switching the type away therefore clears both fields rather than
+  // leaving an orphan date on a row that can never use it.
+  const canSchedule = type === 'lend';
+  const canRemind = canSchedule && !!due && !!selectedPerson?.phone?.trim();
+
   const submit = () => {
     if (invalid) return;
     onSave({
@@ -158,6 +184,8 @@ const SoloEntrySheet = ({
       date: fromDateInput(date),
       method,
       note: note.trim(),
+      dueDate: canSchedule && due ? fromDateInput(due) : null,
+      remind: canRemind && remind,
     });
     onClose();
   };
@@ -388,6 +416,95 @@ const SoloEntrySheet = ({
           </Field>
         )}
 
+        {/* ── when it comes back ────────────────────────────────────────────
+            The one question a ধার always has and a খাতা never recorded: by
+            when? Optional, because plenty of money is lent with no date on it
+            — but once a date IS written down, the app can do the part nobody
+            enjoys and send the reminder itself. */}
+        {canSchedule && (
+          <Field
+            label={`${isBn ? 'ফেরত দেওয়ার তারিখ' : 'Due back by'} · ${isBn ? 'ইচ্ছা হলে' : 'optional'}`}
+            hint={
+              due
+                ? undefined
+                : isBn
+                ? 'তারিখ দিলে সেটা হিসাবের সাথেই থাকবে, আর চাইলে আগের দিন মনে করিয়ে দেওয়া হবে।'
+                : 'A date stays on the entry — and can nudge them the day before.'
+            }
+          >
+            <div className="flex flex-wrap gap-2">
+              {DUE_PRESETS.map((d) => {
+                const value = datePlusDays(d);
+                const active = due === value;
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setDue(active ? '' : value)}
+                    className={cx(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11.5px] font-black transition active:scale-95',
+                      active ? 'border-[#ba0036] bg-[#ba0036]/5 text-[#ba0036]' : 'border-gray-200 bg-white text-gray-600 hover:border-[#ba0036]/40'
+                    )}
+                  >
+                    <CalendarClock size={13} />
+                    {isBn ? `${num(d, language)} দিনে` : `in ${d} days`}
+                  </button>
+                );
+              })}
+              {due && (
+                <button
+                  type="button"
+                  onClick={() => setDue('')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-500 text-[11.5px] font-black active:scale-95 transition"
+                >
+                  <X size={13} /> {isBn ? 'তারিখ ছাড়া' : 'No date'}
+                </button>
+              )}
+            </div>
+
+            <input
+              type="date"
+              value={due}
+              min={toDateInput()}
+              onChange={(e) => setDue(e.target.value)}
+              className={cx(dateInputClass, 'mt-2.5')}
+            />
+
+            {due && (
+              selectedPerson?.phone?.trim() ? (
+                <div className="mt-2.5 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-3">
+                  <span className="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                    <BellRing size={16} strokeWidth={2.3} />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-black text-blue-900 leading-tight">
+                      {isBn
+                        ? `আগের দিন ${selectedPerson.name}-কে মনে করিয়ে দেব`
+                        : `Remind ${selectedPerson.name} the day before`}
+                    </p>
+                    <p className="text-[11px] font-semibold text-blue-700/80 leading-relaxed mt-1">
+                      {isBn
+                        ? `${selectedPerson.phone.trim()} নম্বরে হোয়াটসঅ্যাপে (না পৌঁছালে এসএমএসে) একটি ভদ্র বার্তা যাবে — আপনার নাম, টাকার পরিমাণ আর তারিখসহ। একবারই যাবে।`
+                        : `One polite WhatsApp (SMS if that fails) to ${selectedPerson.phone.trim()}, with your name, the amount and the date. Sent once.`}
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={remind}
+                    onChange={setRemind}
+                    label={isBn ? 'রিমাইন্ডার' : 'Reminder'}
+                  />
+                </div>
+              ) : (
+                <p className="mt-2.5 text-[11.5px] font-semibold text-gray-500 leading-relaxed bg-gray-50 border border-gray-100 rounded-2xl p-3">
+                  {isBn
+                    ? `${selectedPerson?.name ? `${selectedPerson.name}-এর` : 'এই বন্ধুর'} প্রোফাইলে ফোন নম্বর নেই, তাই মনে করিয়ে দেওয়া যাবে না। নম্বর যোগ করলে তারিখের আগের দিন নিজে থেকেই বার্তা চলে যাবে।`
+                    : `No phone number on ${selectedPerson?.name || 'their'} profile, so nobody can be reminded. Add one and the message goes out by itself the day before.`}
+                </p>
+              )
+            )}
+          </Field>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
           <Field label={isBn ? 'তারিখ' : 'Date'}>
             <input type="date" value={date} max={toDateInput()} onChange={(e) => setDate(e.target.value)} className={dateInputClass} />
@@ -479,6 +596,11 @@ const SoloEntrySheet = ({
               {type === 'borrow' && (isBn ? `আপনি ${selectedPerson?.name || 'বন্ধু'}-কে ${taka(amt, language)} ফেরত দেবেন। এটি আয় নয়।` : `You will owe ${selectedPerson?.name || 'them'} ${taka(amt, language)}. This is not income.`)}
               {type === 'repay-in' && (isBn ? `${selectedPerson?.name || 'বন্ধু'}-র কাছে পাওনা ${taka(amt, language)} কমে যাবে।` : `${selectedPerson?.name || 'Their'} dues drop by ${taka(amt, language)}.`)}
               {type === 'repay-out' && (isBn ? `${selectedPerson?.name || 'বন্ধু'}-কে আপনার দেনা ${taka(amt, language)} কমে যাবে।` : `What you owe ${selectedPerson?.name || 'them'} drops by ${taka(amt, language)}.`)}
+              {canSchedule && due && (
+                isBn
+                  ? ` ফেরতের তারিখ ${dateLabel(fromDateInput(due), language)}${canRemind && remind ? ' — আগের দিন মনে করিয়ে দেওয়া হবে।' : '।'}`
+                  : ` Due back ${dateLabel(fromDateInput(due), language)}${canRemind && remind ? ', with a reminder the day before.' : '.'}`
+              )}
             </p>
           </div>
         )}

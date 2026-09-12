@@ -479,12 +479,11 @@ const AppLayout = () => {
 				<GlobalToaster />
 				{!shouldHideAIAssistant && <GlobalAIAssistant />}
 			</Suspense>
-			{/* '/living' is deliberately NOT hidden any more. It can be a user's
-			    home screen now, and a home screen with no rail is a room with no
-			    door: no Explore, no Messages, no Profile from the first screen
-			    they see. Living's own module pills sit at the top, so the two
-			    navigations don't compete. */}
-			<MobileBottomNav hideOnRoutes={['/login', '/list-property', '/properties/']} />
+			{/* '/living' is hidden again: two navigations on one screen read as
+			    clutter, and Living already carries its own — the module pills
+			    below the header switch modules, and the header avatar goes to
+			    the dashboard — so the rail only added a second competing bar. */}
+			<MobileBottomNav hideOnRoutes={['/login', '/list-property', '/properties/', '/living']} />
 			<Suspense fallback={null}>
 				<FeedbackButton />
 			</Suspense>

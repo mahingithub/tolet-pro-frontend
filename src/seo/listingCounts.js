@@ -11,8 +11,8 @@
  * existed and include every page.
  */
 
-export const LISTING_COUNTS_OK = false;
-export const LISTING_COUNTS_FETCHED_AT = "2026-09-08T06:54:56.583Z";
+export const LISTING_COUNTS_OK = true;
+export const LISTING_COUNTS_FETCHED_AT = "2026-09-12T06:38:45.108Z";
 export const LISTING_COUNTS = {};
 
 /**

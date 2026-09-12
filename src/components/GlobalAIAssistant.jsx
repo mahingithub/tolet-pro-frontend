@@ -332,7 +332,8 @@ const GlobalAIAssistant = () => {
   //      transcript preview. Tap mic -> speak -> on a final result it auto-sends.
   //   2) Fallback for browsers without Web Speech (notably iOS Safari, Firefox):
   //      record with MediaRecorder, upload to /ai-chat/transcribe (server-side
-  //      Whisper), then auto-send the returned text. Costs a little per clip.
+  //      Gemini, same backend as the chat itself), then auto-send the returned
+  //      text. Costs a little per clip.
   // Both feed the SAME handleAiSend pipeline (already understands Bengali + runs
   // the property search).
   const SpeechRec =

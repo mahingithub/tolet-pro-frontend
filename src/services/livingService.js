@@ -67,6 +67,14 @@ export const livingService = {
   addMember: (name, color) => req('/members', { method: 'POST', body: { name, color } }),
   removeMember: (id) => req(`/members/${id}`, { method: 'DELETE' }),
 
+  // settle-up reminders. Deliberately OUTSIDE the offline queue: a nudge is a
+  // message to another person, and one that silently goes out tomorrow because
+  // it was queued in a dead zone is not what anyone pressed the button for.
+  // The amount is never sent — the server recomputes the debt and refuses to
+  // nudge anyone who doesn't owe the caller.
+  remindPreview: (memberId) => req(`/remind/${memberId}/preview`),
+  remindMember: (memberId) => req(`/remind/${memberId}`, { method: 'POST' }),
+
   // expenses
   addExpense: (e, opId) => req('/expenses', { method: 'POST', body: e, opId }),
   updateExpense: (id, patch, opId) => req(`/expenses/${id}`, { method: 'PATCH', body: patch, opId }),

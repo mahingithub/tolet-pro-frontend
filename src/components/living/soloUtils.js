@@ -126,7 +126,7 @@ export function soloSummary(solo = {}, offset = 0) {
 export function personRows(solo = {}) {
   const { people = [], entries = [] } = solo;
   const acc = {};
-  people.forEach((p) => (acc[p.id] = { ...p, net: 0, count: 0, lastDate: null }));
+  people.forEach((p) => (acc[p.id] = { ...p, net: 0, count: 0, lastDate: null, _dues: [] }));
 
   entries.forEach((e) => {
     const row = acc[e.personId];
@@ -134,19 +134,64 @@ export function personRows(solo = {}) {
     row.net += personDelta(e);
     row.count += 1;
     if (!row.lastDate || new Date(e.date) > new Date(row.lastDate)) row.lastDate = e.date;
+    if (e.type === 'lend' && e.dueDate) row._dues.push(e);
   });
 
-  const rows = Object.values(acc).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+  // The deadline badge each row shows. Computed after the loop because it
+  // depends on the final balance — see personDue: a cleared debt has no
+  // deadline left, whatever date the original ধার was written with.
+  const rows = Object.values(acc).map(({ _dues, ...row }) => ({ ...row, due: personDue(_dues, row.net) }));
+  rows.sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
   const theyOweMe = rows.reduce((s, r) => s + (r.net > 0 ? r.net : 0), 0);
   const iOwe = rows.reduce((s, r) => s + (r.net < 0 ? -r.net : 0), 0);
   return { rows, theyOweMe, iOwe, net: theyOweMe - iOwe };
+}
+
+// ── repayment dates ──────────────────────────────────────────────────────────
+// A ধার row may carry `dueDate` — the day the money was promised back. It is
+// only ever set on a `lend`, and it only means anything while the person still
+// owes something: once the balance is cleared the promise has been kept, and a
+// date sitting on a settled row is history, not a deadline.
+
+/** Whole days from today (local midnight) to a date. Negative = already past. */
+export const daysToDue = (due) => {
+  if (!due) return null;
+  const d = new Date(due);
+  if (Number.isNaN(d.getTime())) return null;
+  const at = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((at - today) / 86400000);
+};
+
+/**
+ * The repayment date to put in front of the user for one person: the soonest
+ * one still owed, plus how many days away it is.
+ *
+ * Returns null when they owe nothing — a settled friend has no deadline, even
+ * if an old row still carries the date it was once promised back on.
+ */
+export function personDue(entries = [], net = 0) {
+  if (net < 0.5) return null;
+  const dates = entries
+    .filter((e) => e.type === 'lend' && e.dueDate)
+    .map((e) => new Date(e.dueDate))
+    .filter((d) => !Number.isNaN(d.getTime()))
+    .sort((a, b) => a - b);
+  if (!dates.length) return null;
+  // The soonest date that hasn't passed; if every one has, the oldest overdue
+  // promise is the one worth showing.
+  const upcoming = dates.find((d) => daysToDue(d) >= 0);
+  const date = upcoming || dates[0];
+  const days = daysToDue(date);
+  return { date, days, overdue: days < 0 };
 }
 
 /** One friend's balance + their entries, newest first (for the detail sheet). */
 export function personDetail(solo = {}, personId) {
   const entries = (solo.entries || []).filter((e) => e.personId === personId).sort(byNewest);
   const net = entries.reduce((s, e) => s + personDelta(e), 0);
-  return { entries, net };
+  return { entries, net, due: personDue(entries, net) };
 }
 
 /** Spent vs. earned for the last `months` calendar months (oldest → newest). */
