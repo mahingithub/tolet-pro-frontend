@@ -232,11 +232,24 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   return (
     <>
       {/* soft fade above the bar so content underneath blends smoothly */}
-      <div className="md:hidden fixed bottom-[64px] inset-x-0 h-6 pointer-events-none bg-gradient-to-t from-white/85 to-transparent z-30" />
+      <div
+        className="md:hidden fixed inset-x-0 h-6 pointer-events-none bg-gradient-to-t from-white/85 to-transparent z-30"
+        style={{ bottom: 'var(--bottom-nav-h)' }}
+      />
 
+      {/* HEIGHT GROWS BY THE INSET — it does not absorb it. Tailwind preflight
+          makes every box border-box, so the old `h-[64px]` + `padding-bottom:
+          env(safe-area-inset-bottom)` subtracted the gesture bar FROM the 64px
+          instead of adding to it: the rail stayed 64px tall with its lowest
+          ~24px underneath the system gesture pill, and the icons + labels were
+          crushed into the ~40px that were left. Taps on that bottom strip went
+          to the OS, which is what "the bottom doesn't respond" actually was.
+
+          Now: height = 64 + inset, padding-bottom = inset, so the content box
+          is a true 64px sitting entirely above the gesture bar. */}
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-40 h-[64px] bg-white border-t border-gray-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)]"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)]"
+        style={{ height: 'var(--bottom-nav-h)', paddingBottom: 'var(--sab)' }}
       >
         <div className="relative h-full max-w-md mx-auto flex items-center px-1">
           {LEFT.map((item) => (

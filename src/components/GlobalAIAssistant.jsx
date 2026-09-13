@@ -514,7 +514,7 @@ const GlobalAIAssistant = () => {
         >
           <div
             ref={chatWindowRef}
-            className="fixed bottom-[calc(64px+1rem+env(safe-area-inset-bottom))] md:bottom-24 right-4 md:right-8 z-[100] w-[calc(100vw-2rem)] md:w-[400px] h-[600px] max-h-[75vh] md:max-h-[80vh] flex flex-col bg-white/95 backdrop-blur-2xl rounded-[2rem] shadow-[0_30px_80px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.4)] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-10 duration-300"
+            className="fixed bottom-[calc(var(--bottom-nav-h)+1rem)] md:bottom-24 right-4 md:right-8 z-[100] w-[calc(100vw-2rem)] md:w-[400px] h-[600px] max-h-[75vh] md:max-h-[80vh] flex flex-col bg-white/95 backdrop-blur-2xl rounded-[2rem] shadow-[0_30px_80px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.4)] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-10 duration-300"
           >
             {/* ── header (drag handle) ───────────────────────────────── */}
             <div className="drag-header cursor-grab active:cursor-grabbing bg-gradient-to-r from-[#ba0036] to-[#d91a4d] p-4 flex items-center justify-between shrink-0 relative overflow-hidden">

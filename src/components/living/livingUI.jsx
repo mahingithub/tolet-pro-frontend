@@ -524,7 +524,7 @@ export const Sheet = ({ open, onClose, title, subtitle, children, footer, maxWid
               {footer && (
                 <div
                   className="px-5 pt-4 border-t border-gray-100 bg-white rounded-b-[2rem]"
-                  style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+                  style={{ paddingBottom: 'max(1rem, var(--sab))' }}
                 >
                   {footer}
                 </div>

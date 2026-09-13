@@ -71,7 +71,7 @@ function RateSheet({ order, bn, onClose, onDone }) {
       />
       <div
         className="relative w-full sm:max-w-md bg-white rounded-t-[1.75rem] sm:rounded-[1.75rem] p-6 space-y-4 shadow-2xl"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}
+        style={{ paddingBottom: 'calc(var(--sab) + 1.5rem)' }}
       >
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-black text-gray-900">

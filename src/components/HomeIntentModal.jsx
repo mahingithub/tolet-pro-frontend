@@ -127,7 +127,7 @@ export default function HomeIntentModal() {
         </div>
 
         {stage === 'intent' ? (
-          <div className="px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+          <div className="px-5 pb-[calc(1.5rem+var(--sab))]">
             <h2 className="text-[22px] md:text-[26px] font-black text-gray-900 tracking-tight leading-tight mt-1">
               {isBn ? 'কী করতে এসেছেন?' : 'What brings you here?'}
             </h2>
@@ -169,7 +169,7 @@ export default function HomeIntentModal() {
             </button>
           </div>
         ) : (
-          <div className="px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+          <div className="px-5 pb-[calc(1.5rem+var(--sab))]">
             {/* The same picker Living itself uses — one description of solo vs
                 shared in the whole app, so the two can never drift apart. */}
             <ModeChooser isBn={isBn} onPick={chooseWallet} />

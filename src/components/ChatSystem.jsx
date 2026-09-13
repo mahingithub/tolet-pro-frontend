@@ -2647,7 +2647,7 @@ const ChatSystem = () => {
         {/* MAIN CHAT PANE */}
             <main className={`${isMobile && showSidebarMobile ? 'hidden' : 'flex'} relative flex-1 flex-col min-w-0 min-h-0 bg-white/30`}>          <header
             className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/60 bg-white/40 backdrop-blur-md flex justify-between items-center gap-3"
-            style={mobileChatOpen ? { paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' } : undefined}
+            style={mobileChatOpen ? { paddingTop: 'calc(var(--sat) + 0.75rem)' } : undefined}
           >
             <div className="flex items-center gap-3 min-w-0">
               {isMobile && (
@@ -2983,7 +2983,7 @@ const ChatSystem = () => {
           {/* Composer */}
           <div
             className="px-4 sm:px-6 pb-4 sm:pb-6 pt-2 relative"
-            style={mobileChatOpen ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' } : undefined}
+            style={mobileChatOpen ? { paddingBottom: 'calc(var(--sab) + 1rem)' } : undefined}
           >
             {activeChat.blocked ? (
               <div className="flex items-center justify-center gap-3 bg-gray-50 border border-gray-200 rounded-[1.6rem] px-4 py-3.5">

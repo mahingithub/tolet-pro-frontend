@@ -72,14 +72,19 @@ const labelCls = 'block text-[10px] font-black text-gray-400 uppercase tracking-
 const inputCls = 'w-full px-3.5 py-3 rounded-xl border-2 border-gray-100 bg-white text-sm font-bold text-gray-900 placeholder:text-gray-300 placeholder:font-medium focus:border-gray-900 focus:outline-none transition-colors';
 
 // The bottom padding is not decoration. MobileBottomNav is `fixed bottom-0`
-// with a 64px bar (plus its own fade strip above it) and /join/:token is not in
-// its hideOnRoutes list, so on a phone it floats over the last stretch of this
-// page — which is exactly where every step of this flow puts its primary
-// button. Ending the page above the bar keeps "পরবর্তী" reachable instead of
-// hidden behind it. The bar is md:hidden, so the reserve is too.
+// and /join/:token is not in its hideOnRoutes list, so on a phone it floats
+// over the last stretch of this page — which is exactly where every step of
+// this flow puts its primary button. Ending the page above the bar keeps
+// "পরবর্তী" reachable instead of hidden behind it. The bar is md:hidden, so the
+// reserve is too.
+//
+// Reserve `--bottom-nav-h`, not a bare 64px: the rail is 64px of touch target
+// PLUS the gesture inset underneath it, so 64 alone leaves the button under the
+// rail on a gesture-nav phone. The token already carries the inset — don't add
+// --sab on top of it here or the page pads for the gesture bar twice.
 const Shell = ({ children }) => (
   <div className="min-h-screen bg-gray-50">
-    <div className="max-w-lg mx-auto px-4 pt-6 sm:pt-10 pb-[calc(64px+env(safe-area-inset-bottom)+1.5rem)] md:pb-10">
+    <div className="max-w-lg mx-auto px-4 pt-6 sm:pt-10 pb-[calc(var(--bottom-nav-h)+1.5rem)] md:pb-10">
       {children}
     </div>
   </div>

@@ -162,8 +162,10 @@ const CheckoutPage = () => {
     ? (isBn ? 'সীমাহীন বাড়ি, AI সহায়তা, সব ফিচার আনলক' : 'Unlimited listings, AI insights, all features unlocked')
     : (isBn ? '৩টি বাড়ি লিস্ট করুন, ভাড়া ট্র্যাক করুন' : 'List up to 3 properties, track rent');
 
+  // pb clears MobileBottomNav, which is 64px PLUS the gesture inset — a bare
+  // pb-[64px] left the last row of this page under the gesture bar.
   return (
-    <div className="min-h-screen pb-[64px] md:pb-0 bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-[#0A0A0F] dark:via-[#13111C] dark:to-[#1A1625] transition-colors duration-300">
+    <div className="min-h-screen pb-[var(--bottom-nav-h)] md:pb-0 bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-[#0A0A0F] dark:via-[#13111C] dark:to-[#1A1625] transition-colors duration-300">
       
       {/* Toast Notification */}
       {toast && (

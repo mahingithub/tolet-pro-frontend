@@ -220,7 +220,7 @@ const LocationSearchModal = ({
         className="relative z-10 flex flex-col bg-white w-full h-full md:h-auto md:w-full md:max-w-[600px] md:max-h-[72vh] md:rounded-[1.75rem] md:shadow-[0_30px_80px_rgba(15,23,42,0.35)] overflow-hidden tlp-lsm-panel"
       >
         {/* ── Header / search bar ── */}
-        <div className="shrink-0 border-b border-slate-100 px-3 md:px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:pt-4 pb-3">
+        <div className="shrink-0 border-b border-slate-100 px-3 md:px-4 pt-[calc(var(--sat)+0.75rem)] md:pt-4 pb-3">
           <div className="flex items-center gap-2">
             {/* Back arrow (mobile) */}
             <button
@@ -273,7 +273,7 @@ const LocationSearchModal = ({
         {/* ── Suggestions / empty states ── */}
         <div ref={listRef} className="flex-1 overflow-y-auto overscroll-contain">
           {!hasQuery ? (
-            <div className="pt-8 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+            <div className="pt-8 pb-[calc(var(--sab)+1rem)]">
               <div className="flex flex-col items-center text-center mb-7 px-4">
                 <div className="w-14 h-14 rounded-2xl bg-crimson-50 text-crimson-500 flex items-center justify-center mb-4">
                   <MapPin size={26} />
@@ -317,7 +317,7 @@ const LocationSearchModal = ({
               <p className="px-4 pt-3 pb-1 text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
                 {L.suggestions}
               </p>
-              <div className="pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
+              <div className="pb-[calc(var(--sab)+0.5rem)]">
                 {suggestions.map((s, idx) => (
                   <button
                     key={s.id}

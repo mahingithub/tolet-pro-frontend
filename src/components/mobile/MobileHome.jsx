@@ -196,7 +196,7 @@ const PickerSheet = ({ open, title, options, value, onPick, onClose, langKey }) 
       onClick={onClose}
     >
       <div
-        className="w-full bg-white rounded-t-3xl pb-[calc(env(safe-area-inset-bottom)+1rem)] animate-in slide-in-from-bottom-10 duration-200"
+        className="w-full bg-white rounded-t-3xl pb-[calc(var(--sab)+1rem)] animate-in slide-in-from-bottom-10 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="pt-3 pb-2 flex justify-center">
@@ -335,7 +335,7 @@ const DivisionDistrictsSheet = ({ division, onClose, onPickDistrict, t }) => {
       onClick={onClose}
     >
       <div
-        className="w-full bg-white rounded-t-3xl pb-[calc(env(safe-area-inset-bottom)+1rem)] animate-in slide-in-from-bottom-10 duration-200 max-h-[85vh] flex flex-col overflow-hidden"
+        className="w-full bg-white rounded-t-3xl pb-[calc(var(--sab)+1rem)] animate-in slide-in-from-bottom-10 duration-200 max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative h-32 shrink-0">
@@ -540,7 +540,7 @@ const AreaSubzonesSheet = ({ area, onClose, onPickLocation, t }) => {
       onClick={onClose}
     >
       <div
-        className="w-full bg-white rounded-t-3xl pb-[calc(env(safe-area-inset-bottom)+1rem)] animate-in slide-in-from-bottom-10 duration-200 max-h-[85vh] flex flex-col overflow-hidden"
+        className="w-full bg-white rounded-t-3xl pb-[calc(var(--sab)+1rem)] animate-in slide-in-from-bottom-10 duration-200 max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative h-32 shrink-0">
@@ -921,7 +921,7 @@ const CategoryPromptSheet = ({ open, locationName, onClose, onPickCategory, t })
       onClick={onClose}
     >
       <div
-        className="w-full bg-white rounded-t-3xl pb-[calc(env(safe-area-inset-bottom)+1rem)] animate-in slide-in-from-bottom-10 duration-200"
+        className="w-full bg-white rounded-t-3xl pb-[calc(var(--sab)+1rem)] animate-in slide-in-from-bottom-10 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="pt-3 pb-2 flex justify-center">

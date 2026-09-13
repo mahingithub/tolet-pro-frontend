@@ -54,7 +54,7 @@ export default function MediaLightbox({ open, media, onClose, onDownload }) {
           {/* Top bar */}
           <div
             className="flex items-center justify-between gap-3 px-4 text-white shrink-0"
-            style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)', paddingBottom: '0.75rem' }}
+            style={{ paddingTop: 'calc(var(--sat) + 0.75rem)', paddingBottom: '0.75rem' }}
             onClick={(e) => e.stopPropagation()}
           >
             <p className="text-sm font-bold truncate flex items-center gap-2 min-w-0">

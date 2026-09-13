@@ -959,7 +959,7 @@ const MediaViewer = ({ items = [], index, onIndexChange, onClose }) => {
         >
           {/* ── Top bar: what you're looking at + position + close ── */}
           <div className="shrink-0 flex items-center justify-between gap-3 px-4 md:px-6"
-            style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.85rem)', paddingBottom: '0.85rem' }}>
+            style={{ paddingTop: 'calc(var(--sat) + 0.85rem)', paddingBottom: '0.85rem' }}>
             <div className="flex items-center gap-2 min-w-0">
               <span className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
                 style={{ background: 'linear-gradient(135deg,#ba0036,#7c0026)' }}>
@@ -1049,7 +1049,7 @@ const MediaViewer = ({ items = [], index, onIndexChange, onClose }) => {
           {total > 1 && (
             <div ref={railRef}
               className="no-scrollbar shrink-0 flex gap-2.5 md:gap-3 overflow-x-auto px-4 md:px-6 pt-3"
-              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.9rem)' }}>
+              style={{ paddingBottom: 'calc(var(--sab) + 0.9rem)' }}>
               {items.map((item, i) => {
                 const active = i === safeIdx;
                 return (
@@ -3041,10 +3041,13 @@ const PropertyDetails = () => {
       </div>
 
       {/* ── MOBILE: FLOATING BOTTOM ACTION CARD ── */}
-      {/* Sits above the 64px MobileBottomNav so it is never hidden behind it */}
+      {/* 18px above the gesture bar, NOT above the rail: MobileBottomNav returns
+          null on /property/:id precisely so this card can own the bottom edge
+          (see the early return in MobileBottomNav). So the offset is the raw
+          inset — `--bottom-nav-h` here would float the card 64px off nothing. */}
       <div className="lg:hidden fixed left-3 right-3 z-40"
         style={{
-          bottom: 'calc(18px + env(safe-area-inset-bottom))',
+          bottom: 'calc(18px + var(--sab))',
         }}>
         <motion.div
           initial={{ y: 30, opacity: 0 }}

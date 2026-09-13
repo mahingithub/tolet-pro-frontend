@@ -587,7 +587,7 @@ const GlobalCallUI = () => {
             )}
 
             {/* Top bar: call-type chip + (connected video) name + timer */}
-            <div className="relative z-10 w-full flex flex-col items-center px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}>
+            <div className="relative z-10 w-full flex flex-col items-center px-6" style={{ paddingTop: 'calc(var(--sat) + 2rem)' }}>
               <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest border shadow-lg ${
                 isVideoCall ? 'bg-indigo-500/25 border-indigo-400/50 text-indigo-100' : 'bg-[#ba0036]/30 border-[#ba0036]/60 text-red-100'
               }`}>
@@ -634,7 +634,7 @@ const GlobalCallUI = () => {
             )}
 
             {/* Controls */}
-            <div className={`relative z-10 flex items-end justify-center gap-5 sm:gap-8 w-full px-6 ${isInCall && isVideoCall ? 'mt-auto' : ''}`} style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 2.5rem)' }}>
+            <div className={`relative z-10 flex items-end justify-center gap-5 sm:gap-8 w-full px-6 ${isInCall && isVideoCall ? 'mt-auto' : ''}`} style={{ paddingBottom: 'calc(var(--sab) + 2.5rem)' }}>
               {!isInCall ? (
                 callState?.direction === 'incoming' ? (
                   <>

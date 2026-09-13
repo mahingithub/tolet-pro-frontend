@@ -478,8 +478,24 @@ useEffect(() => {
       {/* z-[60] keeps this global header (and its city dropdowns) ABOVE every
           route-level sticky bar (e.g. the PropertyDetails page nav at z-30),
           regardless of any wrapper that React Router or animation libs may
-          add between the navbar and the routed page. */}
-      <header className={`flex flex-col w-full bg-white/95 backdrop-blur-2xl font-sans sticky top-0 z-[60] transition-all duration-300 ease-in-out ${isScrolled ? 'shadow-[0_4px_24px_rgba(0,0,0,0.10)] border-b border-gray-100/80' : 'border-b border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)]'} ${isMobileMenuOpen ? 'md:opacity-100 max-md:opacity-0 max-md:pointer-events-none' : ''}`}>
+          add between the navbar and the routed page.
+
+          paddingTop: var(--sat) is what keeps the logo out from under the
+          status bar. This header is `sticky top-0` inside a full-bleed
+          WebView, so without it the 56px row starts at physical y=0 — the
+          brand mark renders behind the clock and the language pill sits in
+          dead space where taps belong to the OS. The white background fills
+          the status bar strip for free, since the padding is inside it. */}
+      {/* transition is scoped to shadow/border/opacity — NOT `transition-all`.
+          The only thing this header animates on scroll is its shadow and
+          border; with `transition-all` the safe-area padding above joins in,
+          and since Capacitor injects the insets after DOM-ready rather than at
+          first paint, the whole header visibly slid down by the status-bar
+          height on every cold start. */}
+      <header
+        className={`flex flex-col w-full bg-white/95 backdrop-blur-2xl font-sans sticky top-0 z-[60] transition-[box-shadow,border-color,opacity] duration-300 ease-in-out ${isScrolled ? 'shadow-[0_4px_24px_rgba(0,0,0,0.10)] border-b border-gray-100/80' : 'border-b border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)]'} ${isMobileMenuOpen ? 'md:opacity-100 max-md:opacity-0 max-md:pointer-events-none' : ''}`}
+        style={{ paddingTop: 'var(--sat)' }}
+      >
 
         <div className={`relative z-10 w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 flex items-center gap-2.5 md:gap-4 h-[56px] md:h-[64px] transition-all duration-300 ease-in-out mt-0 opacity-100`}>
 

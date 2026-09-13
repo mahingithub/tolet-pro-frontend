@@ -485,15 +485,20 @@ const ProviderDetail = () => {
       </div>
 
       {/* ── The action bar. Call is always here, on every tier. ──────────── */}
-      {/* `bottom-[64px]` on mobile, NOT bottom-0: MobileBottomNav is a 64px
-          fixed bar at z-40 on the same edge, and it renders after the routes in
+      {/* `--bottom-nav-h` on mobile, NOT bottom-0: MobileBottomNav is a fixed
+          bar at z-40 on the same edge, and it renders after the routes in
           App.jsx — so an action bar sharing that layer and that offset is
           simply covered by it. Stacking above is right rather than hiding the
-          app nav: this is a page inside the app, not a takeover of it. */}
-      <div
-        className="fixed bottom-[64px] md:bottom-0 inset-x-0 z-[45] bg-white/95 backdrop-blur-md border-t border-gray-200 px-4 py-3"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}
-      >
+          app nav: this is a page inside the app, not a takeover of it.
+
+          The token, not a bare 64px, because the rail is 64px PLUS the gesture
+          inset — offsetting by 64 alone tucks this bar under it.
+
+          The safe-area padding is md:-only on purpose. On mobile the rail below
+          already clears the gesture bar, so adding the inset here too would
+          pad against nothing twice; on md+ the rail is hidden (md:hidden) and
+          this bar owns the bottom edge, so there it needs the inset itself. */}
+      <div className="fixed bottom-[var(--bottom-nav-h)] md:bottom-0 inset-x-0 z-[45] bg-white/95 backdrop-blur-md border-t border-gray-200 px-4 py-3 md:pb-[calc(var(--sab)+0.75rem)]">
         <div className="max-w-[760px] mx-auto flex gap-2.5">
           <a
             href={`tel:${provider.phone}`}
@@ -527,7 +532,7 @@ const ProviderDetail = () => {
           />
           <div
             className="relative w-full sm:max-w-md bg-white rounded-t-[1.75rem] sm:rounded-[1.75rem] p-5 space-y-4 max-h-[88vh] overflow-y-auto shadow-2xl"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.25rem)' }}
+            style={{ paddingBottom: 'calc(var(--sab) + 1.25rem)' }}
           >
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-black text-gray-900">

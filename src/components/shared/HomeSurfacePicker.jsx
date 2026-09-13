@@ -77,7 +77,7 @@ export default function HomeSurfacePicker({ open, onClose }) {
       role="presentation"
     >
       <div
-        className="w-full sm:max-w-md max-h-[88vh] overflow-y-auto bg-white dark:bg-gray-900 rounded-t-[2rem] sm:rounded-[2rem] p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl"
+        className="w-full sm:max-w-md max-h-[88vh] overflow-y-auto bg-white dark:bg-gray-900 rounded-t-[2rem] sm:rounded-[2rem] p-5 pb-[calc(1.25rem+var(--sab))] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

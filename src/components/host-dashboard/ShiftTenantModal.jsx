@@ -225,7 +225,7 @@ export default function ShiftTenantModal({
         </div>
 
         {/* ── Footer ── */}
-        <div className="px-5 py-4 border-t border-gray-100 shrink-0 flex gap-2 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4">
+        <div className="px-5 py-4 border-t border-gray-100 shrink-0 flex gap-2 pb-[calc(1rem+var(--sab))] sm:pb-4">
           <button
             type="button"
             onClick={onClose}

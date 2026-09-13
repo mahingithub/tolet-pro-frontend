@@ -21,6 +21,36 @@
    ────────────────────────────────────────────────────────────────────────── */
 :root {
   --app-banner-h: 0px;
+
+  /* ─── SAFE-AREA INSETS ───────────────────────────────────────────────────
+     --sat / --sab : how much of the top/bottom of the viewport belongs to the
+     OS (status bar, notch, gesture pill) rather than to us.
+
+     THIS IS NOT COSMETIC. targetSdk is 36 (android/variables.gradle), and
+     Android 15 forces edge-to-edge while Android 16 removes the opt-out
+     entirely — so the WebView is laid out behind both system bars by
+     definition. Anything we paint in those strips is not just visually
+     clipped, it is UNTAPPABLE: the touch goes to the system, not to us.
+
+     Two sources, because no single one covers every device we ship to:
+       env(safe-area-inset-*)   iOS/WKWebView, and Android WebView 140+ when
+                                Capacitor passes the insets through to CSS.
+       var(--safe-area-inset-*) injected onto <html> by Capacitor 8's built-in
+                                SystemBars plugin (SystemBars.injectSafeAreaCSS).
+     They agree when both are populated — on the WebViews where Capacitor pads
+     the native parent instead, it sets BOTH to 0 — so max() never double-pads;
+     it just picks whichever one is actually defined on this device.
+
+     Read insets through these tokens, not env() directly, so there is one
+     place to fix when a platform changes its mind again. */
+  --sat: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  --sab: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+
+  /* The mobile rail is 64px of TOUCH TARGET plus whatever the gesture bar
+     steals underneath it. Anything anchored above the rail must offset by this
+     token — a bare `bottom-[64px]` lands under the rail on a gesture-nav
+     phone. */
+  --bottom-nav-h: calc(64px + var(--sab));
 }
 
 /* Smooth property card entry animation */
