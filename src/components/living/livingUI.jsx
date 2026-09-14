@@ -491,6 +491,8 @@ export const Sheet = ({ open, onClose, title, subtitle, children, footer, maxWid
           />
           <motion.div
             key="panel"
+            // safe-area-ok — this is a pointer-events-none positioning shell; the
+            // actual sheet inside it carries paddingBottom: max(1rem, var(--sab)).
             className="tp-sheet-panel fixed inset-x-0 bottom-0 sm:inset-0 z-[110] flex sm:items-center justify-center sm:p-4 pointer-events-none"
           >
             <motion.div

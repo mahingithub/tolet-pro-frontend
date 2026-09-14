@@ -182,7 +182,7 @@ const CheckoutPage = () => {
       )}
         
       {/* Header */}
-      <div className="w-full border-b border-slate-200 dark:border-white/10 bg-white/80 dark:bg-[#13111C]/80 backdrop-blur-xl sticky top-0 z-40">
+      <div className="w-full border-b border-slate-200 dark:border-white/10 bg-white/80 dark:bg-[#13111C]/80 backdrop-blur-xl sticky top-0 z-40" style={{ paddingTop: 'var(--sat)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
           <button
             type="button"

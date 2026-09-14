@@ -1918,7 +1918,7 @@ const AddProperty = () => {
           header at top-0 sat underneath it and was fully covered. Sticky is the
           preferred fix for this — the alternative is a fixed element offset by
           `calc(var(--app-banner-h) + …)`, see index.css.) */}
-      <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-2xl border-b border-gray-100 shadow-[0_2px_16px_rgba(0,0,0,0.04)]">
+      <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-2xl border-b border-gray-100 shadow-[0_2px_16px_rgba(0,0,0,0.04)]" style={{ paddingTop: 'var(--sat)' }}>
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-gradient-to-br from-[#ba0036] to-rose-500 rounded-xl flex items-center justify-center shadow-[0_4px_10px_rgba(186,0,54,0.25)]">
@@ -2999,7 +2999,9 @@ const AddProperty = () => {
       </div>
 
       {/* Bottom Nav */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-2xl border-t border-gray-100 shadow-[0_-8px_24px_rgba(0,0,0,0.06)]">
+      {/* paddingBottom reserves the gesture bar — this wizard hides the mobile
+          rail, so this bar owns the bottom edge and nothing else clears it. */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-2xl border-t border-gray-100 shadow-[0_-8px_24px_rgba(0,0,0,0.06)]" style={{ paddingBottom: 'var(--sab)' }}>
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
           {step > 1 ? (
             <button onClick={handleBack}

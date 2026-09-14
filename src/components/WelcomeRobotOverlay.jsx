@@ -622,6 +622,9 @@ const WelcomeRobotOverlay = () => {
         {phase === 'minimized' && fly && (
           <motion.div
             key="wr-mini"
+            // safe-area-ok — top-0/left-0 is only the origin for the flight
+            // animation, which translates the robot to the assistant button.
+            // Nothing is drawn or tapped at the corner: pointer-events-none.
             className="fixed top-0 left-0 z-[99999] pointer-events-none"
             initial={{
               x: fly.from.x - MINI_ICON_SIZE / 2,

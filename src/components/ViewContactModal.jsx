@@ -49,10 +49,15 @@ export default function ViewContactModal({
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
+            // w-full h-full inside `fixed inset-0` means this drawer IS the whole
+            // screen on a phone, both edges included. The insets go on the SCROLL
+            // CONTAINER, so the sticky top bar below pins under the status bar
+            // rather than through it.
+            style={{ paddingTop: 'var(--sat)', paddingBottom: 'var(--sab)' }}
             className="bg-white w-full sm:max-w-md h-full shadow-[0_0_80px_rgba(0,0,0,0.25)] overflow-y-auto flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Top bar */}
+            {/* Top bar. safe-area-ok — the scroll container above reserves it. */}
             <div className="sticky top-0 z-10 flex items-center gap-3 px-4 py-3 bg-white/90 backdrop-blur border-b border-gray-100">
               <button onClick={onClose} className="p-2 -ml-1 rounded-xl hover:bg-gray-100 text-gray-600" aria-label="Close">
                 <X size={20} />

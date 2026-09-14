@@ -268,7 +268,7 @@ const TenantProfile = () => {
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80vw] h-[300px] bg-blue-500/10 blur-[100px] pointer-events-none z-0" />
 
       {/* ── TOP NAV ── */}
-      <div className="bg-white/70 backdrop-blur-2xl border-b border-white/50 sticky top-0 z-50 shadow-[0_4px_30px_rgba(0,0,0,0.03)]">
+      <div className="bg-white/70 backdrop-blur-2xl border-b border-white/50 sticky top-0 z-50 shadow-[0_4px_30px_rgba(0,0,0,0.03)]" style={{ paddingTop: 'var(--sat)' }}>
         <div className="max-w-[1200px] mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <button
             onClick={goBack}

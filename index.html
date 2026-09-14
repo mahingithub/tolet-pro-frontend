@@ -5,7 +5,18 @@
 <html lang="bn">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- interactive-widget=resizes-content makes the on-screen KEYBOARD shrink
+         the layout viewport. Without it the keyboard only covers the page: `vh`
+         keeps resolving against the full screen, so a modal capped at
+         `max-h-[92vh]` is still laid out 92% of the WHOLE screen tall and
+         centred behind the keyboard — you see its top third and cannot scroll
+         to the field you are typing in. There are 112 vh-based heights in this
+         app; this one attribute fixes the lot rather than rewriting each.
+
+         viewport-fit=cover must stay in this string verbatim — Capacitor's
+         SystemBars plugin substring-matches it to decide whether to pass the
+         safe-area insets through to CSS. Dropping it silently zeroes --sat/--sab. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <title>বাসা ভাড়া ও টু-লেট — House Rent in Bangladesh | TO-LET PRO</title>
 
     <!-- PWA: manifest + theme (Phase Call-5) -->

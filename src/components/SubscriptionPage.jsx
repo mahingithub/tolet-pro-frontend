@@ -80,7 +80,12 @@ const SubscriptionPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F6FA] dark:bg-[#0A0A0F] text-[#0F172A] dark:text-[#F1F5F9] font-sans transition-colors duration-300 pb-24 overflow-x-hidden relative">
+    // "/subscription" is in hideNavbarRoutes and this page has no top bar of its
+    // own, so its first row starts at physical y=0, under the clock.
+    <div
+      className="min-h-screen bg-[#F4F6FA] dark:bg-[#0A0A0F] text-[#0F172A] dark:text-[#F1F5F9] font-sans transition-colors duration-300 pb-24 overflow-x-hidden relative"
+      style={{ paddingTop: 'var(--sat)' }}
+    >
       
       {/* Abstract Background Orbs */}
       <div className="fixed top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-violet-600/10 dark:bg-violet-600/20 rounded-full blur-[120px] pointer-events-none z-0 mix-blend-multiply dark:mix-blend-screen" />

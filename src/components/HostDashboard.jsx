@@ -5262,7 +5262,7 @@ const HostDashboard = () => {
       {/* 🔴 HOST DASHBOARD SLIDE BAR (Right Drawer) */}
       {isProfileDrawerOpen && <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[60] animate-in fade-in" onClick={() => setIsProfileDrawerOpen(false)}></div>}
       
-      <div className={`fixed top-0 right-0 h-full w-full max-w-[280px] bg-[#fdfdfd] shadow-2xl z-[70] transform transition-transform duration-500 ease-in-out flex flex-col border-l border-gray-100 ${isProfileDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div style={{ paddingTop: 'var(--sat)', paddingBottom: 'var(--sab)' }} className={`fixed top-0 right-0 h-full w-full max-w-[280px] bg-[#fdfdfd] shadow-2xl z-[70] transform transition-transform duration-500 ease-in-out flex flex-col border-l border-gray-100 ${isProfileDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
 
         
         <div className="p-5 pt-6 pb-3 flex flex-col gap-4 relative">

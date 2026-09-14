@@ -800,7 +800,9 @@ export default function RentTab(props) {
               <main className="lg:col-span-8 w-full lg:h-full lg:overflow-y-auto custom-scrollbar pb-24 lg:pr-3 min-w-0">
                 {landlordProfile?.buildingMode === 'multi' && !currentBuildingId ? (
                   <div className="w-full">
-                    {/* BUILDINGS OVERVIEW */}
+                    {/* BUILDINGS OVERVIEW.
+                        safe-area-ok — a section header inside the dashboard's
+                        scroll area; the dashboard header reserves the inset. */}
                     <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:-mx-4 lg:-mx-3 px-3 sm:px-4 lg:px-6 pt-2 pb-3 mb-2 lg:pt-1">
                       <div className="flex items-center justify-between">
                         <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white text-[10px] font-black text-gray-700 uppercase tracking-widest shadow-[0_2px_6px_rgba(0,0,0,0.04)]">
@@ -904,7 +906,9 @@ export default function RentTab(props) {
                     )}
                 {/* Sticky toolbar — two rows. Row 1 = controls (title chip, year
                     stepper, search, export); Row 2 = the filter pills, which wrap
-                    instead of scrolling sideways on mobile / iPad. */}
+                    instead of scrolling sideways on mobile / iPad.
+                    safe-area-ok — inside the dashboard's scroll area; the
+                    dashboard header above it reserves the status bar. */}
                 <div className="sticky top-0 z-30 bg-gray-50/85 backdrop-blur-md -mx-3 sm:-mx-4 xl:-mx-3 px-3 sm:px-4 xl:px-6 pt-2 pb-3 mb-2 xl:pt-1">
                   {/* Row 1 — controls: title chip, year stepper, search, export.
                       Filter pills live on their own wrapping row (Row 2) below so

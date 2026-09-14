@@ -1591,7 +1591,9 @@ const PropertyListing = () => {
 				)}
 			</AnimatePresence>
 
-			{/* STICKY TOP BAR (desktop) */}
+			{/* STICKY TOP BAR (desktop).
+			    safe-area-ok — `hidden lg:block`, so it never renders on a phone,
+			    and at lg the global Navbar is visible and reserves the inset. */}
 			<motion.div initial={{ y: -100 }} animate={{ y: isStickyFilter ? 0 : -100 }} transition={{ duration: 0.3 }} className="fixed top-0 inset-x-0 z-40 bg-white border-b-2 border-gray-900 hidden lg:block">
 				<div className="max-w-[1400px] mx-auto px-4 h-16 flex items-center justify-between">
 					<div className="flex items-center gap-3">
@@ -1614,7 +1616,10 @@ const PropertyListing = () => {
 			    header must stay visible through the whole <lg range or tablets
 			    end up with no search/filter controls at all).
 			    ─────────────────────────────────────────────────────────────── */}
-			<div className="lg:hidden sticky top-0 z-40 bg-white shadow-sm">
+			{/* paddingTop: var(--sat) — App.jsx hides the global Navbar below lg on
+			    this route, so this header IS the top of the screen and `top-0`
+			    puts it under the status bar unless it reserves the inset itself. */}
+			<div className="lg:hidden sticky top-0 z-40 bg-white shadow-sm" style={{ paddingTop: 'var(--sat)' }}>
 				{/* Row 1: Back arrow · Search bar · Sort icon */}
 				<div className="flex items-center gap-2 px-3 pt-3 pb-2">
 					<button
@@ -1729,11 +1734,17 @@ const PropertyListing = () => {
 				                                of the full-screen map. */}
 				<aside
 					data-tour="desktop-filter-sidebar"
+					// As a mobile sheet this owns the bottom edge, so its scroll content
+					// has to end above the gesture bar. Harmless on lg, where it becomes
+					// a sticky sidebar and the inset is 0 anyway.
+					style={{ paddingBottom: 'var(--sab)' }}
 					className={`bg-white max-h-[90vh] overflow-y-auto transition-transform duration-300 transform ${
 					isMapMode
 						? `fixed inset-x-0 bottom-0 z-[80] rounded-t-[2rem] ${isMobileFilterOpen ? "translate-y-0" : "translate-y-full"}`
 						: `fixed inset-x-0 bottom-0 z-50 rounded-t-[2rem] lg:sticky lg:top-[90px] lg:z-10 lg:h-[calc(100vh-110px)] lg:block lg:rounded-[2rem] lg:border lg:border-gray-100 lg:shadow-sm lg:p-0 ${isMobileFilterOpen ? "translate-y-0" : "translate-y-full lg:translate-y-0"}`
 				}`}>
+					{/* safe-area-ok — sticks to the top of the filter sheet above, not to
+					    the screen; the sheet is anchored at the BOTTOM edge. */}
 					<div className={`sticky top-0 bg-white z-20 px-6 pt-4 pb-2 border-b border-gray-50 rounded-t-[2rem] ${isMapMode ? "" : "lg:hidden"}`}>
 						<div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4"></div>
 						<div className="flex justify-between items-center mb-2">

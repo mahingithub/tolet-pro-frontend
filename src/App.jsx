@@ -311,6 +311,9 @@ const AppLayout = () => {
 			<GlobalCallSocket />
 			<AppOpenReporter />
 			<AppDownloadBanner />
+			{/* safe-area-ok — this wrapper only positions the header; <Navbar />
+			    itself carries paddingTop: var(--sat). Adding it here too would
+			    reserve the status bar twice. */}
 			{!shouldHideNavbar && (
 				<div className={`sticky top-0 z-[60] ${isPropertyListingRoute ? "hidden lg:block" : ""}`}>
 					<Navbar />

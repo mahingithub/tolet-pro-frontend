@@ -2439,9 +2439,14 @@ const PropertyDetails = () => {
           POSITIONING: the marketing Navbar is hidden on /property/ routes
           (see App.jsx hideNavbarRoutes), so this is the ONE top bar — it sticks
           flush at `top-0` instead of floating below a phantom navbar. */}
+      {/* paddingTop: var(--sat) because this is the ONE top bar on the route —
+          with the Navbar hidden there is nothing above it to absorb the status
+          bar, so `top-0` means physical y=0 and the breadcrumb renders straight
+          through the clock. The white background fills the strip for free. */}
       <header
         className="sticky top-0 z-40 bg-white border-b border-gray-100"
         style={{
+          paddingTop: 'var(--sat)',
           boxShadow: navScrolled ? '0 6px 18px rgba(15,23,42,0.06)' : 'none',
           transition: 'box-shadow 220ms ease',
         }}

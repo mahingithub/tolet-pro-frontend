@@ -318,7 +318,7 @@ const Living = () => {
       />
 
       {/* ── Header (full width) ─────────────────────────────────────── */}
-      <header data-tour="living-header" className={cx(
+      <header data-tour="living-header" style={{ paddingTop: 'var(--sat)' }} className={cx(
         "w-full bg-white/95 backdrop-blur-2xl sticky top-0 z-[60] border-b border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] transition-transform duration-300 ease-in-out",
         !isNavVisible && "-translate-y-full"
       )}>

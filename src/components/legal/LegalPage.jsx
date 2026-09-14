@@ -83,7 +83,9 @@ export default function LegalPage({
 				<div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-500/10 dark:bg-blue-600/10 rounded-full blur-[120px]" />
 			</div>
 
-			{/* Sticky Glass Navbar */}
+			{/* Sticky Glass Navbar.
+			    safe-area-ok — legal routes are NOT in hideNavbarRoutes, so the
+			    global Navbar sits above this and reserves the status bar. */}
 			<nav className="sticky top-0 z-50 w-full backdrop-blur-xl bg-white/70 dark:bg-slate-900/70 border-b border-slate-200/50 dark:border-slate-800/50 shadow-sm">
 				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 					<div className="flex justify-between items-center h-16">

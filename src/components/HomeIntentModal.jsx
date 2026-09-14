@@ -110,6 +110,8 @@ export default function HomeIntentModal() {
       aria-label={isBn ? 'শুরু করি' : 'Getting started'}
     >
       <div className="w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto bg-[#eaeff5] rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl">
+        {/* safe-area-ok — sticks to the top of the sheet panel above, which is
+            anchored to the BOTTOM edge and capped at 92vh, never the screen top. */}
         <div className="sticky top-0 bg-[#eaeff5]/95 backdrop-blur-xl px-5 pt-4 pb-2 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-[#ba0036] bg-[#ba0036]/10 px-3 py-1.5 rounded-full">

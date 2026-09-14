@@ -1821,7 +1821,7 @@ const handleWizardSubmit = async (payload) => {
       />
 
       {/* --- TOP HEADER — floating glass card identical to HostDashboard --- */}
-      <div className="w-full max-w-[1600px] mx-auto z-[50] sticky top-0 pt-2 md:pt-4 px-2 md:px-4">
+      <div className="w-full max-w-[1600px] mx-auto z-[50] sticky top-0 pt-[calc(var(--sat)+0.5rem)] md:pt-[calc(var(--sat)+1rem)] px-2 md:px-4">
         <header className="bg-white/70 backdrop-blur-3xl border border-white/80 rounded-[2rem] px-4 md:px-8 py-3.5 flex items-center justify-between shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
         {/* 🟢 GLOBAL LOGO — exact same block used in Navbar.jsx so the dashboard
             visually matches every other page. */}
@@ -1982,7 +1982,7 @@ const handleWizardSubmit = async (payload) => {
 
       {/* 🔵 RIGHT-DRAWER MENU (replaces dropdown) — identical mechanics to host. */}
       {isProfileDrawerOpen && <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[60] animate-in fade-in" onClick={() => setIsProfileDrawerOpen(false)}></div>}
-      <div className={`fixed top-0 right-0 h-full w-full max-w-[280px] bg-[#fdfdfd] shadow-2xl z-[70] transform transition-transform duration-500 ease-in-out flex flex-col border-l border-gray-100 ${isProfileDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div style={{ paddingTop: 'var(--sat)', paddingBottom: 'var(--sab)' }} className={`fixed top-0 right-0 h-full w-full max-w-[280px] bg-[#fdfdfd] shadow-2xl z-[70] transform transition-transform duration-500 ease-in-out flex flex-col border-l border-gray-100 ${isProfileDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         {/* Profile preview at top — tap goes to profile tab */}
 
         

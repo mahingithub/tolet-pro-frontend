@@ -190,7 +190,9 @@ const PrivacyCenter = () => {
   return (
     <div className="min-h-screen bg-[#f8f9fa]">
       {/* ── header ─────────────────────────────────────────────────── */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
+      {/* /account/privacy is under "/account", which is in hideNavbarRoutes —
+          so there is no Navbar above this to absorb the status bar. */}
+      <header className="bg-white border-b border-gray-100 sticky top-0 z-10" style={{ paddingTop: 'var(--sat)' }}>
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
           <button
             onClick={goBack}

@@ -716,7 +716,16 @@ const LoginPage = () => {
   );
 
   return (
-    <div className="h-screen w-full flex bg-[#f8f9fa] font-sans overflow-hidden">
+    // "/login" is in hideNavbarRoutes, so nothing above this reserves the status
+    // bar — and h-screen + overflow-hidden means the login/signup form is sized
+    // to the FULL screen including both system bars, putting the role picker
+    // under the clock and the submit button under the gesture bar. Reserving
+    // both insets here shrinks the box to the area we can actually use
+    // (border-box, so h-screen minus the insets).
+    <div
+      className="h-screen w-full flex bg-[#f8f9fa] font-sans overflow-hidden"
+      style={{ paddingTop: 'var(--sat)', paddingBottom: 'var(--sab)' }}
+    >
       {/* ── ROLE PICKER POPUP ──
           Appears on entry to login/signup so the user explicitly picks whether
           they're a tenant or a landlord (they don't have to remember which side

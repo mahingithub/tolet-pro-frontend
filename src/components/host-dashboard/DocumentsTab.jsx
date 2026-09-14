@@ -192,7 +192,9 @@ const todayDate = today;
                 {/* ─── RIGHT PANE — sticky toolbar + folder grid OR file list ─── */}
                 <main className="xl:col-span-8 w-full flex flex-col xl:h-[calc(100vh-160px)] xl:overflow-y-auto xl:pr-2 custom-scrollbar bg-white rounded-[1.75rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100">
 
-                  {/* Sticky toolbar inside scroll container */}
+                  {/* Sticky toolbar inside scroll container.
+                      safe-area-ok — not at the screen edge; the dashboard header
+                      above it is what reserves the status bar. */}
                   <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 px-3 sm:px-4 py-2.5 rounded-t-[1.75rem]">
                     <div className="flex flex-wrap items-center gap-2">
                       {activeFolder ? (

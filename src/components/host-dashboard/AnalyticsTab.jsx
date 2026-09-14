@@ -284,6 +284,8 @@ const AnalyticsTab = ({
           </div>
         </aside>
         <main className="xl:col-span-8 w-full flex flex-col xl:h-[calc(100vh-160px)] xl:overflow-y-auto xl:pr-2 custom-scrollbar bg-white rounded-[1.75rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100">
+          {/* safe-area-ok — a toolbar inside this scrolling <main>, not at the
+              screen edge; the dashboard header above it reserves the inset. */}
           <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 px-3 sm:px-4 py-2.5 rounded-t-[1.75rem]">
             <div className="flex flex-wrap items-center gap-2">
               <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-[10px] font-black uppercase tracking-widest shadow-sm">
