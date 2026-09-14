@@ -32,18 +32,14 @@ import { useBdAreas, loadBdAreas } from '../hooks/useBdAreas';
 import LocationCombobox from './shared/LocationCombobox';
 import { propertyService } from '../services/Propertyservice';
 import { subscriptionService, TIER_LIMITS } from '../services/subscriptionService';
-import { GoogleMap, MarkerF, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, MarkerF } from '@react-google-maps/api';
 
-// ─── GOOGLE MAPS CONFIG (shared with PropertyDetails) ────────────────────────
-// Last-resort fallback so the interactive map keeps working even if the
-// build's env var is missing. This key is restricted in Google Cloud (locked
-// to our domains + Maps JavaScript API only), so exposing it here is low-risk
-// — a Maps JS key is public in the browser bundle regardless.
-const GOOGLE_MAPS_API_KEY =
-  (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_GOOGLE_MAPS_API_KEY) ||
-  (typeof process !== 'undefined' && process?.env?.REACT_APP_GOOGLE_MAPS_API_KEY) ||
-  'AIzaSyC9xWNjjSPhxy2aUWLubPqHR7N6KZWmKlg';
-const GOOGLE_MAPS_LIBRARIES = [];
+// ─── GOOGLE MAPS CONFIG ──────────────────────────────────────────────────────
+// Key, libraries and loader id are shared with PropertyDetails and the listing
+// page — see utils/googleMaps.js. GOOGLE_MAPS_API_KEY is still needed by name
+// here for the reverse-geocode REST call further down, which is a plain fetch
+// and not part of the JS SDK.
+import { GOOGLE_MAPS_API_KEY, useGoogleMaps } from '../utils/googleMaps';
 const ADD_PROP_MAP_STYLES = [
   { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
   { featureType: 'poi.attraction', elementType: 'labels', stylers: [{ visibility: 'off' }] },
@@ -955,17 +951,18 @@ const GpsPanelMap = ({ lat, lng }) => {
     styles: ADD_PROP_MAP_STYLES,
   }), []);
 
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: 'tlp-google-map-script',
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-    libraries: GOOGLE_MAPS_LIBRARIES,
-  });
+  const { isLoaded, unavailable } = useGoogleMaps();
 
-  // Fallback — static placeholder (no iframe).
+  // Fallback — static placeholder (no iframe). Covers no key, a failed script
+  // download, and a key Google rejects; that last one is the common one and it
+  // never surfaces as `loadError` (see utils/googleMaps.js).
   // The old output=embed iframe loaded Google's own internal Maps JS with
   // their default key, causing a "NoApiKeys" console warning. A simple
   // placeholder avoids that entirely.
-  if (!GOOGLE_MAPS_API_KEY || loadError) {
+  //
+  // The pin is already placed by GPS/geocoding at this point — the map is a
+  // visual confirmation of it, so losing it does not block the listing.
+  if (unavailable) {
     return (
       <div
         className="w-full h-52 flex items-center justify-center flex-col gap-2"
@@ -973,7 +970,9 @@ const GpsPanelMap = ({ lat, lng }) => {
       >
         <MapPin size={24} style={{ color: '#94a3b8' }} />
         <span style={{ fontSize: 12, fontWeight: 800, color: '#64748b' }}>Map unavailable</span>
-        <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8' }}>Set VITE_GOOGLE_MAPS_API_KEY to enable the map</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8' }}>
+          {Number.isFinite(lat) && Number.isFinite(lng) ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : 'Location saved'}
+        </span>
       </div>
     );
   }

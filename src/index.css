@@ -63,6 +63,37 @@
   --bottom-nav-h: calc(64px + var(--sab));
 }
 
+/* ─── FOCUS RING ───────────────────────────────────────────────────────────
+   Chromium's UA focus ring is a TWO-TONE ring — a dark inner stroke wrapped in
+   a white outer stroke — so that it stays visible on any background colour. On
+   a white card the dark half is what you notice; on the app's tinted inputs
+   and dark-theme surfaces the WHITE half is, which is the "white border
+   appears when I tap a field" reported on the Redmi Note 7 Pro. It is a UA
+   default, not a Tailwind class, which is why grepping the components for it
+   found nothing.
+
+   Chrome normally suppresses the ring for touch focus (:focus matches,
+   :focus-visible does not). Several WebViews — MIUI's among them — classify a
+   tap on a text field as a "focus-visible" interaction anyway, so the ring
+   appears on a phone that has never seen a keyboard.
+
+   So: drop the ring on plain :focus, and hand :focus-visible a brand ring of
+   our own. Keyboard and assistive-tech users still get a clearly visible focus
+   indicator — this removes the OEM ring, it does not remove focus visibility.
+
+   :where() keeps specificity at ZERO, so every component-level focus style in
+   the app (Tailwind's focus:ring-*, focus:border-*, the auth forms' custom
+   rings) still wins on the elements that define one. A zero-specificity author
+   rule still beats the UA stylesheet, which is the only thing being replaced
+   here. */
+:where(input, textarea, select, button, a, summary, [tabindex], [contenteditable]):focus {
+  outline: none;
+}
+:where(input, textarea, select, button, a, summary, [tabindex], [contenteditable]):focus-visible {
+  outline: 2px solid rgba(186, 0, 54, 0.7);
+  outline-offset: 2px;
+}
+
 /* Smooth property card entry animation */
 @keyframes fadeSlideIn {
   from {

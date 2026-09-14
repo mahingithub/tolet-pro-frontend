@@ -65,22 +65,12 @@ import { propertySchema, breadcrumbSchema } from '../seo/schema';
 // `<Marker />` double-mounts during dev and frequently fails to attach to the
 // map — which is exactly why no pin was showing on the property details page.
 // `MarkerF` is the canonical fix shipped by @react-google-maps/api for this.
-import { GoogleMap, MarkerF, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, MarkerF } from '@react-google-maps/api';
 
-// Pull the API key from whichever bundler the host project uses. Comment the
-// line that does NOT match your build tool — the other line stays.
-// Last-resort fallback so the interactive map keeps working even if the
-// build's env var is missing. This key is restricted in Google Cloud (locked
-// to our domains + Maps JavaScript API only), so exposing it here is low-risk
-// — a Maps JS key is public in the browser bundle regardless.
-const GOOGLE_MAPS_API_KEY =
-  (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_GOOGLE_MAPS_API_KEY) ||
-  (typeof process !== 'undefined' && process?.env?.REACT_APP_GOOGLE_MAPS_API_KEY) ||
-  'AIzaSyC9xWNjjSPhxy2aUWLubPqHR7N6KZWmKlg';
-
-// Loaded libraries (kept as a stable reference for useJsApiLoader). Add
-// 'places' here if you wire up address autocomplete in the inquiry/edit flow.
-const GOOGLE_MAPS_LIBRARIES = [];
+// The key, the libraries and the loader id are shared with the listing page and
+// the Add Property wizard — see utils/googleMaps.js, which also explains why a
+// rejected key never shows up as `loadError`.
+import { useGoogleMaps } from '../utils/googleMaps';
 
 // Light, Voyager-like map styling that mirrors the listing-page styling.
 const MAP_STYLES = [
@@ -1791,12 +1781,16 @@ const PropertyLocationMap = ({ lat, lng, title, langKey = 'en' }) => {
   // Status copy for the two non-map states. Lives here rather than in
   // LOCAL_TRANSLATIONS because this component sits outside the main one and so
   // has no access to lt().
+  // The hint used to read "Set VITE_GOOGLE_MAPS_API_KEY to enable the map" —
+  // build instructions shown to tenants, and wrong besides: the key IS set, it
+  // is the referrer allowlist that rejects it. The "Open in Google Maps" link
+  // further down the page is the way out, so the hint points there instead.
   const mapCopy = {
-    en: { unavailable: 'Map unavailable', hint: 'Set VITE_GOOGLE_MAPS_API_KEY to enable the map', loading: 'Loading map…' },
-    bn: { unavailable: 'ম্যাপ দেখানো যাচ্ছে না', hint: 'ম্যাপ চালু করতে VITE_GOOGLE_MAPS_API_KEY সেট করুন', loading: 'ম্যাপ আসছে…' },
-    ar: { unavailable: 'الخريطة غير متاحة', hint: 'اضبط VITE_GOOGLE_MAPS_API_KEY لتفعيل الخريطة', loading: 'جارٍ تحميل الخريطة…' },
+    en: { unavailable: 'Map unavailable', hint: 'Use “Open in Google Maps” below to see this location', loading: 'Loading map…' },
+    bn: { unavailable: 'ম্যাপ দেখানো যাচ্ছে না', hint: 'নিচের “গুগল ম্যাপে দেখুন” দিয়ে জায়গাটি দেখুন', loading: 'ম্যাপ আসছে…' },
+    ar: { unavailable: 'الخريطة غير متاحة', hint: 'استخدم «فتح في خرائط جوجل» أدناه لعرض الموقع', loading: 'جارٍ تحميل الخريطة…' },
   }[langKey] || {
-    unavailable: 'Map unavailable', hint: 'Set VITE_GOOGLE_MAPS_API_KEY to enable the map', loading: 'Loading map…',
+    unavailable: 'Map unavailable', hint: 'Use “Open in Google Maps” below to see this location', loading: 'Loading map…',
   };
 
   const mapOptions = useMemo(
@@ -1812,18 +1806,14 @@ const PropertyLocationMap = ({ lat, lng, title, langKey = 'en' }) => {
     []
   );
 
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: 'tlp-google-map-script',
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-    libraries: GOOGLE_MAPS_LIBRARIES,
-  });
+  const { isLoaded, unavailable } = useGoogleMaps();
 
-  // Fallback (no API key OR loader error) → static placeholder.
-  // Previously this rendered a Google Maps output=embed iframe, but that
-  // iframe loads Google's own internal Maps JS with their default key,
+  // Fallback (no key, failed download, OR a key Google rejects) → static
+  // placeholder. Previously this rendered a Google Maps output=embed iframe,
+  // but that iframe loads Google's own internal Maps JS with their default key,
   // causing a "NoApiKeys" console warning and a second uncontrolled Maps
   // instance. A simple placeholder avoids that entirely.
-  if (!GOOGLE_MAPS_API_KEY || loadError) {
+  if (unavailable) {
     return (
       <div
         style={{ width: '100%', height: '100%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, borderRadius: 16 }}

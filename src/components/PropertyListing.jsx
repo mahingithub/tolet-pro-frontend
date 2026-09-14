@@ -50,34 +50,24 @@ import {
 // ║      CRA  : REACT_APP_GOOGLE_MAPS_API_KEY=AIza...                       ║
 // ║                                                                         ║
 // ║  Behaviour:                                                             ║
-// ║    • If the key is present → interactive Google Map with custom price   ║
-// ║      chip markers and click → MapMiniCard popup (matches the design     ║
+// ║    • If the key works → interactive Google Map with custom price chip   ║
+// ║      markers and click → MapMiniCard popup (matches the design          ║
 // ║      reference videos for desktop & mobile).                            ║
-// ║    • If the key is missing → graceful iframe fallback so dev work isn't ║
-// ║      blocked. This uses the public /maps embed (no key required).       ║
+// ║    • If the key is missing OR Google rejects it → graceful iframe       ║
+// ║      fallback. This uses the public /maps embed (no key required), so   ║
+// ║      the page still shows a map while the key is being fixed.           ║
+// ║                                                                         ║
+// ║  The key, the libraries and the loader id all live in                   ║
+// ║  utils/googleMaps.js — see the header there before changing any of      ║
+// ║  them, and especially before trusting `loadError` to report a failure.  ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
-import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
+import { GoogleMap } from "@react-google-maps/api";
 import useSupercluster from "use-supercluster";
 // ─── MODERNISED MAP UI (clustering + animated markers + bottom sheet) ─────────
 import MapMarker from "./MapMarker";
 import ClusterMarker from "./ClusterMarker";
 import BottomSheetCard from "./BottomSheetCard";
-
-// Pull the API key from whichever bundler the host project uses. Comment the
-// line that does NOT match your build tool — the other line stays.
-const GOOGLE_MAPS_API_KEY =
-	(typeof import.meta !== "undefined" && import.meta?.env?.VITE_GOOGLE_MAPS_API_KEY) ||
-	(typeof process !== "undefined" && process?.env?.REACT_APP_GOOGLE_MAPS_API_KEY) ||
-	"AIzaSyC9xWNjjSPhxy2aUWLubPqHR7N6KZWmKlg";
-
-// Google Maps libraries. MUST be a stable reference AND identical to every other
-// useJsApiLoader call that shares the "tlp-google-map-script" id. PropertyDetails
-// and AddProperty both pass `[]`, so we match them exactly:
-// @react-google-maps/api keeps ONE Loader per id and THROWS "Loader must not be
-// called again with different options" if a later call passes a different
-// `libraries` value. Omitting the prop defaults it to ['maps'], which mismatches
-// `[]` and crashed the app when navigating between the map and a property page.
-const GOOGLE_MAPS_LIBRARIES = [];
+import { useGoogleMaps } from "../utils/googleMaps";
 
 // Default centre — middle of Dhaka. Override via the prop on <MapView />.
 const DEFAULT_MAP_CENTER = { lat: 23.7652, lng: 90.3893 };
@@ -756,6 +746,7 @@ const FilterSection = ({ title, children }) => (
 // `bottomSheetHeight` is the rendered height of the bottom sheet so the camera
 // can keep the active marker centred in the area above the card.
 const MapView = ({ properties, activeId, onMarkerClick, defaultCenter = DEFAULT_MAP_CENTER, defaultZoom = DEFAULT_MAP_ZOOM, bottomSheetHeight = 0 }) => {
+	const { language } = useLanguage();
 	const [mapInstance, setMapInstance] = useState(null);
 	// Viewport state feeding supercluster. `bounds` is a supercluster BBox
 	// [westLng, southLat, eastLng, northLat]; `zoom` is the rounded map zoom.
@@ -784,15 +775,11 @@ const MapView = ({ properties, activeId, onMarkerClick, defaultCenter = DEFAULT_
 	);
 
 	// Load the Maps JS SDK once per page (the loader de-duplicates internally).
-	// `libraries` MUST match the other loaders that share this id (PropertyDetails
-	// and AddProperty both pass GOOGLE_MAPS_LIBRARIES = []). If they differ, the
-	// shared singleton Loader throws "must not be called again with different
-	// options" when the user navigates between the map and a property page.
-	const { isLoaded, loadError } = useJsApiLoader({
-		id: "tlp-google-map-script",
-		googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-		libraries: GOOGLE_MAPS_LIBRARIES,
-	});
+	// `unavailable` covers the no-key case, a failed script download AND a key
+	// Google refuses — that last one keeps `loadError` null and `isLoaded` true,
+	// so checking loadError alone leaves Google's grey "Oops! Something went
+	// wrong" panel sitting inside our container. See utils/googleMaps.js.
+	const { isLoaded, unavailable } = useGoogleMaps();
 
 	// ── SUPERCLUSTER INPUT ──
 	// One GeoJSON point per listing that has real coordinates. Each carries the
@@ -908,9 +895,13 @@ const MapView = ({ properties, activeId, onMarkerClick, defaultCenter = DEFAULT_
 		[supercluster, mapInstance]
 	);
 
-	// ── Fallback: no API key → public iframe embed (no key required) ──────────
-	// Lets the page keep rendering before the key is provisioned.
-	if (!GOOGLE_MAPS_API_KEY) {
+	// ── Fallback: the SDK can't draw a map → public iframe embed ──────────────
+	// Reached when there is no key, when the script fails to download, or when
+	// Google rejects the key (the usual one — see utils/googleMaps.js). The
+	// embed needs no key of ours, so the user still gets a real, pannable map of
+	// the area; only the price-chip markers and clustering are lost. That beats
+	// both a dead grey rectangle and Google's own "Oops!" panel.
+	if (unavailable) {
 		return (
 			<div className="relative w-full h-full rounded-[2rem] overflow-hidden bg-gray-100">
 				<iframe
@@ -924,21 +915,9 @@ const MapView = ({ properties, activeId, onMarkerClick, defaultCenter = DEFAULT_
 					allowFullScreen
 				/>
 				<div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-bold text-gray-600 shadow-sm border border-gray-100">
-					Add VITE_GOOGLE_MAPS_API_KEY to enable interactive markers
-				</div>
-			</div>
-		);
-	}
-
-	if (loadError) {
-		return (
-			<div className="relative w-full h-full rounded-[2rem] overflow-hidden bg-gray-50 flex items-center justify-center" style={{ minHeight: 400 }}>
-				<div className="text-center px-6">
-					<div className="w-12 h-12 mx-auto rounded-full bg-red-50 flex items-center justify-center mb-3">
-						<MapPin size={20} className="text-brandRed" />
-					</div>
-					<p className="text-sm font-black text-gray-900 mb-1">Couldn't load Google Maps</p>
-					<p className="text-xs font-bold text-gray-500">Check the API key, billing status, and HTTP referrer restrictions.</p>
+					{language === "বাংলা"
+						? "সাধারণ ম্যাপ দেখানো হচ্ছে — এখন পিন দেখানো যাচ্ছে না"
+						: "Showing a basic map — pins are unavailable right now"}
 				</div>
 			</div>
 		);

@@ -2078,7 +2078,11 @@ const handleWizardSubmit = async (payload) => {
            Both the page title row and the descriptive subtitle have been
            removed per the user's request: each tab now opens directly
            into its content, no preamble copy at all. --- */}
-      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-8 lg:px-12 pt-6 md:pt-10 relative z-10 pb-24 selection:bg-[#ba0036]/15 selection:text-[#ba0036]">
+      {/* pb: the mobile rail is 64px of touch target PLUS the gesture bar under
+           it, so a flat `pb-24` (96px) left the last card behind the rail on any
+           phone with a gesture inset over 32px. --bottom-nav-h is that real
+           total; the rail is `md:hidden`, so md+ keeps the plain 96px. */}
+      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-8 lg:px-12 pt-6 md:pt-10 relative z-10 pb-[calc(var(--bottom-nav-h)+1.5rem)] md:pb-24 selection:bg-[#ba0036]/15 selection:text-[#ba0036]">
 
         {/* 🔵 DESKTOP-ONLY BACK ROW — only visible on md+ widths.
             Mobile users navigate back via the browser/system gesture or

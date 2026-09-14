@@ -5109,7 +5109,16 @@ const HostDashboard = () => {
             separate element below, and MobileBottomNav (App.jsx) keeps Home,
             Messages and Profile reachable. It returns on every other tab and
             on desktop, where the space is not scarce. */}
-        <header className={`px-4 md:px-8 py-3 items-center justify-between bg-white/80 backdrop-blur-3xl border-b border-gray-100/80 shadow-[0_2px_12px_rgba(0,0,0,0.04)] ${(activeTab === 'rent' || activeTab === 'bookings') ? 'hidden lg:flex' : 'flex'}`}>
+        {/* paddingTop: var(--sat) — /host-dashboard is in hideNavbarRoutes
+            (App.jsx), so the global <Navbar>, which is the thing that normally
+            reserves the status bar, never renders here. This header IS the top
+            of the screen, and without the inset the logo tile and the bell were
+            drawn under the clock: clipped, and untappable, because the touch
+            belongs to the OS. Same reservation the Navbar and TenantDashboard
+            already make. */}
+        <header
+          style={{ paddingTop: 'var(--sat)' }}
+          className={`px-4 md:px-8 py-3 items-center justify-between bg-white/80 backdrop-blur-3xl border-b border-gray-100/80 shadow-[0_2px_12px_rgba(0,0,0,0.04)] ${(activeTab === 'rent' || activeTab === 'bookings') ? 'hidden lg:flex' : 'flex'}`}>
           {/* Logo → opens the "where to?" popup instead of jumping straight to
               the public homepage, because the dashboard is the landlord's home. */}
           <button
@@ -5408,9 +5417,24 @@ const HostDashboard = () => {
         </div>
       </div>
 
+      {/* Below lg the header above is `hidden` on the Rent and Bookings tabs,
+          which promotes <main> to the top of the screen — so the status bar has
+          to be reserved HERE on exactly those tabs, or the first row of tenants
+          lands under the clock. A spacer rather than padding on <main> so the
+          header keeps owning the inset (and its white fill keeps covering the
+          strip) on every other tab, and neither reserves it twice. */}
+      {(activeTab === 'rent' || activeTab === 'bookings') && (
+        <div className="lg:hidden shrink-0" style={{ height: 'var(--sat)' }} aria-hidden="true" />
+      )}
+
       {/* --- MAIN CONTENT --- */}
-      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-8 lg:px-12 pt-1 md:pt-2 relative z-10 custom-scrollbar overflow-y-auto pb-24">
-        
+      {/* pb: clear the mobile rail, which is 64px of touch target PLUS the
+          gesture bar under it — `pb-24` (96px) was a guess at that total and
+          came up short on any phone whose gesture inset is over 32px, burying
+          the last card. --bottom-nav-h is the real number. The rail is
+          `md:hidden`, so md+ keeps the plain 96px. */}
+      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-8 lg:px-12 pt-1 md:pt-2 relative z-10 custom-scrollbar overflow-y-auto pb-[calc(var(--bottom-nav-h)+1.5rem)] md:pb-24">
+
         {activeDropdownId && <div className="fixed inset-0 z-20" onClick={() => setActiveDropdownId(null)}></div>}
 
         {/* 🔴 PROFILE & VERIFICATION TAB */}
