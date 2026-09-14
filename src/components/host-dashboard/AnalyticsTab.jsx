@@ -261,6 +261,9 @@ const AnalyticsTab = ({
                 return (
                   <div key={m.key} className="flex flex-col items-center gap-1 flex-1 relative z-10 group cursor-default">
                     <span className="text-[8px] font-black tabular-nums text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-4 whitespace-nowrap">{formatBDT(m.collected)}</span>
+                    {/* safe-area-ok — the two bars below are the chart column
+                        itself, 18px wide inside a card. "bottom-0" is the
+                        column floor, not the screen. */}
                     <div className="w-full max-w-[18px] relative" style={{height: '100%'}}>
                       <div className="absolute bottom-0 inset-x-0 rounded-t-md bg-gray-100" style={{height: `${expectedH}%`}}/>
                       <div className={`absolute bottom-0 inset-x-0 rounded-t-md transition-all duration-700 ${isCurrent ? 'bg-gradient-to-t from-[#ba0036] to-[#ff4d7a]' : 'bg-gradient-to-t from-indigo-500 to-violet-400'}`} style={{height: `${h}%`}}/>

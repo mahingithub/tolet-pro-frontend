@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from "react-router-dom";
-import { LanguageProvider } from "./context/LanguageContext";
+import { LanguageProvider, useLanguage } from "./context/LanguageContext";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { SettingsProvider, useSettings } from "./context/SettingsContext.jsx";
 import { NotificationProvider } from "./context/NotificationContext.jsx";
@@ -15,6 +15,10 @@ import ErrorBoundary from './components/ErrorBoundary';
 // app is offline" and "the app is broken", and lazy() alone cannot tell them
 // apart — nor recover from either. See utils/lazyRoute.js.
 import lazyRoute from './utils/lazyRoute';
+// Not lazy: it has to be listening before the user's FIRST Back press, and it
+// costs nothing until then — the Capacitor plugins it needs are imported
+// dynamically inside the hook, and only on native.
+import useAndroidBackButton from './hooks/useAndroidBackButton';
 import { needsBookingLookup, resolveHome } from './utils/homeSurface';
 import { hasCachedSettings } from './services/settingsService';
 
@@ -38,6 +42,9 @@ const GlobalAIAssistant = lazyRoute(() => import("./components/GlobalAIAssistant
 const WelcomeRobotOverlay = lazyRoute(() => import("./components/WelcomeRobotOverlay"), "WelcomeRobotOverlay");
 const HomeIntentModal = lazyRoute(() => import("./components/HomeIntentModal"), "HomeIntentModal");
 const GlobalToaster = lazyRoute(() => import("./components/GlobalToaster"), "GlobalToaster");
+// Tells an installed user a newer Play Store build exists. Lazy: it does
+// nothing for the first few seconds and nothing at all on the web.
+const UpdateGate = lazyRoute(() => import("./components/UpdateGate"), "UpdateGate");
 const FeedbackButton = lazyRoute(() => import("./components/FeedbackButton"), "FeedbackButton");
 const GlobalCallUI = lazyRoute(() => import("./components/GlobalCallUI"), "GlobalCallUI");
 const ThemeWidget = lazyRoute(() => import("./components/shared/ThemeWidget"), "ThemeWidget");
@@ -180,11 +187,44 @@ const AppLayout = () => {
 	const location = useLocation();
 	const navigate = useNavigate();
 	const { isAuthenticated, activeRole, roles } = useAuth();
+	const { language } = useLanguage();
 	const { settings, loading: settingsLoading } = useSettings();
 	const defaultHome = settings?.app?.defaultHome || 'auto';
 	// Captured once, at mount: did this device already have the user's settings?
 	// See the boot effect below for why the distinction matters.
 	const hadCachedPrefs = useRef(hasCachedSettings());
+
+	// Hardware Back. Without this the app could not be closed with Back at all —
+	// @capacitor/app's built-in handler consumes the press and then does nothing
+	// once the WebView has no history left. See hooks/useAndroidBackButton.js.
+	useAndroidBackButton({
+		hint: language === 'বাংলা'
+			? 'বন্ধ করতে আবার ব্যাক চাপুন'
+			: 'Press Back again to exit',
+	});
+
+	// Layer 3 of the safe-area system: after each route settles, measure the
+	// rendered page and report anything TAPPABLE sitting inside a system bar —
+	// the failure the static lint keeps discovering one shape too late. See
+	// utils/insetAudit.js. Dev only, or a debug build with the localStorage
+	// flag; the dynamic import keeps it out of the production entry chunk,
+	// which vite.config.js explicitly watches.
+	useEffect(() => {
+		const enabled =
+			import.meta.env.DEV || window.localStorage?.getItem('tlpInsetAudit') === '1';
+		if (!enabled) return undefined;
+		let cancelled = false;
+		const id = setTimeout(() => {
+			import('./utils/insetAudit')
+				.then(({ installInsetAudit, runInsetAudit }) => {
+					if (cancelled) return;
+					installInsetAudit();
+					runInsetAudit({ outline: false });
+				})
+				.catch(() => {/* a diagnostic must never break the app */});
+		}, 600);
+		return () => { cancelled = true; clearTimeout(id); };
+	}, [location.pathname]);
 
 	// Tell the instant boot splash (index.html) that React has painted, so it
 	// can fade itself out. rAF waits for the first real frame so we don't
@@ -496,6 +536,7 @@ const AppLayout = () => {
 				<WelcomeRobotOverlay />
 				<HomeIntentModal />
 				<GlobalToaster />
+				<UpdateGate />
 				{!shouldHideAIAssistant && <GlobalAIAssistant />}
 			</Suspense>
 			{/* '/living' is hidden again: two navigations on one screen read as

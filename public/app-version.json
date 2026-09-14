@@ -1,0 +1,20 @@
+{
+  "_comment": "EDIT THIS ON EVERY RELEASE. It is what tells an installed app that a newer build exists. Deploys with the website (Vercel), so no backend change is needed. latestVersionCode must match android/app/build.gradle's versionCode. Set minSupportedVersionCode ONLY when a build is genuinely unusable (a broken API contract, a data-loss bug) — it BLOCKS every older build from opening, so a typo here locks every tester out until you redeploy.",
+  "latestVersionCode": 11,
+  "latestVersionName": "1.0.9",
+  "minSupportedVersionCode": 1,
+  "notes": {
+    "bn": [
+      "ব্যাক বাটনে এখন অ্যাপ ঠিকমতো বন্ধ হয়",
+      "উপরের হেডার আর মেনু ঘড়ির নিচে ঢুকে যাওয়া ঠিক হয়েছে",
+      "ম্যাপ স্ক্রিনের সার্চ বার ও বোতামগুলো ঠিক জায়গায় এসেছে",
+      "লেআউট এখন প্রতিটি ফোনের স্ক্রিন মেপে নিজেই মানিয়ে নেয়"
+    ],
+    "en": [
+      "The back button now closes the app properly",
+      "Fixed the header and menu sitting under the status bar",
+      "Fixed the map screen's search bar and buttons",
+      "The layout now measures each phone's screen and adapts itself"
+    ]
+  }
+}

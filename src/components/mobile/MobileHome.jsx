@@ -306,6 +306,8 @@ const DivisionsStrip = ({ onPick, t }) => (
             <ChevronRight size={14} strokeWidth={3} />
           </div>
 
+          {/* safe-area-ok — caption pinned to the bottom of the image card,
+              not the viewport. */}
           <div className="absolute bottom-0 inset-x-0 p-3.5">
             <span className="block text-[9px] font-black uppercase tracking-[0.18em] text-white/75 mb-1">
               {d.tagline}

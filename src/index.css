@@ -52,9 +52,23 @@
      fall back to env() only when it does not exist at all (iOS, web).
 
      Read insets through these tokens, never env() directly, so there is one
-     place to fix when a platform changes its mind again. */
-  --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
-  --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+     place to fix when a platform changes its mind again.
+
+     THIRD SOURCE, AND THE ONE THAT WINS: --tp-inset-*.
+     Published by MainActivity.java, which measures how much of each system bar
+     is STILL covering the WebView — status-bar bottom edge minus WebView top
+     edge, in screen coordinates — rather than trusting any single plugin path.
+     It is 0 whenever something below us already moved the WebView clear, so it
+     cannot double-pad; it is the real inset when nothing did. That is the case
+     Capacitor got wrong on a Galaxy S25, where it padded nothing and injected
+     0, and the app header rendered on top of the clock.
+
+     Order is deliberate: the measurement first, Capacitor's variable second
+     (Android, when the native publisher is absent), env() last (iOS and web).
+     Absent variables fall through; a variable set to 0 is an answer and STOPS
+     the chain, which is the whole point — see the max() warning above. */
+  --sat: var(--tp-inset-top, var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+  --sab: var(--tp-inset-bottom, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
 
   /* The mobile rail is 64px of TOUCH TARGET plus whatever the gesture bar
      steals underneath it. Anything anchored above the rail must offset by this

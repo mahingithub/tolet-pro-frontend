@@ -2495,6 +2495,12 @@ const ChatSystem = () => {
         )}
       </AnimatePresence>
 
+      {/* safe-area-ok — this is the full-screen chat SHELL, not a bar. It paints
+          a white background and positions its children; the two children that
+          actually touch the screen edges reserve the insets themselves — the
+          header below carries paddingTop: calc(var(--sat) + 0.75rem) and the
+          composer paddingBottom: calc(var(--sab) + 1rem). Reserving here too
+          would inset the whole surface a second time and leave a white band. */}
       <div
         className={`flex flex-col md:flex-row overflow-hidden ${
           mobileChatOpen

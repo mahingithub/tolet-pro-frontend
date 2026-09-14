@@ -139,7 +139,13 @@ const BottomSheetCard = ({ property, onClose, onOpen, onHeightChange }) => {
 			animate={{ y: 0, opacity: 1 }}
 			exit={{ y: "115%", opacity: 0 }}
 			transition={{ type: "spring", damping: 30, stiffness: 300, mass: 0.9 }}
-			className="pointer-events-auto relative mx-3 mb-3 max-w-[560px] sm:mx-auto bg-white rounded-3xl shadow-[0_18px_50px_rgba(0,0,0,0.25)] border border-gray-100 overflow-hidden"
+			// mb through the inset rather than a flat `mb-3`: the card is anchored to
+			// the bottom of a full-screen map overlay, so on a gesture-nav phone its
+			// lowest 24-48px — the row carrying the price and the tap target that
+			// opens the listing — sat inside the system's gesture strip and stopped
+			// responding. The 12px gap is preserved on phones with no inset.
+			style={{ marginBottom: 'calc(var(--sab) + 0.75rem)' }}
+			className="pointer-events-auto relative mx-3 max-w-[560px] sm:mx-auto bg-white rounded-3xl shadow-[0_18px_50px_rgba(0,0,0,0.25)] border border-gray-100 overflow-hidden"
 			role="dialog"
 			aria-label={`${property.title || typeLabel} preview`}
 		>

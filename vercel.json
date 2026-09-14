@@ -31,6 +31,15 @@
       ]
     },
     {
+      "comment": "The installed app fetches this to learn whether a newer build exists (src/services/appUpdate.js); its origin is https://localhost, so the request is cross-origin. Vercel already serves static files with Access-Control-Allow-Origin: * — verified against /manifest.json — so this block is NOT what makes CORS work; it pins that guarantee explicitly instead of relying on a platform default, and more importantly caps Cache-Control at 5 minutes so a release is noticed promptly rather than sitting behind a long static cache.",
+      "source": "/app-version.json",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "public, max-age=300" }
+      ]
+    },
+    {
       "source": "/manifest.json",
       "headers": [
         { "key": "Content-Type", "value": "application/manifest+json; charset=utf-8" }

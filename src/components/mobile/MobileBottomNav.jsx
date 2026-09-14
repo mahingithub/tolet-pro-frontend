@@ -232,10 +232,7 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   return (
     <>
       {/* soft fade above the bar so content underneath blends smoothly */}
-      <div
-        className="md:hidden fixed inset-x-0 h-6 pointer-events-none bg-gradient-to-t from-white/85 to-transparent z-30"
-        style={{ bottom: 'var(--bottom-nav-h)' }}
-      />
+      <div className="md:hidden fixed inset-x-0 bottom-rail h-6 pointer-events-none bg-gradient-to-t from-white/85 to-transparent z-30" />
 
       {/* HEIGHT GROWS BY THE INSET — it does not absorb it. Tailwind preflight
           makes every box border-box, so the old `h-[64px]` + `padding-bottom:
@@ -247,10 +244,7 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
 
           Now: height = 64 + inset, padding-bottom = inset, so the content box
           is a true 64px sitting entirely above the gesture bar. */}
-      <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)]"
-        style={{ height: 'var(--bottom-nav-h)', paddingBottom: 'var(--sab)' }}
-      >
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 h-rail pb-safe bg-white border-t border-gray-200 shadow-[0_-6px_20px_-8px_rgba(15,23,42,0.12)]">
         <div className="relative h-full max-w-md mx-auto flex items-center px-1">
           {LEFT.map((item) => (
             <NavBtn key={item.id} item={item} />

@@ -433,7 +433,15 @@ const Living = () => {
         {/* MOBILE: sticky segmented tab bar (5 primary modules) */}
         <div className={cx(
           "lg:hidden sticky z-50 -mx-4 px-4 pt-1 pb-1.5 bg-[#eaeff5]/95 backdrop-blur-xl border-b border-gray-200/50 transition-[top] duration-300 ease-in-out",
-          isNavVisible ? "top-[56px] md:top-[64px]" : "top-0"
+          // The header above is `sticky top-0` and reserves the status bar
+          // itself, so while it is visible this bar parks just below it at
+          // header-height + inset. When it hides on scroll THIS becomes the top
+          // of the screen, and a bare `top-0` slid the tab pills under the
+          // clock — exactly the "scrolling in Living overlaps the time" report.
+          // Both branches carry the inset now; neither is a bare number.
+          isNavVisible
+            ? "top-[calc(var(--sat)+56px)] md:top-[calc(var(--sat)+64px)]"
+            : "top-safe"
         )}>
           <div data-tour="living-mobile-nav" className="flex items-center gap-1 p-1 rounded-2xl bg-white/70 border border-white/80 shadow-[0_6px_20px_-14px_rgba(15,23,42,0.3)]">
             {navModules.map((m) => {
@@ -494,9 +502,11 @@ const Living = () => {
         </aside>
 
         {/* Main Content Area */}
-        {/* pb-10 (not pb-24): MobileBottomNav is hidden on /living, so the tail
-            only has to clear the home indicator, not a 64px rail. */}
-        <main id="living-scroll" data-tour="living-content" className="flex-1 min-w-0 pb-10 lg:pb-12 mt-3 lg:mt-0 relative z-20">
+        {/* MobileBottomNav is hidden on /living, so the tail only has to clear
+            the home indicator, not a 64px rail — but `pb-10` was a flat 40px
+            GUESS at that indicator. pb-safe-10 keeps the same 2.5rem and adds
+            whatever the gesture inset actually measures on this phone. */}
+        <main id="living-scroll" data-tour="living-content" className="flex-1 min-w-0 pb-safe-10 lg:pb-12 mt-3 lg:mt-0 relative z-20">
           <AnimatePresence mode="wait">
             <motion.div
               key={module}

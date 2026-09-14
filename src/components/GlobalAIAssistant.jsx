@@ -885,7 +885,18 @@ const GlobalAIAssistant = () => {
             setIsOpen(true);
           }}
           aria-label="Open AI assistant"
-          className={`fixed bottom-[110px] md:bottom-6 right-4 md:right-8 z-[100] group flex items-center justify-center animate-in zoom-in cursor-pointer touch-manipulation select-none transition-all duration-700 ${(!isIconVisible || isMobileMenuOpen) ? 'opacity-0 scale-50 pointer-events-none' : 'opacity-100 scale-100'}`}
+          // This used to be a literal 110-pixel offset — a guess at "64px rail
+          // plus a gap". It holds only while the gesture inset is ~24px:
+          // --bottom-nav-h is 64px PLUS that inset, so on a phone with a 48px
+          // inset the rail is 112px tall and this button sat behind it. Offset
+          // from the token instead, like the chat panel above (line 517)
+          // already does, so the gap is a real gap on every device. 24px clear
+          // of the rail lands within ~2px of the old value on a typical phone,
+          // so nothing moves visibly where it was already correct.
+          //
+          // (Written in prose, not as the class name: Tailwind scans comments
+          // too, and spelling the old class here made it emit a dead rule.)
+          className={`fixed bottom-[calc(var(--bottom-nav-h)+1.5rem)] md:bottom-6 right-4 md:right-8 z-[100] group flex items-center justify-center animate-in zoom-in cursor-pointer touch-manipulation select-none transition-all duration-700 ${(!isIconVisible || isMobileMenuOpen) ? 'opacity-0 scale-50 pointer-events-none' : 'opacity-100 scale-100'}`}
         >
           <div className="absolute inset-0 bg-[#ba0036] rounded-full blur-xl opacity-40 group-hover:opacity-70 group-hover:scale-110 transition-all duration-300 animate-pulse pointer-events-none"></div>
           <div className="relative w-14 h-14 bg-gradient-to-br from-[#ba0036] to-[#8a0028] rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(186,0,54,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] group-hover:-translate-y-1 transition-transform duration-300 pointer-events-none">

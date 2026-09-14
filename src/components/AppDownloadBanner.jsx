@@ -312,6 +312,9 @@ const AppDownloadBanner = () => {
             {/* Ambient brand bloom + lit bottom hairline */}
             <div className="absolute -top-10 right-10 w-40 h-40 bg-[#ba0036]/25 blur-[48px] rounded-full pointer-events-none" />
             <div className="absolute -bottom-12 -left-6 w-32 h-32 bg-blue-600/10 blur-[40px] rounded-full pointer-events-none" />
+            {/* safe-area-ok — a 1px hairline INSIDE the banner, which sits in
+                normal document flow at the top of the page, not at the bottom
+                of the screen. */}
             <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent pointer-events-none" />
 
             <div className="relative flex items-center gap-3 px-3 py-2.5">
@@ -388,6 +391,9 @@ const AppDownloadBanner = () => {
             {/* Ambient blooms + lit bottom hairline */}
             <div className="absolute -top-16 left-1/3 w-72 h-40 bg-[#ba0036]/20 blur-[64px] rounded-full pointer-events-none" />
             <div className="absolute -top-10 right-1/4 w-48 h-32 bg-blue-600/10 blur-[56px] rounded-full pointer-events-none" />
+            {/* safe-area-ok — a 1px hairline INSIDE the banner, which sits in
+                normal document flow at the top of the page, not at the bottom
+                of the screen. */}
             <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent pointer-events-none" />
 
             <div className="relative w-full max-w-[1400px] mx-auto px-4 lg:px-6 flex items-center justify-between gap-4 h-[44px]">

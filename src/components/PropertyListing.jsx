@@ -2145,11 +2145,19 @@ const PropertyListing = () => {
 						    pushes the map container down. Row 1: back · search · Filters.
 						    Row 2: horizontally-scrolling tenant-type chips wired to the same
 						    `selectedCategories` filter state as the sidebar. */}
+						{/* `absolute top-0` INSIDE a `fixed inset-0` overlay is the screen
+						    top, so this needs the status-bar inset just as much as a
+						    `fixed top-0` bar does — without it the search field and the
+						    back arrow sit under the clock and cannot be tapped. `pt-3`
+						    alone was the gap; the inset is added to it, not swapped for
+						    it, so the bar keeps its breathing room on a phone with no
+						    inset at all. */}
 						<motion.div
 							initial={{ y: -24, opacity: 0 }}
 							animate={{ y: 0, opacity: 1 }}
 							transition={{ type: "spring", damping: 26, stiffness: 260 }}
-							className="absolute top-0 inset-x-0 z-10 px-3 pt-3 pb-1 pointer-events-none"
+							className="absolute top-0 inset-x-0 z-10 px-3 pb-1 pointer-events-none"
+							style={{ paddingTop: 'calc(var(--sat) + 0.75rem)' }}
 						>
 							<div className="max-w-[640px] mx-auto flex flex-col gap-2">
 								{/* Row 1 — back · search · filters */}
@@ -2229,6 +2237,11 @@ const PropertyListing = () => {
 						    pads its viewport by the card's measured height (onHeightChange)
 						    so the active marker stays centred above the card. Closing it
 						    deselects the marker (resets the inverted pill + padding). */}
+						{/* safe-area-ok — this is only the positioning shell; it paints
+						    nothing and takes no touches. The sheet inside it reserves the
+						    gesture bar itself (BottomSheetCard's marginBottom is
+						    calc(var(--sab) + 0.75rem)), so adding the inset here as well
+						    would float the card off the bottom twice over. */}
 						<div className="absolute inset-x-0 bottom-0 z-20 pointer-events-none">
 							<AnimatePresence>
 								{selectedMapProperty && (
@@ -2252,7 +2265,13 @@ const PropertyListing = () => {
 							<button
 								onClick={() => setViewMode("list")}
 								aria-label={language === "বাংলা" ? "তালিকা দেখুন" : "Show list"}
-								className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10 bg-gray-900 text-white px-5 py-2.5 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.3)] flex items-center gap-2 text-sm font-black active:scale-95 transition-transform">
+								// bottom offset, not `bottom-5`: this pill is the only way back
+								// to the list from the map, and a flat 20px put it under the
+								// gesture bar on a phone with a bottom inset — where the touch
+								// belongs to the OS, so the button looked present and did
+								// nothing. The inset is added to the original 20px.
+								style={{ bottom: 'calc(var(--sab) + 1.25rem)' }}
+								className="absolute left-1/2 -translate-x-1/2 z-10 bg-gray-900 text-white px-5 py-2.5 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.3)] flex items-center gap-2 text-sm font-black active:scale-95 transition-transform">
 								<List size={16} /> {language === "বাংলা" ? "তালিকা" : "List"}
 							</button>
 						)}

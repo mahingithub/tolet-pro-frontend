@@ -936,7 +936,13 @@ useEffect(() => {
 
       {/* MOBILE DRAWER */}
       <div className={`md:hidden fixed inset-x-0 top-0 bg-gray-50 h-[100dvh] z-[65] overflow-y-auto overscroll-contain shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="flex flex-col px-4 pt-4 pb-28">
+        {/* The drawer is `fixed top-0` with h-[100dvh], so it owns both screen
+            edges — the logo and Close button were under the status bar and the
+            language buttons under the gesture bar. Found by the runtime audit
+            (utils/insetAudit.js), which sees the rendered page rather than a
+            pattern in the source. pt-safe-4 / pb-safe-28 ADD the inset to the
+            spacing that was already there. */}
+        <div className="flex flex-col px-4 pt-safe-4 pb-safe-28">
           {/* Header — real brand logo (matches main navbar) + close */}
           <div className="flex items-center justify-between mb-4">
             <button

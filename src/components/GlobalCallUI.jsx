@@ -582,6 +582,9 @@ const GlobalCallUI = () => {
                     <VideoOff size={26} className="text-white/50" />
                   </div>
                 )}
+                {/* safe-area-ok — a decorative scrim over the remote video, no
+                    content and nothing to tap. The call UI's own controls
+                    reserve the inset (paddingTop: calc(var(--sat) + 2rem)). */}
                 <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-black/70 to-transparent" />
               </div>
             )}

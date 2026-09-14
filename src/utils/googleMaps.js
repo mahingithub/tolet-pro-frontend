@@ -45,10 +45,20 @@ import { useJsApiLoader } from '@react-google-maps/api';
 // build a keyless bundle. A Maps JS key is public in the browser bundle no
 // matter where it comes from — the restriction list in Cloud Console is what
 // protects it, not secrecy — so this costs nothing and keeps the map alive.
+// THERE ARE TWO MAPS KEYS IN THIS PROJECT AND THEY LOOK ALIKE — both start
+// "AIzaSyC". Use the one ending -Wrq8S-I. Its Website restrictions list
+// https://localhost/* and capacitor://localhost/*, which is what the INSTALLED
+// app reports as its origin (Capacitor 8 defaults androidScheme to https and
+// the host to localhost), and it has the Geocoding API enabled, which the Add
+// Property wizard calls for reverse-geocoding.
+//
+// The old key ending -KZWmKlg allows only the toletpro.rent hosts, so the
+// website worked while the app showed Google's grey "Oops! Something went
+// wrong" panel, and reverse-geocoding returned "This API is not activated".
 export const GOOGLE_MAPS_API_KEY =
   (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_GOOGLE_MAPS_API_KEY) ||
   (typeof process !== 'undefined' && process?.env?.REACT_APP_GOOGLE_MAPS_API_KEY) ||
-  'AIzaSyC9xWNjjSPhxy2aUWLubPqHR7N6KZWmKlg';
+  'AIzaSyCJxYKtSBxh-BokQG79qN5r6DxGWrq8S-I';
 
 // Stable reference, shared by every loader call. See reason 1 above.
 export const GOOGLE_MAPS_LIBRARIES = [];
