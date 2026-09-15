@@ -1,22 +1,16 @@
 {
   "_comment": "EDIT THIS ON EVERY RELEASE. It is what tells an installed app that a newer build exists. Deploys with the website (Vercel), so no backend change is needed. latestVersionCode must match android/app/build.gradle's versionCode. Set minSupportedVersionCode ONLY when a build is genuinely unusable (a broken API contract, a data-loss bug) — it BLOCKS every older build from opening, so a typo here locks every tester out until you redeploy.",
-  "latestVersionCode": 12,
-  "latestVersionName": "1.1.0",
+  "latestVersionCode": 13,
+  "latestVersionName": "1.1.1",
   "minSupportedVersionCode": 1,
   "notes": {
     "bn": [
-      "ব্যাক বাটনে এখন অ্যাপ ঠিকমতো বন্ধ হয়",
-      "উপরের হেডার আর মেনু ঘড়ির নিচে ঢুকে যাওয়া ঠিক হয়েছে",
-      "লিভিং-এ স্ক্রল করলে ট্যাব বার আর ঘড়ির নিচে ঢোকে না",
-      "ম্যাপ স্ক্রিনের সার্চ বার ও বোতামগুলো ঠিক জায়গায় এসেছে",
-      "নতুন আপডেট এলে এখন অ্যাপেই জানিয়ে দেওয়া হবে"
+      "বিদেশে থাকলেও এখন সেখানকার নম্বর দিয়ে সাইনআপ ও লগইন করা যায় — সিঙ্গাপুর, সৌদি আরব, মালয়েশিয়াসহ ১৪টি দেশ",
+      "সাইনআপের সময় পাসওয়ার্ডের নিয়মগুলো এখন আরও স্পষ্ট করে দেখানো হয়"
     ],
     "en": [
-      "The back button now closes the app properly",
-      "Fixed the header and menu sitting under the status bar",
-      "The Living tab bar no longer slides under the clock when scrolling",
-      "Fixed the map screen's search bar and buttons",
-      "You'll now be told inside the app when an update is ready"
+      "Living abroad? Sign up and log in with your local number — 14 countries including Singapore, Saudi Arabia and Malaysia",
+      "Password rules are now shown clearly while you sign up"
     ]
   }
 }

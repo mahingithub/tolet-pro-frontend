@@ -41,17 +41,23 @@ export default function UpdateGate() {
     if (import.meta.env.DEV) {
       const forced = new URLSearchParams(window.location.search).get('forceUpdateGate');
       if (forced === 'recommended' || forced === 'required') {
-        setState({
-          status: forced,
-          currentCode: 1,
-          latestCode: 11,
-          latestName: '1.0.9 (preview)',
-          notes: {
-            bn: ['ব্যাক বাটনে এখন অ্যাপ ঠিকমতো বন্ধ হয়', 'উপরের হেডার ঘড়ির নিচে ঢোকা ঠিক হয়েছে'],
-            en: ['The back button now closes the app properly', 'Fixed the header sitting under the status bar'],
-          },
-        });
-        return undefined;
+        // Preview with the version and notes that will actually ship — the
+        // local public/app-version.json — not a hard-coded sample that goes stale.
+        let previewCancelled = false;
+        fetch('/app-version.json', { cache: 'no-store' })
+          .then((res) => res.json())
+          .then((manifest) => {
+            if (previewCancelled) return;
+            setState({
+              status: forced,
+              currentCode: 1,
+              latestCode: Number(manifest.latestVersionCode) || null,
+              latestName: `${manifest.latestVersionName} (preview)`,
+              notes: { bn: manifest.notes?.bn || [], en: manifest.notes?.en || [] },
+            });
+          })
+          .catch(() => {});
+        return () => { previewCancelled = true; };
       }
     }
 
