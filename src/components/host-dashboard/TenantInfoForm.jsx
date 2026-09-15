@@ -32,7 +32,7 @@ import {
   TENANT_TYPES, tenantTypeById, GOVT_ID_TYPES, MARITAL_STATUSES, HAS_STATUS,
   isValidNid, isValidPassport,
 } from '../../utils/tenantFields';
-import { isBdMobile } from '../../utils/validators';
+import { isSupportedMobile } from '../../utils/validators';
 // The landlord's own profile already uses this; reusing it means one list of
 // institutions and companies across the app instead of a second one here.
 import WorkplaceAutocomplete from '../shared/Workplaceautocomplete';
@@ -68,7 +68,7 @@ export default function TenantInfoForm({
     <p className="text-[10px] font-bold text-rose-600 mt-1 leading-relaxed">{children}</p>
   ) : null);
 
-  const phoneBad = (k) => errors.includes(k) && String(v[k] || '').trim() && !isBdMobile(v[k]);
+  const phoneBad = (k) => errors.includes(k) && String(v[k] || '').trim() && !isSupportedMobile(v[k]);
 
   const labelCls = 'text-[10px] font-black text-gray-400 uppercase tracking-widest';
   const inputCls = 'w-full mt-1.5 p-3.5 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all';
@@ -189,8 +189,8 @@ export default function TenantInfoForm({
           />
           <Hint show={phoneBad('phone')}>
             {isBn
-              ? 'সঠিক বাংলাদেশি মোবাইল নম্বর দিন — ১১ ডিজিট, ০১৩ থেকে ০১৯ দিয়ে শুরু।'
-              : 'Enter a valid Bangladeshi mobile — 11 digits starting 013–019.'}
+              ? 'সঠিক মোবাইল নম্বর দিন। বিদেশি নম্বরে দেশের কোড দিন, যেমন +6581234567।'
+              : 'Enter a valid mobile number; include the country code abroad, e.g. +6581234567.'}
           </Hint>
           {!phoneBad('phone') && (
             <p className="text-[9px] font-bold text-gray-400 mt-1">
@@ -520,8 +520,8 @@ export default function TenantInfoForm({
                   />
                   <Hint show={phoneBad('emergencyPhone')}>
                     {isBn
-                      ? 'সঠিক ১১ ডিজিটের নম্বর দিন, নয়তো খালি রাখুন — ভুল নম্বর না থাকার চেয়েও খারাপ।'
-                      : 'Give a valid 11-digit number or leave it empty — a wrong one is worse than none.'}
+                      ? 'সঠিক মোবাইল নম্বর দেশের কোডসহ দিন, নয়তো খালি রাখুন।'
+                      : 'Enter a valid mobile with its country code, or leave it empty.'}
                   </Hint>
                 </div>
                 <div>

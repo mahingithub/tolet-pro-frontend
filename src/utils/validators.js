@@ -1,3 +1,5 @@
+import { countryFromInternational, toNationalNumber, toE164, DEFAULT_PHONE_COUNTRY } from '../constants/phoneCountries.js';
+
 /**
  * validators.js
  * ─────────────────────────────────────────────────────────────────────────
@@ -24,21 +26,29 @@ export function toBdNationalPhone(v) {
   return digits.replace(/^0+/, '');
 }
 
-/**
- * A real Bangladeshi mobile number: 11 digits starting `01`, where the
- * operator digit is 3-9 — 013/017 Grameenphone, 014/019 Banglalink,
- * 015 Teletalk, 016 Airtel, 018 Robi. Written against the 10-digit national
- * part, so `1[3-9]` + 8 digits.
- *
- * This is deliberately STRICTER than the backend, which only checks generic
- * E.164 (`+` then 8-15 digits). Junk like `1234567890` satisfies the server
- * and burns a real SMS send, so the genuine BD-shape check has to happen here.
- */
+/** Bangladesh-only helper retained for explicitly domestic fields. */
 export const BD_MOBILE_NATIONAL_RE = /^1[3-9]\d{8}$/;
 
 export function isBdMobile(v) {
   return BD_MOBILE_NATIONAL_RE.test(toBdNationalPhone(v));
 }
+
+/**
+ * Shared contact fields have no country picker: international numbers must
+ * include +/00 and a listed country code. Unprefixed legacy inputs mean BD.
+ * Return a canonical identity, never a suffix shared by several countries.
+ */
+export function normalizeMobilePhone(value) {
+  const raw = String(value || '').trim();
+  if (!/^[+\d\s().-]+$/.test(raw)) return null;
+  const international = /^(\+|00)/.test(raw);
+  const country = international ? countryFromInternational(raw) : DEFAULT_PHONE_COUNTRY;
+  if (!country) return null;
+  const national = toNationalNumber(raw, country);
+  return country.mobile.test(national) ? toE164(national, country) : null;
+}
+
+export const isSupportedMobile = (value) => normalizeMobilePhone(value) !== null;
 
 /**
  * Password rules, mirrored 1:1 from the backend
@@ -65,13 +75,12 @@ export function isStrongEnoughPassword(v) {
 }
 
 export const validators = {
-  // Bangladesh mobile number. Accepts the number with or without the
-  // +880 / 880 / leading-0 prefix; see isBdMobile above for the exact rule.
+  // Listed international mobiles, plus existing Bangladesh input formats.
   phone: (v) => ({
-    ok: isBdMobile(v),
+    ok: isSupportedMobile(v),
     msg: {
-      bn: 'বৈধ বাংলাদেশি মোবাইল নম্বর দিন, যেমন ০১৭১২৩৪৫৬৭৮',
-      en: 'Enter a valid Bangladeshi mobile number, e.g. 01712345678',
+      bn: 'সঠিক মোবাইল নম্বর দিন। বিদেশি নম্বরে দেশের কোড দিন, যেমন +6581234567',
+      en: 'Enter a valid mobile number. Include the country code for international numbers, e.g. +6581234567',
     },
   }),
 

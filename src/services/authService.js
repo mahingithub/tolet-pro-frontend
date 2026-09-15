@@ -1,22 +1,16 @@
 /**
- * authService.js
- * ──────────────────────────────────────────────────────────────────────────
- * Talks to the TO-LET PRO auth backend.
+ * authService.js — talks to the TO-LET PRO auth backend.
  *
- * OTP is delivered by the BACKEND via sms.net.bd — there is NO client-side
- * Firebase / reCAPTCHA anymore. The browser only posts the phone number and
- * the 6-digit code the user received by SMS.
+ * Phone proof has two channels, picked by the number's country:
+ *   Bangladesh → the BACKEND texts a 6-digit OTP via sms.net.bd; the client
+ *                posts the code back.
+ *   Abroad     → the backend issues a challenge, the client asks Firebase for
+ *                the SMS, and exchanges Firebase's ID token ONCE for our
+ *                session. It is never used as an app token.
  *
- * Signup:
- * 1.  POST /signup/start  {name, phone, password, role}      → 202 (OTP texted)
- * 2.  POST /signup/verify {phoneNumber, otp}                 → { token, user }
- *
- * Login (no OTP):
- * 1.  POST /login {phone, password}                          → { token, user }
- *
- * Forgot password:
- * 1.  POST /forgot-password {phoneNumber}                    → 202 (OTP texted)
- * 2.  POST /reset-password  {phoneNumber, otp, newPassword}  → 200
+ * Signup:  POST /signup/start → POST /signup/verify  → { token, user }
+ * Login:   POST /login {phone, password}             → { token, user }
+ * Forgot:  POST /forgot-password → POST /reset-password
  */
 
 import { readJson, writeJson, broadcast } from './_storage.js';
@@ -38,6 +32,7 @@ const KEY_LEGACY_EXPIRES = 'auth:expiresAt';
 // preserves ONLY these so a logout doesn't reset the user's language choice or
 // re-trigger the PWA install banner.
 const DEVICE_KEEP_KEYS = new Set([
+  'auth:phoneCountry',    // remembered country picker selection
   'tolet_lang',           // LanguageContext — chosen language
   'toletpro_app_banner_dismissed', // AppDownloadBanner — "don't show again"
   'welcome:login:hidden', // WelcomeRobotOverlay — "never show the login welcome again"
@@ -146,8 +141,10 @@ export function clearAllAppData() {
 export const signupStart  = ({ name, phone, password, role = 'tenant' }) =>
   api('/signup/start', { body: { name, phone, password, role } });
 
-export const signupVerify = async ({ phoneNumber, otp }) => {
-  const data = await api('/signup/verify', { body: { phoneNumber, otp } });
+// The proof is `otp` for a Bangladeshi number (our server texted it) or
+// `firebaseIdToken` + `verificationId` for a number abroad.
+export const signupVerify = async ({ phoneNumber, otp, firebaseIdToken, verificationId }) => {
+  const data = await api('/signup/verify', { body: { phoneNumber, otp, firebaseIdToken, verificationId } });
   // Wipe any previous account's cached data BEFORE persisting the new session,
   // otherwise the freshly-mounted dashboard/chat reads stale fullName/phone/
   // threads from the prior user's storage slots.
@@ -159,6 +156,10 @@ export const signupVerify = async ({ phoneNumber, otp }) => {
 // ─── Login ──────────────────────────────────────────────────────────────────
 export const loginWithPassword = async ({ phone, password }) => {
   const data = await api('/login', { body: { phone, password } });
+  return acceptLoginSession(data);
+};
+
+function acceptLoginSession(data) {
   // Only purge previous tenant-profile localStorage if the user actually
   // CHANGED. Same-user re-login on the same browser must NOT wipe their
   // offline cache — that was eating the profile data every time the user
@@ -174,15 +175,16 @@ export const loginWithPassword = async ({ phone, password }) => {
   return data.user;
 };
 
-// ─── Forgot / Reset (OTP via sms.net.bd) ─────────────────────────────────────
-// Step 1: request an OTP. Backend always returns 202 (constant response) so
-// account existence is never leaked.
+// ─── Forgot / Reset ─────────────────────────────────────────────────────────
+// Step 1: Bangladesh — the backend texts a code; abroad — it returns a Firebase
+// challenge. Constant response either way, so account existence never leaks.
 export const forgotPassword = ({ phoneNumber }) =>
   api('/forgot-password', { body: { phoneNumber } });
 
-// Step 2: verify the OTP and set the new password in a single call.
-export const resetPassword = ({ phoneNumber, otp, newPassword }) =>
-  api('/reset-password', { body: { phoneNumber, otp, newPassword } });
+// Step 2: verify the proof (otp, or firebaseIdToken + verificationId) and set
+// the new password in a single call.
+export const resetPassword = ({ phoneNumber, otp, firebaseIdToken, verificationId, newPassword }) =>
+  api('/reset-password', { body: { phoneNumber, otp, firebaseIdToken, verificationId, newPassword } });
 
 // ─── Session ───────────────────────────────────────────────────────────────
 export const fetchMe = () => api('/me', { method: 'GET', auth: true }).then((d) => d.user);

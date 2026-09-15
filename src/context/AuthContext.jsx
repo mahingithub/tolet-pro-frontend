@@ -213,8 +213,8 @@ export const AuthProvider = ({ children }) => {
       // round trip to /me to "confirm" it only adds a second thing that can
       // fail between a successful signup and the dashboard, and the account is
       // one request old — there is nothing newer to fetch.
-      completeSignup: async ({ phoneNumber, otp }) => {
-        const u = await svcSignupVerify({ phoneNumber, otp });
+      completeSignup: async (verification) => {
+        const u = await svcSignupVerify(verification);
         setUser(u);
 
         const newRoles = Array.isArray(u?.roles) && u.roles.length

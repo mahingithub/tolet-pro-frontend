@@ -4,7 +4,7 @@ import useGoBack from '../hooks/useGoBack';
 import {
   User, Phone, Lock, ArrowLeft, Loader2, CheckCircle2,
   Home, ShieldCheck, Building2, MessageCircle, ChevronRight,
-  Check, AlertCircle,
+  Check, AlertCircle, ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useSettings } from '../context/SettingsContext.jsx';
@@ -15,52 +15,64 @@ import {
   forgotPassword,
   resetPassword,
 } from '../services/authService.js';
+import { createPhoneVerification, phoneAuthErrorMessage } from '../services/firebasePhoneAuth.js';
+import { passwordChecks } from '../utils/validators.js';
 import {
-  toBdNationalPhone,
-  BD_MOBILE_NATIONAL_RE,
-  passwordChecks,
-} from '../utils/validators.js';
+  PHONE_COUNTRIES,
+  DEFAULT_PHONE_COUNTRY,
+  findPhoneCountry,
+  toNationalNumber,
+  countryFromInternational,
+  toE164,
+  toBnDigits,
+} from '../constants/phoneCountries.js';
 
 const RESEND_COOLDOWN_S = 30;
 
-/**
- * Reduce whatever the user typed or pasted to the 10-digit national part that
- * sits after the `+880` prefix shown in the field. Handles the leading 0 a BD
- * user habitually types (`01742…` → `1742…`) and a full pasted number
- * (`+8801742…` → `1742…`), which the old digits-only version mangled into
- * `8801742345`.
- */
-function normalizePhoneInput(raw) {
-  return toBdNationalPhone(raw);
-}
-
-function toE164(localPart) {
-  return `+880${localPart}`;
-}
+// Where the chosen phone country is remembered on this device.
+const PHONE_COUNTRY_KEY = 'auth:phoneCountry';
 
 /**
- * Why this exists: the backend only enforces generic E.164 (`+` then 8-15
- * digits), so `1234567890` used to sail straight through to the OTP screen —
- * an SMS was requested for a number that cannot exist, the rate-limit quota
- * was spent, and the user sat waiting for a code that would never arrive.
+ * Why this exists: the backend login only enforces generic E.164 (`+` then
+ * 8-15 digits), so `1234567890` used to sail straight through to the OTP
+ * screen — an SMS was requested for a number that cannot exist, the rate-limit
+ * quota was spent, and the user sat waiting for a code that would never arrive.
  * We now block that here and say exactly what is wrong.
  *
- * Returns null when the number is a valid BD mobile, otherwise { en, bn }.
+ * `local` is the national number for `country` (see toNationalNumber), or a
+ * `+…` number still being typed in full international form.
+ *
+ * Returns null when the number is a valid mobile there, otherwise { en, bn }.
  */
-function phoneProblem(local) {
+function phoneProblem(local, country) {
   if (!local) {
     return { en: 'Enter your mobile number.', bn: 'আপনার মোবাইল নম্বর দিন।' };
   }
-  if (local.length < 10) {
+  if (local.startsWith('+')) {
+    // Only an unfinished or unlisted number stays in this form: a complete
+    // mobile from a listed country converts the moment it matches.
     return {
-      en: `Too short — ${10 - local.length} more digit${10 - local.length > 1 ? 's' : ''} to go. Example: 1712345678`,
-      bn: `আরও ${10 - local.length}টি সংখ্যা বাকি। যেমন: ১৭১২৩৪৫৬৭৮`,
+      en: 'Choose your country on the left, then type the number without the country code.',
+      bn: 'বাঁ পাশ থেকে আপনার দেশ বেছে নিন, তারপর দেশের কোড ছাড়া নম্বরটি লিখুন।',
     };
   }
-  if (!BD_MOBILE_NATIONAL_RE.test(local)) {
+  if (local.length < country.min) {
+    const left = country.min - local.length;
     return {
-      en: 'This is not a Bangladeshi mobile number. After +880 it must start with 13, 14, 15, 16, 17, 18 or 19.',
-      bn: 'এটি বাংলাদেশি মোবাইল নম্বর নয়। +৮৮০ এর পরে নম্বরটি ১৩, ১৪, ১৫, ১৬, ১৭, ১৮ বা ১৯ দিয়ে শুরু হতে হবে।',
+      en: `Too short — ${left} more digit${left > 1 ? 's' : ''} to go. Example: ${country.example}`,
+      bn: `আরও ${left}টি সংখ্যা বাকি। যেমন: ${toBnDigits(country.example)}`,
+    };
+  }
+  if (!country.mobile.test(local)) {
+    if (country.iso === 'BD') {
+      return {
+        en: 'This is not a Bangladeshi mobile number. After +880 it must start with 13, 14, 15, 16, 17, 18 or 19.',
+        bn: 'এটি বাংলাদেশি মোবাইল নম্বর নয়। +৮৮০ এর পরে নম্বরটি ১৩, ১৪, ১৫, ১৬, ১৭, ১৮ বা ১৯ দিয়ে শুরু হতে হবে।',
+      };
+    }
+    return {
+      en: `This is not a ${country.en} mobile number. Example: +${country.dial} ${country.example}`,
+      bn: `এটি ${country.bn}-এর মোবাইল নম্বর নয়। যেমন: +${toBnDigits(country.dial)} ${toBnDigits(country.example)}`,
     };
   }
   return null;
@@ -76,8 +88,12 @@ function phoneProblem(local) {
  * The rules mirror the backend exactly: 8-128 chars, one ASCII letter, one
  * ASCII digit. We say "English letter / number" out loud because the server's
  * regexes are ASCII-only, so Bengali script and Bengali numerals don't count.
+ *
+ * Shown in a tinted box with an example, because people skimmed past the old
+ * grey list and only met the rules as an error. It turns green once all pass.
  */
-const PasswordRules = ({ checks, isBn }) => {
+const PasswordRules = ({ checks, isBn, title }) => {
+  const allOk = checks.minLength && checks.letter && checks.digit;
   const rules = [
     {
       ok: checks.minLength,
@@ -94,25 +110,36 @@ const PasswordRules = ({ checks, isBn }) => {
   ];
 
   return (
-    <ul className="mt-2 ml-1 space-y-1" aria-live="polite">
-      {rules.map(({ ok, label }) => (
-        <li
-          key={label}
-          className={`flex items-center gap-1.5 text-[11px] font-semibold transition-colors ${ok ? 'text-emerald-600' : 'text-gray-500'}`}
-        >
-          <span
-            className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 transition-colors ${ok ? 'bg-emerald-100' : 'bg-gray-200'}`}
-            aria-hidden="true"
+    <div
+      className={`mt-2 rounded-xl border px-3 py-2.5 transition-colors ${allOk ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}
+    >
+      <p className={`flex items-center gap-1.5 text-xs font-bold ${allOk ? 'text-emerald-800' : 'text-amber-900'}`}>
+        <Lock size={12} aria-hidden="true" className="shrink-0" />
+        {title}
+      </p>
+      <ul className="mt-1.5 space-y-1" aria-live="polite">
+        {rules.map(({ ok, label }) => (
+          <li
+            key={label}
+            className={`flex items-center gap-1.5 text-xs font-semibold transition-colors ${ok ? 'text-emerald-700' : 'text-gray-700'}`}
           >
-            {ok
-              ? <Check size={9} strokeWidth={4} className="text-emerald-600" />
-              : <span className="w-1 h-1 rounded-full bg-gray-400" />}
-          </span>
-          <span className="sr-only">{ok ? (isBn ? 'পূরণ হয়েছে:' : 'Met:') : (isBn ? 'বাকি আছে:' : 'Not met:')}</span>
-          {label}
-        </li>
-      ))}
-    </ul>
+            <span
+              className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 transition-colors ${ok ? 'bg-emerald-100' : 'bg-gray-200'}`}
+              aria-hidden="true"
+            >
+              {ok
+                ? <Check size={9} strokeWidth={4} className="text-emerald-600" />
+                : <span className="w-1 h-1 rounded-full bg-gray-400" />}
+            </span>
+            <span className="sr-only">{ok ? (isBn ? 'পূরণ হয়েছে:' : 'Met:') : (isBn ? 'বাকি আছে:' : 'Not met:')}</span>
+            {label}
+          </li>
+        ))}
+      </ul>
+      <p className={`mt-1.5 text-[11px] font-semibold ${allOk ? 'text-emerald-700' : 'text-amber-800'}`}>
+        {isBn ? 'যেমন: rahim2026' : 'Example: rahim2026'}
+      </p>
+    </div>
   );
 };
 
@@ -186,7 +213,7 @@ const LoginPage = () => {
     // Backend ApiError → { code, message }. Prefer the server's own (Bangla)
     // message, then a local translation by code, then a localized default.
     const byCode = err?.code ? t[err.code] : null;
-    setErrorMsg(err?.serverMessage || byCode || (isBn ? defaultBn : defaultEn));
+    setErrorMsg(phoneAuthErrorMessage(err?.code, isBn) || err?.serverMessage || byCode || (isBn ? defaultBn : defaultEn));
   };
 
   const nextUrl = searchParams.get('next');
@@ -206,6 +233,16 @@ const LoginPage = () => {
         : MODES.LOGIN,
   );
   const [step, setStep] = useState(STEPS.FORM);
+  const [verifiedFirebaseToken, setVerifiedFirebaseToken] = useState(null);
+  const verificationRef = useRef(null);
+  const challengeRef = useRef(null);
+  const cleanupRef = useRef(Promise.resolve());
+  const attemptRef = useRef(0);
+  const recaptchaRef = useRef(null);
+  useEffect(() => () => {
+    attemptRef.current += 1;
+    void verificationRef.current?.dispose();
+  }, []);
   const [role, setRole] = useState(requestedRole === 'landlord' ? 'landlord' : 'tenant');
 
   // ─── Role-selection popup ───────────────────────────────────────────────
@@ -244,7 +281,7 @@ const LoginPage = () => {
   //   'wrong'    — red: the server rejected THIS code (not a network wobble)
   const [otpStatus, setOtpStatus] = useState('idle');
   const otpCode = otp.join('');
-  const otpComplete = otpCode.length === 6;
+  const otpComplete = otpCode.length === 6 || !!verifiedFirebaseToken;
   const otpLocked = otpStatus === 'checking' || otpStatus === 'success';
 
   const focusOtpBox = (i) => {
@@ -260,6 +297,7 @@ const LoginPage = () => {
   const resetOtp = (status = 'idle') => {
     setOtp(['', '', '', '', '', '']);
     setOtpStatus(status);
+    wasOtpCompleteRef.current = false;
   };
 
   // A rejected code stays on screen in red for a beat — you can't learn what you
@@ -292,7 +330,17 @@ const LoginPage = () => {
   // should be known before you invent a password, not after it's rejected.
   const [phoneTouched, setPhoneTouched] = useState(false);
 
-  const phoneIssue = phoneProblem(formData.phone);
+  // Which country the number is in. Remembered on this device, so someone in
+  // Singapore picks Singapore once rather than on every sign-in.
+  const [phoneCountry, setPhoneCountry] = useState(() => {
+    try { return findPhoneCountry(localStorage.getItem(PHONE_COUNTRY_KEY)); } catch { return DEFAULT_PHONE_COUNTRY; }
+  });
+  const pickCountry = (c) => {
+    setPhoneCountry(c);
+    try { localStorage.setItem(PHONE_COUNTRY_KEY, c.iso); } catch { /* storage blocked — just not remembered */ }
+  };
+
+  const phoneIssue = phoneProblem(formData.phone, phoneCountry);
   const phoneError = phoneTouched && phoneIssue ? L(phoneIssue.en, phoneIssue.bn) : '';
 
   // Signup and reset must satisfy the backend's password rules; login must not
@@ -335,8 +383,25 @@ const LoginPage = () => {
     navigate(resolveHome({ activeRole: resolvedRole, roles, defaultHome, hasBooking: true }), { replace: true });
   };
 
-  const handlePhoneChange = (e) =>
-    setFormData((d) => ({ ...d, phone: normalizePhoneInput(e.target.value).slice(0, 10) }));
+  // A number pasted or autofilled in full international form (`+65 8123 4567`)
+  // switches the country to match. One being TYPED that way keeps its `+`
+  // until it is complete and then converts, so someone abroad who writes their
+  // number the way they always do isn't read as a broken +880 number halfway
+  // through. The input's maxLength is generous for the same reason: a browser
+  // cuts a paste to maxLength before this handler ever sees it.
+  const handlePhoneChange = (e) => {
+    const raw = e.target.value;
+    const intl = countryFromInternational(raw);
+    if (intl) {
+      pickCountry(intl);
+      setFormData((d) => ({ ...d, phone: toNationalNumber(raw, intl) }));
+      return;
+    }
+    const phone = /^\s*(\+|00)/.test(raw)
+      ? `+${raw.replace(/\D/g, '').replace(/^00/, '').slice(0, 15)}`
+      : toNationalNumber(raw, phoneCountry).slice(0, 15);
+    setFormData((d) => ({ ...d, phone }));
+  };
 
   /**
    * Hard gate in front of every request that sends an SMS or attempts a login.
@@ -360,7 +425,17 @@ const LoginPage = () => {
     setErrorMsg('');
   };
 
+  const clearVerification = () => {
+    attemptRef.current += 1;
+    if (verificationRef.current) cleanupRef.current = verificationRef.current.dispose();
+    verificationRef.current = null;
+    challengeRef.current = null;
+    setVerifiedFirebaseToken(null);
+    setIsLoading(false);
+  };
+
   const switchMode = (m) => {
+    clearVerification();
     setMode(m);
     setStep(STEPS.FORM);
     setErrorMsg('');
@@ -370,6 +445,80 @@ const LoginPage = () => {
     setFormData({ name: '', phone: '', password: '' });
     setNewPassword('');
     setPhoneTouched(false);
+    setResendIn(0);
+  };
+
+  // Every code starts at the backend. For Bangladesh it texts the code itself;
+  // abroad it issues a purpose-bound, expiring challenge for the Firebase SMS
+  // this client then requests. A client-entered phone is never proof of identity.
+  const startVerification = async ({ resend = false } = {}) => {
+    const attempt = ++attemptRef.current;
+    const previous = verificationRef.current;
+    verificationRef.current = null;
+    challengeRef.current = null;
+    setVerifiedFirebaseToken(null);
+    resetOtp();
+    if (previous) cleanupRef.current = previous.dispose();
+    await cleanupRef.current;
+    if (attempt !== attemptRef.current) return false;
+    const phoneNumber = toE164(formData.phone, phoneCountry);
+    const challenge = mode === MODES.SIGNUP
+      ? await signupStart({ name: formData.name, phone: phoneNumber, password: formData.password, role })
+      : await forgotPassword({ phoneNumber });
+    if (attempt !== attemptRef.current) return false;
+    // Bangladesh: the server has already texted the code — straight to the boxes.
+    if (challenge.provider === 'sms') {
+      challengeRef.current = { provider: 'sms', phoneNumber, attempt };
+      setStep(STEPS.OTP);
+      setResendIn(RESEND_COOLDOWN_S);
+      return true;
+    }
+    if (challenge.provider !== 'firebase' || !challenge.verificationId) {
+      throw Object.assign(new Error('firebase_not_configured'), { code: 'firebase_not_configured' });
+    }
+    challengeRef.current = { provider: 'firebase', verificationId: challenge.verificationId, phoneNumber, attempt };
+    const verification = createPhoneVerification({
+      container: recaptchaRef.current,
+      language: isBn ? 'bn' : 'en',
+      onVerified: (token) => { if (attempt === attemptRef.current) setVerifiedFirebaseToken(token); },
+      onError: (err) => {
+        if (attempt === attemptRef.current) handleError(err, 'কোড পাঠানো যায়নি। আবার চেষ্টা করুন।', 'Could not send the code. Please try again.');
+      },
+    });
+    verificationRef.current = verification;
+    try {
+      await verification.start(phoneNumber, { resend });
+    } catch (err) {
+      await verification.dispose();
+      if (attempt === attemptRef.current) {
+        verificationRef.current = null;
+        challengeRef.current = null;
+        throw err;
+      }
+      return false;
+    }
+    if (attempt !== attemptRef.current) return false;
+    setStep(STEPS.OTP);
+    setResendIn(RESEND_COOLDOWN_S);
+    return true;
+  };
+
+  const verifiedIdentity = async (code) => {
+    const challenge = challengeRef.current;
+    if (challenge?.provider === 'sms') {
+      if (!/^\d{6}$/.test(code || '')) {
+        throw Object.assign(new Error('auth/invalid-verification-code'), { code: 'auth/invalid-verification-code' });
+      }
+      return { phoneNumber: challenge.phoneNumber, otp: code };
+    }
+    if (!verificationRef.current || !challenge) {
+      throw Object.assign(new Error('auth/session-expired'), { code: 'auth/session-expired' });
+    }
+    const firebaseIdToken = verifiedFirebaseToken || await verificationRef.current.confirm(code);
+    if (challenge.attempt !== attemptRef.current) {
+      throw Object.assign(new Error('auth/cancelled'), { code: 'auth/cancelled' });
+    }
+    return { phoneNumber: challenge.phoneNumber, firebaseIdToken, verificationId: challenge.verificationId };
   };
 
   // ─── LOGIN flow (no OTP) ──────────────────────────────────────────────────
@@ -384,15 +533,18 @@ const LoginPage = () => {
       setErrorMsg(L('Enter your password.', 'আপনার পাসওয়ার্ড দিন।'));
       return;
     }
+    const attempt = ++attemptRef.current;
     setIsLoading(true); setErrorMsg(''); setInfoMsg(''); setRoleMismatch(null);
     try {
-      const loggedInUser = await login({ phone: toE164(formData.phone), password: formData.password }, role);
+      const loggedInUser = await login({ phone: toE164(formData.phone, phoneCountry), password: formData.password }, role);
+      if (attempt !== attemptRef.current) return;
       if (['super_admin', 'moderator', 'support_agent'].includes(loggedInUser?.role)) {
         goToNextOrDashboard('admin');
       } else {
         goToNextOrDashboard(role);
       }
     } catch (err) {
+      if (attempt !== attemptRef.current) return;
       // The account exists and the password is right, but it doesn't own the
       // role selected above. Say so plainly and point at the side they DO own,
       // instead of a generic "login failed" that looks like a wrong password.
@@ -411,7 +563,7 @@ const LoginPage = () => {
       }
       handleError(err, 'লগইন করা যায়নি। নম্বর ও পাসওয়ার্ড দেখে নিন।', 'Could not log in. Check your number and password.');
     } finally {
-      setIsLoading(false);
+      if (attempt === attemptRef.current) setIsLoading(false);
     }
   };
 
@@ -437,23 +589,15 @@ const LoginPage = () => {
       ));
       return;
     }
+    const attempt = attemptRef.current + 1;
     setIsLoading(true); setErrorMsg(''); setInfoMsg('');
     try {
-      // Backend validates input, ensures no existing verified account, stores
-      // name + hashed password in a SignupIntent, and texts a 6-digit OTP via
-      // sms.net.bd. A 202 means "OTP on its way".
-      await signupStart({
-        name: formData.name,
-        phone: toE164(formData.phone),
-        password: formData.password,
-        role,
-      });
-      setStep(STEPS.OTP);
-      setResendIn(RESEND_COOLDOWN_S);
+      await startVerification();
     } catch (err) {
+      if (attempt !== attemptRef.current) return;
       handleError(err, 'সাইন আপ শুরু করা যায়নি। আবার চেষ্টা করুন।', 'Could not start signup. Please try again.');
     } finally {
-      setIsLoading(false);
+      if (attempt === attemptRef.current) setIsLoading(false);
     }
   };
 
@@ -465,30 +609,34 @@ const LoginPage = () => {
   // there is one description of what verifying means.
   const runSignupVerify = async (code) => {
     if (isLoading || otpLocked) return;
+    const attempt = attemptRef.current;
     setIsLoading(true); setErrorMsg(''); setInfoMsg(''); setOtpStatus('checking');
     try {
-      const newUser = await completeSignup({
-        phoneNumber: toE164(formData.phone),
-        otp: code,
-      });
+      const identity = await verifiedIdentity(code);
+      const newUser = await completeSignup(identity);
+      if (attempt !== attemptRef.current) return;
+      await verificationRef.current?.dispose();
+      if (attempt !== attemptRef.current) return;
       setOtpStatus('success');
       // Hold the green for a beat. The account is already made and the session
       // is already live — this pause only exists so the person who just typed
       // six digits gets told they got them right, instead of the screen
       // vanishing out from under them.
       await new Promise((resolve) => { setTimeout(resolve, 550); });
-      goToNextOrDashboard(newUser?.role || role);
+      if (attempt !== attemptRef.current) return;
+      goToNextOrDashboard(['super_admin', 'moderator', 'support_agent'].includes(newUser?.role) ? 'admin' : newUser?.role || role);
     } catch (err) {
+      if (attempt !== attemptRef.current) return;
       handleError(err, 'অ্যাকাউন্ট তৈরি করা যায়নি। কোডটি দেখে আবার দিন।', 'Could not create your account. Check the code and try again.');
       // Red means "this code is wrong" and nothing else. A 429, an expired
       // signup session, an account that already exists — none of those are the
       // user mistyping, and wiping six correct digits over a rate limit would
       // be its own small cruelty. Those keep the digits and just show the
       // server's message.
-      if (err?.code === 'otp_invalid') flagWrongOtp();
+      if (err?.code === 'otp_invalid' || err?.code === 'auth/invalid-verification-code') flagWrongOtp();
       else setOtpStatus('idle');
     } finally {
-      setIsLoading(false);
+      if (attempt === attemptRef.current) setIsLoading(false);
     }
   };
 
@@ -516,10 +664,10 @@ const LoginPage = () => {
 
   const wasOtpCompleteRef = useRef(false);
   useEffect(() => {
+    if (step !== STEPS.OTP || isLoading) return;
     const wasComplete = wasOtpCompleteRef.current;
     wasOtpCompleteRef.current = otpComplete;
-
-    if (step !== STEPS.OTP || !otpComplete || wasComplete) return;
+    if (!otpComplete || wasComplete) return;
     // Forgot-password can't auto-verify: the server checks the code and sets
     // the new password in ONE call (there is no verify-only endpoint), so the
     // code alone isn't a complete request. Move to the password field instead —
@@ -529,22 +677,21 @@ const LoginPage = () => {
       return;
     }
     runSignupVerifyRef.current(otpCode);
-  }, [otpCode, otpComplete, mode, step]);
+  }, [otpCode, otpComplete, mode, step, isLoading]);
 
   // ─── FORGOT-PASSWORD flow (with OTP) ──────────────────────────────────────
   const submitForgotStart = async (e) => {
     e.preventDefault();
     if (blockOnBadPhone()) return;
+    const attempt = attemptRef.current + 1;
     setIsLoading(true); setErrorMsg(''); setInfoMsg('');
     try {
-      // Constant 202 response — never reveals whether the account exists.
-      await forgotPassword({ phoneNumber: toE164(formData.phone) });
-      setStep(STEPS.OTP);
-      setResendIn(RESEND_COOLDOWN_S);
+      await startVerification();
     } catch (err) {
+      if (attempt !== attemptRef.current) return;
       handleError(err, 'কোড পাঠানো যায়নি। আবার চেষ্টা করুন।', 'Could not send the code. Please try again.');
     } finally {
-      setIsLoading(false);
+      if (attempt === attemptRef.current) setIsLoading(false);
     }
   };
 
@@ -559,54 +706,45 @@ const LoginPage = () => {
       ));
       return;
     }
+    const attempt = attemptRef.current;
     setIsLoading(true); setErrorMsg(''); setInfoMsg(''); setOtpStatus('checking');
     try {
-      await resetPassword({
-        phoneNumber: toE164(formData.phone),
-        otp: otpCode,
-        newPassword,
-      });
+      const identity = await verifiedIdentity(otpCode);
+      await resetPassword({ ...identity, newPassword });
+      if (attempt !== attemptRef.current) return;
       setOtpStatus('success');
       switchMode(MODES.LOGIN);
       setInfoMsg(isBn
         ? 'পাসওয়ার্ড বদলে গেছে। এখন নতুন পাসওয়ার্ড দিয়ে লগইন করুন।'
         : 'Your password is changed. Log in with the new one.');
     } catch (err) {
+      if (attempt !== attemptRef.current) return;
       handleError(err, 'পাসওয়ার্ড বদলানো যায়নি। কোডটি দেখে আবার চেষ্টা করুন।', 'Could not change the password. Check the code and try again.');
       // Same rule as signup: red is reserved for a code the server actually
       // rejected, so a wrong code is visibly different from a weak password or
       // a rate limit — both of which leave the six digits alone.
-      if (err?.code === 'otp_invalid') flagWrongOtp();
+      if (err?.code === 'otp_invalid' || err?.code === 'auth/invalid-verification-code') flagWrongOtp();
       else setOtpStatus('idle');
     } finally {
-      setIsLoading(false);
+      if (attempt === attemptRef.current) setIsLoading(false);
     }
   };
 
-  // Re-request the OTP. Re-calls the same "start" endpoint, which upserts and
-  // re-texts a fresh code (signup) or re-sends the reset code (forgot).
+  // Re-request from the same start endpoint: Bangladesh gets a fresh texted
+  // code; abroad gets a new challenge and a fresh Firebase SMS.
   const handleResend = async () => {
-    if (resendIn > 0) return;
+    if (resendIn > 0 || isLoading || otpLocked) return;
+    const attempt = attemptRef.current + 1;
     setIsLoading(true); setErrorMsg(''); setInfoMsg('');
     try {
-      if (mode === MODES.SIGNUP) {
-        await signupStart({
-          name: formData.name,
-          phone: toE164(formData.phone),
-          password: formData.password,
-          role,
-        });
-      } else {
-        await forgotPassword({ phoneNumber: toE164(formData.phone) });
-      }
-      resetOtp();
+      if (!await startVerification({ resend: true })) return;
       focusOtpBox(0);
-      setResendIn(RESEND_COOLDOWN_S);
       setInfoMsg(isBn ? 'নতুন কোড পাঠানো হয়েছে।' : 'A new code is on its way.');
     } catch (err) {
+      if (attempt !== attemptRef.current) return;
       handleError(err, 'কোড পাঠানো যায়নি। একটু পরে আবার চেষ্টা করুন।', 'Could not send the code. Please try again in a moment.');
     } finally {
-      setIsLoading(false);
+      if (attempt === attemptRef.current) setIsLoading(false);
     }
   };
 
@@ -620,7 +758,7 @@ const LoginPage = () => {
   };
 
   const handleOtpChange = (index, value) => {
-    if (otpLocked) return;
+    if (isLoading || otpLocked) return;
     const digit = value.replace(/\D/g, '').slice(-1); // keep only the last digit typed
     if (value !== '' && digit === '') return;         // ignore non-numeric input
     const next = [...otp];
@@ -641,7 +779,7 @@ const LoginPage = () => {
    * depended on which side of the digit the caret had landed on.
    */
   const handleOtpKeyDown = (index, e) => {
-    if (otpLocked) {
+    if (isLoading || otpLocked) {
       e.preventDefault();
       return;
     }
@@ -670,7 +808,7 @@ const LoginPage = () => {
 
   const handleOtpPaste = (e) => {
     e.preventDefault();
-    if (otpLocked) return;
+    if (isLoading || otpLocked) return;
     const digits = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
     if (!digits) return;
     const next = ['', '', '', '', '', ''];
@@ -726,6 +864,7 @@ const LoginPage = () => {
       className="h-screen w-full flex bg-[#f8f9fa] font-sans overflow-hidden"
       style={{ paddingTop: 'var(--sat)', paddingBottom: 'var(--sab)' }}
     >
+      <div ref={recaptchaRef} id="auth-recaptcha" />
       {/* ── ROLE PICKER POPUP ──
           Appears on entry to login/signup so the user explicitly picks whether
           they're a tenant or a landlord (they don't have to remember which side
@@ -910,6 +1049,7 @@ const LoginPage = () => {
                   <div className="flex bg-gray-100 p-1 rounded-xl mb-5">
                     <button
                       type="button"
+                      disabled={isLoading}
                       onClick={() => selectRole('tenant')}
                       className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all ${role === 'tenant' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
@@ -917,6 +1057,7 @@ const LoginPage = () => {
                     </button>
                     <button
                       type="button"
+                      disabled={isLoading}
                       onClick={() => selectRole('landlord')}
                       className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all ${role === 'landlord' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
@@ -950,6 +1091,7 @@ const LoginPage = () => {
                         <input
                           type="text"
                           value={formData.name}
+                          disabled={isLoading}
                           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                           placeholder={L('Your name', 'আপনার নাম')}
                           className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-900 focus:bg-white focus:border-brandRed focus:ring-2 focus:ring-brandRed/20 transition-all outline-none"
@@ -973,16 +1115,37 @@ const LoginPage = () => {
                       }`}
                     >
                       <div className={`pl-3.5 pr-2.5 ${phoneError ? 'text-red-400' : 'text-gray-400'}`}><Phone size={16} /></div>
-                      <div className="px-1.5 py-3 border-l border-gray-300 text-gray-600 font-bold text-sm">+880</div>
+                      {/* Country picker: a real <select> laid invisibly over the
+                          flag and code. Closed, it is as compact as the old fixed
+                          "+880"; open, it is the phone's own native list. */}
+                      <div className="relative flex items-center gap-1 px-2 py-3 border-l border-gray-300 text-gray-600 font-bold text-sm">
+                        <span aria-hidden="true">{phoneCountry.flag}</span>
+                        <span>+{phoneCountry.dial}</span>
+                        <ChevronDown size={12} aria-hidden="true" className="text-gray-400" />
+                        <select
+                          value={phoneCountry.iso}
+                          disabled={isLoading}
+                          onChange={(e) => pickCountry(findPhoneCountry(e.target.value))}
+                          aria-label={L('Country', 'দেশ')}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        >
+                          {PHONE_COUNTRIES.map((c) => (
+                            <option key={c.iso} value={c.iso}>
+                              {`${c.flag} ${isBn ? c.bn : c.en} (+${c.dial})`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                       <input
                         id="auth-phone"
                         type="tel"
                         value={formData.phone}
+                        disabled={isLoading}
                         onChange={handlePhoneChange}
                         onBlur={() => setPhoneTouched(true)}
-                        maxLength={10}
-                        placeholder={mode === MODES.SIGNUP ? 'ex- whatsapp number' : 'ex - your number'}
-                        inputMode="numeric"
+                        maxLength={20}
+                        placeholder={phoneCountry.example}
+                        inputMode="tel"
                         autoComplete="tel-national"
                         aria-invalid={phoneError ? 'true' : 'false'}
                         aria-describedby="auth-phone-help"
@@ -1005,10 +1168,15 @@ const LoginPage = () => {
                       ) : (
                         mode === MODES.SIGNUP ? (
                           <span>
-                            {L(
-                              'Type the 10 digits after +880 (skip the first 0). We text your code here.',
-                              '+৮৮০ এর পরের ১০টি সংখ্যা লিখুন (শুরুর ০ বাদ দিন)। এই নম্বরেই এসএমএসে কোড যাবে।'
-                            )}
+                            {phoneCountry.iso === 'BD'
+                              ? L(
+                                'Type the 10 digits after +880 (skip the first 0). We text your code here.',
+                                '+৮৮০ এর পরের ১০টি সংখ্যা লিখুন (শুরুর ০ বাদ দিন)। এই নম্বরেই এসএমএসে কোড যাবে।'
+                              )
+                              : L(
+                                `Type the number after +${phoneCountry.dial}, e.g. ${phoneCountry.example}. We text your code here.`,
+                                `+${toBnDigits(phoneCountry.dial)} এর পরের নম্বরটি লিখুন, যেমন ${toBnDigits(phoneCountry.example)}। এই নম্বরেই এসএমএসে কোড যাবে।`
+                              )}
                           </span>
                         ) : null
                       )}
@@ -1038,6 +1206,7 @@ const LoginPage = () => {
                         <input
                           type="password"
                           value={formData.password}
+                          disabled={isLoading}
                           onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                           placeholder="••••••••"
                           autoComplete={mode === MODES.SIGNUP ? 'new-password' : 'current-password'}
@@ -1048,12 +1217,11 @@ const LoginPage = () => {
                         />
                       </div>
                       {mode === MODES.SIGNUP && (
-                        <>
-                          <p className="text-[11px] font-semibold text-gray-600 mt-2 ml-1">
-                            {L('Your password must have:', 'আপনার পাসওয়ার্ডে থাকতে হবে:')}
-                          </p>
-                          <PasswordRules checks={signupPwChecks} isBn={isBn} />
-                        </>
+                        <PasswordRules
+                          checks={signupPwChecks}
+                          isBn={isBn}
+                          title={L('Your password must have:', 'আপনার পাসওয়ার্ডে থাকতে হবে:')}
+                        />
                       )}
                     </div>
                   )}
@@ -1117,12 +1285,13 @@ const LoginPage = () => {
                     : L('Verify your number', 'নম্বর যাচাই করুন')}
                 </h2>
                 <p className="text-sm text-gray-500 mb-6">
-                  {L('We sent a 6-digit code by SMS to', 'এই নম্বরে এসএমএসে ৬ সংখ্যার একটি কোড পাঠানো হয়েছে')} <br />
-                  <span className="font-bold text-gray-800">+880 {formData.phone}</span>
+                  {verifiedFirebaseToken ? L('Your phone has been verified', 'আপনার ফোন যাচাই হয়েছে') : L('We sent a 6-digit code by SMS to', 'এই নম্বরে এসএমএসে ৬ সংখ্যার একটি কোড পাঠানো হয়েছে')} <br />
+                  <span className="font-bold text-gray-800">+{phoneCountry.dial} {formData.phone}</span>
                 </p>
 
                 <form noValidate onSubmit={mode === MODES.FORGOT ? submitReset : submitSignupOtp} className="flex flex-col items-center">
                   <div
+                    hidden={!!verifiedFirebaseToken}
                     className={`flex justify-center gap-2 sm:gap-4 mb-3 ${otpStatus === 'wrong' ? 'animate-[shake_0.4s_ease-in-out]' : ''}`}
                     onPaste={handleOtpPaste}
                   >
@@ -1138,7 +1307,8 @@ const LoginPage = () => {
                         onChange={(e) => handleOtpChange(index, e.target.value)}
                         onKeyDown={(e) => handleOtpKeyDown(index, e)}
                         onFocus={(e) => e.target.select()}
-                        readOnly={otpLocked}
+                        readOnly={isLoading || otpLocked || !!verifiedFirebaseToken}
+                        aria-label={L(`Code digit ${index + 1}`, `কোডের ${index + 1} নম্বর সংখ্যা`)}
                         aria-invalid={otpStatus === 'wrong' ? 'true' : 'false'}
                         className={`w-10 h-12 sm:w-14 sm:h-14 text-center text-lg sm:text-xl font-black rounded-xl border-2 outline-none transition-all shadow-sm ${OTP_BOX_STYLES[otpStatus]}`}
                       />
@@ -1196,17 +1366,18 @@ const LoginPage = () => {
                           maxLength={128}
                         />
                       </div>
-                      <p className="text-[11px] font-semibold text-gray-600 mt-2 ml-1">
-                        {L('Your new password must have:', 'নতুন পাসওয়ার্ডে থাকতে হবে:')}
-                      </p>
-                      <PasswordRules checks={resetPwChecks} isBn={isBn} />
+                      <PasswordRules
+                        checks={resetPwChecks}
+                        isBn={isBn}
+                        title={L('Your new password must have:', 'নতুন পাসওয়ার্ডে থাকতে হবে:')}
+                      />
                     </div>
                   )}
 
                   <button
                     type="button"
                     onClick={handleResend}
-                    disabled={resendIn > 0 || isLoading}
+                    disabled={resendIn > 0 || isLoading || otpLocked || !!verifiedFirebaseToken}
                     className="mb-4 text-xs font-bold text-gray-500 hover:text-brandRed transition-colors disabled:opacity-50"
                   >
                     {resendIn > 0
@@ -1235,7 +1406,7 @@ const LoginPage = () => {
                   <button
                     type="button"
                     disabled={otpLocked}
-                    onClick={() => { setStep(STEPS.FORM); resetOtp(); setNewPassword(''); setErrorMsg(''); }}
+                    onClick={() => { clearVerification(); setStep(STEPS.FORM); resetOtp(); setNewPassword(''); setErrorMsg(''); }}
                     className="mt-4 text-sm font-bold text-gray-400 hover:text-brandRed transition-colors disabled:opacity-50"
                   >
                     ← {L('Use a different number', 'অন্য নম্বর দিন')}

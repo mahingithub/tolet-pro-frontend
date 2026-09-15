@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { tenantFieldReport } from '../../utils/tenantFields';
 import { listUnits } from '../../services/buildingService';
-import { isBdMobile } from '../../utils/validators';
+import { isSupportedMobile } from '../../utils/validators';
 import {
   X, Camera, Upload, Loader2, CheckCircle2, AlertCircle, ChevronDown,
   ChevronUp, Trash2, Plus, ScanLine, Sparkles, Check, RefreshCw,
@@ -65,7 +65,7 @@ function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onR
 
   // ── Validation helpers ─────────────────────────────────────────────────────
   const phoneVal = String(tenant.phone || '').trim();
-  const phoneInvalid = touched.phone && phoneVal && !isBdMobile(phoneVal);
+  const phoneInvalid = touched.phone && phoneVal && !isSupportedMobile(phoneVal);
   const phoneMissing = touched.phone && !phoneVal;
   const nameVal  = String(tenant.name  || '').trim();
   const nameMissing = touched.name && !nameVal;
@@ -96,7 +96,7 @@ function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onR
     let borderCls = 'border-gray-200 bg-white focus:ring-[#ba0036]/40';
     if (flagged)        borderCls = 'border-amber-300 bg-amber-50 focus:ring-amber-400';
     if (showPhoneErr || showNameErr) borderCls = 'border-rose-400 bg-rose-50 focus:ring-rose-400';
-    else if (isPhone && touched.phone && phoneVal && isBdMobile(phoneVal))
+    else if (isPhone && touched.phone && phoneVal && isSupportedMobile(phoneVal))
                         borderCls = 'border-emerald-400 bg-emerald-50 focus:ring-emerald-400';
 
     return (
@@ -117,7 +117,7 @@ function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onR
         {showPhoneErr && (
           <p className="text-[9px] font-bold text-rose-600 mt-0.5 leading-snug">
             {phoneInvalid
-              ? (isBn ? '০১৩-০১৯ দিয়ে শুরু ১১ ডিজিট দিন' : 'Enter 11 digits starting 013–019')
+              ? (isBn ? 'সঠিক নম্বর দিন; বিদেশি নম্বরে দেশের কোড দিন' : 'Enter a valid mobile; include the country code abroad')
               : (isBn ? 'মোবাইল নম্বর দিতেই হবে' : 'Mobile number is required')}
           </p>
         )}
@@ -126,7 +126,7 @@ function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onR
             {isBn ? 'নাম দিতেই হবে' : 'Name is required'}
           </p>
         )}
-        {isPhone && touched.phone && phoneVal && isBdMobile(phoneVal) && (
+        {isPhone && touched.phone && phoneVal && isSupportedMobile(phoneVal) && (
           <p className="text-[9px] font-bold text-emerald-600 mt-0.5 flex items-center gap-0.5">
             <Check size={9} strokeWidth={3}/> {isBn ? 'বৈধ নম্বর' : 'Valid number'}
           </p>
@@ -191,9 +191,9 @@ function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onR
           <div className="grid grid-cols-2 gap-2 pb-2">
             {gaps.map((g, gi) => {
               const isPhone = g.key === 'phone';
-              const gPhoneInvalid = isPhone && touched[g.key] && String(tenant[g.key] || '').trim() && !isBdMobile(tenant[g.key]);
+              const gPhoneInvalid = isPhone && touched[g.key] && String(tenant[g.key] || '').trim() && !isSupportedMobile(tenant[g.key]);
               const gPhoneMissing = isPhone && touched[g.key] && !String(tenant[g.key] || '').trim();
-              const gPhoneOk     = isPhone && touched[g.key] && isBdMobile(tenant[g.key]);
+              const gPhoneOk     = isPhone && touched[g.key] && isSupportedMobile(tenant[g.key]);
               let borderCls = 'border-amber-300 bg-white focus:ring-amber-400';
               if (gPhoneInvalid || gPhoneMissing) borderCls = 'border-rose-400 bg-rose-50 focus:ring-rose-400';
               else if (gPhoneOk)                  borderCls = 'border-emerald-400 bg-emerald-50 focus:ring-emerald-400';
@@ -218,7 +218,7 @@ function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onR
                   {(gPhoneInvalid || gPhoneMissing) && (
                     <p className="text-[9px] font-bold text-rose-600 mt-0.5">
                       {gPhoneInvalid
-                        ? (isBn ? '০১৩-০১৯ দিয়ে শুরু ১১ ডিজিট' : '11 digits starting 013–019')
+                        ? (isBn ? 'সঠিক নম্বর দিন; বিদেশি নম্বরে দেশের কোড দিন' : 'Enter a valid mobile; include the country code abroad')
                         : (isBn ? 'মোবাইল নম্বর আবশ্যক' : 'Required')}
                     </p>
                   )}
@@ -349,11 +349,11 @@ function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onR
           const choices = ENUM_CHOICES[e.key];
           const isEmgPhone = e.key === 'emergencyPhone';
           const emgPhoneVal = String(prof[e.key] || '').trim();
-          const emgPhoneErr = isEmgPhone && emgPhoneVal && !isBdMobile(emgPhoneVal);
+          const emgPhoneErr = isEmgPhone && emgPhoneVal && !isSupportedMobile(emgPhoneVal);
           const boxCls = `w-full px-2.5 py-2 rounded-lg text-xs font-bold border focus:outline-none focus:ring-1 transition-all ${
             emgPhoneErr
               ? 'border-rose-400 bg-rose-50 focus:ring-rose-400'
-              : isEmgPhone && emgPhoneVal && isBdMobile(emgPhoneVal)
+              : isEmgPhone && emgPhoneVal && isSupportedMobile(emgPhoneVal)
                 ? 'border-emerald-400 bg-white focus:ring-emerald-400'
                 : 'border-blue-200 bg-white focus:ring-blue-400'
           }`;
@@ -386,7 +386,7 @@ function TenantReviewRow({ tenant, idx, onChange, onProfileChange, scanMode, onR
               )}
               {emgPhoneErr && (
                 <p className="text-[9px] font-bold text-rose-600 mt-0.5">
-                  {isBn ? '০১৩-০১৯ দিয়ে শুরু ১১ ডিজিট' : '11 digits starting 013–019'}
+                  {isBn ? 'সঠিক নম্বর দিন; বিদেশি নম্বরে দেশের কোড দিন' : 'Enter a valid mobile; include the country code abroad'}
                 </p>
               )}
             </div>
@@ -777,7 +777,7 @@ export default function AiLedgerScannerModal({
       // painted red used to save anyway, because this only checked emptiness —
       // so the whole Stripe-style validation was decoration, and a mistyped
       // number went into the record where it matched no account for good.
-      if (!isBdMobile(t.phone)) gaps.push('phone');
+      if (!isSupportedMobile(t.phone)) gaps.push('phone');
       // A pinned room already answers this, and a form photo that never showed
       // a room number is the normal case then — demanding one would block a
       // scan whose destination is not in doubt.
@@ -792,8 +792,8 @@ export default function AiLedgerScannerModal({
       showToast(
         badPhone
           ? (isBn
-              ? `${who} — মোবাইল নম্বর সঠিক নয়: ০১৩-০১৯ দিয়ে শুরু ১১ ডিজিট দিন`
-              : `${who} — that mobile number isn't valid: 11 digits starting 013–019`)
+              ? `${who} — মোবাইল নম্বর সঠিক নয়: সঠিক নম্বর দিন; বিদেশি নম্বরে দেশের কোড দিন`
+              : `${who} — that mobile number isn't valid: Enter a valid mobile; include the country code abroad`)
           : (isBn
               ? `${who} — ${gaps.length}টি ঘর খালি, পূরণ করুন`
               : `${who} — ${gaps.length} required field(s) still empty`),

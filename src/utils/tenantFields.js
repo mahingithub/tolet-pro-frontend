@@ -1,4 +1,4 @@
-import { isBdMobile } from './validators.js';
+import { isSupportedMobile } from './validators.js';
 
 /*
  * tenantFields.js
@@ -210,11 +210,11 @@ export const validateTenantProfile = (p = {}) => {
   // rent reminder goes, and the number the landlord calls when something is
   // wrong. One transposed digit sends all of that to a stranger, silently.
   // So the shape is checked, not just the presence.
-  if (!blank('phone') && !isBdMobile(p.phone)) missing.push('phone');
+  if (!blank('phone') && !isSupportedMobile(p.phone)) missing.push('phone');
 
   // Optional, but a wrong emergency number is worse than none — it is only
   // ever used in the one situation where it must work.
-  if (!blank('emergencyPhone') && !isBdMobile(p.emergencyPhone)) missing.push('emergencyPhone');
+  if (!blank('emergencyPhone') && !isSupportedMobile(p.emergencyPhone)) missing.push('emergencyPhone');
 
   // "আছে" is a promise that a number exists — so we hold them to it. "নেই"
   // and unanswered both fall straight through with nothing to validate.
