@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { isNativeApp, nativeLoginUrl } from '../utils/nativeExperience.js';
 
 /**
  * Route guard for any logged-in surface (e.g. /account/privacy).
@@ -31,6 +32,9 @@ const RequireAuth = ({ children, requireRole }) => {
   if (loggingOut) return null;
 
   if (!isAuthenticated) {
+    if (isNativeApp()) {
+      return <Navigate to={nativeLoginUrl({ next: location.pathname + location.search + location.hash, role: requireRole })} replace />;
+    }
     const next = encodeURIComponent(location.pathname + location.search);
     // Carry the role the destination needs into the login screen, so a visitor
     // who landed on a landlord surface doesn't get the tenant signup form and

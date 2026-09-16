@@ -429,6 +429,8 @@ export const TourProvider = ({ children }) => {
   const { language } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
+  // Stands the live tour aside the way a popup does (not recorded as seen).
+  const yieldLiveRef = useRef(null);
   const [activeTour, setActiveTour] = useState(null);
 
   const isBn = language === 'বাংলা';
@@ -829,6 +831,7 @@ export const TourProvider = ({ children }) => {
             // replaced it.
             if (liveDriverRef.current !== driverObj) return;
             liveDriverRef.current = null;
+            yieldLiveRef.current = null;
             lockRef.current = null;
             activeHoldRef.current = null;
             setActiveTour(null);
@@ -856,6 +859,10 @@ export const TourProvider = ({ children }) => {
         }
 
         liveDriverRef.current = driverObj;
+        yieldLiveRef.current = () => {
+          yieldedToPopup = true;
+          driverObj.destroy();
+        };
         lockRef.current = tourId;
         handedOff = true;
         setActiveTour(tourId);
@@ -2402,6 +2409,15 @@ export const TourProvider = ({ children }) => {
 
   const isLandlord = activeRole === 'landlord' || activeRole === 'host';
   const path = location.pathname;
+
+  // Login is a hand-off, not part of any page's walkthrough. A guest in the app
+  // who taps an action on Living is sent straight to /login, and the tour that
+  // was running there stayed pinned over the form. Treated like a popup
+  // interruption: not recorded as seen, offered again when they come back.
+  // Only /login — the required training crosses routes on purpose.
+  useEffect(() => {
+    if (path === '/login') yieldLiveRef.current?.();
+  }, [path]);
   // Which Living wallet is open ('solo' | 'joint' | null) — gates the Living tour below.
   const livingMode = useLivingStore((s) => s.mode);
 

@@ -899,7 +899,7 @@ export default function BookingsTab(props) {
                       </div>
                     ) : (
                       <button onClick={() => setActiveModal('premium_gate')} className="bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 transition-colors shrink-0">
-                         <Lock size={10} /> Free
+                         <Lock size={10} /> {isBn ? 'ফ্রি' : 'Free'}
                       </button>
                     )}
                   </div>
@@ -1448,7 +1448,7 @@ export default function BookingsTab(props) {
                       role="dialog"
                       aria-modal="true"
                       aria-label={detailTitle}
-                      className="relative bg-gray-50 w-full sm:max-w-2xl rounded-t-[1.75rem] sm:rounded-[1.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.28)] max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
+                      className="relative bg-gray-50 w-full sm:max-w-2xl rounded-t-[1.75rem] sm:rounded-[1.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.28)] max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden pb-safe sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
                     >
                       <div className="shrink-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-2.5">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-xs shrink-0 bg-gradient-to-br from-indigo-500 to-purple-600 overflow-hidden">

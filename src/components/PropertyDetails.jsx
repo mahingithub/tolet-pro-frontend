@@ -41,6 +41,13 @@ import { toast } from 'sonner';
 // needs for a rich result, and none of which it could see while every route
 // shared one <title>. See the detailSeo memo further down.
 import useSeo from '../seo/useSeo';
+import { useIsBn } from '../context/LanguageContext';
+import { roomLabel } from '../constants/roomCategories';
+import {
+  propertyTypeLabel, furnishingLabel, listingCategoryLabel, listingIntentLabel, listingStatusLabel,
+  preferredTenantLabel, houseRuleLabel, perMonthLabel, divisionLabel,
+} from '../constants/listingLabels';
+import { propertyPath } from '../utils/propertyPath';
 import { propertySchema, breadcrumbSchema } from '../seo/schema';
 
 // ╔══════════════════════════════════════════════════════════════════════════╗
@@ -576,42 +583,48 @@ const specificDetailIcon = {
 
 // ─── BADGES ───────────────────────────────────────────────────────────────────
 const IntentBadge = ({ intent }) => {
-  const cfg = INTENT_CONFIG[intent] || INTENT_CONFIG.rent;
+  const isBn = useIsBn();
+  const intentKey = INTENT_CONFIG[intent] ? intent : 'rent';
+  const cfg = INTENT_CONFIG[intentKey];
   const Icon = cfg.icon;
   return (
     <span style={{ background: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.2)', color: '#1d4ed8' }}
       className="inline-flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest">
       <Icon size={11} strokeWidth={2.5} />
-      {cfg.label}
+      {listingIntentLabel(intentKey, isBn)}
     </span>
   );
 };
 
 const CategoryBadge = ({ category }) => {
+  const isBn = useIsBn();
   const cfg = CATEGORY_LABELS[category];
   if (!cfg) return null;
   return (
     <span style={{ background: '#f8fafc', border: '1px solid rgba(15,23,42,0.08)', color: '#475569' }}
       className="inline-flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest">
       <span className="text-sm leading-none">{cfg.emoji}</span>
-      {cfg.label}
+      {listingCategoryLabel(category, isBn)}
     </span>
   );
 };
 
 const StatusBadge = ({ status, intent }) => {
+  const isBn = useIsBn();
   const key = status === 'rented' && intent === 'purchase' ? 'sold' : status;
   const cfg = STATUS_CONFIG[key] || STATUS_CONFIG.active;
   return (
     <span className={`inline-flex items-center gap-1.5 ${cfg.bg} ${cfg.text} text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest`}>
       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot} ${key === 'active' ? 'animate-pulse' : ''}`} />
-      {cfg.label}
+      {listingStatusLabel(STATUS_CONFIG[key] ? key : 'active', isBn)}
     </span>
   );
 };
 
 // ─── UNAVAILABILITY OVERLAY ───────────────────────────────────────────────────
-const UnavailableOverlay = ({ intent }) => (
+const UnavailableOverlay = ({ intent }) => {
+  const isBn = useIsBn();
+  return (
   <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
@@ -623,13 +636,16 @@ const UnavailableOverlay = ({ intent }) => (
         style={{ background: 'rgba(255,255,255,0.95)', border: '1px solid rgba(255,255,255,0.4)' }}>
         <X size={28} className="text-slate-700" strokeWidth={3} />
       </div>
-      <p className="text-white font-black text-xl tracking-tight drop-shadow" style={{ fontFamily: 'Oxanium, sans-serif' }}>Not Available</p>
+      <p className="text-white font-black text-xl tracking-tight drop-shadow" style={{ fontFamily: 'Oxanium, sans-serif' }}>{isBn ? 'পাওয়া যাচ্ছে না' : 'Not Available'}</p>
       <p className="text-white/85 text-xs font-bold mt-1 uppercase tracking-widest drop-shadow">
-        {intent === 'purchase' ? 'This property has been sold' : 'This property has been rented'}
+        {intent === 'purchase'
+          ? (isBn ? 'এই প্রপার্টিটি বিক্রি হয়ে গেছে' : 'This property has been sold')
+          : (isBn ? 'এই প্রপার্টিটি ভাড়া হয়ে গেছে' : 'This property has been rented')}
       </p>
     </div>
   </motion.div>
-);
+  );
+};
 
 // Hook to safely convert massive base64 video strings into streamable Blob URLs
 // Browsers natively struggle (or completely fail) to seek/playback large
@@ -690,6 +706,7 @@ const toGoogleDrivePreviewUrl = (value) => {
 };
 
 const VideoPlayer = ({ videos, mainVideo, videoId, coverPhoto, title }) => {
+  const isBn = useIsBn();
   const [showVideo, setShowVideo] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
 
@@ -727,11 +744,13 @@ const VideoPlayer = ({ videos, mainVideo, videoId, coverPhoto, title }) => {
           <Play size={16} className="text-white fill-white ml-0.5" />
         </div>
         <div>
-          <h3 className="text-lg font-black text-slate-900 leading-tight" style={{ fontFamily: 'Oxanium, sans-serif' }}>Video Property Tour</h3>
+          <h2 className="text-lg font-black text-slate-900 leading-tight" style={{ fontFamily: 'Oxanium, sans-serif' }}>{isBn ? 'ভিডিও ট্যুর' : 'Video Property Tour'}</h2>
           <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
             {clips.length > 1
-              ? `${clips.length} walkthroughs`
-              : (isYouTube ? 'YouTube walkthrough' : isDrive ? 'Google Drive walkthrough' : 'Video walkthrough')}
+              ? (isBn ? `${clips.length}টি ভিডিও` : `${clips.length} walkthroughs`)
+              : isBn
+                ? (isYouTube ? 'ইউটিউব ভিডিও' : isDrive ? 'গুগল ড্রাইভ ভিডিও' : 'ভিডিও')
+                : (isYouTube ? 'YouTube walkthrough' : isDrive ? 'Google Drive walkthrough' : 'Video walkthrough')}
           </p>
         </div>
       </div>
@@ -743,7 +762,7 @@ const VideoPlayer = ({ videos, mainVideo, videoId, coverPhoto, title }) => {
           className="relative w-full overflow-hidden rounded-[1.5rem] group block cursor-pointer hover:scale-[1.005] active:scale-[0.995] transition-transform"
           style={{ aspectRatio: '16/9' }}
         >
-          <img src={coverPhoto} alt="Video tour thumbnail"
+          <img src={coverPhoto} alt={isBn ? 'ভিডিও ট্যুরের ছবি' : 'Video tour thumbnail'}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
           <div className="absolute inset-0 flex items-center justify-center">
@@ -756,7 +775,7 @@ const VideoPlayer = ({ videos, mainVideo, videoId, coverPhoto, title }) => {
           </div>
           <div className="absolute bottom-5 left-5 right-5 flex items-center justify-between">
             <div>
-              <p className="text-white font-black text-sm" style={{ fontFamily: 'Oxanium, sans-serif' }}>▶ Watch Full Tour</p>
+              <p className="text-white font-black text-sm" style={{ fontFamily: 'Oxanium, sans-serif' }}>{isBn ? '▶ পুরো ট্যুর দেখুন' : '▶ Watch Full Tour'}</p>
               <p className="text-white/60 text-[11px] font-bold mt-0.5">{title}</p>
             </div>
             {isYouTube && (
@@ -774,7 +793,7 @@ const VideoPlayer = ({ videos, mainVideo, videoId, coverPhoto, title }) => {
             {isDirectVideo && (
               <span className="text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 uppercase tracking-widest"
                 style={{ background: 'rgba(186,0,54,0.85)', border: '1px solid rgba(255,255,255,0.2)' }}>
-                <Video size={10} /> Video
+                <Video size={10} /> {isBn ? 'ভিডিও' : 'Video'}
               </span>
             )}
           </div>
@@ -796,7 +815,7 @@ const VideoPlayer = ({ videos, mainVideo, videoId, coverPhoto, title }) => {
             <iframe
               key={safeIdx}
               src={toGoogleDrivePreviewUrl(active.url)}
-              title="Property Video Tour"
+              title={isBn ? 'প্রপার্টির ভিডিও ট্যুর' : 'Property Video Tour'}
               className="w-full h-full"
               style={{ background: '#000' }}
               allow="autoplay; encrypted-media"
@@ -808,7 +827,7 @@ const VideoPlayer = ({ videos, mainVideo, videoId, coverPhoto, title }) => {
             <iframe
               key={safeIdx}
               src={`https://www.youtube.com/embed/${active.youtubeId}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1`}
-              title="Property Video Tour"
+              title={isBn ? 'প্রপার্টির ভিডিও ট্যুর' : 'Property Video Tour'}
               className="w-full h-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
@@ -872,6 +891,7 @@ const VideoPlayer = ({ videos, mainVideo, videoId, coverPhoto, title }) => {
 //   • Body scroll is locked while open, and the page behind keeps its position.
 // ─────────────────────────────────────────────────────────────────────────────
 const MediaViewer = ({ items = [], index, onIndexChange, onClose }) => {
+  const isBn = useIsBn();
   const total = items.length;
   const isOpen = index != null && index >= 0 && total > 0;
   // Clamp so a shorter list (host removed a photo mid-view) can't blank the stage.
@@ -957,7 +977,7 @@ const MediaViewer = ({ items = [], index, onIndexChange, onClose }) => {
               </span>
               <p className="text-white text-[12px] md:text-sm font-black uppercase tracking-widest truncate"
                 style={{ fontFamily: 'Oxanium, sans-serif' }}>
-                {current?.label || (isVideo ? 'Video Tour' : 'Photo')}
+                {current?.label || (isVideo ? (isBn ? 'ভিডিও ট্যুর' : 'Video Tour') : (isBn ? 'ছবি' : 'Photo'))}
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -965,7 +985,7 @@ const MediaViewer = ({ items = [], index, onIndexChange, onClose }) => {
                 style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.16)' }}>
                 {safeIdx + 1} / {total}
               </span>
-              <button onClick={onClose} aria-label="Close viewer"
+              <button onClick={onClose} aria-label={isBn ? 'বন্ধ করুন' : 'Close viewer'}
                 className="w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center text-white transition-colors active:scale-95"
                 style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)' }}>
                 <X size={19} />
@@ -991,13 +1011,13 @@ const MediaViewer = ({ items = [], index, onIndexChange, onClose }) => {
                       className="w-full h-full object-contain" style={{ background: '#000' }} />
                   ) : isDriveClip ? (
                     <iframe key={`drive-${safeIdx}`} src={toGoogleDrivePreviewUrl(current.url)}
-                      title={current.label || 'Property video tour'} className="w-full h-full"
+                      title={current.label || (isBn ? 'প্রপার্টির ভিডিও ট্যুর' : 'Property video tour')} className="w-full h-full"
                       style={{ background: '#000', border: 'none' }}
                       allow="autoplay; encrypted-media" allowFullScreen />
                   ) : (
                     <iframe key={`yt-${safeIdx}`}
                       src={`https://www.youtube.com/embed/${current.youtubeId}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1`}
-                      title={current.label || 'Property video tour'} className="w-full h-full"
+                      title={current.label || (isBn ? 'প্রপার্টির ভিডিও ট্যুর' : 'Property video tour')} className="w-full h-full"
                       style={{ border: 'none' }}
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen />
@@ -1007,7 +1027,7 @@ const MediaViewer = ({ items = [], index, onIndexChange, onClose }) => {
                 <motion.img
                   key={`p-${safeIdx}`}
                   src={current?.url}
-                  alt={current?.label || 'Property photo'}
+                  alt={current?.label || (isBn ? 'প্রপার্টির ছবি' : 'Property photo')}
                   initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
                   transition={{ duration: 0.2 }}
                   className="max-w-full max-h-full object-contain rounded-2xl select-none"
@@ -1021,12 +1041,12 @@ const MediaViewer = ({ items = [], index, onIndexChange, onClose }) => {
             {/* Prev / next — pinned to the stage edges, mid-height */}
             {total > 1 && (
               <>
-                <button onClick={(e) => { e.stopPropagation(); step(-1); }} aria-label="Previous item"
+                <button onClick={(e) => { e.stopPropagation(); step(-1); }} aria-label={isBn ? 'আগেরটি' : 'Previous item'}
                   className="absolute left-2 md:left-6 top-1/2 -translate-y-1/2 w-11 h-11 md:w-14 md:h-14 rounded-full flex items-center justify-center text-white transition-all active:scale-90 hover:bg-white/20"
                   style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)', backdropFilter: 'blur(8px)' }}>
                   <ChevronLeft size={24} strokeWidth={2.4} />
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); step(1); }} aria-label="Next item"
+                <button onClick={(e) => { e.stopPropagation(); step(1); }} aria-label={isBn ? 'পরেরটি' : 'Next item'}
                   className="absolute right-2 md:right-6 top-1/2 -translate-y-1/2 w-11 h-11 md:w-14 md:h-14 rounded-full flex items-center justify-center text-white transition-all active:scale-90 hover:bg-white/20"
                   style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)', backdropFilter: 'blur(8px)' }}>
                   <ChevronRight size={24} strokeWidth={2.4} />
@@ -1061,14 +1081,14 @@ const MediaViewer = ({ items = [], index, onIndexChange, onClose }) => {
                     {item.kind === 'video' ? (
                       <>
                         {item.poster
-                          ? <img src={item.poster} alt="" className="w-full h-full object-cover" loading="lazy" />
+                          ? <img src={item.poster} alt={`${item.label || 'Video'} ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
                           : <span className="w-full h-full block" style={{ background: '#1f2937' }} />}
                         <span className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.35)' }}>
                           <Play size={16} className="text-white fill-white" />
                         </span>
                       </>
                     ) : (
-                      <img src={item.url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                      <img src={item.url} alt={`${item.label || 'Photo'} ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
                     )}
                   </button>
                 );
@@ -1108,14 +1128,14 @@ function galleryRoomOrder(property) {
   return ['single_seat', 'room', 'bedroom', 'living', 'kitchen', 'bathroom', 'common_area', 'dining', 'balcony', 'front_view', 'other'];
 }
 
-function buildGallery(property) {
+function buildGallery(property, isBn = false) {
   if (!property) return [];
   const items = [];
 
   // Cover photo always leads the gallery.
   if (property.coverPhoto) {
     const m = ROOM_META.cover;
-    items.push({ url: property.coverPhoto, room: 'cover', label: m.label, emoji: m.emoji, Icon: m.Icon });
+    items.push({ url: property.coverPhoto, room: 'cover', label: roomLabel('cover', isBn), emoji: m.emoji, Icon: m.Icon });
   }
 
   // Accept BOTH the form-time shape `{ room, preview }` AND the persisted / API
@@ -1139,7 +1159,7 @@ function buildGallery(property) {
       .filter((p) => (p.room || 'other') === roomId)
       .forEach((p) => {
         const url = p.preview || p.url;
-        if (url) items.push({ url, room: roomId, label: m.label, emoji: m.emoji, Icon: m.Icon });
+        if (url) items.push({ url, room: roomId, label: roomLabel(roomId, isBn), emoji: m.emoji, Icon: m.Icon });
       });
   });
 
@@ -1148,7 +1168,7 @@ function buildGallery(property) {
   if (items.length === 0 && Array.isArray(property.images)) {
     property.images.filter(Boolean).forEach((url, i) => {
       const m = i === 0 ? ROOM_META.cover : ROOM_META.other;
-      items.push({ url, room: i === 0 ? 'cover' : 'other', label: m.label, emoji: m.emoji, Icon: m.Icon });
+      items.push({ url, room: i === 0 ? 'cover' : 'other', label: roomLabel(i === 0 ? 'cover' : 'other', isBn), emoji: m.emoji, Icon: m.Icon });
     });
   }
 
@@ -1172,6 +1192,7 @@ const slideVariants = {
 // through it, close it, and the hero is exactly where you left off.
 // ─────────────────────────────────────────────────────────────────────────────
 const HeroCarousel = ({ images, isUnavailable, property, priceLabel, onShowAll, onPhotoClick, index = 0, onIndexChange, keyNavEnabled = true }) => {
+  const isBn = useIsBn();
   const [dir, setDir] = useState(1);
   const touchStartX = useRef(null);
   const total = images.length;
@@ -1261,7 +1282,7 @@ const HeroCarousel = ({ images, isUnavailable, property, priceLabel, onShowAll, 
               className="text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all active:scale-95"
               style={{ background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.15)' }}>
               <Layers size={11} className="text-[#ba0036]" />
-              {total} photos
+              {isBn ? `${total}টি ছবি` : `${total} photos`}
             </button>
           </div>
         )}
@@ -1269,12 +1290,12 @@ const HeroCarousel = ({ images, isUnavailable, property, priceLabel, onShowAll, 
         {/* Arrows — stop propagation so clicking arrows doesn't open fullscreen */}
         {!isUnavailable && total > 1 && (
           <>
-            <button onClick={(e) => { e.stopPropagation(); goPrev(); }} aria-label="Previous photo"
+            <button onClick={(e) => { e.stopPropagation(); goPrev(); }} aria-label={isBn ? 'আগের ছবি' : 'Previous photo'}
               className="absolute left-3 top-1/2 -translate-y-1/2 z-[5] w-9 h-9 text-white rounded-full flex items-center justify-center transition-all duration-200 active:scale-90"
               style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.12)' }}>
               <ChevronLeft size={18} />
             </button>
-            <button onClick={(e) => { e.stopPropagation(); goNext(); }} aria-label="Next photo"
+            <button onClick={(e) => { e.stopPropagation(); goNext(); }} aria-label={isBn ? 'পরের ছবি' : 'Next photo'}
               className="absolute right-3 top-1/2 -translate-y-1/2 z-[5] w-9 h-9 text-white rounded-full flex items-center justify-center transition-all duration-200 active:scale-90"
               style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.12)' }}>
               <ChevronRight size={18} />
@@ -1301,7 +1322,8 @@ const HeroCarousel = ({ images, isUnavailable, property, priceLabel, onShowAll, 
 // counter top-right, and the "Show all photos" pill anchored bottom-RIGHT.
 // All overlay chrome is z-[5] so it never overlaps the sticky top nav.
 // ─────────────────────────────────────────────────────────────────────────────
-const WidePhotoCarousel = ({ images, isUnavailable, property, onShowAll, onPhotoClick, index = 0, onIndexChange, showAllLabel = 'Show all photos' }) => {
+const WidePhotoCarousel = ({ images, isUnavailable, property, onShowAll, onPhotoClick, index = 0, onIndexChange, showAllLabel }) => {
+  const isBn = useIsBn();
   const [dir, setDir] = useState(1);
   const total = images.length;
   // Controlled by the page — same index the fullscreen viewer uses, so the two
@@ -1370,12 +1392,12 @@ const WidePhotoCarousel = ({ images, isUnavailable, property, onShowAll, onPhoto
         {/* Prev/next arrows */}
         {!isUnavailable && total > 1 && (
           <>
-            <button onClick={goPrev} aria-label="Previous photo"
+            <button onClick={goPrev} aria-label={isBn ? 'আগের ছবি' : 'Previous photo'}
               className="absolute left-4 top-1/2 -translate-y-1/2 z-[5] w-12 h-12 text-slate-900 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 opacity-80 hover:opacity-100"
               style={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', border: '1px solid rgba(15,23,42,0.08)', boxShadow: '0 4px 14px rgba(15,23,42,0.12)' }}>
               <ChevronLeft size={22} />
             </button>
-            <button onClick={goNext} aria-label="Next photo"
+            <button onClick={goNext} aria-label={isBn ? 'পরের ছবি' : 'Next photo'}
               className="absolute right-4 top-1/2 -translate-y-1/2 z-[5] w-12 h-12 text-slate-900 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 opacity-80 hover:opacity-100"
               style={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', border: '1px solid rgba(15,23,42,0.08)', boxShadow: '0 4px 14px rgba(15,23,42,0.12)' }}>
               <ChevronRight size={22} />
@@ -1389,7 +1411,7 @@ const WidePhotoCarousel = ({ images, isUnavailable, property, onShowAll, onPhoto
             className="absolute bottom-4 right-4 z-[5] flex items-center gap-2 text-slate-900 text-[12px] font-black px-4 py-2.5 rounded-2xl transition-all active:scale-95"
             style={{ background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(12px)', border: '1px solid rgba(15,23,42,0.08)', boxShadow: '0 6px 18px rgba(15,23,42,0.16)' }}>
             <Layers size={14} className="text-[#ba0036]" />
-            {showAllLabel} {total}
+            {showAllLabel || (isBn ? 'সব ছবি দেখুন' : 'Show all photos')} {total}
           </button>
         )}
 
@@ -1420,6 +1442,7 @@ const WidePhotoCarousel = ({ images, isUnavailable, property, onShowAll, onPhoto
 //   • Close button (X) is anchored TOP-RIGHT.
 // ─────────────────────────────────────────────────────────────────────────────
 const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property, allowEscape = true }) => {
+  const isBn = useIsBn();
   const modalVideoUrl = useDataUrlToBlobUrl(property?.mainVideo?.preview || property?.mainVideo);
 
   // Group by room — preserving the order rooms first appear in the gallery.
@@ -1518,17 +1541,17 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property, allow
             <div className="shrink-0 px-5 md:px-10 py-4 md:py-5 flex items-center justify-between gap-3"
               style={{ borderBottom: '1px solid rgba(15,23,42,0.06)', background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(20px)' }}>
               <div className="min-w-0">
-                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Photo tour</p>
+                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">{isBn ? 'ছবি ট্যুর' : 'Photo tour'}</p>
                 <h2 className="text-slate-900 font-black text-lg md:text-xl tracking-tight leading-tight truncate" style={{ fontFamily: 'Oxanium, sans-serif' }}>
-                  {property?.title || 'All Photos'}
+                  {property?.title || (isBn ? 'সব ছবি' : 'All Photos')}
                 </h2>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className="hidden md:inline-flex items-center gap-1.5 text-slate-700 text-[11px] font-black px-3 py-1.5 rounded-full"
                   style={{ background: '#f1f5f9', border: '1px solid rgba(15,23,42,0.06)' }}>
-                  <Layers size={12} className="text-[#ba0036]" /> {images.length} photos
+                  <Layers size={12} className="text-[#ba0036]" /> {isBn ? `${images.length}টি ছবি` : `${images.length} photos`}
                 </span>
-                <button onClick={onClose} aria-label="Close photo tour"
+                <button onClick={onClose} aria-label={isBn ? 'ছবি ট্যুর বন্ধ করুন' : 'Close photo tour'}
                   className="w-11 h-11 text-slate-700 rounded-full flex items-center justify-center transition-colors active:scale-95"
                   style={{ background: '#f1f5f9', border: '1px solid rgba(15,23,42,0.06)' }}>
                   <X size={19} />
@@ -1541,10 +1564,10 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property, allow
               {/* Sticky left rail — desktop only, keeps room list visible while scrolling */}
               <aside className="hidden md:flex md:w-64 lg:w-72 shrink-0 flex-col py-6 px-5 lg:px-7 overflow-y-auto"
                 style={{ borderRight: '1px solid rgba(15,23,42,0.06)', scrollbarWidth: 'thin' }}>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Rooms</p>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">{isBn ? 'ঘরসমূহ' : 'Rooms'}</p>
                 <div className="flex flex-col gap-1">
                   {orderedRooms.map((room) => {
-                    const rt = ROOM_META[room] || { label: prettifyRoom(room), emoji: '📷' };
+                    const rt = { ...(ROOM_META[room] || { emoji: '📷' }), label: roomLabel(room, isBn) };
                     const isActive = activeRoom === room;
                     return (
                       <button key={room}
@@ -1578,7 +1601,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property, allow
                       <span className="flex items-center gap-2.5 min-w-0">
                         <span className="text-base shrink-0">🎬</span>
                         <span className={`text-sm font-black ${activeRoom === 'video' ? 'text-[#ba0036]' : 'text-slate-700'}`}
-                          style={{ fontFamily: 'Oxanium, sans-serif' }}>Video Tour</span>
+                          style={{ fontFamily: 'Oxanium, sans-serif' }}>{isBn ? 'ভিডিও ট্যুর' : 'Video Tour'}</span>
                       </span>
                       <span className="shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: '#f1f5f9', color: '#64748b' }}>1</span>
                     </button>
@@ -1590,7 +1613,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property, allow
               <div className="md:hidden absolute top-[68px] left-0 right-0 z-[5] px-4 py-2.5 flex gap-2 overflow-x-auto"
                 style={{ borderBottom: '1px solid rgba(15,23,42,0.05)', background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(16px)', scrollbarWidth: 'none' }}>
                 {orderedRooms.map((room) => {
-                  const rt = ROOM_META[room] || { label: prettifyRoom(room), emoji: '📷' };
+                  const rt = { ...(ROOM_META[room] || { emoji: '📷' }), label: roomLabel(room, isBn) };
                   const isActive = activeRoom === room;
                   return (
                     <button key={room} onClick={() => scrollToRoom(room)}
@@ -1613,7 +1636,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property, allow
                     style={activeRoom === 'video'
                       ? { background: 'rgba(186,0,54,0.08)', border: '1px solid rgba(186,0,54,0.3)', color: '#ba0036' }
                       : { background: '#f8fafc', border: '1px solid rgba(15,23,42,0.06)', color: '#64748b' }}>
-                    <span>🎬</span><span>Video</span>
+                    <span>🎬</span><span>{isBn ? 'ভিডিও' : 'Video'}</span>
                   </button>
                 )}
               </div>
@@ -1624,7 +1647,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property, allow
                 style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 #ffffff' }}>
 
                 {orderedRooms.map((room, sIdx) => {
-                  const rt = ROOM_META[room] || { label: prettifyRoom(room), emoji: '📷' };
+                  const rt = { ...(ROOM_META[room] || { emoji: '📷' }), label: roomLabel(room, isBn) };
                   const roomImages = grouped[room] || [];
                   if (!roomImages.length) return null;
                   const [hero, ...rest] = roomImages;
@@ -1643,7 +1666,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property, allow
                             {rt.label}
                           </h3>
                           <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest mt-1">
-                            {roomImages.length} photo{roomImages.length !== 1 ? 's' : ''}
+                            {isBn ? `${roomImages.length}টি ছবি` : `${roomImages.length} photo${roomImages.length !== 1 ? 's' : ''}`}
                           </p>
                         </div>
                       </div>
@@ -1700,8 +1723,8 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property, allow
                     <div className="flex items-center gap-3 mb-5">
                       <span className="text-2xl md:text-3xl">🎬</span>
                       <div>
-                        <h3 className="text-slate-900 font-black text-xl md:text-2xl tracking-tight leading-none" style={{ fontFamily: 'Oxanium, sans-serif' }}>Video Tour</h3>
-                        <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest mt-1">Watch the full walkthrough</p>
+                        <h3 className="text-slate-900 font-black text-xl md:text-2xl tracking-tight leading-none" style={{ fontFamily: 'Oxanium, sans-serif' }}>{isBn ? 'ভিডিও ট্যুর' : 'Video Tour'}</h3>
+                        <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest mt-1">{isBn ? 'সম্পূর্ণ ভিডিওটি দেখুন' : 'Watch the full walkthrough'}</p>
                       </div>
                     </div>
                     {modalClip ? (
@@ -1713,7 +1736,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property, allow
                         <div className="relative rounded-[1.25rem] overflow-hidden" style={{ aspectRatio: '16/9', border: '1px solid rgba(15,23,42,0.06)' }}>
                           <iframe
                             src={toGoogleDrivePreviewUrl(modalClip.url)}
-                            title="Property Video Tour" className="w-full h-full"
+                            title={isBn ? 'প্রপার্টির ভিডিও ট্যুর' : 'Property Video Tour'} className="w-full h-full"
                             style={{ background: '#000' }}
                             allow="autoplay; encrypted-media"
                             allowFullScreen />
@@ -1726,7 +1749,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property, allow
                         <div className="relative rounded-[1.25rem] overflow-hidden" style={{ aspectRatio: '16/9', border: '1px solid rgba(15,23,42,0.06)' }}>
                           <iframe
                             src={`https://www.youtube.com/embed/${modalClip.youtubeId}?rel=0`}
-                            title="Property Video Tour" className="w-full h-full"
+                            title={isBn ? 'প্রপার্টির ভিডিও ট্যুর' : 'Property Video Tour'} className="w-full h-full"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowFullScreen />
                         </div>
@@ -1739,7 +1762,7 @@ const PhotoGridModal = ({ images, isOpen, onClose, onPhotoClick, property, allow
                       <div className="relative rounded-[1.25rem] overflow-hidden" style={{ aspectRatio: '16/9', border: '1px solid rgba(15,23,42,0.06)' }}>
                         <iframe
                           src={`https://www.youtube.com/embed/${property.videoId}?rel=0`}
-                          title="Property Video Tour" className="w-full h-full"
+                          title={isBn ? 'প্রপার্টির ভিডিও ট্যুর' : 'Property Video Tour'} className="w-full h-full"
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                           allowFullScreen />
                       </div>
@@ -1936,8 +1959,10 @@ const PropertyDetails = () => {
       // landlord record if one exists.
       const fallbackLandlord = {
         id:             p.landlordId || p.ownerUserId || `host-${p.id}`,
-        name:           p.contactName || 'Property Owner',
-        avatar:         `https://ui-avatars.com/api/?name=${encodeURIComponent(p.contactName || 'Owner')}&background=1a0510&color=ba0036`,
+        // The listing already carries its owner's name and photo (resolved
+        // server-side), so a landlord lookup that fails still shows who owns it.
+        name:           p.landlordName || p.contactName || (langKey === 'bn' ? 'বাড়িওয়ালা' : 'Property Owner'),
+        avatar:         p.landlordAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.landlordName || p.contactName || 'Owner')}&background=1a0510&color=ba0036`,
         phone:          p.contactPhone || '',
         email:          p.contactEmail || '',
         verified:       false,
@@ -1964,7 +1989,8 @@ const PropertyDetails = () => {
 
   const isUnavailable = property?.status === 'rented' || property?.status === 'sold';
   const isOwnProperty = auth?.user && (String(auth.user.id || auth.user._id) === String(landlord?.id || property?.landlordId || property?.ownerUserId));
-  const priceLabel = INTENT_CONFIG[property?.intent]?.priceLabel || '/mo';
+  // Sale listings carry no suffix; everything else is a monthly price.
+  const priceLabel = property?.intent === 'purchase' ? '' : perMonthLabel(langKey === 'bn');
 
   // Human-readable list of the intent/type-specific answers the host entered in
   // the wizard (stored in property.specificDetails — commercial fire safety, gas
@@ -2023,11 +2049,11 @@ const PropertyDetails = () => {
     if (!property) return { heroStats: [], detailItems: [] };
     const base = [];
     if (showBedsBaths) {
-      base.push({ icon: Bed,  label: lt('bedrooms'),  value: `${property.beds ?? 0}`,  unit: 'Beds' });
-      base.push({ icon: Bath, label: lt('bathrooms'), value: `${property.baths ?? 0}`, unit: 'Baths' });
+      base.push({ icon: Bed,  label: lt('bedrooms'),  value: `${property.beds ?? 0}`,  unit: langKey === 'bn' ? 'বেড' : 'Beds' });
+      base.push({ icon: Bath, label: lt('bathrooms'), value: `${property.baths ?? 0}`, unit: langKey === 'bn' ? 'বাথ' : 'Baths' });
     }
     if (Number(property.sqft) > 0) {
-      base.push({ icon: Maximize2, label: lt('area'), value: Number(property.sqft).toLocaleString(), unit: 'sqft' });
+      base.push({ icon: Maximize2, label: lt('area'), value: Number(property.sqft).toLocaleString(), unit: langKey === 'bn' ? 'বর্গফুট' : 'sqft' });
     }
     // Floor is universal for built units, but a "0 Fl" tile is noise for land —
     // so only show it when set, unless residential (where 0 means ground floor).
@@ -2046,7 +2072,7 @@ const PropertyDetails = () => {
     };
   }, [property, showBedsBaths, specificDetailItems, langKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const galleryImages = useMemo(() => buildGallery(property), [property]);
+  const galleryImages = useMemo(() => buildGallery(property, langKey === 'bn'), [property, langKey]);
 
   // ── ONE MEDIA LIST FOR THE FULLSCREEN VIEWER ──────────────────────────────
   // Every gallery photo, then every walkthrough video. Because photos and
@@ -2142,13 +2168,14 @@ const PropertyDetails = () => {
     requireAuthFor(() => {
       let saved = JSON.parse(localStorage.getItem('savedProperties') || '[]');
       if (isSaved) {
-        saved = saved.filter((p) => String(p.id) !== String(id));
+        // The URL param may be a slug now; the saved list is keyed by id.
+        saved = saved.filter((p) => String(p.id) !== String(property?.id ?? id));
         setIsSaved(false);
-        showToast('Removed from saved list');
+        showToast(langKey === 'bn' ? 'সেভ করা তালিকা থেকে সরানো হয়েছে' : 'Removed from saved list');
       } else {
-        saved.push({ ...property, id });
+        saved.push({ ...property, id: property?.id ?? id });
         setIsSaved(true);
-        showToast('Saved to favorites! ❤️');
+        showToast(langKey === 'bn' ? 'পছন্দের তালিকায় সেভ হয়েছে! ❤️' : 'Saved to favorites! ❤️');
       }
       localStorage.setItem('savedProperties', JSON.stringify(saved));
     });
@@ -2163,7 +2190,7 @@ const PropertyDetails = () => {
     const origin = (typeof window !== 'undefined' && window.location && window.location.origin)
       ? window.location.origin
       : 'https://toletpro.com';
-    const url = `${origin}/property/${property?.id || id}`;
+    const url = `${origin}${property ? propertyPath(property) : `/property/${id}`}`;
     const title = property?.title || 'TO-LET PRO listing';
     try {
       if (navigator.share) {
@@ -2172,7 +2199,7 @@ const PropertyDetails = () => {
       }
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url);
-        showToast('Link copied! 🔗');
+        showToast(langKey === 'bn' ? 'লিংক কপি হয়েছে! 🔗' : 'Link copied! 🔗');
         return;
       }
       // Last-resort fallback for browsers without the Clipboard API.
@@ -2184,16 +2211,16 @@ const PropertyDetails = () => {
       ta.select();
       document.execCommand('copy');
       document.body.removeChild(ta);
-      showToast('Link copied! 🔗');
+      showToast(langKey === 'bn' ? 'লিংক কপি হয়েছে! 🔗' : 'Link copied! 🔗');
     } catch (err) {
       // User cancelled the native share sheet, or share/clipboard failed —
       // fall back to a copy so the host always ends up with a usable link.
       if (err?.name === 'AbortError') return;
       try {
         await navigator.clipboard?.writeText(url);
-        showToast('Link copied! 🔗');
+        showToast(langKey === 'bn' ? 'লিংক কপি হয়েছে! 🔗' : 'Link copied! 🔗');
       } catch {
-        showToast(`Share this link: ${url}`);
+        showToast(langKey === 'bn' ? `এই লিংকটি শেয়ার করুন: ${url}` : `Share this link: ${url}`);
       }
     }
   };
@@ -2346,13 +2373,14 @@ const PropertyDetails = () => {
     return {
       title: titleBits,
       description,
-      canonical: `/property/${property.id || property._id || id}`,
+      canonical: propertyPath(property),
       type: 'product',
       image: seoImages[0],
+      imageAlt: property.title,
       noindex: !indexable,
       jsonLd: indexable ? [
         propertySchema(property, {
-          url: `/property/${property.id || property._id || id}`,
+          url: propertyPath(property),
           images: seoImages,
         }),
         breadcrumbSchema([
@@ -2361,7 +2389,7 @@ const PropertyDetails = () => {
           ...(property.division
             ? [{ name: property.division, path: `/properties/${property.division}` }]
             : []),
-          { name: property.title, path: `/property/${property.id || property._id || id}` },
+          { name: property.title, path: propertyPath(property) },
         ]),
       ] : null,
     };
@@ -2389,16 +2417,17 @@ const PropertyDetails = () => {
         <div className="max-w-md w-full bg-white rounded-2xl p-8 text-center shadow-xl"
           style={{ border: '1px solid rgba(15,23,42,0.08)' }}>
           <Home size={36} className="mx-auto mb-3 text-[#ba0036]" />
-          <h2 className="text-xl font-black text-slate-900 mb-2">Property not found</h2>
+          <h2 className="text-xl font-black text-slate-900 mb-2">{langKey === 'bn' ? 'প্রপার্টি পাওয়া যায়নি' : 'Property not found'}</h2>
           <p className="text-sm text-slate-600 mb-5">
-            This listing is no longer available, or it hasn't been uploaded yet.
-            Try browsing all available properties.
+            {langKey === 'bn'
+              ? 'এই বিজ্ঞাপনটি আর নেই, অথবা এখনও আপলোড হয়নি। সব বিজ্ঞাপন দেখে নিন।'
+              : "This listing is no longer available, or it hasn't been uploaded yet. Try browsing all available properties."}
           </p>
           <button
-            onClick={() => navigate('/properties')}
+            onClick={() => navigate('/properties/all')}
             className="px-5 py-2.5 rounded-full bg-[#ba0036] text-white text-sm font-black hover:bg-[#7c0026] transition-colors"
           >
-            Browse properties
+            {langKey === 'bn' ? 'সব বিজ্ঞাপন দেখুন' : 'Browse properties'}
           </button>
         </div>
       </div>
@@ -2460,7 +2489,7 @@ const PropertyDetails = () => {
           <div className="flex items-center gap-1.5 md:gap-2 min-w-0 flex-1 justify-center text-[10px] md:text-[11px] font-black text-slate-500 uppercase tracking-widest">
             <Link to="/" className="hover:text-[#ba0036] transition-colors shrink-0">{lt('home')}</Link>
             <ChevronRight size={11} className="shrink-0 text-slate-400" />
-            <span className="hover:text-[#ba0036] cursor-pointer transition-colors shrink-0 capitalize">{property.division}</span>
+            <span className="hover:text-[#ba0036] cursor-pointer transition-colors shrink-0 capitalize">{divisionLabel(property.division, langKey === 'bn')}</span>
             <ChevronRight size={11} className="shrink-0 text-slate-400" />
             <span className="text-slate-800 truncate min-w-0">{property.title}</span>
           </div>
@@ -2548,21 +2577,18 @@ const PropertyDetails = () => {
             )}
             <span className="inline-flex items-center gap-1.5 text-blue-700 text-[10px] font-black px-3 py-1.5 rounded-full capitalize"
               style={{ background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.2)' }}>
-              {property.furnishing}
+              {furnishingLabel(property.furnishing, langKey === 'bn')}
             </span>
             <span className="inline-flex items-center gap-1.5 text-slate-600 text-[10px] font-black px-3 py-1.5 rounded-full capitalize"
               style={{ background: '#f1f5f9', border: '1px solid rgba(15,23,42,0.06)' }}>
-              {property.type}
+              {propertyTypeLabel(property.type, langKey === 'bn')}
             </span>
           </div>
 
-          {/* Title (mobile only) */}
-          <h1 className="md:hidden text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight mb-2"
-            style={{ fontFamily: 'Oxanium, sans-serif' }}>
-            {property.title}
-          </h1>
-          {/* Title (desktop only) */}
-          <h1 className="hidden md:block text-2xl lg:text-3xl font-black text-slate-900 tracking-tight leading-tight mb-2"
+          {/* The page's one <h1>. It used to be two — a mobile copy and a
+              desktop copy of the same title, one hidden by CSS — which put two
+              h1s in every listing's HTML. Same sizes, set responsively. */}
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight leading-tight mb-2"
             style={{ fontFamily: 'Oxanium, sans-serif' }}>
             {property.title}
           </h1>
@@ -2663,14 +2689,14 @@ const PropertyDetails = () => {
               {!property.videos?.length && !property.mainVideo && !property.videoId && (
                 <div className="text-center py-8">
                   <Play size={36} className="mx-auto mb-2 text-slate-300" />
-                  <p className="font-bold text-sm text-slate-500">No video tour available for this property.</p>
+                  <p className="font-bold text-sm text-slate-500">{langKey === 'bn' ? 'এই প্রপার্টির কোনো ভিডিও ট্যুর নেই।' : 'No video tour available for this property.'}</p>
                 </div>
               )}
             </GlassCard>
 
             {/* ABOUT */}
             <GlassCard className="p-5 md:p-7">
-              <h3 className="text-xl font-black text-slate-900 mb-4" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('aboutProperty')}</h3>
+              <h2 className="text-xl font-black text-slate-900 mb-4" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('aboutProperty')}</h2>
               <p className={`text-slate-600 leading-relaxed font-medium text-sm md:text-base transition-all ${!expandAbout ? 'line-clamp-4' : ''}`}>
                 {property.description}
               </p>
@@ -2683,7 +2709,7 @@ const PropertyDetails = () => {
 
             {/* AMENITIES */}
             <GlassCard className="p-5 md:p-7">
-              <h3 className="text-xl font-black text-slate-900 mb-5" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('amenities')}</h3>
+              <h2 className="text-xl font-black text-slate-900 mb-5" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('amenities')}</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {amenities.map((amenity, i) => {
                   const cfg = amenityConfig[amenity] || { icon: CheckCircle2, color: 'text-[#ba0036]', bg: 'bg-red-50' };
@@ -2707,7 +2733,7 @@ const PropertyDetails = () => {
                 when the listing carries no specific details. */}
             {detailItems.length > 0 && (
               <GlassCard className="p-5 md:p-7">
-                <h3 className="text-xl font-black text-slate-900 mb-5" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('propertyDetails')}</h3>
+                <h2 className="text-xl font-black text-slate-900 mb-5" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('propertyDetails')}</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                   {detailItems.map((item) => {
                     const cfg = specificDetailIcon[item.key] || { icon: item.isToggle ? CheckCircle2 : Info, color: 'text-[#ba0036]', bg: 'bg-red-50' };
@@ -2731,7 +2757,7 @@ const PropertyDetails = () => {
 
             {/* MAP + NEARBY */}
             <GlassCard className="p-5 md:p-7">
-              <h3 className="text-xl font-black text-slate-900 mb-1" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('location')}</h3>
+              <h2 className="text-xl font-black text-slate-900 mb-1" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('location')}</h2>
               <p className="text-slate-600 font-bold text-sm mb-4 flex items-center gap-2">
                 <MapPin size={13} className="text-[#ba0036]" /> {property.location}
               </p>
@@ -2796,7 +2822,7 @@ const PropertyDetails = () => {
 
             {/* LANDLORD */}
             <GlassCard className="p-5 md:p-7">
-              <h3 className="text-xl font-black text-slate-900 mb-5" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('aboutLandlord')}</h3>
+              <h2 className="text-xl font-black text-slate-900 mb-5" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('aboutLandlord')}</h2>
               <div className="flex gap-4 md:gap-5 items-start">
                 <Link to={`/landlord/${landlord.id}`} className="shrink-0">
                   <img src={landlord.avatar} alt={landlord.name}
@@ -2806,12 +2832,12 @@ const PropertyDetails = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-1">
                     <Link to={`/landlord/${landlord.id}`}>
-                      <h4 className="text-lg font-black text-slate-900 hover:text-[#ba0036] transition-colors" style={{ fontFamily: 'Oxanium, sans-serif' }}>{landlord.name}</h4>
+                      <h3 className="text-lg font-black text-slate-900 hover:text-[#ba0036] transition-colors" style={{ fontFamily: 'Oxanium, sans-serif' }}>{landlord.name}</h3>
                     </Link>
                     {landlord.verified && <BadgeCheck size={17} className="text-blue-600 shrink-0" />}
                   </div>
                   <div className="flex flex-wrap gap-3 text-xs font-bold text-slate-500 mb-3">
-                    <span className="flex items-center gap-1"><Calendar size={11} /> Since {landlord.memberSince}</span>
+                    <span className="flex items-center gap-1"><Calendar size={11} /> {langKey === 'bn' ? `${landlord.memberSince} থেকে সদস্য` : `Since ${landlord.memberSince}`}</span>
                     <span className="flex items-center gap-1"><Star size={11} className="text-yellow-400 fill-yellow-400" /> {landlord.rating} ({landlord.totalReviews})</span>
                     <span className="flex items-center gap-1"><Clock size={11} /> {landlord.responseTime}</span>
                   </div>
@@ -2844,11 +2870,11 @@ const PropertyDetails = () => {
                 <div className="mt-5 pt-5" style={{ borderTop: '1px solid rgba(15,23,42,0.06)' }}>
                   {landlord.preferredTenants?.length > 0 && (
                     <div className="mb-4">
-                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Preferred Tenants</p>
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{langKey === 'bn' ? 'পছন্দের ভাড়াটিয়া' : 'Preferred Tenants'}</p>
                       <div className="flex flex-wrap gap-2">
                         {landlord.preferredTenants.map((pt, i) => (
                           <span key={i} className="bg-blue-50 text-blue-700 border border-blue-100 px-2.5 py-1 rounded-lg text-[10px] font-bold capitalize">
-                            {pt.replace('_', ' ')}
+                            {preferredTenantLabel(pt, langKey === 'bn')}
                           </span>
                         ))}
                       </div>
@@ -2856,12 +2882,12 @@ const PropertyDetails = () => {
                   )}
                   {landlord.houseRules?.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">House Rules</p>
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{langKey === 'bn' ? 'বাড়ির নিয়ম' : 'House Rules'}</p>
                       <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {landlord.houseRules.map((hr, i) => (
                           <li key={i} className="flex items-center gap-2 text-xs font-medium text-slate-600">
                             <CheckCircle2 size={12} className="text-[#ba0036]" />
-                            <span className="capitalize">{hr.replace(/_/g, ' ')}</span>
+                            <span className="capitalize">{houseRuleLabel(hr, langKey === 'bn')}</span>
                           </li>
                         ))}
                       </ul>
@@ -2894,9 +2920,11 @@ const PropertyDetails = () => {
                       style={{ background: '#f1f5f9', border: '1px solid rgba(15,23,42,0.08)' }}>
                       <X size={24} className="text-slate-500" strokeWidth={3} />
                     </div>
-                    <p className="font-black text-slate-900 text-lg" style={{ fontFamily: 'Oxanium, sans-serif' }}>Not Available</p>
+                    <p className="font-black text-slate-900 text-lg" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('notAvailable')}</p>
                     <p className="text-slate-500 font-bold text-xs mt-1">
-                      {property.intent === 'purchase' ? 'This property has been sold' : 'This property has been rented'}
+                      {property.intent === 'purchase'
+                        ? (langKey === 'bn' ? 'এই প্রপার্টিটি বিক্রি হয়ে গেছে' : 'This property has been sold')
+                        : (langKey === 'bn' ? 'এই প্রপার্টিটি ভাড়া হয়ে গেছে' : 'This property has been rented')}
                     </p>
                   </div>
                 )}
@@ -2912,7 +2940,7 @@ const PropertyDetails = () => {
                   </h2>
                   {landlord?.serviceCharge > 0 && (
                     <p className="text-xs font-bold text-slate-500 mt-1">
-                      + ৳{Number(landlord.serviceCharge).toLocaleString('en-IN')} Service Charge
+                      + ৳{Number(landlord.serviceCharge).toLocaleString('en-IN')} {langKey === 'bn' ? 'সার্ভিস চার্জ' : 'Service Charge'}
                     </p>
                   )}
                   <div className="flex flex-wrap gap-2 mt-2">
@@ -2932,13 +2960,13 @@ const PropertyDetails = () => {
                   <div className="flex-1 min-w-0">
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5">{lt('listedBy')}</p>
                     <Link to={`/landlord/${landlord.id}`}>
-                      <h4 className="font-black text-slate-900 hover:text-[#ba0036] transition-colors truncate" style={{ fontFamily: 'Oxanium, sans-serif' }}>{landlord.name}</h4>
+                      <h3 className="font-black text-slate-900 hover:text-[#ba0036] transition-colors truncate" style={{ fontFamily: 'Oxanium, sans-serif' }}>{landlord.name}</h3>
                     </Link>
                     <div className="flex items-center gap-2 mt-1">
                       <Star size={11} className="fill-yellow-400 text-yellow-400" />
                       <span className="text-xs font-bold text-slate-700">{landlord.rating}</span>
                       <span className="text-slate-300 text-xs">·</span>
-                      <span className="text-xs font-bold text-emerald-700">{landlord.responseRate}% response</span>
+                      <span className="text-xs font-bold text-emerald-700">{langKey === 'bn' ? `উত্তরের হার ${landlord.responseRate}%` : `${landlord.responseRate}% response`}</span>
                     </div>
                   </div>
                   {landlord.verified && <BadgeCheck size={18} className="text-blue-600 shrink-0" />}
@@ -2960,7 +2988,7 @@ const PropertyDetails = () => {
                     <div className="flex gap-3 mb-5">
                       <button 
                         disabled={isUnavailable || loadingLandlord || (!loadingLandlord && !landlord?.phoneNumber)} 
-                        title={!loadingLandlord && !landlord?.phoneNumber ? "Information not available" : ""}
+                        title={!loadingLandlord && !landlord?.phoneNumber ? (langKey === 'bn' ? 'তথ্য পাওয়া যায়নি' : 'Information not available') : ''}
                         onClick={() => !isUnavailable && requireAuthFor(() => setActiveModal('call'))}
                         className={`flex-1 py-3 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all ${(isUnavailable || loadingLandlord || (!loadingLandlord && !landlord?.phoneNumber)) ? 'opacity-40 cursor-not-allowed text-slate-400' : 'text-emerald-700'}`}
                         style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.08)' }}>
@@ -2968,7 +2996,7 @@ const PropertyDetails = () => {
                       </button>
                       <button 
                         disabled={isUnavailable || loadingLandlord || (!loadingLandlord && !landlord?.id)} 
-                        title={!loadingLandlord && !landlord?.id ? "Information not available" : ""}
+                        title={!loadingLandlord && !landlord?.id ? (langKey === 'bn' ? 'তথ্য পাওয়া যায়নি' : 'Information not available') : ''}
                         onClick={() => !isUnavailable && requireAuthFor(() => setActiveModal('message'))}
                         className={`flex-1 py-3 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all ${(isUnavailable || loadingLandlord || (!loadingLandlord && !landlord?.id)) ? 'opacity-40 cursor-not-allowed text-slate-400' : 'text-blue-700'}`}
                         style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.08)' }}>
@@ -2983,9 +3011,15 @@ const PropertyDetails = () => {
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">{lt('howItWorks')}</p>
                   <div className="flex flex-col gap-2">
                     {[
-                      { icon: '📩', title: 'You send an inquiry', sub: 'Your name, phone & message go to the landlord' },
-                      { icon: '📞', title: 'Landlord contacts you', sub: `${landlord.name} will call or message you back` },
-                      { icon: '🏠', title: 'Visit & deal directly', sub: 'Schedule a viewing and finalize everything together' },
+                      langKey === 'bn'
+                        ? { icon: '📩', title: 'আপনি জিজ্ঞাসা পাঠান', sub: 'আপনার নাম, ফোন ও মেসেজ বাড়িওয়ালার কাছে যায়' }
+                        : { icon: '📩', title: 'You send an inquiry', sub: 'Your name, phone & message go to the landlord' },
+                      langKey === 'bn'
+                        ? { icon: '📞', title: 'বাড়িওয়ালা যোগাযোগ করবেন', sub: `${landlord.name} আপনাকে কল বা মেসেজ করবেন` }
+                        : { icon: '📞', title: 'Landlord contacts you', sub: `${landlord.name} will call or message you back` },
+                      langKey === 'bn'
+                        ? { icon: '🏠', title: 'সরাসরি দেখে ঠিক করুন', sub: 'বাসা দেখার সময় ঠিক করুন, তারপর সবকিছু একসাথে চূড়ান্ত করুন' }
+                        : { icon: '🏠', title: 'Visit & deal directly', sub: 'Schedule a viewing and finalize everything together' },
                     ].map((step, i) => (
                       <div key={i} className={`flex items-start gap-3 py-2.5 ${i < 2 ? 'border-b' : ''}`}
                         style={i < 2 ? { borderColor: 'rgba(15,23,42,0.05)' } : {}}>
@@ -3022,7 +3056,10 @@ const PropertyDetails = () => {
                   <Shield size={15} className="text-amber-600" /> {lt('safetyTips')}
                 </h4>
                 <ul className="flex flex-col gap-2">
-                  {['Never pay before visiting', 'Verify landlord identity', 'Get a written agreement', 'Use secure payment channels'].map((tip, i) => (
+                  {(langKey === 'bn'
+                    ? ['বাসা না দেখে কোনো টাকা দেবেন না', 'বাড়িওয়ালার পরিচয় যাচাই করুন', 'লিখিত চুক্তি করে নিন', 'নিরাপদ মাধ্যমে টাকা পরিশোধ করুন']
+                    : ['Never pay before visiting', 'Verify landlord identity', 'Get a written agreement', 'Use secure payment channels']
+                  ).map((tip, i) => (
                     <li key={i} className="text-xs font-bold text-amber-700 flex items-start gap-2">
                       <CheckCircle2 size={12} className="text-amber-500 shrink-0 mt-0.5" /> {tip}
                     </li>
@@ -3065,7 +3102,7 @@ const PropertyDetails = () => {
               {priceLabel && <span className="text-[10px] text-slate-500 font-bold ml-0.5">{priceLabel}</span>}
             </p>
             {landlord?.serviceCharge > 0 && (
-              <p className="text-[9px] font-bold text-slate-500 mt-0.5">+ ৳{Number(landlord.serviceCharge).toLocaleString('en-IN')} SC</p>
+              <p className="text-[9px] font-bold text-slate-500 mt-0.5">+ ৳{Number(landlord.serviceCharge).toLocaleString('en-IN')} {langKey === 'bn' ? 'সার্ভিস চার্জ' : 'SC'}</p>
             )}
           </div>
           <motion.button disabled={isUnavailable}
@@ -3095,7 +3132,7 @@ const PropertyDetails = () => {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={() => setActiveModal(null)}>
             <motion.div
-              className="w-full sm:max-w-sm shadow-2xl overflow-hidden relative p-8 text-center rounded-t-[2.5rem] sm:rounded-[2rem]"
+              className="w-full sm:max-w-sm shadow-2xl overflow-hidden relative p-8 pb-[calc(2rem+var(--sab))] sm:pb-8 text-center rounded-t-[2.5rem] sm:rounded-[2rem]"
               style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.06)' }}
               initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
@@ -3103,7 +3140,7 @@ const PropertyDetails = () => {
               <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-[#ba0036] to-transparent" />
               <div className="absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full sm:hidden"
                 style={{ background: 'rgba(15,23,42,0.12)' }} />
-              <button onClick={() => setActiveModal(null)} aria-label="Close"
+              <button onClick={() => setActiveModal(null)} aria-label={langKey === 'bn' ? 'বন্ধ করুন' : 'Close'}
                 className="absolute top-5 right-5 p-2 rounded-full transition-colors"
                 style={{ background: '#f1f5f9' }}>
                 <X size={18} className="text-slate-600" />
@@ -3116,14 +3153,18 @@ const PropertyDetails = () => {
                     <div className="absolute inset-0 bg-emerald-400/10 rounded-full animate-ping" />
                     <Phone size={32} className="text-emerald-600" />
                   </div>
-                  <h3 className="text-2xl font-black text-slate-900 mb-2" style={{ fontFamily: 'Oxanium, sans-serif' }}>Call Landlord</h3>
-                  <p className="text-slate-600 font-bold text-sm mb-2">Connect with <span className="text-[#ba0036]">{landlord.name}</span></p>
-                  <p className="text-slate-400 text-xs font-bold mb-8">via TO-LET PRO Secure Line</p>
+                  <h3 className="text-2xl font-black text-slate-900 mb-2" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('callLandlord')}</h3>
+                  <p className="text-slate-600 font-bold text-sm mb-2">
+                    {langKey === 'bn'
+                      ? <><span className="text-[#ba0036]">{landlord.name}</span>-এর সাথে যোগাযোগ করুন</>
+                      : <>Connect with <span className="text-[#ba0036]">{landlord.name}</span></>}
+                  </p>
+                  <p className="text-slate-400 text-xs font-bold mb-8">{lt('secureLine')}</p>
                   <button
                     onClick={() => {
                       const peerId = landlord?.id ?? property?.landlordId ?? property?.ownerUserId;
                       if (!peerId) {
-                        toast.error("Unable to start call. Landlord info missing.");
+                        toast.error(langKey === 'bn' ? 'কল করা যাচ্ছে না — বাড়িওয়ালার তথ্য পাওয়া যায়নি।' : 'Unable to start call. Landlord info missing.');
                         return;
                       }
                       setActiveModal(null);
@@ -3138,7 +3179,7 @@ const PropertyDetails = () => {
                     }}
                     className="cyber-btn w-full text-white py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2"
                     style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 8px 22px rgba(16,185,129,0.22)' }}>
-                    <Phone size={18} /> Start Secure Call
+                    <Phone size={18} /> {lt('startSecureCall')}
                   </button>
                 </>
               )}
@@ -3149,13 +3190,17 @@ const PropertyDetails = () => {
                     style={{ background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.25)' }}>
                     <MessageSquare size={32} className="text-blue-600" />
                   </div>
-                  <h3 className="text-2xl font-black text-slate-900 mb-2" style={{ fontFamily: 'Oxanium, sans-serif' }}>Send Message</h3>
-                  <p className="text-slate-600 font-bold text-sm mb-8">Chat with <span className="text-[#ba0036]">{landlord.name}</span></p>
+                  <h3 className="text-2xl font-black text-slate-900 mb-2" style={{ fontFamily: 'Oxanium, sans-serif' }}>{lt('sendMessage')}</h3>
+                  <p className="text-slate-600 font-bold text-sm mb-8">
+                    {langKey === 'bn'
+                      ? <><span className="text-[#ba0036]">{landlord.name}</span>-এর সাথে চ্যাট করুন</>
+                      : <>Chat with <span className="text-[#ba0036]">{landlord.name}</span></>}
+                  </p>
                   <button
                     onClick={() => {
                       const peerId = landlord?.id ?? property?.landlordId ?? property?.ownerUserId;
                       if (!peerId) {
-                        toast.error("Unable to open chat. Landlord info missing.");
+                        toast.error(langKey === 'bn' ? 'চ্যাট খোলা যাচ্ছে না — বাড়িওয়ালার তথ্য পাওয়া যায়নি।' : 'Unable to open chat. Landlord info missing.');
                         return;
                       }
                       setActiveModal(null);
@@ -3171,7 +3216,7 @@ const PropertyDetails = () => {
                     }}
                     className="cyber-btn w-full text-white py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2"
                     style={{ background: 'linear-gradient(135deg, #ba0036 0%, #7c0026 100%)', boxShadow: '0 8px 22px rgba(186,0,54,0.22)' }}>
-                    <MessageSquare size={18} /> Open Chat
+                    <MessageSquare size={18} /> {lt('openChat')}
                   </button>
                 </>
               )}

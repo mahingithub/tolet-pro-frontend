@@ -577,7 +577,7 @@ const HostFields = ({ stepKey, data, setData, isBn, photoInputRef, handleFilePic
         <div className="relative">
           <DollarSign size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25" />
           <input
-            type="number"
+            type="text" data-number
             inputMode="numeric"
             min="0"
             value={data.serviceCharge}

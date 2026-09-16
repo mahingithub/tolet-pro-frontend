@@ -1603,3 +1603,11 @@ export const LanguageProvider = ({ children }) => {
 };
 
 export const useLanguage = () => useContext(LanguageContext);
+
+/**
+ * True when the app is in Bangla. For small components that only need to pick
+ * between two strings — badges, overlays, modal bodies — so each can follow the
+ * language itself instead of having `language` threaded down to it as a prop
+ * (which is how several of them ended up never receiving it, and stayed English).
+ */
+export const useIsBn = () => useContext(LanguageContext)?.language === 'বাংলা';

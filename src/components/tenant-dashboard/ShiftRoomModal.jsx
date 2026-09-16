@@ -94,7 +94,7 @@ export default function ShiftRoomModal({ booking, language, onClose, onSubmitted
       aria-modal="true"
     >
       <div
-        className="w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-[0_30px_80px_rgba(0,0,0,0.25)] overflow-hidden flex flex-col max-h-[92vh]"
+        className="w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-[0_30px_80px_rgba(0,0,0,0.25)] overflow-hidden flex flex-col max-h-[92vh] pb-safe sm:pb-0"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ── */}

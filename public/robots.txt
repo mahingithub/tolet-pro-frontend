@@ -54,3 +54,5 @@ Allow: /property/
 Allow: /to-let
 
 Sitemap: https://www.toletpro.rent/sitemap.xml
+# Live listings, served by the API and proxied onto this host (vercel.json).
+Sitemap: https://www.toletpro.rent/sitemap-properties.xml

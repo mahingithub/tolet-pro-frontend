@@ -16,6 +16,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useGoBack from '../hooks/useGoBack';
+import { clockTime } from '../utils/bnTime';
 import { toast } from 'sonner';
 import {
   ArrowLeft, LifeBuoy, Send, Plus, MessageSquare, ChevronRight,
@@ -239,7 +240,9 @@ export default function SupportPage() {
   const fmtTime = (iso) => {
     if (!iso) return '';
     try {
-      return new Date(iso).toLocaleTimeString(isBn ? 'bn-BD' : 'en-US', { hour: 'numeric', minute: '2-digit' });
+      return isBn
+        ? clockTime(iso, true, { hour: 'numeric', minute: '2-digit' })
+        : new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     } catch { return ''; }
   };
 

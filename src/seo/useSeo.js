@@ -27,7 +27,7 @@
 import { useEffect } from 'react';
 import {
   SITE_URL, BRAND, OG_IMAGE, OG_IMAGE_WIDTH, OG_IMAGE_HEIGHT,
-  DEFAULT_LOCALE, ALTERNATE_LOCALE, absoluteUrl,
+  DEFAULT_LOCALE, ALTERNATE_LOCALE, OG_IMAGE_ALT, absoluteUrl, metaDescription,
 } from './siteConfig';
 
 /** Tags this hook owns get stamped so cleanup never touches anything else. */
@@ -61,6 +61,9 @@ function upsert(tag, keyAttr, keyValue, valueAttr, value) {
 
 const setName = (name, content) => upsert('meta', 'name', name, 'content', content);
 const setProp = (property, content) => upsert('meta', 'property', property, 'content', content);
+// Removes the tag whoever created it — upsert() deliberately leaves index.html's
+// own tags in place, which is wrong when the tag's value would be a lie.
+const dropProp = (property) => document.querySelector(`meta[property="${property}"]`)?.remove();
 
 function setCanonical(url) {
   let el = document.querySelector('link[rel="canonical"]');
@@ -137,6 +140,7 @@ const BASELINE = typeof document === 'undefined' ? null : {
   ogDescription: readMeta('meta[property="og:description"]'),
   ogUrl: readMeta('meta[property="og:url"]'),
   ogImage: readMeta('meta[property="og:image"]') || OG_IMAGE,
+  ogImageAlt: readMeta('meta[property="og:image:alt"]') || OG_IMAGE_ALT,
   ogType: readMeta('meta[property="og:type"]') || 'website',
 };
 
@@ -150,6 +154,7 @@ const BASELINE = typeof document === 'undefined' ? null : {
  * @param {string}   seo.canonical    Path ('/properties/dhaka') or absolute URL.
  * @param {boolean}  seo.noindex      Private screens — keeps them out of the index.
  * @param {string}   seo.image        Absolute OG image URL.
+ * @param {string}   seo.imageAlt     What that image shows (og:image:alt, twitter:image:alt).
  * @param {string}   seo.type         og:type ('website' | 'article' | 'product').
  * @param {object|object[]} seo.jsonLd  Structured-data block(s).
  * @param {boolean}  seo.appendBrand  Set false when the title already says TO-LET PRO.
@@ -158,7 +163,7 @@ const BASELINE = typeof document === 'undefined' ? null : {
 export default function useSeo(seo = {}, deps = []) {
   const {
     title, description, keywords, canonical, noindex = false,
-    image, type = 'website', jsonLd = null, appendBrand = true,
+    image, imageAlt, type = 'website', jsonLd = null, appendBrand = true,
   } = seo;
 
   useEffect(() => {
@@ -167,10 +172,15 @@ export default function useSeo(seo = {}, deps = []) {
     const fullTitle = title
       ? (appendBrand ? `${title} | ${BRAND}` : title)
       : BASELINE.title;
-    const desc = description || BASELINE.description;
+    const desc = metaDescription(description || BASELINE.description);
     const url = canonical ? absoluteUrl(canonical) : absoluteUrl(window.location.pathname);
     const kw = Array.isArray(keywords) ? keywords.join(', ') : keywords;
     const img = image || BASELINE.ogImage;
+    // og:image:width/height describe the default share graphic. A listing's
+    // image is a landlord's photo of unknown size, and claiming 1024×500 for it
+    // made Facebook crop and letterbox it — so for any other image, say nothing.
+    const isDefaultImage = img === BASELINE.ogImage;
+    const imgAlt = imageAlt || (isDefaultImage ? BASELINE.ogImageAlt : fullTitle);
 
     document.title = fullTitle;
     setName('description', desc);
@@ -193,8 +203,14 @@ export default function useSeo(seo = {}, deps = []) {
     setProp('og:url', url);
     setProp('og:type', type);
     setProp('og:image', img);
-    setProp('og:image:width', String(OG_IMAGE_WIDTH));
-    setProp('og:image:height', String(OG_IMAGE_HEIGHT));
+    if (isDefaultImage) {
+      setProp('og:image:width', String(OG_IMAGE_WIDTH));
+      setProp('og:image:height', String(OG_IMAGE_HEIGHT));
+    } else {
+      dropProp('og:image:width');
+      dropProp('og:image:height');
+    }
+    setProp('og:image:alt', imgAlt);
     setProp('og:site_name', BRAND);
     setProp('og:locale', DEFAULT_LOCALE);
     setProp('og:locale:alternate', ALTERNATE_LOCALE);
@@ -203,6 +219,7 @@ export default function useSeo(seo = {}, deps = []) {
     setName('twitter:title', fullTitle);
     setName('twitter:description', desc);
     setName('twitter:image', img);
+    setName('twitter:image:alt', imgAlt);
 
     setJsonLd(jsonLd);
 
@@ -227,10 +244,14 @@ export default function useSeo(seo = {}, deps = []) {
       setProp('og:url', BASELINE.ogUrl);
       setProp('og:type', BASELINE.ogType);
       setProp('og:image', BASELINE.ogImage);
+      setProp('og:image:width', String(OG_IMAGE_WIDTH));
+      setProp('og:image:height', String(OG_IMAGE_HEIGHT));
+      setProp('og:image:alt', BASELINE.ogImageAlt);
+      setName('twitter:image:alt', null);
       setJsonLd(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, description, canonical, noindex, image, type, appendBrand,
+  }, [title, description, canonical, noindex, image, imageAlt, type, appendBrand,
       Array.isArray(keywords) ? keywords.join('|') : keywords,
       jsonLd ? JSON.stringify(jsonLd) : null,
       ...deps]);

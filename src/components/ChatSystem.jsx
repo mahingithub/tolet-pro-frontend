@@ -28,7 +28,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import chatService from '../services/chatService';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage, useIsBn } from '../context/LanguageContext';
+import { clockTime } from '../utils/bnTime';
 import { getCurrentUser } from '../services/authService';
 import { listTenantReceipts, listHostReceipts } from '../services/receiptService';
 import callProvider from '../services/callProvider';
@@ -280,6 +281,7 @@ const formatLastSeen = (iso, isBn = false) => {
 //     marked a month paid. Visually consistent with TenantDashboard's
 //     receipt-detail modal (blue = full, amber = partial). ────────────────────
 const ReceiptCard = ({ receipt, mine, onView }) => {
+  const isBn = useIsBn();
   const isFull = receipt.status === 'full' || (Number(receipt.balance) || 0) <= 0;
   const grad = isFull
     ? 'from-blue-500 to-indigo-600'
@@ -296,7 +298,7 @@ const ReceiptCard = ({ receipt, mine, onView }) => {
         <div className="relative flex items-center gap-2">
           {isFull ? <CheckCheck size={16} strokeWidth={3}/> : <Hourglass size={16} strokeWidth={2.5}/>}
           <p className="text-[9px] font-black uppercase tracking-[0.18em]">
-            {isFull ? 'Rent Receipt · Full Paid' : 'Rent Receipt · Partial'}
+            {isFull ? (isBn ? 'ভাড়ার রসিদ · সম্পূর্ণ পরিশোধিত' : 'Rent Receipt · Full Paid') : (isBn ? 'ভাড়ার রসিদ · আংশিক' : 'Rent Receipt · Partial')}
           </p>
         </div>
         <p className="text-xl font-black tracking-tight mt-1.5 tabular-nums">
@@ -310,15 +312,15 @@ const ReceiptCard = ({ receipt, mine, onView }) => {
       <div className="px-4 py-3 space-y-1.5">
         <p className="text-[11px] font-black text-gray-900 line-clamp-1">{receipt.propertyTitle}</p>
         <div className="flex items-center justify-between text-[10px] font-bold text-gray-500">
-          <span>Due {formatBDT(receipt.totalDue)}</span>
+          <span>{isBn ? 'প্রাপ্য' : 'Due'} {formatBDT(receipt.totalDue)}</span>
           <span className={(Number(receipt.balance) || 0) > 0 ? 'text-amber-600' : 'text-blue-600'}>
-            {(Number(receipt.balance) || 0) > 0 ? `Balance ${formatBDT(receipt.balance)}` : 'Cleared'}
+            {(Number(receipt.balance) || 0) > 0 ? `${isBn ? 'বাকি' : 'Balance'} ${formatBDT(receipt.balance)}` : (isBn ? 'পরিশোধিত' : 'Cleared')}
           </span>
         </div>
         <div className="flex items-center justify-between pt-1">
           <span className="text-[9px] font-black text-gray-300 font-mono truncate max-w-[60%]">{receipt.id}</span>
           <span className="text-[10px] font-black text-[#ba0036] flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-            View <ChevronRight size={11}/>
+            {isBn ? 'দেখুন' : 'View'} <ChevronRight size={11}/>
           </span>
         </div>
       </div>
@@ -331,6 +333,7 @@ const ReceiptCard = ({ receipt, mine, onView }) => {
 //     WhatsApp and IMO show call events in the chat thread. Tap a card
 //     to call the peer back instantly. ────────────────────────────────────
 const ChatCallCard = ({ call, mine, onCallBack }) => {
+  const isBn = useIsBn();
   // Status palette — missed/declined go red, completed goes neutral.
   const missed = call.status === 'missed' || call.status === 'no-answer' || call.status === 'declined';
   let Icon = call.direction === 'incoming' ? PhoneIncoming : PhoneOutgoing;
@@ -338,21 +341,21 @@ const ChatCallCard = ({ call, mine, onCallBack }) => {
   const TypeIcon = call.type === 'video' ? Video : Phone;
 
   let label;
-  if (call.status === 'missed')     label = call.type === 'video' ? 'Missed video call' : 'Missed voice call';
-  else if (call.status === 'no-answer') label = 'No answer';
-  else if (call.status === 'declined') label = call.direction === 'outgoing' ? 'Call declined' : 'You declined';
+  if (call.status === 'missed')     label = call.type === 'video' ? (isBn ? 'মিসড ভিডিও কল' : 'Missed video call') : (isBn ? 'মিসড ভয়েস কল' : 'Missed voice call');
+  else if (call.status === 'no-answer') label = isBn ? 'সাড়া দেয়নি' : 'No answer';
+  else if (call.status === 'declined') label = call.direction === 'outgoing' ? (isBn ? 'কল কেটে দিয়েছে' : 'Call declined') : (isBn ? 'আপনি কেটে দিয়েছেন' : 'You declined');
   else if (call.status === 'completed') {
     const dur = callService.formatCallDuration(call.durationSec);
-    label = `${call.type === 'video' ? 'Video' : 'Voice'} call · ${dur}`;
+    label = isBn ? `${call.type === 'video' ? 'ভিডিও' : 'ভয়েস'} কল · ${dur}` : `${call.type === 'video' ? 'Video' : 'Voice'} call · ${dur}`;
   } else {
-    label = call.type === 'video' ? 'Video call' : 'Voice call';
+    label = call.type === 'video' ? (isBn ? 'ভিডিও কল' : 'Video call') : (isBn ? 'ভয়েস কল' : 'Voice call');
   }
 
   const time = (() => {
     if (!call.iso) return '';
     const d = new Date(call.iso);
     if (isNaN(d.getTime())) return '';
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return clockTime(d, isBn);
   })();
 
   return (
@@ -379,7 +382,7 @@ const ChatCallCard = ({ call, mine, onCallBack }) => {
           <TypeIcon size={10} className="shrink-0"/>
           {time}
           <span className="text-gray-300">·</span>
-          <span className="text-gray-500 group-hover:text-[#ba0036] transition-colors">Tap to call back</span>
+          <span className="text-gray-500 group-hover:text-[#ba0036] transition-colors">{isBn ? 'কল ব্যাক করতে ট্যাপ করুন' : 'Tap to call back'}</span>
         </p>
       </div>
     </button>
@@ -1159,7 +1162,16 @@ const ChatSystem = () => {
   useEffect(() => {
     const vv = typeof window !== 'undefined' ? window.visualViewport : null;
     if (!mobileChatOpen || !vv) { setKbViewport({ height: null, offsetTop: 0 }); return undefined; }
-    const apply = () => setKbViewport({ height: vv.height, offsetTop: vv.offsetTop || 0 });
+    // Only the KEYBOARD may resize the chat, never a zoom. On iOS a zoom also
+    // shrinks vv.height and fires resize/scroll, so following it meant: zoom in
+    // → chat shrinks → layout moves → zoom changes → chat resizes again, and the
+    // screen pumped in and out while someone typed. Focus zoom is off on iOS now
+    // (utils/iosViewport.js), but a pinch still scales, so ignore any frame
+    // where the page isn't at 1×.
+    const apply = () => {
+      if (vv.scale && Math.abs(vv.scale - 1) > 0.01) return;
+      setKbViewport({ height: vv.height, offsetTop: vv.offsetTop || 0 });
+    };
     apply();
     vv.addEventListener('resize', apply);
     vv.addEventListener('scroll', apply);
@@ -2530,7 +2542,7 @@ const ChatSystem = () => {
               <button
                 onClick={() => setIsSearching(s => !s)}
                 className="p-2 hover:bg-white rounded-xl text-gray-500 hover:text-[#ba0036] transition-all"
-                aria-label="Toggle search"
+                aria-label={language === 'বাংলা' ? 'সার্চ চালু/বন্ধ' : 'Toggle search'}
               >
                 <Search size={18}/>
               </button>
@@ -2666,7 +2678,7 @@ const ChatSystem = () => {
                     else setShowSidebarMobile(true);
                   }}
                   className="p-2 -ml-1 rounded-xl hover:bg-white/70 transition-all"
-                  aria-label="Back to chats"
+                  aria-label={language === 'বাংলা' ? 'চ্যাটে ফিরে যান' : 'Back to chats'}
                 >
                   <ArrowLeft size={20} className="text-gray-700"/>
                 </button>
@@ -2736,7 +2748,7 @@ const ChatSystem = () => {
                   });
                 }}
                 className="p-2.5 sm:p-3 bg-white hover:bg-red-50 rounded-2xl text-gray-500 hover:text-[#ba0036] transition-all shadow-sm"
-                aria-label="Voice call"
+                aria-label={language === 'বাংলা' ? 'ভয়েস কল' : 'Voice call'}
               >
                 <Phone size={18}/>
               </button>
@@ -2751,7 +2763,7 @@ const ChatSystem = () => {
                   });
                 }}
                 className="p-2.5 sm:p-3 bg-white hover:bg-red-50 rounded-2xl text-gray-500 hover:text-[#ba0036] transition-all shadow-sm"
-                aria-label="Video call"
+                aria-label={language === 'বাংলা' ? 'ভিডিও কল' : 'Video call'}
               >
                 <Video size={18}/>
               </button>
@@ -2766,7 +2778,7 @@ const ChatSystem = () => {
                     className={`p-2.5 sm:p-3 rounded-2xl transition-all shadow-sm ${
                       headerMenuOpen ? 'bg-[#ba0036] text-white' : 'bg-white hover:bg-red-50 text-gray-500 hover:text-[#ba0036]'
                     }`}
-                    aria-label="Chat options"
+                    aria-label={language === 'বাংলা' ? 'চ্যাট অপশন' : 'Chat options'}
                   >
                     <MoreVertical size={18}/>
                   </button>
@@ -2796,10 +2808,14 @@ const ChatSystem = () => {
                 </span>
                 <span className="flex-1 min-w-0 truncate">
                   {contextBanner.source === 'tenant-receipt'
-                    ? <>Replying about <b>{contextBanner.propertyTitle}</b>{contextBanner.monthKey ? ` (${contextBanner.monthKey})` : ''}{contextBanner.receiptId ? ` · receipt ${contextBanner.receiptId}` : ''}</>
-                    : <>Conversation about <b>{contextBanner.propertyTitle || 'this booking'}</b></>}
+                    ? (language === 'বাংলা'
+                      ? <><b>{contextBanner.propertyTitle}</b>{contextBanner.monthKey ? ` (${contextBanner.monthKey})` : ''}{contextBanner.receiptId ? ` · রসিদ ${contextBanner.receiptId}` : ''} নিয়ে উত্তর দিচ্ছেন</>
+                      : <>Replying about <b>{contextBanner.propertyTitle}</b>{contextBanner.monthKey ? ` (${contextBanner.monthKey})` : ''}{contextBanner.receiptId ? ` · receipt ${contextBanner.receiptId}` : ''}</>)
+                    : (language === 'বাংলা'
+                      ? <><b>{contextBanner.propertyTitle || 'এই বুকিং'}</b> নিয়ে কথোপকথন</>
+                      : <>Conversation about <b>{contextBanner.propertyTitle || 'this booking'}</b></>)}
                 </span>
-                <button onClick={() => setContextBanner(null)} className="p-1 hover:bg-white rounded-full" aria-label="Dismiss">
+                <button onClick={() => setContextBanner(null)} className="p-1 hover:bg-white rounded-full" aria-label={language === 'বাংলা' ? 'সরিয়ে দিন' : 'Dismiss'}>
                   <X size={12} className="text-gray-400"/>
                 </button>
               </div>
@@ -3016,7 +3032,7 @@ const ChatSystem = () => {
                   </p>
                   <p className="text-[11px] font-bold text-gray-500 truncate">{replyPreviewText(replyTo)}</p>
                 </div>
-                <button onClick={() => setReplyTo(null)} className="p-1 hover:bg-gray-100 rounded-full shrink-0" aria-label="Cancel reply">
+                <button onClick={() => setReplyTo(null)} className="p-1 hover:bg-gray-100 rounded-full shrink-0" aria-label={language === 'বাংলা' ? 'রিপ্লাই বাতিল' : 'Cancel reply'}>
                   <X size={13} className="text-gray-400" />
                 </button>
               </motion.div>
@@ -3033,7 +3049,7 @@ const ChatSystem = () => {
                   });
                 }}
                 className={`shrink-0 p-2.5 rounded-xl transition-all ${showEmojiPicker ? 'bg-[#ba0036]/10 text-[#ba0036]' : 'text-gray-400 hover:text-[#ba0036] hover:bg-gray-50'}`}
-                aria-label="Emoji"
+                aria-label={language === 'বাংলা' ? 'ইমোজি' : 'Emoji'}
               >
                 <Smile size={18}/>
               </button>
@@ -3136,16 +3152,16 @@ const ChatSystem = () => {
                   <button
                     onClick={() => stopRecording(false)}
                     className="w-11 h-11 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-xl flex items-center justify-center transition-all active:scale-95"
-                    aria-label="Cancel recording"
-                    title="বাতিল"
+                    aria-label={language === 'বাংলা' ? 'রেকর্ডিং বাতিল' : 'Cancel recording'}
+                    title={language === 'বাংলা' ? 'বাতিল' : 'Cancel'}
                   >
                     <X size={18}/>
                   </button>
                   <button
                     onClick={() => stopRecording(true)}
                     className="w-11 h-11 bg-gradient-to-br from-[#ba0036] to-[#7a0024] text-white rounded-xl flex items-center justify-center shadow-[0_8px_20px_rgba(186,0,54,0.30)] transition-all active:scale-95"
-                    aria-label="Send voice message"
-                    title="পাঠান"
+                    aria-label={language === 'বাংলা' ? 'ভয়েস মেসেজ পাঠান' : 'Send voice message'}
+                    title={language === 'বাংলা' ? 'পাঠান' : 'Send'}
                   >
                     <Send size={18} className="ml-0.5"/>
                   </button>
@@ -3169,7 +3185,7 @@ const ChatSystem = () => {
                     className={`absolute inset-0 w-11 h-11 bg-gradient-to-br from-[#ba0036] to-[#7a0024] text-white rounded-xl flex items-center justify-center shadow-[0_8px_20px_rgba(186,0,54,0.30)] transition-all duration-150 active:scale-95 ${
                       inputText.trim() ? 'opacity-100 scale-100' : 'opacity-0 scale-75 pointer-events-none'
                     }`}
-                    aria-label="Send"
+                    aria-label={language === 'বাংলা' ? 'পাঠান' : 'Send'}
                   >
                     <Send size={18} className="ml-0.5"/>
                   </button>
@@ -3206,7 +3222,7 @@ const ChatSystem = () => {
 
             {!inputText && !isMobile && !showEmojiPicker && (
               <p className="text-center text-[9px] font-black text-gray-300 uppercase tracking-[0.18em] mt-2.5">
-                Enter to send · Shift + Enter for new line · Esc to close call
+                {language === 'বাংলা' ? 'Enter চাপলে পাঠানো হবে · নতুন লাইনের জন্য Shift + Enter · কল বন্ধ করতে Esc' : 'Enter to send · Shift + Enter for new line · Esc to close call'}
               </p>
             )}
               </>
@@ -3272,28 +3288,28 @@ const ChatSystem = () => {
                       ? <CheckCheck size={26} strokeWidth={3}/>
                       : <Hourglass size={26} strokeWidth={2.5}/>}
                   </div>
-                  <p className="text-[10px] font-black text-white/70 uppercase tracking-widest mb-1">Digital Rent Receipt</p>
+                  <p className="text-[10px] font-black text-white/70 uppercase tracking-widest mb-1">{language === 'বাংলা' ? 'ডিজিটাল ভাড়ার রসিদ' : 'Digital Rent Receipt'}</p>
                   <h3 className="text-2xl font-black tracking-tight">{formatBDT(activeReceipt.totalPaid)}</h3>
                   <p className="text-[11px] font-bold text-white/80 mt-1">
                     {(activeReceipt.status === 'full' || (Number(activeReceipt.balance) || 0) <= 0)
-                      ? 'Full payment confirmed'
-                      : 'Partial payment recorded'}
+                      ? (language === 'বাংলা' ? 'সম্পূর্ণ পেমেন্ট নিশ্চিত' : 'Full payment confirmed')
+                      : (language === 'বাংলা' ? 'আংশিক পেমেন্ট রেকর্ড করা হয়েছে' : 'Partial payment recorded')}
                   </p>
                 </div>
               </div>
               <div className="p-6 space-y-3">
                 {[
-                  ['Property', activeReceipt.propertyTitle],
-                  ['Month', activeReceipt.monthLabel || activeReceipt.monthKey],
-                  ['Total Due', formatBDT(activeReceipt.totalDue)],
-                  ['Total Paid', formatBDT(activeReceipt.totalPaid)],
-                  ['Balance', (Number(activeReceipt.balance) || 0) > 0 ? formatBDT(activeReceipt.balance) : 'Cleared'],
-                  ['Method', activeReceipt.method ? `${activeReceipt.method}${activeReceipt.txnId ? ' · ' + activeReceipt.txnId : ''}` : '—'],
-                  ['Date', activeReceipt.date],
-                  ['Receipt ID', activeReceipt.id],
-                ].map(([k, v], i, a) => (
+                  ['Property', activeReceipt.propertyTitle, 'প্রপার্টি'],
+                  ['Month', activeReceipt.monthLabel || activeReceipt.monthKey, 'মাস'],
+                  ['Total Due', formatBDT(activeReceipt.totalDue), 'মোট প্রাপ্য'],
+                  ['Total Paid', formatBDT(activeReceipt.totalPaid), 'মোট পরিশোধ'],
+                  ['Balance', (Number(activeReceipt.balance) || 0) > 0 ? formatBDT(activeReceipt.balance) : (language === 'বাংলা' ? 'পরিশোধিত' : 'Cleared'), 'বাকি'],
+                  ['Method', activeReceipt.method ? `${activeReceipt.method}${activeReceipt.txnId ? ' · ' + activeReceipt.txnId : ''}` : '—', 'মাধ্যম'],
+                  ['Date', activeReceipt.date, 'তারিখ'],
+                  ['Receipt ID', activeReceipt.id, 'রসিদ আইডি'],
+                ].map(([k, v, kBn], i, a) => (
                   <div key={k} className={`flex justify-between items-center py-2 ${i < a.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{k}</span>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? kBn : k}</span>
                     <span className={`text-sm font-black text-right max-w-[220px] ${k === 'Balance' && (Number(activeReceipt.balance) || 0) > 0 ? 'text-[#ba0036]' : k === 'Balance' ? 'text-green-600' : 'text-gray-900'} ${k === 'Receipt ID' ? 'font-mono text-[11px]' : ''}`}>
                       {v}
                     </span>
@@ -3301,16 +3317,18 @@ const ChatSystem = () => {
                 ))}
                 <button
                   onClick={() => {
+                    const bn = language === 'বাংলা';
+                    const cleared = (Number(activeReceipt.balance) || 0) > 0 ? formatBDT(activeReceipt.balance) : (bn ? 'পরিশোধিত' : 'Cleared');
                     const text = [
-                      'TO-LET PRO Rent Receipt',
-                      `Property: ${activeReceipt.propertyTitle}`,
-                      `Month: ${activeReceipt.monthLabel || activeReceipt.monthKey}`,
-                      `Total Due: ${formatBDT(activeReceipt.totalDue)}`,
-                      `Total Paid: ${formatBDT(activeReceipt.totalPaid)}`,
-                      `Balance: ${(Number(activeReceipt.balance) || 0) > 0 ? formatBDT(activeReceipt.balance) : 'Cleared'}`,
-                      `Method: ${activeReceipt.method || '—'}${activeReceipt.txnId ? ' · Txn ' + activeReceipt.txnId : ''}`,
-                      `Date: ${activeReceipt.date}`,
-                      `Receipt ID: ${activeReceipt.id}`,
+                      bn ? 'TO-LET PRO ভাড়ার রসিদ' : 'TO-LET PRO Rent Receipt',
+                      `${bn ? 'প্রপার্টি' : 'Property'}: ${activeReceipt.propertyTitle}`,
+                      `${bn ? 'মাস' : 'Month'}: ${activeReceipt.monthLabel || activeReceipt.monthKey}`,
+                      `${bn ? 'মোট প্রাপ্য' : 'Total Due'}: ${formatBDT(activeReceipt.totalDue)}`,
+                      `${bn ? 'মোট পরিশোধ' : 'Total Paid'}: ${formatBDT(activeReceipt.totalPaid)}`,
+                      `${bn ? 'বাকি' : 'Balance'}: ${cleared}`,
+                      `${bn ? 'মাধ্যম' : 'Method'}: ${activeReceipt.method || '—'}${activeReceipt.txnId ? ' · Txn ' + activeReceipt.txnId : ''}`,
+                      `${bn ? 'তারিখ' : 'Date'}: ${activeReceipt.date}`,
+                      `${bn ? 'রসিদ আইডি' : 'Receipt ID'}: ${activeReceipt.id}`,
                     ].join('\n');
                     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
                     const url = URL.createObjectURL(blob);
@@ -3319,7 +3337,7 @@ const ChatSystem = () => {
                   }}
                   className="w-full mt-2 py-3 bg-gray-900 hover:bg-[#ba0036] text-white rounded-xl text-[11px] font-black transition-all flex items-center justify-center gap-2"
                 >
-                  <Download size={14}/> Download receipt
+                  <Download size={14}/> {language === 'বাংলা' ? 'রসিদ ডাউনলোড করুন' : 'Download receipt'}
                 </button>
               </div>
             </motion.div>

@@ -282,22 +282,22 @@ export default function BuildingSetupWizard({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>{isBn ? 'ডিফল্ট ভাড়া (৳)' : 'Default Rent (৳)'}</label>
-                  <input type="number" min="0" value={form.defaultMonthlyRent} onChange={(e) => set({ defaultMonthlyRent: e.target.value })} placeholder="0" className={inputCls} />
+                  <input type="text" inputMode="numeric" data-number min="0" value={form.defaultMonthlyRent} onChange={(e) => set({ defaultMonthlyRent: e.target.value })} placeholder="0" className={inputCls} />
                 </div>
                 <div>
                   <label className={labelCls}>{isBn ? 'সার্ভিস চার্জ (৳)' : 'Service Charge (৳)'}</label>
-                  <input type="number" min="0" value={form.defaultServiceCharge} onChange={(e) => set({ defaultServiceCharge: e.target.value })} placeholder="0" className={inputCls} />
+                  <input type="text" inputMode="numeric" data-number min="0" value={form.defaultServiceCharge} onChange={(e) => set({ defaultServiceCharge: e.target.value })} placeholder="0" className={inputCls} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>{isBn ? 'প্রতি মাসের কত তারিখে ভাড়া?' : 'Rent Due Day'}</label>
-                  <input type="number" min="1" max="28" value={form.defaultRentDueDay} onChange={(e) => set({ defaultRentDueDay: e.target.value })} className={inputCls} />
+                  <input type="text" inputMode="numeric" data-number min="1" max="28" value={form.defaultRentDueDay} onChange={(e) => set({ defaultRentDueDay: e.target.value })} className={inputCls} />
                 </div>
                 {form.rentedAs === 'seat' && (
                   <div>
                     <label className={labelCls}>{isBn ? 'রুম প্রতি ডিফল্ট সিট সংখ্যা' : 'Default Seats/Room'}</label>
-                    <input type="number" min="1" max="60" value={form.defaultSeatCapacity} onChange={(e) => set({ defaultSeatCapacity: e.target.value })} className={inputCls} />
+                    <input type="text" inputMode="numeric" data-number min="1" max="60" value={form.defaultSeatCapacity} onChange={(e) => set({ defaultSeatCapacity: e.target.value })} className={inputCls} />
                   </div>
                 )}
               </div>

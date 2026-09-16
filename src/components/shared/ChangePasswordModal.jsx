@@ -22,6 +22,7 @@ import {
   ArrowRight, RefreshCcw, Phone, AlertTriangle,
 } from 'lucide-react';
 import { forgotPassword, resetPassword } from '../../services/authService.js';
+import { toAsciiDigits } from '../../utils/digits.js';
 
 const RESEND_COOLDOWN_S = 45;
 
@@ -105,7 +106,7 @@ const ChangePasswordModal = ({ open, onClose, phone, phoneVerified = false, bn =
 
   // ── OTP box helpers ───────────────────────────────────────────────────────
   const handleOtpChange = (i, val) => {
-    const digit = val.replace(/\D/g, '').slice(-1);
+    const digit = toAsciiDigits(val).replace(/\D/g, '').slice(-1);
     if (val !== '' && digit === '') return;
     const next = [...otp];
     next[i] = digit;
@@ -116,7 +117,8 @@ const ChangePasswordModal = ({ open, onClose, phone, phoneVerified = false, bn =
     if (e.key === 'Backspace' && !otp[i] && i > 0) inputsRef.current[i - 1]?.focus();
   };
   const handleOtpPaste = (e) => {
-    const text = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+    // A paste never fires `input`, so the app-wide digit folding misses it.
+    const text = toAsciiDigits(e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
     if (!text) return;
     e.preventDefault();
     const next = ['', '', '', '', '', ''];
@@ -176,7 +178,7 @@ const ChangePasswordModal = ({ open, onClose, phone, phoneVerified = false, bn =
 
       {/* Gradient-glow border wrapper → inner panel */}
       <div className="relative w-full md:max-w-md p-[1.5px] rounded-t-[2rem] md:rounded-[2rem] tp-border-glow animate-tp-modal-in">
-        <div className="relative rounded-t-[calc(2rem-1.5px)] md:rounded-[calc(2rem-1.5px)] bg-white overflow-hidden">
+        <div className="relative rounded-t-[calc(2rem-1.5px)] md:rounded-[calc(2rem-1.5px)] bg-white overflow-hidden pb-safe md:pb-0">
           {/* Header — tech grid + gradient key */}
           <div className="tp-grid relative flex items-center justify-between gap-4 px-6 pt-6 pb-4">
             <span className="absolute top-0 left-8 right-8 h-px bg-gradient-to-r from-transparent via-[#ba0036] to-transparent" aria-hidden />

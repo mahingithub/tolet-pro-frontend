@@ -407,7 +407,7 @@ function PaymentMethodFormModal({ method, language, onClose, onSaved }) {
   return (
     <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="bg-white rounded-t-[2rem] sm:rounded-[2rem] w-full sm:max-w-md relative z-10 overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in slide-in-from-bottom-6 sm:zoom-in-95 duration-300">
+      <div className="bg-white rounded-t-[2rem] sm:rounded-[2rem] w-full sm:max-w-md relative z-10 overflow-hidden shadow-2xl flex flex-col max-h-[90vh] pb-safe sm:pb-0 animate-in fade-in slide-in-from-bottom-6 sm:zoom-in-95 duration-300">
         <div className="flex items-center justify-between p-5 sm:p-6 border-b border-gray-100">
           <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
             <CreditCard className="text-[#ba0036]" size={22} />

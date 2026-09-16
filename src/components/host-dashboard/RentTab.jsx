@@ -641,7 +641,7 @@ export default function RentTab(props) {
                       </div>
                     ) : (
                       <button onClick={() => setActiveModal('premium_gate')} className="bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest flex items-center gap-1 transition-colors shrink-0">
-                         <Lock size={10} /> Free
+                         <Lock size={10} /> {language === 'বাংলা' ? 'ফ্রি' : 'Free'}
                       </button>
                     )}
                   </div>

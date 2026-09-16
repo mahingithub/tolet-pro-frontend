@@ -54,6 +54,12 @@ const HomePage = () => {
     // ✨ Premium wrapper with global selection colours + fade-in.
     <div className="flex flex-col min-h-screen bg-slate-50 font-sans relative overflow-hidden text-gray-900 selection:bg-[#ba0036] selection:text-white animate-in fade-in duration-1000">
 
+      {/* The page's one <h1>, for both layouts. The mobile hero's heading was
+          removed on request and the desktop hero never had one, so the
+          homepage had no heading at all. Read by crawlers and screen readers;
+          nothing on screen changes. */}
+      <h1 className="sr-only">{HOME_TITLE}</h1>
+
       {/* ───── MOBILE HOMEPAGE (max-width: 768px) ───── */}
       {/* Self-contained native-app-style feed: sticky glass search, trust */}
       {/* badge rail, swipeable divisions strip, landlord CTA card, and a    */}

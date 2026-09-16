@@ -1,19 +1,20 @@
 import React, { useState } from 'react';
 import { Check, X, Calendar, CheckCircle2, User, Phone, Home, MessageSquare, Trash2 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { updateInquiryStatus } from '../services/inquiryService';
 import ScheduleVisitModal from './ScheduleVisitModal';
 
 export default function InquiryCard({ inquiry, propertyStatus, onStatusChange, onChat, onCall, onDelete }) {
-  const { language } = useAuth();
+  const { language } = useLanguage();
+  const isBn = language === 'বাংলা';
   const [loadingAction, setLoadingAction] = useState(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   // Safe fallbacks for inquiry details
-  const tenantName = inquiry?.user || inquiry?.tenantName || 'Unknown Tenant';
+  const tenantName = inquiry?.user || inquiry?.tenantName || (isBn ? 'অজানা ভাড়াটিয়া' : 'Unknown Tenant');
   const tenantPhone = inquiry?.phone || inquiry?.tenantPhone || 'N/A';
   const tenantAvatar = inquiry?.userAvatar || inquiry?.tenantAvatar || '';
-  const propertyTitle = inquiry?.propTitle || inquiry?.propertyName || 'Unknown Property';
+  const propertyTitle = inquiry?.propTitle || inquiry?.propertyName || (isBn ? 'অজানা প্রপার্টি' : 'Unknown Property');
   const status = inquiry?.status?.toLowerCase() || 'delivered';
 
   const handleAction = async (newStatus) => {
@@ -126,14 +127,14 @@ export default function InquiryCard({ inquiry, propertyStatus, onStatusChange, o
                 disabled={loadingAction === 'accepted'}
                 className="flex-1 flex items-center justify-center gap-1.5 bg-green-50 hover:bg-green-100 text-green-700 px-4 py-2.5 rounded-xl text-sm font-black transition-colors disabled:opacity-50"
               >
-                {loadingAction === 'accepted' ? '...' : <><Check size={16} strokeWidth={3} /> Accept ✓</>}
+                {loadingAction === 'accepted' ? '...' : <><Check size={16} strokeWidth={3} /> {isBn ? 'গ্রহণ করুন' : 'Accept'}</>}
               </button>
               <button
                 onClick={() => handleAction('rejected')}
                 disabled={loadingAction === 'rejected'}
                 className="flex-1 flex items-center justify-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2.5 rounded-xl text-sm font-black transition-colors disabled:opacity-50"
               >
-                {loadingAction === 'rejected' ? '...' : <><X size={16} strokeWidth={3} /> Reject ✗</>}
+                {loadingAction === 'rejected' ? '...' : <><X size={16} strokeWidth={3} /> {isBn ? 'বাতিল করুন' : 'Reject'}</>}
               </button>
             </>
           )}

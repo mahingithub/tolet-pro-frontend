@@ -15,6 +15,8 @@ import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, Video, MessageCircle } from 'lucide-react';
 import callService from '../services/callService';
+import { useIsBn } from '../context/LanguageContext';
+import { clockTime, dateTime } from '../utils/bnTime';
 
 const { formatCallDuration } = callService;
 
@@ -27,31 +29,32 @@ const sameDay = (a, b) => {
          x.getDate() === y.getDate();
 };
 
-const fmtAbs = (iso) => {
+const fmtAbs = (iso, isBn) => {
   if (!iso) return '—';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '—';
-  return d.toLocaleString(undefined, {
+  return dateTime(d, isBn, {
     weekday: 'short', day: 'numeric', month: 'short',
     hour: '2-digit', minute: '2-digit',
   });
 };
 
-const fmtTime = (iso) => {
+const fmtTime = (iso, isBn) => {
   if (!iso) return '';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return clockTime(d, isBn);
 };
 
 // Map describeCall's normalised status → label + colour.
-const statusInfo = (call) => {
+const statusInfo = (call, isBn) => {
+  const L = (bn, en) => (isBn ? bn : en);
   switch (call.status) {
-    case 'missed':      return { label: 'Missed call',    tone: 'text-red-600' };
-    case 'no-answer':   return { label: 'No answer',      tone: 'text-red-600' };
-    case 'declined':    return { label: call.direction === 'outgoing' ? 'Declined' : 'You declined', tone: 'text-red-600' };
-    case 'completed':   return { label: 'Completed',      tone: 'text-green-600' };
-    case 'in-progress': return { label: 'In progress',    tone: 'text-amber-600' };
+    case 'missed':      return { label: L('মিসড কল', 'Missed call'),    tone: 'text-red-600' };
+    case 'no-answer':   return { label: L('সাড়া দেয়নি', 'No answer'),  tone: 'text-red-600' };
+    case 'declined':    return { label: call.direction === 'outgoing' ? L('কেটে দিয়েছে', 'Declined') : L('আপনি কেটে দিয়েছেন', 'You declined'), tone: 'text-red-600' };
+    case 'completed':   return { label: L('সম্পন্ন', 'Completed'),      tone: 'text-green-600' };
+    case 'in-progress': return { label: L('চলছে', 'In progress'),      tone: 'text-amber-600' };
     default:            return { label: call.status || '—', tone: 'text-gray-600' };
   }
 };
@@ -64,6 +67,8 @@ export default function CallDetailModal({
   onMessage,      // () => void
   onViewProfile,  // () => void  (optional)
 }) {
+  const isBn = useIsBn();
+  const L = (bn, en) => (isBn ? bn : en);
   // Group: how many calls with this same peer happened today.
   const todayWithPeer = useMemo(() => {
     if (!call?.peer?.id) return [];
@@ -85,7 +90,7 @@ export default function CallDetailModal({
   const peer = call.peer || {};
   const initials = (peer.name || '?')
     .split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase();
-  const { label, tone } = statusInfo(call);
+  const { label, tone } = statusInfo(call, isBn);
   const isVideo = call.type === 'video';
 
   return (
@@ -106,7 +111,7 @@ export default function CallDetailModal({
 
           {/* Sheet / card */}
           <motion.div
-            className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
+            className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden pb-safe sm:pb-0"
             initial={{ y: 40, opacity: 0, scale: 0.98 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 40, opacity: 0, scale: 0.98 }}
@@ -116,7 +121,7 @@ export default function CallDetailModal({
             <button
               onClick={onClose}
               className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-all"
-              aria-label="Close"
+              aria-label={L('বন্ধ করুন', 'Close')}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -135,7 +140,7 @@ export default function CallDetailModal({
                   </div>
                 )}
               </div>
-              <h3 className="text-xl font-black text-gray-900">{peer.name || 'Unknown'}</h3>
+              <h3 className="text-xl font-black text-gray-900">{peer.name || L('অজানা', 'Unknown')}</h3>
               {peer.phone && (
                 <p className="text-[13px] font-bold text-gray-500 mt-0.5">{peer.phone}</p>
               )}
@@ -150,22 +155,22 @@ export default function CallDetailModal({
               </div>
               {todayWithPeer.length > 1 && (
                 <span className="mt-2 text-[10px] font-black uppercase tracking-widest text-[#ba0036] bg-red-50 border border-red-100 px-2.5 py-1 rounded-full">
-                  {todayWithPeer.length} calls today
+                  {L(`আজ ${todayWithPeer.length.toLocaleString('bn-BD')}টি কল`, `${todayWithPeer.length} calls today`)}
                 </span>
               )}
             </div>
 
             {/* Detail rows */}
             <div className="px-6 py-3 space-y-2.5 border-t border-gray-100">
-              <DetailRow k="Direction" v={call.direction === 'outgoing' ? 'Outgoing' : 'Incoming'} />
-              <DetailRow k="Type" v={isVideo ? 'Video call' : 'Voice call'} />
-              <DetailRow k="Started" v={fmtAbs(call.startedAt || call.iso)} />
-              <DetailRow k="Ended" v={call.endedAt ? fmtAbs(call.endedAt) : '—'} />
+              <DetailRow k={L('দিক', 'Direction')} v={call.direction === 'outgoing' ? L('আউটগোয়িং', 'Outgoing') : L('ইনকামিং', 'Incoming')} />
+              <DetailRow k={L('ধরন', 'Type')} v={isVideo ? L('ভিডিও কল', 'Video call') : L('ভয়েস কল', 'Voice call')} />
+              <DetailRow k={L('শুরু', 'Started')} v={fmtAbs(call.startedAt || call.iso, isBn)} />
+              <DetailRow k={L('শেষ', 'Ended')} v={call.endedAt ? fmtAbs(call.endedAt, isBn) : '—'} />
               {call.durationSec > 0 && (
-                <DetailRow k="Duration" v={formatCallDuration(call.durationSec)} />
+                <DetailRow k={L('সময়কাল', 'Duration')} v={formatCallDuration(call.durationSec)} />
               )}
               {call.roomId && (
-                <DetailRow k="Room ID" v={<span className="font-mono text-[10px] text-gray-400 break-all">{call.roomId}</span>} />
+                <DetailRow k={L('রুম আইডি', 'Room ID')} v={<span className="font-mono text-[10px] text-gray-400 break-all">{call.roomId}</span>} />
               )}
             </div>
 
@@ -173,11 +178,11 @@ export default function CallDetailModal({
             {recentWithPeer.length > 0 && (
               <div className="px-6 pb-2">
                 <p className="text-[9px] font-black uppercase tracking-[0.18em] text-gray-400 mb-1.5">
-                  Recent with {peer.name?.split(' ')[0] || 'them'}
+                  {L(`${peer.name?.split(' ')[0] || 'তার'}-এর সাথে সাম্প্রতিক`, `Recent with ${peer.name?.split(' ')[0] || 'them'}`)}
                 </p>
                 <div className="space-y-1">
                   {recentWithPeer.map((c) => {
-                    const ci = statusInfo(c);
+                    const ci = statusInfo(c, isBn);
                     return (
                       <div key={c.id} className="flex items-center gap-2 text-[11px]">
                         {c.type === 'video'
@@ -186,7 +191,7 @@ export default function CallDetailModal({
                         <span className={`font-bold ${ci.tone}`}>{ci.label}</span>
                         <span className="text-gray-400 font-bold ml-auto">
                           {c.status === 'completed' && c.durationSec > 0 ? `${formatCallDuration(c.durationSec)} · ` : ''}
-                          {fmtTime(c.iso)}
+                          {fmtTime(c.iso, isBn)}
                         </span>
                       </div>
                     );
@@ -201,19 +206,19 @@ export default function CallDetailModal({
                 onClick={() => onCall?.('voice')}
                 className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-green-50 hover:bg-green-100 text-green-700 font-black text-[13px] transition-all active:scale-95"
               >
-                <Phone size={16} /> Voice
+                <Phone size={16} /> {L('ভয়েস', 'Voice')}
               </button>
               <button
                 onClick={() => onCall?.('video')}
                 className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-black text-[13px] transition-all active:scale-95"
               >
-                <Video size={16} /> Video
+                <Video size={16} /> {L('ভিডিও', 'Video')}
               </button>
               <button
                 onClick={() => onMessage?.()}
                 className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-[#ba0036] hover:bg-[#90002a] text-white font-black text-[13px] shadow-md transition-all active:scale-95"
               >
-                <MessageCircle size={16} /> Message
+                <MessageCircle size={16} /> {L('মেসেজ', 'Message')}
               </button>
               <button
                 onClick={() => onViewProfile?.()}
@@ -225,7 +230,7 @@ export default function CallDetailModal({
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                   <circle cx="12" cy="7" r="4" />
                 </svg>
-                Profile
+                {L('প্রোফাইল', 'Profile')}
               </button>
             </div>
           </motion.div>

@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { isNativeApp, nativeLoginUrl } from '../utils/nativeExperience.js';
 
 /**
  * useRequireAuth — gate an ACTION behind login.
@@ -23,17 +24,24 @@ import { useAuth } from '../context/AuthContext.jsx';
 export default function useRequireAuth() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   return useCallback(
-    (cb) => {
+    (cb, { next, role, action } = {}) => {
       if (isAuthenticated) {
         if (typeof cb === 'function') cb();
         return true;
       }
-      const next = encodeURIComponent(window.location.pathname + window.location.search);
-      navigate(`/login?next=${next}`);
+      const destination = next || location.pathname + location.search + location.hash;
+      if (isNativeApp()) {
+        navigate(nativeLoginUrl({ next: destination, role, action }));
+      } else {
+        const params = new URLSearchParams({ next: destination });
+        if (role) params.set('role', role);
+        navigate(`/login?${params}`);
+      }
       return false;
     },
-    [isAuthenticated, navigate],
+    [isAuthenticated, navigate, location.pathname, location.search, location.hash],
   );
 }

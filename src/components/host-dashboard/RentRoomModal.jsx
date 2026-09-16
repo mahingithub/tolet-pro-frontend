@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { remainingFor, paidSoFar } from '../../utils/rentLedger';
 import ModalPortal from '../shared/ModalPortal.jsx';
+import useBackGuard from '../../hooks/useBackGuard';
 
 const PAYMENT_METHODS = ['bKash', 'Nagad', 'Rocket', 'Bank Transfer', 'Cash'];
 
@@ -62,6 +63,12 @@ export default function RentRoomModal({
   const [confirming, setConfirming] = useState(false);
   const [paidOn, setPaidOn] = useState(todayIso());
   const [method, setMethod] = useState('bKash');
+
+  // Android's Back button closes the room instead of leaving the Rent tab. Until
+  // this, the only ways out were an X at the far top of a tall phone and a thin
+  // strip of backdrop above the sheet — on a Galaxy S24 Ultra that read as "this
+  // can't be dismissed".
+  useBackGuard(true, onClose);
 
   // Escape closes, and the page behind doesn't scroll while a room is open.
   useEffect(() => {
@@ -115,7 +122,7 @@ export default function RentRoomModal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative bg-gray-50 w-full sm:max-w-2xl rounded-t-[1.75rem] sm:rounded-[1.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.28)] max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
+        className="relative bg-gray-50 w-full sm:max-w-2xl rounded-t-[1.75rem] sm:rounded-[1.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.28)] max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden pb-safe sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
       >
         {/* ── Header — which room, and nothing else ── */}
         <div className="shrink-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-2.5">

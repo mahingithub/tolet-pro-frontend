@@ -40,6 +40,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useSettings } from '../../context/SettingsContext.jsx';
 import { useNotificationSettings } from '../../context/NotificationContext';
 import ChangePasswordModal from './ChangePasswordModal.jsx';
+import { NATIVE_START_PATH, isNativeApp } from '../../utils/nativeExperience.js';
 
 // ─── Language mapping (LanguageContext uses labels, backend uses codes) ──────
 const toLangCode = (label) => (label === 'বাংলা' ? 'bn' : 'en');
@@ -591,11 +592,27 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
           {/* Shown to everyone, not just dual-role accounts: "which screen do I
               want first?" is a question a tenant-only user has too — plenty of
               them open the app to write down a খরচ, not to look at listings. */}
-          <Row
-            label={bn ? 'অ্যাপ খুললে যা দেখব' : 'Open the app on'}
-            sublabel={bn ? 'অ্যাপ চালু করলে প্রথমে কোন স্ক্রিন আসবে' : 'The first screen when you open the app'}
-            right={<SelectInput value={app.defaultHome} onChange={(v) => save({ app: { defaultHome: v } })} options={opts.defaultHome} />}
-          />
+          {/* The installed app opens on the choice made at /app/start, which is
+              kept on the device and not on the account — so it offers that
+              instead of the website's defaultHome, which it no longer reads. */}
+          {isNativeApp() ? (
+            <Row
+              label={bn ? 'অ্যাপ ব্যবহারের ধরন' : 'How I use the app'}
+              sublabel={bn ? 'ভাড়াটিয়া (হিসাব বা বাসা খোঁজা) অথবা বাড়িওয়ালা' : 'Tenant (ledger or home search) or landlord'}
+              right={
+                <button type="button" onClick={() => navigate(NATIVE_START_PATH)}
+                  className="px-3 py-1.5 rounded-lg bg-gray-100 text-xs font-black text-gray-700 active:scale-95 transition">
+                  {bn ? 'বদলান' : 'Change'}
+                </button>
+              }
+            />
+          ) : (
+            <Row
+              label={bn ? 'অ্যাপ খুললে যা দেখব' : 'Open the app on'}
+              sublabel={bn ? 'অ্যাপ চালু করলে প্রথমে কোন স্ক্রিন আসবে' : 'The first screen when you open the app'}
+              right={<SelectInput value={app.defaultHome} onChange={(v) => save({ app: { defaultHome: v } })} options={opts.defaultHome} />}
+            />
+          )}
           {(isTenant && isLandlord) && (
             <Row
               label={bn ? 'ডিফল্ট ড্যাশবোর্ড' : 'Default dashboard'}
@@ -705,7 +722,7 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
       content: (
         <>
           <Row label={bn ? 'শহর' : 'City'} right={<TextField value={tn.defaultCity} onCommit={(v) => save({ tenant: { defaultCity: v } })} placeholder={bn ? 'ঢাকা' : 'Dhaka'} maxLength={60} className="w-36" />} />
-          <Row label={bn ? 'এলাকা' : 'Area'} right={<TextField value={tn.defaultArea} onCommit={(v) => save({ tenant: { defaultArea: v } })} placeholder="Gulshan" maxLength={80} className="w-36" />} />
+          <Row label={bn ? 'এলাকা' : 'Area'} right={<TextField value={tn.defaultArea} onCommit={(v) => save({ tenant: { defaultArea: v } })} placeholder={bn ? 'গুলশান' : 'Gulshan'} maxLength={80} className="w-36" />} />
           <Row label={bn ? 'সর্বনিম্ন বাজেট (৳)' : 'Min budget (৳)'} right={<NumberField value={tn.defaultBudgetMin} onCommit={(v) => save({ tenant: { defaultBudgetMin: v } })} placeholder="10,000" />} />
           <Row label={bn ? 'সর্বোচ্চ বাজেট (৳)' : 'Max budget (৳)'} right={<NumberField value={tn.defaultBudgetMax} onCommit={(v) => save({ tenant: { defaultBudgetMax: v } })} placeholder="40,000" />} />
           <Row label={bn ? 'প্রপার্টি টাইপ' : 'Property type'} right={<SelectInput value={tn.defaultPropertyType} onChange={(v) => save({ tenant: { defaultPropertyType: v } })} options={opts.tenantType} />} />

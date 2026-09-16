@@ -7,10 +7,14 @@ import {
   User,
   PlusCircle,
   Wallet,
+  Building2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useSettings } from '../../context/SettingsContext.jsx';
 import { resolveHome } from '../../utils/homeSurface';
+import { useIsBn } from '../../context/LanguageContext';
+import useNativeExperience from '../../hooks/useNativeExperience';
+import { nativeLoginUrl } from '../../utils/nativeExperience';
 
 /**
  * MobileBottomNav — fixed-position bottom rail for the mobile app shell.
@@ -26,6 +30,14 @@ import { resolveHome } from '../../utils/homeSurface';
  * Only the raised centre action changes by role: tenants get "Living"
  * (Roommate Wallet), everyone else gets "+ List". Saved lives inside the
  * tenant dashboard (Profile → Saved), keeping the rail uncluttered.
+ *
+ * INSTALLED APP: the rail follows the choice made on /app/start instead
+ * (utils/nativeExperience.js), signed in or not:
+ *   Tenant · Living : Ledger · Messages · Profile            (no FAB)
+ *   Tenant · Search : Home · Explore · [Living FAB] · Messages · Profile
+ *   Landlord        : Home · Properties · [+List FAB] · Messages · Profile
+ * A signed-out app user tapping an action (List, Messages, Profile) goes
+ * straight to login with that role already chosen — no drawer, no role picker.
  *
  * Profile button behaviour (auth-aware):
  *   - Not logged in → opens the Navbar slide-out drawer (Join TO-LET PRO,
@@ -44,6 +56,8 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   const { user, isAuthenticated, isAdmin, roles } = useAuth();
   const { settings } = useSettings();
   const defaultHome = settings?.app?.defaultHome || 'auto';
+  const isBn = useIsBn();
+  const { isNative, mode: nativeMode } = useNativeExperience();
 
   // Event-driven hide: HostDashboard dispatches 'hide-bottom-nav' when the
   // user enters Bookings / Rent tabs, and 'show-bottom-nav' when they leave.
@@ -80,43 +94,67 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   // 'landlord' or 'host', so accept both.
   const isLandlord = isAuthenticated && (user?.role === 'landlord' || user?.role === 'host');
 
+  // null on the website, and in the app until /app/start has been answered.
+  const appMode = isNative ? nativeMode : null;
+  const appGuest = !!appMode && !isAuthenticated;
+
   // "Home" is wherever the user's home actually is — the same answer the app
   // uses when it opens (utils/homeSurface.js), not a second rule maintained
   // here. `?tab=dashboard` on the landlord path guarantees a tap always lands
   // on the overview, even if they were sitting on another dashboard tab.
   const homeTo = (() => {
+    if (appMode === 'living') return '/living';
+    if (appMode === 'search') return '/';
+    if (appMode === 'host') return '/host-dashboard?tab=dashboard';
     if (!isAuthenticated) return '/';
     const to = resolveHome({ activeRole: user?.role, roles, defaultHome, hasBooking: true });
     return to === '/host-dashboard' ? '/host-dashboard?tab=dashboard' : to;
   })();
 
-  const LEFT = [
-    { id: 'home', label: 'Home', icon: Home, to: homeTo },
-    { id: 'explore', label: 'Explore', icon: Search, to: '/properties/all' },
-  ];
+  const homeItem = appMode === 'living'
+    ? { id: 'home', label: isBn ? 'হিসাব' : 'Ledger', icon: Wallet, to: homeTo }
+    : { id: 'home', label: isBn ? 'হোম' : 'Home', icon: Home, to: homeTo };
+
+  const LEFT = appMode === 'living'
+    ? [homeItem]
+    : appMode === 'host'
+    ? [homeItem, appGuest
+        ? { id: 'properties', label: isBn ? 'প্রপার্টি' : 'Properties', icon: Building2, action: 'login', next: '/host-dashboard?tab=properties' }
+        : { id: 'properties', label: isBn ? 'প্রপার্টি' : 'Properties', icon: Building2, to: '/host-dashboard?tab=properties' }]
+    : [homeItem, { id: 'explore', label: isBn ? 'খুঁজুন' : 'Explore', icon: Search, to: '/properties/all' }];
 
   // Profile target depends on who's logged in. Falls back to "open drawer"
   // for guests so they can pick Login / Sign Up.
   const profileTarget = (() => {
-    if (!isAuthenticated) return { id: 'profile', label: 'Profile', icon: User, action: 'drawer' };
-    if (isAdmin)           return { id: 'profile', label: 'Profile', icon: User, to: '/admin' };
+    if (appGuest) return { id: 'profile', label: isBn ? 'প্রোফাইল' : 'Profile', icon: User, action: 'login' };
+    if (!isAuthenticated) return { id: 'profile', label: isBn ? 'প্রোফাইল' : 'Profile', icon: User, action: 'drawer' };
+    if (isAdmin)           return { id: 'profile', label: isBn ? 'প্রোফাইল' : 'Profile', icon: User, to: '/admin' };
     if (isLandlord) {
       if (location.pathname.startsWith('/host-dashboard')) {
-        return { id: 'profile', label: 'Profile', icon: User, action: 'host-drawer' };
+        return { id: 'profile', label: isBn ? 'প্রোফাইল' : 'Profile', icon: User, action: 'host-drawer' };
       }
-      return { id: 'profile', label: 'Profile', icon: User, to: '/host-dashboard?tab=dashboard' };
+      return { id: 'profile', label: isBn ? 'প্রোফাইল' : 'Profile', icon: User, to: '/host-dashboard?tab=dashboard' };
     }
     // default to tenant
-    return { id: 'profile', label: 'Profile', icon: User, to: '/tenant-dashboard' };
+    return { id: 'profile', label: isBn ? 'প্রোফাইল' : 'Profile', icon: User, to: '/tenant-dashboard' };
   })();
 
   const RIGHT = [
-    { id: 'messages', label: 'Messages', icon: MessageCircle, to: '/messages' },
+    appGuest
+      ? { id: 'messages', label: isBn ? 'মেসেজ' : 'Messages', icon: MessageCircle, action: 'login', next: '/messages' }
+      : { id: 'messages', label: isBn ? 'মেসেজ' : 'Messages', icon: MessageCircle, to: '/messages' },
     profileTarget,
   ];
 
+  // Which raised action sits in the middle. A Living-only app user has no use
+  // for either — their wallet has its own add buttons.
+  const centre = appMode === 'living' ? null
+    : appMode === 'search' ? 'living'
+    : appMode === 'host' ? 'list'
+    : isTenant ? 'living' : 'list';
+
   const isActive = (item) => {
-    if ((item.action === 'drawer' || item.action === 'host-drawer') && !item.to) return false;
+    if (!item.to) return false;
 
     // Split any ?tab= off the target so we can compare pathname + tab
     // (landlord Home → dashboard overview, Profile → dashboard settings).
@@ -152,6 +190,12 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   };
 
   const handleClick = (item) => {
+    if (item.action === 'login') {
+      // Straight to login/sign-up with the app's chosen role — no drawer, no
+      // role picker. Omitting `next` returns them to the page they are on.
+      navigate(nativeLoginUrl({ next: item.next }));
+      return;
+    }
     if (item.action === 'drawer') {
       // Tell <Navbar> to open its slide-out drawer. See the matching
       // `open-mobile-menu` listener in Navbar.jsx.
@@ -206,7 +250,7 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
             <img
               key={user.avatar}
               src={user.avatar}
-              alt="Profile"
+              alt={isBn ? 'প্রোফাইল' : 'Profile'}
               className={`relative w-[22px] h-[22px] rounded-full object-cover ${active ? 'ring-2 ring-[#ba0036]' : 'ring-1 ring-gray-200'}`}
               onError={() => setImgError(true)}
             />
@@ -254,8 +298,9 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
               so their centre slot becomes the "Living" (Roommate Wallet) entry
               — their flagship daily-use surface. Landlords + guests keep the
               "+ List" action so they can start a new listing in one tap. */}
+          {centre && (
           <div className="flex-1 h-full flex flex-col items-center justify-end relative pb-1">
-            {isTenant ? (
+            {centre === 'living' ? (
               <>
                 <button
                   onClick={() => navigate('/living')}
@@ -266,35 +311,36 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
                   className={`absolute -top-5 w-14 h-14 rounded-2xl bg-gradient-to-br from-[#ba0036] via-[#d4143a] to-[#ff4d6d] text-white flex items-center justify-center shadow-[0_12px_30px_-8px_rgba(186,0,54,0.55)] active:scale-95 transition-transform ring-4 ring-white ${
                     location.pathname === '/living' ? 'scale-105' : ''
                   }`}
-                  aria-label="Roommate Wallet"
+                  aria-label={isBn ? 'রুমমেট ওয়ালেট' : 'Roommate Wallet'}
                   aria-current={location.pathname === '/living' ? 'page' : undefined}
                 >
                   <Wallet size={24} strokeWidth={2.3} />
                 </button>
                 <span className="text-[9px] font-black uppercase tracking-widest text-[#ba0036]">
-                  Living
+                  {isBn ? 'লিভিং' : 'Living'}
                 </span>
               </>
             ) : (
               <>
                 <button
-                  onClick={() => navigate('/list-property')}
+                  onClick={() => (appGuest ? navigate(nativeLoginUrl({ next: '/list-property' })) : navigate('/list-property'))}
                   // Tour anchor: on a phone the header's "List Property" button
                   // is hidden (`hidden sm:inline-flex`), so this FAB is the only
                   // way a landlord starts a listing — and the host dashboard
                   // tour had no step for it at all. See TourContext.jsx.
                   data-tour="mobile-nav-list"
                   className="absolute -top-5 w-14 h-14 rounded-2xl bg-gradient-to-br from-[#ba0036] via-[#d4143a] to-[#ff4d6d] text-white flex items-center justify-center shadow-[0_12px_30px_-8px_rgba(186,0,54,0.55)] active:scale-95 transition-transform ring-4 ring-white"
-                  aria-label="List a property"
+                  aria-label={isBn ? 'বিজ্ঞাপন দিন' : 'List a property'}
                 >
                   <PlusCircle size={26} strokeWidth={2.2} />
                 </button>
                 <span className="text-[9px] font-black uppercase tracking-widest text-[#ba0036]">
-                  List
+                  {isBn ? 'বিজ্ঞাপন' : 'List'}
                 </span>
               </>
             )}
           </div>
+          )}
 
           {RIGHT.map((item) => (
             <NavBtn key={item.id} item={item} />

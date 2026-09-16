@@ -7,7 +7,7 @@ import {
   Building, Users, Calendar, Activity, Eye, Lightbulb,
   ChevronRight, ShieldCheck, Clock, Camera, ImageIcon, FileWarning, AlertTriangle
 } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage, useIsBn } from '../context/LanguageContext';
 import { fetchHostInsights } from '../services/insightsService';
 
 // ─── Tag style config ───────────────────────────────────────────────────────
@@ -63,6 +63,7 @@ function formatCurrency(n) {
 }
 
 export default function AIInsightsPage() {
+  const isBn = useIsBn();
   const goBack = useGoBack('/');
   const { language = 'English' } = useLanguage() || {};
   const bn = language === 'বাংলা';
@@ -227,7 +228,7 @@ export default function AIInsightsPage() {
                 className="text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest animate-pulse"
                 style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.4), rgba(236,72,153,0.4))', border: '1px solid rgba(99,102,241,0.5)', color: '#a5b4fc' }}
               >
-                LIVE
+                {isBn ? 'লাইভ' : 'LIVE'}
               </span>
             </div>
             <p className="text-xs font-medium mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
@@ -322,7 +323,7 @@ export default function AIInsightsPage() {
                       {/* Comparables badge */}
                       <div className="shrink-0 w-12 h-12 rounded-xl flex flex-col items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)' }}>
                         <span className="text-[15px] font-black text-indigo-300 leading-none">{opp.comparables}</span>
-                        <span className="text-[7px] font-black uppercase tracking-widest mt-0.5" style={{ color: 'rgba(165,180,252,0.6)' }}>comp</span>
+                        <span className="text-[7px] font-black uppercase tracking-widest mt-0.5" style={{ color: 'rgba(165,180,252,0.6)' }}>{isBn ? 'তুলনা' : 'comp'}</span>
                       </div>
 
                       <div className="flex-1 min-w-0">

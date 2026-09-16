@@ -119,7 +119,7 @@ export default function AgreementBrandModal({
           role="dialog"
           aria-modal="true"
           aria-label={L('ডকুমেন্ট ব্র্যান্ডিং', 'Document branding')}
-          className="relative bg-white w-full sm:max-w-md rounded-t-[1.75rem] sm:rounded-[1.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.28)] max-h-[92vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
+          className="relative bg-white w-full sm:max-w-md rounded-t-[1.75rem] sm:rounded-[1.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.28)] max-h-[92vh] flex flex-col overflow-hidden pb-safe sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
         >
           <div className="shrink-0 px-5 py-4 border-b border-gray-100 flex items-center gap-3">
             <div className="min-w-0 flex-1">

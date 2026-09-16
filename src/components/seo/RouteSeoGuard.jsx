@@ -26,6 +26,7 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import useSeo from '../../seo/useSeo';
+import { PUBLIC_PAGE_SEO } from '../../seo/staticPages';
 
 /**
  * Path prefixes that must never be indexed. Order does not matter; the first
@@ -58,39 +59,8 @@ const PRIVATE_PREFIXES = [
   { prefix: '/services', title: 'Home services' },
 ];
 
-/** Public pages whose components don't manage their own head. */
-const PUBLIC_ROUTE_SEO = {
-  '/support': {
-    title: 'সাহায্য ও সাপোর্ট — Help & Support',
-    description:
-      'TO-LET PRO ব্যবহারে কোনো সমস্যা? বাসা ভাড়া, বিজ্ঞাপন, অ্যাকাউন্ট, পেমেন্ট বা '
-      + 'রিপোর্ট সংক্রান্ত সাহায্যের জন্য সাপোর্ট টিমের কাছে অনুরোধ পাঠান — বাংলা ও ইংরেজিতে।',
-  },
-  '/privacy-policy': {
-    title: 'প্রাইভেসি পলিসি — Privacy Policy',
-    description:
-      'TO-LET PRO কোন তথ্য সংগ্রহ করে, কেন করে, কতদিন রাখে এবং আপনি কিভাবে আপনার তথ্য '
-      + 'দেখতে, সংশোধন করতে বা মুছে ফেলতে পারেন — সম্পূর্ণ প্রাইভেসি পলিসি।',
-  },
-  '/terms': {
-    title: 'ব্যবহারের শর্তাবলী — Terms of Service',
-    description:
-      'TO-LET PRO ব্যবহারের শর্তাবলী — বাড়িওয়ালা ও ভাড়াটিয়ার দায়িত্ব, বিজ্ঞাপনের নিয়ম, '
-      + 'নিষিদ্ধ ব্যবহার এবং অ্যাকাউন্ট সংক্রান্ত শর্ত।',
-  },
-  '/refund': {
-    title: 'রিফান্ড পলিসি — Refund Policy',
-    description:
-      'TO-LET PRO এর পেইড প্ল্যান ও বুস্ট সংক্রান্ত রিফান্ড নীতি — কখন রিফান্ড প্রযোজ্য, '
-      + 'কিভাবে অনুরোধ করবেন এবং কত সময় লাগে।',
-  },
-  '/trust-safety': {
-    title: 'ট্রাস্ট ও নিরাপত্তা — Trust & Safety',
-    description:
-      'ভেরিফিকেশন, প্রতারণা এড়ানোর উপায়, নিরাপদে বাসা দেখা ও রিপোর্ট করার নিয়ম — '
-      + 'TO-LET PRO তে নিরাপদ থাকার নির্দেশিকা।',
-  },
-};
+/** Public pages whose components don't manage their own head — copy in src/seo/staticPages.js. */
+const PUBLIC_ROUTE_SEO = PUBLIC_PAGE_SEO;
 
 const RouteSeoGuard = () => {
   const { pathname } = useLocation();

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 import useLivingStore from '../../store/useLivingStore';
+import useLivingAction from './useLivingAction';
 import { walletSummary, buildReminders, taka, takaSigned } from './livingUtils';
 import { Card, IconBadge, Avatar, AvatarStack, Chip, PrimaryButton, GhostButton, Field, TextInput, Sheet, ConfirmDialog, cx } from './livingUI';
 
@@ -236,8 +237,9 @@ const MoreRow = ({ icon: Icon, tint, text, label, badge, onClick }) => (
   </button>
 );
 
-const WalletSummary = ({ go, me, language }) => {
+const WalletSummary = ({ go, me, language, intent, clearIntent }) => {
   const isBn = language === 'বাংলা';
+  const requireAction = useLivingAction('overview');
   const state = useLivingStore();
   const roommates = useLivingStore((s) => s.roommates);
   const addRoommate = useLivingStore((s) => s.addRoommate);
@@ -257,6 +259,13 @@ const WalletSummary = ({ go, me, language }) => {
   const [connectOpen, setConnectOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [pendingRemove, setPendingRemove] = useState(null);
+
+  // Reopens the sheet a guest was reaching for before login took them away.
+  useEffect(() => {
+    if (intent !== 'roommate' && intent !== 'connect') return;
+    if (requireAction(intent)) (intent === 'roommate' ? setAddOpen : setConnectOpen)(true);
+    clearIntent?.();
+  }, [intent, clearIntent, requireAction]);
 
   useEffect(() => {
     const handleTourAction = (e) => {
@@ -416,7 +425,7 @@ const WalletSummary = ({ go, me, language }) => {
                     </p>
                   </div>
                   {!r.joined && !r.isMe && isOwner && (
-                    <button onClick={() => setPendingRemove(r)} className="p-2 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90 shrink-0" aria-label="remove">
+                    <button onClick={() => { if (requireAction()) setPendingRemove(r); }} className="p-2 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90 shrink-0" aria-label="remove">
                       <X size={15} />
                     </button>
                   )}
@@ -449,12 +458,12 @@ const WalletSummary = ({ go, me, language }) => {
                 </p>
               </div>
             </div>
-            <button data-tour="living-add-roommate" onClick={() => setAddOpen(true)} className="flex items-center gap-1 bg-gray-100 text-gray-700 pl-2.5 pr-3 py-2 rounded-xl text-[12px] font-black active:scale-95 transition shrink-0">
+            <button data-tour="living-add-roommate" onClick={() => { if (requireAction('roommate')) setAddOpen(true); }} className="flex items-center gap-1 bg-gray-100 text-gray-700 pl-2.5 pr-3 py-2 rounded-xl text-[12px] font-black active:scale-95 transition shrink-0">
               <UserPlus size={15} /> {isBn ? 'যোগ' : 'Add'}
             </button>
           </div>
 
-          <button data-tour="living-connect-roommates" onClick={() => setConnectOpen(true)} className="w-full flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#ba0036]/[0.07] to-transparent border border-[#ba0036]/15 px-3.5 py-3 active:scale-[0.99] transition">
+          <button data-tour="living-connect-roommates" onClick={() => { if (requireAction('connect')) setConnectOpen(true); }} className="w-full flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#ba0036]/[0.07] to-transparent border border-[#ba0036]/15 px-3.5 py-3 active:scale-[0.99] transition">
             <IconBadge icon={Users} tint="bg-[#ba0036]/10" text="text-[#ba0036]" size={40} iconSize={18} />
             <div className="flex-1 text-left min-w-0">
               <p className="text-[13px] font-black text-gray-900">{isBn ? 'রুম তৈরি বা জয়েন করুন' : 'Create or join a room'}</p>
@@ -472,7 +481,7 @@ const WalletSummary = ({ go, me, language }) => {
         {moreCard}
       </div>
 
-      <AddRoommateSheet open={addOpen} onClose={() => setAddOpen(false)} isBn={isBn} onAdd={addRoommate} />
+      <AddRoommateSheet open={addOpen} onClose={() => setAddOpen(false)} isBn={isBn} onAdd={(name, color) => { if (requireAction('roommate')) addRoommate(name, color); }} />
       <ConnectSheet open={connectOpen} onClose={() => setConnectOpen(false)} isBn={isBn} />
       <LeaveHouseholdSheet open={leaveOpen} onClose={() => setLeaveOpen(false)} isBn={isBn} onConfirm={leaveHousehold} />
       <ConfirmDialog

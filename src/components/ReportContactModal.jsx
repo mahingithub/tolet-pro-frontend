@@ -12,10 +12,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Flag } from 'lucide-react';
+import { useIsBn } from '../context/LanguageContext';
 
-const REASONS = ['Spam', 'Harassment', 'Scam / Fraud', 'Inappropriate'];
+// value → Bangla label. The English value is what moderators receive.
+const REASONS = [['Spam', 'স্প্যাম'], ['Harassment', 'হয়রানি'], ['Scam / Fraud', 'প্রতারণা'], ['Inappropriate', 'অনুপযুক্ত']];
 
-export default function ReportContactModal({ open, name = 'this contact', onCancel, onConfirm }) {
+export default function ReportContactModal({ open, name, onCancel, onConfirm }) {
+  const isBn = useIsBn();
+  const L = (bn, en) => (isBn ? bn : en);
+  const who = name || L('এই কন্টাক্ট', 'this contact');
   const [reason, setReason] = useState('');
 
   useEffect(() => { if (open) setReason(''); }, [open]);
@@ -40,14 +45,13 @@ export default function ReportContactModal({ open, name = 'this contact', onCanc
               <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4">
                 <Flag size={28} strokeWidth={2.5} />
               </div>
-              <h3 className="text-lg font-black text-gray-900">Report {name}?</h3>
+              <h3 className="text-lg font-black text-gray-900">{L(`${who}-কে রিপোর্ট করবেন?`, `Report ${who}?`)}</h3>
               <p className="text-[12px] font-bold text-gray-500 mt-2 leading-relaxed">
-                The last few messages from this contact will be forwarded to our team for review.
-                You can optionally tell us why.
+                {L('এই কন্টাক্টের সাম্প্রতিক কয়েকটি মেসেজ যাচাইয়ের জন্য আমাদের টিমের কাছে পাঠানো হবে। চাইলে কারণটিও জানাতে পারেন।', 'The last few messages from this contact will be forwarded to our team for review. You can optionally tell us why.')}
               </p>
 
               <div className="flex flex-wrap justify-center gap-1.5 mt-4">
-                {REASONS.map((r) => (
+                {REASONS.map(([r, bn]) => (
                   <button
                     key={r}
                     onClick={() => setReason((cur) => (cur === r ? '' : r))}
@@ -57,7 +61,7 @@ export default function ReportContactModal({ open, name = 'this contact', onCanc
                         : 'bg-white border-gray-200 text-gray-600 hover:border-amber-300'
                     }`}
                   >
-                    {r}
+                    {L(bn, r)}
                   </button>
                 ))}
               </div>
@@ -68,14 +72,14 @@ export default function ReportContactModal({ open, name = 'this contact', onCanc
                 onClick={onCancel}
                 className="flex-1 py-4 text-[12px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-50 transition-colors"
               >
-                Cancel
+                {L('বাতিল', 'Cancel')}
               </button>
               <span className="w-px bg-gray-100" />
               <button
                 onClick={() => onConfirm?.(reason)}
                 className="flex-1 py-4 text-[12px] font-black uppercase tracking-widest text-amber-600 hover:bg-amber-50 transition-colors flex items-center justify-center gap-1.5"
               >
-                <Flag size={14} /> Report
+                <Flag size={14} /> {L('রিপোর্ট', 'Report')}
               </button>
             </div>
           </motion.div>

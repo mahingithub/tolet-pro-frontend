@@ -5,9 +5,19 @@ import * as Sentry from '@sentry/react'
 import App from './App.jsx'
 import './index.css'
 import { setupFetchInterceptor } from './utils/fetchInterceptor.js'
+import { installDigitInput } from './utils/digits.js'
+import { preventIosInputZoom } from './utils/iosViewport.js'
+
+// iPhone zooms the page in on every tap into a 14px field, and out again as
+// focus moves — the "screen keeps zooming while I type" bug. iOS only; see
+// utils/iosViewport.js. Runs before render, so before any field can take focus.
+preventIosInputZoom()
 
 // Setup global fetch interceptor for auto token refresh
 setupFetchInterceptor()
+
+// ১০১ typed into any numeric field arrives in React as 101 — see utils/digits.js.
+installDigitInput()
 
 // ─── Sentry: frontend error tracking (Phase 7) ─────────────────────────────
 // DSN comes from VITE_SENTRY_DSN (set it on Vercel). If unset, Sentry stays

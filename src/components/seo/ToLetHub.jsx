@@ -29,7 +29,8 @@ import { breadcrumbSchema, faqSchema, webPageSchema } from '../../seo/schema';
 import { toKeywordString, RENT_KEYWORDS } from '../../seo/keywords';
 import Footer from '../Footer';
 
-const TITLE = 'সারা বাংলাদেশে টু-লেট — To-Let & House Rent in All 64 Districts';
+// "টু-লেট" already says To-Let; naming it twice ran the title to 76 characters.
+const TITLE = 'সারা বাংলাদেশে টু-লেট — House Rent in All 64 Districts';
 
 const DESCRIPTION =
   'বাংলাদেশের ৮ বিভাগ ও ৬৪ জেলার বাসা ভাড়া, ফ্ল্যাট, রুম, সিট, মেস ও সাবলেটের '

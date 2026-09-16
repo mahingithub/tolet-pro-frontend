@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Search,
   MapPin,
@@ -26,6 +26,7 @@ import {
 import { useLanguage } from '../../context/LanguageContext';
 import useRequireAuth from '../../hooks/useRequireAuth';
 import { roomLabel } from '../../constants/roomCategories';
+import { propertyPath } from '../../utils/propertyPath';
 import usePropertyStore from '../../store/usePropertyStore';
 import { SALE_INTENT_ENABLED } from '../../constants/listingIntents';
 import {
@@ -724,7 +725,7 @@ const PropertyCard = ({ property, t, landlord }) => {
   const thumbs = [...rawThumbs, ...padThumbs].slice(0, 3);
   const extraImages = Array.isArray(property.images) ? property.images.length : 0;
 
-  const go = () => navigate(`/property/${property.id}`);
+  const go = () => navigate(propertyPath(property));
 
   const isPro = property.hostTier === 'pro';
   const isPlus = property.hostTier === 'plus';
@@ -852,9 +853,14 @@ const PropertyCard = ({ property, t, landlord }) => {
         {/* INFO BLOCK */}
         <div className="px-4 pb-4 pt-1">
           <div className="flex items-start justify-between gap-2">
-            <h4 className="text-[15px] font-black text-gray-900 leading-tight line-clamp-1">
-              {property.title}
-            </h4>
+            {/* A real link so crawlers can reach the listing — the card itself
+                only navigates by onClick. stopPropagation keeps that onClick
+                from pushing the same page a second time. */}
+            <h3 className="text-[15px] font-black text-gray-900 leading-tight line-clamp-1">
+              <Link to={propertyPath(property)} onClick={(e) => e.stopPropagation()}>
+                {property.title}
+              </Link>
+            </h3>
             <div className="shrink-0 inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full text-[11px] font-black">
               <Star size={11} className="fill-amber-500 text-amber-500" />
               {property.rating}
@@ -871,7 +877,7 @@ const PropertyCard = ({ property, t, landlord }) => {
               /* Commercial / land don't have beds & baths — showing "1 bed 1 bath"
                  on an office is exactly the confusion the user flagged. */
               <span className="inline-flex items-center gap-1">
-                <Building2 size={12} /> {Number(property.sqft || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} sqft
+                <Building2 size={12} /> {Number(property.sqft || 0).toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} {language === 'বাংলা' ? 'বর্গফুট' : 'sqft'}
               </span>
             ) : (
               <>
@@ -879,14 +885,14 @@ const PropertyCard = ({ property, t, landlord }) => {
                   <Building2 size={12} /> {property.beds.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} {t.mobBed} · {property.baths.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} {t.mobBath}
                 </span>
                 <span className="text-gray-300">·</span>
-                <span>{property.sqft.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} sqft</span>
+                <span>{property.sqft.toLocaleString(language === 'বাংলা' ? 'bn-BD' : 'en-BD')} {language === 'বাংলা' ? 'বর্গফুট' : 'sqft'}</span>
               </>
             )}
           </div>
 
           <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100">
             <div className="flex items-center gap-2 min-w-0">
-              {landlord && (
+              {landlord?.avatar && (
                 <SafeImg
                   src={landlord.avatar}
                   alt={landlord.name}
@@ -1028,8 +1034,18 @@ const MobileHome = () => {
   // Re-fetches on mount and whenever a property is uploaded from another tab
   // (e.g. Add Property writes to localStorage → subscribeUserProperties fires).
   const [properties, setProperties] = useState([]);
-  const [landlordsById, setLandlordsById] = useState({});
   const [isLoadingProps, setIsLoadingProps] = useState(true);
+
+  // Each card's owner chip, read off the listing itself. The feed already
+  // carries landlordName + landlordAvatar (resolved server-side in one batch),
+  // but this used to fetch GET /api/landlords/:id once per landlord on every
+  // homepage load — five extra requests for fifteen cards, two of which 404'd
+  // for owners the profile endpoint didn't recognise, leaving their cards blank.
+  const landlordsById = useMemo(() => Object.fromEntries(
+    properties
+      .filter((p) => p.landlordId && (p.landlordName || p.ownerName))
+      .map((p) => [p.landlordId, { name: p.landlordName || p.ownerName, avatar: p.landlordAvatar || '' }]),
+  ), [properties]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1038,17 +1054,9 @@ const MobileHome = () => {
       try {
         const list = await propertyService.getProperties({}, 'Newest Listings');
         if (cancelled) return;
-        const arr = Array.isArray(list) ? list : [];
-        setProperties(arr);
-        // Resolve a landlord per unique landlordId so each card can show an
-        // avatar + name without one fetch per card render.
-        const ids = [...new Set(arr.map((p) => p.landlordId).filter(Boolean))];
-        const entries = await Promise.all(ids.map(async (id) => [id, await propertyService.getLandlord(id)]));
-        if (!cancelled) {
-          setLandlordsById(Object.fromEntries(entries.filter(([, v]) => v)));
-        }
+        setProperties(Array.isArray(list) ? list : []);
       } catch {
-        if (!cancelled) { setProperties([]); setLandlordsById({}); }
+        if (!cancelled) setProperties([]);
       } finally {
         if (!cancelled) setIsLoadingProps(false);
       }

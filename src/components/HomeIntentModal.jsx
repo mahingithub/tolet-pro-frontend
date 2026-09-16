@@ -25,6 +25,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useSettings } from '../context/SettingsContext.jsx';
 import useLivingStore from '../store/useLivingStore';
 import { ModeChooser } from './living/LivingMode';
+import { isNativeApp } from '../utils/nativeExperience.js';
 
 export default function HomeIntentModal() {
   const [open, setOpen] = useState(false);
@@ -37,6 +38,8 @@ export default function HomeIntentModal() {
   const isBn = lang?.language === 'বাংলা' || lang?.language === 'bn';
 
   useEffect(() => {
+    // The installed app already asked before browsing or authentication.
+    if (isNativeApp()) return undefined;
     // Only after a SIGNUP, and only for a tenant. A landlord's home is settled
     // by the role they picked on the form; asking them anything here is noise.
     let pending = false;
@@ -100,7 +103,7 @@ export default function HomeIntentModal() {
     [navigate, setLivingMode, update],
   );
 
-  if (!open) return null;
+  if (isNativeApp() || !open) return null;
 
   return (
     <div
@@ -109,7 +112,7 @@ export default function HomeIntentModal() {
       aria-modal="true"
       aria-label={isBn ? 'শুরু করি' : 'Getting started'}
     >
-      <div className="w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto bg-[#eaeff5] rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl">
+      <div className="w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto bg-[#eaeff5] rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl pb-safe sm:pb-0">
         {/* safe-area-ok — sticks to the top of the sheet panel above, which is
             anchored to the BOTTOM edge and capped at 92vh, never the screen top. */}
         <div className="sticky top-0 bg-[#eaeff5]/95 backdrop-blur-xl px-5 pt-4 pb-2 flex items-start justify-between gap-3">

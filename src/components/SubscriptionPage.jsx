@@ -191,7 +191,7 @@ const SubscriptionPage = () => {
             >
               {isBn ? 'বার্ষিক' : 'YEARLY'}
               <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider">
-                SAVE 20%
+                {isBn ? '২০% সাশ্রয়' : 'SAVE 20%'}
               </span>
             </button>
           </div>
@@ -205,7 +205,7 @@ const SubscriptionPage = () => {
             <div className="absolute top-0 left-0 w-full h-1 bg-slate-300 dark:bg-slate-700" />
             <div className="mb-6">
               <span className="inline-block px-3 py-1 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 text-xs font-black uppercase tracking-widest rounded-full mb-4">
-                FREE
+                {isBn ? 'ফ্রি' : 'FREE'}
               </span>
               <p className="text-sm text-slate-500 dark:text-slate-400 italic mb-3">
                 {isBn ? 'সাধারণ ব্যবহারের জন্য একদম ফ্রি' : 'Completely free for basic use'}
@@ -373,7 +373,7 @@ const SubscriptionPage = () => {
                   <th className="p-6 bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 font-bold text-slate-900 dark:text-white w-2/5">
                     {isBn ? 'ফিচার সমূহ' : 'Features'}
                   </th>
-                  <th className="p-6 bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 font-black text-slate-500 dark:text-slate-400 text-center w-1/5">FREE</th>
+                  <th className="p-6 bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 font-black text-slate-500 dark:text-slate-400 text-center w-1/5">{isBn ? 'ফ্রি' : 'FREE'}</th>
                   <th className="p-6 bg-violet-50/50 dark:bg-violet-500/10 border-b border-violet-100 dark:border-violet-500/20 font-black text-violet-700 dark:text-violet-400 text-center w-1/5">PLUS</th>
                   <th className="p-6 bg-amber-50/50 dark:bg-amber-500/10 border-b border-amber-100 dark:border-amber-500/20 font-black text-amber-700 dark:text-amber-400 text-center w-1/5">PRO</th>
                 </tr>

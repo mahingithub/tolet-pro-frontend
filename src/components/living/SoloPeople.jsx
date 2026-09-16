@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import useLivingStore from '../../store/useLivingStore';
+import useLivingAction from './useLivingAction';
 import { dateLabel, num, taka } from './livingUtils';
 import { getEntryType, typeForDirection, PERSON_SWATCHES } from './soloConfig';
 import { daysToDue, personDetail, personRows } from './soloUtils';
@@ -394,7 +395,18 @@ const PersonDetailSheet = ({ personId, onClose, isBn, language, onEditProfile, o
 };
 
 // ── the module ───────────────────────────────────────────────────────────────
-const SoloPeople = ({ language }) => {
+const SoloPeople = ({ language, intent, clearIntent }) => {
+  const requireAction = useLivingAction('people');
+  const openAdd = () => {
+    if (!requireAction('add')) return;
+    setEditing(null); setFormOpen(true);
+  };
+  useEffect(() => {
+    if (intent === 'add') {
+      if (requireAction('add')) { setEditing(null); setFormOpen(true); }
+      clearIntent?.();
+    }
+  }, [intent, clearIntent, requireAction]);
   const isBn = language === 'বাংলা';
   const solo = useLivingStore((s) => s.solo);
   const addPerson = useLivingStore((s) => s.addPerson);
@@ -421,7 +433,7 @@ const SoloPeople = ({ language }) => {
         subtitle={isBn ? 'কার কাছে কত পাবেন, কাকে কত দেবেন' : 'Who owes you, and whom you owe'}
         right={
           <button
-            onClick={() => { setEditing(null); setFormOpen(true); }}
+            onClick={openAdd}
             className="flex items-center gap-1 bg-[#ba0036] text-white pl-2.5 pr-3.5 py-2 rounded-xl text-[12px] font-black shadow-[0_8px_20px_-8px_rgba(186,0,54,0.55)] active:scale-95 transition"
           >
             <UserPlus size={15} /> {isBn ? 'বন্ধু' : 'Friend'}
@@ -457,7 +469,7 @@ const SoloPeople = ({ language }) => {
                 : 'Add the people you lend to or borrow from once, and every transaction lands on their own line.'
             }
             action={
-              <PrimaryButton onClick={() => { setEditing(null); setFormOpen(true); }}>
+              <PrimaryButton onClick={openAdd}>
                 <UserPlus size={16} /> {isBn ? 'বন্ধু যোগ করুন' : 'Add a friend'}
               </PrimaryButton>
             }

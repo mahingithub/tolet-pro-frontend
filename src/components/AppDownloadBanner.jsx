@@ -197,7 +197,7 @@ const AppDownloadBanner = () => {
         // install instructions — see BLOCKING_UI in context/TourContext.jsx.
         // Only this dialog is a blocker; the in-flow banner strips are not.
         <div
-          className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 bg-black/50 backdrop-blur-md motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
+          className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 pb-[calc(1rem+var(--sab))] md:pb-4 bg-black/50 backdrop-blur-md motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
           role="dialog"
           aria-modal="true"
           aria-label={t?.installAppGuideTitle || 'How to install the app'}

@@ -38,7 +38,8 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { SITE_URL, BRAND, OG_IMAGE } from '../src/seo/siteConfig.js';
+import { SITE_URL, BRAND, OG_IMAGE, metaDescription } from '../src/seo/siteConfig.js';
+import { PUBLIC_PAGE_SEO, ALL_LISTINGS_SEO } from '../src/seo/staticPages.js';
 import {
   ALL_LOCATION_PAGES, ALL_DISTRICTS, districtPath, HUB_SECTIONS,
 } from '../src/seo/locationSeo.js';
@@ -89,6 +90,8 @@ function buildHead(html, {
   title, description, keywords, path, image = OG_IMAGE, jsonLd = [], noindex = false,
 }) {
   const url = SITE_URL + path;
+  // Same cap useSeo() applies at runtime, so the static file and the live page agree.
+  description = metaDescription(description);
   let out = html;
 
   out = out.replace(/<title>[\s\S]*?<\/title>/, `<title>${esc(title)}</title>`);
@@ -309,7 +312,7 @@ function featureBody(page) {
 
 /* ── the page list ───────────────────────────────────────────────────────── */
 
-const HUB_TITLE = `সারা বাংলাদেশে টু-লেট — To-Let & House Rent in All 64 Districts | ${BRAND}`;
+const HUB_TITLE = `সারা বাংলাদেশে টু-লেট — House Rent in All 64 Districts | ${BRAND}`;
 const HUB_DESCRIPTION =
   'বাংলাদেশের ৮ বিভাগ ও ৬৪ জেলার বাসা ভাড়া, ফ্ল্যাট, রুম, সিট, মেস ও সাবলেটের টু-লেট '
   + 'বিজ্ঞাপন — জেলা ধরে খুঁজুন। Browse to-let listings across all 8 divisions and 64 '
@@ -442,6 +445,33 @@ const pages = [
     ],
   })),
 ];
+
+/* ── Pages whose components set their head at runtime only ───────────────
+   /properties/all and the support + legal pages had no file here, so each one
+   shipped the homepage's HTML: the homepage's title and a canonical of "/",
+   which told every crawler that runs no JavaScript that all six were copies of
+   the homepage. Same copy the React pages use (src/seo/staticPages.js). */
+const staticPage = (path, { title, description }, extraJsonLd = []) => ({
+  path,
+  title: `${title} | ${BRAND}`,
+  description,
+  body: `
+    <main>
+      <h1>${esc(title)}</h1>
+      <p>${esc(description)}</p>
+      ${siteLinks()}
+    </main>`,
+  jsonLd: [webPageSchema({ name: title, description, url: path }), ...extraJsonLd],
+});
+
+pages.push(
+  staticPage('/properties/all', ALL_LISTINGS_SEO, [breadcrumbSchema([
+    { name: 'Home', path: '/' },
+    { name: 'To-Let', path: '/to-let' },
+    { name: 'All listings', path: '/properties/all' },
+  ])]),
+  ...Object.entries(PUBLIC_PAGE_SEO).map(([path, seo]) => staticPage(path, seo)),
+);
 
 /* ── write ───────────────────────────────────────────────────────────────── */
 

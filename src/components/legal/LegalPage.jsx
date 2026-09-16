@@ -101,9 +101,9 @@ export default function LegalPage({
 								<div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-rose-600 to-rose-400 flex items-center justify-center shadow-lg shadow-rose-500/20">
 									{HeaderIcon && <HeaderIcon className="w-4 h-4 text-white" strokeWidth={2.5} />}
 								</div>
-								<h1 className="text-xl font-bold text-slate-800 dark:text-white hidden sm:block tracking-tight">
+								<p className="text-xl font-bold text-slate-800 dark:text-white hidden sm:block tracking-tight">
 									{isBn ? titleBn : titleEn}
-								</h1>
+								</p>
 							</div>
 						</div>
 						

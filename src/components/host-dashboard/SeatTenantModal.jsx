@@ -364,7 +364,7 @@ export default function SeatTenantModal({
             </label>
             <input
               id="seat-advance"
-              type="number"
+              type="text" data-number
               min="0"
               inputMode="numeric"
               value={advance}

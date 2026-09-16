@@ -3,6 +3,7 @@ import { Plus, Receipt, Trash2, Pencil, Camera, Layers, List, X, Check } from 'l
 
 import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
+import useLivingAction from './useLivingAction';
 import {
   byNewest, expenseShares, taka, num, dateLabel, monthEntries, monthLabel, monthSpan, monthStart,
   recentNotes, roommateById,
@@ -260,7 +261,7 @@ const ExpenseSheet = ({ open, onClose, roommates, expenses = [], editing, preset
                 {splitType === 'percentage' && (
                   <div className="flex items-center gap-1">
                     <input
-                      type="number"
+                      type="text" inputMode="decimal" data-number
                       value={shares[id] ?? ''}
                       onChange={(e) => setShares((p) => ({ ...p, [id]: e.target.value === '' ? '' : Number(e.target.value) }))}
                       className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[13px] font-bold text-right focus:outline-none focus:ring-2 focus:ring-[#ba0036]/30"
@@ -273,7 +274,7 @@ const ExpenseSheet = ({ open, onClose, roommates, expenses = [], editing, preset
                   <div className="flex items-center gap-1">
                     <span className="text-[12px] font-black text-gray-400">৳</span>
                     <input
-                      type="number"
+                      type="text" inputMode="decimal" data-number
                       value={shares[id] ?? ''}
                       onChange={(e) => setShares((p) => ({ ...p, [id]: e.target.value === '' ? '' : Number(e.target.value) }))}
                       className="w-20 bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[13px] font-bold text-right focus:outline-none focus:ring-2 focus:ring-[#ba0036]/30"
@@ -359,6 +360,7 @@ const ExpenseSheet = ({ open, onClose, roommates, expenses = [], editing, preset
 };
 
 const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
+  const requireAction = useLivingAction('expenses');
   const isBn = language === 'বাংলা';
   const roommates = useLivingStore((s) => s.roommates);
   const expenses = useLivingStore((s) => s.expenses);
@@ -378,12 +380,13 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
 
   useEffect(() => {
     if (intent === 'add') {
+      if (!requireAction('add')) { clearIntent?.(); return; }
       setEditing(null);
       setPresetCategory(null);
       setOpen(true);
       clearIntent?.();
     }
-  }, [intent, clearIntent]);
+  }, [intent, clearIntent, requireAction]);
 
   const pickView = (next) => {
     setView(next);
@@ -419,11 +422,13 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
   }, [rows]);
 
   const openAdd = (category = null) => {
+    if (!requireAction('add')) return;
     setEditing(null);
     setPresetCategory(category);
     setOpen(true);
   };
   const openEdit = (exp) => {
+    if (!requireAction()) return;
     setEditing(exp);
     setPresetCategory(null);
     setOpen(true);

@@ -406,7 +406,7 @@ function SubmitPaymentModal({ booking, methods, selectedMethod, totalDue, monthK
   return (
     <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="bg-white rounded-t-[2rem] sm:rounded-[2rem] w-full sm:max-w-md relative z-10 overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in slide-in-from-bottom-6 sm:zoom-in-95 duration-300">
+      <div className="bg-white rounded-t-[2rem] sm:rounded-[2rem] w-full sm:max-w-md relative z-10 overflow-hidden shadow-2xl flex flex-col max-h-[90vh] pb-safe sm:pb-0 animate-in fade-in slide-in-from-bottom-6 sm:zoom-in-95 duration-300">
         <div className="flex items-center justify-between p-5 sm:p-6 border-b border-gray-100">
           <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
             <CreditCard className="text-emerald-600" size={22} />
@@ -451,7 +451,7 @@ function SubmitPaymentModal({ booking, methods, selectedMethod, totalDue, monthK
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{bn ? 'পরিমাণ (৳)' : 'Amount (৳)'}</label>
-              <input type="number" min="1" value={amount} onChange={(e) => setAmount(e.target.value)}
+              <input type="text" inputMode="numeric" data-number min="1" value={amount} onChange={(e) => setAmount(e.target.value)}
                 className="w-full p-3.5 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white border border-transparent focus:border-emerald-500/30 transition-all" />
             </div>
             <div>

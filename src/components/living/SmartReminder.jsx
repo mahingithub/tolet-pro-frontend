@@ -4,6 +4,7 @@ import { BellRing, ShoppingBasket, UtensilsCrossed, HandCoins, ArrowDownLeft, Sp
 
 import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
+import useLivingAction from './useLivingAction';
 import { buildReminders, monthlyReport, taka } from './livingUtils';
 import { getBillType } from './livingConfig';
 import { Card, SectionHeader, IconBadge, ProgressBar, PrimaryButton, Field, MoneyInput, EmptyState, Sheet, cx } from './livingUI';
@@ -64,6 +65,7 @@ const BudgetSheet = ({ open, onClose, current, onSave }) => {
 };
 
 const SmartReminder = ({ go, me, language }) => {
+  const requireAction = useLivingAction('reminders');
   const isBn = language === 'বাংলা';
   const state = useLivingStore();
   const budgets = useLivingStore((s) => s.budgets);
@@ -144,7 +146,7 @@ const SmartReminder = ({ go, me, language }) => {
         title={isBn ? 'স্মার্ট রিমাইন্ডার' : 'Smart Reminder'}
         subtitle={isBn ? 'স্বয়ংক্রিয় সতর্কতা' : 'Automatic alerts that keep you on track'}
         right={
-          <button onClick={() => setOpen(true)} className="flex items-center gap-1 bg-gray-900 text-white pl-2.5 pr-3.5 py-2 rounded-xl text-[12px] font-black active:scale-95 transition">
+          <button onClick={() => { if (requireAction()) setOpen(true); }} className="flex items-center gap-1 bg-gray-900 text-white pl-2.5 pr-3.5 py-2 rounded-xl text-[12px] font-black active:scale-95 transition">
             <Settings size={14} /> {isBn ? 'বাজেট' : 'Budgets'}
           </button>
         }

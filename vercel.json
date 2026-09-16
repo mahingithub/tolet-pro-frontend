@@ -2,6 +2,10 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
+      "source": "/sitemap-properties.xml",
+      "destination": "https://api.toletpro.rent/api/sitemap/properties.xml"
+    },
+    {
       "source": "/((?!api/|\\.well-known/|assets/|icons/|splash/|manifest\\.json|service-worker\\.js|offline\\.html|apple-touch-icon\\.png|favicon-.*\\.png|robots\\.txt|.*\\.(?:js|css|png|jpg|jpeg|svg|webp|ico|json|txt|woff2?|map)).*)",
       "destination": "/index.html"
     }

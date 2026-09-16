@@ -3,16 +3,17 @@ import { Link } from 'react-router-dom';
 import { Star, Send, CheckCircle2, Loader2, Lock, Trash2, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { reviewService } from '../../services/reviewService';
+import { useIsBn } from '../../context/LanguageContext';
 
 // Interactive 1–5 star picker for the submit form.
-const StarPicker = ({ value, onChange }) => (
+const StarPicker = ({ value, onChange, isBn = false }) => (
   <div className="flex gap-1.5">
     {[1, 2, 3, 4, 5].map((s) => (
       <button
         key={s}
         type="button"
         onClick={() => onChange(s)}
-        aria-label={`${s} star${s > 1 ? 's' : ''}`}
+        aria-label={isBn ? `${s} স্টার` : `${s} star${s > 1 ? 's' : ''}`}
         className="transition-transform hover:scale-110 active:scale-95"
       >
         <Star size={26} className={s <= value ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'} />
@@ -44,11 +45,13 @@ const StarsRow = ({ value }) => (
  *   • Any logged-in user may leave/edit exactly ONE review — no booking gate.
  *   • You can't review your own profile (form hidden; backend also blocks it).
  */
-export default function ProfileReviews({ revieweeId, revieweeRole, revieweeName = 'this user' }) {
+export default function ProfileReviews({ revieweeId, revieweeRole, revieweeName }) {
   const { user, isAuthenticated } = useAuth();
+  const isBn = useIsBn();
+  const L = (bn, en) => (isBn ? bn : en);
   const myId = user?.id || user?._id || null;
   const isOwnProfile = !!myId && String(myId) === String(revieweeId);
-  const roleLabel = revieweeRole === 'landlord' ? 'landlord' : 'tenant';
+  const roleLabel = revieweeRole === 'landlord' ? L('বাড়িওয়ালা', 'landlord') : L('ভাড়াটিয়া', 'tenant');
 
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState([]);
@@ -72,7 +75,7 @@ export default function ProfileReviews({ revieweeId, revieweeRole, revieweeName 
         setComment(data.myReview.comment || '');
       }
     } catch (e) {
-      setError(e.serverMessage || 'Could not load reviews.');
+      setError(e.serverMessage || L('রিভিউ লোড করা যায়নি।', 'Could not load reviews.'));
     } finally {
       setLoading(false);
     }
@@ -97,7 +100,7 @@ export default function ProfileReviews({ revieweeId, revieweeRole, revieweeName 
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 3000);
     } catch (e2) {
-      setError(e2.serverMessage || 'Could not submit your review.');
+      setError(e2.serverMessage || L('আপনার রিভিউ জমা দেওয়া যায়নি।', 'Could not submit your review.'));
     } finally {
       setSubmitting(false);
     }
@@ -114,7 +117,7 @@ export default function ProfileReviews({ revieweeId, revieweeRole, revieweeName 
       setRating(5);
       setComment('');
     } catch (e2) {
-      setError(e2.serverMessage || 'Could not delete your review.');
+      setError(e2.serverMessage || L('আপনার রিভিউ মুছে ফেলা যায়নি।', 'Could not delete your review.'));
     } finally {
       setSubmitting(false);
     }
@@ -128,16 +131,16 @@ export default function ProfileReviews({ revieweeId, revieweeRole, revieweeName 
       <div className={cardCls}>
         <div className="flex items-center gap-2 mb-2">
           <MessageSquare size={18} className="text-[#ba0036]" />
-          <h3 className="text-lg md:text-xl font-black text-gray-900">Reviews</h3>
+          <h3 className="text-lg md:text-xl font-black text-gray-900">{L('রিভিউ', 'Reviews')}</h3>
         </div>
         <div className="text-center py-8">
           <Lock size={30} className="mx-auto mb-3 text-gray-300" />
-          <p className="text-sm font-bold text-gray-600 mb-4">Log in to see reviews and leave one.</p>
+          <p className="text-sm font-bold text-gray-600 mb-4">{L('রিভিউ দেখতে ও দিতে লগইন করুন।', 'Log in to see reviews and leave one.')}</p>
           <Link
             to="/login"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#ba0036] text-white text-sm font-black hover:bg-[#7c0026] transition-all active:scale-95"
           >
-            Log in
+            {L('লগইন করুন', 'Log in')}
           </Link>
         </div>
       </div>
@@ -150,7 +153,7 @@ export default function ProfileReviews({ revieweeId, revieweeRole, revieweeName 
       <div className="flex items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-2">
           <MessageSquare size={18} className="text-[#ba0036]" />
-          <h3 className="text-lg md:text-xl font-black text-gray-900">Reviews</h3>
+          <h3 className="text-lg md:text-xl font-black text-gray-900">{L('রিভিউ', 'Reviews')}</h3>
         </div>
         {summary.count > 0 && (
           <div className="flex items-center gap-2">
@@ -165,15 +168,15 @@ export default function ProfileReviews({ revieweeId, revieweeRole, revieweeName 
       {!isOwnProfile ? (
         <form onSubmit={handleSubmit} className="mb-6 p-4 rounded-2xl bg-gray-50/80 border border-gray-100">
           <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">
-            {myReview ? 'Update your review' : `Rate this ${roleLabel}`}
+            {myReview ? L('আপনার রিভিউ আপডেট করুন', 'Update your review') : L(`এই ${roleLabel}কে রেটিং দিন`, `Rate this ${roleLabel}`)}
           </p>
-          <StarPicker value={rating} onChange={setRating} />
+          <StarPicker value={rating} onChange={setRating} isBn={isBn} />
           <textarea
             rows={3}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             maxLength={1000}
-            placeholder={`Share your experience with ${revieweeName}...`}
+            placeholder={L(`${revieweeName || 'এই ব্যবহারকারী'}-এর সাথে আপনার অভিজ্ঞতা লিখুন...`, `Share your experience with ${revieweeName || 'this user'}...`)}
             className="mt-3 w-full p-3.5 rounded-xl text-sm font-bold text-gray-900 bg-white border border-gray-200 outline-none focus:border-[#ba0036]/40 resize-none transition-all"
           />
           {error && <p className="mt-2 text-xs font-bold text-[#ba0036]">{error}</p>}
@@ -184,7 +187,7 @@ export default function ProfileReviews({ revieweeId, revieweeRole, revieweeName 
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#ba0036] text-white text-sm font-black hover:bg-[#7c0026] transition-all active:scale-95 disabled:opacity-50"
             >
               {submitting ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-              {myReview ? 'Update' : 'Submit'}
+              {myReview ? L('আপডেট করুন', 'Update') : L('জমা দিন', 'Submit')}
             </button>
             {myReview && (
               <button
@@ -193,19 +196,19 @@ export default function ProfileReviews({ revieweeId, revieweeRole, revieweeName 
                 disabled={submitting}
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full text-gray-500 text-sm font-bold hover:text-[#ba0036] hover:bg-red-50 transition-all active:scale-95 disabled:opacity-50"
               >
-                <Trash2 size={14} /> Delete
+                <Trash2 size={14} /> {L('মুছুন', 'Delete')}
               </button>
             )}
             {justSaved && (
               <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-black">
-                <CheckCircle2 size={14} /> Saved
+                <CheckCircle2 size={14} /> {L('সেভ হয়েছে', 'Saved')}
               </span>
             )}
           </div>
         </form>
       ) : (
         <p className="mb-5 text-xs font-bold text-gray-400">
-          This is how others have rated you as a {roleLabel}.
+          {L(`${roleLabel} হিসেবে অন্যরা আপনাকে এভাবে রেটিং দিয়েছেন।`, `This is how others have rated you as a ${roleLabel}.`)}
         </p>
       )}
 
@@ -218,7 +221,7 @@ export default function ProfileReviews({ revieweeId, revieweeRole, revieweeName 
         <div className="text-center py-8">
           <Star size={30} className="mx-auto mb-2 text-gray-200" />
           <p className="text-sm font-bold text-gray-500">
-            No reviews yet.{!isOwnProfile ? ' Be the first.' : ''}
+            {L('এখনও কোনো রিভিউ নেই।', 'No reviews yet.')}{!isOwnProfile ? L(' প্রথম রিভিউটি আপনিই দিন।', ' Be the first.') : ''}
           </p>
         </div>
       ) : (
@@ -228,21 +231,21 @@ export default function ProfileReviews({ revieweeId, revieweeRole, revieweeName 
               <div className="flex items-start gap-3">
                 <img
                   src={r.reviewerAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.reviewerName || 'User')}&background=fce4ec&color=ba0036`}
-                  alt={r.reviewerName || 'User'}
+                  alt={r.reviewerName || L('ব্যবহারকারী', 'User')}
                   className="w-10 h-10 rounded-full shrink-0 object-cover"
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
                     <div>
                       <p className="font-black text-gray-900 text-sm">
-                        {r.reviewerName || 'User'}
+                        {r.reviewerName || L('ব্যবহারকারী', 'User')}
                         {myId && String(r.reviewerId) === String(myId) && (
-                          <span className="ml-2 text-[10px] font-black text-[#ba0036]">You</span>
+                          <span className="ml-2 text-[10px] font-black text-[#ba0036]">{L('আপনি', 'You')}</span>
                         )}
                       </p>
                       <p className="text-[10px] font-bold text-gray-400">
                         {r.createdAt
-                          ? new Date(r.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                          ? new Date(r.createdAt).toLocaleDateString(isBn ? 'bn-BD' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
                           : ''}
                       </p>
                     </div>

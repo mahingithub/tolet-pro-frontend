@@ -1,4 +1,5 @@
 import { isSupportedMobile } from './validators.js';
+import { toAsciiDigits } from './digits.js';
 
 /*
  * tenantFields.js
@@ -100,7 +101,7 @@ export const GOVT_ID_TYPES = [
 // A Bangladeshi NID number is 10 digits (Smart card), 13 (old), or 17 (old
 // with the 4-digit birth year prefixed). Nothing else is a real NID, and those
 // three lengths are unambiguous — so a typo in one is catchable.
-export const isValidNid = (v) => /^(\d{10}|\d{13}|\d{17})$/.test(String(v || '').replace(/\D/g, ''));
+export const isValidNid = (v) => /^(\d{10}|\d{13}|\d{17})$/.test(toAsciiDigits(v || '').replace(/\D/g, ''));
 
 // A BD passport number is nine characters: an e-passport is one letter then 8
 // digits (A01234567); an older MRP is two letters then 7 (BX0123456). Lenient

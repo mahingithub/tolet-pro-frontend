@@ -18,6 +18,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useIsBn } from '../context/LanguageContext';
 import callProvider from '../services/callProvider';
 
 // Quality levels: 0 excellent · 1 good · 2 medium · 3 bad · 4 unusable.
@@ -43,6 +44,7 @@ function qualityLabel(level) {
 }
 
 export default function CallQualityOverlay({ callType = 'voice', enableSwitchCamera = true }) {
+  const isBn = useIsBn();
   const [level, setLevel] = useState(null);       // 0..4 or null
   const [reconnecting, setReconnecting] = useState(false);
   const [switching, setSwitching] = useState(false);
@@ -100,7 +102,7 @@ export default function CallQualityOverlay({ callType = 'voice', enableSwitchCam
             className="w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin"
             aria-hidden="true"
           />
-          <span className="text-[10px] font-black uppercase tracking-widest">Reconnecting…</span>
+          <span className="text-[10px] font-black uppercase tracking-widest">{isBn ? 'আবার সংযোগ হচ্ছে…' : 'Reconnecting…'}</span>
         </div>
       )}
 
@@ -110,8 +112,8 @@ export default function CallQualityOverlay({ callType = 'voice', enableSwitchCam
           onClick={handleSwitch}
           disabled={switching}
           className="absolute top-4 right-40 sm:right-52 z-20 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 backdrop-blur-md flex items-center justify-center transition-all disabled:opacity-50"
-          aria-label="Switch camera"
-          title="Switch camera"
+          aria-label={isBn ? 'ক্যামেরা বদলান' : 'Switch camera'}
+          title={isBn ? 'ক্যামেরা বদলান' : 'Switch camera'}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

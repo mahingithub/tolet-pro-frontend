@@ -30,12 +30,12 @@ const popularCities = [
 ];
 
 const dhakaFinest = [
-  { id: 'gulshan',     name: 'Gulshan',     properties: '1,240+', price: '50k - 2L',   image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80',   tag: 'Ultra Premium' },
-  { id: 'banani',      name: 'Banani',      properties: '980+',   price: '40k - 1.5L', image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&q=80',   tag: 'Luxury' },
-  { id: 'dhanmondi',   name: 'Dhanmondi',   properties: '1,500+', price: '30k - 1L',   image: 'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?w=800&q=80',   tag: 'Family Hub' },
-  { id: 'bashundhara', name: 'Bashundhara', properties: '2,100+', price: '20k - 1.2L', image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80', tag: 'Modern Living' },
-  { id: 'uttara',      name: 'Uttara',      properties: '3,200+', price: '15k - 80k',  image: 'https://images.unsplash.com/photo-1449844908441-8829872d2607?w=800&q=80',  tag: 'Planned City' },
-  { id: 'mirpur',      name: 'Mirpur',      properties: '4,500+', price: '10k - 50k',  image: 'https://images.unsplash.com/photo-1479839672679-a46483c0e7c8?w=800&q=80',  tag: 'Budget Friendly' },
+  { id: 'gulshan',     name: 'Gulshan',     properties: '1,240+', price: '50k - 2L',   image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80&auto=format',   tag: 'Ultra Premium' },
+  { id: 'banani',      name: 'Banani',      properties: '980+',   price: '40k - 1.5L', image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&q=80&auto=format',   tag: 'Luxury' },
+  { id: 'dhanmondi',   name: 'Dhanmondi',   properties: '1,500+', price: '30k - 1L',   image: 'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?w=800&q=80&auto=format',   tag: 'Family Hub' },
+  { id: 'bashundhara', name: 'Bashundhara', properties: '2,100+', price: '20k - 1.2L', image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80&auto=format', tag: 'Modern Living' },
+  { id: 'uttara',      name: 'Uttara',      properties: '3,200+', price: '15k - 80k',  image: 'https://images.unsplash.com/photo-1449844908441-8829872d2607?w=800&q=80&auto=format',  tag: 'Planned City' },
+  { id: 'mirpur',      name: 'Mirpur',      properties: '4,500+', price: '10k - 50k',  image: 'https://images.unsplash.com/photo-1479839672679-a46483c0e7c8?w=800&q=80&auto=format',  tag: 'Budget Friendly' },
 ];
 
 const allSuggestions = [
@@ -681,7 +681,7 @@ const HeroSection = () => {
               muted
               playsInline
               className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-              title="To-Let Pro hero video"
+              title={language === 'বাংলা' ? 'TO-LET PRO পরিচিতি ভিডিও' : 'TO-LET PRO hero video'}
             ></video>
             
             {/* Cinematic gradient for headline contrast */}
@@ -735,7 +735,7 @@ const HeroSection = () => {
                       type="button"
                       onClick={() => setLocation('')}
                       className="ml-1 shrink-0 p-1"
-                      aria-label="Clear location"
+                      aria-label={language === 'বাংলা' ? 'লোকেশন মুছুন' : 'Clear location'}
                     >
                       <X size={13} className="text-slate-400" />
                     </button>
@@ -821,7 +821,7 @@ const HeroSection = () => {
                       type="button"
                       onClick={() => setLocation('')}
                       className="ml-1 shrink-0 p-1"
-                      aria-label="Clear location"
+                      aria-label={language === 'বাংলা' ? 'লোকেশন মুছুন' : 'Clear location'}
                     >
                       <X size={12} className="text-slate-400 hover:text-slate-600 transition-colors" />
                     </button>
@@ -897,9 +897,9 @@ const HeroSection = () => {
                       <div className="mt-2 pt-3 border-t border-slate-100 px-1">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">{t?.customRange || 'Custom Range (BDT)'}</span>
                         <div className="flex items-center gap-2 mb-2">
-                          <input type="number" placeholder="Min" value={customMin} onChange={e => setCustomMin(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-crimson-500 transition-colors" />
+                          <input type="text" inputMode="numeric" data-number placeholder={language === 'বাংলা' ? 'সর্বনিম্ন' : 'Min'} value={customMin} onChange={e => setCustomMin(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-crimson-500 transition-colors" />
                           <span className="text-slate-300 font-bold">–</span>
-                          <input type="number" placeholder="Max" value={customMax} onChange={e => setCustomMax(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-crimson-500 transition-colors" />
+                          <input type="text" inputMode="numeric" data-number placeholder={language === 'বাংলা' ? 'সর্বোচ্চ' : 'Max'} value={customMax} onChange={e => setCustomMax(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-crimson-500 transition-colors" />
                         </div>
                         <button onClick={() => setIsBudgetOpen(false)} className="w-full bg-slate-900 text-white py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors">{t?.applyRange || 'Apply Range'}</button>
                       </div>
@@ -1042,7 +1042,7 @@ const HeroSection = () => {
             <button
               type="button"
               onClick={() => scrollDivisions(-1)}
-              aria-label="Scroll to previous divisions"
+              aria-label={language === 'বাংলা' ? 'আগের বিভাগগুলো দেখুন' : 'Scroll to previous divisions'}
               className="hidden md:flex absolute left-3 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/90 backdrop-blur-md text-slate-800 items-center justify-center shadow-[0_10px_30px_rgba(15,23,42,0.18)] hover:bg-white hover:scale-105 active:scale-95 transition-all"
             >
               <ArrowLeft size={18} strokeWidth={2.5} />
@@ -1050,7 +1050,7 @@ const HeroSection = () => {
             <button
               type="button"
               onClick={() => scrollDivisions(1)}
-              aria-label="Scroll to next divisions"
+              aria-label={language === 'বাংলা' ? 'পরের বিভাগগুলো দেখুন' : 'Scroll to next divisions'}
               className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/90 backdrop-blur-md text-slate-800 items-center justify-center shadow-[0_10px_30px_rgba(15,23,42,0.18)] hover:bg-white hover:scale-105 active:scale-95 transition-all"
             >
               <ArrowRight size={18} strokeWidth={2.5} />
@@ -1411,7 +1411,7 @@ const HeroSection = () => {
                 <ul className="flex flex-col gap-2 md:gap-4 text-[11px] md:text-sm font-bold text-slate-400">
                   <li className="flex items-center gap-2"><Mail size={13} className="text-crimson-500 shrink-0" /> support@toletpro.rent</li>
                   <li className="flex items-center gap-2"><Phone size={13} className="text-crimson-500 shrink-0" /> +880 1742898206</li>
-                  <li className="flex items-center gap-2"><MapPin size={13} className="text-crimson-500 shrink-0" /> Banani, Dhaka, Bangladesh</li>
+                  <li className="flex items-center gap-2"><MapPin size={13} className="text-crimson-500 shrink-0" /> {language === 'বাংলা' ? 'বনানী, ঢাকা, বাংলাদেশ' : 'Banani, Dhaka, Bangladesh'}</li>
                 </ul>
               </div>
             </div>
@@ -1503,9 +1503,9 @@ const HeroSection = () => {
             <div className="pt-3 border-t border-slate-100">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">{t?.customRange || 'Custom Range (BDT)'}</span>
               <div className="flex items-center gap-2 mb-3">
-                <input type="number" placeholder="Min" value={customMin} onChange={e => setCustomMin(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-crimson-500 transition-colors" />
+                <input type="text" inputMode="numeric" data-number placeholder={language === 'বাংলা' ? 'সর্বনিম্ন' : 'Min'} value={customMin} onChange={e => setCustomMin(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-crimson-500 transition-colors" />
                 <span className="text-slate-300 font-bold">–</span>
-                <input type="number" placeholder="Max" value={customMax} onChange={e => setCustomMax(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-crimson-500 transition-colors" />
+                <input type="text" inputMode="numeric" data-number placeholder={language === 'বাংলা' ? 'সর্বোচ্চ' : 'Max'} value={customMax} onChange={e => setCustomMax(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-crimson-500 transition-colors" />
               </div>
               <button onClick={() => setIsMobileBudgetOpen(false)} className="w-full bg-slate-900 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors shadow-md">
                 {t?.applyRange || 'Apply Range'}

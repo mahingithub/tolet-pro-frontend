@@ -314,7 +314,7 @@ export default function RentPaymentHistory() {
 
       {/* Delete confirmation — bottom-sheet on mobile, centered on desktop */}
       {confirming && (
-        <div className="fixed inset-0 z-[140] flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 z-[140] flex items-end sm:items-center justify-center p-4 pb-[calc(1rem+var(--sab))] sm:pb-4">
           <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => (busyId ? null : setConfirming(null))} />
           <div className="bg-white rounded-[1.75rem] w-full max-w-sm relative z-10 overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 slide-in-from-bottom-4">
             <div className="p-6">

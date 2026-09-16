@@ -226,7 +226,7 @@ const LandlordOnboardingModal = ({ open, onClose, onSuccess }) => {
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full md:max-w-2xl bg-white md:rounded-[2rem] rounded-t-[2rem] shadow-[0_30px_80px_rgba(0,0,0,0.25)] overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="w-full md:max-w-2xl bg-white md:rounded-[2rem] rounded-t-[2rem] shadow-[0_30px_80px_rgba(0,0,0,0.25)] overflow-hidden flex flex-col max-h-[92vh] pb-safe md:pb-0">
 
         {/* ── Header — soft gradient, no 1px lines ──────────────────── */}
         <div className="relative px-6 md:px-8 pt-7 pb-5 bg-gradient-to-br from-white via-rose-50/40 to-rose-50/20">

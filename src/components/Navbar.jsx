@@ -96,16 +96,6 @@ const hostLinks = [
   { Icon: SettingsIcon,    color: 'text-gray-700',    bg: 'bg-transparent',   label: 'Settings',          tKey: 'menuSettings', path: '/host-dashboard?tab=settings' },
 ];
 
-const footerLinks = [
-  { Icon: LifeBuoy,      color: 'text-gray-700', bg: 'bg-transparent',    label: 'Help & Support',         path: '/' },
-  { Icon: Globe,         color: 'text-gray-700', bg: 'bg-transparent',    label: 'Language',               path: '/', isLanguage: true },
-  { Icon: FileText,      color: 'text-gray-400', bg: 'bg-transparent',    label: 'Terms & Policies',       path: '/' },
-];
-
-const settingsLinks = [
-  { Icon: SettingsIcon, color: 'text-gray-700', bg: 'bg-transparent',  label: 'Account Settings', path: '/' },
-];
-
 const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -520,7 +510,7 @@ useEffect(() => {
             </div>
             {/* Beta badge (Phase 7) — signals the app is in beta testing. */}
             <span className="ml-1 px-1.5 py-0.5 text-[9px] md:text-[10px] font-black uppercase tracking-wider text-[#ba0036] bg-red-50 border border-[#ba0036]/30 rounded-md leading-none self-center">
-              Beta
+              {langCode === 'bn' ? 'বেটা' : 'Beta'}
             </span>
           </a>
 
@@ -539,7 +529,7 @@ useEffect(() => {
                     if (e.key === 'Enter')  { setNavLocOpen(false); const slug = navLoc.trim() ? navLoc.trim().toLowerCase().replace(/,?\s+/g, '-') : 'all'; navigate(`/properties/${slug}?category=${navType.id}`); }
                     if (e.key === 'Escape') setNavLocOpen(false);
                   }}
-                  placeholder="Area, district, city…"
+                  placeholder={langCode === 'bn' ? 'এলাকা, জেলা, শহর…' : 'Area, district, city…'}
                   className="!bg-transparent outline-none border-none w-full text-sm font-bold text-gray-900 placeholder-gray-400 py-3 min-w-0"
                   autoComplete="off"
                 />
@@ -553,7 +543,7 @@ useEffect(() => {
                   <div className="absolute top-[calc(100%+8px)] left-0 w-[320px] bg-white rounded-2xl shadow-[0_16px_48px_rgba(0,0,0,0.12)] border border-gray-100 z-[500] overflow-hidden">
                     {!navLoc && (
                       <div className="px-3 pt-3 pb-2 border-b border-gray-50">
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Popular Areas</p>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">{langCode === 'bn' ? 'জনপ্রিয় এলাকা' : 'Popular Areas'}</p>
                         <div className="flex flex-wrap gap-1.5">
                           {['Dhanmondi','Gulshan','Banani','Uttara','Mirpur'].map(chip => (
                             <button key={chip} onMouseDown={e => e.preventDefault()} onClick={() => { setNavLoc(chip + ', Dhaka'); setNavLocOpen(false); }}
@@ -631,7 +621,7 @@ useEffect(() => {
                 }}
                 className="shrink-0 m-1.5 bg-[#ba0036] hover:bg-[#a0002d] text-white px-5 py-2 rounded-full font-black text-xs flex items-center gap-1.5 transition-all active:scale-95 whitespace-nowrap border-none"
               >
-                <Search size={13} /> Search
+                <Search size={13} /> {langCode === 'bn' ? 'খুঁজুন' : 'Search'}
               </button>
             </div>
           </div>
@@ -667,7 +657,7 @@ useEffect(() => {
               >
                 <Wallet size={16} />
                 {t?.menuRoommateWallet || 'Roommate Wallet'}
-                <span className="rounded-full bg-[#ba0036]/10 text-[#ba0036] group-hover:bg-white/25 group-hover:text-white px-1.5 py-0.5 text-[9px] font-extrabold leading-none tracking-wider transition-colors">LIVING</span>
+                <span className="rounded-full bg-[#ba0036]/10 text-[#ba0036] group-hover:bg-white/25 group-hover:text-white px-1.5 py-0.5 text-[9px] font-extrabold leading-none tracking-wider transition-colors">{langCode === 'bn' ? 'লিভিং' : 'LIVING'}</span>
               </button>
             ) : (
               <button
@@ -684,13 +674,13 @@ useEffect(() => {
                 <Sparkles size={16} className="relative z-10" />
                 <span className="relative z-10 tracking-wide">{t?.listProperty || 'Post Property'}</span>
                 <span className="relative z-10 rounded-full bg-white/20 text-white px-2 py-0.5 text-[9px] font-extrabold leading-none tracking-widest border border-white/20 backdrop-blur-sm group-hover:bg-white group-hover:text-[#ba0036] transition-colors uppercase shadow-sm">
-                  FREE
+                  {langCode === 'bn' ? 'ফ্রি' : 'FREE'}
                 </span>
               </button>
             )}
 
             <div className="relative" ref={langRef}>
-              <button onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} aria-label="Select Language" className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-full hover:bg-gray-100 transition-colors text-gray-700 hover:text-gray-900 font-bold">
+              <button onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} aria-label={langCode === 'bn' ? 'ভাষা বেছে নিন' : 'Select Language'} className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-full hover:bg-gray-100 transition-colors text-gray-700 hover:text-gray-900 font-bold">
                 <Globe size={16} /> <span className="text-[13px]">{language}</span>
               </button>
               {isLangMenuOpen && (
@@ -763,7 +753,7 @@ useEffect(() => {
             <div className="relative" ref={mobileLangRef}>
               <button
                 onClick={() => setIsLangMenuOpen(v => !v)}
-                aria-label="Language"
+                aria-label={langCode === 'bn' ? 'ভাষা' : 'Language'}
                 className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-gray-700 bg-white/70 backdrop-blur-md border border-white/60 shadow-sm hover:text-[#ba0036] hover:bg-red-50 hover:border-red-100 transition-all"
               >
                 <Globe size={15} strokeWidth={2.4} />
@@ -825,7 +815,7 @@ useEffect(() => {
             ))}
 
             <Link to="/properties/all" className="flex items-center gap-1 text-[11px] lg:text-xs font-bold text-gray-600 uppercase hover:text-gray-900 transition-colors shrink-0">
-              ALL CITIES <ArrowRight size={14} className="text-gray-400" />
+              {langCode === 'bn' ? 'সব শহর' : 'ALL CITIES'} <ArrowRight size={14} className="text-gray-400" />
             </Link>
           </div>
         </div>
@@ -856,7 +846,7 @@ useEffect(() => {
                   if (e.key === 'Enter') { setMobileNavLocOpen(false); setIsMobileSearchOpen(false); const slug = mobileNavLoc.trim() ? mobileNavLoc.trim().toLowerCase().replace(/,?\s+/g, '-') : 'all'; navigate(`/properties/${slug}?category=${navType.id}`); }
                   if (e.key === 'Escape') { setMobileNavLocOpen(false); setIsMobileSearchOpen(false); }
                 }}
-                placeholder="Area, district, city…"
+                placeholder={langCode === 'bn' ? 'এলাকা, জেলা, শহর…' : 'Area, district, city…'}
                 className="!bg-transparent outline-none border-none text-sm font-bold text-gray-900 placeholder-gray-400 w-full"
                 autoComplete="off"
                 autoFocus
@@ -871,7 +861,7 @@ useEffect(() => {
                 <div className="absolute top-[calc(100%+6px)] left-0 right-0 bg-white rounded-2xl shadow-[0_16px_48px_rgba(0,0,0,0.14)] border border-gray-100 z-[500] overflow-hidden">
                   {!mobileNavLoc && (
                     <div className="px-3 pt-3 pb-2 border-b border-gray-50">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Popular Areas</p>
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">{langCode === 'bn' ? 'জনপ্রিয় এলাকা' : 'Popular Areas'}</p>
                       <div className="flex flex-wrap gap-1.5">
                         {['Dhanmondi','Gulshan','Banani','Uttara','Mirpur'].map(chip => (
                           <button key={chip} onMouseDown={e => e.preventDefault()}
@@ -948,7 +938,7 @@ useEffect(() => {
             <button
               onClick={() => handleLogoClick({ fromDrawer: true })}
               className="flex items-center gap-2 group"
-              aria-label="TO-LET PRO home"
+              aria-label={langCode === 'bn' ? 'TO-LET PRO হোম' : 'TO-LET PRO home'}
             >
               <div className="bg-[#ba0036] p-2 rounded-xl shadow-[0_4px_15px_rgba(186,0,54,0.3)] group-active:scale-95 transition-transform">
                 <Building2 className="text-white w-[18px] h-[18px]" />
@@ -958,7 +948,7 @@ useEffect(() => {
                 <span className="text-gray-900">TO-LET</span> <span className="text-[#ba0036]">PRO</span>
               </div>
               <span className="ml-0.5 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-[#ba0036] bg-red-50 border border-[#ba0036]/30 rounded-md leading-none self-center">
-                Beta
+                {langCode === 'bn' ? 'বেটা' : 'Beta'}
               </span>
             </button>
 
@@ -966,7 +956,7 @@ useEffect(() => {
                 brand gradient on hover while the X spins 90°. */}
             <button
               onClick={closeAll}
-              aria-label="Close menu"
+              aria-label={langCode === 'bn' ? 'মেনু বন্ধ করুন' : 'Close menu'}
               className="group relative w-10 h-10 rounded-full flex items-center justify-center text-gray-500 bg-white/80 backdrop-blur border border-gray-200/80 shadow-[0_2px_10px_rgba(0,0,0,0.06)] hover:text-white hover:border-transparent hover:bg-gradient-to-br hover:from-[#ba0036] hover:to-[#e60045] hover:shadow-[0_6px_18px_rgba(186,0,54,0.35)] transition-all duration-300 active:scale-90"
             >
               <span className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/40 pointer-events-none" />
@@ -1210,18 +1200,18 @@ useEffect(() => {
               <div className="w-20 h-20 bg-red-50 rounded-3xl flex items-center justify-center mb-6 shadow-inner border border-red-100">
                 <ShieldAlert size={36} className="text-[#ba0036]" />
               </div>
-              <h3 className="text-2xl font-black text-gray-900 mb-3 tracking-tight">Login Required</h3>
+              <h3 className="text-2xl font-black text-gray-900 mb-3 tracking-tight">{langCode === 'bn' ? 'লগইন প্রয়োজন' : 'Login Required'}</h3>
               <p className="text-sm font-bold text-gray-500 mb-8 leading-relaxed px-2">
-                Sign in to list properties, manage your dashboard, and access all platform features.
+                {langCode === 'bn' ? 'বিজ্ঞাপন দিতে, ড্যাশবোর্ড ব্যবহার করতে এবং সব সুবিধা পেতে সাইন ইন করুন।' : 'Sign in to list properties, manage your dashboard, and access all platform features.'}
               </p>
               <div className="w-full flex flex-col gap-3">
                 <button onClick={() => { setShowAuthModal(false); navigate('/login'); }}
                   className="w-full bg-gradient-to-r from-[#ba0036] to-[#e60045] text-white py-4 rounded-2xl font-black text-sm shadow-[0_10px_20px_rgba(186,0,54,0.2)] hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-2">
-                  Sign In to Continue <ArrowRight size={18} />
+                  {langCode === 'bn' ? 'সাইন ইন করে এগিয়ে যান' : 'Sign In to Continue'} <ArrowRight size={18} />
                 </button>
                 <button onClick={() => setShowAuthModal(false)}
                   className="w-full bg-white border border-gray-200 text-gray-600 py-4 rounded-2xl font-black text-sm hover:bg-gray-50 transition-all active:scale-95">
-                  Cancel
+                  {langCode === 'bn' ? 'বাতিল' : 'Cancel'}
                 </button>
               </div>
             </div>

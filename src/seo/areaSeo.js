@@ -90,7 +90,10 @@ export const areaPath = (slug) => `/properties/${slug}`;
 
 /* ── copy ────────────────────────────────────────────────────────────────── */
 
-const title = (en, bn) => `${bn} বাসা ভাড়া — To-Let & Flat Rent in ${en}, Dhaka`;
+// "To-Let & " dropped: with a long Bangla name AND a long English one (Tejgaon
+// Industrial Area) this ran to 84 characters, and "বাসা ভাড়া" already carries the
+// rent intent. 38 area titles were past the ~65 characters a result shows.
+const title = (en, bn) => `${bn} বাসা ভাড়া — Flat Rent in ${en}, Dhaka`;
 
 function description(area, campuses, offices) {
   const near = campuses.length

@@ -41,6 +41,7 @@ import SeatTenantModal from './SeatTenantModal';
 import ShiftTenantModal from './ShiftTenantModal';
 import EditTenantModal from './EditTenantModal';
 import { submitOnEnter } from '../../utils/submitOnEnter';
+import { toAsciiDigits } from '../../utils/digits';
 import TenantDetailModal from './TenantDetailModal';
 import ModalPortal from '../shared/ModalPortal.jsx';
 import {
@@ -56,8 +57,9 @@ import {
 // padding is preserved because "007" and "7" are different doors.
 const MAX_RANGE = 200;
 export const expandRoomRange = (from, to) => {
-  const a = String(from || '').trim();
-  const b = String(to || '').trim();
+  // ১০১ → ১০৯ is the same nine rooms; `\d` below only knows ASCII.
+  const a = toAsciiDigits(from || '').trim();
+  const b = toAsciiDigits(to || '').trim();
   if (!a || !b) return { rooms: [], error: 'both' };
   const shape = /^(\D*)(\d+)(\D*)$/;
   const ma = shape.exec(a);
@@ -176,7 +178,7 @@ export default function UnitsManager({
     setEditSaving(true);
     try {
       const data = {};
-      if (editForm.roomNumber !== undefined) data.roomNumber = String(editForm.roomNumber).trim();
+      if (editForm.roomNumber !== undefined) data.roomNumber = toAsciiDigits(editForm.roomNumber).trim();
       if (editForm.floor !== undefined) data.floor = Number(editForm.floor) || 0;
       if (isSeat && editForm.seatCapacity !== undefined) data.seatCapacity = Number(editForm.seatCapacity) || 1;
       if (editForm.monthlyRent !== undefined) data.monthlyRent = Number(editForm.monthlyRent) || 0;
@@ -283,8 +285,8 @@ export default function UnitsManager({
     setSaving(true);
     try {
       const r = await createUnitsBulk(building.id, {
-        from: range.from.trim(),
-        to: range.to.trim(),
+        from: toAsciiDigits(range.from).trim(),
+        to: toAsciiDigits(range.to).trim(),
         floor: Number(form.floor) || 0,
         seatCapacity: isSeat ? Number(form.seatCapacity) || 1 : 1,
         suitableFor: isFlat ? form.suitableFor : '',
@@ -317,7 +319,7 @@ export default function UnitsManager({
     setSaving(true);
     try {
       const payload = {
-        roomNumber: String(form.roomNumber).trim(),
+        roomNumber: toAsciiDigits(form.roomNumber).trim(),
         floor: Number(form.floor) || 0,
         // Seats only exist in a seat building; the server pins this too.
         seatCapacity: isSeat ? Number(form.seatCapacity) || 1 : 1,
@@ -539,7 +541,7 @@ export default function UnitsManager({
             <div>
               <label className={labelCls}>{isBn ? 'ফ্লোর' : 'Floor'}</label>
               <input
-                type="number"
+                type="text" inputMode="numeric" data-number
                 value={form.floor}
                 onChange={(e) => set({ floor: e.target.value })}
                 placeholder="0"
@@ -579,7 +581,7 @@ export default function UnitsManager({
             <div className="mt-3">
               <label className={labelCls}>{isBn ? 'এই রুমে কয়টি সিট?' : 'How many seats in this room?'}</label>
               <input
-                type="number" min="1" max="60"
+                type="text" inputMode="numeric" data-number min="1" max="60"
                 value={form.seatCapacity}
                 onChange={(e) => set({ seatCapacity: e.target.value })}
                 className={inputCls}
@@ -593,15 +595,15 @@ export default function UnitsManager({
           <div className="grid grid-cols-3 gap-3 mt-3">
             <div>
               <label className={labelCls}>{isBn ? 'ভাড়া (৳)' : 'Rent (৳)'}</label>
-              <input type="number" min="0" value={form.monthlyRent} onChange={(e) => set({ monthlyRent: e.target.value })} placeholder={String(building?.defaultMonthlyRent || 0)} className={inputCls} />
+              <input type="text" inputMode="numeric" data-number min="0" value={form.monthlyRent} onChange={(e) => set({ monthlyRent: e.target.value })} placeholder={String(building?.defaultMonthlyRent || 0)} className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>{isBn ? 'সার্ভিস (৳)' : 'Service (৳)'}</label>
-              <input type="number" min="0" value={form.serviceCharge} onChange={(e) => set({ serviceCharge: e.target.value })} placeholder={String(building?.defaultServiceCharge || 0)} className={inputCls} />
+              <input type="text" inputMode="numeric" data-number min="0" value={form.serviceCharge} onChange={(e) => set({ serviceCharge: e.target.value })} placeholder={String(building?.defaultServiceCharge || 0)} className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>{isBn ? 'ডিউ ডে' : 'Due Day'}</label>
-              <input type="number" min="1" max="28" value={form.rentDueDay} onChange={(e) => set({ rentDueDay: e.target.value })} placeholder={String(building?.defaultRentDueDay || 5)} className={inputCls} />
+              <input type="text" inputMode="numeric" data-number min="1" max="28" value={form.rentDueDay} onChange={(e) => set({ rentDueDay: e.target.value })} placeholder={String(building?.defaultRentDueDay || 5)} className={inputCls} />
             </div>
           </div>
           <p className="text-[9px] font-bold text-gray-400 mt-1.5">
@@ -876,7 +878,7 @@ export default function UnitsManager({
                                 <div>
                                   <label className={labelCls}>{isBn ? 'ফ্লোর' : 'Floor'}</label>
                                   <input
-                                    type="number"
+                                    type="text" inputMode="numeric" data-number
                                     value={editForm.floor}
                                     onChange={(e) => setEdit({ floor: e.target.value })}
                                     className={inputCls}
@@ -888,7 +890,7 @@ export default function UnitsManager({
                                 <div className="mt-3">
                                   <label className={labelCls}>{isBn ? 'সিট সংখ্যা' : 'Seat Capacity'}</label>
                                   <input
-                                    type="number" min="1" max="60"
+                                    type="text" inputMode="numeric" data-number min="1" max="60"
                                     value={editForm.seatCapacity}
                                     onChange={(e) => setEdit({ seatCapacity: e.target.value })}
                                     className={inputCls}
@@ -902,15 +904,15 @@ export default function UnitsManager({
                               <div className="grid grid-cols-3 gap-3 mt-3">
                                 <div>
                                   <label className={labelCls}>{isBn ? 'ভাড়া (৳)' : 'Rent (৳)'}</label>
-                                  <input type="number" min="0" value={editForm.monthlyRent} onChange={(e) => setEdit({ monthlyRent: e.target.value })} className={inputCls} />
+                                  <input type="text" inputMode="numeric" data-number min="0" value={editForm.monthlyRent} onChange={(e) => setEdit({ monthlyRent: e.target.value })} className={inputCls} />
                                 </div>
                                 <div>
                                   <label className={labelCls}>{isBn ? 'সার্ভিস (৳)' : 'Service (৳)'}</label>
-                                  <input type="number" min="0" value={editForm.serviceCharge} onChange={(e) => setEdit({ serviceCharge: e.target.value })} className={inputCls} />
+                                  <input type="text" inputMode="numeric" data-number min="0" value={editForm.serviceCharge} onChange={(e) => setEdit({ serviceCharge: e.target.value })} className={inputCls} />
                                 </div>
                                 <div>
                                   <label className={labelCls}>{isBn ? 'ডিউ ডে' : 'Due Day'}</label>
-                                  <input type="number" min="1" max="28" value={editForm.rentDueDay} onChange={(e) => setEdit({ rentDueDay: e.target.value })} className={inputCls} />
+                                  <input type="text" inputMode="numeric" data-number min="1" max="28" value={editForm.rentDueDay} onChange={(e) => setEdit({ rentDueDay: e.target.value })} className={inputCls} />
                                 </div>
                               </div>
 
@@ -991,7 +993,7 @@ export default function UnitsManager({
         <ModalPortal>
         <div className="fixed inset-0 z-[118] flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSeatMenu(null)} />
-          <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 animate-in slide-in-from-bottom-2 sm:zoom-in-95">
+          <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 pb-[calc(1.25rem+var(--sab))] sm:pb-5 animate-in slide-in-from-bottom-2 sm:zoom-in-95">
             <div className="flex items-start gap-2 mb-4">
               <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-black text-gray-900 truncate">

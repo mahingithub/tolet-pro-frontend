@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useSettings } from '../context/SettingsContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
 import { resolveHome } from '../utils/homeSurface';
+import { getNativeExperience, getNativeHome, isNativeApp, safeAppPath } from '../utils/nativeExperience.js';
 import {
   signupStart,
   forgotPassword,
@@ -17,6 +18,7 @@ import {
 } from '../services/authService.js';
 import { createPhoneVerification, phoneAuthErrorMessage } from '../services/firebasePhoneAuth.js';
 import { passwordChecks } from '../utils/validators.js';
+import { toAsciiDigits } from '../utils/digits.js';
 import {
   PHONE_COUNTRIES,
   DEFAULT_PHONE_COUNTRY,
@@ -172,7 +174,9 @@ const OTP_STATUS_TEXT = {
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const goBack = useGoBack('/');
+  const native = isNativeApp();
+  const nativeExperience = native ? getNativeExperience() : null;
+  const goBack = useGoBack(native ? getNativeHome(nativeExperience) : '/');
   const [searchParams] = useSearchParams();
   const { login, completeSignup, roles } = useAuth();
   const { settings } = useSettings();
@@ -226,6 +230,11 @@ const LoginPage = () => {
   //   /login?mode=signup&role=landlord → signup as landlord
   const requestedMode = searchParams.get('mode');
   const requestedRole = searchParams.get('role');
+  // App onboarding already established the side being used. Keep that choice
+  // across login, signup and password reset, including older plain /login links.
+  const nativeRole = nativeExperience?.role
+    || (native && ['tenant', 'landlord'].includes(requestedRole) ? requestedRole : null);
+  const roleIsFixed = native && !!nativeRole;
 
   const [mode, setMode] = useState(
     requestedMode === 'signup' ? MODES.SIGNUP
@@ -243,7 +252,7 @@ const LoginPage = () => {
     attemptRef.current += 1;
     void verificationRef.current?.dispose();
   }, []);
-  const [role, setRole] = useState(requestedRole === 'landlord' ? 'landlord' : 'tenant');
+  const [role, setRole] = useState(nativeRole || (requestedRole === 'landlord' ? 'landlord' : 'tenant'));
 
   // ─── Role-selection popup ───────────────────────────────────────────────
   // On entering the login / signup screen we prompt the user to say whether
@@ -254,8 +263,13 @@ const LoginPage = () => {
   // available as a quick way to change the choice afterwards.
   const hasExplicitRole = requestedRole === 'landlord' || requestedRole === 'tenant';
   const [showRolePicker, setShowRolePicker] = useState(
-    !hasExplicitRole && requestedMode !== 'forgot',
+    !roleIsFixed && !hasExplicitRole && requestedMode !== 'forgot',
   );
+  useEffect(() => {
+    if (!roleIsFixed) return;
+    setRole(nativeRole);
+    setShowRolePicker(false);
+  }, [roleIsFixed, nativeRole]);
   const chooseRole = (r) => {
     setRole(r);
     setShowRolePicker(false);
@@ -363,6 +377,13 @@ const LoginPage = () => {
   }, [resendIn]);
 
   const goToNextOrDashboard = (resolvedRole) => {
+    if (native) {
+      // URLSearchParams already decoded next once. Decoding a second time
+      // corrupts values containing encoded addresses, ampersands or percent signs.
+      const safeNext = safeAppPath(nextUrl, null) && !/^\/login(?:[/?#]|$)/.test(nextUrl);
+      navigate(safeNext ? nextUrl : resolvedRole === 'admin' ? '/admin' : getNativeHome(), { replace: true });
+      return;
+    }
     if (nextUrl) {
       try {
         navigate(decodeURIComponent(nextUrl), { replace: true });
@@ -759,7 +780,7 @@ const LoginPage = () => {
 
   const handleOtpChange = (index, value) => {
     if (isLoading || otpLocked) return;
-    const digit = value.replace(/\D/g, '').slice(-1); // keep only the last digit typed
+    const digit = toAsciiDigits(value).replace(/\D/g, '').slice(-1); // keep only the last digit typed
     if (value !== '' && digit === '') return;         // ignore non-numeric input
     const next = [...otp];
     next[index] = digit;
@@ -809,7 +830,8 @@ const LoginPage = () => {
   const handleOtpPaste = (e) => {
     e.preventDefault();
     if (isLoading || otpLocked) return;
-    const digits = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+    // A paste never fires `input`, so the app-wide digit folding misses it.
+    const digits = toAsciiDigits(e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
     if (!digits) return;
     const next = ['', '', '', '', '', ''];
     for (let i = 0; i < digits.length; i += 1) next[i] = digits[i];
@@ -871,7 +893,7 @@ const LoginPage = () => {
           they signed up on). Skipped when a role is already set via the URL or
           on the forgot-password screen. Picking an option preselects the role
           and reveals the form; the in-form toggle can still change it. */}
-      {showRolePicker && mode !== MODES.FORGOT && (
+      {!roleIsFixed && showRolePicker && mode !== MODES.FORGOT && (
         <div
           className="fixed inset-0 z-[120] flex items-center justify-center p-4"
           role="dialog"
@@ -1021,10 +1043,12 @@ const LoginPage = () => {
                 {roleMismatch && (
                   <button
                     type="button"
-                    onClick={() => selectRole(roleMismatch)}
+                    onClick={() => roleIsFixed ? navigate('/app/start') : selectRole(roleMismatch)}
                     className="block w-full mt-2 text-xs font-bold text-brandRed underline"
                   >
-                    {roleMismatch === 'landlord'
+                    {roleIsFixed
+                      ? L('Change how I use the app', 'অ্যাপ ব্যবহারের ধরন বদলান')
+                      : roleMismatch === 'landlord'
                       ? L('This account is a landlord — log in as landlord', 'এই অ্যাকাউন্টটি বাড়িওয়ালার — বাড়িওয়ালা হিসেবে লগইন করুন')
                       : L('This account is a tenant — log in as tenant', 'এই অ্যাকাউন্টটি ভাড়াটিয়ার — ভাড়াটিয়া হিসেবে লগইন করুন')}
                   </button>
@@ -1045,7 +1069,21 @@ const LoginPage = () => {
                   <p className="text-sm text-gray-500 mt-1">{formSub}</p>
                 </div>
 
-                {mode !== MODES.FORGOT && (
+                {/* The app already asked on /app/start, so there is no toggle —
+                    only a way out for someone who picked the wrong side. */}
+                {roleIsFixed && mode !== MODES.FORGOT && (
+                  <p className="-mt-3 mb-5 text-xs font-semibold text-gray-500 text-center lg:text-left">
+                    {nativeRole === 'landlord'
+                      ? L('Continuing as a landlord', 'বাড়িওয়ালা হিসেবে চালিয়ে যাচ্ছেন')
+                      : L('Continuing as a tenant', 'ভাড়াটিয়া হিসেবে চালিয়ে যাচ্ছেন')}
+                    {' · '}
+                    <button type="button" disabled={isLoading} onClick={() => navigate('/app/start')} className="font-bold text-brandRed underline">
+                      {L('Change', 'বদলান')}
+                    </button>
+                  </p>
+                )}
+
+                {!roleIsFixed && mode !== MODES.FORGOT && (
                   <div className="flex bg-gray-100 p-1 rounded-xl mb-5">
                     <button
                       type="button"

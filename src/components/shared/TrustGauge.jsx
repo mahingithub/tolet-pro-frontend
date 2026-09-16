@@ -13,17 +13,20 @@
 
 import React from 'react';
 import { ShieldCheck } from 'lucide-react';
+import { useIsBn } from '../../context/LanguageContext';
+import { trustTierLabel } from '../../constants/listingLabels';
 
 const TIERS = [
-  { min: 80, label: 'Trusted',  ring: 'stroke-emerald-500', text: 'text-emerald-600', chip: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
-  { min: 60, label: 'Verified', ring: 'stroke-blue-500',    text: 'text-blue-600',    chip: 'bg-blue-50 text-blue-600 border-blue-100' },
-  { min: 40, label: 'Growing',  ring: 'stroke-amber-500',   text: 'text-amber-600',   chip: 'bg-amber-50 text-amber-700 border-amber-100' },
-  { min: 0,  label: 'New',      ring: 'stroke-slate-400',   text: 'text-slate-500',   chip: 'bg-slate-50 text-slate-600 border-slate-100' },
+  { min: 80, en: 'Trusted',  bn: 'বিশ্বস্ত',     ring: 'stroke-emerald-500', text: 'text-emerald-600', chip: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+  { min: 60, en: 'Verified', bn: 'যাচাইকৃত',    ring: 'stroke-blue-500',    text: 'text-blue-600',    chip: 'bg-blue-50 text-blue-600 border-blue-100' },
+  { min: 40, en: 'Growing',  bn: 'উন্নতির পথে', ring: 'stroke-amber-500',   text: 'text-amber-600',   chip: 'bg-amber-50 text-amber-700 border-amber-100' },
+  { min: 0,  en: 'New',      bn: 'নতুন',        ring: 'stroke-slate-400',   text: 'text-slate-500',   chip: 'bg-slate-50 text-slate-600 border-slate-100' },
 ];
 
 const tierFor = (score) => TIERS.find(t => score >= t.min) || TIERS[TIERS.length - 1];
 
-const TrustGauge = ({ score = 0, tier, size = 128, label = 'Trust Score' }) => {
+const TrustGauge = ({ score = 0, tier, size = 128, label }) => {
+  const isBn = useIsBn();
   const safeScore = Math.max(0, Math.min(100, Math.round(score || 0)));
   const t = tierFor(safeScore);
   const r = (size / 2) - 8;
@@ -58,9 +61,9 @@ const TrustGauge = ({ score = 0, tier, size = 128, label = 'Trust Score' }) => {
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">/ 100</span>
         </div>
       </div>
-      <span className="mt-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</span>
+      <span className="mt-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label || (isBn ? 'ট্রাস্ট স্কোর' : 'Trust Score')}</span>
       <span className={`mt-1 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${t.chip}`}>
-        {tier || t.label}
+        {tier ? trustTierLabel(tier, isBn) : (isBn ? t.bn : t.en)}
       </span>
     </div>
   );

@@ -18,7 +18,7 @@ import {
   User, GraduationCap, Leaf, Utensils, Coffee, Rocket,
   Flame, Droplets, Search
 } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage, useIsBn } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTour } from '../context/TourContext.jsx';
 import {
@@ -897,14 +897,14 @@ const GpsPanel = ({ form, set, isBn }) => {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{isBn ? 'অক্ষাংশ' : 'Latitude'}</p>
-                <input type="number" step="0.000001" className={inputCls}
+                <input type="text" inputMode="decimal" data-number step="0.000001" className={inputCls}
                   value={form.gpsLat}
                   onChange={e => set('gpsLat', e.target.value)}
                   placeholder="23.7925" />
               </div>
               <div>
                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{isBn ? 'দ্রাঘিমাংশ' : 'Longitude'}</p>
-                <input type="number" step="0.000001" className={inputCls}
+                <input type="text" inputMode="decimal" data-number step="0.000001" className={inputCls}
                   value={form.gpsLng}
                   onChange={e => set('gpsLng', e.target.value)}
                   placeholder="90.4078" />
@@ -940,6 +940,7 @@ const GpsPanel = ({ form, set, isBn }) => {
 
 // ─── GPS PANEL MAP (Google Maps interactive or iframe fallback) ───────────────
 const GpsPanelMap = ({ lat, lng }) => {
+  const isBn = useIsBn();
   const center = React.useMemo(() => ({ lat, lng }), [lat, lng]);
   const mapOptions = React.useMemo(() => ({
     disableDefaultUI: false,
@@ -969,9 +970,9 @@ const GpsPanelMap = ({ lat, lng }) => {
         style={{ background: '#f1f5f9', borderRadius: 16 }}
       >
         <MapPin size={24} style={{ color: '#94a3b8' }} />
-        <span style={{ fontSize: 12, fontWeight: 800, color: '#64748b' }}>Map unavailable</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: '#64748b' }}>{isBn ? 'ম্যাপ পাওয়া যাচ্ছে না' : 'Map unavailable'}</span>
         <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8' }}>
-          {Number.isFinite(lat) && Number.isFinite(lng) ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : 'Location saved'}
+          {Number.isFinite(lat) && Number.isFinite(lng) ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : (isBn ? 'লোকেশন সেভ হয়েছে' : 'Location saved')}
         </span>
       </div>
     );
@@ -982,7 +983,7 @@ const GpsPanelMap = ({ lat, lng }) => {
       <div className="w-full h-52 flex items-center justify-center" style={{ background: '#fafbfc' }}>
         <div className="flex flex-col items-center gap-2">
           <div className="w-8 h-8 border-[3px] border-[#ba0036] border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-bold text-gray-400">Loading map…</span>
+          <span className="text-xs font-bold text-gray-400">{isBn ? 'ম্যাপ লোড হচ্ছে…' : 'Loading map…'}</span>
         </div>
       </div>
     );
@@ -2398,7 +2399,7 @@ const AddProperty = () => {
                   <Field label={isBn ? 'আয়তন (বর্গফুট) — ঐচ্ছিক' : 'Area (sq. ft.) — Optional'}>
                     <div className="relative">
                       <Square size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
-                      <input type="number"
+                      <input type="text" inputMode="numeric" data-number
                         className={`${inputCls} pl-10`}
                         placeholder={isBn ? 'যেমন: ১৫০০' : 'e.g. 1500'}
                         value={form.sqft}
@@ -2418,7 +2419,7 @@ const AddProperty = () => {
                         : '0 = ground floor, 1 = 1st floor, etc.'}>
                       <div className="relative">
                         <Layers size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
-                        <input type="number"
+                        <input type="text" inputMode="numeric" data-number
                           className={`${inputCls} pl-10`}
                           placeholder={isBn ? 'যেমন: ৫' : 'e.g. 5'}
                           value={form.floor}
@@ -2909,7 +2910,7 @@ const AddProperty = () => {
                     required>
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-gray-400">৳</span>
-                      <input type="number"
+                      <input type="text" inputMode="numeric" data-number
                         className={`${inputCls} pl-9 ${err('price') ? 'border-red-200 bg-red-50' : ''}`}
                         data-tour="property-pricing"
                         placeholder={isBn ? currentIntentData.pricePlaceholderBn : currentIntentData.pricePlaceholder}

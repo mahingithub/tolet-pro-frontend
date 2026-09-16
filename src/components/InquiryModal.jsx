@@ -297,7 +297,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 					onClick={onClose}
 				>
 					<motion.div
-						className="bg-white rounded-t-[2.5rem] sm:rounded-[2.5rem] w-full sm:max-w-md shadow-2xl border-t sm:border border-gray-100 overflow-hidden relative max-h-[92vh] flex flex-col"
+						className="bg-white rounded-t-[2.5rem] sm:rounded-[2.5rem] w-full sm:max-w-md shadow-2xl border-t sm:border border-gray-100 overflow-hidden relative max-h-[92vh] flex flex-col pb-safe sm:pb-0"
 						initial={{ y: 100, opacity: 0 }}
 						animate={{ y: 0, opacity: 1 }}
 						exit={{ y: 100, opacity: 0 }}
@@ -310,7 +310,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 						<button
 							onClick={onClose}
 							className="absolute top-5 right-5 p-2 bg-gray-50 hover:bg-red-50 hover:text-[#ba0036] rounded-full transition-colors z-20"
-							aria-label="Close inquiry"
+							aria-label={isBn ? 'ইনকোয়ারি বন্ধ করুন' : 'Close inquiry'}
 						>
 							<X size={18} />
 						</button>

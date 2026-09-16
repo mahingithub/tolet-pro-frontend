@@ -18,20 +18,21 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, X } from 'lucide-react';
+import { useIsBn } from '../context/LanguageContext';
 
 const RECENT_KEY = 'tolet_recent_emoji';
 
 // Compact-but-broad emoji set per category ("All everything").
 const CATEGORIES = [
-  { id: 'recent',   icon: '🕘', label: 'Recent', emojis: [] },
-  { id: 'smileys',  icon: '😀', label: 'Smileys & People', emojis: '😀 😃 😄 😁 😆 😅 😂 🤣 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😗 😚 😙 😋 😛 😜 🤪 😝 🤑 🤗 🤭 🤫 🤔 🤐 😐 😑 😶 😏 😒 🙄 😬 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🥵 🥶 😵 🤯 🤠 🥳 😎 🤓 🧐 😕 😟 🙁 ☹️ 😮 😯 😲 😳 🥺 😦 😧 😨 😰 😥 😢 😭 😱 😖 😞 😓 😩 😫 😤 😡 😠 🤬 👍 👎 👏 🙌 🙏 💪 👋 🤝 ✌️ 🤞 👌 🫶 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💔 💯'.split(' ') },
-  { id: 'animals',  icon: '🐻', label: 'Animals & Nature', emojis: '🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🐦 🐤 🦆 🦉 🐴 🦄 🐝 🐛 🦋 🐌 🐞 🐢 🐍 🐙 🦀 🐠 🐟 🐬 🐳 🐋 🦈 🌵 🌲 🌳 🌴 🌱 🌿 🍀 🎍 🌾 🌷 🌹 🥀 🌺 🌸 🌼 🌻 🌞 🌝 🌛 ⭐ 🌟 ✨ ⚡ 🔥 🌈 ☀️ ⛅ ☁️ 🌧️ ❄️ 💧 🌊'.split(' ') },
-  { id: 'food',     icon: '🍔', label: 'Food & Drink', emojis: '🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍈 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🍆 🥑 🥦 🥬 🌽 🥕 🥔 🍠 🥐 🍞 🥖 🧀 🥚 🍳 🥞 🧇 🥓 🍔 🍟 🍕 🌭 🥪 🌮 🌯 🥙 🍜 🍝 🍣 🍱 🍛 🍚 🍙 🍦 🍰 🎂 🍫 🍬 🍭 🍩 🍪 ☕ 🍵 🧃 🥤 🍺 🍻 🍷 🥂'.split(' ') },
-  { id: 'activity', icon: '⚽', label: 'Activity', emojis: '⚽ 🏀 🏈 ⚾ 🥎 🎾 🏐 🏉 🎱 🏓 🏸 🥅 🏒 🏑 🏏 ⛳ 🎯 🎣 🥊 🥋 ⛸️ 🎿 🛷 🥌 🎽 🏆 🥇 🥈 🥉 🎖️ 🏅 🎗️ 🎫 🎪 🎭 🎨 🎬 🎤 🎧 🎼 🎹 🥁 🎷 🎺 🎸 🎻 🎲 🎮 🕹️ 🎰 🎳'.split(' ') },
-  { id: 'travel',   icon: '🚗', label: 'Travel & Places', emojis: '🚗 🚕 🚙 🚌 🚎 🏎️ 🚓 🚑 🚒 🚐 🚚 🚛 🚜 🛵 🏍️ 🚲 🛴 🚨 🚔 🚍 🚝 🚄 🚅 🚈 🚂 🚆 🚇 🚊 ✈️ 🛫 🛬 🚀 🛸 🚁 ⛵ 🚤 🛥️ 🚢 ⚓ 🏕️ 🏖️ 🏜️ 🏝️ 🗻 🏔️ ⛰️ 🌋 🏙️ 🌆 🌇 🌃 🌉 🗽 🗼 🏰 🏯 🎡 🎢 🎠'.split(' ') },
-  { id: 'objects',  icon: '💡', label: 'Objects', emojis: '⌚ 📱 💻 ⌨️ 🖥️ 🖨️ 🖱️ 💽 💾 📷 📸 📹 🎥 📞 ☎️ 📺 📻 🔋 🔌 💡 🔦 📚 📖 📝 ✏️ 🖊️ 🖌️ 📌 📎 🔒 🔑 🔨 🛠️ ⚙️ 🧲 💉 💊 🚪 🛏️ 🛒 🎁 🎈 🎉 🎊 🎀 🕯️ 💰 💳 💎 ⏰ ⏳ 📅 📆'.split(' ') },
-  { id: 'symbols',  icon: '❤️', label: 'Symbols', emojis: '❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 ✅ ❌ ❓ ❗ ‼️ ⭕ 🔴 🟠 🟡 🟢 🔵 🟣 ⚫ ⚪ 🔺 🔻 🔶 🔷 ▶️ ⏸️ ⏹️ 🔀 🔁 ➕ ➖ ➗ ✖️ ♾️ 💲 💱 ™️ ©️ ®️ 〰️ ➰ ✔️ ☑️ 🔔 🔕'.split(' ') },
-  { id: 'flags',    icon: '🏳️', label: 'Flags', emojis: '🏳️ 🏴 🏁 🚩 🏳️‍🌈 🇧🇩 🇮🇳 🇵🇰 🇺🇸 🇬🇧 🇨🇦 🇦🇺 🇸🇦 🇦🇪 🇶🇦 🇸🇬 🇲🇾 🇯🇵 🇨🇳 🇰🇷 🇩🇪 🇫🇷 🇮🇹 🇪🇸 🇧🇷 🇷🇺 🇹🇷 🇮🇩 🇹🇭 🇳🇵'.split(' ') },
+  { id: 'recent',   icon: '🕘', label: 'Recent', bn: 'সাম্প্রতিক', emojis: [] },
+  { id: 'smileys',  icon: '😀', label: 'Smileys & People', bn: 'হাসি ও মানুষ', emojis: '😀 😃 😄 😁 😆 😅 😂 🤣 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😗 😚 😙 😋 😛 😜 🤪 😝 🤑 🤗 🤭 🤫 🤔 🤐 😐 😑 😶 😏 😒 🙄 😬 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🥵 🥶 😵 🤯 🤠 🥳 😎 🤓 🧐 😕 😟 🙁 ☹️ 😮 😯 😲 😳 🥺 😦 😧 😨 😰 😥 😢 😭 😱 😖 😞 😓 😩 😫 😤 😡 😠 🤬 👍 👎 👏 🙌 🙏 💪 👋 🤝 ✌️ 🤞 👌 🫶 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💔 💯'.split(' ') },
+  { id: 'animals',  icon: '🐻', label: 'Animals & Nature', bn: 'প্রাণী ও প্রকৃতি', emojis: '🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🐦 🐤 🦆 🦉 🐴 🦄 🐝 🐛 🦋 🐌 🐞 🐢 🐍 🐙 🦀 🐠 🐟 🐬 🐳 🐋 🦈 🌵 🌲 🌳 🌴 🌱 🌿 🍀 🎍 🌾 🌷 🌹 🥀 🌺 🌸 🌼 🌻 🌞 🌝 🌛 ⭐ 🌟 ✨ ⚡ 🔥 🌈 ☀️ ⛅ ☁️ 🌧️ ❄️ 💧 🌊'.split(' ') },
+  { id: 'food',     icon: '🍔', label: 'Food & Drink', bn: 'খাবার ও পানীয়', emojis: '🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍈 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🍆 🥑 🥦 🥬 🌽 🥕 🥔 🍠 🥐 🍞 🥖 🧀 🥚 🍳 🥞 🧇 🥓 🍔 🍟 🍕 🌭 🥪 🌮 🌯 🥙 🍜 🍝 🍣 🍱 🍛 🍚 🍙 🍦 🍰 🎂 🍫 🍬 🍭 🍩 🍪 ☕ 🍵 🧃 🥤 🍺 🍻 🍷 🥂'.split(' ') },
+  { id: 'activity', icon: '⚽', label: 'Activity', bn: 'খেলাধুলা', emojis: '⚽ 🏀 🏈 ⚾ 🥎 🎾 🏐 🏉 🎱 🏓 🏸 🥅 🏒 🏑 🏏 ⛳ 🎯 🎣 🥊 🥋 ⛸️ 🎿 🛷 🥌 🎽 🏆 🥇 🥈 🥉 🎖️ 🏅 🎗️ 🎫 🎪 🎭 🎨 🎬 🎤 🎧 🎼 🎹 🥁 🎷 🎺 🎸 🎻 🎲 🎮 🕹️ 🎰 🎳'.split(' ') },
+  { id: 'travel',   icon: '🚗', label: 'Travel & Places', bn: 'ভ্রমণ ও স্থান', emojis: '🚗 🚕 🚙 🚌 🚎 🏎️ 🚓 🚑 🚒 🚐 🚚 🚛 🚜 🛵 🏍️ 🚲 🛴 🚨 🚔 🚍 🚝 🚄 🚅 🚈 🚂 🚆 🚇 🚊 ✈️ 🛫 🛬 🚀 🛸 🚁 ⛵ 🚤 🛥️ 🚢 ⚓ 🏕️ 🏖️ 🏜️ 🏝️ 🗻 🏔️ ⛰️ 🌋 🏙️ 🌆 🌇 🌃 🌉 🗽 🗼 🏰 🏯 🎡 🎢 🎠'.split(' ') },
+  { id: 'objects',  icon: '💡', label: 'Objects', bn: 'জিনিসপত্র', emojis: '⌚ 📱 💻 ⌨️ 🖥️ 🖨️ 🖱️ 💽 💾 📷 📸 📹 🎥 📞 ☎️ 📺 📻 🔋 🔌 💡 🔦 📚 📖 📝 ✏️ 🖊️ 🖌️ 📌 📎 🔒 🔑 🔨 🛠️ ⚙️ 🧲 💉 💊 🚪 🛏️ 🛒 🎁 🎈 🎉 🎊 🎀 🕯️ 💰 💳 💎 ⏰ ⏳ 📅 📆'.split(' ') },
+  { id: 'symbols',  icon: '❤️', label: 'Symbols', bn: 'চিহ্ন', emojis: '❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 ✅ ❌ ❓ ❗ ‼️ ⭕ 🔴 🟠 🟡 🟢 🔵 🟣 ⚫ ⚪ 🔺 🔻 🔶 🔷 ▶️ ⏸️ ⏹️ 🔀 🔁 ➕ ➖ ➗ ✖️ ♾️ 💲 💱 ™️ ©️ ®️ 〰️ ➰ ✔️ ☑️ 🔔 🔕'.split(' ') },
+  { id: 'flags',    icon: '🏳️', label: 'Flags', bn: 'পতাকা', emojis: '🏳️ 🏴 🏁 🚩 🏳️‍🌈 🇧🇩 🇮🇳 🇵🇰 🇺🇸 🇬🇧 🇨🇦 🇦🇺 🇸🇦 🇦🇪 🇶🇦 🇸🇬 🇲🇾 🇯🇵 🇨🇳 🇰🇷 🇩🇪 🇫🇷 🇮🇹 🇪🇸 🇧🇷 🇷🇺 🇹🇷 🇮🇩 🇹🇭 🇳🇵'.split(' ') },
 ];
 
 const STICKERS = '😀 😂 🥰 😎 😭 😡 👍 🙏 🎉 🔥 💯 ❤️ 🥳 🤩 😴 🤔 🙌 👏 💪 🤝 🌹 🎂 🍕 ⚽ 🏆 🚀 🌈 ⭐ 💰 🏠'.split(' ');
@@ -41,6 +42,7 @@ function loadRecent() {
 }
 
 export default function EmojiPicker({ open, onClose, onPickEmoji, onSendSticker, onSendGif }) {
+  const isBn = useIsBn();
   const [tab, setTab] = useState('emoji');       // 'emoji' | 'sticker' | 'gif'
   const [cat, setCat] = useState('smileys');
   const [recent, setRecent] = useState(loadRecent);
@@ -104,10 +106,10 @@ export default function EmojiPicker({ open, onClose, onPickEmoji, onSendSticker,
               tab === t ? 'bg-[#ba0036] text-white' : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
-            {t === 'emoji' ? 'Emoji' : t === 'gif' ? 'GIF' : 'Sticker'}
+            {t === 'emoji' ? (isBn ? 'ইমোজি' : 'Emoji') : t === 'gif' ? 'GIF' : (isBn ? 'স্টিকার' : 'Sticker')}
           </button>
         ))}
-        <button onClick={onClose} className="ml-auto p-1.5 rounded-full hover:bg-gray-100 text-gray-400" aria-label="Close emoji picker">
+        <button onClick={onClose} className="ml-auto p-1.5 rounded-full hover:bg-gray-100 text-gray-400" aria-label={isBn ? 'ইমোজি প্যানেল বন্ধ করুন' : 'Close emoji picker'}>
           <X size={16} />
         </button>
       </div>
@@ -117,10 +119,10 @@ export default function EmojiPicker({ open, onClose, onPickEmoji, onSendSticker,
         <>
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2">
             {cat === 'recent' && recent.length === 0 ? (
-              <p className="text-center text-[12px] font-bold text-gray-400 py-10">No recent emojis yet.</p>
+              <p className="text-center text-[12px] font-bold text-gray-400 py-10">{isBn ? 'এখনো সাম্প্রতিক কোনো ইমোজি নেই।' : 'No recent emojis yet.'}</p>
             ) : (
               <>
-                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">{activeCat.label}</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">{isBn ? activeCat.bn : activeCat.label}</p>
                 <div className="grid grid-cols-8 sm:grid-cols-10 gap-0.5">
                   {catEmojis.map((e, i) => (
                     <button
@@ -144,7 +146,7 @@ export default function EmojiPicker({ open, onClose, onPickEmoji, onSendSticker,
                 className={`w-8 h-8 rounded-lg text-lg leading-none flex items-center justify-center transition-all ${
                   cat === c.id ? 'bg-[#ba0036]/10 scale-110' : 'opacity-50 hover:opacity-100'
                 }`}
-                aria-label={c.label}
+                aria-label={isBn ? c.bn : c.label}
               >
                 {c.icon}
               </button>
@@ -156,7 +158,7 @@ export default function EmojiPicker({ open, onClose, onPickEmoji, onSendSticker,
       {/* STICKER TAB */}
       {tab === 'sticker' && (
         <div className="flex-1 overflow-y-auto px-3 py-3">
-          <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2">Tap to send</p>
+          <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2">{isBn ? 'পাঠাতে ট্যাপ করুন' : 'Tap to send'}</p>
           <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
             {STICKERS.map((e, i) => (
               <button
@@ -176,8 +178,7 @@ export default function EmojiPicker({ open, onClose, onPickEmoji, onSendSticker,
         <div className="flex-1 overflow-y-auto px-3 py-2">
           {!TENOR_KEY ? (
             <div className="h-full flex flex-col items-center justify-center text-center px-6 py-10">
-              <p className="text-[12px] font-bold text-gray-500">GIF search needs a free Tenor API key.</p>
-              <p className="text-[11px] font-medium text-gray-400 mt-1">Add <code className="bg-gray-100 px-1 rounded">VITE_TENOR_KEY</code> to your .env to enable GIFs.</p>
+              <p className="text-[12px] font-bold text-gray-500">{isBn ? 'GIF এখন পাওয়া যাচ্ছে না।' : 'GIFs are not available right now.'}</p>
             </div>
           ) : (
             <>
@@ -186,12 +187,12 @@ export default function EmojiPicker({ open, onClose, onPickEmoji, onSendSticker,
                 <input
                   value={gifQuery}
                   onChange={(e) => setGifQuery(e.target.value)}
-                  placeholder="Search GIFs…"
+                  placeholder={isBn ? 'GIF খুঁজুন…' : 'Search GIFs…'}
                   className="w-full bg-gray-50 rounded-full py-2 pl-9 pr-3 text-[13px] font-bold text-gray-800 outline-none focus:bg-gray-100"
                 />
               </div>
               {gifLoading ? (
-                <p className="text-center text-[12px] font-bold text-gray-400 py-8">Loading…</p>
+                <p className="text-center text-[12px] font-bold text-gray-400 py-8">{isBn ? 'লোড হচ্ছে…' : 'Loading…'}</p>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   {gifs.map((g, i) => (
@@ -200,7 +201,7 @@ export default function EmojiPicker({ open, onClose, onPickEmoji, onSendSticker,
                       onClick={() => { onSendGif?.(g.full); onClose?.(); }}
                       className="rounded-xl overflow-hidden bg-gray-100 aspect-video"
                     >
-                      <img src={g.preview} alt="gif" loading="lazy" className="w-full h-full object-cover" />
+                      <img src={g.preview} alt="GIF" loading="lazy" className="w-full h-full object-cover" />
                     </button>
                   ))}
                 </div>

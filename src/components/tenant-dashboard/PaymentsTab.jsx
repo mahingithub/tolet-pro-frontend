@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { clockTime } from '../../utils/bnTime';
 import {
   Wallet, FileText, Calendar, ArrowRight, ShieldCheck, CheckCircle2, Lock, Receipt, X, CheckCheck, Hourglass, Search, Filter, ChevronDown, Clock, CreditCard, Home, MapPin, KeyRound, DoorOpen
 } from 'lucide-react';
@@ -23,7 +24,9 @@ const fmtReceiptDateTime = (r, language) => {
   }
   const locale = language === 'বাংলা' ? 'bn-BD' : 'en-GB';
   const date = d.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' });
-  const time = d.toLocaleTimeString(language === 'বাংলা' ? 'bn-BD' : 'en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const time = language === 'বাংলা'
+    ? clockTime(d, true, { hour: '2-digit', minute: '2-digit', hour12: true })
+    : d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   return { date, time };
 };
 

@@ -4,13 +4,14 @@
  * and then the month in three glances: where it went, who owes whom, what just
  * happened.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownLeft, ArrowUpRight, ChevronRight, HandCoins, PiggyBank, Settings2,
   Sparkles, Target, Wallet,
 } from 'lucide-react';
 
 import useLivingStore from '../../store/useLivingStore';
+import useLivingAction from './useLivingAction';
 import { dateLabel, monthLabel, taka } from './livingUtils';
 import { getEntryType, getSpendCategory } from './soloConfig';
 import { byNewest, personRows, soloSummary, takaBalance } from './soloUtils';
@@ -110,10 +111,18 @@ const SettingsSheet = ({ open, onClose, isBn }) => {
   );
 };
 
-const SoloOverview = ({ go, language }) => {
+const SoloOverview = ({ go, language, intent, clearIntent }) => {
+  const requireAction = useLivingAction('overview');
   const isBn = language === 'বাংলা';
   const solo = useLivingStore((s) => s.solo);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const openSettings = () => { if (requireAction('settings')) setSettingsOpen(true); };
+  useEffect(() => {
+    if (intent === 'settings') {
+      if (requireAction('settings')) setSettingsOpen(true);
+      clearIntent?.();
+    }
+  }, [intent, clearIntent, requireAction]);
 
   const s = useMemo(() => soloSummary(solo, 0), [solo]);
   const dues = useMemo(() => personRows(solo), [solo]);
@@ -134,7 +143,7 @@ const SoloOverview = ({ go, language }) => {
               <span className="text-[11px] font-black uppercase tracking-widest">{isBn ? 'হাতে আছে' : 'Cash in hand'}</span>
             </div>
             <button
-              onClick={() => setSettingsOpen(true)}
+              onClick={openSettings}
               className="p-2 rounded-xl bg-white/15 border border-white/10 text-white/90 active:scale-90 transition"
               aria-label={isBn ? 'সেটিং' : 'Settings'}
             >
@@ -210,7 +219,7 @@ const SoloOverview = ({ go, language }) => {
             </Card>
           ) : (
             <button
-              onClick={() => setSettingsOpen(true)}
+              onClick={openSettings}
               className="w-full flex items-center gap-3 rounded-3xl bg-white border border-gray-100 shadow-[0_10px_30px_-14px_rgba(15,23,42,0.18)] p-4 active:scale-[0.99] transition"
             >
               <IconBadge icon={Target} tint="bg-amber-50" text="text-amber-600" size={40} iconSize={18} />

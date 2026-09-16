@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Bell, Check, CircleDollarSign, RotateCcw, CalendarClock, Pencil, Trash2, Info, Users, HandCoins } from 'lucide-react';
 
 import useLivingStore from '../../store/useLivingStore';
+import useLivingAction from './useLivingAction';
 import { taka, num, dateLabel, daysUntil, deriveBillStatus, billPaid, isSameMonth, roommateById } from './livingUtils';
 import { pendingKeys } from '../../store/livingOps';
 import { BILL_TYPES, BILL_ORDER, getBillType, BILL_STATUS } from './livingConfig';
@@ -150,7 +151,7 @@ const BillSheet = ({ open, onClose, editing, onSave, roommates = [], myId = 'me'
             <span className="flex items-center gap-2 text-[13px] font-bold text-gray-700">
               <RotateCcw size={16} className="text-gray-400" /> {isBn ? 'প্রতি মাসে অটো-রিপিট' : 'Repeat every month'}
             </span>
-            <Toggle checked={recurring} onChange={setRecurring} label="recurring" />
+            <Toggle checked={recurring} onChange={setRecurring} label={isBn ? 'প্রতি মাসে অটো-রিপিট' : 'Repeat every month'} />
           </div>
           {recurring && (
             <p className="text-[11px] font-semibold text-violet-600 mt-1.5 px-1 flex items-center gap-1.5">
@@ -167,14 +168,14 @@ const BillSheet = ({ open, onClose, editing, onSave, roommates = [], myId = 'me'
           <span className="flex items-center gap-2 text-[13px] font-bold text-gray-700">
             <CircleDollarSign size={16} className="text-gray-400" /> {isBn ? 'এটি ইতিমধ্যে পরিশোধ করা হয়েছে' : 'Already paid'}
           </span>
-          <Toggle checked={alreadyPaid} onChange={setAlreadyPaid} label="already paid" />
+          <Toggle checked={alreadyPaid} onChange={setAlreadyPaid} label={isBn ? 'ইতিমধ্যে পরিশোধিত' : 'Already paid'} />
         </div>
 
         <div className="flex items-center justify-between rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3">
           <span className="flex items-center gap-2 text-[13px] font-bold text-gray-700">
             <Bell size={16} className="text-gray-400" /> {isBn ? 'পেমেন্ট রিমাইন্ডার' : 'Payment reminder'}
           </span>
-          <Toggle checked={reminder} onChange={setReminder} label="reminder" />
+          <Toggle checked={reminder} onChange={setReminder} label={isBn ? 'পেমেন্ট রিমাইন্ডার' : 'Payment reminder'} />
         </div>
       </div>
     </Sheet>
@@ -277,7 +278,14 @@ const PayBillSheet = ({ open, onClose, bill, memberCount, language, onPay }) => 
   );
 };
 
-const Bills = ({ language }) => {
+const Bills = ({ language, intent, clearIntent }) => {
+  const requireAction = useLivingAction('bills');
+  useEffect(() => {
+    if (intent === 'add') {
+      if (requireAction('add')) { setEditing(null); setOpen(true); }
+      clearIntent?.();
+    }
+  }, [intent, clearIntent, requireAction]);
   const isBn = language === 'বাংলা';
   const bills = useLivingStore((s) => s.bills);
   const roommates = useLivingStore((s) => s.roommates);
@@ -322,9 +330,9 @@ const Bills = ({ language }) => {
     return { due, paid };
   }, [bills]);
 
-  const openAdd = () => { setEditing(null); setOpen(true); };
-  const openEdit = (bill) => { setEditing(bill); setOpen(true); };
-  const openPay = (bill) => setPaying(bill);
+  const openAdd = () => { if (!requireAction('add')) return; setEditing(null); setOpen(true); };
+  const openEdit = (bill) => { if (!requireAction()) return; setEditing(bill); setOpen(true); };
+  const openPay = (bill) => { if (requireAction()) setPaying(bill); };
   const handleSave = (data) => {
     if (editing) { updateBill(editing.id, data); return; }
     addBill({ ...data, paidDate: data.status === 'paid' ? new Date().toISOString() : null });
@@ -490,10 +498,10 @@ const Bills = ({ language }) => {
                   {b.reminder ? (isBn ? 'রিমাইন্ডার চালু' : 'Reminder on') : (isBn ? 'রিমাইন্ডার বন্ধ' : 'Reminder off')}
                 </button>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => openEdit(b)} className="p-2 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition active:scale-90" aria-label="edit">
+                  <button onClick={() => openEdit(b)} className="p-2 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition active:scale-90" aria-label={isBn ? 'সম্পাদনা' : 'Edit'}>
                     <Pencil size={15} />
                   </button>
-                  <button onClick={() => setPendingDelete(b)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                  <button onClick={() => setPendingDelete(b)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label={isBn ? 'মুছুন' : 'Delete'}>
                     <Trash2 size={15} />
                   </button>
                   {paid > 0 && (

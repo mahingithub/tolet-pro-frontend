@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { X, Calendar, Clock, MapPin } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { proposeVisit } from '../services/inquiryService';
 
 export default function ScheduleVisitModal({ inquiry, onClose, onSchedule }) {
-  const { language } = useAuth();
+  const { language } = useLanguage();
   const [form, setForm] = useState({
     scheduledDate: '',
     scheduledTime: '',

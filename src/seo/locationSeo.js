@@ -110,7 +110,10 @@ const areaSampleBn = (districtId, limit = 8) =>
  * whole. Bangla first because that is the majority of the search volume here,
  * English second because that is what the diaspora and office renters type.
  */
-const placeTitle = (en, bn) => `${en} বাসা ভাড়া — To-Let & Flat Rent in ${en} (${bn})`;
+// Bangla name first (that is the search), English once. It used to name the
+// English place twice — "Chittagong বাসা ভাড়া — … in Chittagong (চট্টগ্রাম)" —
+// pushing district titles to 66–70 characters, past where results truncate.
+const placeTitle = (en, bn) => `${bn} বাসা ভাড়া — To-Let & Flat Rent in ${en}`;
 
 const districtDescription = (en, bn, areas, aka) => {
   const spots = areas.slice(0, 4).join(', ');

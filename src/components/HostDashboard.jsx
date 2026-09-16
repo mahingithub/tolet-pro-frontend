@@ -5139,7 +5139,7 @@ const HostDashboard = () => {
             {/* Beta badge (Phase 7) — signals the app is in beta testing.
                 Hidden until lg so it doesn't crowd the header on iPad / tablet. */}
             <span className="ml-1 px-1.5 py-0.5 text-[9px] md:text-[10px] font-black uppercase tracking-wider text-[#ba0036] bg-red-50 border border-[#ba0036]/30 rounded-md leading-none self-center hidden lg:block">
-              Beta
+              {language === 'বাংলা' ? 'বেটা' : 'Beta'}
             </span>
           </button>
           
@@ -5172,7 +5172,7 @@ const HostDashboard = () => {
                   </div>
                   <div className="p-1.5 space-y-1.5 max-h-[300px] overflow-y-auto">
                     {notifications.length === 0 ? (
-                      <p className="text-xs text-gray-400 text-center py-4">No notifications</p>
+                      <p className="text-xs text-gray-400 text-center py-4">{language === 'বাংলা' ? 'কোনো নোটিফিকেশন নেই' : 'No notifications'}</p>
                     ) : (
                       notifications.map(notif => (
                         <div key={notif.id} onClick={async () => { 
@@ -5412,7 +5412,7 @@ const HostDashboard = () => {
             className="flex items-center justify-center gap-2 text-[#3b2a2a] hover:text-[#ba0036] font-bold transition-colors w-full py-1.5 group"
           >
             <LogOut size={16} className="group-hover:-translate-x-1 transition-transform" />
-            <span className="tracking-wider text-[11px] uppercase">Logout</span>
+            <span className="tracking-wider text-[11px] uppercase">{language === 'বাংলা' ? 'লগআউট' : 'Logout'}</span>
           </button>
         </div>
       </div>
@@ -7226,7 +7226,7 @@ const HostDashboard = () => {
                           <label className={`${labelCls} flex items-center gap-1`}>
                             <Users size={11} className="text-[#ba0036]" /> {isBn ? 'অকুপ্যান্ট সংখ্যা' : 'Number of Occupants'}
                           </label>
-                          <input type="number" min="1" max="50" value={leaseForm.occupants} onChange={e => setLeaseForm(f => ({ ...f, occupants: e.target.value }))} placeholder={isBn ? 'যেমন ৩' : 'e.g. 3'} className={inputCls} />
+                          <input type="text" inputMode="numeric" data-number min="1" max="50" value={leaseForm.occupants} onChange={e => setLeaseForm(f => ({ ...f, occupants: e.target.value }))} placeholder={isBn ? 'যেমন ৩' : 'e.g. 3'} className={inputCls} />
                           <p className="text-[9px] font-bold text-gray-400 mt-1">{isBn ? 'ভাড়াটিয়ার ফ্যামিলি মেম্বার থেকে অটো-ফিল' : "Auto-filled from tenant's family members"}</p>
                         </div>
                       )}
@@ -7317,15 +7317,15 @@ const HostDashboard = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className={labelCls}>{leaseForm.category === 'hostel' ? (isBn ? 'রুম ভাড়া (৳) — সিটে ভাগ হবে' : 'Room Rent (৳) — split across seats') : (isBn ? 'মাসিক ভাড়া (৳)' : 'Monthly Rent (৳)')}</label>
-                          <input id="lease-monthlyRent" type="number" min="0" value={leaseForm.monthlyRent} onChange={e => setLeaseForm(f => ({ ...f, monthlyRent: e.target.value }))} placeholder="85000" className={`${inputCls} ${leaseErrCls('monthlyRent')}`} />
+                          <input id="lease-monthlyRent" type="text" inputMode="numeric" data-number min="0" value={leaseForm.monthlyRent} onChange={e => setLeaseForm(f => ({ ...f, monthlyRent: e.target.value }))} placeholder="85000" className={`${inputCls} ${leaseErrCls('monthlyRent')}`} />
                         </div>
                         <div>
                           <label className={labelCls}>{isBn ? 'প্রতি মাসের কত তারিখে?' : 'Rent Due Day'}</label>
-                          <input type="number" min="1" max="31" value={leaseForm.rentDueDay} onChange={e => setLeaseForm(f => ({ ...f, rentDueDay: e.target.value }))} className={inputCls} />
+                          <input type="text" inputMode="numeric" data-number min="1" max="31" value={leaseForm.rentDueDay} onChange={e => setLeaseForm(f => ({ ...f, rentDueDay: e.target.value }))} className={inputCls} />
                         </div>
                         <div className="sm:col-span-2">
                           <label className={labelCls}>{isBn ? 'সার্ভিস চার্জ (৳)' : 'Service Charge (৳)'}</label>
-                          <input type="number" min="0" value={leaseForm.serviceCharge} onChange={e => setLeaseForm(f => ({ ...f, serviceCharge: e.target.value }))} placeholder="0" className={inputCls} />
+                          <input type="text" inputMode="numeric" data-number min="0" value={leaseForm.serviceCharge} onChange={e => setLeaseForm(f => ({ ...f, serviceCharge: e.target.value }))} placeholder="0" className={inputCls} />
                           <p className="text-[9px] font-bold text-gray-400 mt-1">{isBn ? 'প্রোফাইল থেকে অটো-ফিল · এডিটযোগ্য' : 'Auto-filled from profile · editable'}</p>
                         </div>
                       </div>
@@ -7355,7 +7355,7 @@ const HostDashboard = () => {
                               <div>
                                 <label className={labelCls}>{isBn ? 'লেট ফি (৳)' : 'Late Fee (৳)'}</label>
                                 <input
-                                  type="number" min="0" max="100000" inputMode="numeric"
+                                  type="text" data-number min="0" max="100000" inputMode="numeric"
                                   value={leaseForm.lateFeeAmount}
                                   onChange={e => setLeaseForm(f => ({ ...f, lateFeeAmount: e.target.value.replace(/[^0-9]/g, '') }))}
                                   placeholder={isBn ? 'নেই' : 'None'}
@@ -7365,7 +7365,7 @@ const HostDashboard = () => {
                               <div>
                                 <label className={labelCls}>{isBn ? 'গ্রেস (দিন)' : 'Grace (days)'}</label>
                                 <input
-                                  type="number" min="0" max="28" inputMode="numeric"
+                                  type="text" data-number min="0" max="28" inputMode="numeric"
                                   value={leaseForm.gracePeriodDays}
                                   onChange={e => setLeaseForm(f => ({ ...f, gracePeriodDays: e.target.value.replace(/[^0-9]/g, '') }))}
                                   placeholder="5"
@@ -7430,7 +7430,7 @@ const HostDashboard = () => {
                               {isCommercial ? (
                                 <div>
                                   <label className={labelCls}>{isBn ? 'লিজ মেয়াদ (মাস)' : 'Lease Term (months)'}</label>
-                                  <input id="lease-leaseTermMonths" type="number" min="1" max="600" value={leaseForm.leaseTermMonths} onChange={e => setLeaseForm(f => ({ ...f, leaseTermMonths: e.target.value }))} placeholder="24" className="w-full mt-1.5 p-3.5 bg-white rounded-xl text-sm font-bold text-gray-900 outline-none focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-gray-100 focus:border-[#ba0036]/30 transition-all" />
+                                  <input id="lease-leaseTermMonths" type="text" inputMode="numeric" data-number min="1" max="600" value={leaseForm.leaseTermMonths} onChange={e => setLeaseForm(f => ({ ...f, leaseTermMonths: e.target.value }))} placeholder="24" className="w-full mt-1.5 p-3.5 bg-white rounded-xl text-sm font-bold text-gray-900 outline-none focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-gray-100 focus:border-[#ba0036]/30 transition-all" />
                                 </div>
                               ) : fixedTerm ? (
                                 <div>
@@ -7494,7 +7494,7 @@ const HostDashboard = () => {
                         </div>
                         <div>
                           <label className={labelCls}>{isBn ? 'অ্যাডভান্স (৳)' : 'Advance Amount (৳)'}</label>
-                          <input type="number" min="0" value={leaseForm.advancePayment} onChange={e => setLeaseForm(f => ({ ...f, advancePayment: e.target.value }))} placeholder="0" className="w-full mt-1.5 p-3.5 bg-white rounded-xl text-sm font-bold text-gray-900 outline-none focus:shadow-[0_4px_15px_rgba(16,185,129,0.12)] border border-gray-100 focus:border-emerald-300 transition-all" />
+                          <input type="text" inputMode="numeric" data-number min="0" value={leaseForm.advancePayment} onChange={e => setLeaseForm(f => ({ ...f, advancePayment: e.target.value }))} placeholder="0" className="w-full mt-1.5 p-3.5 bg-white rounded-xl text-sm font-bold text-gray-900 outline-none focus:shadow-[0_4px_15px_rgba(16,185,129,0.12)] border border-gray-100 focus:border-emerald-300 transition-all" />
                         </div>
                         <label className={`${labelCls} block mt-3`}>{isBn ? 'পেমেন্ট মেথড' : 'Payment Method'}</label>
                         <div className="flex flex-wrap gap-1.5 mt-1.5">
@@ -7522,7 +7522,7 @@ const HostDashboard = () => {
                           </button>
                         </div>
                         <label className={labelCls}>{isBn ? 'কত দিন আগে রিমাইন্ডার?' : 'Remind X days before due'}</label>
-                        <input type="number" min="0" max="14" value={leaseForm.reminderLeadDays} onChange={e => setLeaseForm(f => ({ ...f, reminderLeadDays: e.target.value }))} className="w-full mt-1.5 p-3 bg-white rounded-xl text-sm font-bold text-gray-900 outline-none focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
+                        <input type="text" inputMode="numeric" data-number min="0" max="14" value={leaseForm.reminderLeadDays} onChange={e => setLeaseForm(f => ({ ...f, reminderLeadDays: e.target.value }))} className="w-full mt-1.5 p-3 bg-white rounded-xl text-sm font-bold text-gray-900 outline-none focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] border border-transparent focus:border-[#ba0036]/20 transition-all" />
                         {/* The cap is a promise to the tenant, so it's stated
                             plainly to the landlord too: three messages a month,
                             not a daily drip. */}
@@ -7849,7 +7849,7 @@ const HostDashboard = () => {
                               <div className="mt-2 relative">
                                 <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black ${theme.accent}`}>৳</span>
                                 <input
-                                  type="number"
+                                  type="text" inputMode="numeric" data-number
                                   min="0"
                                   step="1"
                                   value={payForm.amount}
@@ -7908,13 +7908,13 @@ const HostDashboard = () => {
                               <div>
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'পেমেন্ট মেথড' : 'Method'}</label>
                                 <select value={payForm.method} onChange={e => setPayForm(f => ({ ...f, method: e.target.value }))} className={`w-full mt-1.5 p-4 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white border border-transparent ${theme.ring} transition-all`}>
-                                  <option>bKash</option>
-                                  <option>Nagad</option>
-                                  <option>Rocket</option>
-                                  <option>Bank Transfer</option>
-                                  <option>Cash</option>
-                                  <option>Cheque</option>
-                                  <option>Other</option>
+                                  <option value="bKash">{language === 'বাংলা' ? 'বিকাশ' : 'bKash'}</option>
+                                  <option value="Nagad">{language === 'বাংলা' ? 'নগদ' : 'Nagad'}</option>
+                                  <option value="Rocket">{language === 'বাংলা' ? 'রকেট' : 'Rocket'}</option>
+                                  <option value="Bank Transfer">{language === 'বাংলা' ? 'ব্যাংক ট্রান্সফার' : 'Bank Transfer'}</option>
+                                  <option value="Cash">{language === 'বাংলা' ? 'ক্যাশ' : 'Cash'}</option>
+                                  <option value="Cheque">{language === 'বাংলা' ? 'চেক' : 'Cheque'}</option>
+                                  <option value="Other">{language === 'বাংলা' ? 'অন্যান্য' : 'Other'}</option>
                                 </select>
                               </div>
                               <div className="sm:col-span-2">
@@ -7996,8 +7996,9 @@ const HostDashboard = () => {
                   <div className="flex flex-col gap-2.5 pt-2">
                     <button
                       onClick={() => {
-                        // TODO(backend): redirect to /pricing or open Stripe checkout.
-                        navigate('/pricing');
+                        // /pricing was never a route — the catch-all quietly sent
+                        // this button to the homepage. The plans live on /subscription.
+                        navigate('/subscription');
                         setActiveModal(null);
                       }}
                       className="w-full bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white py-4 rounded-xl font-black shadow-[0_8px_20px_rgba(251,146,60,0.3)] hover:-translate-y-0.5 transition-all text-sm flex items-center justify-center gap-2"
@@ -8123,7 +8124,7 @@ const HostDashboard = () => {
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'কভার ছবি' : 'Cover Photo'}</label>
                       <div className="mt-1.5 relative w-full aspect-[16/9] bg-gray-100 rounded-xl overflow-hidden border border-gray-100">
                         {coverPreview ? (
-                          <img src={coverPreview} alt="cover" className="absolute inset-0 w-full h-full object-cover" />
+                          <img src={coverPreview} alt={language === 'বাংলা' ? 'কভার ছবি' : 'Cover photo'} className="absolute inset-0 w-full h-full object-cover" />
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-xs font-black">
                             {language === 'বাংলা' ? 'কভার ছবি যোগ করুন' : 'Add a cover photo'}
@@ -8237,21 +8238,21 @@ const HostDashboard = () => {
                         <>
                           <div>
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বেডরুম' : 'Beds'}</label>
-                            <input type="number" min="0" value={editForm.beds} onChange={e => setEditForm(f => ({...f, beds: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
+                            <input type="text" inputMode="numeric" data-number min="0" value={editForm.beds} onChange={e => setEditForm(f => ({...f, beds: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
                           </div>
                           <div>
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বাথরুম' : 'Baths'}</label>
-                            <input type="number" min="0" value={editForm.baths} onChange={e => setEditForm(f => ({...f, baths: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
+                            <input type="text" inputMode="numeric" data-number min="0" value={editForm.baths} onChange={e => setEditForm(f => ({...f, baths: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
                           </div>
                         </>
                       )}
                       <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'বর্গফুট' : 'Sqft'}</label>
-                        <input type="number" min="0" value={editForm.sqft} onChange={e => setEditForm(f => ({...f, sqft: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
+                        <input type="text" inputMode="numeric" data-number min="0" value={editForm.sqft} onChange={e => setEditForm(f => ({...f, sqft: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
                       </div>
                       <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'বাংলা' ? 'কত তলায়' : 'Floor'}</label>
-                        <input type="number" min="0" value={editForm.floor} onChange={e => setEditForm(f => ({...f, floor: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
+                        <input type="text" inputMode="numeric" data-number min="0" value={editForm.floor} onChange={e => setEditForm(f => ({...f, floor: e.target.value}))} className="w-full mt-1.5 p-3 bg-gray-50 rounded-xl text-sm font-bold text-gray-900 outline-none focus:bg-white focus:shadow-[0_4px_15px_rgba(186,0,54,0.08)] transition-all border border-transparent focus:border-[#ba0036]/20" />
                       </div>
                     </div>
 

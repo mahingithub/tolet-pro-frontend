@@ -10,14 +10,17 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BellOff } from 'lucide-react';
+import { useIsBn } from '../context/LanguageContext';
 
 const OPTIONS = [
-  { key: '8h',     label: '8 hours' },
-  { key: '1w',     label: '1 week' },
-  { key: 'always', label: 'Always' },
+  { key: '8h',     label: '8 hours', bn: '৮ ঘণ্টা' },
+  { key: '1w',     label: '1 week',  bn: '১ সপ্তাহ' },
+  { key: 'always', label: 'Always',  bn: 'সবসময়' },
 ];
 
-export default function MuteNotificationsModal({ open, name = 'this chat', onCancel, onConfirm }) {
+export default function MuteNotificationsModal({ open, name, onCancel, onConfirm }) {
+  const isBn = useIsBn();
+  const who = name || (isBn ? 'এই চ্যাট' : 'this chat');
   const [choice, setChoice] = useState('8h');
 
   // Reset to the default each time it opens.
@@ -45,8 +48,8 @@ export default function MuteNotificationsModal({ open, name = 'this chat', onCan
                   <BellOff size={22} />
                 </span>
                 <div>
-                  <h3 className="text-base font-black text-gray-900">Mute notifications</h3>
-                  <p className="text-[11px] font-bold text-gray-400">Mute {name} for…</p>
+                  <h3 className="text-base font-black text-gray-900">{isBn ? 'নোটিফিকেশন বন্ধ রাখুন' : 'Mute notifications'}</h3>
+                  <p className="text-[11px] font-bold text-gray-400">{isBn ? `${who} কতক্ষণ মিউট থাকবে?` : `Mute ${who} for…`}</p>
                 </div>
               </div>
 
@@ -65,7 +68,7 @@ export default function MuteNotificationsModal({ open, name = 'this chat', onCan
                     >
                       {choice === o.key && <span className="w-2.5 h-2.5 rounded-full bg-[#ba0036]" />}
                     </span>
-                    <span className="text-[14px] font-bold text-gray-800">{o.label}</span>
+                    <span className="text-[14px] font-bold text-gray-800">{isBn ? o.bn : o.label}</span>
                     {/* Hidden native radio keeps keyboard/a11y behaviour. */}
                     <input
                       type="radio"
@@ -85,14 +88,14 @@ export default function MuteNotificationsModal({ open, name = 'this chat', onCan
                 onClick={onCancel}
                 className="flex-1 py-4 text-[12px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-50 transition-colors"
               >
-                Cancel
+                {isBn ? 'বাতিল' : 'Cancel'}
               </button>
               <span className="w-px bg-gray-100" />
               <button
                 onClick={() => onConfirm?.(choice)}
                 className="flex-1 py-4 text-[12px] font-black uppercase tracking-widest text-[#ba0036] hover:bg-red-50 transition-colors"
               >
-                OK
+                {isBn ? 'ঠিক আছে' : 'OK'}
               </button>
             </div>
           </motion.div>

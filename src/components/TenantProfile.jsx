@@ -39,21 +39,22 @@ import { useAuth } from '../context/AuthContext.jsx';
 import TrustGauge from './shared/TrustGauge';
 import VerifStep  from './shared/VerifStep';
 import ProfileReviews from './shared/ProfileReviews';
+import { useIsBn } from '../context/LanguageContext';
+import { monthName, paymentMethodLabel, professionLabel, trustTierLabel } from '../constants/listingLabels';
 
 // ── Payment helpers (module scope, pure) ────────────────────────────────────
 const bdt = (n) => `৳ ${(Number(n) || 0).toLocaleString('en-IN')}`;
 
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const monthKeyLabel = (key) => {
+const monthKeyLabel = (key, isBn) => {
   const m = /^(\d{4})-(\d{2})$/.exec(String(key || ''));
   if (!m) return String(key || '');
-  return `${MONTHS_SHORT[Number(m[2]) - 1] || '?'} ${m[1]}`;
+  return `${monthName(Number(m[2]) - 1, isBn) || '?'} ${m[1]}`;
 };
-const prettyDate = (iso) => {
+const prettyDate = (iso, isBn) => {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return String(iso);
-  return `${MONTHS_SHORT[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}, ${d.getFullYear()}`;
+  return `${monthName(d.getMonth(), isBn)} ${String(d.getDate()).padStart(2, '0')}, ${d.getFullYear()}`;
 };
 
 const fadeInUp = {
@@ -77,6 +78,8 @@ const TenantProfile = () => {
   const { user: authUser } = useAuth();
   // Call / Message are ACTIONS → gate behind login (viewing the profile stays open).
   const requireAuth = useRequireAuth();
+  const isBn = useIsBn();
+  const L = (bn, en) => (isBn ? bn : en);
 
   const [tenant, setTenant]   = useState(null);
   const [loading, setLoading] = useState(true);
@@ -153,7 +156,7 @@ const TenantProfile = () => {
       <div className="w-full min-h-[50vh] flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 mx-auto mb-4 rounded-full border-4 border-blue-500/30 border-t-blue-500 animate-spin" />
-          <p className="text-slate-600 text-sm font-semibold">Loading tenant…</p>
+          <p className="text-slate-600 text-sm font-semibold">{L('ভাড়াটিয়ার তথ্য আসছে…', 'Loading tenant…')}</p>
         </div>
       </div>
     );
@@ -163,15 +166,15 @@ const TenantProfile = () => {
     return (
       <div className="w-full min-h-[50vh] flex items-center justify-center p-6">
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-md w-full bg-white rounded-3xl p-8 text-center shadow-2xl shadow-blue-500/5 border border-gray-100">
-          <h2 className="text-2xl font-black text-slate-900 mb-2">Tenant not found</h2>
+          <h2 className="text-2xl font-black text-slate-900 mb-2">{L('ভাড়াটিয়া পাওয়া যায়নি', 'Tenant not found')}</h2>
           <p className="text-sm text-slate-600 mb-6">
-            This tenant profile is unavailable or has been removed.
+            {L('এই ভাড়াটিয়ার প্রোফাইলটি পাওয়া যাচ্ছে না বা সরিয়ে ফেলা হয়েছে।', 'This tenant profile is unavailable or has been removed.')}
           </p>
           <button
             onClick={goBack}
             className="px-6 py-3 rounded-full bg-blue-500 text-white text-sm font-black hover:bg-blue-600 hover:shadow-lg hover:shadow-blue-500/30 transition-all active:scale-95"
           >
-            Go back
+            {L('ফিরে যান', 'Go back')}
           </button>
         </motion.div>
       </div>
@@ -226,12 +229,12 @@ const TenantProfile = () => {
     ? tenant.badges
     : (() => {
         const out = [];
-        if (idStatus === 'verified') out.push('ID Verified');
-        if (phoneStatus === 'verified') out.push('Phone Verified');
-        if (emailStatus === 'verified') out.push('Email Verified');
-        if (employmentStatus === 'verified') out.push('Employment Verified');
+        if (idStatus === 'verified') out.push(L('NID যাচাইকৃত', 'ID Verified'));
+        if (phoneStatus === 'verified') out.push(L('ফোন যাচাইকৃত', 'Phone Verified'));
+        if (emailStatus === 'verified') out.push(L('ইমেইল যাচাইকৃত', 'Email Verified'));
+        if (employmentStatus === 'verified') out.push(L('পেশা যাচাইকৃত', 'Employment Verified'));
         if (trustTier && !/^bronze$/i.test(trustTier)) {
-          out.push(`${trustTier.charAt(0).toUpperCase()}${trustTier.slice(1)} Tenant`);
+          out.push(L(`${trustTierLabel(trustTier, true)} ভাড়াটিয়া`, `${trustTierLabel(trustTier, false)} Tenant`));
         }
         return out;
       })();
@@ -274,9 +277,9 @@ const TenantProfile = () => {
             onClick={goBack}
             className="flex items-center gap-2 text-sm font-black text-blue-600 bg-white/50 border border-blue-100/50 px-4 py-2 rounded-full hover:bg-blue-50 hover:border-blue-200 transition-all active:scale-95 shadow-sm"
           >
-            <ArrowLeft size={15} /> Back
+            <ArrowLeft size={15} /> {L('পিছনে', 'Back')}
           </button>
-          <p className="font-black text-gray-900 truncate">Tenant Profile</p>
+          <p className="font-black text-gray-900 truncate">{L('ভাড়াটিয়ার প্রোফাইল', 'Tenant Profile')}</p>
           <button className="p-2.5 rounded-full border border-gray-200 bg-white/50 text-gray-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 transition-all active:scale-90 shadow-sm">
             <Share2 size={16} />
           </button>
@@ -292,7 +295,7 @@ const TenantProfile = () => {
         {/* ── HEADER CARD ── */}
         <motion.div variants={fadeInUp} className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] border border-white/80 shadow-[0_8px_40px_rgba(0,0,0,0.04)] overflow-hidden mb-8">
           <div className="w-full h-48 md:h-72 bg-gray-200 relative group overflow-hidden">
-            <img src={coverImage} alt="Cover" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
+            <img src={coverImage} alt={L('কভার ছবি', 'Cover photo')} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
             <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-gray-900/20 to-transparent" />
           </div>
 
@@ -315,7 +318,7 @@ const TenantProfile = () => {
               <div className="hidden md:flex items-center gap-4">
                 {/* Trust Score Highlight in Header */}
                 <div className="mr-4 flex flex-col items-end justify-center">
-                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Trust Score</p>
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">{L('ট্রাস্ট স্কোর', 'Trust Score')}</p>
                   <div className="flex items-center gap-1.5 text-blue-600 bg-gradient-to-r from-blue-50 to-white px-4 py-1.5 rounded-2xl border border-blue-100 shadow-sm">
                     <ShieldCheck size={20} className="text-blue-500" />
                     <span className="text-2xl font-black bg-gradient-to-br from-blue-700 to-blue-500 bg-clip-text text-transparent">{trustScore}</span>
@@ -327,13 +330,13 @@ const TenantProfile = () => {
                   onClick={() => requireAuth(() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } }))}
                   className="bg-white text-gray-800 py-3.5 px-6 rounded-2xl font-black text-sm border border-gray-200 hover:border-green-300 hover:bg-green-50 hover:text-green-600 shadow-sm transition-all flex items-center gap-2 group"
                 >
-                  <Phone size={18} className="group-hover:rotate-12 transition-transform" /> Call
+                  <Phone size={18} className="group-hover:rotate-12 transition-transform" /> {L('কল করুন', 'Call')}
                 </button>
                 <button
                   onClick={() => requireAuth(() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar } }))}
                   className="bg-gradient-to-r from-blue-600 to-blue-500 text-white py-3.5 px-7 rounded-2xl font-black text-sm shadow-[0_8px_20px_rgba(37,99,235,0.25)] hover:shadow-[0_12px_25px_rgba(37,99,235,0.35)] hover:-translate-y-0.5 active:scale-95 transition-all flex items-center gap-2"
                 >
-                  <MessageCircle size={18} /> Send Message
+                  <MessageCircle size={18} /> {L('মেসেজ পাঠান', 'Send Message')}
                 </button>
               </div>
             </div>
@@ -355,7 +358,7 @@ const TenantProfile = () => {
                     ))}
                     {isNewTenant && badges.length === 0 && (
                       <span className="text-xs font-black px-4 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-2 uppercase tracking-widest shadow-sm">
-                        <Award size={14} /> New tenant
+                        <Award size={14} /> {L('নতুন ভাড়াটিয়া', 'New tenant')}
                       </span>
                     )}
                   </div>
@@ -364,7 +367,7 @@ const TenantProfile = () => {
 
               <div className="flex flex-col md:hidden gap-4 w-full mt-2">
                 <div className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-white p-5 rounded-2xl border border-blue-100 shadow-sm">
-                  <p className="text-xs font-black text-blue-800 uppercase tracking-widest">Trust Score</p>
+                  <p className="text-xs font-black text-blue-800 uppercase tracking-widest">{L('ট্রাস্ট স্কোর', 'Trust Score')}</p>
                   <div className="flex items-center gap-1.5 text-blue-600">
                     <ShieldCheck size={20} />
                     <span className="text-2xl font-black">{trustScore}</span>
@@ -377,13 +380,13 @@ const TenantProfile = () => {
                     onClick={() => requireAuth(() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } }))}
                     className="flex-1 py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-800 shadow-sm active:scale-95"
                   >
-                    <Phone size={18} /> Call
+                    <Phone size={18} /> {L('কল করুন', 'Call')}
                   </button>
                   <button
                     onClick={() => requireAuth(() => navigate('/messages', { state: { peerUserId: tenant.id || tenant._id || id, peerName: tenant.name, peerAvatar: avatar } }))}
                     className="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 text-white py-4 rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
                   >
-                    <MessageCircle size={18} /> Message
+                    <MessageCircle size={18} /> {L('মেসেজ', 'Message')}
                   </button>
                 </div>
               </div>
@@ -395,7 +398,7 @@ const TenantProfile = () => {
                   <Calendar size={16} className="md:w-[18px] md:h-[18px]" />
                 </div>
                 <span className="block text-lg md:text-xl font-black text-gray-900 mb-1">{memberSince}</span>
-                <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest">Member Since</p>
+                <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest">{L('সদস্য হয়েছেন', 'Member Since')}</p>
               </div>
 
               {(!isUnlocked || phone) && (
@@ -404,9 +407,9 @@ const TenantProfile = () => {
                     {phone ? <Phone size={16} className="md:w-[18px] md:h-[18px]" /> : <Lock size={16} className="text-gray-400 md:w-[18px] md:h-[18px]" />}
                   </div>
                   <p className={`text-xs md:text-sm font-bold truncate ${phone ? 'text-gray-900' : 'text-gray-400'}`}>
-                    {phone || 'Locked'}
+                    {phone || L('লক করা', 'Locked')}
                   </p>
-                  <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Phone</p>
+                  <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">{L('ফোন', 'Phone')}</p>
                 </div>
               )}
 
@@ -416,9 +419,9 @@ const TenantProfile = () => {
                     {email ? <Mail size={16} className="md:w-[18px] md:h-[18px]" /> : <Lock size={16} className="text-gray-400 md:w-[18px] md:h-[18px]" />}
                   </div>
                   <p className={`text-xs md:text-sm font-bold truncate ${email ? 'text-gray-900' : 'text-gray-400'}`}>
-                    {email || 'Locked'}
+                    {email || L('লক করা', 'Locked')}
                   </p>
-                  <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Email</p>
+                  <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">{L('ইমেইল', 'Email')}</p>
                 </div>
               )}
             </div>
@@ -428,7 +431,7 @@ const TenantProfile = () => {
                 <div className="p-2 bg-white rounded-full shadow-sm">
                   <Lock size={16} className="text-blue-500" />
                 </div>
-                Contact details unlock once this tenant submits an inquiry on one of your listings.
+                {L('এই ভাড়াটিয়া আপনার কোনো বিজ্ঞাপনে জিজ্ঞাসা পাঠালে যোগাযোগের তথ্য দেখা যাবে।', 'Contact details unlock once this tenant submits an inquiry on one of your listings.')}
               </motion.div>
             )}
           </div>
@@ -440,7 +443,7 @@ const TenantProfile = () => {
             
             {bio && (
               <motion.div variants={fadeInUp} className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.03)] p-6 md:p-8">
-                <h3 className="text-lg md:text-xl font-black text-gray-900 mb-4">About</h3>
+                <h3 className="text-lg md:text-xl font-black text-gray-900 mb-4">{L('পরিচিতি', 'About')}</h3>
                 <p className="text-gray-600 font-medium leading-relaxed text-sm md:text-base">
                   {bio}
                 </p>
@@ -453,25 +456,25 @@ const TenantProfile = () => {
                   <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
                     <Briefcase size={18} className="md:w-5 md:h-5" />
                   </div>
-                  Professional Details
+                  {L('পেশাগত তথ্য', 'Professional Details')}
                 </h3>
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                    <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Status</span>
-                    <span className="text-[15px] font-bold text-gray-900 capitalize">{tenant.professionType}</span>
+                    <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">{L('পেশা', 'Status')}</span>
+                    <span className="text-[15px] font-bold text-gray-900 capitalize">{professionLabel(tenant.professionType, isBn)}</span>
                   </div>
                   
                   {isUnlocked && tenant.professionType === 'student' && (
                     <>
                       {professionDetails.institution && (
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Institution</span>
+                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">{L('প্রতিষ্ঠান', 'Institution')}</span>
                           <span className="text-[15px] font-bold text-gray-900">{professionDetails.institution}</span>
                         </div>
                       )}
                       {professionDetails.studentId && (
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Student ID</span>
+                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">{L('স্টুডেন্ট আইডি', 'Student ID')}</span>
                           <span className="text-[15px] font-bold text-gray-900">{professionDetails.studentId}</span>
                         </div>
                       )}
@@ -481,19 +484,19 @@ const TenantProfile = () => {
                     <>
                       {professionDetails.company && (
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Company</span>
+                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">{L('কোম্পানি', 'Company')}</span>
                           <span className="text-[15px] font-bold text-gray-900">{professionDetails.company}</span>
                         </div>
                       )}
                       {professionDetails.designation && (
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Designation</span>
+                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">{L('পদবি', 'Designation')}</span>
                           <span className="text-[15px] font-bold text-gray-900">{professionDetails.designation}</span>
                         </div>
                       )}
                       {professionDetails.officeId && (
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Office ID</span>
+                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">{L('অফিস আইডি', 'Office ID')}</span>
                           <span className="text-[15px] font-bold text-gray-900">{professionDetails.officeId}</span>
                         </div>
                       )}
@@ -503,7 +506,7 @@ const TenantProfile = () => {
                     <>
                       {professionDetails.company && (
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Business</span>
+                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">{L('ব্যবসা', 'Business')}</span>
                           <span className="text-[15px] font-bold text-gray-900">{professionDetails.company}</span>
                         </div>
                       )}
@@ -511,7 +514,7 @@ const TenantProfile = () => {
                   )}
                   {!isUnlocked && (
                     <div className="mt-2 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100/50 rounded-2xl flex gap-3 items-center text-sm font-bold text-blue-800 shadow-sm">
-                      <div className="bg-white p-1.5 rounded-full shadow-sm"><Lock size={14} className="text-blue-500" /></div> Full professional details are locked
+                      <div className="bg-white p-1.5 rounded-full shadow-sm"><Lock size={14} className="text-blue-500" /></div> {L('সম্পূর্ণ পেশাগত তথ্য লক করা আছে', 'Full professional details are locked')}
                     </div>
                   )}
                 </div>
@@ -524,22 +527,22 @@ const TenantProfile = () => {
                   <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">
                     <ShieldCheck size={18} className="md:w-5 md:h-5" />
                   </div>
-                  Emergency Contact
+                  {L('জরুরি যোগাযোগ', 'Emergency Contact')}
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                   <div className="p-3 md:p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                    <span className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Name</span>
+                    <span className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{L('নাম', 'Name')}</span>
                     <span className="text-sm md:text-base font-bold text-gray-900">{emergencyContact.name}</span>
                   </div>
                   {emergencyContact.relation && (
                     <div className="p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                      <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Relation</span>
+                      <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{L('সম্পর্ক', 'Relation')}</span>
                       <span className="text-base font-bold text-gray-900">{emergencyContact.relation}</span>
                     </div>
                   )}
                   {emergencyContact.phone && (
                     <div className="p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                      <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Phone</span>
+                      <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{L('ফোন', 'Phone')}</span>
                       <span className="text-base font-bold text-gray-900">{emergencyContact.phone}</span>
                     </div>
                   )}
@@ -553,11 +556,11 @@ const TenantProfile = () => {
                   <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
                     <Briefcase size={18} className="md:w-5 md:h-5" />
                   </div>
-                  Family Information
+                  {L('পরিবারের তথ্য', 'Family Information')}
                 </h3>
                 <div className="p-3 md:p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50 flex flex-col sm:flex-row sm:items-center justify-between">
-                  <span className="text-[10px] md:text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">Family Size</span>
-                  <span className="text-sm md:text-[15px] font-bold text-gray-900">{familySize} {familySize === '1' ? 'Person' : 'People'}</span>
+                  <span className="text-[10px] md:text-xs font-black text-gray-400 uppercase tracking-widest mb-1 sm:mb-0">{L('সদস্য সংখ্যা', 'Family Size')}</span>
+                  <span className="text-sm md:text-[15px] font-bold text-gray-900">{familySize} {L('জন', familySize === '1' ? 'Person' : 'People')}</span>
                 </div>
               </motion.div>
             )}
@@ -573,11 +576,11 @@ const TenantProfile = () => {
                     <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
                       <Wallet size={18} className="md:w-5 md:h-5" />
                     </div>
-                    Payment &amp; Rent
+                    {L('পেমেন্ট ও ভাড়া', 'Payment & Rent')}
                   </h3>
                   {activeBooking?.paymentMethod && (
                     <span className="text-[10px] font-black px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-widest inline-flex items-center gap-1.5">
-                      <Banknote size={12} /> {activeBooking.paymentMethod}
+                      <Banknote size={12} /> {paymentMethodLabel(activeBooking.paymentMethod, isBn)}
                     </span>
                   )}
                 </div>
@@ -585,15 +588,15 @@ const TenantProfile = () => {
                 {/* Summary tiles */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                   <div className="p-4 bg-gradient-to-b from-emerald-50/60 to-emerald-50 rounded-2xl border border-emerald-100/70 text-center">
-                    <p className="text-[9px] md:text-[10px] font-black text-emerald-600/80 uppercase tracking-widest mb-1">Advance Paid</p>
+                    <p className="text-[9px] md:text-[10px] font-black text-emerald-600/80 uppercase tracking-widest mb-1">{L('অগ্রিম দেওয়া', 'Advance Paid')}</p>
                     <p className="text-base md:text-xl font-black text-emerald-700 tabular-nums">{bdt(totalAdvance)}</p>
                   </div>
                   <div className="p-4 bg-gradient-to-b from-blue-50/60 to-blue-50 rounded-2xl border border-blue-100/70 text-center">
-                    <p className="text-[9px] md:text-[10px] font-black text-blue-600/80 uppercase tracking-widest mb-1">Monthly Rent</p>
+                    <p className="text-[9px] md:text-[10px] font-black text-blue-600/80 uppercase tracking-widest mb-1">{L('মাসিক ভাড়া', 'Monthly Rent')}</p>
                     <p className="text-base md:text-xl font-black text-blue-700 tabular-nums">{bdt(activeBooking?.monthlyRent)}</p>
                   </div>
                   <div className="p-4 bg-gradient-to-b from-gray-50/60 to-gray-50 rounded-2xl border border-gray-100 text-center col-span-2 md:col-span-1">
-                    <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Collected</p>
+                    <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{L('মোট আদায়', 'Total Collected')}</p>
                     <p className="text-base md:text-xl font-black text-gray-900 tabular-nums">{bdt(totalCollected)}</p>
                   </div>
                 </div>
@@ -613,8 +616,8 @@ const TenantProfile = () => {
                       <span className="inline-flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
                         <Calendar size={12} className="text-gray-400" />
                         {activeBooking.leaseEnd
-                          ? `${prettyDate(activeBooking.leaseStart)} – ${prettyDate(activeBooking.leaseEnd)}`
-                          : `${prettyDate(activeBooking.leaseStart)} – ongoing`}
+                          ? `${prettyDate(activeBooking.leaseStart, isBn)} – ${prettyDate(activeBooking.leaseEnd, isBn)}`
+                          : `${prettyDate(activeBooking.leaseStart, isBn)} – ${L('চলমান', 'ongoing')}`}
                       </span>
                     )}
                   </div>
@@ -624,7 +627,7 @@ const TenantProfile = () => {
                 <div className="mt-6">
                   <div className="flex items-center gap-2 mb-3">
                     <Receipt size={14} className="text-gray-400" />
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Payment Receipts</span>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{L('পেমেন্ট রসিদ', 'Payment Receipts')}</span>
                     <div className="flex-1 h-px bg-gray-100" />
                     <span className="text-[10px] font-black text-gray-400 tabular-nums">{paymentReceipts.length}</span>
                   </div>
@@ -632,7 +635,7 @@ const TenantProfile = () => {
                   {paymentReceipts.length === 0 ? (
                     <div className="text-center py-8 bg-gray-50/60 rounded-2xl border border-dashed border-gray-200">
                       <Receipt className="mx-auto text-gray-300 mb-2" size={22} />
-                      <p className="text-xs font-bold text-gray-400">No rent payments recorded yet.</p>
+                      <p className="text-xs font-bold text-gray-400">{L('এখনও কোনো ভাড়ার পেমেন্ট রেকর্ড হয়নি।', 'No rent payments recorded yet.')}</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -644,16 +647,16 @@ const TenantProfile = () => {
                               {partial ? <Clock size={18} /> : <CheckCircle2 size={18} />}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-black text-gray-900 truncate">{monthKeyLabel(r.monthKey)}</p>
+                              <p className="text-sm font-black text-gray-900 truncate">{monthKeyLabel(r.monthKey, isBn)}</p>
                               <p className="text-[10px] font-bold text-gray-400 truncate">
-                                {r.paidOn ? prettyDate(r.paidOn) : 'Recorded'}
-                                {r.method ? <> · {r.method}</> : null}
+                                {r.paidOn ? prettyDate(r.paidOn, isBn) : L('রেকর্ড করা', 'Recorded')}
+                                {r.method ? <> · {paymentMethodLabel(r.method, isBn)}</> : null}
                               </p>
                             </div>
                             <div className="text-right shrink-0">
                               <p className="text-sm font-black text-gray-900 tabular-nums">{bdt(r.amount)}</p>
                               <span className={`text-[9px] font-black uppercase tracking-widest ${partial ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                {partial ? 'Partial' : 'Paid'}
+                                {partial ? L('আংশিক', 'Partial') : L('পরিশোধিত', 'Paid')}
                               </span>
                             </div>
                           </div>
@@ -670,32 +673,32 @@ const TenantProfile = () => {
             {/* ── Trust + Verification ──────── */}
             <motion.div variants={fadeInUp} className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.03)] p-6 md:p-8 sticky top-24">
               <div className="flex justify-center mb-6 md:mb-8 pb-6 md:pb-8 border-b border-gray-100/80">
-                <TrustGauge score={trustScore} tier={trustTier} label="Tenant Trust" />
+                <TrustGauge score={trustScore} tier={trustTier} label={L('ভাড়াটিয়ার ট্রাস্ট', 'Tenant Trust')} />
               </div>
               <div className="space-y-4">
                 {emailStatus !== 'none' && (
                   <VerifStep
-                    title="Email"
-                    description="Confirmed via magic link / OTP."
+                    title={L('ইমেইল', 'Email')}
+                    description={L('ম্যাজিক লিংক / OTP দিয়ে নিশ্চিত করা।', 'Confirmed via magic link / OTP.')}
                     status={emailStatus}
                     readOnly
                   />
                 )}
                 <VerifStep
-                  title="Phone"
-                  description="Confirmed via SMS OTP."
+                  title={L('ফোন', 'Phone')}
+                  description={L('SMS OTP দিয়ে নিশ্চিত করা।', 'Confirmed via SMS OTP.')}
                   status={phoneStatus}
                   readOnly
                 />
                 <VerifStep
-                  title="Government ID"
-                  description="NID / Passport reviewed by the TO-LET PRO trust team."
+                  title={L('সরকারি পরিচয়পত্র', 'Government ID')}
+                  description={L('NID / পাসপোর্ট TO-LET PRO ট্রাস্ট টিম যাচাই করেছে।', 'NID / Passport reviewed by the TO-LET PRO trust team.')}
                   status={idStatus}
                   readOnly
                 />
                 <VerifStep
-                  title="Employment"
-                  description="Optional. Helps landlords gauge ability to pay."
+                  title={L('পেশা', 'Employment')}
+                  description={L('ঐচ্ছিক। ভাড়া দেওয়ার সামর্থ্য বুঝতে বাড়িওয়ালাকে সাহায্য করে।', 'Optional. Helps landlords gauge ability to pay.')}
                   status={employmentStatus}
                   readOnly
                 />

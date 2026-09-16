@@ -7,6 +7,7 @@ import {
 import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
 import { pendingKeys } from '../../store/livingOps';
+import useLivingAction from './useLivingAction';
 import { messSummary, messWeeklyBreakdown, inDateRange, monthLabel, taka, takaSigned, num, dateLabel, roommateById } from './livingUtils';
 import {
   Card, SectionHeader, IconBadge, Avatar, PendingChip, PendingDot, Stepper, PrimaryButton, Field, MoneyInput, TextInput,
@@ -296,12 +297,22 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
 
  // { kind, id }
 
+  // Every write in the mess starts at one of these, so a guest in the app is
+  // taken to login instead of into a sheet. The action names reopen the same
+  // sheet afterwards (LIVING_FORM_ACTIONS in useLivingAction.js).
+  const requireAction = useLivingAction('meals');
+  const openDeposit = () => { if (requireAction('deposit')) setDepositOpen(true); };
+  const openBazar = () => { if (requireAction('bazar')) setBazarOpen(true); };
+  const openRate = () => { if (requireAction('rate')) setRateOpen(true); };
+  const tickMeal = (day, roommateId, mealKey, value) => { if (requireAction()) setMeal(day, roommateId, mealKey, value); };
+  const askDelete = (item) => { if (requireAction()) setPendingDelete(item); };
+
   useEffect(() => {
-    if (intent === 'add') {
-      setDepositOpen(true);
-      clearIntent?.();
-    }
-  }, [intent, clearIntent]);
+    const open = { add: setDepositOpen, deposit: setDepositOpen, bazar: setBazarOpen, rate: setRateOpen }[intent];
+    if (!open) return;
+    if (requireAction(intent)) open(true);
+    clearIntent?.();
+  }, [intent, clearIntent, requireAction]);
 
   useEffect(() => {
     const handleTourAction = (e) => {
@@ -366,7 +377,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
         title={isBn ? 'মিল ম্যানেজার' : 'Meal Manager'}
         subtitle={isBn ? 'মেস জমা, মিল, রেট ও ব্যালেন্স' : 'Mess deposits, meals, rate & balance'}
         right={
-          <button onClick={() => setDepositOpen(true)} className="flex items-center gap-1 bg-[#ba0036] text-white pl-2.5 pr-3.5 py-2 rounded-xl text-[12px] font-black shadow-[0_8px_20px_-8px_rgba(186,0,54,0.55)] active:scale-95 transition">
+          <button onClick={openDeposit} className="flex items-center gap-1 bg-[#ba0036] text-white pl-2.5 pr-3.5 py-2 rounded-xl text-[12px] font-black shadow-[0_8px_20px_-8px_rgba(186,0,54,0.55)] active:scale-95 transition">
             <PiggyBank size={15} /> {isBn ? 'জমা' : 'Deposit'}
           </button>
         }
@@ -452,7 +463,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
           <MiniStat icon={HandCoins} label={isBn ? 'মোট জমা' : 'Total deposit'} value={taka(summary.totalDeposit, language)} valueClass="text-emerald-600" sub={isBn ? 'এ মাসে' : 'This month'} />
           <MiniStat icon={ShoppingBasket} label={isBn ? 'মোট মিল খরচ' : 'Meal cost'} value={taka(summary.totalMealCost, language)} />
           <MiniStat icon={UtensilsCrossed} label={isBn ? 'মোট মিল' : 'Total meals'} value={num(summary.totalMeals, language)} />
-          <button data-tour="set-rate-btn" onClick={() => setRateOpen(true)} className="rounded-2xl bg-gray-50 border border-gray-100 p-3 text-left active:scale-95 transition">
+          <button data-tour="set-rate-btn" onClick={openRate} className="rounded-2xl bg-gray-50 border border-gray-100 p-3 text-left active:scale-95 transition">
             <span className="flex items-center justify-between">
               <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-gray-400">
                 <Gauge size={12} /> {isBn ? 'মিল রেট' : 'Meal rate'}
@@ -480,11 +491,11 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
 
       {/* quick actions */}
       <div className="grid grid-cols-2 gap-3">
-        <button data-tour="add-deposit-btn" onClick={() => setDepositOpen(true)} className="flex items-center justify-center gap-2 bg-white rounded-2xl border border-gray-100 py-3.5 shadow-[0_8px_22px_-16px_rgba(15,23,42,0.3)] active:scale-95 transition">
+        <button data-tour="add-deposit-btn" onClick={openDeposit} className="flex items-center justify-center gap-2 bg-white rounded-2xl border border-gray-100 py-3.5 shadow-[0_8px_22px_-16px_rgba(15,23,42,0.3)] active:scale-95 transition">
           <IconBadge icon={PiggyBank} tint="bg-emerald-50" text="text-emerald-600" size={34} iconSize={16} />
           <span className="text-[13px] font-black text-gray-800">{isBn ? 'জমা দিন' : 'Add Deposit'}</span>
         </button>
-        <button data-tour="add-bazar-btn" onClick={() => setBazarOpen(true)} className="flex items-center justify-center gap-2 bg-white rounded-2xl border border-gray-100 py-3.5 shadow-[0_8px_22px_-16px_rgba(15,23,42,0.3)] active:scale-95 transition">
+        <button data-tour="add-bazar-btn" onClick={openBazar} className="flex items-center justify-center gap-2 bg-white rounded-2xl border border-gray-100 py-3.5 shadow-[0_8px_22px_-16px_rgba(15,23,42,0.3)] active:scale-95 transition">
           <IconBadge icon={ShoppingBasket} tint="bg-amber-50" text="text-amber-600" size={34} iconSize={16} />
           <span className="text-[13px] font-black text-gray-800">{isBn ? 'বাজার যোগ' : 'Add Bazar'}</span>
         </button>
@@ -627,7 +638,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                         <span className="flex items-center gap-1 text-[10px] font-black text-gray-500">
                           <MIcon size={12} /> {isBn ? meal.bn : meal.en}
                         </span>
-                        <Stepper value={m[meal.key] || 0} onChange={(v) => setMeal(iso, r.id, meal.key, v)} />
+                        <Stepper value={m[meal.key] || 0} onChange={(v) => tickMeal(iso, r.id, meal.key, v)} />
                       </div>
                     );
                   })}
@@ -667,7 +678,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                   </div>
                   {pending.has(d.id) && <PendingChip isBn={isBn} className="shrink-0" />}
                   <span className="text-[13px] font-black text-emerald-600 shrink-0">+{taka(d.amount, language)}</span>
-                  <button onClick={() => setPendingDelete({ kind: 'deposit', id: d.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                  <button onClick={() => askDelete({ kind: 'deposit', id: d.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -727,7 +738,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                   </div>
                   {pending.has(g.id) && <PendingChip isBn={isBn} className="shrink-0" />}
                   <span className="text-[13px] font-black text-gray-900 shrink-0">{taka(g.amount, language)}</span>
-                  <button onClick={() => setPendingDelete({ kind: 'grocery', id: g.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                  <button onClick={() => askDelete({ kind: 'grocery', id: g.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -824,7 +835,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                   </div>
                   {pending.has(d.id) && <PendingChip isBn={isBn} className="shrink-0" />}
                   <span className="text-[13px] font-black text-emerald-600 shrink-0">+{taka(d.amount, language)}</span>
-                  <button onClick={() => setPendingDelete({ kind: 'deposit', id: d.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                  <button onClick={() => askDelete({ kind: 'deposit', id: d.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -884,7 +895,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                   </div>
                   {pending.has(g.id) && <PendingChip isBn={isBn} className="shrink-0" />}
                   <span className="text-[13px] font-black text-gray-900 shrink-0">{taka(g.amount, language)}</span>
-                  <button onClick={() => setPendingDelete({ kind: 'grocery', id: g.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                  <button onClick={() => askDelete({ kind: 'grocery', id: g.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -936,7 +947,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                   </div>
                   {pending.has(d.id) && <PendingChip isBn={isBn} className="shrink-0" />}
                   <span className="text-[13px] font-black text-emerald-600 shrink-0">+{taka(d.amount, language)}</span>
-                  <button onClick={() => setPendingDelete({ kind: 'deposit', id: d.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                  <button onClick={() => askDelete({ kind: 'deposit', id: d.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -996,7 +1007,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                   </div>
                   {pending.has(g.id) && <PendingChip isBn={isBn} className="shrink-0" />}
                   <span className="text-[13px] font-black text-gray-900 shrink-0">{taka(g.amount, language)}</span>
-                  <button onClick={() => setPendingDelete({ kind: 'grocery', id: g.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
+                  <button onClick={() => askDelete({ kind: 'grocery', id: g.id })} className="p-1.5 rounded-lg text-gray-300 hover:text-red-600 hover:bg-rose-50 transition active:scale-90" aria-label="delete">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -1065,7 +1076,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                         <span className="flex items-center gap-1 text-[10px] font-black text-gray-500">
                           <MIcon size={12} /> {isBn ? meal.bn : meal.en}
                         </span>
-                        <Stepper value={m[meal.key] || 0} onChange={(v) => setMeal(iso, r.id, meal.key, v)} />
+                        <Stepper value={m[meal.key] || 0} onChange={(v) => tickMeal(iso, r.id, meal.key, v)} />
                       </div>
                     );
                   })}
@@ -1134,7 +1145,7 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
                         <span className="flex items-center gap-1 text-[10px] font-black text-gray-500">
                           <MIcon size={12} /> {isBn ? meal.bn : meal.en}
                         </span>
-                        <Stepper value={m[meal.key] || 0} onChange={(v) => setMeal(iso, r.id, meal.key, v)} />
+                        <Stepper value={m[meal.key] || 0} onChange={(v) => tickMeal(iso, r.id, meal.key, v)} />
                       </div>
                     );
                   })}
@@ -1149,9 +1160,9 @@ const MealManagement = ({ me, language, intent, clearIntent }) => {
           </div>
         )}
       </div>
-      <DepositSheet open={depositOpen} onClose={() => setDepositOpen(false)} roommates={roommates} onSave={addDeposit} />
-      <GrocerySheet open={bazarOpen} onClose={() => setBazarOpen(false)} roommates={roommates} onSave={addGrocery} />
-      <RateSheet open={rateOpen} onClose={() => setRateOpen(false)} autoRate={summary.autoRate} current={mealRateSetting} onSave={setMealRate} language={language} />
+      <DepositSheet open={depositOpen} onClose={() => setDepositOpen(false)} roommates={roommates} onSave={(...args) => { if (requireAction('deposit')) addDeposit(...args); }} />
+      <GrocerySheet open={bazarOpen} onClose={() => setBazarOpen(false)} roommates={roommates} onSave={(...args) => { if (requireAction('bazar')) addGrocery(...args); }} />
+      <RateSheet open={rateOpen} onClose={() => setRateOpen(false)} autoRate={summary.autoRate} current={mealRateSetting} onSave={(...args) => { if (requireAction('rate')) setMealRate(...args); }} language={language} />
       <MonthlyHistorySheet open={!!historyOpenFor} onClose={() => setHistoryOpenFor(null)} roommate={historyOpenFor ? roommateById(roommates, historyOpenFor) : null} meals={meals} range={summary.range} monthName={periodLabel} language={language} />
       <ConfirmDialog
         open={!!pendingDelete}

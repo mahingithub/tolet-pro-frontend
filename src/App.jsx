@@ -21,6 +21,16 @@ import lazyRoute from './utils/lazyRoute';
 import useAndroidBackButton from './hooks/useAndroidBackButton';
 import { needsBookingLookup, resolveHome } from './utils/homeSurface';
 import { hasCachedSettings } from './services/settingsService';
+import {
+	NATIVE_START_PATH,
+	experienceForRole,
+	getNativeExperience,
+	getNativeHome,
+	inferNativeExperience,
+	isNativeApp,
+	roleMatchesExperience,
+	saveNativeExperience,
+} from './utils/nativeExperience';
 
 // ─── CRITICAL SHELL — static, loads with the entry chunk ────────────────────
 // What the user sees immediately, or what has to run before first paint. There
@@ -103,6 +113,10 @@ const MyServiceOrders   = lazyRoute(() => import("./components/services/MyServic
 const HowItWorks       = lazyRoute(() => import("./components/HowItWorks"), "HowItWorks");
 const JoinPropertyPage = lazyRoute(() => import("./components/JoinPropertyPage"), "JoinPropertyPage");
 const CampaignRedirect = lazyRoute(() => import("./components/CampaignRedirect"), "CampaignRedirect");
+// Installed app only: the first-run "who are you?" screen, and what a signed-out
+// landlord sees instead of a login wall. See utils/nativeExperience.js.
+const NativeStart       = lazyRoute(() => import("./components/native/NativeStart"), "NativeStart");
+const NativeHostPreview = lazyRoute(() => import("./components/native/NativeHostPreview"), "NativeHostPreview");
 
 // --- SEO landing pages ---
 // Public, content-rich pages for the half of the product that lives behind a
@@ -111,6 +125,7 @@ const CampaignRedirect = lazyRoute(() => import("./components/CampaignRedirect")
 // could not see any of this before — see src/seo/featurePages.js.
 const ToLetHub       = lazyRoute(() => import("./components/seo/ToLetHub"), "ToLetHub");
 const FeatureLanding = lazyRoute(() => import("./components/seo/FeatureLanding"), "FeatureLanding");
+const NotFoundPage = lazyRoute(() => import("./components/NotFoundPage"), "NotFoundPage");
 
 // --- Legal pages (Phase 7) ---
 const PrivacyPolicy   = lazyRoute(() => import("./components/legal/PrivacyPolicy"), "PrivacyPolicy");
@@ -250,8 +265,58 @@ const AppLayout = () => {
 	// `defaultHome` normally comes off the settings CACHE, which SettingsProvider
 	// hydrates synchronously — so a returning user is redirected on the first
 	// frame, with no flash of the public homepage.
+	// ── Installed app: open on the choice made at /app/start ──────────────
+	// The app asks "who are you?" before anything else and then always opens on
+	// that answer — signed in or not. It is a device preference kept apart from
+	// the website's defaultHome (see utils/nativeExperience.js), so the web
+	// effect below stands down inside the app.
+	//
+	// The session restores synchronously from cache, so a signed-in user is
+	// known on the first render. One who was signed in before this screen
+	// existed is not asked again: their role already answers it.
+	//
+	// Only "/" is redirected — a cold start from an invite or campaign link
+	// keeps the page it was opened for.
+	const nativeBootHandled = useRef(false);
+	useEffect(() => {
+		if (!isNativeApp() || nativeBootHandled.current) return;
+		if (isAuthenticated && !activeRole) return;
+		nativeBootHandled.current = true;
+		if (location.pathname !== '/') return;
+		let experience = getNativeExperience();
+		if (!experience && isAuthenticated) {
+			const inferred = inferNativeExperience({ activeRole, defaultHome });
+			if (inferred) experience = saveNativeExperience(inferred.role, inferred.mode);
+		}
+		const to = experience ? getNativeHome(experience) : NATIVE_START_PATH;
+		if (to !== '/') navigate(to, { replace: true });
+	}, [isAuthenticated, activeRole, defaultHome, location.pathname, navigate]);
+
+	// ── The account's role outranks the device's choice once signed in ────
+	// /app/start is what a GUEST is asked. A signed-in account already answers
+	// the same question, and it can change mid-session: the tenant⇄host switch
+	// in the Navbar drawer and in both dashboards all flip the active role
+	// (AuthContext.setActiveRole). Without this the app stayed dressed as the
+	// side picked at install — a landlord who switched to Tenant kept the
+	// landlord rail and never saw Living, which is exactly what was reported.
+	//
+	// Only the side is adopted, never the tenant's own surface: `tenantMode`
+	// remembers whether they live in Living or in search, so switching back
+	// returns them to the one they were using rather than resetting it.
+	//
+	// It does not navigate. Each switch already routes to its own dashboard;
+	// moving them a second time would fight that.
+	useEffect(() => {
+		if (!isNativeApp() || !isAuthenticated || !activeRole) return;
+		const experience = getNativeExperience();
+		if (!experience || roleMatchesExperience(experience, activeRole)) return;
+		const next = experienceForRole(activeRole, { defaultHome, previous: experience });
+		if (next) saveNativeExperience(next.role, next.mode);
+	}, [isAuthenticated, activeRole, defaultHome]);
+
 	const bootHandled = useRef(false);
 	useEffect(() => {
+		if (isNativeApp()) return;
 		if (bootHandled.current) return;
 		// Wait until BOTH auth and the role are resolved, so we don't trip the
 		// one-shot guard before we can tell who this is. Acting on a null user
@@ -299,6 +364,8 @@ const AppLayout = () => {
 	// Hide the marketing Navbar on dashboards, auth, admin, and the privacy center
 	// (the privacy center has its own header with a back button).
 	const hideNavbarRoutes = [
+		// The app's first-run question is a full screen of its own.
+		NATIVE_START_PATH,
 		"/tenant-dashboard",
 		"/host-dashboard",
 		"/living",
@@ -447,12 +514,21 @@ const AppLayout = () => {
 				<Route path="/refund" element={<RefundPolicy />} />
 				<Route path="/trust-safety" element={<TrustSafety />} />
 
+				{/* Installed app only — NativeStart sends the website back to "/". */}
+				<Route path={NATIVE_START_PATH} element={<NativeStart />} />
+
 				<Route
 					path="/host-dashboard"
 					element={
-						<RequireAuth requireRole="landlord">
-							<HostDashboard />
-						</RequireAuth>
+						// A signed-out landlord in the app looks around first, and every
+						// action on the preview is the login. The website keeps its wall.
+						isNativeApp() && !isAuthenticated ? (
+							<NativeHostPreview />
+						) : (
+							<RequireAuth requireRole="landlord">
+								<HostDashboard />
+							</RequireAuth>
+						)
 					}
 				/>
 				<Route
@@ -475,9 +551,15 @@ const AppLayout = () => {
 				<Route
 					path="/living"
 					element={
-						<RequireAuth>
+						// In the app a guest can open the wallet and look around; every
+						// add / save goes to login instead (living/useLivingAction.js).
+						isNativeApp() ? (
 							<Living />
-						</RequireAuth>
+						) : (
+							<RequireAuth>
+								<Living />
+							</RequireAuth>
+						)
 					}
 				/>
 				<Route
@@ -488,7 +570,17 @@ const AppLayout = () => {
 						</RequireAuth>
 					}
 				/>
-				<Route path="/ai-insights" element={<AIInsightsPage />} />
+				{/* Landlord-only data, gated like /subscription. Open to guests, it fired
+				    GET /api/host/insights → 401, then a pointless /auth/refresh → 401,
+				    and rendered an empty page. */}
+				<Route
+					path="/ai-insights"
+					element={
+						<RequireAuth requireRole="landlord">
+							<AIInsightsPage />
+						</RequireAuth>
+					}
+				/>
 				<Route path="/landlord/:id" element={<LandlordProfile />} />
 				<Route path="/tenant/:id" element={<TenantProfile />} />
 
@@ -517,7 +609,9 @@ const AppLayout = () => {
 					}
 				/>
 
-				<Route path="*" element={<Navigate to="/" replace />} />
+				{/* An unknown URL gets a real "not found" page (noindex, with links
+				    onward) instead of silently becoming another copy of the homepage. */}
+				<Route path="*" element={<NotFoundPage />} />
 			</Routes>
 			</Suspense>
 
@@ -543,7 +637,7 @@ const AppLayout = () => {
 			    clutter, and Living already carries its own — the module pills
 			    below the header switch modules, and the header avatar goes to
 			    the dashboard — so the rail only added a second competing bar. */}
-			<MobileBottomNav hideOnRoutes={['/login', '/list-property', '/properties/', '/living']} />
+			<MobileBottomNav hideOnRoutes={['/login', '/list-property', '/properties/', '/living', NATIVE_START_PATH]} />
 			<Suspense fallback={null}>
 				<FeedbackButton />
 			</Suspense>

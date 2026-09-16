@@ -12,16 +12,21 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Ban } from 'lucide-react';
+import { useIsBn } from '../context/LanguageContext';
 
+// value → Bangla label. The English value is what moderators receive.
 const REASONS = [
-  'Spam or scam',
-  'Harassment or bullying',
-  'Inappropriate content',
-  'Pretending to be someone',
-  'Other',
+  ['Spam or scam', 'স্প্যাম বা প্রতারণা'],
+  ['Harassment or bullying', 'হয়রানি বা উত্ত্যক্ত করা'],
+  ['Inappropriate content', 'অনুপযুক্ত কনটেন্ট'],
+  ['Pretending to be someone', 'অন্যের পরিচয় দেওয়া'],
+  ['Other', 'অন্যান্য'],
 ];
 
-export default function BlockUserModal({ open, name = 'this user', onCancel, onConfirm }) {
+export default function BlockUserModal({ open, name, onCancel, onConfirm }) {
+  const isBn = useIsBn();
+  const L = (bn, en) => (isBn ? bn : en);
+  const who = name || L('এই ব্যবহারকারী', 'this user');
   const [reason, setReason] = useState('');
   const [details, setDetails] = useState('');
 
@@ -59,22 +64,22 @@ export default function BlockUserModal({ open, name = 'this user', onCancel, onC
               <div className="w-16 h-16 mx-auto rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mb-4">
                 <Ban size={30} strokeWidth={2.5} />
               </div>
-              <h3 className="text-lg font-black text-gray-900 text-center">Block {name}?</h3>
+              <h3 className="text-lg font-black text-gray-900 text-center">{L(`${who}-কে ব্লক করবেন?`, `Block ${who}?`)}</h3>
               <p className="text-[12px] font-bold text-gray-500 mt-2 mb-4 leading-relaxed text-center">
-                They won't be able to message or call you. Please pick a reason to continue.
+                {L('তিনি আপনাকে আর মেসেজ বা কল করতে পারবেন না। চালিয়ে যেতে একটি কারণ বেছে নিন।', "They won't be able to message or call you. Please pick a reason to continue.")}
               </p>
 
               {/* Reason (REQUIRED) */}
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5">
-                Reason <span className="text-red-500">*</span>
+                {L('কারণ', 'Reason')} <span className="text-red-500">*</span>
               </label>
               <select
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 className="w-full bg-white border border-gray-200 rounded-2xl px-3.5 py-3 text-[13px] font-bold text-gray-800 outline-none focus:border-[#ba0036]/40 transition-colors"
               >
-                <option value="">Select a reason…</option>
-                {REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                <option value="">{L('একটি কারণ বেছে নিন…', 'Select a reason…')}</option>
+                {REASONS.map(([r, bn]) => <option key={r} value={r}>{L(bn, r)}</option>)}
               </select>
 
               {/* Optional details */}
@@ -82,7 +87,7 @@ export default function BlockUserModal({ open, name = 'this user', onCancel, onC
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
                 rows={2}
-                placeholder="Add details (optional)…"
+                placeholder={L('বিস্তারিত লিখুন (ঐচ্ছিক)…', 'Add details (optional)…')}
                 className="mt-3 w-full bg-white border border-gray-200 rounded-2xl px-3.5 py-3 text-[13px] font-medium text-gray-800 outline-none focus:border-[#ba0036]/40 transition-colors resize-none placeholder:text-gray-400"
               />
             </div>
@@ -92,7 +97,7 @@ export default function BlockUserModal({ open, name = 'this user', onCancel, onC
                 onClick={onCancel}
                 className="flex-1 py-4 text-[12px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-50 transition-colors"
               >
-                Cancel
+                {L('বাতিল', 'Cancel')}
               </button>
               <span className="w-px bg-gray-100" />
               <button
@@ -102,7 +107,7 @@ export default function BlockUserModal({ open, name = 'this user', onCancel, onC
                   canBlock ? 'text-red-600 hover:bg-red-50' : 'text-gray-300 cursor-not-allowed'
                 }`}
               >
-                <Ban size={14} /> Block
+                <Ban size={14} /> {L('ব্লক', 'Block')}
               </button>
             </div>
           </motion.div>

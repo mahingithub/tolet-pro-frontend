@@ -608,6 +608,28 @@ if (typeof window !== 'undefined') {
     useLivingStore.getState().flushOutbox();
     useLivingStore.getState().hydrateSolo();
   }, 4000);
+  // Logout wipes localStorage but not this in-memory copy, and the installed
+  // app sends a signed-out user straight back to /living as a guest — which
+  // would show the previous account's ledger. Only on a real logout: signup
+  // and login also clear storage, and a guest's own entries must survive those.
+  window.addEventListener('auth:logged-out', () => {
+    useLivingStore.setState({
+      ...blankWallet(),
+      solo: blankSolo(),
+      mode: null,
+      connected: false,
+      householdId: null,
+      householdName: '',
+      inviteCode: '',
+      isOwner: false,
+      myId: 'me',
+      hydrating: false,
+      outbox: [],
+      flushing: false,
+      soloSyncedAt: null,
+      soloUserId: null,
+    });
+  });
 }
 
 export default useLivingStore;

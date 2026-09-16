@@ -16,6 +16,7 @@
 import { readJson, writeJson, broadcast } from './_storage.js';
 import { unsubscribeFromPushNotifications } from '../utils/pushSubscription.js';
 import { directUpload, privateUpload } from './cloudinaryUpload.js';
+import { NATIVE_EXPERIENCE_KEY } from '../utils/nativeExperience.js';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL
   ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/auth`
@@ -32,6 +33,7 @@ const KEY_LEGACY_EXPIRES = 'auth:expiresAt';
 // preserves ONLY these so a logout doesn't reset the user's language choice or
 // re-trigger the PWA install banner.
 const DEVICE_KEEP_KEYS = new Set([
+  NATIVE_EXPERIENCE_KEY, // installed app role / purpose; no account data
   'auth:phoneCountry',    // remembered country picker selection
   'tolet_lang',           // LanguageContext — chosen language
   'toletpro_app_banner_dismissed', // AppDownloadBanner — "don't show again"

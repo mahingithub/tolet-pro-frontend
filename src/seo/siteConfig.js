@@ -54,3 +54,29 @@ export const absoluteUrl = (path = '/') => {
   if (/^https?:\/\//i.test(p)) return p;
   return `${SITE_URL}${p.startsWith('/') ? p : `/${p}`}`;
 };
+
+export const OG_IMAGE_ALT = 'TO-LET PRO — house rent and house management in Bangladesh';
+
+/**
+ * A meta description that fits in a search result.
+ *
+ * Google cuts a snippet at roughly 155–160 characters. Every description this
+ * site generated ran longer — median 274, longest 366 — so what got cut off
+ * was the end of the sentence, usually the part that said why to click. Trims
+ * at the last sentence break before the limit, otherwise at the last space.
+ * Used for <meta name="description"> and its og/twitter twins, at runtime
+ * (useSeo) and at build time (scripts/prerender-seo.mjs), so both agree.
+ */
+export const META_DESCRIPTION_MAX = 160;
+
+export function metaDescription(text, max = META_DESCRIPTION_MAX) {
+  const s = String(text || '').replace(/\s+/g, ' ').trim();
+  const chars = [...s];
+  if (chars.length <= max) return s;
+  const head = chars.slice(0, max - 1).join('');
+  const sentence = Math.max(head.lastIndexOf('। '), head.lastIndexOf('. '));
+  if (sentence >= head.length * 0.6) return head.slice(0, sentence + 1).trim();
+  const space = head.lastIndexOf(' ');
+  const cut = space >= head.length * 0.6 ? head.slice(0, space) : head;
+  return `${cut.replace(/[\s,;:—–-]+$/, '')}…`;
+}

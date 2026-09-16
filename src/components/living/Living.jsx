@@ -9,6 +9,9 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useSettings } from '../../context/SettingsContext.jsx';
 import useLivingStore from '../../store/useLivingStore';
+import useNativeExperience from '../../hooks/useNativeExperience';
+import { nativeLoginUrl } from '../../utils/nativeExperience';
+import useLivingAction, { LIVING_FORM_ACTIONS } from './useLivingAction';
 import callProvider from '../../services/callProvider';
 import { isSoloOp } from '../../store/livingOps';
 import { buildReminders, initials, num } from './livingUtils';
@@ -73,10 +76,12 @@ const Living = () => {
   const { t, language } = useLanguage();
   const isBn = language === 'বাংলা';
   const { user } = useAuth();
+  const { isNative, homePath } = useNativeExperience();
+  const requireLivingAction = useLivingAction('overview');
   const { settings, update: updateSettings } = useSettings();
   // Is Living this user's home screen? If so it must not offer a "back" that
   // points at a page they never came from.
-  const isHome = (settings?.app?.defaultHome || 'auto') === 'living';
+  const isHome = isNative ? homePath === '/living' : (settings?.app?.defaultHome || 'auto') === 'living';
 
   const setMyName = useLivingStore((s) => s.setMyName);
   const roommates = useLivingStore((s) => s.roommates);
@@ -120,7 +125,7 @@ const Living = () => {
     hydrateHousehold(ctrl.signal);
     hydrateSolo(ctrl.signal);
     return () => ctrl.abort();
-  }, [hydrateHousehold, hydrateSolo]);
+  }, [hydrateHousehold, hydrateSolo, user?.id, user?._id]);
 
   // Adopt the authenticated user's name for the LOCAL "You" roommate (connected
   // member names come from each user's real account, so skip it there).
@@ -160,6 +165,30 @@ const Living = () => {
   // Consumed once by the target module, then cleared.
   const [intent, setIntent] = useState(null);
 
+  // Login restores the exact wallet and opens a form once. An allowlist prevents
+  // arbitrary query parameters from triggering a write or destructive action.
+  useEffect(() => {
+    if (!isNative) return;
+    const params = new URLSearchParams(location.search);
+    const wallet = params.get('wallet');
+    const target = params.get('m');
+    const action = params.get('livingAction');
+    if (wallet !== 'solo' && wallet !== 'joint') return;
+    if (mode !== wallet) { setLivingMode(wallet); return; }
+    if (!user || !LIVING_FORM_ACTIONS[wallet]?.[target]?.includes(action)) return;
+    setModule(target);
+    setIntent(action);
+    params.delete('livingAction');
+    navigate({ pathname: '/living', search: `?${params}` }, { replace: true });
+  }, [isNative, location.search, mode, navigate, setLivingMode, user]);
+
+  // Store-level checks also cover a session ending while a form is open.
+  useEffect(() => {
+    const onRequireAuth = () => requireLivingAction(null, module);
+    window.addEventListener('living:require-auth', onRequireAuth);
+    return () => window.removeEventListener('living:require-auth', onRequireAuth);
+  }, [module, requireLivingAction]);
+
   // React to deep-links (bottom-nav / cross-module jumps) after mount.
   useEffect(() => {
     if (initialModule !== module) setModule(initialModule);
@@ -192,6 +221,7 @@ const Living = () => {
   const go = useCallback(
     (id, nextIntent = null) => {
       if (!validIds.includes(id)) return;
+      if (nextIntent && !requireLivingAction(nextIntent, id)) return;
       if (id === 'overview') {
         if (toOverview()) {
           setIntent(nextIntent);
@@ -213,7 +243,7 @@ const Living = () => {
       setIntent(nextIntent);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
-    [location.search, module, navigate, toOverview, validIds]
+    [location.search, module, navigate, requireLivingAction, toOverview, validIds]
   );
 
   useEffect(() => {
@@ -244,13 +274,13 @@ const Living = () => {
       // Remember it on the account too. Fire-and-forget: the local store is
       // what renders, so a failed write costs the user nothing today and is
       // retried the next time they switch.
-      if (next !== savedMode) updateSettings({ app: { livingMode: next } }).catch(() => {});
+      if (user && next !== savedMode) updateSettings({ app: { livingMode: next } }).catch(() => {});
       setModule('overview');
       setIntent(null);
       toOverview();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
-    [toOverview, setLivingMode, savedMode, updateSettings]
+    [toOverview, setLivingMode, savedMode, updateSettings, user]
   );
 
   // Manual "send it now". The queue retries on its own (on reconnect, on every
@@ -267,7 +297,9 @@ const Living = () => {
   // Reminders are derived from the shared household (bills, dues, budgets), so
   // they only mean something on the joint side.
   const reminders = useMemo(() => (isSolo || !mode ? [] : buildReminders(state, ME)), [state, isSolo, mode]);
-  const leaveLiving = useGoBack('/tenant-dashboard');
+  // In the app, "out of Living" is the home the user chose — a signed-out guest
+  // has no tenant dashboard to fall back to.
+  const leaveLiving = useGoBack(isNative ? homePath : '/tenant-dashboard');
 
   // ── Back: one step at a time, not one step out of the app ────────────────
   // The arrow used to close Living from wherever you stood, so a tap meant on
@@ -400,7 +432,9 @@ const Living = () => {
 
             <button
               data-tour="living-profile"
-              onClick={() => navigate('/tenant-dashboard')}
+              // A guest in the app has no dashboard yet: straight to login as
+              // a tenant, and back to the wallet afterwards.
+              onClick={() => navigate(user ? '/tenant-dashboard' : nativeLoginUrl({ next: '/living' }))}
               className="rounded-full border border-white/80 shadow-sm active:scale-90 transition"
               aria-label={isBn ? 'প্রোফাইল' : 'Profile'}
             >

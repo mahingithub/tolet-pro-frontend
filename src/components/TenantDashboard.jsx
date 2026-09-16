@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
+import { clockTime } from '../utils/bnTime';
 import { uploadVerificationDoc, uploadAvatar, getCurrentToken } from '../services/authService';
 import { listMyInquiries, deleteInquiry } from '../services/inquiryService.js';
 import { listTenantReceipts, markReceiptRead as apiMarkReceiptRead } from '../services/receiptService.js';
@@ -443,7 +444,9 @@ const fmtReceiptDateTime = (r, language) => {
   }
   const locale = language === 'বাংলা' ? 'bn-BD' : 'en-GB';
   const date = d.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' });
-  const time = d.toLocaleTimeString(language === 'বাংলা' ? 'bn-BD' : 'en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const time = language === 'বাংলা'
+    ? clockTime(d, true, { hour: '2-digit', minute: '2-digit', hour12: true })
+    : d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   return { date, time };
 };
 
@@ -1864,7 +1867,7 @@ const handleWizardSubmit = async (payload) => {
             </span>
             <span className="hidden md:block text-left leading-none">
               <span className="block text-[11px] font-black text-gray-800">{language === 'বাংলা' ? 'রুমমেট ওয়ালেট' : 'Roommate Wallet'}</span>
-              <span className="block text-[8px] font-black text-emerald-500 uppercase tracking-[0.16em] mt-0.5">Living</span>
+              <span className="block text-[8px] font-black text-emerald-500 uppercase tracking-[0.16em] mt-0.5">{language === 'বাংলা' ? 'লিভিং' : 'Living'}</span>
             </span>
           </Link>
 

@@ -23,6 +23,8 @@ import {
   CheckCheck, Check, Hourglass, X, Ban, FileText, Download, Play, Sparkles, CornerUpLeft, Smile, MoreVertical,
 } from 'lucide-react';
 import CompactAudioPlayer from './CompactAudioPlayer';
+import { useIsBn } from '../context/LanguageContext';
+import { clockTime } from '../utils/bnTime';
 
 // ── Pure helpers (kept local so this file has no coupling to ChatSystem) ─────
 const EMOJI_ONLY_RE = (() => { try { return new RegExp('^(?:\\p{Extended_Pictographic}|\\uFE0F|\\u200D|\\s){1,8}$', 'u'); } catch { return null; } })();
@@ -38,20 +40,20 @@ const parseReplyQuote = (text) => {
   if (nl === -1) return null;
   return { quote: text.slice(2, nl).trim(), body: text.slice(nl + 1) };
 };
-const replyQuoteLabel = (r) => {
+const replyQuoteLabel = (r, isBn) => {
   if (!r) return '';
-  if (r.isDeleted) return '🚫 Deleted message';
-  if (r.type === 'image') return '📷 Photo';
-  if (r.type === 'video') return '🎥 Video';
-  if (r.type === 'audio') return '🎤 Voice message';
-  if (r.type === 'document') return '📄 Document';
+  if (r.isDeleted) return isBn ? '🚫 মুছে ফেলা মেসেজ' : '🚫 Deleted message';
+  if (r.type === 'image') return isBn ? '📷 ছবি' : '📷 Photo';
+  if (r.type === 'video') return isBn ? '🎥 ভিডিও' : '🎥 Video';
+  if (r.type === 'audio') return isBn ? '🎤 ভয়েস মেসেজ' : '🎤 Voice message';
+  if (r.type === 'document') return isBn ? '📄 ডকুমেন্ট' : '📄 Document';
   return (r.text || '').slice(0, 120);
 };
-const formatTime = (iso) => {
-  if (!iso) return 'Just now';
+const formatTime = (iso, isBn) => {
+  if (!iso) return isBn ? 'এইমাত্র' : 'Just now';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return clockTime(d, isBn);
 };
 const bubbleRadius = (mine, position) => {
   if (position === 'middle') return mine ? 'rounded-l-3xl rounded-r-md' : 'rounded-r-3xl rounded-l-md';
@@ -64,6 +66,7 @@ const LONG_PRESS_MS = 350;   // requirement: exactly 350ms
 function ChatMessageBubble({ m, currentUserId, onOpenMenu, onOpenReactions, onReply, onMediaClick }) {
   const timerRef = useRef(null);
   const posRef = useRef(null);
+  const isBn = useIsBn();
 
   const clearTimer = () => {
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
@@ -105,14 +108,14 @@ function ChatMessageBubble({ m, currentUserId, onOpenMenu, onOpenReactions, onRe
       <button
         onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onOpenReactions?.(m, r.left + r.width / 2, r.bottom); }}
         className="w-7 h-7 rounded-full bg-white shadow-sm border border-gray-100 flex items-center justify-center text-gray-400 hover:text-[#ba0036] active:scale-90 transition-transform"
-        aria-label="React"
+        aria-label={isBn ? 'রিঅ্যাক্ট' : 'React'}
       >
         <Smile size={15} />
       </button>
       <button
         onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onOpenMenu?.(m, r.left + r.width / 2, r.bottom); }}
         className="w-7 h-7 rounded-full bg-white shadow-sm border border-gray-100 flex items-center justify-center text-gray-400 hover:text-[#ba0036] active:scale-90 transition-transform"
-        aria-label="More actions"
+        aria-label={isBn ? 'আরও অপশন' : 'More actions'}
       >
         <MoreVertical size={15} />
       </button>
@@ -152,20 +155,20 @@ function ChatMessageBubble({ m, currentUserId, onOpenMenu, onOpenReactions, onRe
       >
         {fromBot && m.position !== 'middle' && m.position !== 'last' && (
           <div className="flex items-center gap-1.5 mb-1 text-[9px] font-black text-white/60 uppercase tracking-widest">
-            <Sparkles size={10}/> AI Assistant
+            <Sparkles size={10}/> {isBn ? 'এআই সহকারী' : 'AI Assistant'}
           </div>
         )}
 
         {m.isDeleted ? (
           <p className={`text-[13px] italic font-medium inline-flex items-center gap-1.5 ${mine || fromBot ? 'text-white/70' : 'text-gray-400'}`}>
-            <Ban size={13} className="shrink-0" /> This message was deleted
+            <Ban size={13} className="shrink-0" /> {isBn ? 'এই মেসেজটি মুছে ফেলা হয়েছে' : 'This message was deleted'}
           </p>
         ) : (
           <>
             {/* ── Media ─────────────────────────────────────────────────── */}
             {m.type === 'image' && m.mediaUrl ? (
               <button type="button" onClick={() => onMediaClick?.({ type: 'image', url: m.mediaUrl, name })} className="block">
-                <img src={m.mediaUrl} alt="shared" className="rounded-xl max-w-full max-h-72 object-cover cursor-pointer" loading="lazy" />
+                <img src={m.mediaUrl} alt={isBn ? 'শেয়ার করা ছবি' : 'Shared image'} className="rounded-xl max-w-full max-h-72 object-cover cursor-pointer" loading="lazy" />
               </button>
             ) : m.type === 'video' && m.mediaUrl ? (
               <button
@@ -193,11 +196,11 @@ function ChatMessageBubble({ m, currentUserId, onOpenMenu, onOpenReactions, onRe
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className={`text-[12px] font-bold truncate leading-tight mb-0.5 ${mine || fromBot ? 'text-white' : 'text-gray-800'}`}>
-                    {name || 'Document.pdf'}
+                    {name || (isBn ? 'ডকুমেন্ট.pdf' : 'Document.pdf')}
                   </p>
                   <div className="flex items-center justify-between mt-1">
                     <p className={`text-[9px] font-black uppercase tracking-widest ${mine || fromBot ? 'text-white/60' : 'text-gray-400'}`}>
-                      {m.mediaMeta?.bytes ? (m.mediaMeta.bytes / 1024 / 1024).toFixed(2) + ' MB' : 'PDF FILE'}
+                      {m.mediaMeta?.bytes ? (m.mediaMeta.bytes / 1024 / 1024).toFixed(2) + ' MB' : (isBn ? 'PDF ফাইল' : 'PDF FILE')}
                     </p>
                     <Download size={12} className={`${mine || fromBot ? 'text-white/80' : 'text-gray-400'} group-hover:-translate-y-0.5 transition-transform`} />
                   </div>
@@ -208,7 +211,7 @@ function ChatMessageBubble({ m, currentUserId, onOpenMenu, onOpenReactions, onRe
             {/* ── Text (+ reply quote / jumbo emoji / lone media URL) ─────── */}
             {(m.type === 'text' || !m.type) ? (() => {
               const legacy = m.replyTo ? null : parseReplyQuote(m.text);
-              const quote = m.replyTo ? replyQuoteLabel(m.replyTo) : (legacy ? legacy.quote : null);
+              const quote = m.replyTo ? replyQuoteLabel(m.replyTo, isBn) : (legacy ? legacy.quote : null);
               const body = legacy ? legacy.body : m.text;
               return (
                 <>
@@ -216,13 +219,13 @@ function ChatMessageBubble({ m, currentUserId, onOpenMenu, onOpenReactions, onRe
                     <div className={`mb-1.5 rounded-lg px-2.5 py-1.5 border-l-[3px] ${
                       mine ? 'bg-white/15 border-white/60' : fromBot ? 'bg-white/10 border-white/40' : 'bg-gray-50 border-[#ba0036]/50'
                     }`}>
-                      <p className={`text-[9px] font-black uppercase tracking-widest mb-0.5 ${mine || fromBot ? 'text-white/70' : 'text-[#ba0036]'}`}>Reply</p>
+                      <p className={`text-[9px] font-black uppercase tracking-widest mb-0.5 ${mine || fromBot ? 'text-white/70' : 'text-[#ba0036]'}`}>{isBn ? 'রিপ্লাই' : 'Reply'}</p>
                       <p className={`text-[11px] font-medium line-clamp-2 ${mine || fromBot ? 'text-white/80' : 'text-gray-500'}`}>{quote}</p>
                     </div>
                   )}
                   {isImageUrl(body) ? (
                     <button type="button" onClick={() => onMediaClick?.({ type: 'image', url: body.trim() })} className="block">
-                      <img src={body} alt="gif" loading="lazy" className="rounded-xl max-w-full max-h-72 object-cover" />
+                      <img src={body} alt="GIF" loading="lazy" className="rounded-xl max-w-full max-h-72 object-cover" />
                     </button>
                   ) : (
                     <p className={isJumboEmoji(body) ? 'text-5xl leading-tight' : 'text-[13px] sm:text-sm font-medium whitespace-pre-line leading-relaxed'}>{body}</p>
@@ -238,7 +241,7 @@ function ChatMessageBubble({ m, currentUserId, onOpenMenu, onOpenReactions, onRe
         {/* Timestamp + status ticks */}
         {showTail && (
           <div className={`flex items-center gap-1.5 mt-1 ${mine ? 'justify-end text-white/70' : fromBot ? 'justify-start text-white/50' : 'justify-start text-gray-400'}`}>
-            <span className="text-[9px] font-bold tabular-nums">{formatTime(m.iso)}</span>
+            <span className="text-[9px] font-bold tabular-nums">{formatTime(m.iso, isBn)}</span>
             {mine && (
               m.status === 'read' ? <CheckCheck size={11} className="text-blue-200"/>
               : m.status === 'delivered' ? <CheckCheck size={11}/>

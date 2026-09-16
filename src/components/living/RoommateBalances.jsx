@@ -4,6 +4,7 @@ import { HandCoins, ArrowRight, ArrowLeftRight, BellRing, Check, Clock, Loader2,
 
 import { useLanguage } from '../../context/LanguageContext';
 import useLivingStore from '../../store/useLivingStore';
+import useLivingAction from './useLivingAction';
 import livingService from '../../services/livingService';
 import { computeLedger, simplifyDebts, paymentBreakdown, taka, dateLabel, timeAgo, roommateById } from './livingUtils';
 import { pendingKeys } from '../../store/livingOps';
@@ -292,6 +293,7 @@ const DebtRow = ({ person, amount, kind, isBn, language, onSettle, onRemind }) =
 };
 
 const RoommateBalances = ({ me, language, intent, clearIntent }) => {
+  const requireAction = useLivingAction('balances');
   const isBn = language === 'বাংলা';
   const roommates = useLivingStore((s) => s.roommates);
   const expenses = useLivingStore((s) => s.expenses);
@@ -325,15 +327,16 @@ const RoommateBalances = ({ me, language, intent, clearIntent }) => {
 
   useEffect(() => {
     if (intent === 'add') {
+      if (!requireAction('add')) { clearIntent?.(); return; }
       const mine = iOwe[0] || owedToMe[0];
       setPreset(mine ? { from: mine.from, to: mine.to, amount: mine.amount } : null);
       setOpen(true);
       clearIntent?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [intent]);
+  }, [intent, clearIntent, requireAction]);
 
-  const openSettle = (p) => { setPreset(p || null); setOpen(true); };
+  const openSettle = (p) => { if (!requireAction('add')) return; setPreset(p || null); setOpen(true); };
   const history = useMemo(() => [...settlements].sort((a, b) => new Date(b.date) - new Date(a.date)), [settlements]);
   const allSettled = owedToMe.length === 0 && iOwe.length === 0 && otherDebts.length === 0;
 

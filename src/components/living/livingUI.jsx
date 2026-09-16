@@ -423,7 +423,7 @@ export const Select = ({ className = '', children, ...rest }) => (
 export const MoneyInput = ({ className = '', ...rest }) => (
   <div className="relative">
     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-black text-sm">৳</span>
-    <input type="number" step="any" inputMode="decimal" className={cx(inputBase, 'pl-8', className)} {...rest} />
+    <input type="text" data-number step="any" inputMode="decimal" className={cx(inputBase, 'pl-8', className)} {...rest} />
   </div>
 );
 

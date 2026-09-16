@@ -12,6 +12,8 @@ import { propertyService, subscribeUserProperties, propertyLocationHaystack } fr
 import usePropertyStore from "../store/usePropertyStore";
 import { normaliseIntent, SALE_INTENT_ENABLED } from "../constants/listingIntents";
 import { roomLabel } from "../constants/roomCategories";
+import { propertyPath } from "../utils/propertyPath";
+import { ALL_LISTINGS_SEO } from "../seo/staticPages";
 // Beds/baths only apply to residential listings — commercial & land must not
 // show phantom bed/bath chips (shared rule, same one the detail page uses).
 import { hasBedsBaths } from "../constants/propertyFields";
@@ -140,7 +142,7 @@ const IntentTabBar = ({ activeIntent, onChange }) => {
 	const { language } = useLanguage();
 	const isBn = language === 'বাংলা';
 	return (
-	<div role="tablist" aria-label="Listing intent" className={`grid ${INTENT_TABS.length === 2 ? "grid-cols-2" : "grid-cols-3"} gap-2 mb-6`}>
+	<div role="tablist" aria-label={isBn ? "বিজ্ঞাপনের ধরন" : "Listing intent"} className={`grid ${INTENT_TABS.length === 2 ? "grid-cols-2" : "grid-cols-3"} gap-2 mb-6`}>
 		{INTENT_TABS.map((tab) => {
 			const active = activeIntent === tab.intent;
 			return (
@@ -449,7 +451,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 		<div onMouseEnter={() => onHover && onHover(property.id)} onMouseLeave={() => onHoverEnd && onHoverEnd()} className={`rounded-3xl border overflow-hidden flex flex-col md:flex-row hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] transition-all duration-500 group ${cardStyle} ${property.availabilityStatus === 'rented' ? 'opacity-60 grayscale-[50%]' : ''}`}>
 			<div className="w-full md:w-[280px] lg:w-[300px] h-[190px] md:h-auto shrink-0">
 				<div className="relative w-full h-full overflow-hidden flex bg-gray-100">
-					<div className="relative w-[75%] h-full overflow-hidden cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
+					<div className="relative w-[75%] h-full overflow-hidden cursor-pointer" onClick={() => navigate(propertyPath(property))}>
 						{coverImg ? (
 							<img src={coverImg} alt={property.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out" loading="lazy" decoding="async" />
 						) : (
@@ -517,7 +519,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 					    did not tag photos by room. */}
 					<div className="w-[25%] flex flex-col h-full">
 						{collageThumbs.map((shot, idx) => (
-							<div key={`${shot.room || "x"}-${idx}`} className="relative flex-1 overflow-hidden cursor-pointer bg-gray-200" onClick={() => navigate(`/property/${property.id}`)}>
+							<div key={`${shot.room || "x"}-${idx}`} className="relative flex-1 overflow-hidden cursor-pointer bg-gray-200" onClick={() => navigate(propertyPath(property))}>
 								<img src={shot.url} className="w-full h-full object-cover hover:opacity-80 transition-opacity duration-300" alt={shot.room ? roomLabel(shot.room, isBn) : ""} loading="lazy" decoding="async" />
 								{shot.room && (
 									<span className="absolute bottom-1 left-1 px-1.5 py-[2px] rounded-md bg-black/55 text-white text-[8px] font-black uppercase tracking-wider">
@@ -541,7 +543,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 					    and keeps the original stack: rating row on top, title underneath. */}
 					<div className="flex flex-row-reverse items-start gap-3 md:flex-col md:items-stretch md:gap-0">
 						<div className="flex items-start justify-between gap-4 shrink-0 md:mb-2">
-							<div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
+							<div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate(propertyPath(property))}>
 								<div className="bg-gray-900 text-white text-[11px] font-black px-2 py-1 rounded-lg flex items-center gap-1 shadow-sm">
 									<Star size={10} className="fill-yellow-400 text-yellow-400" /> {property.rating}
 								</div>
@@ -556,9 +558,12 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 								</span>
 							</div>
 						</div>
-						<h3 className="min-w-0 flex-1 md:flex-none text-base md:text-lg font-black text-gray-900 leading-tight group-hover:text-brandRed transition-colors cursor-pointer mb-1" onClick={() => navigate(`/property/${property.id}`)}>
-							{property.title}
-						</h3>
+						{/* A real link, so crawlers can follow it to the listing — every card used
+						    to navigate by onClick alone, leaving no listing reachable by a link.
+						    h2: the cards sit directly under the page's h1. */}
+						<h2 className="min-w-0 flex-1 md:flex-none text-base md:text-lg font-black text-gray-900 leading-tight group-hover:text-brandRed transition-colors mb-1">
+							<Link to={propertyPath(property)} className="hover:text-brandRed">{property.title}</Link>
+						</h2>
 					</div>
 					<p className="text-xs font-bold text-gray-500 flex items-center gap-1.5 mb-2.5">
 						<MapPin size={14} className="text-gray-400" /> {property.location}
@@ -641,7 +646,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 								className="md:hidden min-w-0"
 							/>
 						)}
-						<div className="ml-auto md:ml-0 flex flex-col items-end md:items-start shrink-0 cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
+						<div className="ml-auto md:ml-0 flex flex-col items-end md:items-start shrink-0 cursor-pointer" onClick={() => navigate(propertyPath(property))}>
 							<div className="flex items-baseline gap-2">
 								<span className="text-lg md:text-xl font-black text-gray-900 tracking-tighter">৳ {property.price.toLocaleString("en-IN")}</span>
 								{property.originalPrice > property.price && (
@@ -662,7 +667,7 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 					<div className="flex items-center gap-3 w-full md:w-auto">
 						{/* ── DETAILS BUTTON: full listing page (also a tour anchor) ── */}
 						<button
-							onClick={() => navigate(`/property/${property.id}`)}
+							onClick={() => navigate(propertyPath(property))}
 							data-tour="details-button"
 							className="flex-1 md:flex-none px-4 py-2.5 md:py-2 rounded-lg text-[11px] font-black text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all">
 							{t.detailsBtn || "Details"}
@@ -905,7 +910,7 @@ const MapView = ({ properties, activeId, onMarkerClick, defaultCenter = DEFAULT_
 		return (
 			<div className="relative w-full h-full rounded-[2rem] overflow-hidden bg-gray-100">
 				<iframe
-					title="Properties map"
+					title={language === "বাংলা" ? "বিজ্ঞাপনের ম্যাপ" : "Properties map"}
 					src={`https://www.google.com/maps?q=${defaultCenter.lat},${defaultCenter.lng}&hl=en&z=${defaultZoom}&output=embed`}
 					width="100%"
 					height="100%"
@@ -928,7 +933,7 @@ const MapView = ({ properties, activeId, onMarkerClick, defaultCenter = DEFAULT_
 			<div className="relative w-full h-full rounded-[2rem] overflow-hidden bg-gray-50 flex items-center justify-center" style={{ minHeight: 400 }}>
 				<div className="flex flex-col items-center gap-3">
 					<div className="w-10 h-10 border-4 border-brandRed border-t-transparent rounded-full animate-spin" />
-					<span className="text-sm font-bold text-gray-400">Loading map…</span>
+					<span className="text-sm font-bold text-gray-400">{language === "বাংলা" ? "ম্যাপ লোড হচ্ছে…" : "Loading map…"}</span>
 				</div>
 			</div>
 		);
@@ -1497,11 +1502,8 @@ const PropertyListing = () => {
 		}
 		if (!locationSeo) {
 			return {
-				title: 'সব বিজ্ঞাপন — Browse All To-Let Listings in Bangladesh',
-				description:
-					'বাংলাদেশের সব জেলার বাসা, ফ্ল্যাট, রুম, সিট ও মেস ভাড়ার টু-লেট বিজ্ঞাপন '
-					+ 'এক তালিকায় — ভাড়া, এলাকা ও ধরন অনুযায়ী ফিল্টার করুন। Browse every to-let '
-					+ 'listing on TO-LET PRO: flats, rooms, mess seats, sublets and family houses.',
+				title: ALL_LISTINGS_SEO.title,
+				description: ALL_LISTINGS_SEO.description,
 				canonical: '/properties/all',
 				jsonLd: breadcrumbSchema([
 					{ name: 'Home', path: '/' },
@@ -1604,7 +1606,7 @@ const PropertyListing = () => {
 					<button
 						onClick={goBack}
 						className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0 active:scale-90 transition-transform"
-						aria-label="Go back">
+						aria-label={language === "বাংলা" ? "পিছনে যান" : "Go back"}>
 						<ArrowLeft size={18} className="text-gray-800" />
 					</button>
 					<div className="flex-1 relative">
@@ -1620,7 +1622,7 @@ const PropertyListing = () => {
 							<button
 								onClick={() => setSearchArea("")}
 								className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full bg-gray-300 text-white active:scale-90 transition-transform"
-								aria-label="Clear search">
+								aria-label={language === "বাংলা" ? "খোঁজা মুছুন" : "Clear search"}>
 								<X size={12} />
 							</button>
 						)}
@@ -1732,7 +1734,7 @@ const PropertyListing = () => {
 								<button onClick={handleClearAll} className="text-[11px] font-black text-[#ba0036] uppercase tracking-wider px-2 py-1 rounded-md hover:bg-red-50 transition-colors">
 									{t.clearAll || "Clear All"}
 								</button>
-								<button onClick={() => setIsMobileFilterOpen(false)} aria-label="Close filters" className="p-2 bg-gray-100 rounded-full active:scale-95 transition-transform">
+								<button onClick={() => setIsMobileFilterOpen(false)} aria-label={language === "বাংলা" ? "ফিল্টার বন্ধ করুন" : "Close filters"} className="p-2 bg-gray-100 rounded-full active:scale-95 transition-transform">
 									<X size={18} />
 								</button>
 							</div>
@@ -1823,11 +1825,11 @@ const PropertyListing = () => {
 								<div className="flex gap-4">
 									<div className="flex-1">
 										<label className="text-[9px] font-black text-gray-400 uppercase">{t.minPrice || "Min Price"}</label>
-										<input type="number" value={minPrice} onChange={(e) => setMinPrice(Number(e.target.value))} className="w-full bg-gray-50 border border-gray-100 rounded-lg p-2.5 text-xs font-bold outline-none focus:border-brandRed text-gray-700" />
+										<input type="text" inputMode="numeric" data-number value={minPrice} onChange={(e) => setMinPrice(Number(e.target.value))} className="w-full bg-gray-50 border border-gray-100 rounded-lg p-2.5 text-xs font-bold outline-none focus:border-brandRed text-gray-700" />
 									</div>
 									<div className="flex-1">
 										<label className="text-[9px] font-black text-gray-400 uppercase">{t.maxPrice || "Max Price"}</label>
-										<input type="number" value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))} className="w-full bg-gray-50 border border-gray-100 rounded-lg p-2.5 text-xs font-bold outline-none focus:border-brandRed text-gray-700" />
+										<input type="text" inputMode="numeric" data-number value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))} className="w-full bg-gray-50 border border-gray-100 rounded-lg p-2.5 text-xs font-bold outline-none focus:border-brandRed text-gray-700" />
 									</div>
 								</div>
 							</div>
@@ -2069,10 +2071,10 @@ const PropertyListing = () => {
 						<div className="flex items-center gap-3">
 							<div className="hidden lg:flex items-center bg-gray-100 rounded-xl p-1 gap-1">
 								<button onClick={() => setViewMode("list")} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black transition-all ${!isMapMode ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
-									<List size={14} /> List
+									<List size={14} /> {language === "বাংলা" ? "তালিকা" : "List"}
 								</button>
 								<button onClick={() => setViewMode("map")} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black transition-all ${isMapMode ? "bg-brandRed text-white shadow-sm" : "text-gray-500 hover:text-brandRed"}`}>
-									<Map size={14} /> Map View
+									<Map size={14} /> {language === "বাংলা" ? "ম্যাপ" : "Map View"}
 								</button>
 							</div>
 							<div className="hidden lg:flex items-center gap-2">
@@ -2138,7 +2140,7 @@ const PropertyListing = () => {
 						transition={{ duration: 0.18 }}
 						className="fixed inset-0 z-[60] bg-white flex flex-col"
 						role="dialog"
-						aria-label="Map view"
+						aria-label={language === "বাংলা" ? "ম্যাপ" : "Map view"}
 					>
 						{/* ── FLOATING FILTER BAR (replaces the old breadcrumb/count header) ──
 						    A sticky bar that floats over the map (absolute z-10) — it never
@@ -2164,7 +2166,7 @@ const PropertyListing = () => {
 								<div className="bg-white rounded-2xl shadow-[0_8px_28px_rgba(0,0,0,0.18)] flex items-center gap-1 px-2 py-1.5 pointer-events-auto border border-gray-100">
 									<button
 										onClick={() => setViewMode("list")}
-										aria-label="Back to list"
+										aria-label={language === "বাংলা" ? "তালিকায় ফিরুন" : "Back to list"}
 										className="p-2 rounded-xl hover:bg-gray-100 active:scale-95 transition-all shrink-0">
 										<ArrowLeft size={18} className="text-gray-800" />
 									</button>
@@ -2178,7 +2180,7 @@ const PropertyListing = () => {
 									{searchArea && (
 										<button
 											onClick={() => setSearchArea("")}
-											aria-label="Clear search"
+											aria-label={language === "বাংলা" ? "খোঁজা মুছুন" : "Clear search"}
 											className="p-2 rounded-xl hover:bg-gray-100 active:scale-95 transition-all shrink-0">
 											<X size={16} className="text-gray-600" />
 										</button>
@@ -2248,7 +2250,7 @@ const PropertyListing = () => {
 									<BottomSheetCard
 										key="map-bottom-sheet"
 										property={selectedMapProperty}
-										onOpen={(p) => navigate(`/property/${p.id}`)}
+										onOpen={(p) => navigate(propertyPath(p))}
 										onClose={() => {
 											setSelectedMapProperty(null);
 											setBottomSheetHeight(0);

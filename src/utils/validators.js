@@ -1,4 +1,5 @@
 import { countryFromInternational, toNationalNumber, toE164, DEFAULT_PHONE_COUNTRY } from '../constants/phoneCountries.js';
+import { toAsciiDigits } from './digits.js';
 
 /**
  * validators.js
@@ -19,7 +20,7 @@ import { countryFromInternational, toNationalNumber, toE164, DEFAULT_PHONE_COUNT
  *   `+880 1712-345678` (spaces / hyphens are stripped)
  */
 export function toBdNationalPhone(v) {
-  let digits = String(v || '').replace(/\D/g, '');
+  let digits = toAsciiDigits(v || '').replace(/\D/g, '');
   if (digits.startsWith('880')) digits = digits.slice(3);
   // A national part always begins with 1, so stripping leading zeros can
   // never eat a meaningful digit.
@@ -39,7 +40,7 @@ export function isBdMobile(v) {
  * Return a canonical identity, never a suffix shared by several countries.
  */
 export function normalizeMobilePhone(value) {
-  const raw = String(value || '').trim();
+  const raw = toAsciiDigits(value || '').trim();
   if (!/^[+\d\s().-]+$/.test(raw)) return null;
   const international = /^(\+|00)/.test(raw);
   const country = international ? countryFromInternational(raw) : DEFAULT_PHONE_COUNTRY;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import useGoBack from '../hooks/useGoBack';
 import useRequireAuth from '../hooks/useRequireAuth';
 import { motion } from 'framer-motion';
@@ -10,6 +10,11 @@ import {
 } from 'lucide-react';
 
 import { propertyService } from '../services/Propertyservice';
+import { propertyPath } from '../utils/propertyPath';
+import { useIsBn } from '../context/LanguageContext';
+import {
+  propertyTypeLabel, preferredTenantLabel, contactMethodLabel, houseRuleLabel, perMonthLabel,
+} from '../constants/listingLabels';
 import TrustGauge from './shared/TrustGauge';
 import VerifStep  from './shared/VerifStep';
 import ProfileReviews from './shared/ProfileReviews';
@@ -34,6 +39,8 @@ const LandlordProfile = () => {
   const goBack = useGoBack('/');
   // Call / Message are ACTIONS → gate behind login (viewing the profile stays open).
   const requireAuth = useRequireAuth();
+  const isBn = useIsBn();
+  const L = (bn, en) => (isBn ? bn : en);
 
   const [landlord, setLandlord] = useState(null);
   const [properties, setProperties] = useState([]);
@@ -47,7 +54,9 @@ const LandlordProfile = () => {
       try {
         const [ll, allProps] = await Promise.all([
           propertyService.getLandlord(id),
-          propertyService.getProperties({}, 'Newest Listings'),
+          // Asks the server for this owner's listings only. The filter below
+          // stays as a guard for a backend that doesn't know the param yet.
+          propertyService.getProperties({ landlordId: id }, 'Newest Listings'),
         ]);
         if (cancelled) return;
         setLandlord(ll || null);
@@ -70,7 +79,7 @@ const LandlordProfile = () => {
       <div className="w-full min-h-[50vh] flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 mx-auto mb-4 rounded-full border-4 border-[#ba0036]/30 border-t-[#ba0036] animate-spin" />
-          <p className="text-slate-600 text-sm font-semibold">Loading landlord…</p>
+          <p className="text-slate-600 text-sm font-semibold">{L('বাড়িওয়ালার তথ্য আসছে…', 'Loading landlord…')}</p>
         </div>
       </div>
     );
@@ -80,15 +89,15 @@ const LandlordProfile = () => {
     return (
       <div className="w-full min-h-[50vh] flex items-center justify-center p-6">
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-md w-full bg-white rounded-3xl p-8 text-center shadow-2xl shadow-red-500/5 border border-gray-100">
-          <h2 className="text-2xl font-black text-slate-900 mb-2">Landlord not found</h2>
+          <h2 className="text-2xl font-black text-slate-900 mb-2">{L('বাড়িওয়ালা পাওয়া যায়নি', 'Landlord not found')}</h2>
           <p className="text-sm text-slate-600 mb-6">
-            This landlord hasn't listed anything yet or their profile is unavailable.
+            {L('এই বাড়িওয়ালা এখনও কোনো বিজ্ঞাপন দেননি, অথবা প্রোফাইলটি পাওয়া যাচ্ছে না।', 'This landlord hasn\'t listed anything yet or their profile is unavailable.')}
           </p>
           <button
-            onClick={() => navigate('/properties')}
+            onClick={() => navigate('/properties/all')}
             className="px-6 py-3 rounded-full bg-[#ba0036] text-white text-sm font-black hover:bg-[#7c0026] hover:shadow-lg hover:shadow-red-500/20 transition-all active:scale-95"
           >
-            Browse properties
+            {L('সব বিজ্ঞাপন দেখুন', 'Browse properties')}
           </button>
         </motion.div>
       </div>
@@ -154,9 +163,9 @@ const LandlordProfile = () => {
             onClick={goBack}
             className="flex items-center gap-2 text-sm font-black text-[#ba0036] bg-white/50 border border-red-100/50 px-4 py-2 rounded-full hover:bg-red-50 hover:border-red-200 transition-all active:scale-95 shadow-sm"
           >
-            <ArrowLeft size={15} /> Back
+            <ArrowLeft size={15} /> {L('পিছনে', 'Back')}
           </button>
-          <p className="font-black text-gray-900 truncate">Landlord Profile</p>
+          <p className="font-black text-gray-900 truncate">{L('বাড়িওয়ালার প্রোফাইল', 'Landlord Profile')}</p>
           <button className="p-2.5 rounded-full border border-gray-200 bg-white/50 text-gray-500 hover:border-[#ba0036] hover:text-[#ba0036] hover:bg-red-50 transition-all active:scale-90 shadow-sm">
             <Share2 size={16} />
           </button>
@@ -172,7 +181,7 @@ const LandlordProfile = () => {
         {/* ── PROFILE HEADER CARD ── */}
         <motion.div variants={fadeInUp} className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] border border-white/80 shadow-[0_8px_40px_rgba(0,0,0,0.04)] overflow-hidden mb-8">
           <div className="w-full h-48 md:h-72 bg-gray-200 relative group overflow-hidden">
-            <img src={coverImage} alt="Cover" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
+            <img src={coverImage} alt={landlord?.name ? L(`${landlord.name}-এর কভার ছবি`, `${landlord.name} — cover photo`) : L('বাড়িওয়ালার কভার ছবি', 'Landlord cover photo')} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
             <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-gray-900/20 to-transparent" />
           </div>
 
@@ -196,12 +205,12 @@ const LandlordProfile = () => {
                 <button
                   onClick={() => requireAuth(() => navigate('/messages', { state: { peerUserId: landlord.id || landlord._id || id, peerName: landlord.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } }))}
                   className="bg-white text-gray-800 py-3.5 px-6 rounded-2xl font-black text-sm border border-gray-200 hover:border-green-300 hover:bg-green-50 hover:text-green-600 shadow-sm transition-all flex items-center gap-2 group">
-                  <Phone size={18} className="group-hover:rotate-12 transition-transform" /> Call
+                  <Phone size={18} className="group-hover:rotate-12 transition-transform" /> {L('কল করুন', 'Call')}
                 </button>
                 <button
                   onClick={() => requireAuth(() => navigate('/messages', { state: { peerUserId: landlord.id || landlord._id || id, peerName: landlord.name, peerAvatar: avatar } }))}
                   className="bg-gradient-to-r from-[#ba0036] to-[#90002a] text-white py-3.5 px-7 rounded-2xl font-black text-sm shadow-[0_8px_20px_rgba(186,0,54,0.25)] hover:shadow-[0_12px_25px_rgba(186,0,54,0.35)] hover:-translate-y-0.5 active:scale-95 transition-all flex items-center gap-2">
-                  <MessageCircle size={18} /> Send Message
+                  <MessageCircle size={18} /> {L('মেসেজ পাঠান', 'Send Message')}
                 </button>
               </div>
             </div>
@@ -218,12 +227,12 @@ const LandlordProfile = () => {
                   <div className="flex flex-wrap gap-2.5 mt-5">
                     {landlord.verified && (
                       <span className="text-[10px] md:text-xs font-black px-3 md:px-4 py-1.5 md:py-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 flex items-center gap-1.5 md:gap-2 uppercase tracking-widest shadow-sm">
-                        <BadgeCheck size={12} className="md:w-3.5 md:h-3.5" /> Verified Landlord
+                        <BadgeCheck size={12} className="md:w-3.5 md:h-3.5" /> {L('যাচাইকৃত বাড়িওয়ালা', 'Verified Landlord')}
                       </span>
                     )}
                     {isNewHost && !landlord.verified && (
                       <span className="text-[10px] md:text-xs font-black px-3 md:px-4 py-1.5 md:py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1.5 md:gap-2 uppercase tracking-widest shadow-sm">
-                        <Award size={12} className="md:w-3.5 md:h-3.5" /> New landlord
+                        <Award size={12} className="md:w-3.5 md:h-3.5" /> {L('নতুন বাড়িওয়ালা', 'New landlord')}
                       </span>
                     )}
                     {badges.map((badge, i) => (
@@ -240,12 +249,12 @@ const LandlordProfile = () => {
                   <button
                     onClick={() => requireAuth(() => navigate('/messages', { state: { peerUserId: landlord.id || landlord._id || id, peerName: landlord.name, peerAvatar: avatar, mode: 'call', callType: 'voice' } }))}
                     className="flex-1 py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-800 shadow-sm active:scale-95">
-                    <Phone size={18} /> Call
+                    <Phone size={18} /> {L('কল করুন', 'Call')}
                   </button>
                   <button
                     onClick={() => requireAuth(() => navigate('/messages', { state: { peerUserId: landlord.id || landlord._id || id, peerName: landlord.name, peerAvatar: avatar } }))}
                     className="flex-1 bg-gradient-to-r from-[#ba0036] to-[#90002a] text-white py-4 rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
-                    <MessageCircle size={18} /> Message
+                    <MessageCircle size={18} /> {L('মেসেজ', 'Message')}
                   </button>
                 </div>
               </div>
@@ -258,7 +267,7 @@ const LandlordProfile = () => {
                   <Star size={16} className="fill-yellow-500 md:w-[18px] md:h-[18px]" />
                 </div>
                 <span className="block text-lg md:text-xl font-black text-gray-900 mb-1">{rating}</span>
-                <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest">({totalReviews} Reviews)</p>
+                <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest">({totalReviews} {L('রিভিউ', 'Reviews')})</p>
               </div>
 
               <div className="p-4 md:p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow">
@@ -266,7 +275,7 @@ const LandlordProfile = () => {
                   <MessageCircle size={16} className="md:w-[18px] md:h-[18px]" />
                 </div>
                 <span className="block text-lg md:text-xl font-black text-gray-900 mb-1">{responseRate}%</span>
-                <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest">Response Rate</p>
+                <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest">{L('উত্তরের হার', 'Response Rate')}</p>
               </div>
 
               <div className="p-4 md:p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow">
@@ -274,7 +283,7 @@ const LandlordProfile = () => {
                   <Clock size={16} className="md:w-[18px] md:h-[18px]" />
                 </div>
                 <span className="block text-lg md:text-xl font-black text-gray-900 mb-1">{responseTime}</span>
-                <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest">Avg. Reply</p>
+                <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest">{L('গড় উত্তরের সময়', 'Avg. Reply')}</p>
               </div>
 
               <div className="p-4 md:p-5 bg-gradient-to-b from-gray-50/50 to-gray-50 rounded-2xl border border-gray-100/80 text-center hover:shadow-md transition-shadow">
@@ -282,7 +291,7 @@ const LandlordProfile = () => {
                   <Calendar size={16} className="md:w-[18px] md:h-[18px]" />
                 </div>
                 <span className="block text-lg md:text-xl font-black text-gray-900 mb-1">{memberSince}</span>
-                <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest">Member Since</p>
+                <p className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase tracking-widest">{L('সদস্য হয়েছেন', 'Member Since')}</p>
               </div>
             </div>
           </div>
@@ -293,7 +302,7 @@ const LandlordProfile = () => {
           <div className="lg:col-span-7 space-y-6 md:space-y-8">
             {bio && (
               <motion.div variants={fadeInUp} className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.03)] p-6 md:p-8">
-                <h3 className="text-lg md:text-xl font-black text-gray-900 mb-4">About the Landlord</h3>
+                <h3 className="text-lg md:text-xl font-black text-gray-900 mb-4">{L('বাড়িওয়ালা সম্পর্কে', 'About the Landlord')}</h3>
                 <p className="text-gray-600 font-medium leading-relaxed text-sm md:text-base">
                   {bio}
                 </p>
@@ -305,15 +314,15 @@ const LandlordProfile = () => {
               <motion.div variants={fadeInUp} className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {(landlord.preferredTenants?.length > 0 || landlord.communication?.length > 0) && (
                   <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 p-6 md:p-8 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
-                    <h3 className="text-base md:text-lg font-black text-gray-900 mb-5 md:mb-6">Landlord Preferences</h3>
+                    <h3 className="text-base md:text-lg font-black text-gray-900 mb-5 md:mb-6">{L('বাড়িওয়ালার পছন্দ', 'Landlord Preferences')}</h3>
                     
                     {landlord.preferredTenants?.length > 0 && (
                       <div className="mb-5 md:mb-6">
-                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2.5 md:mb-3">Preferred Tenants</p>
+                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2.5 md:mb-3">{L('পছন্দের ভাড়াটিয়া', 'Preferred Tenants')}</p>
                         <div className="flex flex-wrap gap-2 md:gap-2.5">
                           {landlord.preferredTenants.map((pt, i) => (
                             <span key={i} className="bg-blue-50/80 text-blue-700 border border-blue-100 px-3 py-1.5 md:px-3.5 md:py-1.5 rounded-xl text-[11px] md:text-xs font-bold capitalize shadow-sm">
-                              {pt.replace('_', ' ')}
+                              {preferredTenantLabel(pt, isBn)}
                             </span>
                           ))}
                         </div>
@@ -322,11 +331,11 @@ const LandlordProfile = () => {
                     
                     {landlord.communication?.length > 0 && (
                       <div>
-                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2.5 md:mb-3">Preferred Contact</p>
+                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2.5 md:mb-3">{L('যোগাযোগের মাধ্যম', 'Preferred Contact')}</p>
                         <div className="flex flex-wrap gap-2 md:gap-2.5">
                           {landlord.communication.map((cm, i) => (
                             <span key={i} className="bg-gray-50/80 text-gray-600 border border-gray-200 px-3 py-1.5 md:px-3.5 md:py-1.5 rounded-xl text-[11px] md:text-xs font-bold capitalize shadow-sm">
-                              {cm.replace('_', ' ')}
+                              {contactMethodLabel(cm, isBn)}
                             </span>
                           ))}
                         </div>
@@ -337,16 +346,16 @@ const LandlordProfile = () => {
                 
                 {(landlord.houseRules?.length > 0 || landlord.serviceCharge !== null) && (
                   <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 p-6 md:p-8 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
-                    <h3 className="text-base md:text-lg font-black text-gray-900 mb-5 md:mb-6">House Rules & Fees</h3>
+                    <h3 className="text-base md:text-lg font-black text-gray-900 mb-5 md:mb-6">{L('বাড়ির নিয়ম ও খরচ', 'House Rules & Fees')}</h3>
                     
                     {landlord.houseRules?.length > 0 && (
                       <div className="mb-6">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">House Rules</p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">{L('বাড়ির নিয়ম', 'House Rules')}</p>
                         <ul className="space-y-3">
                           {landlord.houseRules.map((hr, i) => (
                             <li key={i} className="flex items-center gap-3 text-sm font-medium text-gray-700">
                               <div className="w-2 h-2 rounded-full bg-rose-500 shadow-sm"></div>
-                              <span className="capitalize">{hr.replace(/_/g, ' ')}</span>
+                              <span className="capitalize">{houseRuleLabel(hr, isBn)}</span>
                             </li>
                           ))}
                         </ul>
@@ -355,11 +364,11 @@ const LandlordProfile = () => {
 
                     {landlord.serviceCharge !== null && (
                       <div className="mt-4 p-4 bg-gray-50/50 rounded-2xl border border-gray-100/50">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Service Charge</p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{L('সার্ভিস চার্জ', 'Service Charge')}</p>
                         {landlord.serviceCharge > 0 ? (
-                          <p className="text-[15px] font-black text-gray-900">৳{landlord.serviceCharge.toLocaleString('en-IN')}<span className="text-xs text-gray-500 font-medium">/mo</span></p>
+                          <p className="text-[15px] font-black text-gray-900">৳{landlord.serviceCharge.toLocaleString('en-IN')}<span className="text-xs text-gray-500 font-medium">{perMonthLabel(isBn)}</span></p>
                         ) : (
-                          <p className="text-[15px] font-bold text-emerald-600 flex items-center gap-2"><BadgeCheck size={16} /> No service charge</p>
+                          <p className="text-[15px] font-bold text-emerald-600 flex items-center gap-2"><BadgeCheck size={16} /> {L('কোনো সার্ভিস চার্জ নেই', 'No service charge')}</p>
                         )}
                       </div>
                     )}
@@ -379,35 +388,35 @@ const LandlordProfile = () => {
             {/* ── Trust + Verification ──────── */}
             <motion.div variants={fadeInUp} className="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.03)] p-6 md:p-8 sticky top-24">
               <div className="flex justify-center mb-6 md:mb-8 pb-6 md:pb-8 border-b border-gray-100/80">
-                <TrustGauge score={trustScore} tier={trustTier} label="Landlord Trust" />
+                <TrustGauge score={trustScore} tier={trustTier} label={L('বাড়িওয়ালার ট্রাস্ট', 'Landlord Trust')} />
               </div>
               <div className="space-y-4">
                 {emailStatus !== 'none' && (
                   <VerifStep
-                    title="Email"
-                    description="Confirmed via magic link / OTP."
+                    title={L('ইমেইল', 'Email')}
+                    description={L('ম্যাজিক লিংক / OTP দিয়ে নিশ্চিত করা।', 'Confirmed via magic link / OTP.')}
                     status={emailStatus}
                     readOnly
                   />
                 )}
                 <VerifStep
-                  title="Phone"
-                  description="Confirmed via SMS OTP."
+                  title={L('ফোন', 'Phone')}
+                  description={L('SMS OTP দিয়ে নিশ্চিত করা।', 'Confirmed via SMS OTP.')}
                   status={phoneStatus}
                   readOnly
                 />
                 <VerifStep
-                  title="Government ID"
-                  description="NID / Passport reviewed by the TO-LET PRO trust team."
+                  title={L('সরকারি পরিচয়পত্র', 'Government ID')}
+                  description={L('NID / পাসপোর্ট TO-LET PRO ট্রাস্ট টিম যাচাই করেছে।', 'NID / Passport reviewed by the TO-LET PRO trust team.')}
                   status={idStatus}
                   readOnly
                 />
                 <VerifStep
-                  title="Property Verified"
+                  title={L('প্রপার্টি যাচাইকৃত', 'Property Verified')}
                   description={
                     vLandlord.propertyAddress
-                      ? `Utility bill matched to ${vLandlord.propertyAddress}.`
-                      : 'Utility bill matched to the registered address.'
+                      ? L(`ইউটিলিটি বিল ${vLandlord.propertyAddress} ঠিকানার সাথে মিলেছে।`, `Utility bill matched to ${vLandlord.propertyAddress}.`)
+                      : L('ইউটিলিটি বিল নিবন্ধিত ঠিকানার সাথে মিলেছে।', 'Utility bill matched to the registered address.')
                   }
                   status={addressStatus}
                   readOnly
@@ -425,7 +434,7 @@ const LandlordProfile = () => {
         {/* ── ACTIVE LISTINGS ── */}
         <motion.div variants={fadeInUp} className="mb-10 pt-4">
           <h2 className="text-xl md:text-3xl font-black text-gray-900 mb-6 md:mb-8 flex items-center gap-2 md:gap-3">
-            Active Properties <span className="text-gray-400 text-sm md:text-lg font-bold bg-gray-100 px-2 md:px-3 py-1 rounded-full">{totalProperties}</span>
+            {L('সক্রিয় বিজ্ঞাপন', 'Active Properties')} <span className="text-gray-400 text-sm md:text-lg font-bold bg-gray-100 px-2 md:px-3 py-1 rounded-full">{totalProperties}</span>
           </h2>
 
           {properties.length === 0 ? (
@@ -434,7 +443,7 @@ const LandlordProfile = () => {
                 <MapPin size={24} className="text-gray-300" />
               </div>
               <p className="text-base text-slate-500 font-semibold max-w-md mx-auto">
-                This landlord hasn't published any active listings yet. Check back soon!
+                {L('এই বাড়িওয়ালার এখন কোনো সক্রিয় বিজ্ঞাপন নেই। কিছুদিন পর আবার দেখুন!', 'This landlord hasn\'t published any active listings yet. Check back soon!')}
               </p>
             </div>
           ) : (
@@ -446,7 +455,7 @@ const LandlordProfile = () => {
                     key={property.id}
                     whileHover={{ y: -8 }}
                     className="bg-white/80 backdrop-blur-xl rounded-[2rem] overflow-hidden border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:shadow-2xl transition-all cursor-pointer group flex flex-col"
-                    onClick={() => navigate(`/property/${property.id}`)}
+                    onClick={() => navigate(propertyPath(property))}
                   >
                     <div className="h-56 relative overflow-hidden bg-gray-100">
                       {cover && (
@@ -456,30 +465,33 @@ const LandlordProfile = () => {
                       
                       {property.type && (
                         <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-full text-[10px] font-black text-gray-900 uppercase tracking-widest shadow-sm">
-                          {property.type}
+                          {propertyTypeLabel(property.type, isBn)}
                         </div>
                       )}
                     </div>
 
                     <div className="p-6 flex flex-col flex-1">
-                      <h3 className="text-lg font-black text-gray-900 mb-2 line-clamp-1 group-hover:text-[#ba0036] transition-colors">{property.title}</h3>
+                      <h3 className="text-lg font-black text-gray-900 mb-2 line-clamp-1 group-hover:text-[#ba0036] transition-colors">
+                        {/* Crawlable link; stopPropagation keeps the card's onClick from navigating twice. */}
+                        <Link to={propertyPath(property)} onClick={(e) => e.stopPropagation()}>{property.title}</Link>
+                      </h3>
                       <p className="flex items-center gap-1.5 text-xs font-bold text-gray-500 mb-5 truncate">
                         <MapPin size={14} className="text-[#ba0036]" /> {property.location}
                       </p>
 
                       <div className="flex items-center gap-4 text-[11px] font-black text-gray-600 mb-6 uppercase tracking-wider">
-                        {property.beds != null && <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-100"><BedDouble size={14} className="text-gray-400" /> {property.beds} BD</span>}
-                        {property.baths != null && <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-100"><Bath size={14} className="text-gray-400" /> {property.baths} BA</span>}
+                        {property.beds != null && <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-100"><BedDouble size={14} className="text-gray-400" /> {property.beds} {L('বেড', 'BD')}</span>}
+                        {property.baths != null && <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-100"><Bath size={14} className="text-gray-400" /> {property.baths} {L('বাথ', 'BA')}</span>}
                         {property.sqft != null && <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-100"><Square size={14} className="text-gray-400" /> {property.sqft}</span>}
                       </div>
 
                       <div className="flex items-center justify-between pt-5 border-t border-gray-100 mt-auto">
                         <p className="text-2xl font-black text-[#ba0036]">
                           ৳{Number(property.price || 0).toLocaleString('en-IN')}
-                          <span className="text-[11px] text-gray-400 font-black uppercase tracking-wider ml-1">/mo</span>
+                          <span className="text-[11px] text-gray-400 font-black uppercase tracking-wider ml-1">{perMonthLabel(isBn)}</span>
                         </p>
                         <button className="bg-red-50 text-[#ba0036] px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-[#ba0036] hover:text-white transition-all shadow-sm">
-                          View
+                          {L('দেখুন', 'View')}
                         </button>
                       </div>
                     </div>

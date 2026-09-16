@@ -1,3 +1,5 @@
+import { toAsciiDigits } from './digits.js';
+
 /*
  * buildingScope.js
  * ──────────────────────────────────────────────────────────────────────────
@@ -73,9 +75,7 @@ export const scopeBookings = (bookings, buildings, currentBuildingId) => {
 // Units carry an integer floor now, and a booking denormalises it, so a digit
 // can be pulled back out reliably.
 const floorRank = (b) => {
-  const BN = { '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4', '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9' };
-  const s = String(b?.floorNumber ?? '').replace(/[০-৯]/g, (d) => BN[d] || d);
-  const m = /-?\d+/.exec(s);
+  const m = /-?\d+/.exec(toAsciiDigits(b?.floorNumber));
   // No floor recorded sorts last, so unlabelled rows never displace real ones.
   return m ? parseInt(m[0], 10) : Number.MAX_SAFE_INTEGER;
 };
@@ -83,8 +83,8 @@ const floorRank = (b) => {
 // "101 · 102 · 110", not "101 · 110 · 102". Numeric where there are digits,
 // locale-natural otherwise (for "A", "Shop-2" and the like).
 const compareRoom = (a, b) => {
-  const na = parseInt(String(a ?? '').replace(/\D/g, ''), 10);
-  const nb = parseInt(String(b ?? '').replace(/\D/g, ''), 10);
+  const na = parseInt(toAsciiDigits(a).replace(/\D/g, ''), 10);
+  const nb = parseInt(toAsciiDigits(b).replace(/\D/g, ''), 10);
   if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb;
   return String(a ?? '').localeCompare(String(b ?? ''), undefined, { numeric: true, sensitivity: 'base' });
 };

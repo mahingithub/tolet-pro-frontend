@@ -902,7 +902,7 @@ export default function AiLedgerScannerModal({
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-gray-900/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in">
-      <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[85vh] overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95">
+      <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[85vh] overflow-hidden pb-safe sm:pb-0 animate-in slide-in-from-bottom-4 sm:zoom-in-95">
 
         {/* Header */}
         <div className="flex items-center gap-2.5 px-4 pt-4 pb-3 border-b border-gray-100 shrink-0">
@@ -1209,7 +1209,7 @@ export default function AiLedgerScannerModal({
                         : `${tenants.filter(t => !String(t.floorNumber || '').trim()).length} row(s) have no floor`}
                     </span>
                     <input
-                      type="number"
+                      type="text" inputMode="numeric" data-number
                       value={pageFloor}
                       onChange={(e) => setPageFloor(e.target.value)}
                       placeholder={isBn ? 'ফ্লোর' : 'Floor'}

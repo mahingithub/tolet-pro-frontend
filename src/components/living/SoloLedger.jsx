@@ -14,6 +14,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Layers, Pencil, Plus, Trash2, Wallet } from 'lucide-react';
 
 import useLivingStore from '../../store/useLivingStore';
+import useLivingAction from './useLivingAction';
 import { dateLabel, taka } from './livingUtils';
 import { getMethod } from './livingConfig';
 import {
@@ -47,6 +48,7 @@ const dayHeading = (day, language) => {
 };
 
 const SoloLedger = ({ flow = 'out', language, intent, clearIntent }) => {
+  const requireAction = useLivingAction(flow === 'in' ? 'income' : 'spending');
   const isBn = language === 'বাংলা';
   const solo = useLivingStore((s) => s.solo);
   const addSoloEntry = useLivingStore((s) => s.addSoloEntry);
@@ -66,12 +68,13 @@ const SoloLedger = ({ flow = 'out', language, intent, clearIntent }) => {
   // on this side's default type, a type key opens it locked to that type.
   useEffect(() => {
     if (!intent) return;
+    if (!requireAction(intent)) { clearIntent?.(); return; }
     setEditing(null);
     setLockType(getEntryType(intent).key === intent ? intent : null);
     setPresetCategory(null);
     setOpen(true);
     clearIntent?.();
-  }, [intent, clearIntent]);
+  }, [intent, clearIntent, requireAction]);
 
   const pickView = (next) => {
     setView(next);
@@ -125,6 +128,7 @@ const SoloLedger = ({ flow = 'out', language, intent, clearIntent }) => {
   }, [months, solo.entries, flow]);
 
   const openAdd = (type = null, category = null) => {
+    if (!requireAction(type || 'add')) return;
     setEditing(null);
     setLockType(type);
     setPresetCategory(category);
@@ -132,6 +136,7 @@ const SoloLedger = ({ flow = 'out', language, intent, clearIntent }) => {
   };
 
   const openEdit = (entry) => {
+    if (!requireAction()) return;
     setEditing(entry);
     setLockType(null);
     setPresetCategory(null);

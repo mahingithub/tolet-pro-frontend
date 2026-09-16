@@ -102,7 +102,7 @@ const Footer = () => {
           </div>
 
           <div>
-            <h4 className="text-brandRed text-xs font-bold uppercase tracking-widest mb-6">{t.discoveryTitle}</h4>
+            <h2 className="text-brandRed text-xs font-bold uppercase tracking-widest mb-6">{t.discoveryTitle}</h2>
             {/* These were four unclickable <li>s styled to look like links —
                 dead ends for a visitor and invisible to a crawler. They now
                 point at the pages they were always describing. */}
@@ -115,7 +115,7 @@ const Footer = () => {
           </div>
 
           <div>
-            <h4 className="text-brandRed text-xs font-bold uppercase tracking-widest mb-6">{t.landlordsTitle}</h4>
+            <h2 className="text-brandRed text-xs font-bold uppercase tracking-widest mb-6">{t.landlordsTitle}</h2>
             <ul className="space-y-4 text-gray-400 text-sm font-medium">
               <li>
                 <Link to="/how-it-works" className="hover:text-white transition-colors">{t.navHowItWorks}</Link>
@@ -132,7 +132,7 @@ const Footer = () => {
           </div>
 
           <div>
-            <h4 className="text-brandRed text-xs font-bold uppercase tracking-widest mb-6">{t.stayInspired}</h4>
+            <h2 className="text-brandRed text-xs font-bold uppercase tracking-widest mb-6">{t.stayInspired}</h2>
             <p className="text-gray-400 text-sm mb-4">
               {t.newsletterDesc}
             </p>

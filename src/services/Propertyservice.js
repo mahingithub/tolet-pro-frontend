@@ -390,6 +390,7 @@ export const propertyService = {
       
       // Backend filters mapped from frontend state
       if (filters.intent) params.set('intent', filters.intent);
+      if (filters.landlordId) params.set('landlordId', filters.landlordId);
       if (filters.minPrice !== undefined) params.set('minPrice', filters.minPrice);
       if (filters.maxPrice !== undefined) params.set('maxPrice', filters.maxPrice);
       if (filters.selectedTypes?.length) params.set('type', filters.selectedTypes[0]);

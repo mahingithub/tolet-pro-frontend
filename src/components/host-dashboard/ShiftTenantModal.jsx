@@ -31,6 +31,7 @@ import {
   X, DoorOpen, Loader2, Check, AlertTriangle, ArrowRight, Calendar, User,
 } from 'lucide-react';
 import { shiftTenantToUnit } from '../../services/buildingService';
+import useBackGuard from '../../hooks/useBackGuard';
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -44,6 +45,8 @@ export default function ShiftTenantModal({
   onClose,
   onSaved,
 }) {
+  // Mounted only while open, so Back always closes it rather than the page.
+  useBackGuard(true, onClose);
   const isBn = language === 'বাংলা';
   const L = (bn, en) => (isBn ? bn : en);
   const noun = building?.rentedAs === 'seat' ? L('রুম', 'Room') : L('ইউনিট', 'Unit');
@@ -98,7 +101,7 @@ export default function ShiftTenantModal({
       aria-modal="true"
     >
       <div
-        className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-[0_30px_80px_rgba(0,0,0,0.25)] overflow-hidden flex flex-col max-h-[92vh]"
+        className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-[0_30px_80px_rgba(0,0,0,0.25)] overflow-hidden flex flex-col max-h-[92vh] pb-safe sm:pb-0"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ── */}
@@ -208,7 +211,7 @@ export default function ShiftTenantModal({
                 {L('নতুন ভাড়া', 'New rent')}
               </label>
               <input
-                type="number"
+                type="text" data-number
                 inputMode="numeric"
                 value={monthlyRent}
                 onChange={(e) => setMonthlyRent(e.target.value)}

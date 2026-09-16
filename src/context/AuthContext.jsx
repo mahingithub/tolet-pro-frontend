@@ -17,6 +17,7 @@ import {
 import { subscribe } from '../services/_storage.js';
 import { isSessionTerminated } from '../utils/fetchInterceptor.js';
 import { useNavigate } from 'react-router-dom';
+import { getNativeHome, isNativeApp } from '../utils/nativeExperience.js';
 
 const AuthContext = createContext(null);
 
@@ -195,7 +196,7 @@ export const AuthProvider = ({ children }) => {
         
         // ওয়েলকাম রোবট শুধু tenant/landlord-এর জন্য — admin-জাতীয় role
         // (super_admin / moderator / support_agent) হলে dispatch-ই হবে না।
-        if (u && !loggedInRoles.some(isAdminRole)) {
+        if (u && !loggedInRoles.some(isAdminRole) && !isNativeApp()) {
           window.dispatchEvent(
             new CustomEvent('triggerWelcomeRobot', {
               detail: { role: u.role, name: u.name, type: 'login' },
@@ -220,7 +221,7 @@ export const AuthProvider = ({ children }) => {
         const newRoles = Array.isArray(u?.roles) && u.roles.length
           ? u.roles
           : (u?.role ? [u.role] : []);
-        if (u && !newRoles.some(isAdminRole)) {
+        if (u && !newRoles.some(isAdminRole) && !isNativeApp()) {
           window.dispatchEvent(
             new CustomEvent('triggerWelcomeRobot', {
               detail: { role: u.role, name: u.name, type: 'signup' },
@@ -246,9 +247,12 @@ export const AuthProvider = ({ children }) => {
         setLoggingOut(true);
         svcLogout();
         setUser(null);
-        
-        // Navigate directly to the login screen without a full page reload.
-        navigate('/login', { replace: true });
+        // Stores that keep account data in memory (the Living wallet) listen for
+        // this; clearing localStorage alone leaves it on screen for the guest.
+        window.dispatchEvent(new Event('auth:logged-out'));
+
+        // Installed apps return to the selected guest experience after logout.
+        navigate(isNativeApp() ? getNativeHome() : '/login', { replace: true });
         
         // Reset logging out flag after a short delay to allow the navigation to land
         setTimeout(() => setLoggingOut(false), 100);

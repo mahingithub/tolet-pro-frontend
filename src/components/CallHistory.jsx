@@ -21,6 +21,8 @@ import {
   PhoneOff, Bot,
 } from 'lucide-react';
 import callService from '../services/callService';
+import { useIsBn } from '../context/LanguageContext';
+import { clockTime } from '../utils/bnTime';
 
 const { formatCallDuration } = callService;
 
@@ -34,39 +36,42 @@ const sameDay = (a, b) => {
          x.getDate() === y.getDate();
 };
 
-const formatCallTime = (iso) => {
+const formatCallTime = (iso, isBn) => {
   if (!iso) return '';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
   const today = new Date();
   const yest  = new Date(); yest.setDate(today.getDate() - 1);
-  const time  = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  if (sameDay(d, today)) return `Today, ${time}`;
-  if (sameDay(d, yest))  return `Yesterday, ${time}`;
-  return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }) + `, ${time}`;
+  const loc   = isBn ? 'bn-BD' : undefined;
+  const time  = clockTime(d, isBn);
+  if (sameDay(d, today)) return `${isBn ? 'আজ' : 'Today'}, ${time}`;
+  if (sameDay(d, yest))  return `${isBn ? 'গতকাল' : 'Yesterday'}, ${time}`;
+  return d.toLocaleDateString(loc, { weekday: 'short', day: 'numeric', month: 'short' }) + `, ${time}`;
 };
 
 // ─── Per-call status icon + colour palette ───────────────────────────────────
-const statusVisuals = (call) => {
+const statusVisuals = (call, isBn) => {
+  const L = (bn, en) => (isBn ? bn : en);
   if (call.status === 'missed') {
-    return { Icon: PhoneMissed,   color: 'text-red-600',   label: 'Missed' };
+    return { Icon: PhoneMissed,   color: 'text-red-600',   label: L('মিসড কল', 'Missed') };
   }
   if (call.status === 'no-answer') {
-    return { Icon: PhoneOff,      color: 'text-red-600',   label: 'No answer' };
+    return { Icon: PhoneOff,      color: 'text-red-600',   label: L('সাড়া দেয়নি', 'No answer') };
   }
   if (call.status === 'declined') {
     return { Icon: PhoneOff,      color: 'text-red-600',
-             label: call.direction === 'outgoing' ? 'Declined' : 'You declined' };
+             label: call.direction === 'outgoing' ? L('কেটে দিয়েছে', 'Declined') : L('আপনি কেটে দিয়েছেন', 'You declined') };
   }
   if (call.direction === 'incoming') {
-    return { Icon: PhoneIncoming, color: 'text-green-600', label: 'Incoming' };
+    return { Icon: PhoneIncoming, color: 'text-green-600', label: L('ইনকামিং', 'Incoming') };
   }
-  return { Icon: PhoneOutgoing, color: 'text-blue-600',  label: 'Outgoing' };
+  return { Icon: PhoneOutgoing, color: 'text-blue-600',  label: L('আউটগোয়িং', 'Outgoing') };
 };
 
 // ─── The visible row content (shared; sits on top of the swipe actions) ──────
 const RowContent = ({ call, onCallBack }) => {
-  const { Icon, color, label } = statusVisuals(call);
+  const isBn = useIsBn();
+  const { Icon, color, label } = statusVisuals(call, isBn);
   const initials = (call.peer?.name || '?')
     .split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
   const isCompleted = call.status === 'completed';
@@ -93,7 +98,7 @@ const RowContent = ({ call, onCallBack }) => {
       {/* Main column */}
       <div className="flex-1 min-w-0">
         <h4 className={`font-black text-[13px] truncate ${isMissedOrDeclined ? 'text-red-600' : 'text-gray-900'}`}>
-          {call.peer?.name || 'Unknown'}
+          {call.peer?.name || (isBn ? 'অজানা' : 'Unknown')}
         </h4>
         <div className="flex items-center gap-1.5 mt-0.5">
           <Icon size={12} className={`${color} shrink-0`} strokeWidth={2.5}/>
@@ -102,7 +107,7 @@ const RowContent = ({ call, onCallBack }) => {
             {isCompleted && call.durationSec > 0 && (
               <span className="text-gray-400"> · {formatCallDuration(call.durationSec)}</span>
             )}
-            <span className="text-gray-400"> · {formatCallTime(call.iso)}</span>
+            <span className="text-gray-400"> · {formatCallTime(call.iso, isBn)}</span>
           </p>
         </div>
       </div>
@@ -116,8 +121,8 @@ const RowContent = ({ call, onCallBack }) => {
             ? 'bg-blue-50 hover:bg-blue-100 text-blue-600'
             : 'bg-green-50 hover:bg-green-100 text-green-600'
         }`}
-        aria-label={`Call ${call.peer?.name || 'back'}`}
-        title={`${call.type === 'video' ? 'Video' : 'Voice'} call back`}
+        aria-label={isBn ? `${call.peer?.name || ''} — কল ব্যাক` : `Call ${call.peer?.name || 'back'}`}
+        title={isBn ? (call.type === 'video' ? 'ভিডিও কল ব্যাক' : 'ভয়েস কল ব্যাক') : `${call.type === 'video' ? 'Video' : 'Voice'} call back`}
       >
         <TypeIcon size={16}/>
       </button>
@@ -129,6 +134,7 @@ const RowContent = ({ call, onCallBack }) => {
 const SWIPE_TRIGGER = 64;
 
 const SwipeableRow = ({ call, onCallBack, onSelectCall, onDelete }) => {
+  const isBn = useIsBn();
   const x = useMotionValue(0);
   const callOpacity = useTransform(x, [8, 56], [0, 1]);   // green reveal (right swipe)
   const delOpacity  = useTransform(x, [-56, -8], [1, 0]); // red reveal (left swipe)
@@ -158,7 +164,7 @@ const SwipeableRow = ({ call, onCallBack, onSelectCall, onDelete }) => {
         aria-hidden="true"
       >
         <Phone size={20} className="text-white" />
-        <span className="ml-2 text-white font-black text-sm uppercase tracking-widest">Call back</span>
+        <span className="ml-2 text-white font-black text-sm uppercase tracking-widest">{isBn ? 'কল ব্যাক' : 'Call back'}</span>
       </motion.div>
 
       {/* Delete action (revealed on left swipe) */}
@@ -167,7 +173,7 @@ const SwipeableRow = ({ call, onCallBack, onSelectCall, onDelete }) => {
         className="absolute inset-y-0 left-0 right-0 flex items-center justify-end pr-5 bg-red-500 rounded-2xl pointer-events-none"
         aria-hidden="true"
       >
-        <span className="mr-2 text-white font-black text-sm uppercase tracking-widest">Delete</span>
+        <span className="mr-2 text-white font-black text-sm uppercase tracking-widest">{isBn ? 'মুছুন' : 'Delete'}</span>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
              stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
@@ -207,7 +213,7 @@ const DayGroup = ({ label }) => (
   </div>
 );
 
-const groupByDay = (calls) => {
+const groupByDay = (calls, isBn) => {
   const groups = [];
   let lastLabel = null;
   for (const c of calls) {
@@ -216,9 +222,9 @@ const groupByDay = (calls) => {
     const today = new Date();
     const yest = new Date(); yest.setDate(today.getDate() - 1);
     let label;
-    if (sameDay(d, today)) label = 'Today';
-    else if (sameDay(d, yest)) label = 'Yesterday';
-    else label = d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' });
+    if (sameDay(d, today)) label = isBn ? 'আজ' : 'Today';
+    else if (sameDay(d, yest)) label = isBn ? 'গতকাল' : 'Yesterday';
+    else label = d.toLocaleDateString(isBn ? 'bn-BD' : undefined, { weekday: 'long', day: 'numeric', month: 'short' });
     if (label !== lastLabel) {
       groups.push({ kind: 'divider', id: `d-${label}`, label });
       lastLabel = label;
@@ -230,10 +236,10 @@ const groupByDay = (calls) => {
 
 // ─── Filter tabs ────────────────────────────────────────────────────────────
 const FILTERS = [
-  { key: 'all',      label: 'All' },
-  { key: 'missed',   label: 'Missed' },
-  { key: 'incoming', label: 'Incoming' },
-  { key: 'outgoing', label: 'Outgoing' },
+  { key: 'all',      label: 'All',      bn: 'সব' },
+  { key: 'missed',   label: 'Missed',   bn: 'মিসড' },
+  { key: 'incoming', label: 'Incoming', bn: 'ইনকামিং' },
+  { key: 'outgoing', label: 'Outgoing', bn: 'আউটগোয়িং' },
 ];
 
 const matchesFilter = (c, filter) => {
@@ -244,9 +250,9 @@ const matchesFilter = (c, filter) => {
   return true;
 };
 
-const FilterTabs = ({ filter, setFilter, counts }) => (
+const FilterTabs = ({ filter, setFilter, counts, isBn }) => (
   <div className="flex gap-1.5 px-3 pb-2">
-    {FILTERS.map(({ key, label }) => {
+    {FILTERS.map(({ key, label, bn }) => {
       const active = filter === key;
       const showMissedBadge = key === 'missed' && counts.missed > 0;
       return (
@@ -257,7 +263,7 @@ const FilterTabs = ({ filter, setFilter, counts }) => (
             active ? 'bg-[#ba0036] text-white shadow-sm' : 'text-gray-500 hover:text-gray-800 hover:bg-white/60'
           }`}
         >
-          {label}
+          {isBn ? bn : label}
           {showMissedBadge && (
             <span className={`text-[8px] rounded-full min-w-[15px] h-[14px] px-1 inline-flex items-center justify-center ${
               active ? 'bg-white/25 text-white' : 'bg-red-100 text-red-700'
@@ -279,6 +285,7 @@ const CallHistory = ({
   searchQuery = '',
 }) => {
   const [filter, setFilter] = useState('all');
+  const isBn = useIsBn();
 
   const q = (searchQuery || '').trim().toLowerCase();
   const searched = useMemo(
@@ -298,15 +305,15 @@ const CallHistory = ({
     [searched, filter],
   );
 
-  const grouped = groupByDay(filtered);
+  const grouped = groupByDay(filtered, isBn);
 
   return (
     <div>
-      <FilterTabs filter={filter} setFilter={setFilter} counts={counts} />
+      <FilterTabs filter={filter} setFilter={setFilter} counts={counts} isBn={isBn} />
 
       {isLoading && calls.length === 0 ? (
         <div className="text-center text-xs font-bold text-gray-400 py-10 px-4">
-          Loading call history…
+          {isBn ? 'কল হিস্ট্রি লোড হচ্ছে…' : 'Loading call history…'}
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center px-6 py-12">
@@ -314,16 +321,19 @@ const CallHistory = ({
             <Phone size={22}/>
           </div>
           <h4 className="text-sm font-black text-gray-700">
-            {q
+            {isBn
+              ? (q ? `"${searchQuery}" নামে কোনো কল নেই`
+                 : filter === 'all' ? 'এখনো কোনো কল নেই' : `কোনো ${FILTERS.find((f) => f.key === filter)?.bn || ''} কল নেই`)
+              : q
               ? `No calls matching "${searchQuery}"`
               : filter === 'all' ? 'No calls yet' : `No ${filter} calls`}
           </h4>
           <p className="text-[11px] font-bold text-gray-400 mt-1 leading-relaxed max-w-[240px] mx-auto">
             {q
-              ? 'Try a different name.'
+              ? (isBn ? 'অন্য নাম দিয়ে খুঁজুন।' : 'Try a different name.')
               : filter === 'all'
-                ? 'Voice and video calls will appear here. Tap the phone icon on any chat to start one.'
-                : 'Switch filters to see your other calls.'}
+                ? (isBn ? 'ভয়েস ও ভিডিও কল এখানে দেখাবে। যেকোনো চ্যাটে ফোন আইকনে ট্যাপ করে কল করুন।' : 'Voice and video calls will appear here. Tap the phone icon on any chat to start one.')
+                : (isBn ? 'অন্য কলগুলো দেখতে ফিল্টার বদলান।' : 'Switch filters to see your other calls.')}
           </p>
         </div>
       ) : (

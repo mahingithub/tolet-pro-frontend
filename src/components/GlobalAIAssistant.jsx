@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import Draggable from 'react-draggable';
 import {
-  Bot, Send, Sparkles, Minimize2, ExternalLink, TrendingUp,
+  Bot, Send, Sparkles, Minimize2, ExternalLink,
   Headphones, Inbox, ArrowLeft, ShieldCheck, CheckCircle2, Clock, Play,
   Building2, MapPin, BedDouble, Bath, Mic
 } from 'lucide-react';
 import VideoModal from './shared/VideoModal';
+import { propertyPath } from '../utils/propertyPath';
+import useBackGuard, { useOverlayNavigate } from '../hooks/useBackGuard';
 
 import { useAuth } from '../context/AuthContext.jsx';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage, useIsBn } from '../context/LanguageContext';
 import {
   openTicket as svcOpenTicket,
   listMyTickets,
@@ -38,28 +40,40 @@ const HUMAN_KEYWORDS = ['human', 'agent', 'support', 'complaint', 'real person',
 
 const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
 
-// /ai-chat/* routes are auth-gated (AI calls cost money). Same token the rest
-// of the app uses (see supportService.js) — without this header every ask
-// returned 401 and the user only ever saw the generic "brain" error.
+// /ai-chat/* answers guests too (routes/aiChatRoutes.js); the token is sent when
+// there is one so a signed-in user is still identified. Same token the rest of
+// the app uses (see supportService.js).
 const authHeader = () => {
   const t = window.localStorage.getItem('auth:token');
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
+// Phones get the assistant as a full screen, not a floating card. The 600px card
+// was pinned above the bottom rail, so once the keyboard opened the rail rode up
+// on top of it and the chat shrank to a sliver between the two.
+const PHONE_QUERY = '(max-width: 767px)';
+const matchesPhone = () => typeof window !== 'undefined' && !!window.matchMedia?.(PHONE_QUERY).matches;
+
 const GlobalAIAssistant = () => {
-  const navigate = useNavigate();
+  // Every link inside the chat also closes it. On a phone the open chat holds a
+  // Back entry; this replaces that entry with the destination instead of
+  // stranding it, so Back from there lands on the page the chat was opened on.
+  const navigate = useOverlayNavigate();
   const location = useLocation();
   const { user, isAuthenticated } = useAuth();
   // Current UI language mode — sent with every AI question so the bot names
   // the buttons the user actually sees ('যোগাযোগ করুন' vs 'Inquire').
   const { language } = useLanguage() || {};
   const uiLang = language === 'বাংলা' ? 'bn' : 'en';
+  const pick = (bnText, enText) => (uiLang === 'bn' ? bnText : enText);
 
   const messagesEndRef = useRef(null);
   const chatWindowRef = useRef(null);
   const floatingBtnRef = useRef(null);
+  const inputRef = useRef(null);
 
   const [isOpen, setIsOpen] = useState(false);
+  const [isPhone, setIsPhone] = useState(matchesPhone);
   const [isIconVisible, setIsIconVisible] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [view, setView] = useState(/** @type {'ai'|'tickets'|'ticket'} */('ai'));
@@ -147,21 +161,16 @@ const GlobalAIAssistant = () => {
       const saved = sessionStorage.getItem('ai_chat_history');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        // id 1 was the canned welcome bubble. A chat saved earlier in this
+        // session would otherwise bring it straight back.
+        if (Array.isArray(parsed)) return parsed.filter((m) => m.id !== 1);
       }
     } catch {
       // fall through
     }
-    return [
-      {
-        id: 1,
-        sender: 'ai',
-        text:
-          "Hello! I'm your AI Assistant. I can help you find properties, " +
-          'check saved items, or answer questions. If I can\'t help, I can ' +
-          'connect you with a human teammate.',
-      },
-    ];
+    // No canned welcome bubble: it sat at the top of every conversation. The
+    // suggestion chips above the input are the empty state.
+    return [];
   });
 
   // How many AI replies in a row have been unhelpful (no `action`)? Used to
@@ -174,8 +183,8 @@ const GlobalAIAssistant = () => {
     const aiMsg = {
         id: crypto.randomUUID(),
         sender: 'ai',
-        text: `Here is a video guide for: ${guide.title}`,
-        videoAction: { label: 'Play Video', url: guide.videoUrl, title: guide.title }
+        text: pick(`এই বিষয়ের ভিডিও গাইড: ${guide.title}`, `Here is a video guide for: ${guide.title}`),
+        videoAction: { label: pick('ভিডিও দেখুন', 'Play Video'), url: guide.videoUrl, title: guide.title }
     };
     setAiMessages(prev => [...prev, userMsg, aiMsg]);
     setTimeout(() => {
@@ -196,12 +205,45 @@ const GlobalAIAssistant = () => {
     }
   }, [aiMessages]);
 
-  // ── auto-scroll on every render that adds content ──────────────────────
+  // ── keep the newest message in view ────────────────────────────────────
+  // Scrolls the message list itself. scrollIntoView() scrolled EVERY scrollable
+  // ancestor to reach the end marker — the page behind the chat included — so
+  // with the keyboard up each new message shoved the whole screen around.
+  const scrollToLatest = useCallback(() => {
+    const list = messagesEndRef.current?.parentElement;
+    if (list) list.scrollTop = list.scrollHeight;
+  }, []);
+
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [aiMessages, activeTicket, isTyping, isOpen, view]);
+    scrollToLatest();
+  }, [aiMessages, activeTicket, isTyping, isOpen, view, scrollToLatest]);
+
+  // ── phone: a full screen that behaves like one ─────────────────────────
+  useEffect(() => {
+    const mq = window.matchMedia?.(PHONE_QUERY);
+    if (!mq) return undefined;
+    const onChange = () => setIsPhone(mq.matches);
+    mq.addEventListener?.('change', onChange);
+    return () => mq.removeEventListener?.('change', onChange);
+  }, []);
+
+  // Back closes the chat instead of leaving the page underneath it.
+  useBackGuard(isOpen && isPhone, () => setIsOpen(false));
+
+  useEffect(() => {
+    if (!isOpen || !isPhone) return undefined;
+    // The page behind must not scroll while the chat covers it.
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    // The keyboard shrinks the chat from below. Re-pin to the newest message,
+    // or the one being replied to slides out of view as the keyboard opens.
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', scrollToLatest);
+    return () => {
+      document.body.style.overflow = prev;
+      vv?.removeEventListener('resize', scrollToLatest);
+    };
+  }, [isOpen, isPhone, scrollToLatest]);
 
   // ── load tickets when user opens the Tickets view, and react to admin
   //    replies in real time via the supportService broadcast. ─────────────
@@ -303,7 +345,7 @@ const GlobalAIAssistant = () => {
           // question matches a guide (e.g. "how do I rent a house?"). It renders
           // as a "Watch" button under the reply that opens the video modal.
           videoAction: data.videoGuide?.videoUrl
-            ? { label: `Watch: ${data.videoGuide.title}`, url: data.videoGuide.videoUrl, title: data.videoGuide.title }
+            ? { label: pick(`দেখুন: ${data.videoGuide.title}`, `Watch: ${data.videoGuide.title}`), url: data.videoGuide.videoUrl, title: data.videoGuide.title }
             : undefined,
         }]);
         setUnhelpfulStreak(0); // reset streak on success
@@ -471,7 +513,7 @@ const GlobalAIAssistant = () => {
       setView('ticket');
     } catch (e) {
       console.error('Failed to open ticket:', e);
-      alert('Failed to connect to a human teammate right now.');
+      alert(pick('এই মুহূর্তে সাপোর্ট টিমের সাথে যুক্ত করা যাচ্ছে না।', 'Failed to connect to a human teammate right now.'));
     }
   };
 
@@ -487,21 +529,26 @@ const GlobalAIAssistant = () => {
       refreshActiveTicket();
     } catch (error) {
       console.error('Failed to send message:', error);
-      alert('Failed to send message. Please try again.');
+      alert(pick('মেসেজ পাঠানো যায়নি। আবার চেষ্টা করুন।', 'Failed to send message. Please try again.'));
     } finally {
       setIsTyping(false);
     }
   };
+
+  // Tapping Send (or the mic) took focus off the field, so the keyboard closed,
+  // the chat grew back to full height and the reply landed somewhere else on
+  // screen — people cancelled and started over. Keep focus in the field.
+  const keepKeyboard = (e) => e.preventDefault();
 
   // ── view-mode dispatch for the input form ──────────────────────────────
   const onSubmit = view === 'ticket' ? handleTicketSend : handleAiSend;
   const inputDisabled = view === 'tickets';
   const placeholder =
     view === 'ai'
-      ? 'Ask me anything…'
+      ? pick('যেকোনো কিছু জিজ্ঞেস করুন…', 'Ask me anything…')
       : view === 'ticket'
-      ? 'Type your reply to support…'
-      : 'Open a ticket to start chatting';
+      ? pick('সাপোর্টকে উত্তর লিখুন…', 'Type your reply to support…')
+      : pick('চ্যাট শুরু করতে একটি টিকেট খুলুন', 'Open a ticket to start chatting');
 
   return (
     <div className="font-sans">
@@ -511,13 +558,28 @@ const GlobalAIAssistant = () => {
           bounds="body"
           handle=".drag-header"
           cancel=".no-drag"
+          // A full-screen chat has nowhere to be dragged, and a drag starting on
+          // the header fights the scroll on a touch screen.
+          disabled={isPhone}
         >
           <div
             ref={chatWindowRef}
-            className="fixed bottom-[calc(var(--bottom-nav-h)+1rem)] md:bottom-24 right-4 md:right-8 z-[100] w-[calc(100vw-2rem)] md:w-[400px] h-[600px] max-h-[75vh] md:max-h-[80vh] flex flex-col bg-white/95 backdrop-blur-2xl rounded-[2rem] shadow-[0_30px_80px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.4)] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-10 duration-300"
+            role="dialog"
+            aria-label={pick('TO-LET AI সহকারী', 'TO-LET AI Assistant')}
+            className={isPhone
+              ? 'fixed inset-0 z-[100] flex flex-col bg-white overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200'
+              : 'fixed bottom-24 right-8 z-[100] w-[400px] h-[600px] max-h-[80vh] flex flex-col bg-white/95 backdrop-blur-2xl rounded-[2rem] shadow-[0_30px_80px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.4)] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-10 duration-300'}
+            // On a phone the panel's bottom edge IS the screen's. The native
+            // layer publishes a zero inset while the keyboard is up, so the
+            // field sits right on the keyboard then and clears the navigation
+            // buttons otherwise.
+            style={isPhone ? { paddingBottom: 'var(--sab)' } : undefined}
           >
-            {/* ── header (drag handle) ───────────────────────────────── */}
-            <div className="drag-header cursor-grab active:cursor-grabbing bg-gradient-to-r from-[#ba0036] to-[#d91a4d] p-4 flex items-center justify-between shrink-0 relative overflow-hidden">
+            {/* ── header (drag handle on desktop) ────────────────────── */}
+            <div
+              className={`drag-header ${isPhone ? '' : 'cursor-grab active:cursor-grabbing'} bg-gradient-to-r from-[#ba0036] to-[#d91a4d] p-4 flex items-center justify-between shrink-0 relative overflow-hidden`}
+              style={isPhone ? { paddingTop: 'calc(var(--sat) + 1rem)' } : undefined}
+            >
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
 
               <div className="flex items-center gap-3 relative z-10">
@@ -529,7 +591,7 @@ const GlobalAIAssistant = () => {
                       setActiveTicket(null);
                     }}
                     className="no-drag p-1.5 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
-                    aria-label="Back to tickets"
+                    aria-label={pick('টিকেটে ফিরে যান', 'Back to tickets')}
                   >
                     <ArrowLeft size={16} />
                   </button>
@@ -540,15 +602,15 @@ const GlobalAIAssistant = () => {
                 <div className="flex flex-col min-w-0">
                   <h3 className="font-black text-white text-sm tracking-wide truncate">
                     {view === 'ai'
-                      ? 'TO-LET AI Assistant'
+                      ? pick('TO-LET AI সহকারী', 'TO-LET AI Assistant')
                       : view === 'tickets'
-                      ? 'Your Support Tickets'
-                      : activeTicket?.ticket?.subject || 'Support Conversation'}
+                      ? pick('আপনার সাপোর্ট টিকেট', 'Your Support Tickets')
+                      : activeTicket?.ticket?.subject || pick('সাপোর্ট কথোপকথন', 'Support Conversation')}
                   </h3>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse shadow-[0_0_6px_rgba(74,222,128,0.6)]"></div>
                     <span className="text-[10px] text-white/80 font-medium">
-                      {view === 'ai' ? 'Online & Ready' : 'Connected to support'}
+                      {view === 'ai' ? pick('অনলাইনে আছে', 'Online & Ready') : pick('সাপোর্টের সাথে যুক্ত', 'Connected to support')}
                     </span>
                   </div>
                 </div>
@@ -557,7 +619,7 @@ const GlobalAIAssistant = () => {
               <button
                 onClick={() => setIsOpen(false)}
                 className="no-drag p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors relative z-10"
-                aria-label="Minimize"
+                aria-label={pick('ছোট করুন', 'Minimize')}
               >
                 <Minimize2 size={16} />
               </button>
@@ -574,7 +636,7 @@ const GlobalAIAssistant = () => {
                       : 'text-gray-400 hover:text-gray-600'
                   }`}
                 >
-                  <Bot size={14} /> AI Chat
+                  <Bot size={14} /> {pick('AI চ্যাট', 'AI Chat')}
                 </button>
                 <button
                   onClick={() => setView('tickets')}
@@ -584,7 +646,7 @@ const GlobalAIAssistant = () => {
                       : 'text-gray-400 hover:text-gray-600'
                   }`}
                 >
-                  <Inbox size={14} /> My Tickets
+                  <Inbox size={14} /> {pick('আমার টিকেট', 'My Tickets')}
                   {tickets.filter((t) => t.status === 'open' || t.status === 'pending_user').length > 0 && (
                     <span className="ml-1 bg-[#ba0036] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
                       {tickets.filter((t) => t.status === 'open' || t.status === 'pending_user').length}
@@ -594,21 +656,11 @@ const GlobalAIAssistant = () => {
               </div>
             )}
 
-            {/* ── ad slot (AI view only) ─────────────────────────────── */}
-            {view === 'ai' && (
-              <div className="bg-gradient-to-r from-orange-50 to-red-50 shadow-[0_2px_6px_rgba(0,0,0,0.03)] p-2.5 flex items-center justify-between shrink-0 relative z-10">
-                <div className="flex items-center gap-2">
-                  <TrendingUp size={14} className="text-orange-600" />
-                  <span className="text-[10px] font-bold text-gray-700 uppercase tracking-widest">Sponsored</span>
-                </div>
-                <a href="#" className="text-[10px] font-black text-[#ba0036] hover:underline flex items-center gap-1">
-                  Get 20% off Premium <ExternalLink size={10} />
-                </a>
-              </div>
-            )}
-
             {/* ── content area ────────────────────────────────────────── */}
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 custom-scrollbar bg-[#f8f9fa]/50">
+            {/* min-h-0: without it a flex child refuses to shrink below its
+                content, so the keyboard pushed the input row off screen instead
+                of shortening the list. */}
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 flex flex-col gap-4 custom-scrollbar bg-[#f8f9fa]/50">
               {view === 'ai' && (
                 <>
                   {aiMessages.map((msg) => (
@@ -670,7 +722,7 @@ const GlobalAIAssistant = () => {
                             <AiPropertyCard
                               key={p.id}
                               property={p}
-                              onOpen={() => { navigate(`/property/${p.id}`); setIsOpen(false); }}
+                              onOpen={() => { navigate(propertyPath(p)); setIsOpen(false); }}
                             />
                           ))}
                         </div>
@@ -693,22 +745,22 @@ const GlobalAIAssistant = () => {
                           <Headphones size={16} />
                         </div>
                         <div className="flex-1">
-                          <h4 className="text-sm font-black text-gray-900">Want a real human?</h4>
+                          <h4 className="text-sm font-black text-gray-900">{pick('মানুষের সাথে কথা বলতে চান?', 'Want a real human?')}</h4>
                           <p className="text-xs font-medium text-gray-600 mt-1">
-                            We&apos;ll attach this whole conversation so you don&apos;t have to repeat yourself.
+                            {pick('পুরো কথোপকথনটি সাথে পাঠিয়ে দেব, আবার বলতে হবে না।', 'We\'ll attach this whole conversation so you don\'t have to repeat yourself.')}
                           </p>
                           <div className="flex gap-2 mt-3">
                             <button
                               onClick={handleHandoff}
                               className="flex-1 bg-[#ba0036] hover:bg-[#d4004a] text-white px-4 py-2 rounded-xl text-xs font-black shadow-[0_4px_12px_rgba(186,0,54,0.25)] transition-colors"
                             >
-                              Talk to a human
+                              {pick('সাপোর্ট টিমের সাথে কথা বলুন', 'Talk to a human')}
                             </button>
                             <button
                               onClick={() => setShowHandoffCta(false)}
                               className="px-3 py-2 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 transition-colors"
                             >
-                              Not now
+                              {pick('এখন না', 'Not now')}
                             </button>
                           </div>
                         </div>
@@ -723,9 +775,9 @@ const GlobalAIAssistant = () => {
                   {!isAuthenticated && (
                     <div className="bg-white rounded-2xl p-6 text-center shadow-sm">
                       <ShieldCheck size={32} className="text-gray-300 mx-auto mb-3" />
-                      <h4 className="font-black text-gray-900 text-sm">Sign in to see your tickets</h4>
+                      <h4 className="font-black text-gray-900 text-sm">{pick('টিকেট দেখতে সাইন ইন করুন', 'Sign in to see your tickets')}</h4>
                       <p className="text-xs font-medium text-gray-500 mt-1">
-                        We keep a record of every support conversation under your account.
+                        {pick('প্রতিটি সাপোর্ট কথোপকথন আপনার অ্যাকাউন্টে সংরক্ষিত থাকে।', 'We keep a record of every support conversation under your account.')}
                       </p>
                       <button
                         onClick={() => {
@@ -734,22 +786,22 @@ const GlobalAIAssistant = () => {
                         }}
                         className="mt-4 bg-[#ba0036] text-white px-5 py-2 rounded-xl text-xs font-black shadow-[0_4px_12px_rgba(186,0,54,0.2)]"
                       >
-                        Sign in
+                        {pick('সাইন ইন', 'Sign in')}
                       </button>
                     </div>
                   )}
                   {isAuthenticated && tickets.length === 0 && (
                     <div className="bg-white rounded-2xl p-6 text-center shadow-sm">
                       <Inbox size={32} className="text-gray-300 mx-auto mb-3" />
-                      <h4 className="font-black text-gray-900 text-sm">No tickets yet</h4>
+                      <h4 className="font-black text-gray-900 text-sm">{pick('এখনও কোনো টিকেট নেই', 'No tickets yet')}</h4>
                       <p className="text-xs font-medium text-gray-500 mt-1">
-                        Ask the AI a question first — if it can&apos;t help, you can hand off to a human.
+                        {pick('আগে AI-কে জিজ্ঞেস করুন — সমাধান না হলে সাপোর্ট টিমের কাছে পাঠাতে পারবেন।', 'Ask the AI a question first — if it can\'t help, you can hand off to a human.')}
                       </p>
                       <button
                         onClick={() => setView('ai')}
                         className="mt-4 bg-gray-900 text-white px-5 py-2 rounded-xl text-xs font-black"
                       >
-                        Open AI Chat
+                        {pick('AI চ্যাট খুলুন', 'Open AI Chat')}
                       </button>
                     </div>
                   )}
@@ -771,7 +823,7 @@ const GlobalAIAssistant = () => {
                         </div>
                         <p className="text-[11px] font-medium text-gray-500 flex items-center gap-1">
                           <Clock size={11} />
-                          {timeAgo(t.updatedAt)}
+                          {timeAgo(t.updatedAt, uiLang === 'bn')}
                           {t.assignedAdminName && (
                             <>
                               <span className="mx-1">•</span>
@@ -793,7 +845,7 @@ const GlobalAIAssistant = () => {
                     <div className="self-stretch bg-green-50 border border-green-200 rounded-2xl p-3 text-center">
                       <CheckCircle2 size={16} className="text-green-600 inline-block mr-1.5" />
                       <span className="text-xs font-black text-green-700 uppercase tracking-widest">
-                        Resolved by {activeTicket.ticket.assignedAdminName ?? 'Support'}
+                        {pick(`${activeTicket.ticket.assignedAdminName ?? 'সাপোর্ট'} সমাধান করেছেন`, `Resolved by ${activeTicket.ticket.assignedAdminName ?? 'Support'}`)}
                       </span>
                     </div>
                   )}
@@ -827,10 +879,11 @@ const GlobalAIAssistant = () => {
                   {micAvailable && view === 'ai' && (
                     <button
                       type="button"
+                      onMouseDown={keepKeyboard}
                       onClick={toggleVoice}
                       disabled={inputDisabled || isTyping || isTranscribing}
                       title={isListening ? 'শোনা বন্ধ করুন' : isTranscribing ? 'রূপান্তর হচ্ছে…' : 'বাংলায় বলুন'}
-                      aria-label={isListening ? 'Stop listening' : 'Speak in Bengali'}
+                      aria-label={isListening ? pick('শোনা বন্ধ করুন', 'Stop listening') : pick('বাংলায় বলুন', 'Speak in Bengali')}
                       className={`p-2.5 rounded-xl transition-all shrink-0 flex items-center justify-center ${
                         isListening
                           ? 'bg-[#ba0036] text-white shadow-[0_4px_12px_rgba(186,0,54,0.3)] animate-pulse'
@@ -841,15 +894,20 @@ const GlobalAIAssistant = () => {
                     </button>
                   )}
                   <input
+                    ref={inputRef}
                     type="text"
+                    enterKeyHint="send"
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                     placeholder={isListening ? 'শুনছি... এখন বলুন' : isTranscribing ? 'রূপান্তর হচ্ছে…' : placeholder}
                     disabled={inputDisabled}
-                    className="flex-1 bg-transparent border-none outline-none text-sm font-medium text-gray-900 placeholder-gray-400 px-3 py-2 disabled:opacity-50"
+                    // 16px on phones: iOS zooms the whole page into any field
+                    // smaller than that the moment it is focused.
+                    className="flex-1 min-w-0 bg-transparent border-none outline-none text-base md:text-sm font-medium text-gray-900 placeholder-gray-400 px-3 py-2 disabled:opacity-50"
                   />
                   <button
                     type="submit"
+                    onMouseDown={keepKeyboard}
                     disabled={!inputText.trim() || isTyping || inputDisabled}
                     className={`p-2.5 rounded-xl transition-all shrink-0 flex items-center justify-center ${
                       inputText.trim() && !isTyping && !inputDisabled
@@ -863,8 +921,8 @@ const GlobalAIAssistant = () => {
                 <div className="text-center mt-2">
                   <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
                     {view === 'ai'
-                      ? 'AI responses may not always be 100% accurate'
-                      : 'You\'re chatting with a human teammate'}
+                      ? pick('AI-এর উত্তর সবসময় ১০০% সঠিক নাও হতে পারে', 'AI responses may not always be 100% accurate')
+                      : pick('আপনি আমাদের টিমের একজনের সাথে চ্যাট করছেন', "You're chatting with a human teammate")}
                   </span>
                 </div>
                 </div>
@@ -884,7 +942,7 @@ const GlobalAIAssistant = () => {
             e.preventDefault();
             setIsOpen(true);
           }}
-          aria-label="Open AI assistant"
+          aria-label={pick('AI সহকারী খুলুন', 'Open AI assistant')}
           // This used to be a literal 110-pixel offset — a guess at "64px rail
           // plus a gap". It holds only while the gesture inset is ~24px:
           // --bottom-nav-h is 64px PLUS that inset, so on a phone with a 48px
@@ -958,6 +1016,7 @@ const AiPropertyCard = ({ property, onOpen }) => {
 
 
 const TicketStatusPill = ({ status }) => {
+  const isBn = useIsBn();
   const styles = {
     open: 'bg-blue-50 text-blue-600',
     pending_user: 'bg-amber-50 text-amber-700',
@@ -965,10 +1024,10 @@ const TicketStatusPill = ({ status }) => {
     closed: 'bg-gray-100 text-gray-500',
   };
   const label = {
-    open: 'Open',
-    pending_user: 'Awaiting you',
-    resolved: 'Resolved',
-    closed: 'Closed',
+    open: isBn ? 'খোলা' : 'Open',
+    pending_user: isBn ? 'আপনার উত্তরের অপেক্ষায়' : 'Awaiting you',
+    resolved: isBn ? 'সমাধান হয়েছে' : 'Resolved',
+    closed: isBn ? 'বন্ধ' : 'Closed',
   };
   return (
     <span
@@ -982,6 +1041,7 @@ const TicketStatusPill = ({ status }) => {
 };
 
 const TicketMessageBubble = ({ message, myUserId }) => {
+  const isBn = useIsBn();
   if (message.author === 'system') {
     return (
       <div className="self-center bg-gray-100 text-gray-500 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full">
@@ -1005,12 +1065,12 @@ const TicketMessageBubble = ({ message, myUserId }) => {
       </div>
       <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1 px-1">
         {message.author === 'admin'
-          ? `Support · ${message.authorName ?? 'Team'}`
+          ? (isBn ? `সাপোর্ট · ${message.authorName ?? 'টিম'}` : `Support · ${message.authorName ?? 'Team'}`)
           : mine
-          ? 'You'
+          ? (isBn ? 'আপনি' : 'You')
           : message.authorName}
         {' · '}
-        {timeAgo(message.createdAt)}
+        {timeAgo(message.createdAt, isBn)}
       </span>
     </div>
   );
@@ -1018,16 +1078,16 @@ const TicketMessageBubble = ({ message, myUserId }) => {
 
 // ─── helpers ────────────────────────────────────────────────────────────
 
-function timeAgo(iso) {
+function timeAgo(iso, isBn = false) {
   if (!iso) return '';
   const ms = Date.now() - new Date(iso).getTime();
-  if (ms < 60_000) return 'just now';
+  if (ms < 60_000) return isBn ? 'এইমাত্র' : 'just now';
   const min = Math.floor(ms / 60_000);
-  if (min < 60) return `${min}m ago`;
+  if (min < 60) return isBn ? `${min} মিনিট আগে` : `${min}m ago`;
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return isBn ? `${hr} ঘণ্টা আগে` : `${hr}h ago`;
   const day = Math.floor(hr / 24);
-  return `${day}d ago`;
+  return isBn ? `${day} দিন আগে` : `${day}d ago`;
 }
 
 export default GlobalAIAssistant;

@@ -126,7 +126,7 @@ export default function LocationBar({ location, precise, asking, onUseGps, onPic
             className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
             onClick={() => setOpen(false)}
           />
-          <div className="relative w-full sm:max-w-md bg-white rounded-t-[1.75rem] sm:rounded-[1.75rem] max-h-[80vh] flex flex-col shadow-2xl">
+          <div className="relative w-full sm:max-w-md bg-white rounded-t-[1.75rem] sm:rounded-[1.75rem] max-h-[80vh] flex flex-col shadow-2xl pb-safe sm:pb-0">
             <div className="p-4 border-b border-gray-100 flex items-center gap-2">
               <div className="flex-1 flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
                 <Search size={15} className="text-gray-400 shrink-0" />
