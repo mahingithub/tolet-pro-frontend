@@ -872,9 +872,18 @@ const GlobalAIAssistant = () => {
                   </div>
                 )}
                 <div className="p-3 pt-2">
+                {/* The focus indicator lives HERE, on the rounded pill, not on
+                    the bare <input> inside it. index.css hands every field a
+                    brand :focus-visible outline, and a text input matches
+                    :focus-visible even when it was focused by TOUCH — so on a
+                    phone, tapping to type drew a hard square crimson rectangle
+                    straight through the rounded composer. Moving the ring out
+                    to the container keeps focus just as visible (more so — the
+                    old /10 tint was barely there) and lets it follow the
+                    corner radius instead of cutting across it. */}
                 <form
                   onSubmit={onSubmit}
-                  className="flex items-center bg-[#f4f7fb] rounded-2xl p-1.5 shadow-inner focus-within:ring-2 focus-within:ring-[#ba0036]/10 transition-all"
+                  className="flex items-center bg-[#f4f7fb] rounded-2xl p-1.5 shadow-inner ring-1 ring-transparent focus-within:ring-2 focus-within:ring-[#ba0036]/40 transition-all"
                 >
                   {micAvailable && view === 'ai' && (
                     <button
@@ -903,7 +912,11 @@ const GlobalAIAssistant = () => {
                     disabled={inputDisabled}
                     // 16px on phones: iOS zooms the whole page into any field
                     // smaller than that the moment it is focused.
-                    className="flex-1 min-w-0 bg-transparent border-none outline-none text-base md:text-sm font-medium text-gray-900 placeholder-gray-400 px-3 py-2 disabled:opacity-50"
+                    // focus-visible:outline-none is the half that actually wins:
+                    // plain `outline-none` ties with the global :focus-visible
+                    // rule in index.css on specificity and loses on source
+                    // order. The form around it carries the focus ring.
+                    className="flex-1 min-w-0 bg-transparent border-none outline-none focus:outline-none focus-visible:outline-none text-base md:text-sm font-medium text-gray-900 placeholder-gray-400 px-3 py-2 disabled:opacity-50"
                   />
                   <button
                     type="submit"

@@ -90,7 +90,7 @@ export default function QuickReplyToast({
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); send(); } }}
               placeholder={labels.placeholder || 'Reply…'}
-              className="flex-1 min-w-0 bg-transparent outline-none text-[13px] font-medium text-gray-800 placeholder:text-gray-400"
+              className="flex-1 min-w-0 bg-transparent outline-none focus:outline-none focus-visible:outline-none text-[13px] font-medium text-gray-800 placeholder:text-gray-400"
             />
             <button
               onClick={send}

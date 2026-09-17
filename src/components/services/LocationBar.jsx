@@ -128,14 +128,14 @@ export default function LocationBar({ location, precise, asking, onUseGps, onPic
           />
           <div className="relative w-full sm:max-w-md bg-white rounded-t-[1.75rem] sm:rounded-[1.75rem] max-h-[80vh] flex flex-col shadow-2xl pb-safe sm:pb-0">
             <div className="p-4 border-b border-gray-100 flex items-center gap-2">
-              <div className="flex-1 flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
+              <div className="flex-1 flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5 ring-1 ring-transparent focus-within:ring-2 focus-within:ring-[#ba0036]/25 transition-all">
                 <Search size={15} className="text-gray-400 shrink-0" />
                 <input
                   autoFocus
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder={bn ? 'থানা খুঁজুন' : 'Search thana'}
-                  className="flex-1 bg-transparent outline-none text-sm font-bold text-gray-900 placeholder:text-gray-400 placeholder:font-medium"
+                  className="flex-1 bg-transparent outline-none focus:outline-none focus-visible:outline-none text-sm font-bold text-gray-900 placeholder:text-gray-400 placeholder:font-medium"
                 />
               </div>
               <button

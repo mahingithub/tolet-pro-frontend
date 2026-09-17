@@ -296,7 +296,7 @@ const LandlordOnboardingModal = ({ open, onClose, onSuccess }) => {
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-[#ba0036] mb-2 flex items-center gap-1.5">
                   <MapPin size={11} /> {isBn ? 'প্রপার্টির ঠিকানা' : 'Property Address'}
                 </h3>
-                <div className="rounded-2xl bg-gray-50/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_2px_8px_rgba(0,0,0,0.02)] p-4">
+                <div className="rounded-2xl bg-gray-50/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_2px_8px_rgba(0,0,0,0.02)] p-4 ring-1 ring-transparent focus-within:ring-2 focus-within:ring-[#ba0036]/25 transition-shadow">
                   <textarea
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
@@ -304,7 +304,7 @@ const LandlordOnboardingModal = ({ open, onClose, onSuccess }) => {
                       ? 'যেমন: বাড়ি #১২, রোড #৭, ধানমন্ডি, ঢাকা'
                       : 'e.g. House #12, Road #7, Dhanmondi, Dhaka'}
                     rows={2}
-                    className="w-full bg-transparent outline-none text-sm font-bold text-gray-800 placeholder:text-gray-400 resize-none"
+                    className="w-full bg-transparent outline-none focus:outline-none focus-visible:outline-none text-sm font-bold text-gray-800 placeholder:text-gray-400 resize-none"
                   />
                 </div>
                 <p className="text-[11px] font-bold text-gray-400 mt-1.5">

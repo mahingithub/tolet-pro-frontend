@@ -144,6 +144,9 @@ function startRefresh(originalFetch) {
   });
 }
 
+// Writes need an account; reads do not. See utils/guestSave.js.
+import { requireLoginToSave } from './guestSave';
+
 export function setupFetchInterceptor() {
   const originalFetch = window.fetch;
 
@@ -159,6 +162,21 @@ export function setupFetchInterceptor() {
       if (!init.credentials) {
         init.credentials = 'include';
       }
+    }
+
+    // "Sign in to save". A guest in the installed app reads freely — the host
+    // dashboard, the rent ledger, the wizard are all browsable — but anything
+    // that would be STORED needs the account it would be stored under. The auth
+    // endpoints are how they get that account, so those always go through.
+    // Nothing leaves the phone here: guestSave raises the ask and we answer the
+    // caller ourselves.
+    const method = String(init?.method || (typeof input !== 'string' && input?.method) || 'GET').toUpperCase();
+    const isWrite = !['GET', 'HEAD', 'OPTIONS'].includes(method);
+    if (isApiRequest && isWrite && !url.includes('/auth/') && !requireLoginToSave()) {
+      return new Response(
+        JSON.stringify({ error: 'login_required', message: 'সেভ করতে লগইন করুন' }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } },
+      );
     }
 
     const response = await originalFetch(input, init);

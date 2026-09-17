@@ -23,13 +23,16 @@ import { needsBookingLookup, resolveHome } from './utils/homeSurface';
 import { hasCachedSettings } from './services/settingsService';
 import {
 	NATIVE_START_PATH,
+	NATIVE_WELCOME_PATH,
 	experienceForRole,
 	getNativeExperience,
 	getNativeHome,
 	inferNativeExperience,
 	isNativeApp,
+	modeForSurface,
 	roleMatchesExperience,
 	saveNativeExperience,
+	surfaceForMode,
 } from './utils/nativeExperience';
 
 // ─── CRITICAL SHELL — static, loads with the entry chunk ────────────────────
@@ -52,6 +55,9 @@ const GlobalAIAssistant = lazyRoute(() => import("./components/GlobalAIAssistant
 const WelcomeRobotOverlay = lazyRoute(() => import("./components/WelcomeRobotOverlay"), "WelcomeRobotOverlay");
 const HomeIntentModal = lazyRoute(() => import("./components/HomeIntentModal"), "HomeIntentModal");
 const GlobalToaster = lazyRoute(() => import("./components/GlobalToaster"), "GlobalToaster");
+// The app's one "sign in to save" ask. Raised from utils/guestSave.js wherever
+// a signed-out visitor tries to write something.
+const GuestLoginPrompt = lazyRoute(() => import("./components/native/GuestLoginPrompt"), "GuestLoginPrompt");
 // Tells an installed user a newer Play Store build exists. Lazy: it does
 // nothing for the first few seconds and nothing at all on the web.
 const UpdateGate = lazyRoute(() => import("./components/UpdateGate"), "UpdateGate");
@@ -113,10 +119,10 @@ const MyServiceOrders   = lazyRoute(() => import("./components/services/MyServic
 const HowItWorks       = lazyRoute(() => import("./components/HowItWorks"), "HowItWorks");
 const JoinPropertyPage = lazyRoute(() => import("./components/JoinPropertyPage"), "JoinPropertyPage");
 const CampaignRedirect = lazyRoute(() => import("./components/CampaignRedirect"), "CampaignRedirect");
-// Installed app only: the first-run "who are you?" screen, and what a signed-out
-// landlord sees instead of a login wall. See utils/nativeExperience.js.
+// Installed app only: the first-run "who are you?" screen. A signed-out
+// landlord gets the real dashboard instead of a preview — see the route below
+// and utils/guestSave.js for where the login is actually asked for.
 const NativeStart       = lazyRoute(() => import("./components/native/NativeStart"), "NativeStart");
-const NativeHostPreview = lazyRoute(() => import("./components/native/NativeHostPreview"), "NativeHostPreview");
 
 // --- SEO landing pages ---
 // Public, content-rich pages for the half of the product that lives behind a
@@ -203,7 +209,7 @@ const AppLayout = () => {
 	const navigate = useNavigate();
 	const { isAuthenticated, activeRole, roles } = useAuth();
 	const { language } = useLanguage();
-	const { settings, loading: settingsLoading } = useSettings();
+	const { settings, loading: settingsLoading, update: updateSettings } = useSettings();
 	const defaultHome = settings?.app?.defaultHome || 'auto';
 	// Captured once, at mount: did this device already have the user's settings?
 	// See the boot effect below for why the distinction matters.
@@ -265,11 +271,17 @@ const AppLayout = () => {
 	// `defaultHome` normally comes off the settings CACHE, which SettingsProvider
 	// hydrates synchronously — so a returning user is redirected on the first
 	// frame, with no flash of the public homepage.
-	// ── Installed app: open on the choice made at /app/start ──────────────
-	// The app asks "who are you?" before anything else and then always opens on
-	// that answer — signed in or not. It is a device preference kept apart from
-	// the website's defaultHome (see utils/nativeExperience.js), so the web
-	// effect below stands down inside the app.
+	// ── Installed app: open on the side this phone is set up for ──────────
+	// Once there IS an experience the app always opens on it — signed in or not.
+	// It is a device preference kept apart from the website's defaultHome (see
+	// utils/nativeExperience.js), so the web effect below stands down inside
+	// the app.
+	//
+	// With nothing stored, a FIRST run goes to /welcome: what the app does, and
+	// one phone number. It deliberately does not ask which side they are on —
+	// an account already answers that (see LoginPage's `knownUser`), and a new
+	// one answers it inside signup. /app/start still asks, for the person who
+	// goes there from Profile to change how they use the app.
 	//
 	// The session restores synchronously from cache, so a signed-in user is
 	// known on the first render. One who was signed in before this screen
@@ -286,9 +298,12 @@ const AppLayout = () => {
 		let experience = getNativeExperience();
 		if (!experience && isAuthenticated) {
 			const inferred = inferNativeExperience({ activeRole, defaultHome });
-			if (inferred) experience = saveNativeExperience(inferred.role, inferred.mode);
+			// 'account': worked out from the account rather than answered here, so
+			// the account's own saved home may still correct it (see the mirror
+			// effect below). A choice made on /app/start is never overwritten.
+			if (inferred) experience = saveNativeExperience(inferred.role, inferred.mode, 'account');
 		}
-		const to = experience ? getNativeHome(experience) : NATIVE_START_PATH;
+		const to = experience ? getNativeHome(experience) : NATIVE_WELCOME_PATH;
 		if (to !== '/') navigate(to, { replace: true });
 	}, [isAuthenticated, activeRole, defaultHome, location.pathname, navigate]);
 
@@ -311,8 +326,37 @@ const AppLayout = () => {
 		const experience = getNativeExperience();
 		if (!experience || roleMatchesExperience(experience, activeRole)) return;
 		const next = experienceForRole(activeRole, { defaultHome, previous: experience });
-		if (next) saveNativeExperience(next.role, next.mode);
+		if (next) saveNativeExperience(next.role, next.mode, 'account');
 	}, [isAuthenticated, activeRole, defaultHome]);
+
+	// ── The choice follows the person, not just the phone ─────────────────
+	// Living on the device is the right default — it works signed out, which is
+	// the whole point of /app/start. But a returning user on a NEW phone (or
+	// after a reinstall) has nothing on the device at all, which is how an old
+	// user ends up being asked "who are you?" like a stranger.
+	//
+	// So the two directions:
+	//   • They answered it themselves ('chosen') → mirror it onto the account's
+	//     "open the app on" setting, and it is waiting for them on the next phone.
+	//   • We guessed it from the account ('account') → step aside as soon as the
+	//     account's own saved home arrives. A choice they made is never
+	//     overwritten this way.
+	useEffect(() => {
+		if (!isNativeApp() || !isAuthenticated || settingsLoading) return;
+		const experience = getNativeExperience();
+		if (!experience) return;
+		if (experience.source === 'account') {
+			const saved = modeForSurface(defaultHome);
+			if (experience.role === 'tenant' && saved && saved !== experience.mode) {
+				saveNativeExperience('tenant', saved, 'account');
+			}
+			return;
+		}
+		const surface = surfaceForMode(experience.mode);
+		// Fire-and-forget: the device already renders from its own copy, so a
+		// failed write costs this session nothing and is retried on the next change.
+		if (surface && surface !== defaultHome) updateSettings({ app: { defaultHome: surface } }).catch(() => {});
+	}, [isAuthenticated, defaultHome, settingsLoading, updateSettings]);
 
 	const bootHandled = useRef(false);
 	useEffect(() => {
@@ -364,7 +408,9 @@ const AppLayout = () => {
 	// Hide the marketing Navbar on dashboards, auth, admin, and the privacy center
 	// (the privacy center has its own header with a back button).
 	const hideNavbarRoutes = [
-		// The app's first-run question is a full screen of its own.
+		// The app's first screen, and the "change how I use the app" questions,
+		// are each a full screen of their own.
+		NATIVE_WELCOME_PATH,
 		NATIVE_START_PATH,
 		"/tenant-dashboard",
 		"/host-dashboard",
@@ -457,6 +503,15 @@ const AppLayout = () => {
 				<Route path="/property/:id" element={<PropertyDetails />} />
 				<Route path="/inquire/:id" element={<InquiryPage />} />
 				<Route path="/login" element={<LoginPage />} />
+				{/* The app's first screen IS the login screen, with the carousel
+				    above it — same component, so the phone, country, OTP and
+				    session handling cannot drift between the two. The website
+				    has no first run, and two URLs for one auth form is a
+				    duplicate for search engines, so it goes to /login. */}
+				<Route
+					path={NATIVE_WELCOME_PATH}
+					element={isNativeApp() ? <LoginPage /> : <Navigate to="/login" replace />}
+				/>
 
 				{/* Tenant self-onboarding — the screen a landlord's invite QR opens.
 				    PUBLIC on purpose: the link lands on phones with no account yet,
@@ -520,10 +575,13 @@ const AppLayout = () => {
 				<Route
 					path="/host-dashboard"
 					element={
-						// A signed-out landlord in the app looks around first, and every
-						// action on the preview is the login. The website keeps its wall.
+						// A signed-out landlord in the app gets the REAL dashboard, empty:
+						// the rent ledger, bookings and properties are the product, and a
+						// preview card cannot explain them. Their own data needs an
+						// account, so the lists come back empty and every write raises the
+						// "sign in to save" ask. The website keeps its wall.
 						isNativeApp() && !isAuthenticated ? (
-							<NativeHostPreview />
+							<HostDashboard />
 						) : (
 							<RequireAuth requireRole="landlord">
 								<HostDashboard />
@@ -534,9 +592,17 @@ const AppLayout = () => {
 				<Route
 					path="/list-property"
 					element={
-						<RequireAuth requireRole="landlord">
+						// In the app a guest walks the whole wizard and only meets the
+						// login at PUBLISH — AddProperty parks the draft, sends them to
+						// login and republishes on the way back (?resume=1). The website
+						// keeps its wall.
+						isNativeApp() ? (
 							<AddProperty />
-						</RequireAuth>
+						) : (
+							<RequireAuth requireRole="landlord">
+								<AddProperty />
+							</RequireAuth>
+						)
 					}
 				/>
 				<Route path="/messages" element={<ChatSystem />} />
@@ -625,11 +691,16 @@ const AppLayout = () => {
 			    an overlay — a spinner for a floating button would be worse than
 			    the button simply appearing a moment later. */}
 			<Suspense fallback={null}>
-				<ThemeWidget />
+				{/* Website only. The app is locked to one scheme (see
+				    SettingsContext.resolveTheme), so a floating light/dark/system
+				    switcher there is a control that changes nothing — and it sat
+				    on top of every screen to do it. */}
+				{!isNativeApp() && <ThemeWidget />}
 				<GlobalCallUI />
 				<WelcomeRobotOverlay />
 				<HomeIntentModal />
 				<GlobalToaster />
+				<GuestLoginPrompt />
 				<UpdateGate />
 				{!shouldHideAIAssistant && <GlobalAIAssistant />}
 			</Suspense>
@@ -637,7 +708,12 @@ const AppLayout = () => {
 			    clutter, and Living already carries its own — the module pills
 			    below the header switch modules, and the header avatar goes to
 			    the dashboard — so the rail only added a second competing bar. */}
-			<MobileBottomNav hideOnRoutes={['/login', '/list-property', '/properties/', '/living', NATIVE_START_PATH]} />
+			{/* '/living' keeps the rail hidden everywhere: the ledger carries its
+			    own module pills, and the generic tabs (Explore, Messages) are not
+			    what someone keeping accounts needs under them. The way OUT of the
+			    ledger is a Home button in Living's own header — without it, a
+			    tenant whose home IS the ledger had no route back to the homepage. */}
+			<MobileBottomNav hideOnRoutes={['/login', NATIVE_WELCOME_PATH, '/list-property', NATIVE_START_PATH, '/living', '/properties/']} />
 			<Suspense fallback={null}>
 				<FeedbackButton />
 			</Suspense>

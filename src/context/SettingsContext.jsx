@@ -3,6 +3,7 @@ import React, {
   useMemo, useRef, useState, useCallback,
 } from 'react';
 import { useAuth } from './AuthContext.jsx';
+import { isInsideNativeApp } from '../hooks/useAppInstall';
 import {
   DEFAULT_SETTINGS,
   getCachedSettings,
@@ -33,6 +34,12 @@ const SettingsContext = createContext(null);
 // ─── Global side-effect appliers ────────────────────────────────────────────
 
 function resolveTheme(theme) {
+  // The APP is one scheme, deliberately. A light surface, always, on every
+  // screen — so the product has a single look to design against instead of two
+  // that have to be checked, and nobody lands on a half-converted screen after
+  // flipping a switch. The WEBSITE keeps the choice: on a desktop browser the
+  // theme is the reader's, not ours.
+  if (isInsideNativeApp()) return 'light';
   if (theme === 'light' || theme === 'dark') return theme;
   // 'system' → follow the OS preference.
   const prefersDark =

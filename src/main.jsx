@@ -7,6 +7,7 @@ import './index.css'
 import { setupFetchInterceptor } from './utils/fetchInterceptor.js'
 import { installDigitInput } from './utils/digits.js'
 import { preventIosInputZoom } from './utils/iosViewport.js'
+import { installFocusModality } from './utils/focusModality.js'
 
 // iPhone zooms the page in on every tap into a 14px field, and out again as
 // focus moves — the "screen keeps zooming while I type" bug. iOS only; see
@@ -18,6 +19,11 @@ setupFetchInterceptor()
 
 // ১০১ typed into any numeric field arrives in React as 101 — see utils/digits.js.
 installDigitInput()
+
+// Marks <html> while the user is tabbing, so the focus ring in index.css can
+// fire for keyboard users without painting on every tap into a text field.
+// Registered before render, so before any field can take focus.
+installFocusModality()
 
 // ─── Sentry: frontend error tracking (Phase 7) ─────────────────────────────
 // DSN comes from VITE_SENTRY_DSN (set it on Vercel). If unset, Sentry stays

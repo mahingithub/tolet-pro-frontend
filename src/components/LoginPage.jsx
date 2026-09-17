@@ -1,22 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import useGoBack from '../hooks/useGoBack';
+import WelcomeCarousel from './native/WelcomeCarousel.jsx';
 import {
   User, Phone, Lock, ArrowLeft, Loader2, CheckCircle2,
   Home, ShieldCheck, Building2, MessageCircle, ChevronRight,
-  Check, AlertCircle, ChevronDown,
+  Check, AlertCircle, ChevronDown, Smartphone, Eye, EyeOff,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useSettings } from '../context/SettingsContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
 import { resolveHome } from '../utils/homeSurface';
-import { getNativeExperience, getNativeHome, isNativeApp, safeAppPath } from '../utils/nativeExperience.js';
+import { NATIVE_START_PATH, NATIVE_WELCOME_PATH, experienceForRole, getNativeExperience, getNativeHome, inferNativeExperience, isNativeApp, safeAppPath, saveNativeExperience } from '../utils/nativeExperience.js';
 import {
   signupStart,
   forgotPassword,
   resetPassword,
 } from '../services/authService.js';
 import { createPhoneVerification, phoneAuthErrorMessage } from '../services/firebasePhoneAuth.js';
+import { isPhoneHintSupported, phoneHintAvailable, requestPhoneHint } from '../plugins/phoneHint.js';
 import { passwordChecks } from '../utils/validators.js';
 import { toAsciiDigits } from '../utils/digits.js';
 import {
@@ -62,7 +64,11 @@ function phoneProblem(local, country) {
     const left = country.min - local.length;
     return {
       en: `Too short — ${left} more digit${left > 1 ? 's' : ''} to go. Example: ${country.example}`,
-      bn: `আরও ${left}টি সংখ্যা বাকি। যেমন: ${toBnDigits(country.example)}`,
+      // The count is a Bengali numeral like every other number in this sentence.
+      // It was the one digit here that stayed Latin, so the line read
+      // "আরও 5টি সংখ্যা বাকি। যেমন: ১৭১২৩৪৫৬৭৮" — two numbering systems, one
+      // sentence, in the message telling someone their number is wrong.
+      bn: `আরও ${toBnDigits(String(left))}টি সংখ্যা বাকি। যেমন: ${toBnDigits(country.example)}`,
     };
   }
   if (!country.mobile.test(local)) {
@@ -93,34 +99,87 @@ function phoneProblem(local, country) {
  *
  * Shown in a tinted box with an example, because people skimmed past the old
  * grey list and only met the rules as an error. It turns green once all pass.
+ *
+ * `compact` lays the same three rules across the box instead of down it and
+ * folds the example into the heading. It is for the APP, where the whole signup
+ * has to fit one screen with no scrolling — the website has the room for the
+ * fuller wording and keeps it.
  */
-const PasswordRules = ({ checks, isBn, title }) => {
+/**
+ * Show/hide for a password field.
+ *
+ * Typing a password you cannot see, on a phone keyboard, in a script whose
+ * keyboard people switch away from to reach `a-z` and `0-9`, is how a signup
+ * ends in "wrong password" twice and then not at all. It sits INSIDE the field's
+ * relative wrapper, so the field needs pr-12 to keep text out from under it.
+ *
+ * It is a button, not a checkbox, and it is never a submit: an Enter press in
+ * the field must still send the form, not flip the mask.
+ */
+const RevealButton = ({ shown, onToggle, isBn, disabled = false }) => (
+  <button
+    type="button"
+    onClick={onToggle}
+    disabled={disabled}
+    aria-pressed={shown}
+    aria-label={shown
+      ? (isBn ? 'পাসওয়ার্ড লুকান' : 'Hide password')
+      : (isBn ? 'পাসওয়ার্ড দেখুন' : 'Show password')}
+    className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-xl text-gray-400 transition-colors hover:text-brandRed disabled:opacity-50"
+  >
+    {shown ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
+  </button>
+);
+
+/**
+ * Wide letter spacing suits a row of mask dots and nothing else — on revealed
+ * text it reads as a typo, and on a Bangla placeholder it pulls the conjuncts
+ * apart. So it applies only while there are dots to space.
+ */
+const maskedTracking = (value, shown) => (value && !shown ? 'tracking-widest' : '');
+
+const PasswordRules = ({ checks, isBn, title, compact = false }) => {
   const allOk = checks.minLength && checks.letter && checks.digit;
   const rules = [
     {
       ok: checks.minLength,
       label: isBn ? '৮ বা তার বেশি অক্ষর' : '8 characters or more',
+      short: isBn ? '৮+ অক্ষর' : '8+ characters',
     },
     {
       ok: checks.letter,
       label: isBn ? 'অন্তত একটি ইংরেজি অক্ষর (a-z)' : 'At least one English letter (a-z)',
+      short: isBn ? 'একটি a-z অক্ষর' : 'a letter (a-z)',
     },
     {
       ok: checks.digit,
       label: isBn ? 'অন্তত একটি সংখ্যা (0-9)' : 'At least one number (0-9)',
+      short: isBn ? 'একটি 0-9 সংখ্যা' : 'a number (0-9)',
     },
   ];
+  const example = isBn ? 'যেমন: rahim2026' : 'Example: rahim2026';
 
   return (
     <div
-      className={`mt-2 rounded-xl border px-3 py-2.5 transition-colors ${allOk ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}
+      className={`mt-2 rounded-xl border px-3 transition-colors ${compact ? 'py-2' : 'py-2.5'} ${allOk ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}
     >
-      <p className={`flex items-center gap-1.5 text-xs font-bold ${allOk ? 'text-emerald-800' : 'text-amber-900'}`}>
+      {/* amber-800 rather than -900: the dark palette lightens the -600/-700/-800
+          steps and stops there, so -900 stayed near-black on its own tinted box
+          and the heading was unreadable in dark mode. */}
+      <p className={`flex items-center gap-1.5 text-xs font-bold ${allOk ? 'text-emerald-800' : 'text-amber-800'}`}>
         <Lock size={12} aria-hidden="true" className="shrink-0" />
         {title}
+        {/* Compact keeps the example on this line. Below the rules it wrapped to
+            a line of its own that started at the box edge, out of line with the
+            rule text above it, which made a tidy box look ragged. */}
+        {compact && (
+          <span className={`ml-auto shrink-0 text-[11px] font-semibold ${allOk ? 'text-emerald-700' : 'text-amber-800'}`}>
+            {example}
+          </span>
+        )}
       </p>
-      <ul className="mt-1.5 space-y-1" aria-live="polite">
-        {rules.map(({ ok, label }) => (
+      <ul className={`mt-1.5 ${compact ? 'flex flex-wrap gap-x-3 gap-y-1' : 'space-y-1'}`} aria-live="polite">
+        {rules.map(({ ok, label, short }) => (
           <li
             key={label}
             className={`flex items-center gap-1.5 text-xs font-semibold transition-colors ${ok ? 'text-emerald-700' : 'text-gray-700'}`}
@@ -134,13 +193,15 @@ const PasswordRules = ({ checks, isBn, title }) => {
                 : <span className="w-1 h-1 rounded-full bg-gray-400" />}
             </span>
             <span className="sr-only">{ok ? (isBn ? 'পূরণ হয়েছে:' : 'Met:') : (isBn ? 'বাকি আছে:' : 'Not met:')}</span>
-            {label}
+            {compact ? short : label}
           </li>
         ))}
       </ul>
-      <p className={`mt-1.5 text-[11px] font-semibold ${allOk ? 'text-emerald-700' : 'text-amber-800'}`}>
-        {isBn ? 'যেমন: rahim2026' : 'Example: rahim2026'}
-      </p>
+      {!compact && (
+        <p className={`mt-1.5 text-[11px] font-semibold ${allOk ? 'text-emerald-700' : 'text-amber-800'}`}>
+          {example}
+        </p>
+      )}
     </div>
   );
 };
@@ -178,6 +239,11 @@ const LoginPage = () => {
   const nativeExperience = native ? getNativeExperience() : null;
   const goBack = useGoBack(native ? getNativeHome(nativeExperience) : '/');
   const [searchParams] = useSearchParams();
+  const { pathname } = useLocation();
+  // The app's first screen. Same component as /login — duplicating any of the
+  // phone, country, OTP or session handling into a second screen is how the two
+  // drift apart — with the carousel above the form and the guest way out below.
+  const isWelcome = native && pathname === NATIVE_WELCOME_PATH;
   const { login, completeSignup, roles } = useAuth();
   const { settings } = useSettings();
 
@@ -234,13 +300,27 @@ const LoginPage = () => {
   // across login, signup and password reset, including older plain /login links.
   const nativeRole = nativeExperience?.role
     || (native && ['tenant', 'landlord'].includes(requestedRole) ? requestedRole : null);
-  const roleIsFixed = native && !!nativeRole;
+  // A returning user, logging in where nothing has established a side yet.
+  // Their ACCOUNT already knows which side they are on, so we neither ask them
+  // nor send a role: the login adopts whatever the account's active role is,
+  // and the app configures itself from that afterwards.
+  //
+  // In the app this is the normal case, not a special one — the first screen is
+  // a phone number, so most logins arrive with no role at all. `known=1` is
+  // kept because /app/start still links with it.
+  const knownUser = native && (searchParams.get('known') === '1' || !nativeRole);
 
   const [mode, setMode] = useState(
     requestedMode === 'signup' ? MODES.SIGNUP
       : requestedMode === 'forgot' ? MODES.FORGOT
         : MODES.LOGIN,
   );
+
+  // The side is settled — never ask again — when the app already knows it
+  // (/app/start) or when a returning user arrived via "I already have an
+  // account". The second case holds for LOGIN only: a brand-new signup still
+  // has to say which side it is for, or it would silently become a tenant.
+  const roleIsFixed = native && (!!nativeRole || (knownUser && mode === MODES.LOGIN));
   const [step, setStep] = useState(STEPS.FORM);
   const [verifiedFirebaseToken, setVerifiedFirebaseToken] = useState(null);
   const verificationRef = useRef(null);
@@ -255,24 +335,47 @@ const LoginPage = () => {
   const [role, setRole] = useState(nativeRole || (requestedRole === 'landlord' ? 'landlord' : 'tenant'));
 
   // ─── Role-selection popup ───────────────────────────────────────────────
-  // On entering the login / signup screen we prompt the user to say whether
-  // they're a tenant or a landlord, so they never have to guess which side
-  // they registered on. We skip it when the URL already carries an explicit
+  // On the WEBSITE, login and signup can be reached from anywhere with nothing
+  // establishing a side, so we ask once rather than let someone guess which
+  // side they registered on. Skipped when the URL already carries an explicit
   // role (e.g. the navbar "I'm a landlord" CTA → ?role=landlord) or on the
-  // forgot-password flow where role is irrelevant. The in-form toggle stays
-  // available as a quick way to change the choice afterwards.
+  // forgot-password flow where role is irrelevant.
+  //
+  // In the APP it is asked at exactly one moment: stepping into SIGNUP without
+  // a side already established. Never in front of the first screen, and never
+  // for logging in — an account carries its own side (see `knownUser`).
+  //
+  // It replaces the in-form tenant/landlord toggle, which sat in the middle of
+  // the form pre-set to "tenant". People filled the form around it without ever
+  // reading it, and a landlord who did that got a tenant-only account — which
+  // they then could not switch out of, because adding the landlord role needs
+  // landlord verification to have passed first (see Navbar.handleSwitchRole).
+  // A question you must answer beats a default that is silently wrong.
   const hasExplicitRole = requestedRole === 'landlord' || requestedRole === 'tenant';
   const [showRolePicker, setShowRolePicker] = useState(
-    !roleIsFixed && !hasExplicitRole && requestedMode !== 'forgot',
+    native
+      ? requestedMode === 'signup' && !nativeRole
+      : !roleIsFixed && !hasExplicitRole && requestedMode !== 'forgot',
   );
   useEffect(() => {
-    if (!roleIsFixed) return;
-    setRole(nativeRole);
-    setShowRolePicker(false);
+    // Only when there IS one. `roleIsFixed` also covers "no role needed" — a
+    // returning app user — and blanking `role` there used to send role: null
+    // to signup (which the backend's optional enum rejects) the moment they
+    // tapped "Sign up" instead.
+    if (roleIsFixed && nativeRole) setRole(nativeRole);
   }, [roleIsFixed, nativeRole]);
+
   const chooseRole = (r) => {
     setRole(r);
     setShowRolePicker(false);
+    if (!native) return;
+    // The answer sticks to the DEVICE, in the same slot /app/start writes, so
+    // it is asked once and then carried by itself: signup sends this role, the
+    // app dresses itself for it, and a later login on this phone needs no
+    // question at all. `experienceForRole` picks the tenant's own surface
+    // rather than resetting someone who already lives in Living.
+    const experience = experienceForRole(r, { defaultHome: settings?.app?.defaultHome });
+    if (experience) saveNativeExperience(experience.role, experience.mode, 'chosen');
   };
 
   const [isLoading, setIsLoading] = useState(false);
@@ -284,6 +387,10 @@ const LoginPage = () => {
   const [roleMismatch, setRoleMismatch] = useState(null);
 
   const [formData, setFormData] = useState({ name: '', phone: '', password: '' });
+  // Whether the password is currently readable. Per field, and never persisted:
+  // an unmasked password left on screen is the next person to pick up the phone.
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [newPassword, setNewPassword] = useState('');
   const [resendIn, setResendIn] = useState(0);
@@ -357,6 +464,59 @@ const LoginPage = () => {
   const phoneIssue = phoneProblem(formData.phone, phoneCountry);
   const phoneError = phoneTouched && phoneIssue ? L(phoneIssue.en, phoneIssue.bn) : '';
 
+  // ─── The SIM's own number, in one tap ──────────────────────────────────────
+  // Android can offer the numbers on this phone's SIMs in a system sheet
+  // (src/plugins/phoneHint.js). It is an OFFER, never a step: the website and
+  // iOS never get here, a phone that can't show it simply never draws the
+  // button, and a dismissed sheet leaves the field untouched.
+  const [phoneHintReady, setPhoneHintReady] = useState(false);
+  // The sheet opens itself when the field is first focused — the whole point is
+  // that the number is there before you start typing. Once per screen, though:
+  // re-opening it every time focus returns (which is what dismissing it does)
+  // would trap someone who has decided to type instead. Deliberately NOT reset
+  // by switchMode either — "no thanks" is an answer about this screen, not
+  // about the login tab, and the button above the field is the way back.
+  const phoneHintAskedRef = useRef(false);
+  const phoneHintBusyRef = useRef(false);
+
+  useEffect(() => {
+    if (!isPhoneHintSupported()) return undefined;
+    let alive = true;
+    phoneHintAvailable().then((ok) => { if (alive) setPhoneHintReady(ok); });
+    return () => { alive = false; };
+  }, []);
+
+  const askPhoneHint = async () => {
+    if (!phoneHintReady || phoneHintBusyRef.current) return;
+    phoneHintBusyRef.current = true;
+    phoneHintAskedRef.current = true;
+    let hint;
+    try { hint = await requestPhoneHint(); } finally { phoneHintBusyRef.current = false; }
+    // Dismissed, nothing to offer, or a SIM from a country we don't serve.
+    if (!hint) return;
+    pickCountry(hint.country);
+    setFormData((d) => ({ ...d, phone: hint.national }));
+    // A number the phone supplied is not one they can have mistyped, so an
+    // error left over from a previous attempt should not stay on screen.
+    setPhoneTouched(false);
+  };
+
+  const onPhoneFocus = () => {
+    // Never over something already typed, and never twice.
+    if (phoneHintAskedRef.current || formData.phone) return;
+    void askPhoneHint();
+  };
+
+  // The sheet is its own Android window, so opening it blurs the field. Left to
+  // itself that would mark the field "touched" and paint "Enter your mobile
+  // number" in red UNDERNEATH the sheet — and leave it there after a dismissal,
+  // which is the one thing a dismissal must not do. Leaving the field is what
+  // marks it touched; having a system dialog appear over it is not.
+  const onPhoneBlur = () => {
+    if (phoneHintBusyRef.current) return;
+    setPhoneTouched(true);
+  };
+
   // Signup and reset must satisfy the backend's password rules; login must not
   // (a legacy account whose password predates those rules would be locked out
   // of our own gate before the request ever left the browser).
@@ -380,8 +540,22 @@ const LoginPage = () => {
     if (native) {
       // URLSearchParams already decoded next once. Decoding a second time
       // corrupts values containing encoded addresses, ampersands or percent signs.
-      const safeNext = safeAppPath(nextUrl, null) && !/^\/login(?:[/?#]|$)/.test(nextUrl);
-      navigate(safeNext ? nextUrl : resolvedRole === 'admin' ? '/admin' : getNativeHome(), { replace: true });
+      // Never honour an auth screen as the destination — /welcome is one too,
+      // so it belongs in the same guard as /login or signing in there would
+      // land straight back on the carousel.
+      const safeNext = safeAppPath(nextUrl, null) && !/^(?:\/login|\/welcome)(?:[/?#]|$)/.test(nextUrl);
+      if (safeNext) { navigate(nextUrl, { replace: true }); return; }
+      if (resolvedRole === 'admin') { navigate('/admin', { replace: true }); return; }
+      // A returning user on a fresh install has nothing saved on the device, so
+      // getNativeHome() would send them back to the "who are you?" screen they
+      // just skipped. Their account answers it instead: the role decides the
+      // side, and the home saved on the account decides the tenant surface.
+      let experience = getNativeExperience();
+      if (!experience) {
+        const inferred = inferNativeExperience({ activeRole: resolvedRole, defaultHome: settings?.app?.defaultHome });
+        if (inferred) experience = saveNativeExperience(inferred.role, inferred.mode, 'account');
+      }
+      navigate(getNativeHome(experience), { replace: true });
       return;
     }
     if (nextUrl) {
@@ -465,8 +639,24 @@ const LoginPage = () => {
     resetOtp();
     setFormData({ name: '', phone: '', password: '' });
     setNewPassword('');
+    // The field is cleared, so the eye goes back to closed with it — otherwise
+    // the next password starts its life already on screen.
+    setShowPassword(false);
+    setShowNewPassword(false);
     setPhoneTouched(false);
     setResendIn(0);
+    // Stepping into signup in the app is the one moment the side has to be
+    // settled, so ask here rather than leave a pre-set toggle in the form.
+    if (native && m === MODES.SIGNUP && !nativeRole) setShowRolePicker(true);
+  };
+
+  // "Have a look around" — the app works signed out, and putting a phone field
+  // on the first screen must not quietly take that away. Browsing is the tenant
+  // search side, which is also what `experienceForRole` defaults a tenant to;
+  // it is a choice, so Profile → "change how I use the app" can still move it.
+  const browseAsGuest = () => {
+    saveNativeExperience('tenant', 'search', 'chosen');
+    navigate('/', { replace: true });
   };
 
   // Every code starts at the backend. For Bangladesh it texts the code itself;
@@ -557,7 +747,11 @@ const LoginPage = () => {
     const attempt = ++attemptRef.current;
     setIsLoading(true); setErrorMsg(''); setInfoMsg(''); setRoleMismatch(null);
     try {
-      const loggedInUser = await login({ phone: toE164(formData.phone, phoneCountry), password: formData.password }, role);
+      // A returning user sends NO role: the client-side role gate in
+      // AuthContext only fires when one is requested, so this lets any account
+      // — tenant, landlord or both — sign in without being asked which it is.
+      const loginRole = knownUser && !nativeRole ? undefined : role;
+      const loggedInUser = await login({ phone: toE164(formData.phone, phoneCountry), password: formData.password }, loginRole);
       if (attempt !== attemptRef.current) return;
       if (['super_admin', 'moderator', 'support_agent'].includes(loggedInUser?.role)) {
         goToNextOrDashboard('admin');
@@ -840,12 +1034,27 @@ const LoginPage = () => {
   };
 
   // ─── Render ──────────────────────────────────────────────────────────────
+  // On the first screen of a fresh install "Welcome back" is addressed to the
+  // wrong person, and the carousel above has already said what the app is — so
+  // the heading is the one instruction that is left, with no sub-line under it.
+  //
+  // It names ONE action. The form under it logs you in; offering registration
+  // in the heading as well only made the person who came here to log in read a
+  // choice they didn't have to make. Signing up is still one tap away — it is
+  // the single line under the form, where someone who needs it will look.
+  const welcomeLogin = isWelcome && mode === MODES.LOGIN;
+  // The first screen proper: the carousel is up, so the heading is read as the
+  // caption's next line and hangs left with it. Every OTHER app screen sits
+  // under a centred brand row, where a left-flush heading reads as a mistake.
+  const welcomeCarousel = welcomeLogin && step === STEPS.FORM;
   const formTitle =
-    mode === MODES.SIGNUP ? L('Create your account', 'নতুন অ্যাকাউন্ট খুলুন')
+    welcomeLogin ? L('Log in', 'লগইন করুন')
+      : mode === MODES.SIGNUP ? L('Create your account', 'নতুন অ্যাকাউন্ট খুলুন')
       : mode === MODES.FORGOT ? L('Set a new password', 'নতুন পাসওয়ার্ড দিন')
       : L('Welcome back', 'আবার স্বাগতম');
   const formSub =
-    mode === MODES.SIGNUP ? L('It only takes a minute', 'মাত্র এক মিনিটের কাজ')
+    welcomeLogin ? ''
+      : mode === MODES.SIGNUP ? L('It only takes a minute', 'মাত্র এক মিনিটের কাজ')
       : mode === MODES.FORGOT ? L("Give us your number and we'll text you a code", 'আপনার নম্বর দিন, আমরা এসএমএসে একটি কোড পাঠাবো')
       : L('Log in to your account', 'আপনার অ্যাকাউন্টে লগইন করুন');
 
@@ -888,12 +1097,16 @@ const LoginPage = () => {
     >
       <div ref={recaptchaRef} id="auth-recaptcha" />
       {/* ── ROLE PICKER POPUP ──
-          Appears on entry to login/signup so the user explicitly picks whether
-          they're a tenant or a landlord (they don't have to remember which side
-          they signed up on). Skipped when a role is already set via the URL or
-          on the forgot-password screen. Picking an option preselects the role
-          and reveals the form; the in-form toggle can still change it. */}
-      {!roleIsFixed && showRolePicker && mode !== MODES.FORGOT && (
+          The user explicitly picks whether they're a tenant or a landlord, so
+          they don't have to remember which side they signed up on. On the
+          website it opens on entry to login/signup; in the app only when
+          stepping into signup with no side established yet. Skipped when a role
+          is already set via the URL or on the forgot-password screen.
+
+          The app's first ask has NO way out — no backdrop dismiss — because
+          skipping it is the whole failure it exists to stop. Reopened later
+          from "Change", when a side is already set, it closes like any dialog. */}
+      {showRolePicker && mode !== MODES.FORGOT && (
         <div
           className="fixed inset-0 z-[120] flex items-center justify-center p-4"
           role="dialog"
@@ -901,7 +1114,7 @@ const LoginPage = () => {
         >
           <div
             className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
-            onClick={() => setShowRolePicker(false)}
+            onClick={native && !nativeRole ? undefined : () => setShowRolePicker(false)}
           />
           <div className="relative bg-white rounded-3xl shadow-[0_30px_80px_rgba(0,0,0,0.25)] w-full max-w-sm overflow-hidden animate-[floatIn_0.3s_ease-out]">
             {/* Brand header */}
@@ -914,7 +1127,12 @@ const LoginPage = () => {
                   : L('Log in as a tenant or a landlord?', 'ভাড়াটিয়া, না বাড়িওয়ালা হিসেবে লগইন করবেন?')}
               </h3>
               <p className="text-white/80 text-sm mt-1">
-                {L('Pick one to continue', 'একটি বেছে নিন')}
+                {/* In the app the answer is kept on the phone, so say so — and
+                    say it is not a one-way door, which is what makes people
+                    willing to answer a question instead of hunting for a skip. */}
+                {native
+                  ? L('The app is set up from this. You can change it later.', 'এই অনুযায়ী অ্যাপ সাজানো হবে। পরে বদলাতে পারবেন।')
+                  : L('Pick one to continue', 'একটি বেছে নিন')}
               </p>
             </div>
 
@@ -1012,28 +1230,83 @@ const LoginPage = () => {
 
       {/* ── RIGHT SIDE: FORM ── */}
       <div className="w-full lg:w-[54%] relative bg-white flex flex-col">
-        <button
-          onClick={() => (step !== STEPS.FORM ? setStep(STEPS.FORM) : goBack())}
-          className="absolute top-5 left-5 z-30 text-gray-400 hover:text-brandRed transition-colors p-2 rounded-full hover:bg-gray-100"
-          aria-label={L('Back', 'পিছনে')}
-        >
-          <ArrowLeft size={22} />
-        </button>
+        {/* On the first screen of the app there is nothing behind us to go back
+            to, and an arrow that lands on a blank route is worse than no arrow.
+            It still appears on the OTP step, which does have a way back. */}
+        {!(isWelcome && step === STEPS.FORM) && (
+          <button
+            onClick={() => (step !== STEPS.FORM ? setStep(STEPS.FORM) : goBack())}
+            className="absolute top-5 left-5 z-30 text-gray-400 hover:text-brandRed transition-colors p-2 rounded-full hover:bg-gray-100"
+            aria-label={L('Back', 'পিছনে')}
+          >
+            <ArrowLeft size={22} />
+          </button>
+        )}
 
         {LangToggle}
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col justify-center items-center px-6 sm:px-10 py-16">
-          <div className="w-full max-w-sm animate-[floatIn_0.5s_ease-out]">
-            {/* Mobile-only brand block (desktop shows the left panel instead) */}
-            <div className="lg:hidden flex flex-col items-center text-center mb-7">
-              <img src="/icons/logo.svg" alt="To-Let Pro" className="w-16 h-16 mb-3 shadow-lg rounded-2xl" />
-              <h1 className="text-lg font-black tracking-tight text-gray-900">
-                TO-LET <span className="text-brandRed">PRO</span>
-              </h1>
-              <p className="text-xs font-semibold text-gray-500 mt-0.5">
-                {L('Home rentals across Bangladesh', 'বাংলাদেশজুড়ে বাসা ভাড়ার ঠিকানা')}
-              </p>
-            </div>
+        <div
+          className={`flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center px-6 sm:px-10 ${
+            // pt-16 clears the absolutely-positioned language pill above (it
+            // ends at 54px); at pt-14 the illustration started 2px under it.
+            isWelcome ? 'justify-start pt-16 pb-3' : 'justify-center py-16'
+          }`}
+        >
+          <div
+            className={`w-full max-w-sm animate-[floatIn_0.5s_ease-out] ${
+              // In the app this is a screen, not a page you scroll. Everything
+              // here keeps its own height — a flex item never shrinks below its
+              // content — and the illustration is the one thing told it may
+              // give height back, so a short phone loses artwork rather than
+              // pushing the button under the fold. Past the illustration's own
+              // floor the column stops squeezing and the screen scrolls again,
+              // which is the right answer on a phone that is genuinely too short.
+              //
+              // Without the carousel there is nothing to give height back, so
+              // the short form is centred instead of hanging off the top. It is
+              // `my-auto` and not `justify-center`: an auto margin collapses to
+              // zero once the content outgrows the screen, so a small phone
+              // scrolls to the top of the form rather than having it cut off.
+              welcomeCarousel ? 'flex flex-1 flex-col' : isWelcome ? 'my-auto flex flex-col' : ''
+            }`}
+          >
+            {/* What the app does, before it asks for anything. It replaces the
+                logo block rather than sitting under it: two brand statements
+                stacked is exactly the clutter this screen is here to remove. */}
+            {welcomeCarousel ? (
+              /* max-h is the carousel at full size — 224 of artwork, 8 of gap,
+                 ~40 of caption, 32 of dots. It has to be capped HERE, on the
+                 outermost box that grows: uncapped, this slot swallows all the
+                 spare height of a tall phone and parks it as a band of empty
+                 screen around the artwork. Capped, the spare height falls
+                 through to the auto margin further down, between the form and
+                 the ways past it. Undershooting is harmless — the artwork just
+                 gives back the difference — so it is not worth chasing exactly. */
+              <div className="-mx-6 sm:-mx-10 mb-3 flex max-h-[304px] flex-1 flex-col">
+                <WelcomeCarousel isBn={isBn} />
+              </div>
+            ) : isWelcome ? (
+              /* Past the first screen the pitch has been made, and the carousel
+                 is ~300px that signup needs in order to fit on one screen. A
+                 single brand line says where you are without spending them. */
+              <div className="mb-4 flex items-center justify-center gap-2">
+                <img src="/icons/logo.svg" alt="" aria-hidden="true" className="w-9 h-9 shadow-sm rounded-xl" />
+                <span className="text-base font-black tracking-tight text-gray-900">
+                  TO-LET <span className="text-brandRed">PRO</span>
+                </span>
+              </div>
+            ) : (
+              /* Mobile-only brand block (desktop shows the left panel instead) */
+              <div className="lg:hidden flex flex-col items-center text-center mb-7">
+                <img src="/icons/logo.svg" alt="To-Let Pro" className="w-16 h-16 mb-3 shadow-lg rounded-2xl" />
+                <h1 className="text-lg font-black tracking-tight text-gray-900">
+                  TO-LET <span className="text-brandRed">PRO</span>
+                </h1>
+                <p className="text-xs font-semibold text-gray-500 mt-0.5">
+                  {L('Home rentals across Bangladesh', 'বাংলাদেশজুড়ে বাসা ভাড়ার ঠিকানা')}
+                </p>
+              </div>
+            )}
 
             {errorMsg && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm font-semibold text-red-600 text-center">
@@ -1064,26 +1337,37 @@ const LoginPage = () => {
             {/* ── FORM STEP ── */}
             {step === STEPS.FORM && (
               <>
-                <div className="mb-6 text-center lg:text-left">
+                <div className={welcomeCarousel ? 'mb-3 text-left' : isWelcome ? 'mb-4 text-center' : 'mb-6 text-center lg:text-left'}>
                   <h2 className="text-2xl font-black text-gray-900 tracking-tight">{formTitle}</h2>
-                  <p className="text-sm text-gray-500 mt-1">{formSub}</p>
+                  {formSub && <p className="text-sm text-gray-500 mt-1">{formSub}</p>}
                 </div>
 
                 {/* The app already asked on /app/start, so there is no toggle —
                     only a way out for someone who picked the wrong side. */}
-                {roleIsFixed && mode !== MODES.FORGOT && (
+                {roleIsFixed && nativeRole && mode !== MODES.FORGOT && (
                   <p className="-mt-3 mb-5 text-xs font-semibold text-gray-500 text-center lg:text-left">
                     {nativeRole === 'landlord'
                       ? L('Continuing as a landlord', 'বাড়িওয়ালা হিসেবে চালিয়ে যাচ্ছেন')
                       : L('Continuing as a tenant', 'ভাড়াটিয়া হিসেবে চালিয়ে যাচ্ছেন')}
                     {' · '}
-                    <button type="button" disabled={isLoading} onClick={() => navigate('/app/start')} className="font-bold text-brandRed underline">
+                    {/* Mid-signup this reopens the same question in place, so a
+                        wrong tap costs one more tap and not the name, number
+                        and password already typed. From the login screen it
+                        still means "change how I use the app". */}
+                    <button
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => (mode === MODES.SIGNUP ? setShowRolePicker(true) : navigate('/app/start'))}
+                      className="font-bold text-brandRed underline"
+                    >
                       {L('Change', 'বদলান')}
                     </button>
                   </p>
                 )}
 
-                {!roleIsFixed && mode !== MODES.FORGOT && (
+                {/* Website only. In the app the side is answered by the popup
+                    before the form is drawn, so there is nothing here to miss. */}
+                {!native && !roleIsFixed && mode !== MODES.FORGOT && (
                   <div className="flex bg-gray-100 p-1 rounded-xl mb-5">
                     <button
                       type="button"
@@ -1142,13 +1426,39 @@ const LoginPage = () => {
                   )}
 
                   <div>
-                    <label htmlFor="auth-phone" className="block text-[11px] font-bold text-gray-700 mb-1 ml-1 uppercase tracking-wider">
-                      {L('Mobile number', 'মোবাইল নম্বর')}
-                    </label>
+                    <div className="flex justify-between items-center mb-1 ml-1">
+                      {/* Signup says WhatsApp in the label, not only in the hint
+                          under the field: it is a condition on WHICH of your
+                          numbers to type, so it has to be read before you type
+                          one, and the account carries it from here on. */}
+                      <label htmlFor="auth-phone" className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider">
+                        {mode === MODES.SIGNUP
+                          ? L('WhatsApp mobile number', 'হোয়াটসঅ্যাপ মোবাইল নম্বর')
+                          : L('Mobile number', 'মোবাইল নম্বর')}
+                      </label>
+                      {/* The way BACK to the sheet. It opens itself on first
+                          focus; this is for the person who dismissed it, or
+                          who has two SIMs and picked the wrong one. Drawn only
+                          where it leads somewhere — see phoneHintReady. */}
+                      {phoneHintReady && (
+                        <button
+                          type="button"
+                          disabled={isLoading}
+                          onClick={askPhoneHint}
+                          className="flex items-center gap-1 text-[11px] font-bold text-brandRed hover:underline disabled:opacity-50"
+                        >
+                          <Smartphone size={12} aria-hidden="true" />
+                          {L('Use my number', 'আমার নম্বর দিন')}
+                        </button>
+                      )}
+                    </div>
                     <div
                       className={`relative flex items-center bg-gray-50 border rounded-xl transition-all overflow-hidden ${
                         phoneError
-                          ? 'border-red-400 ring-2 ring-red-100'
+                          // The error ring is always on, so it can't double as a
+                          // focus indicator — deepen it on focus, or a keyboard
+                          // user tabbing into an invalid field sees no change.
+                          ? 'border-red-400 ring-2 ring-red-100 focus-within:ring-red-300'
                           : 'border-gray-200 focus-within:bg-white focus-within:border-brandRed focus-within:ring-2 focus-within:ring-brandRed/20'
                       }`}
                     >
@@ -1180,14 +1490,18 @@ const LoginPage = () => {
                         value={formData.phone}
                         disabled={isLoading}
                         onChange={handlePhoneChange}
-                        onBlur={() => setPhoneTouched(true)}
+                        onFocus={onPhoneFocus}
+                        onBlur={onPhoneBlur}
                         maxLength={20}
                         placeholder={phoneCountry.example}
                         inputMode="tel"
                         autoComplete="tel-national"
                         aria-invalid={phoneError ? 'true' : 'false'}
                         aria-describedby="auth-phone-help"
-                        className="flex-1 min-w-0 bg-transparent py-3 pl-2 pr-4 text-sm font-bold text-gray-900 outline-none tracking-wide"
+                        // The wrapper above owns the focus ring (focus-within),
+                        // and it is the rounded one — an outline on this bare
+                        // field would cut a square through it.
+                        className="flex-1 min-w-0 bg-transparent py-3 pl-2 pr-4 text-sm font-bold text-gray-900 outline-none focus:outline-none focus-visible:outline-none tracking-wide"
                         required
                       />
                     </div>
@@ -1205,6 +1519,14 @@ const LoginPage = () => {
                         </div>
                       ) : (
                         mode === MODES.SIGNUP ? (
+                          <>
+                            <span className="flex items-start gap-1 font-bold text-emerald-700">
+                              <MessageCircle size={12} aria-hidden="true" className="mt-[1px] shrink-0" />
+                              {L(
+                                'Use a number that has WhatsApp — updates go there.',
+                                'হোয়াটসঅ্যাপ আছে এমন নম্বর দিন — খবর ওখানেই যাবে।',
+                              )}
+                            </span>
                           <span>
                             {phoneCountry.iso === 'BD'
                               ? L(
@@ -1216,6 +1538,7 @@ const LoginPage = () => {
                                 `+${toBnDigits(phoneCountry.dial)} এর পরের নম্বরটি লিখুন, যেমন ${toBnDigits(phoneCountry.example)}। এই নম্বরেই এসএমএসে কোড যাবে।`
                               )}
                           </span>
+                          </>
                         ) : null
                       )}
                     </div>
@@ -1242,23 +1565,36 @@ const LoginPage = () => {
                           <Lock size={16} />
                         </div>
                         <input
-                          type="password"
+                          type={showPassword ? 'text' : 'password'}
                           value={formData.password}
                           disabled={isLoading}
                           onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                          placeholder="••••••••"
+                          placeholder={mode === MODES.SIGNUP
+                            ? L('Create a password', 'একটি পাসওয়ার্ড দিন')
+                            : L('Your password', 'আপনার পাসওয়ার্ড')}
                           autoComplete={mode === MODES.SIGNUP ? 'new-password' : 'current-password'}
-                          className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-900 focus:bg-white focus:border-brandRed focus:ring-2 focus:ring-brandRed/20 transition-all outline-none tracking-widest"
+                          className={`w-full pl-10 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-900 focus:bg-white focus:border-brandRed focus:ring-2 focus:ring-brandRed/20 transition-all outline-none ${maskedTracking(formData.password, showPassword)}`}
                           required
                           minLength={mode === MODES.SIGNUP ? 8 : 1}
                           maxLength={mode === MODES.SIGNUP ? 128 : undefined}
+                        />
+                        <RevealButton
+                          shown={showPassword}
+                          onToggle={() => setShowPassword((v) => !v)}
+                          isBn={isBn}
+                          disabled={isLoading}
                         />
                       </div>
                       {mode === MODES.SIGNUP && (
                         <PasswordRules
                           checks={signupPwChecks}
                           isBn={isBn}
-                          title={L('Your password must have:', 'আপনার পাসওয়ার্ডে থাকতে হবে:')}
+                          compact={native}
+                          // Compact puts the example on the heading line, so the
+                          // heading gives up the words it can spare.
+                          title={native
+                            ? L('Password must have:', 'পাসওয়ার্ডে থাকতে হবে:')
+                            : L('Your password must have:', 'আপনার পাসওয়ার্ডে থাকতে হবে:')}
                         />
                       )}
                     </div>
@@ -1280,7 +1616,7 @@ const LoginPage = () => {
                   </button>
                 </form>
 
-                <div className="mt-7 text-center">
+                <div className={`${isWelcome ? 'mt-4' : 'mt-7'} text-center`}>
                   {mode === MODES.LOGIN && (
                     <p className="text-xs sm:text-sm font-semibold text-gray-500">
                       {L('New to TO-LET PRO?', 'TO-LET PRO-তে নতুন?')}
@@ -1301,8 +1637,38 @@ const LoginPage = () => {
                   )}
                 </div>
 
+                {/* Two ways past the form, kept to one quiet line each.
+                    · Browsing signed out is how most people start, and it is
+                      the only thing here that needs no account at all.
+                    · A landlord who wants to look around first would otherwise
+                      land on the tenant side with no hint that there is
+                      another one — /app/start is where that question lives. */}
+                {/* mt-auto: everything above is the job you came to do, and
+                    these are the ways past it. On a tall phone the leftover
+                    height collects HERE, between the two, instead of pooling
+                    under the last line and leaving the screen bottom-empty. */}
+                {isWelcome && mode === MODES.LOGIN && (
+                  <div className="mt-auto flex flex-col items-center pt-2">
+                    <button
+                      type="button"
+                      onClick={browseAsGuest}
+                      className="flex min-h-11 items-center gap-1.5 text-sm font-bold text-gray-600 hover:text-brandRed transition-colors"
+                    >
+                      <Home size={15} />
+                      {L('Have a look around first', 'আগে ঘুরে দেখুন')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(NATIVE_START_PATH)}
+                      className="min-h-11 text-xs font-semibold text-gray-400 hover:text-brandRed transition-colors"
+                    >
+                      {L('Are you a landlord? Start here', 'বাড়িওয়ালা? এখান থেকে শুরু করুন')}
+                    </button>
+                  </div>
+                )}
+
                 {/* Trust line — true to the product (every account is OTP-verified) */}
-                <div className="mt-6 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-gray-400">
+                <div className={`${isWelcome ? 'mt-3' : 'mt-6'} flex items-center justify-center gap-1.5 text-[11px] font-semibold text-gray-400`}>
                   <ShieldCheck size={13} className="text-gray-400" />
                   {L('Every number is verified by SMS', 'প্রতিটি নম্বর এসএমএসে যাচাই করা হয়')}
                 </div>
@@ -1393,21 +1759,30 @@ const LoginPage = () => {
                         </div>
                         <input
                           id="reset-new-password"
-                          type="password"
+                          type={showNewPassword ? 'text' : 'password'}
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="••••••••"
+                          placeholder={L('Your new password', 'নতুন পাসওয়ার্ড দিন')}
                           autoComplete="new-password"
-                          className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-900 focus:bg-white focus:border-brandRed focus:ring-2 focus:ring-brandRed/20 transition-all outline-none tracking-widest"
+                          className={`w-full pl-10 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-900 focus:bg-white focus:border-brandRed focus:ring-2 focus:ring-brandRed/20 transition-all outline-none ${maskedTracking(newPassword, showNewPassword)}`}
                           required
                           minLength={8}
                           maxLength={128}
+                        />
+                        <RevealButton
+                          shown={showNewPassword}
+                          onToggle={() => setShowNewPassword((v) => !v)}
+                          isBn={isBn}
+                          disabled={isLoading}
                         />
                       </div>
                       <PasswordRules
                         checks={resetPwChecks}
                         isBn={isBn}
-                        title={L('Your new password must have:', 'নতুন পাসওয়ার্ডে থাকতে হবে:')}
+                        compact={native}
+                        title={native
+                          ? L('New password must have:', 'নতুন পাসওয়ার্ডে থাকতে হবে:')
+                          : L('Your new password must have:', 'নতুন পাসওয়ার্ডে থাকতে হবে:')}
                       />
                     </div>
                   )}

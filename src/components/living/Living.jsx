@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import useGoBack from '../../hooks/useGoBack';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
 import { toast } from 'sonner';
-import { ArrowLeft, Wallet, BellRing, CloudOff } from 'lucide-react';
+import { ArrowLeft, Home, Wallet, BellRing, CloudOff } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -181,13 +181,6 @@ const Living = () => {
     params.delete('livingAction');
     navigate({ pathname: '/living', search: `?${params}` }, { replace: true });
   }, [isNative, location.search, mode, navigate, setLivingMode, user]);
-
-  // Store-level checks also cover a session ending while a form is open.
-  useEffect(() => {
-    const onRequireAuth = () => requireLivingAction(null, module);
-    window.addEventListener('living:require-auth', onRequireAuth);
-    return () => window.removeEventListener('living:require-auth', onRequireAuth);
-  }, [module, requireLivingAction]);
 
   // React to deep-links (bottom-nav / cross-module jumps) after mount.
   useEffect(() => {
@@ -374,6 +367,20 @@ const Living = () => {
                 }
               >
                 <ArrowLeft size={18} />
+              </button>
+            )}
+            {/* When the ledger IS the home screen there is no back arrow — and
+                with the bottom rail hidden here, that left someone who keeps
+                only accounts with no way to the homepage, search or services at
+                all. This is that way out; the wallet's own tabs stay above. */}
+            {isHome && atWalletHome && (
+              <button
+                onClick={() => navigate('/')}
+                className="p-2.5 bg-white/70 rounded-xl border border-white/80 shadow-sm text-gray-600 hover:text-gray-900 hover:bg-white active:scale-90 transition"
+                aria-label={isBn ? 'হোম' : 'Home'}
+                title={isBn ? 'মূল হোমপেজে যান' : 'Go to the main home page'}
+              >
+                <Home size={18} />
               </button>
             )}
             <div className="flex items-center gap-2.5 min-w-0">

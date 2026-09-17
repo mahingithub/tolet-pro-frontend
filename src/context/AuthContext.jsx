@@ -17,7 +17,7 @@ import {
 import { subscribe } from '../services/_storage.js';
 import { isSessionTerminated } from '../utils/fetchInterceptor.js';
 import { useNavigate } from 'react-router-dom';
-import { getNativeHome, isNativeApp } from '../utils/nativeExperience.js';
+import { NATIVE_START_PATH, getNativeHome, isNativeApp, nativeLoginUrl } from '../utils/nativeExperience.js';
 
 const AuthContext = createContext(null);
 
@@ -203,6 +203,23 @@ export const AuthProvider = ({ children }) => {
             }),
           );
         }
+        // The app skips the welcome robot (it belongs to the website's first
+        // visit), so a returning user was greeted by nothing at all. One line,
+        // then they are on their own screen. Imported here rather than at the
+        // top: sonner would otherwise land in the entry chunk, which
+        // vite.config.js watches — GlobalToaster has it loaded by now anyway.
+        if (u && isNativeApp() && !loggedInRoles.some(isAdminRole)) {
+          const firstName = String(u.name || '').trim().split(' ')[0];
+          let bn = true;
+          try { bn = window.localStorage.getItem('tolet_lang') !== 'English'; } catch { /* default Bangla */ }
+          import('sonner')
+            .then(({ toast }) => toast.success(
+              bn
+                ? `স্বাগতম${firstName ? `, ${firstName}` : ''}!`
+                : `Welcome back${firstName ? `, ${firstName}` : ''}!`,
+            ))
+            .catch(() => {/* a greeting is not worth an error */});
+        }
         return u;
       },
       // Finish signup: verify the OTP and START THE SESSION. Verifying the code
@@ -251,8 +268,21 @@ export const AuthProvider = ({ children }) => {
         // this; clearing localStorage alone leaves it on screen for the guest.
         window.dispatchEvent(new Event('auth:logged-out'));
 
-        // Installed apps return to the selected guest experience after logout.
-        navigate(isNativeApp() ? getNativeHome() : '/login', { replace: true });
+        // Logging out is a full stop, not a step back into the guest app — the
+        // app lands on the login screen, exactly like the website. Dropping
+        // people on a guest home instead was disorienting: the screen looked
+        // signed-in-ish and the first-run tour could open on top of it.
+        //
+        // The device's app choice survives (it is not account data), so the
+        // login screen already knows which side they are on and sends them back
+        // to that home once they sign in.
+        const home = isNativeApp() ? getNativeHome() : null;
+        navigate(
+          isNativeApp()
+            ? nativeLoginUrl(home && home !== NATIVE_START_PATH ? { next: home } : {})
+            : '/login',
+          { replace: true },
+        );
         
         // Reset logging out flag after a short delay to allow the navigation to land
         setTimeout(() => setLoggingOut(false), 100);

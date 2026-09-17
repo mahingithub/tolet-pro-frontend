@@ -1694,7 +1694,7 @@ const PropertyListing = () => {
 
 
 
-			<div className="max-w-[1400px] mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-8 items-start">
+			<div className="max-w-[1400px] mx-auto px-4 py-4 lg:py-8 grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-8 items-start">
 				{/* Backdrop. On mobile it shows whenever the filter sheet is open.
 				    In map mode it ALSO shows on desktop because the filter renders as a
 				    full sheet over the OYO map at every breakpoint. */}
@@ -2036,9 +2036,9 @@ const PropertyListing = () => {
 
 				{/* MAIN RIGHT CONTENT */}
 				<main className="flex flex-col gap-2 lg:gap-3 min-h-screen">
-					<div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-2">
+					<div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3 mb-1 sm:mb-2">
 						<div>
-							<p className="text-xs font-bold text-gray-500 flex items-center gap-2 mb-2">
+							<p className="text-xs font-bold text-gray-500 flex items-center gap-2 mb-1.5">
 								<Link to="/" className="hover:text-brandRed transition-colors">
 									{t.home || "Home"}
 								</Link>{" "}
@@ -2062,7 +2062,7 @@ const PropertyListing = () => {
 							    that the free-text search box happens to hold. This is the
 							    page's H1, so it is also the first thing a search engine
 							    reads about it. */}
-							<h1 className="text-3xl font-black text-gray-900 tracking-tight">
+							<h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
 								{locationSeo
 									? `${language === "বাংলা" ? locationSeo.bn : locationSeo.en} ${unitNoun}`
 									: `${searchArea && searchArea !== (t.nearMe || "Nearby Location") ? searchArea.charAt(0).toUpperCase() + searchArea.slice(1) : formattedDivision} ${unitNoun}`}
@@ -2094,7 +2094,7 @@ const PropertyListing = () => {
 							<motion.div key="list-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="w-full">
 								{isPropertiesLoading ? (
 									Array.from({ length: 6 }, (_, idx) => (
-										<div key={`property-skeleton-${idx}`} className="mb-4 md:mb-6">
+										<div key={`property-skeleton-${idx}`} className="mb-3 md:mb-5">
 											<PropertyCardSkeleton />
 										</div>
 									))
@@ -2103,7 +2103,7 @@ const PropertyListing = () => {
 										return (
 											<React.Fragment key={property.id}>
 												{/* Unified PropertyCard for both Desktop and Mobile */}
-												<div className="mb-4 md:mb-6">
+												<div className="mb-3 md:mb-5">
 													<PropertyCard property={property} navigate={navigate} t={t} showToast={showToast} isHighlighted={highlightedId === property.id} onHover={setHighlightedId} onHoverEnd={() => setHighlightedId(null)} onInquire={openInquiry} />
 												</div>
 											</React.Fragment>
@@ -2163,7 +2163,7 @@ const PropertyListing = () => {
 						>
 							<div className="max-w-[640px] mx-auto flex flex-col gap-2">
 								{/* Row 1 — back · search · filters */}
-								<div className="bg-white rounded-2xl shadow-[0_8px_28px_rgba(0,0,0,0.18)] flex items-center gap-1 px-2 py-1.5 pointer-events-auto border border-gray-100">
+								<div className="bg-white rounded-2xl shadow-[0_8px_28px_rgba(0,0,0,0.18)] flex items-center gap-1 px-2 py-1.5 pointer-events-auto border border-gray-100 ring-1 ring-transparent focus-within:ring-2 focus-within:ring-[#ba0036]/30 transition-shadow">
 									<button
 										onClick={() => setViewMode("list")}
 										aria-label={language === "বাংলা" ? "তালিকায় ফিরুন" : "Back to list"}
@@ -2175,7 +2175,7 @@ const PropertyListing = () => {
 										value={searchArea}
 										onChange={(e) => setSearchArea(e.target.value)}
 										placeholder={searchArea ? "" : (t.searchAreaPlaceholder || "Search area...")}
-										className="flex-1 min-w-0 outline-none bg-transparent text-sm font-bold text-gray-900 placeholder:text-gray-400"
+										className="flex-1 min-w-0 outline-none focus:outline-none focus-visible:outline-none bg-transparent text-sm font-bold text-gray-900 placeholder:text-gray-400"
 									/>
 									{searchArea && (
 										<button

@@ -569,6 +569,11 @@ const ChatSystem = () => {
   // Legacy states kept for basic overlay visibility; managed by callProvider now
   const [muted, setMuted] = useState(false);
   const [inputText, setInputText] = useState('');
+  // Messenger-style composer: once there's a draft the emoji + attach tools
+  // collapse so the field owns the bar. This is the user's override — the
+  // chevron sets it, and the effect below drops it again as soon as the draft
+  // is gone, so the next message starts from the default (tools showing).
+  const [showComposerTools, setShowComposerTools] = useState(false);
   const [isBotTyping, setIsBotTyping] = useState(false);
   // Walkthrough video the AI attached to a reply, opened in VideoModal.
   const [aiVideo, setAiVideo] = useState(null);
@@ -659,6 +664,14 @@ const ChatSystem = () => {
 
   // Keep the ref in lockstep with state (see messagesRef declaration above).
   useEffect(() => { messagesRef.current = messages; }, [messages]);
+
+  // Draft gone (sent, cleared, chat switched) → forget the chevron override, so
+  // the next message starts with the tools showing again. Covers every path
+  // that empties inputText, which is why it's an effect and not a line in the
+  // send handler.
+  useEffect(() => {
+    if (!inputText.trim()) setShowComposerTools(false);
+  }, [inputText]);
 
   // Sync to localStorage for instant hydration on next mount
   useEffect(() => {
@@ -1230,6 +1243,28 @@ const ChatSystem = () => {
     const t = setInterval(refreshCallHistory, 30_000);
     return () => clearInterval(t);
   }, [refreshCallHistory]);
+
+  // Re-run the composer's auto-grow whenever the field's WIDTH changes.
+  // onChange sizes the height from scrollHeight at the width the field had
+  // while you were typing — but typing is also what collapses the emoji/attach
+  // tools, so the field gets wider a frame later and the text reflows onto
+  // fewer lines. Without this the bar stays two lines tall around one line of
+  // text. A plain effect on the collapse flag would fire mid-animation and
+  // measure a width still in motion, so watch the element itself; the width
+  // guard stops our own height write from re-triggering the observer.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let lastWidth = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth === lastWidth) return;
+      lastWidth = el.clientWidth;
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [activeChatId, isRecording]);
 
 
 
@@ -2455,6 +2490,10 @@ const ChatSystem = () => {
   // Chats available as forward targets (real people, not this chat, not blocked).
   const forwardTargets = chats.filter(c => c.id !== 'ai-bot' && c.id !== activeChatId && !c.blocked);
 
+  // Composer tools hide as soon as there's something to send, unless the user
+  // asked for them back with the chevron.
+  const toolsCollapsed = inputText.trim().length > 0 && !showComposerTools;
+
   return (
     <div className={`relative w-full ${isMobile ? 'h-[100dvh] overflow-hidden' : ''}`}>
       {/* Backdrop accents */}
@@ -2599,7 +2638,10 @@ const ChatSystem = () => {
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
                       placeholder={sidebarTab === 'messages' ? (t.chatSearchChats || 'Search chats…') : (t.chatSearchCalls || 'Search calls…')}
-                      className="w-full bg-white border border-white rounded-2xl py-2.5 pl-11 pr-10 outline-none text-sm font-bold text-gray-800 focus:border-[#ba0036]/30 transition-all shadow-sm"
+                      // This one is rounded in its own right, so the ring (and
+                      // the keyboard outline from index.css) follow its radius.
+                      // focus:border alone was too faint to read as "active".
+                      className="w-full bg-white border border-white rounded-2xl py-2.5 pl-11 pr-10 outline-none text-sm font-bold text-gray-800 focus:border-[#ba0036]/30 focus:ring-2 focus:ring-[#ba0036]/25 transition-all shadow-sm"
                     />
                     {searchQuery && (
                       <button
@@ -3037,22 +3079,15 @@ const ChatSystem = () => {
                 </button>
               </motion.div>
             )}
-            <div className="flex items-end gap-2 bg-white border border-white p-2 rounded-[1.6rem] shadow-[0_10px_25px_rgba(0,0,0,0.06)]">
-              <button
-                onClick={() => {
-                  // Toggle the emoji panel. When opening, blur the input so the
-                  // on-screen keyboard drops and the panel takes its place.
-                  setShowEmojiPicker((s) => {
-                    const next = !s;
-                    if (next) inputRef.current?.blur();
-                    return next;
-                  });
-                }}
-                className={`shrink-0 p-2.5 rounded-xl transition-all ${showEmojiPicker ? 'bg-[#ba0036]/10 text-[#ba0036]' : 'text-gray-400 hover:text-[#ba0036] hover:bg-gray-50'}`}
-                aria-label={language === 'বাংলা' ? 'ইমোজি' : 'Emoji'}
-              >
-                <Smile size={18}/>
-              </button>
+            {/* The PILL owns the focus ring, not the textarea inside it.
+                `outline` follows the border-radius of the element it is drawn
+                on, and the textarea is a bare transparent box with radius 0 —
+                a ring on it cuts a square straight through this pill. Same
+                reason the textarea carries focus-visible:outline-none below.
+                See the FOCUS RING block in index.css. */}
+            <div className="flex items-end gap-2 bg-white border border-white p-2 rounded-[1.6rem] shadow-[0_10px_25px_rgba(0,0,0,0.06)] ring-1 ring-transparent focus-within:ring-2 focus-within:ring-[#ba0036]/40 transition-shadow">
+              {/* Stays mounted while the tools collapse — openPicker() reaches
+                  it through fileInputRef, so it must outlive them. */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -3060,43 +3095,93 @@ const ChatSystem = () => {
                 className="hidden"
                 onChange={handleFileChosen}
               />
-              <div className="relative shrink-0">
-                <button
-                  onClick={handleAttachClick}
-                  disabled={isUploadingMedia || isRecording}
-                  className={`p-2.5 rounded-xl transition-all disabled:opacity-40 ${showAttachMenu ? 'bg-[#ba0036]/10 text-[#ba0036]' : 'text-gray-400 hover:text-[#ba0036] hover:bg-gray-50'}`}
-                  aria-label="Attach"
-                  title={t.attachTitle || 'Attach photo, video or PDF'}
-                >
-                  <Paperclip size={18}/>
-                </button>
-                {showAttachMenu && (
-                  <>
-                    <div className="fixed inset-0 z-[60]" onClick={() => setShowAttachMenu(false)} />
-                    <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{ duration: 0.14, ease: 'easeOut' }}
-                      className="absolute bottom-full left-0 mb-2 z-[61] w-48 bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-gray-100 p-1.5 origin-bottom-left"
+              {/* ── Messenger-style tool collapse ─────────────────────────────
+                  The moment there's a draft, emoji + attach slide out and the
+                  field takes their width, leaving just the text and Send. The
+                  chevron below brings them back — without a way back, attaching
+                  a photo after you've typed would be impossible.
+                  overflow-hidden is dropped while the attach menu is open, or
+                  the clip that keeps the slide tidy would cut off the popup
+                  that opens upward out of this row. */}
+              <AnimatePresence initial={false}>
+                {!toolsCollapsed && (
+                  <motion.div
+                    key="composer-tools"
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: 'auto', opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    transition={{ duration: 0.18, ease: 'easeOut' }}
+                    className={`flex items-end gap-2 shrink-0 ${showAttachMenu ? '' : 'overflow-hidden'}`}
+                  >
+                    <button
+                      onClick={() => {
+                        // Toggle the emoji panel. When opening, blur the input so the
+                        // on-screen keyboard drops and the panel takes its place.
+                        setShowEmojiPicker((s) => {
+                          const next = !s;
+                          if (next) inputRef.current?.blur();
+                          return next;
+                        });
+                      }}
+                      className={`shrink-0 p-2.5 rounded-xl transition-all ${showEmojiPicker ? 'bg-[#ba0036]/10 text-[#ba0036]' : 'text-gray-400 hover:text-[#ba0036] hover:bg-gray-50'}`}
+                      aria-label={language === 'বাংলা' ? 'ইমোজি' : 'Emoji'}
                     >
+                      <Smile size={18}/>
+                    </button>
+                    <div className="relative shrink-0">
                       <button
-                        onClick={() => openPicker('image/*,video/*')}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors text-[13px] font-bold text-gray-700"
+                        onClick={handleAttachClick}
+                        disabled={isUploadingMedia || isRecording}
+                        className={`p-2.5 rounded-xl transition-all disabled:opacity-40 ${showAttachMenu ? 'bg-[#ba0036]/10 text-[#ba0036]' : 'text-gray-400 hover:text-[#ba0036] hover:bg-gray-50'}`}
+                        aria-label="Attach"
+                        title={t.attachTitle || 'Attach photo, video or PDF'}
                       >
-                        <span className="w-8 h-8 rounded-lg bg-[#ba0036]/10 text-[#ba0036] flex items-center justify-center shrink-0"><ImageIcon size={16}/></span>
-                        {t.attachPhotoVideo || 'Photo & Video'}
+                        <Paperclip size={18}/>
                       </button>
-                      <button
-                        onClick={() => openPicker('application/pdf')}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors text-[13px] font-bold text-gray-700"
-                      >
-                        <span className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center shrink-0"><FileText size={16}/></span>
-                        {t.attachDocument || 'Document'}
-                      </button>
-                    </motion.div>
-                  </>
+                      {showAttachMenu && (
+                        <>
+                          <div className="fixed inset-0 z-[60]" onClick={() => setShowAttachMenu(false)} />
+                          <motion.div
+                            initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{ duration: 0.14, ease: 'easeOut' }}
+                            className="absolute bottom-full left-0 mb-2 z-[61] w-48 bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-gray-100 p-1.5 origin-bottom-left"
+                          >
+                            <button
+                              onClick={() => openPicker('image/*,video/*')}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors text-[13px] font-bold text-gray-700"
+                            >
+                              <span className="w-8 h-8 rounded-lg bg-[#ba0036]/10 text-[#ba0036] flex items-center justify-center shrink-0"><ImageIcon size={16}/></span>
+                              {t.attachPhotoVideo || 'Photo & Video'}
+                            </button>
+                            <button
+                              onClick={() => openPicker('application/pdf')}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors text-[13px] font-bold text-gray-700"
+                            >
+                              <span className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center shrink-0"><FileText size={16}/></span>
+                              {t.attachDocument || 'Document'}
+                            </button>
+                          </motion.div>
+                        </>
+                      )}
+                    </div>
+                  </motion.div>
                 )}
-              </div>
+              </AnimatePresence>
+              {toolsCollapsed && (
+                <motion.button
+                  type="button"
+                  initial={{ opacity: 0, scale: 0.7 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.16, ease: 'easeOut' }}
+                  onClick={() => setShowComposerTools(true)}
+                  className="shrink-0 p-2.5 rounded-xl text-gray-400 hover:text-[#ba0036] hover:bg-gray-50 transition-all"
+                  aria-label={language === 'বাংলা' ? 'আরও অপশন দেখান' : 'Show more options'}
+                  title={language === 'বাংলা' ? 'আরও অপশন' : 'More options'}
+                >
+                  <ChevronRight size={18}/>
+                </motion.button>
+              )}
               {isRecording ? (
                 /* Recording in progress — replace the textarea with a live indicator.
                    min-w-0 lets this middle area shrink so the Cancel/Send buttons
@@ -3143,7 +3228,11 @@ const ChatSystem = () => {
                   }}
                   onFocus={() => setShowEmojiPicker(false)}
                   placeholder={activeChat.isAI ? (t.chatAskAI || 'Ask the AI assistant anything…') : (t.chatTypeMessage || 'Type a message…')}
-                  className="flex-1 min-w-0 bg-transparent outline-none text-sm font-bold text-gray-800 resize-none py-2 max-h-[120px] leading-relaxed placeholder:text-gray-400"
+                  // focus-visible:outline-none is the half that actually wins:
+                  // bare `outline-none` ties with the global text-field rule in
+                  // index.css on specificity and loses on source order. The pill
+                  // around it carries the focus ring, following its radius.
+                  className="flex-1 min-w-0 bg-transparent outline-none focus:outline-none focus-visible:outline-none text-sm font-bold text-gray-800 resize-none py-2 max-h-[120px] leading-relaxed placeholder:text-gray-400"
                 />
               )}
               {isRecording ? (

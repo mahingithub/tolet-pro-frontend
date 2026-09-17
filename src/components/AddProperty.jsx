@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useLanguage, useIsBn } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
+import { requireLoginToSave } from '../utils/guestSave';
 import { useTour } from '../context/TourContext.jsx';
 import {
   DIVISIONS,
@@ -526,7 +527,11 @@ const Field = ({ label, required, children, hint }) => (
   </div>
 );
 
-const inputCls = "w-full p-4 bg-gray-50 border border-transparent rounded-xl text-sm font-bold text-gray-900 outline-none placeholder-gray-300 focus:bg-white focus:border-[#ba0036]/20 focus:shadow-[0_4px_20px_rgba(186,0,54,0.07)] transition-all duration-200";
+// Every field in the wizard shares this. The ring is the focus indicator: the
+// border at /20 plus a soft shadow was too faint to read as "this field is
+// active", and since these fields are rounded in their own right the ring (and
+// the keyboard outline from index.css) both follow the radius correctly.
+const inputCls = "w-full p-4 bg-gray-50 border border-transparent rounded-xl text-sm font-bold text-gray-900 outline-none placeholder-gray-300 focus:bg-white focus:border-[#ba0036]/20 focus:ring-2 focus:ring-[#ba0036]/25 focus:shadow-[0_4px_20px_rgba(186,0,54,0.07)] transition-all duration-200";
 
 // ─── COUNTER INPUT ────────────────────────────────────────────────────────────
 const CounterInput = ({ value, onChange, min = 0, max = 20 }) => (
@@ -1773,7 +1778,11 @@ const AddProperty = () => {
     // the user lands back here with ?resume=1 and the publish flow
     // resumes automatically from the success screen.
     if (!isAuthenticated) {
+      // The draft is parked FIRST, so nothing typed is lost whichever way this
+      // goes. In the app the ask is dismissible ("not now" keeps them in the
+      // wizard); on the website it still bounces straight to login.
       persistDraft();
+      if (!requireLoginToSave({ next: '/list-property?resume=1', action: 'publish-property' })) return;
       showToast(
         isBn ? 'প্রকাশের জন্য সাইন ইন করুন — আপনার তথ্য সংরক্ষিত আছে।' : 'Sign in to publish — your draft is saved.',
         'info',

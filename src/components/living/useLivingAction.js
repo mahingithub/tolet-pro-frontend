@@ -1,8 +1,5 @@
 import { useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext.jsx';
 import useLivingStore from '../../store/useLivingStore';
-import { isNativeApp, nativeLoginUrl } from '../../utils/nativeExperience';
 
 // Only these intentions may reopen a form after login. None performs a write.
 export const LIVING_FORM_ACTIONS = {
@@ -27,13 +24,24 @@ export function livingActionPath(wallet, module, action) {
   return `/living?${params}`;
 }
 
-/** Allow browsing, but take native guests straight to the chosen-role login. */
+/** Where login should return someone who was reaching for a form in Living. */
+export function livingReturnPath(module, action) {
+  return livingActionPath(useLivingStore.getState().mode, module, action);
+}
+
+/**
+ * Opening a form is no longer gated.
+ * ──────────────────────────────────────────────────────────────────────────
+ * This hook used to send a signed-out visitor to login the moment they tapped
+ * "add" — so they never saw what the form even asked for. The gate now sits on
+ * the WRITE instead (store/useLivingStore.js `_apply`, and the fetch
+ * interceptor for anything server-side): fill the form in, and the "sign in to
+ * save" ask arrives at save time, dismissible, with everything still on screen.
+ *
+ * The call sites keep calling this — `if (!requireAction('add')) return;` — so
+ * the gate has one obvious place to come back to if a screen ever needs to be
+ * closed off again. Today it always allows.
+ */
 export default function useLivingAction(module) {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  return useCallback((action, targetModule = module) => {
-    if (!isNativeApp() || user) return true;
-    navigate(nativeLoginUrl({ next: livingActionPath(useLivingStore.getState().mode, targetModule, action) }));
-    return false;
-  }, [module, navigate, user]);
+  return useCallback(() => true, [module]);
 }

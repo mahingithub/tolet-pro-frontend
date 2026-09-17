@@ -561,13 +561,17 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
       subtitle: bn ? 'থিম, ভাষা, মুদ্রা, মোশন' : 'Theme, language, currency, motion',
       content: (
         <>
-          <div className="py-3.5 border-b border-gray-50">
-            <div className="mb-3">
-              <p className="text-sm font-black text-gray-900">{bn ? 'থিম' : 'Theme'}</p>
-              <p className="text-[11px] font-bold text-gray-400">{bn ? 'লাইট, ডার্ক বা সিস্টেম অনুযায়ী' : 'Light, dark, or match your system'}</p>
+          {/* Website only — the app has one scheme and no switch for it, so
+              offering the control here would be a setting that does nothing. */}
+          {!isNativeApp() && (
+            <div className="py-3.5 border-b border-gray-50">
+              <div className="mb-3">
+                <p className="text-sm font-black text-gray-900">{bn ? 'থিম' : 'Theme'}</p>
+                <p className="text-[11px] font-bold text-gray-400">{bn ? 'লাইট, ডার্ক বা সিস্টেম অনুযায়ী' : 'Light, dark, or match your system'}</p>
+              </div>
+              <ThemeSwitcher value={settings.theme} onChange={(v) => save({ theme: v })} bn={bn} />
             </div>
-            <ThemeSwitcher value={settings.theme} onChange={(v) => save({ theme: v })} bn={bn} />
-          </div>
+          )}
           <Row
             label={bn ? 'ভাষা' : 'Language'}
             right={

@@ -241,7 +241,7 @@ const LocationSearchModal = ({
                 onChange={(e) => { setQuery(e.target.value); setActiveIndex(-1); }}
                 onKeyDown={handleKeyDown}
                 placeholder={L.placeholder}
-                className="flex-1 min-w-0 bg-transparent border-none outline-none focus:ring-0 text-[15px] md:text-sm font-bold text-slate-900 placeholder-slate-400"
+                className="flex-1 min-w-0 bg-transparent border-none outline-none focus:outline-none focus-visible:outline-none focus:ring-0 text-[15px] md:text-sm font-bold text-slate-900 placeholder-slate-400"
                 autoComplete="off"
                 spellCheck={false}
                 inputMode="search"

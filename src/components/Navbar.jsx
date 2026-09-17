@@ -516,7 +516,10 @@ useEffect(() => {
 
           {showNavSearch && (
           <div className={`hidden md:flex flex-1 justify-center transition-all duration-300 ${(isScrolled || compactHeader) ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-2 pointer-events-none absolute'}`}>
-            <div className="w-full max-w-[580px] flex items-center bg-gradient-to-br from-white via-slate-50/80 to-white backdrop-blur-xl backdrop-saturate-[180%] border border-slate-200/80 rounded-full shadow-[inset_0_1.5px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(15,23,42,0.04),0_10px_28px_rgba(15,23,42,0.10)] hover:shadow-[inset_0_1.5px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(15,23,42,0.04),0_14px_36px_rgba(186,0,54,0.18)] hover:border-[#ba0036]/40 transition-all duration-200 overflow-visible">
+            {/* focus-within on the WHOLE pill: the field inside is transparent
+                and square, so its own focus ring would cut a rectangle through
+                this rounded-full bar. See the FOCUS RING block in index.css. */}
+            <div className="w-full max-w-[580px] flex items-center bg-gradient-to-br from-white via-slate-50/80 to-white backdrop-blur-xl backdrop-saturate-[180%] border border-slate-200/80 rounded-full shadow-[inset_0_1.5px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(15,23,42,0.04),0_10px_28px_rgba(15,23,42,0.10)] hover:shadow-[inset_0_1.5px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(15,23,42,0.04),0_14px_36px_rgba(186,0,54,0.18)] hover:border-[#ba0036]/40 focus-within:border-[#ba0036]/50 focus-within:ring-2 focus-within:ring-[#ba0036]/25 transition-all duration-200 overflow-visible">
 
               <div className="flex-1 flex items-center gap-2.5 pl-5 pr-3 py-0 relative min-w-0 rounded-l-full" ref={navLocRef}>
                 <MapPin size={14} className="text-[#ba0036] shrink-0" />
@@ -530,7 +533,7 @@ useEffect(() => {
                     if (e.key === 'Escape') setNavLocOpen(false);
                   }}
                   placeholder={langCode === 'bn' ? 'এলাকা, জেলা, শহর…' : 'Area, district, city…'}
-                  className="!bg-transparent outline-none border-none w-full text-sm font-bold text-gray-900 placeholder-gray-400 py-3 min-w-0"
+                  className="!bg-transparent outline-none focus:outline-none focus-visible:outline-none border-none w-full text-sm font-bold text-gray-900 placeholder-gray-400 py-3 min-w-0"
                   autoComplete="off"
                 />
                 {navLoc && (
@@ -835,7 +838,7 @@ useEffect(() => {
           style={{ top: 'calc(var(--app-banner-h, 0px) + 56px)' }}
           className="md:hidden fixed inset-x-0 z-[55] bg-white/85 backdrop-blur-xl backdrop-saturate-[180%] border-b border-white/70 shadow-[0_8px_30px_rgba(15,23,42,0.10)] px-4 py-3 animate-[slideDown_0.2s_ease]">
           <div className="flex items-center gap-2" ref={mobileNavLocRef}>
-            <div className="flex-1 flex items-center gap-2 bg-gradient-to-br from-white via-slate-50/80 to-white backdrop-blur-md border border-slate-200/80 rounded-full px-4 py-2.5 relative shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(15,23,42,0.04),0_4px_14px_rgba(15,23,42,0.08)]">
+            <div className="flex-1 flex items-center gap-2 bg-gradient-to-br from-white via-slate-50/80 to-white backdrop-blur-md border border-slate-200/80 rounded-full px-4 py-2.5 relative shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(15,23,42,0.04),0_4px_14px_rgba(15,23,42,0.08)] focus-within:border-[#ba0036]/50 focus-within:ring-2 focus-within:ring-[#ba0036]/25 transition-colors">
               <MapPin size={14} className="text-[#ba0036] shrink-0" />
               <input
                 type="text"
@@ -847,7 +850,7 @@ useEffect(() => {
                   if (e.key === 'Escape') { setMobileNavLocOpen(false); setIsMobileSearchOpen(false); }
                 }}
                 placeholder={langCode === 'bn' ? 'এলাকা, জেলা, শহর…' : 'Area, district, city…'}
-                className="!bg-transparent outline-none border-none text-sm font-bold text-gray-900 placeholder-gray-400 w-full"
+                className="!bg-transparent outline-none focus:outline-none focus-visible:outline-none border-none text-sm font-bold text-gray-900 placeholder-gray-400 w-full"
                 autoComplete="off"
                 autoFocus
               />

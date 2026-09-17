@@ -103,21 +103,21 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   // here. `?tab=dashboard` on the landlord path guarantees a tap always lands
   // on the overview, even if they were sitting on another dashboard tab.
   const homeTo = (() => {
-    if (appMode === 'living') return '/living';
-    if (appMode === 'search') return '/';
+    // BOTH tenant surfaces keep the public homepage as Home. Pointing Home at
+    // the ledger instead is what stranded people who chose Living: the rail
+    // lost Home and Explore, so the homepage, search and services became
+    // unreachable from the one screen they lived on. The ledger is still one
+    // tap away — it is the raised centre action below.
+    if (appMode === 'living' || appMode === 'search') return '/';
     if (appMode === 'host') return '/host-dashboard?tab=dashboard';
     if (!isAuthenticated) return '/';
     const to = resolveHome({ activeRole: user?.role, roles, defaultHome, hasBooking: true });
     return to === '/host-dashboard' ? '/host-dashboard?tab=dashboard' : to;
   })();
 
-  const homeItem = appMode === 'living'
-    ? { id: 'home', label: isBn ? 'হিসাব' : 'Ledger', icon: Wallet, to: homeTo }
-    : { id: 'home', label: isBn ? 'হোম' : 'Home', icon: Home, to: homeTo };
+  const homeItem = { id: 'home', label: isBn ? 'হোম' : 'Home', icon: Home, to: homeTo };
 
-  const LEFT = appMode === 'living'
-    ? [homeItem]
-    : appMode === 'host'
+  const LEFT = appMode === 'host'
     ? [homeItem, appGuest
         ? { id: 'properties', label: isBn ? 'প্রপার্টি' : 'Properties', icon: Building2, action: 'login', next: '/host-dashboard?tab=properties' }
         : { id: 'properties', label: isBn ? 'প্রপার্টি' : 'Properties', icon: Building2, to: '/host-dashboard?tab=properties' }]
@@ -146,11 +146,11 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
     profileTarget,
   ];
 
-  // Which raised action sits in the middle. A Living-only app user has no use
-  // for either — their wallet has its own add buttons.
-  const centre = appMode === 'living' ? null
-    : appMode === 'search' ? 'living'
-    : appMode === 'host' ? 'list'
+  // Which raised action sits in the middle. Every tenant gets Living there —
+  // including the one who opens on it, for whom it is now the ONLY way back to
+  // the ledger from the rest of the app.
+  const centre = appMode === 'host' ? 'list'
+    : appMode ? 'living'
     : isTenant ? 'living' : 'list';
 
   const isActive = (item) => {

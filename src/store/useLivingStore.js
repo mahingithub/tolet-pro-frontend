@@ -3,6 +3,9 @@ import { persist } from 'zustand/middleware';
 import { toast } from 'sonner';
 import livingService from '../services/livingService';
 import { ACTIVITY, LOCAL, SEND, SOLO_ACTIONS, TMP_PREFIX, isSoloOp, mergeOp, uid } from './livingOps';
+// The ledger writes to the phone first, so its "sign in to save" ask cannot
+// come from the network layer — it has to be raised here. See utils/guestSave.js.
+import { requireLoginToSave } from '../utils/guestSave';
 
 /**
  * useLivingStore — client-side data layer for the "Living / Roommate Wallet"
@@ -155,6 +158,11 @@ const useLivingStore = create(
        *     mints and the server adopts — one writer, nothing to coordinate.
        */
       _apply: (action, args) => {
+        // A guest in the app may open any form and fill it in; the ask arrives
+        // HERE, where the entry would be written, and nothing is stored until
+        // they sign in. On the website (and for a signed-in user) this is a
+        // no-op — the ledger is offline-first by design.
+        if (!requireLoginToSave()) return null;
         const solo = SOLO_ACTIONS.has(action);
         const op = {
           opId: uid(),

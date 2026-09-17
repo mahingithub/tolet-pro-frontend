@@ -320,14 +320,14 @@ export default function SupportPage() {
                 </div>
               ) : (
                 <div className="sticky bottom-24 md:bottom-4">
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-2 flex items-end gap-2">
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-2 flex items-end gap-2 ring-1 ring-transparent focus-within:ring-2 focus-within:ring-[#ba0036]/30 transition-shadow">
                     <textarea
                       value={reply}
                       onChange={(e) => setReply(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReply(); } }}
                       rows={1}
                       placeholder={tr('Write a reply…', 'একটি উত্তর লিখুন…')}
-                      className="flex-1 resize-none bg-transparent px-3 py-2 text-sm font-medium text-gray-900 placeholder-gray-400 outline-none max-h-32"
+                      className="flex-1 resize-none bg-transparent px-3 py-2 text-sm font-medium text-gray-900 placeholder-gray-400 outline-none focus:outline-none focus-visible:outline-none max-h-32"
                     />
                     <button
                       onClick={handleReply}

@@ -86,24 +86,62 @@
    default, not a Tailwind class, which is why grepping the components for it
    found nothing.
 
-   Chrome normally suppresses the ring for touch focus (:focus matches,
-   :focus-visible does not). Several WebViews — MIUI's among them — classify a
-   tap on a text field as a "focus-visible" interaction anyway, so the ring
-   appears on a phone that has never seen a keyboard.
+   So: drop the ring on plain :focus, and hand keyboard users a brand ring of
+   our own. This removes the OEM ring, it does not remove focus visibility.
 
-   So: drop the ring on plain :focus, and hand :focus-visible a brand ring of
-   our own. Keyboard and assistive-tech users still get a clearly visible focus
-   indicator — this removes the OEM ring, it does not remove focus visibility.
+   WHY :focus-visible IS NOT THE WHOLE ANSWER.
+   For buttons, links, selects and [tabindex] it is exactly right: it matches
+   on Tab and not on a tap. For TEXT-ENTRY fields it is not. The spec tells the
+   browser to match :focus-visible on <input type=text>/<textarea> however
+   focus arrived — mouse, touch, or keyboard — because a caret field is
+   expected to advertise itself. So a plain `:focus-visible { outline }` paints
+   on every tap into every field, which is the same bug in a new coat: verified
+   in-browser, `el.matches(':focus-visible')` is true straight after a mouse
+   click.
 
-   :where() keeps specificity at ZERO, so every component-level focus style in
-   the app (Tailwind's focus:ring-*, focus:border-*, the auth forms' custom
-   rings) still wins on the elements that define one. A zero-specificity author
-   rule still beats the UA stylesheet, which is the only thing being replaced
-   here. */
+   And it looks worse than the UA ring it replaced. `outline` follows the
+   BORDER-RADIUS OF THE ELEMENT IT IS DRAWN ON, and our composers are bare
+   transparent inputs inside a rounded wrapper — the input's own radius is 0.
+   Result: a hard square rectangle slicing through a pill, which is what got
+   reported on the AI assistant composer.
+
+   So text fields are split off and gated on real keyboard navigation instead:
+   utils/focusModality.js puts `tp-keyboard-nav` on <html> while the user is
+   tabbing and takes it off on the next pointer event. Tap = no ring anywhere;
+   Tab = ring on everything. Nothing loses its focus indicator.
+
+   :where() keeps specificity at (0,1,0) — the pseudo-class outside it is the
+   only thing that counts — which is the SAME as a Tailwind `.outline-none`
+   utility, and this file is loaded after `@tailwind utilities`, so these rules
+   win the tie on source order. That is deliberate for the suppression above;
+   it is also why a component that wants to own its focus treatment has to say
+   `focus-visible:outline-none` (0,2,0) rather than bare `outline-none` — see
+   the composer in GlobalAIAssistant.jsx for the pattern. Component ring/border
+   styles set a DIFFERENT property and are untouched either way. */
+
+/* 1 — kill the UA ring everywhere, whatever the focus came from. */
 :where(input, textarea, select, button, a, summary, [tabindex], [contenteditable]):focus {
   outline: none;
 }
-:where(input, textarea, select, button, a, summary, [tabindex], [contenteditable]):focus-visible {
+
+/* 2 — non-text controls: :focus-visible already means "keyboard". Trust it. */
+:where(
+  select, button, a, summary, [tabindex],
+  input[type="checkbox"], input[type="radio"], input[type="button"],
+  input[type="submit"], input[type="reset"], input[type="file"],
+  input[type="range"], input[type="color"], input[type="image"]
+):focus-visible {
+  outline: 2px solid rgba(186, 0, 54, 0.7);
+  outline-offset: 2px;
+}
+
+/* 3 — text-entry: ring only while the user is actually navigating by keyboard.
+   Listed last so it outranks rule 1 on source order at equal specificity. */
+:where(html.tp-keyboard-nav) :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="image"]),
+  textarea,
+  [contenteditable]:not([contenteditable="false"])
+):focus {
   outline: 2px solid rgba(186, 0, 54, 0.7);
   outline-offset: 2px;
 }

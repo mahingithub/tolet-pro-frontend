@@ -20,7 +20,8 @@
     "android:strip-maps": "find android/app/src/main/assets/public -name '*.map' -delete && echo 'stripped sourcemaps from android assets'",
     "android:aab": "npm run android:sync && cd android && ./gradlew bundleRelease",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "release:check": "RELEASE_CHECK=1 vitest run src/test/playStoreRelease.test.js"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",

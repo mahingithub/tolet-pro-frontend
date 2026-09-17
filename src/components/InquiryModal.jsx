@@ -437,7 +437,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 											className={`bg-gray-50 rounded-2xl px-4 py-3.5 border transition-all ${
 												phone && !phoneOk
 													? 'border-red-300 focus-within:border-red-400 bg-red-50/50'
-													: 'border-gray-100 focus-within:border-[#ba0036] focus-within:bg-white'
+													: 'border-gray-100 focus-within:border-[#ba0036] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ba0036]/20'
 											}`}
 										>
 											<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
@@ -450,7 +450,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 												placeholder="+880 1XXX-XXXXXX"
 												value={phone}
 												onChange={(e) => setPhone(e.target.value)}
-												className="w-full bg-transparent text-sm font-bold text-gray-900 placeholder-gray-300 outline-none"
+												className="w-full bg-transparent text-sm font-bold text-gray-900 placeholder-gray-300 outline-none focus:outline-none focus-visible:outline-none"
 											/>
 											{phone && !phoneOk && (
 												<p className="text-[10px] font-black text-red-500 mt-1">
@@ -510,7 +510,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 										</div>
 
 										{/* ── Message preview / manual edit ── */}
-										<div className="bg-gray-50 rounded-2xl px-4 py-3.5 border border-gray-100 focus-within:border-[#ba0036] focus-within:bg-white transition-all">
+										<div className="bg-gray-50 rounded-2xl px-4 py-3.5 border border-gray-100 focus-within:border-[#ba0036] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ba0036]/20 transition-all">
 											<div className="flex items-center justify-between mb-1">
 												<p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
 													{t.yourMessage}
@@ -524,7 +524,7 @@ const InquiryModal = ({ isOpen, onClose, property, landlord }) => {
 												placeholder={t.messageOptionalNote}
 												value={message}
 												onChange={(e) => setMessage(e.target.value)}
-												className="w-full bg-transparent text-sm font-bold text-gray-900 placeholder-gray-300 outline-none resize-none h-20 leading-relaxed"
+												className="w-full bg-transparent text-sm font-bold text-gray-900 placeholder-gray-300 outline-none focus:outline-none focus-visible:outline-none resize-none h-20 leading-relaxed"
 											/>
 										</div>
 
