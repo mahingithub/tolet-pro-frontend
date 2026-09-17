@@ -210,23 +210,49 @@ function bindForegroundHandler(messaging) {
       const callerName = data.callerName || 'Someone';
       const isVideo = data.type === 'video';
       const isMissed = data.kind === 'missed_call' || data.click_action === 'MISSED_CALL';
-      const title = isMissed ? `Missed call from ${callerName}` : `${callerName} is calling`;
+      // Is this a CALL at all?
+      //
+      // This handler used to assume so. It is bound to onMessage, which
+      // receives EVERY foreground FCM message, and it built call copy from
+      // whatever arrived — so once rent and message notifications started
+      // reaching the browser reliably, an overdue-rent push landing while the
+      // tab was hidden would have announced itself as "Someone is calling /
+      // Incoming voice call", with Receive and Reject buttons.
+      //
+      // A call is identified by carrying a callId, not by the absence of
+      // anything else. `data.type` is no help on its own: on a call it holds
+      // the MEDIUM ('voice' | 'video'), while on everything else it holds the
+      // notification type ('payment', 'message_new'…).
+      const isCall = Boolean(data.callId) || isMissed;
+
+      const title = isCall
+        ? (isMissed ? `Missed call from ${callerName}` : `${callerName} is calling`)
+        : (payload.notification?.title || data.title || 'TO-LET PRO');
+
+      const callBody = isMissed
+        ? (isVideo ? 'You missed a video call' : 'You missed a voice call')
+        : (isVideo ? 'Incoming video call' : 'Incoming voice call');
+
       const options = {
-        body: isMissed
-          ? (isVideo ? 'You missed a video call' : 'You missed a voice call')
-          : (isVideo ? 'Incoming video call' : 'Incoming voice call'),
+        body: isCall ? callBody : (payload.notification?.body || data.body || ''),
         icon: '/icons/icon-192.png',
         badge: '/icons/icon-192.png',
         timestamp: Date.now(),
         vibrate: isMissed ? [160, 80, 160] : [250, 100, 250, 100, 250],
         silent: false,
-        tag: data.callId ? `incoming-call-${data.callId}` : 'incoming-call',
+        tag: isCall
+          ? (data.callId ? `incoming-call-${data.callId}` : 'incoming-call')
+          // Collapse per subject, matching the server's collapseKey, so a
+          // second notification about the same thing replaces the first.
+          : (data.notificationId ? `notif-${data.notificationId}` : `notif-${data.type || 'general'}`),
         data,
-        requireInteraction: !isMissed,
-        actions: isMissed ? [] : [
+        // Only a ringing phone earns a notification that will not go away on
+        // its own. Everything else is information, and information waits.
+        requireInteraction: isCall && !isMissed,
+        actions: (isCall && !isMissed) ? [
           { action: 'accept', title: 'Receive' },
           { action: 'decline', title: 'Reject' },
-        ],
+        ] : [],
       };
 
       try {

@@ -9,6 +9,7 @@ import callProvider from "./services/callProvider";
 import { getCurrentToken } from "./services/authService";
 import { listTenantBookings } from "./services/bookingService";
 import fcmService from "./services/fcmService";
+import { notificationDestination, isLandlordMode } from "./utils/notificationRoute";
 import ErrorBoundary from './components/ErrorBoundary';
 // Every code-split component below goes through this instead of React's bare
 // lazy(). A route chunk that fails to download is the difference between "the
@@ -200,6 +201,50 @@ const AppOpenReporter = () => {
 			.then((m) => m.reportAppOpen())
 			.catch(() => {});
 	}, [isAuthenticated]);
+
+	return null;
+};
+
+// ─── Native notification taps ───────────────────────────────────────────────
+// The OS notification is only half the feature; the other half is that tapping
+// it lands on the thing it was about. On the web that is the service worker's
+// notificationclick handler. Native has no service worker in the delivery path
+// — Capacitor hands the tap to JS — so this is the equivalent, and until it
+// existed a tapped push just opened the app wherever the user left it.
+//
+// Routing goes through notificationDestination(), the SAME table the bell
+// dropdown and the in-app toast use. A second hand-maintained switch over
+// `type` is exactly the defect that file was written to remove.
+const NativePushRouter = () => {
+	const navigate = useNavigate();
+	const auth = useAuth();
+	const { user } = auth;
+
+	useEffect(() => {
+		let disposed = false;
+		let detach = null;
+
+		import("./services/nativePush")
+			.then(({ setPushNavigationHandler }) => {
+				if (disposed) return;
+				detach = setPushNavigationHandler((n) => {
+					const { path, state } = notificationDestination(n, {
+						isLandlord: isLandlordMode(auth),
+						userId: user?.id || user?._id || "",
+					});
+					navigate(path, state ? { state } : undefined);
+				});
+			})
+			.catch(() => {});
+
+		return () => {
+			disposed = true;
+			detach?.();
+		};
+		// `auth` is read inside the handler rather than closed over stale: the
+		// effect re-runs when the role or identity changes, which is what decides
+		// whether a rent notification opens the host or the tenant dashboard.
+	}, [navigate, auth, user?.id, user?._id]);
 
 	return null;
 };
@@ -470,6 +515,7 @@ const AppLayout = () => {
 			<RouteSeoGuard />
 			<GlobalCallSocket />
 			<AppOpenReporter />
+			<NativePushRouter />
 			<AppDownloadBanner />
 			{/* safe-area-ok — this wrapper only positions the header; <Navbar />
 			    itself carries paddingTop: var(--sat). Adding it here too would

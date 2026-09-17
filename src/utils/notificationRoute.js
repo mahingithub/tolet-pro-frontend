@@ -120,6 +120,15 @@ export function notificationDestination(n, { isLandlord = false, userId = '' } =
     case 'rent_overdue':
       return at(isLandlord ? HOST.rent : TENANT.payments, targetId || bookingId);
 
+    // The landlord's weekly unpaid-tenant digest. Landlord-only by
+    // construction, so it does NOT consult isLandlord — a landlord reading it
+    // while switched into tenant mode still needs the rent register, which is
+    // the only screen where the digest's number can be acted on. It also has no
+    // highlightId on purpose: it is about several people at once, and flashing
+    // one of their rows would misrepresent it.
+    case 'rent_due_summary':
+      return { path: HOST.rent };
+
     // booking.controller.js sends { bookingId } (not targetId) for both
     // rent_updated emits — a rent/lease change, and being added to a rent as a
     // member.

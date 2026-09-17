@@ -472,12 +472,21 @@ export function daysUntil(dateISO) {
 export const roommateById = (roommates, id) => roommates.find((r) => r.id === id) || { id, name: '—', color: '#94a3b8' };
 
 // Deterministic initials for avatars.
-export const initials = (name = '') =>
-  name
+//
+// `String(name ?? '')` rather than a `= ''` default parameter: a default only
+// fires for `undefined`, so an explicit `null` walked straight into
+// `null.trim()` and threw. That is not hypothetical — SoloLedger's PersonSchema
+// declares `name` with `default: 'Friend'`, and a Mongoose default also only
+// fills `undefined`, so the API can and does hand back `name: null`. Every
+// person row renders an <Avatar>, so one nameless friend took down the whole
+// দেনা-পাওনা tab with "কিছু একটা সমস্যা হয়েছে", and the same helper behind the
+// wallet's dues avatars took the overview down with it.
+export const initials = (name) =>
+  String(name ?? '')
     .trim()
     .split(/\s+/)
     .slice(0, 2)
-    .map((w) => w[0])
+    .map((w) => w[0] || '')
     .join('')
     .toUpperCase() || '?';
 

@@ -1,16 +1,20 @@
 {
   "_comment": "EDIT THIS ON EVERY RELEASE. It is what tells an installed app that a newer build exists. Deploys with the website (Vercel), so no backend change is needed. latestVersionCode must match android/app/build.gradle's versionCode. Set minSupportedVersionCode ONLY when a build is genuinely unusable (a broken API contract, a data-loss bug) — it BLOCKS every older build from opening, so a typo here locks every tester out until you redeploy.",
-  "latestVersionCode": 14,
-  "latestVersionName": "1.1.2",
+  "latestVersionCode": 16,
+  "latestVersionName": "1.1.4",
   "minSupportedVersionCode": 1,
   "notes": {
     "bn": [
-      "ছোটখাটো সমস্যাগুলো ঠিক করা হয়েছে",
-      "অ্যাপ আগের চেয়ে দ্রুত ও স্থিতিশীল হয়েছে"
+      "ভাড়ার বিল, বকেয়া আর নতুন মেসেজ এখন ফোনের নোটিফিকেশনে আসবে",
+      "কোন ভাড়াটিয়ার ভাড়া বাকি আছে — বাড়িওয়ালা এখন নিজেই খবর পাবেন",
+      "নোটিফিকেশনে চাপ দিলে সরাসরি সেই পাতায় নিয়ে যাবে",
+      "রাতের নীরব সময়ে নোটিফিকেশন আর শব্দ করবে না"
     ],
     "en": [
-      "Fixed the small problems you were running into",
-      "The app is faster and steadier than before"
+      "Rent bills, dues and new messages now arrive as phone notifications",
+      "Landlords are told which tenants haven't paid this month",
+      "Tapping a notification opens the screen it is about",
+      "Notifications stay silent during your quiet hours"
     ]
   }
 }

@@ -454,7 +454,13 @@ const ChatRow = React.memo(function ChatRow({ chat, lastMessage, isActive, onSel
   const preview = lastMessage
     ? (lastMessage.sender === 'me' ? `You: ${lastMessage.text || ''}` : (lastMessage.text || ''))
     : '';
-  const timeLabel = lastMessage?.iso ? formatTime(lastMessage.iso) : chat.time;
+  // `chat.time` is NOT a label — buildChats() stores a raw ISO string on it
+  // whenever the conversation has a lastMessageAt, and only falls back to the
+  // literal 'Just now'. Rendering it unformatted put "2026-09-02T06:36:07.613Z"
+  // in the chat list for every conversation whose lastMessage prop hadn't
+  // loaded. formatTime() handles both: it passes a non-date label straight
+  // through and turns a real ISO into a clock time.
+  const timeLabel = formatTime(lastMessage?.iso || chat.time);
 
   return (
     <button
