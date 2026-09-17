@@ -29,6 +29,27 @@ import { FEATURE_PAGES } from '../../seo/featurePages';
 const LocationSeoBlock = ({ seo }) => {
   const { language } = useLanguage();
   const bn = language === 'বাংলা';
+
+  // Sub-area names for a Dhaka thana page (Kazipara inside Mirpur, Sheikhertek
+  // inside Adabar, …). Fetched on demand rather than bundled: all 669 of them
+  // with both languages weigh 51 KB, they only ever appear on one page type,
+  // and they sit below the fold. Google's renderer executes this fetch, and the
+  // prerendered HTML already contains them for crawlers that do not.
+  //
+  // These two hooks must stay ABOVE the `if (!seo)` guard. They used to sit
+  // further down, so a `seo` that arrived asynchronously took the component
+  // from 0 hooks to 2 between renders — "rendered more hooks than during the
+  // previous render". The effect is already null-safe via `seo?.`.
+  const [subAreas, setSubAreas] = useState(null);
+  useEffect(() => {
+    if (seo?.kind !== 'area') { setSubAreas(null); return undefined; }
+    let cancelled = false;
+    import('../../seo/dhakaSubAreas.js')
+      .then((m) => { if (!cancelled) setSubAreas(m.DHAKA_SUB_AREAS[seo.id] || []); })
+      .catch(() => { /* chips are a nice-to-have; the page stands without them */ });
+    return () => { cancelled = true; };
+  }, [seo?.kind, seo?.id]);
+
   if (!seo) return null;
 
   const isDistrict = seo.kind === 'district';
@@ -58,21 +79,6 @@ const LocationSeoBlock = ({ seo }) => {
   // useful thing that page can offer: nobody searching Dhaka wants "all of
   // Dhaka", they want their area.
   const showDhakaAreas = seo.id === 'dhaka';
-
-  // Sub-area names for a Dhaka thana page (Kazipara inside Mirpur, Sheikhertek
-  // inside Adabar, …). Fetched on demand rather than bundled: all 669 of them
-  // with both languages weigh 51 KB, they only ever appear on one page type,
-  // and they sit below the fold. Google's renderer executes this fetch, and the
-  // prerendered HTML already contains them for crawlers that do not.
-  const [subAreas, setSubAreas] = useState(null);
-  useEffect(() => {
-    if (seo?.kind !== 'area') { setSubAreas(null); return undefined; }
-    let cancelled = false;
-    import('../../seo/dhakaSubAreas.js')
-      .then((m) => { if (!cancelled) setSubAreas(m.DHAKA_SUB_AREAS[seo.id] || []); })
-      .catch(() => { /* chips are a nice-to-have; the page stands without them */ });
-    return () => { cancelled = true; };
-  }, [seo?.kind, seo?.id]);
 
   const areaList = seo.kind === 'area'
     ? (subAreas || []).map((s) => (bn ? (s.bn || s.en) : s.en))

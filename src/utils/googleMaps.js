@@ -57,6 +57,10 @@ import { useJsApiLoader } from '@react-google-maps/api';
 // wrong" panel, and reverse-geocoding returned "This API is not activated".
 export const GOOGLE_MAPS_API_KEY =
   (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_GOOGLE_MAPS_API_KEY) ||
+  // `process` is not a browser global and Vite does not shim it, which is
+  // exactly why the `typeof` guard is there — this is a deliberate CRA-era
+  // fallback, not a missing import. no-undef cannot see the guard.
+  // eslint-disable-next-line no-undef
   (typeof process !== 'undefined' && process?.env?.REACT_APP_GOOGLE_MAPS_API_KEY) ||
   'AIzaSyCJxYKtSBxh-BokQG79qN5r6DxGWrq8S-I';
 

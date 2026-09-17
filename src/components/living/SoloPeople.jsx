@@ -6,7 +6,7 @@
  * of "I think I gave you five hundred sometime", the ledger shows the row, the
  * day, and what the running balance is right now.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownLeft, ArrowUpRight, BellRing, CalendarClock, Check,
   Pencil, Phone, Trash2, UserPlus, Users,

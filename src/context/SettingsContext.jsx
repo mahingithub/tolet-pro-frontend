@@ -34,14 +34,25 @@ const SettingsContext = createContext(null);
 // ─── Global side-effect appliers ────────────────────────────────────────────
 
 function resolveTheme(theme) {
-  // The APP is one scheme, deliberately. A light surface, always, on every
-  // screen — so the product has a single look to design against instead of two
-  // that have to be checked, and nobody lands on a half-converted screen after
-  // flipping a switch. The WEBSITE keeps the choice: on a desktop browser the
-  // theme is the reader's, not ours.
-  if (isInsideNativeApp()) return 'light';
+  // AN EXPLICIT CHOICE IS HONOURED EVERYWHERE, app included. The switcher is
+  // back in the app (App.jsx renders ThemeWidget on every screen but login),
+  // and a control that reports a preference it quietly refuses to apply is
+  // worse than no control at all.
   if (theme === 'light' || theme === 'dark') return theme;
-  // 'system' → follow the OS preference.
+
+  // 'system' IS THE DEFAULT, AND IN THE APP IT MEANS LIGHT — not the OS.
+  //
+  // Nineteen of the ~317 files under src/ carry any `dark:` styles. Resolving
+  // 'system' against the phone would therefore hand every user whose Android
+  // is in dark mode a half-converted app they never asked for, silently, on
+  // first launch. Dark stays something you choose, not something you are given.
+  //
+  // Widen this to the OS once the screens are actually styled for it; nothing
+  // else has to change.
+  if (isInsideNativeApp()) return 'light';
+
+  // The WEBSITE follows the OS as it always has: on a desktop browser the
+  // theme is the reader's, not ours.
   const prefersDark =
     typeof window !== 'undefined' &&
     window.matchMedia &&

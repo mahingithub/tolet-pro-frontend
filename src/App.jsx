@@ -444,6 +444,13 @@ const AppLayout = () => {
 
 	const shouldHideAIAssistant = !shouldShowAIAssistant;
 
+	// The theme switcher is hidden on the login screen and nowhere else. Both
+	// paths are the SAME LoginPage component — NATIVE_WELCOME_PATH is the app's
+	// first screen — and a tab floating over the phone/OTP form sits on top of
+	// the only thing there is to do there.
+	const isLoginScreen =
+		location.pathname === "/login" || location.pathname === NATIVE_WELCOME_PATH;
+
 	// On the property listing page, the Navbar is replaced on mobile by the
 	// immersive Daraz-style header built into PropertyListing itself.
 	// We still render it on desktop (lg+) so the brand bar stays visible there.
@@ -691,11 +698,12 @@ const AppLayout = () => {
 			    an overlay — a spinner for a floating button would be worse than
 			    the button simply appearing a moment later. */}
 			<Suspense fallback={null}>
-				{/* Website only. The app is locked to one scheme (see
-				    SettingsContext.resolveTheme), so a floating light/dark/system
-				    switcher there is a control that changes nothing — and it sat
-				    on top of every screen to do it. */}
-				{!isNativeApp() && <ThemeWidget />}
+				{/* The light/dark switcher, in the app as well as on the website.
+				    It is hidden on the login screen only — see isLoginScreen.
+				    An explicit choice now applies inside the app too
+				    (SettingsContext.resolveTheme), so the control is no longer
+				    the no-op that got it removed from here. */}
+				{!isLoginScreen && <ThemeWidget />}
 				<GlobalCallUI />
 				<WelcomeRobotOverlay />
 				<HomeIntentModal />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Building, Building2, Calendar,
@@ -80,6 +80,7 @@ import { PLAY_STORE_URL } from '../hooks/useAppInstall';
 import { SITE_URL } from '../seo/siteConfig';
 import { directUpload } from '../services/cloudinaryUpload';
 import AgreementBrandModal from './host-dashboard/AgreementBrandModal.jsx';
+import ScheduleVisitModal from './ScheduleVisitModal';
 import { submitOnEnter } from '../utils/submitOnEnter';
 import { listBuildings } from '../services/buildingService';
 import useHostSyncStore from '../store/useHostSyncStore';
@@ -1506,8 +1507,15 @@ const HostDashboard = () => {
   const [inquiryTab, setInquiryTab] = useState('pending'); // 'pending' | 'accepted' | 'rejected' | 'rented'
   const [searchQuery, setSearchQuery] = useState('');
   const [propertyFilter, setPropertyFilter] = useState('all');
-  const [activeModal, setActiveModal] = useState(null); 
+  const [activeModal, setActiveModal] = useState(null);
   const [modalData, setModalData] = useState(null);
+  // The schedule_visit block at the bottom of the render calls closeModal(),
+  // which was never defined — it would have thrown ReferenceError the moment
+  // that modal opened. Same clear-both-pieces of state as the back guard does.
+  const closeModal = useCallback(() => {
+    setActiveModal(null);
+    setModalData(null);
+  }, []);
   // ── Quick-action modal state (broadcast / reminders / export report) ────────
   // These three dashboard actions used to be toast-only stubs; they now drive
   // real work, so they need backing form + in-flight state.

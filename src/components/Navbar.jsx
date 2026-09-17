@@ -328,7 +328,12 @@ useEffect(() => {
     return () => window.removeEventListener('open-mobile-menu', handler);
   }, []);
 
-  const closeAll = () => { setIsMobileMenuOpen(false); setIsProfileMenuOpen(false); setShowVerificationModal(false); window.dispatchEvent(new CustomEvent('close-mobile-menu')); };
+  // `setIsProfileMenuOpen(false)` used to sit in the middle of this line. Its
+  // useState was deleted in ff45916 but the call was left behind, so every
+  // go() -> closeAll() threw ReferenceError *after* setIsMobileMenuOpen but
+  // *before* the close-mobile-menu dispatch — the drawer closed, the bottom
+  // nav never heard about it, and Sentry took an uncaught error per nav tap.
+  const closeAll = () => { setIsMobileMenuOpen(false); setShowVerificationModal(false); window.dispatchEvent(new CustomEvent('close-mobile-menu')); };
 
   const go = path => { navigate(path); closeAll(); };
 
