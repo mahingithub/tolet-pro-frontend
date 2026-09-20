@@ -57,6 +57,12 @@ const DEVICE_KEEP_PREFIXES = [
   // ever, so purging this on logout would turn a one-time consent question into
   // a prompt that returns on every sign-in.
   'tolet_pro::offer_optin_asked',
+  // utils/appOpens.js — how many times this account has launched the app, which
+  // is what count-gated prompts wait on before interrupting anyone. Clearing it
+  // on logout would reset that progress, so a user who signs out regularly
+  // would never reach the threshold and would never be asked at all — the
+  // silent-exclusion failure the count exists to fix.
+  'tolet_pro::app_opens',
 ];
 
 const isDeviceLevelKey = (k) =>

@@ -21,6 +21,7 @@ import lazyRoute from './utils/lazyRoute';
 // dynamically inside the hook, and only on native.
 import useAndroidBackButton from './hooks/useAndroidBackButton';
 import { needsBookingLookup, resolveHome } from './utils/homeSurface';
+import { recordAppOpen } from './utils/appOpens';
 import { hasCachedSettings } from './services/settingsService';
 import {
 	NATIVE_START_PATH,
@@ -193,14 +194,26 @@ const GlobalCallSocket = () => {
 // install, and a plain browser session is the baseline the other two are
 // distinguished from.
 const AppOpenReporter = () => {
-	const { isAuthenticated } = useAuth();
+	const { isAuthenticated, user } = useAuth();
+	const userId = user?.id || user?._id || "";
 
 	useEffect(() => {
 		if (!isAuthenticated) return;
 		import("./services/appClientService")
 			.then((m) => m.reportAppOpen())
 			.catch(() => {});
-	}, [isAuthenticated]);
+		// The same launch, counted locally as well. The server's appClients entry
+		// records WHEN the app was last opened but not HOW OFTEN, and "has this
+		// person come back a few times" is the question an in-app prompt needs
+		// answered before it interrupts anyone — see utils/appOpens.js.
+		//
+		// Counted here rather than inside reportAppOpen() because this is the
+		// component that knows who is signed in; the service only holds a bearer
+		// token, and a count that cannot be keyed to an account would let one
+		// person's familiarity with the app speak for the next person on a shared
+		// phone.
+		recordAppOpen(userId);
+	}, [isAuthenticated, userId]);
 
 	return null;
 };

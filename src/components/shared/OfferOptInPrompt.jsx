@@ -14,12 +14,26 @@
  * works; nobody knows it is there.
  *
  * WHEN IT ASKS — and why not at launch.
- * The caller passes `eligible`, and is expected to pass true only once the
- * account has done the thing the app is FOR: a landlord with a property, a
- * tenant with a tenancy. Asking on first launch means asking someone who has no
- * idea yet whether this app is worth hearing from, and a "no" is permanent — we
- * only ask once, ever. Waiting costs a few days and buys an answer that means
- * something.
+ * Asking on first launch means asking someone who has no idea yet whether this
+ * app is worth hearing from, and a "no" is permanent — we only ask once, ever.
+ * Waiting costs a few days and buys an answer that means something.
+ *
+ * There are now TWO ways to have waited long enough, and either is sufficient:
+ *
+ *   1. `eligible` — the caller says the account has done the thing the app is
+ *      FOR: a landlord with a property, a tenant with a tenancy. The strongest
+ *      possible signal, and it asks at the first good moment.
+ *
+ *   2. THREE APP OPENS — see utils/appOpens.js. Somebody who has come back
+ *      twice after installing has formed an opinion, whether or not they have
+ *      a property or a tenancy yet.
+ *
+ * The second exists because the first turned out to be far narrower than it
+ * reads. Most live bookings carry no occupant row, so the great majority of
+ * tenants were never `eligible` and were therefore NEVER ASKED — and an admin
+ * WhatsApp campaign to 32 users reported "31 never opted in", which was true
+ * and which nobody could act on, because those 31 had not declined anything.
+ * A consent gate that silently never asks is not consent, it is a dead channel.
  *
  * ASKED ONCE, EVER.
  * Both buttons record the ask. Declining is not a maybe-later: a promo consent
@@ -36,6 +50,7 @@ import { MessageCircle, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useSettings } from '../../context/SettingsContext.jsx';
 import { useLanguage } from '../../context/LanguageContext';
+import { hasOpenedAtLeast } from '../../utils/appOpens';
 
 // Per-account so a shared phone does not answer for the next person. The
 // prefix is registered in services/authService.js → DEVICE_KEEP_PREFIXES.
@@ -52,6 +67,13 @@ const markAsked = (userId) => {
 // Long enough that the sheet is not part of the screen's arrival — it should
 // read as a considered question, not a popup that fired on page load.
 const APPEAR_DELAY_MS = 4000;
+
+// Launches before we will ask an account that has no property and no tenancy.
+// Three, because two is "installed it and opened it again to look around" and
+// three is a deliberate return. Counted per account by utils/appOpens.js, which
+// records one per app load — so this is three separate visits, not three
+// screens in one sitting.
+const MIN_APP_OPENS = 3;
 
 export default function OfferOptInPrompt({ eligible = false }) {
   const auth = useAuth();
@@ -70,9 +92,19 @@ export default function OfferOptInPrompt({ eligible = false }) {
   // found the toggle on their own must never be asked as though they hadn't.
   const alreadyOptedIn = settings?.notifications?.whatsappOptIn === true;
 
+  // Either qualification is enough, and the choice is made INSIDE the timer
+  // rather than before it. The launch count is written by App.jsx's
+  // AppOpenReporter on this same page load, and the two components sit in
+  // different subtrees — so which effect runs first is an ordering detail
+  // nothing should depend on. Deciding a few seconds later means the count is
+  // always the current one; getting this backwards would not crash anything, it
+  // would just quietly defer every qualifying user by one launch, forever.
   useEffect(() => {
-    if (!eligible || !userId || alreadyOptedIn || wasAsked(userId)) return undefined;
-    const t = setTimeout(() => setOpen(true), APPEAR_DELAY_MS);
+    if (!userId || alreadyOptedIn || wasAsked(userId)) return undefined;
+    const t = setTimeout(() => {
+      if (!eligible && !hasOpenedAtLeast(userId, MIN_APP_OPENS)) return;
+      setOpen(true);
+    }, APPEAR_DELAY_MS);
     return () => clearTimeout(t);
   }, [eligible, userId, alreadyOptedIn]);
 
