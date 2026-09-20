@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import notificationService from '../services/notificationService';
@@ -7,6 +7,12 @@ import { useAuth } from './AuthContext'; // Need to make sure AuthContext exists
 import { notificationDestination, isLandlordMode } from '../utils/notificationRoute';
 
 const NotificationContext = createContext();
+
+// Types allowed to interrupt with a toast. Chat is deliberately ABSENT —
+// GlobalToaster renders a richer message toast off RECEIVE_MESSAGE, and both
+// firing produces a duplicate. Read by the socket handler and by the
+// foreground-push handler, which must agree or the exclusion above leaks.
+const TOASTABLE = ['booking', 'payment', 'receipt', 'rent_receipt', 'rent_updated', 'marketing', 'tenant_onboarding'];
 
 export function NotificationProvider({ children }) {
   const auth = useAuth();
@@ -86,15 +92,57 @@ export function NotificationProvider({ children }) {
     }
   }, [isAuthed, loadNotifications]);
 
+  // ─── Toast de-duplication ────────────────────────────────────────────────
+  // The SAME notification can now arrive twice on a native device: once over
+  // the socket (the in-app channel) and once as an FCM push delivered to the
+  // foreground (see services/nativePush.js). An admin blast that selects both
+  // channels does exactly this, and two identical toasts stacked on top of each
+  // other is worse than the silence it replaced.
+  //
+  // Keyed on CONTENT, not id: a marketing push carries no notificationId (the
+  // blast calls firebaseAdmin directly rather than going through emit()), so
+  // there is no shared identifier to join on. Whichever transport arrives first
+  // toasts and claims the key; the other is dropped.
+  const recentToastsRef = useRef(new Map());
+  const TOAST_DEDUPE_MS = 15000;
+
+  // A synchronous mirror of `items`, so a socket handler can ask "do I already
+  // hold this row?" without reaching into a state updater to find out.
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+
+  const claimToast = useCallback((data) => {
+    const key = `${data?.type || ''}|${data?.title || ''}|${data?.body || ''}`;
+    const now = Date.now();
+    const seen = recentToastsRef.current;
+    // Sweep on read — this map is touched a handful of times per session, so a
+    // timer to prune it would cost more than it saves.
+    for (const [k, at] of seen) if (now - at > TOAST_DEDUPE_MS) seen.delete(k);
+    if (seen.has(key)) return false;
+    seen.set(key, now);
+    return true;
+  }, []);
+
   // Handle socket for real-time updates
   useEffect(() => {
     if (!isAuthed) return;
-    
+
     let cancelled = false;
     const socket = callProvider.getSocket();
 
     const handleNewNotification = (data) => {
       if (cancelled) return;
+      // Prepend only if the row isn't already held. Two things can insert the
+      // same notification: this event, and a loadNotifications() refetch — from
+      // the 'connect' handler below, or from the foreground-push effect. When a
+      // refetch lands first, an unguarded prepend produced a duplicate row in
+      // the bell and an unread count one too high, which never self-corrected
+      // until a remount.
+      //
+      // Checked against a ref rather than inside the setItems updater: the
+      // updater must stay a pure function of `prev` (React may invoke it twice),
+      // so it is not somewhere to compute a flag that setUnreadCount then reads.
+      if (data?.id && itemsRef.current.some((x) => String(x.id) === String(data.id))) return;
       setItems((prev) => [data, ...prev]);
       setUnreadCount((prev) => prev + 1);
 
@@ -116,7 +164,11 @@ export function NotificationProvider({ children }) {
       // is the answer to a form they filled in with their NID on it. Both are
       // as time-sensitive as anything else on this list, and neither was
       // surfacing at all until it was added here.
-      const TOASTABLE = ['booking', 'payment', 'receipt', 'rent_receipt', 'rent_updated', 'marketing', 'tenant_onboarding'];
+      //
+      // Hoisted to module scope (TOASTABLE) because the foreground-push effect
+      // below has to make the identical decision — most importantly the
+      // exclusion of chat, which GlobalToaster owns and which would otherwise
+      // toast twice on a native device.
 
       // DND applies to PROMOTIONAL traffic only. The rest of this list is
       // transactional — a rent receipt or an overdue notice is exactly what a
@@ -124,7 +176,7 @@ export function NotificationProvider({ children }) {
       // schedule meant for offers would be a regression. The row and unread
       // count are recorded above either way, so a held-back toast loses nothing.
       const isPromotional = data.type === 'marketing';
-      if (TOASTABLE.includes(data.type) && !(isPromotional && isDNDActive())) {
+      if (TOASTABLE.includes(data.type) && !(isPromotional && isDNDActive()) && claimToast(data)) {
         toast.info(data.title || 'New Notification', {
           description: data.body,
           action: {
@@ -184,7 +236,55 @@ export function NotificationProvider({ children }) {
     // changes when the user edits their DND schedule, so the listener churn is
     // negligible. `isLandlord` / `myId` are read by the toast's routing and
     // change only on a role switch or re-login, for the same reason.
-  }, [isAuthed, loadNotifications, isDNDActive, isLandlord, myId, navigate]);
+  }, [isAuthed, loadNotifications, isDNDActive, isLandlord, myId, navigate, claimToast]);
+
+  // ─── Foreground push (native only) ───────────────────────────────────────
+  // On Android the OS posts nothing while the app is open, so without this a
+  // push aimed at an active user vanished entirely. Surfaced as a toast, which
+  // is the same thing the socket path does — and deduped against it, because a
+  // campaign that picks both in-app AND push delivers both to this device.
+  //
+  // The list is refetched rather than optimistically prepended: a push payload
+  // is not a Notification row and a marketing one has no id at all, so pushing
+  // it into `items` would seed a row that markAsRead and removeNotification
+  // cannot act on. The server already holds the real row when the in-app
+  // channel was used; when it wasn't, there is correctly nothing to add.
+  useEffect(() => {
+    if (!isAuthed) return undefined;
+    let cancelled = false;
+    let detach = null;
+
+    (async () => {
+      const { Capacitor } = await import('@capacitor/core');
+      if (cancelled || !Capacitor.isNativePlatform()) return;
+      const { setPushForegroundHandler } = await import('../services/nativePush');
+      if (cancelled) return;
+
+      detach = setPushForegroundHandler((data) => {
+        if (!TOASTABLE.includes(data.type)) return;
+        const isPromotional = data.type === 'marketing';
+        if (isPromotional && isDNDActive()) return;
+        if (!claimToast(data)) return;
+
+        loadNotifications();
+        toast.info(data.title || 'New Notification', {
+          description: data.body,
+          action: {
+            label: 'দেখুন',
+            onClick: () => {
+              const { path, state } = notificationDestination(data, { isLandlord, userId: myId });
+              navigate(path, state ? { state } : undefined);
+            },
+          },
+        });
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      if (detach) detach();
+    };
+  }, [isAuthed, isDNDActive, claimToast, loadNotifications, isLandlord, myId, navigate]);
 
   const markAsRead = async (id) => {
     setItems((prev) => prev.map((x) => x.id === id ? { ...x, read: true } : x));

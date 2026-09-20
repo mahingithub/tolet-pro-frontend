@@ -21,6 +21,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import { LOCAL, SEND, mergeOp, newOpId, opSubject, replayInto } from './hostOps';
+import { LOGGED_OUT_EVENT } from '../services/authService.js';
 
 const looksOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
 
@@ -175,6 +176,18 @@ if (typeof window !== 'undefined') {
   window.setTimeout(() => {
     useHostSyncStore.getState().flush();
   }, 5000);
+  // The queue belongs to the landlord who typed it. reset() was written for this
+  // ("Leaving the account behind") and never wired to anything.
+  //
+  // This is not new data loss: clearAllAppData() already deletes the PERSISTED
+  // queue on every logout, so all that survived was a ghost copy in memory. Left
+  // alone it does two bad things — persist() writes it back to storage on the
+  // next set(), and if a DIFFERENT landlord signs in on this phone without a
+  // reload, the next flush sends account A's collections under account B's
+  // token. Clearing memory just makes it agree with the disk.
+  window.addEventListener(LOGGED_OUT_EVENT, () => {
+    useHostSyncStore.getState().reset();
+  });
 }
 
 export default useHostSyncStore;

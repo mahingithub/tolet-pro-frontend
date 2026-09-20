@@ -173,7 +173,14 @@ export const AuthProvider = ({ children }) => {
           && !loggedInRoles.includes(requestedRole)) {
           // svcLogin has already persisted the token, so tear the session back
           // down — a rejected login must not leave a usable one behind.
-          try { await svcLogout(); } catch { /* storage is cleared regardless */ }
+          //
+          // `dropAccountState: false` because this login never got far enough to
+          // load any: the account was rejected before a single fetch, so what is
+          // in the Living store is still the GUEST's own unsaved খরচ, typed
+          // before they tried to sign in. Wiping it here would punish someone for
+          // tapping the wrong role. Nothing of the rejected account is in memory
+          // to leak — the storage wipe inside svcLogout is the whole job.
+          try { await svcLogout({ dropAccountState: false }); } catch { /* storage is cleared regardless */ }
           setUser(null);
           const err = new Error('ROLE_MISMATCH');
           err.code = 'ROLE_MISMATCH';
@@ -262,11 +269,11 @@ export const AuthProvider = ({ children }) => {
         // SPA navigation below takes to commit. RequireAuth checks this flag and
         // holds its redirect instead.
         setLoggingOut(true);
+        // Announces auth:logged-out for the in-memory stores on its own — see
+        // authService.logout(). It used to be dispatched here instead, which is
+        // why the three NON-button ways out of a session never cleared them.
         svcLogout();
         setUser(null);
-        // Stores that keep account data in memory (the Living wallet) listen for
-        // this; clearing localStorage alone leaves it on screen for the guest.
-        window.dispatchEvent(new Event('auth:logged-out'));
 
         // Logging out is a full stop, not a step back into the guest app — the
         // app lands on the login screen, exactly like the website. Dropping

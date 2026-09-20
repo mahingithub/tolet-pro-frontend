@@ -22,6 +22,7 @@ import {
 import { loadSeenMap, isInquiryUnread, markInquirySeen } from '../utils/inquiryUnread';
 import SmartAlertsPage from './Smartalertspage';
 import SmartAlertsPopup from './SmartAlertsPopup';
+import OfferOptInPrompt from './shared/OfferOptInPrompt';
 import LandlordHomeChoiceModal from './shared/LandlordHomeChoiceModal';
 import LocationSearchModal from './shared/LocationSearchModal';
 import { buildSearchUrl } from '../data/searchData';
@@ -1793,6 +1794,12 @@ const handleWizardSubmit = async (payload) => {
         role="tenant"
         onViewAll={() => setActiveTab('alerts')}
       />
+
+      {/* 💬 WHATSAPP OFFERS OPT-IN — asked ONCE per account, and only once the
+          tenant actually has a tenancy. Someone still browsing listings has no
+          basis to answer, and the answer is permanent. Mirrors the gate used on
+          the landlord side (a property published). */}
+      <OfferOptInPrompt eligible={Boolean(activeBookingIdsKey)} />
 
       {/* ✨ GLOWING ORBS ✨ — same decorative pattern as HostDashboard */}
       <div className="fixed top-[-20%] left-[-10%] w-[50vw] h-[50vw] bg-gradient-to-br from-[#ba0036]/10 to-transparent rounded-full blur-[120px] pointer-events-none z-0"></div>

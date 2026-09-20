@@ -30,6 +30,18 @@ let _registering = null;
 let _pendingTap = null;
 let _navigate = null;
 
+// ─── Foreground delivery ───────────────────────────────────────────────────
+// Android does NOT post a system notification while the app is in the
+// foreground. The push still arrives — Capacitor hands it to
+// 'pushNotificationReceived' — but if nothing is listening it is dropped on the
+// floor, which is indistinguishable from never having been sent. An offer blast
+// aimed at people actively using the app reached exactly none of them.
+//
+// Unlike the tap, there is nothing to replay here: a foreground push that
+// arrives before React has mounted is by definition not a foreground push, so
+// this handler is simply absent until the provider installs it.
+let _onForeground = null;
+
 /**
  * Install the navigation handler. Called once from the React tree (see
  * NativePushRouter in App.jsx), which is the only place that owns a router.
@@ -48,20 +60,34 @@ export function setPushNavigationHandler(fn) {
   return () => { if (_navigate === fn) _navigate = null; };
 }
 
-function deliverTap(notification) {
+/**
+ * Install the foreground-delivery handler. Called from NotificationContext,
+ * which owns both the toast and the unread count. Returns an unsubscribe.
+ */
+export function setPushForegroundHandler(fn) {
+  _onForeground = typeof fn === 'function' ? fn : null;
+  return () => { if (_onForeground === fn) _onForeground = null; };
+}
+
+/** Shape a Capacitor push into the same object a Notification row produces. */
+function toNotificationShape(notification) {
   // FCM only forwards the `data` dict to the client; title/body live on the
-  // notification envelope. The server puts the routing fields (type, targetId,
-  // bookingId, conversationId…) in `data`, so that is what the route table
-  // needs. Shape it like a Notification row so notificationDestination() can
-  // read it unchanged.
+  // notification envelope.
   const data = notification?.data || {};
-  const payload = {
+  return {
     id: data.notificationId || '',
     type: data.type || 'system',
     title: notification?.title || '',
     body: notification?.body || '',
     data,
   };
+}
+
+function deliverTap(notification) {
+  // The server puts the routing fields (type, targetId, bookingId,
+  // conversationId…) in `data`, so that is what the route table needs. Shaped
+  // like a Notification row so notificationDestination() reads it unchanged.
+  const payload = toNotificationShape(notification);
   if (_navigate) {
     try { _navigate(payload); } catch { /* non-fatal */ }
   } else {
@@ -113,6 +139,16 @@ function bindListeners() {
   // does not take you to its subject is barely a notification.
   PushNotifications.addListener('pushNotificationActionPerformed', ({ notification }) => {
     deliverTap(notification);
+  });
+
+  // THE FOREGROUND CASE. See _onForeground above: with the app open, Android
+  // posts nothing to the shade and this event is the only delivery. Handing it
+  // to the provider lets it surface as an in-app toast — the same treatment a
+  // socket-delivered notification gets, which is what a user already recognises
+  // as "something arrived".
+  PushNotifications.addListener('pushNotificationReceived', (notification) => {
+    if (!_onForeground) return;
+    try { _onForeground(toNotificationShape(notification)); } catch { /* non-fatal */ }
   });
 }
 

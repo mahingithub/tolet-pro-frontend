@@ -52,6 +52,7 @@ import { openConversation, sendMessage, sendMediaMessage } from "../services/cha
 import { uploadAvatar, uploadVerificationDoc } from "../services/authService";
 import ProfileSection from './shared/ProfileSection';
 import FreeProTrialModal from './FreeProTrialModal';
+import OfferOptInPrompt from './shared/OfferOptInPrompt';
 import VerificationModal from './VerificationModal';
 import SharedSettings from './shared/SharedSettings';
 import Smartalertspage from './Smartalertspage';
@@ -5054,6 +5055,14 @@ const HostDashboard = () => {
         loading={paymentMethodsLoading}
         onAddMethod={() => setActiveTab('payments')}
       />
+
+      {/* 💬 WHATSAPP OFFERS OPT-IN — asked ONCE per account, and only after the
+          landlord has a property live. Same gate-on-real-activity reasoning as
+          the payment reminder above: consent to be marketed to is worth asking
+          for from someone who has seen what the app does, and worthless (a
+          reflex "no", recorded forever) from someone who signed up an hour ago.
+          Everything else about when and whether to show lives in the component. */}
+      <OfferOptInPrompt eligible={!isPropertiesLoading && properties.length > 0} />
 
       {/* 🎁 FREE PRO TRIAL MODAL — share the app, unlock 2 months Pro. */}
       <FreeProTrialModal

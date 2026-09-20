@@ -52,10 +52,31 @@ const DEVICE_KEEP_KEYS = new Set([
 // A "show this once" flag is worthless if it doesn't outlive a logout.
 const DEVICE_KEEP_PREFIXES = [
   'tolet_pro::tours_completed', // TourContext — which guided tours are done
+  // OfferOptInPrompt — "we already asked this account about WhatsApp offers".
+  // Same reasoning as the tour record, and the stakes are higher: we ask ONCE,
+  // ever, so purging this on logout would turn a one-time consent question into
+  // a prompt that returns on every sign-in.
+  'tolet_pro::offer_optin_asked',
 ];
 
 const isDeviceLevelKey = (k) =>
   DEVICE_KEEP_KEYS.has(k) || DEVICE_KEEP_PREFIXES.some((p) => k.startsWith(p));
+
+/**
+ * "The session that was signed in is over — drop anything of theirs you are
+ * holding." Listened for by the stores that keep account data in memory, where
+ * clearing localStorage alone does not reach:
+ *   store/useLivingStore.js    — the Living wallet (joint + solo)
+ *   store/useHostSyncStore.js  — the landlord's queued rent collections
+ *
+ * Exported so a listener can never drift from the dispatcher by a typo; that
+ * silent-miss is exactly the shape of the bug this event was added to fix.
+ */
+export const LOGGED_OUT_EVENT = 'auth:logged-out';
+
+const announceLoggedOut = () => {
+  try { window.dispatchEvent(new Event(LOGGED_OUT_EVENT)); } catch { /* non-browser (SSR / tests) */ }
+};
 
 const ADMIN_ROLES = ['support_agent', 'moderator', 'super_admin'];
 export const isAdminRole = (role) => ADMIN_ROLES.includes(role);
@@ -191,14 +212,13 @@ export const resetPassword = ({ phoneNumber, otp, firebaseIdToken, verificationI
 // ─── Session ───────────────────────────────────────────────────────────────
 export const fetchMe = () => api('/me', { method: 'GET', auth: true }).then((d) => d.user);
 
-export const logout = () => {
+export const logout = ({ dropAccountState = true } = {}) => {
   // Keep the token so the background revocation below can still authenticate
   // after storage is wiped.
   const token = getCurrentToken();
 
   // Full wipe (keeps only language + PWA prefs). Matches the product rule:
-  // "on logout the data is gone". The AuthContext hard-reloads afterwards so
-  // no stale in-memory state from this account survives either.
+  // "on logout the data is gone".
   //
   // This runs FIRST and synchronously. Signing out is a local decision — the
   // session is dead the moment we drop the token — so the UI must never wait
@@ -207,6 +227,19 @@ export const logout = () => {
   // for seconds after they clicked, and the redirect only landed once the
   // requests settled.
   clearAllAppData();
+
+  // Storage is only half the account. Stores that hold it in MEMORY (the Living
+  // wallet, the host write queue) keep rendering the signed-out user's data
+  // until they are told, and the app has no hard reload to wash that away — it
+  // is an SPA navigation to /login, and inside the installed app /living is
+  // deliberately reachable as a guest. That is how a signed-out phone still
+  // showed the previous account's ledger, household name and member list.
+  //
+  // Announced HERE rather than at the call site because there are four ways a
+  // session ends — the button, a terminal 401 on boot, a terminal 401 on
+  // refresh, and a rejected wrong-role login — and only the button used to fire
+  // it. Whoever ends a session next gets the wipe for free.
+  if (dropAccountState) announceLoggedOut();
 
   // Best-effort server-side cleanup: revoke the session and stop push for this
   // device. Deliberately fire-and-forget — the caller redirects immediately and

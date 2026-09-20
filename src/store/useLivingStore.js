@@ -6,6 +6,7 @@ import { ACTIVITY, LOCAL, SEND, SOLO_ACTIONS, TMP_PREFIX, isSoloOp, mergeOp, uid
 // The ledger writes to the phone first, so its "sign in to save" ask cannot
 // come from the network layer — it has to be raised here. See utils/guestSave.js.
 import { requireLoginToSave } from '../utils/guestSave';
+import { LOGGED_OUT_EVENT } from '../services/authService.js';
 
 /**
  * useLivingStore — client-side data layer for the "Living / Roommate Wallet"
@@ -620,7 +621,13 @@ if (typeof window !== 'undefined') {
   // app sends a signed-out user straight back to /living as a guest — which
   // would show the previous account's ledger. Only on a real logout: signup
   // and login also clear storage, and a guest's own entries must survive those.
-  window.addEventListener('auth:logged-out', () => {
+  //
+  // Fired by authService.logout(), so it now covers an AUTOMATIC sign-out (a
+  // terminal 401 on boot or on refresh) and not just the button. That gap is
+  // what left a signed-out phone showing the previous account's balance and
+  // household — and zustand's persist would then write it all back to storage
+  // on the next set(), quietly undoing clearAllAppData().
+  window.addEventListener(LOGGED_OUT_EVENT, () => {
     useLivingStore.setState({
       ...blankWallet(),
       solo: blankSolo(),
