@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import notificationService from '../services/notificationService';
 import callProvider from '../services/callProvider';
+import useAudioChime from '../hooks/useAudioChime';
 import { useAuth } from './AuthContext'; // Need to make sure AuthContext exists and can be imported
 import { notificationDestination, isLandlordMode } from '../utils/notificationRoute';
 
@@ -123,6 +124,34 @@ export function NotificationProvider({ children }) {
     return true;
   }, []);
 
+  // ─── The alert sound ─────────────────────────────────────────────────────
+  // Every toast raised below is accompanied by the chime, because a toast on
+  // its own is only a notification for someone who happens to be looking at the
+  // screen. Until this existed, `playChime` had exactly ONE caller in the whole
+  // app — GlobalToaster's chat handler — so a rent receipt, a booking, a tenant
+  // onboarding request and an admin offer all arrived in total silence. That is
+  // the "notifications don't make a sound" report: they were never meant to be
+  // silent, nothing was ever wired up to make them audible.
+  //
+  // Read through a ref rather than added to the socket effect's deps: toggling
+  // Sound in settings would otherwise tear down and re-bind the notification
+  // listener, and the handler only ever reads this at fire time anyway.
+  const playChime = useAudioChime();
+  const soundEnabledRef = useRef(soundEnabled);
+  soundEnabledRef.current = soundEnabled;
+
+  // Quiet hours silence the SOUND for everything, not just promos. The toast
+  // itself is governed separately below (transactional toasts still show during
+  // DND — the information is wanted, the noise is not), which is the same split
+  // the server makes when it downgrades a push to the silent channel rather
+  // than dropping it. `soundEnabled` mirrors preferences.notifications.sound,
+  // synced from the server by SharedSettings.
+  const alertChime = useCallback(() => {
+    if (!soundEnabledRef.current) return;
+    if (isDNDActive()) return;
+    playChime();
+  }, [playChime, isDNDActive]);
+
   // Handle socket for real-time updates
   useEffect(() => {
     if (!isAuthed) return;
@@ -177,6 +206,7 @@ export function NotificationProvider({ children }) {
       // count are recorded above either way, so a held-back toast loses nothing.
       const isPromotional = data.type === 'marketing';
       if (TOASTABLE.includes(data.type) && !(isPromotional && isDNDActive()) && claimToast(data)) {
+        alertChime();
         toast.info(data.title || 'New Notification', {
           description: data.body,
           action: {
@@ -235,8 +265,10 @@ export function NotificationProvider({ children }) {
     // isDNDActive is a dependency because the toast gate above reads it; it only
     // changes when the user edits their DND schedule, so the listener churn is
     // negligible. `isLandlord` / `myId` are read by the toast's routing and
-    // change only on a role switch or re-login, for the same reason.
-  }, [isAuthed, loadNotifications, isDNDActive, isLandlord, myId, navigate, claimToast]);
+    // change only on a role switch or re-login, for the same reason. `alertChime`
+    // is stable for the same reason isDNDActive is — note it deliberately does
+    // NOT depend on `soundEnabled`, which is read through a ref.
+  }, [isAuthed, loadNotifications, isDNDActive, isLandlord, myId, navigate, claimToast, alertChime]);
 
   // ─── Foreground push (native only) ───────────────────────────────────────
   // On Android the OS posts nothing while the app is open, so without this a
@@ -267,6 +299,10 @@ export function NotificationProvider({ children }) {
         if (!claimToast(data)) return;
 
         loadNotifications();
+        // A foreground push posts NOTHING to the Android shade, so this toast
+        // and this chime are the entire notification. Without the sound the
+        // user's only cue is a banner they have to already be looking at.
+        alertChime();
         toast.info(data.title || 'New Notification', {
           description: data.body,
           action: {
@@ -284,7 +320,7 @@ export function NotificationProvider({ children }) {
       cancelled = true;
       if (detach) detach();
     };
-  }, [isAuthed, isDNDActive, claimToast, loadNotifications, isLandlord, myId, navigate]);
+  }, [isAuthed, isDNDActive, claimToast, loadNotifications, isLandlord, myId, navigate, alertChime]);
 
   const markAsRead = async (id) => {
     setItems((prev) => prev.map((x) => x.id === id ? { ...x, read: true } : x));
