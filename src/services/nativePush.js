@@ -123,6 +123,12 @@ function bindListeners() {
   _listenersBound = true;
 
   PushNotifications.addListener('registration', ({ value }) => {
+    // Parked where guestDeviceService.js can read it. That service registers
+    // the INSTALL (before anyone has signed in) and wants to include the push
+    // token when one exists — but it must never prompt for permission to get
+    // one, so it cannot call register() itself. Reading the token this listener
+    // already received is how it stays a passive observer.
+    try { window.__toletproFcmToken = value; } catch { /* non-fatal */ }
     postRegistration(value);
   });
 

@@ -57,6 +57,10 @@ const GlobalAIAssistant = lazyRoute(() => import("./components/GlobalAIAssistant
 const WelcomeRobotOverlay = lazyRoute(() => import("./components/WelcomeRobotOverlay"), "WelcomeRobotOverlay");
 const HomeIntentModal = lazyRoute(() => import("./components/HomeIntentModal"), "HomeIntentModal");
 const GlobalToaster = lazyRoute(() => import("./components/GlobalToaster"), "GlobalToaster");
+// The in-app half of the guest feature tour — shown only to signed-out installs
+// that the server has a tip for and no way to push. Lazy because most launches
+// have nothing to show and it should cost the entry chunk nothing.
+const FeatureTipCard = lazyRoute(() => import("./components/shared/FeatureTipCard"), "FeatureTipCard");
 // The app's one "sign in to save" ask. Raised from utils/guestSave.js wherever
 // a signed-out visitor tries to write something.
 const GuestLoginPrompt = lazyRoute(() => import("./components/native/GuestLoginPrompt"), "GuestLoginPrompt");
@@ -195,7 +199,21 @@ const GlobalCallSocket = () => {
 // distinguished from.
 const AppOpenReporter = () => {
 	const { isAuthenticated, user } = useAuth();
+	const { language } = useLanguage();
 	const userId = user?.id || user?._id || "";
+
+	// ─── The install, whoever is holding it ───────────────────────────────
+	// Runs for EVERYONE, signed in or not, and before the authed report below.
+	// Somebody who installed the app and never signed up is invisible to every
+	// other endpoint in this codebase — this row is the only thing that makes
+	// the guest feature tour possible at all. It never prompts for notification
+	// permission; it records the install whether or not one was ever granted,
+	// because a device we cannot push is still one we can show a card to.
+	useEffect(() => {
+		import("./services/guestDeviceService")
+			.then((m) => m.reportGuestDevice(language === "বাংলা" || language === "bn" ? "bn" : "en"))
+			.catch(() => {});
+	}, [language]);
 
 	useEffect(() => {
 		if (!isAuthenticated) return;
@@ -767,6 +785,7 @@ const AppLayout = () => {
 				<WelcomeRobotOverlay />
 				<HomeIntentModal />
 				<GlobalToaster />
+				{!isLoginScreen && <FeatureTipCard />}
 				<GuestLoginPrompt />
 				<UpdateGate />
 				{!shouldHideAIAssistant && <GlobalAIAssistant />}
