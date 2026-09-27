@@ -37,6 +37,9 @@ export default function HowItWorks() {
   const isLandlord = activeRole === 'landlord';
   const isBn = language === 'বাংলা' || language === 'bn';
   const tr = (en, bn) => (isBn ? bn : en);
+  // Caps + letter-spacing are for English labels only — tracking pulls the
+  // parts of a Bangla word apart ("নিরাপত্তা" rendered in pieces).
+  const caps = isBn ? '' : 'uppercase tracking-wider';
   const [openFaq, setOpenFaq] = useState(null);
   const [tenantVideos, setTenantVideos] = useState([]);
   const [landlordVideos, setLandlordVideos] = useState([]);
@@ -139,7 +142,7 @@ export default function HowItWorks() {
             size={16}
             className="absolute left-4 top-5 md:left-6 md:top-6 z-10 inline-flex items-center gap-1.5 text-white/90 hover:text-white bg-white/15 hover:bg-white/25 backdrop-blur px-3 py-2 rounded-full text-xs font-black active:scale-95 transition-all [-webkit-tap-highlight-color:transparent]"
           />
-          <span className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider mb-5">
+          <span className={`inline-flex items-center gap-1.5 bg-white/15 backdrop-blur px-3 py-1.5 rounded-full text-xs font-black ${caps} mb-5`}>
             <Sparkles size={14} /> {tr('Simple. Safe. Free.', 'সহজ। নিরাপদ। ফ্রি।')}
           </span>
           <h1 className="text-3xl md:text-5xl font-black tracking-tight mb-4 leading-tight">
@@ -164,13 +167,23 @@ export default function HowItWorks() {
           is the first question this page exists to answer. */}
       <HomeSeoContent />
 
-      {/* For tenants */}
+      {/* For tenants — the video guides lead, the four steps follow. People
+          watch before they read; the steps are the summary of what they saw. */}
       <section className="max-w-5xl mx-auto px-4 mt-8">
         <div className="bg-white/60 backdrop-blur rounded-[2rem] p-2 md:p-4">
           <div className="px-3 pt-3 pb-1">
-            <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036] mb-1">{tr('For tenants', 'ভাড়াটিয়াদের জন্য')}</p>
+            <p className={`text-[11px] font-black ${caps} text-[#ba0036] mb-1`}>{tr('For tenants', 'ভাড়াটিয়াদের জন্য')}</p>
             <h2 className="text-xl md:text-2xl font-black text-gray-900">{tr('Find your next home in 4 steps', '৪টি ধাপে খুঁজে নিন পরবর্তী বাড়ি')}</h2>
           </div>
+          {tenantVideos.length > 0 && (
+            <div className="p-3">
+              <p className="mb-3 inline-flex items-center gap-2 text-[13px] font-bold text-gray-600">
+                <PlayCircle size={16} className="text-[#ba0036] shrink-0" />
+                {tr('Watch first — it’s quicker than reading', 'আগে দেখে নিন — পড়ার চেয়ে দ্রুত')}
+              </p>
+              <VideoGuides guides={tenantVideos} bn={isBn} />
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3">
             {tenantSteps.map((s, i) => (
               <StepCard key={i} n={i + 1} Icon={s.Icon} title={tr(s.en, s.bn)} desc={tr(s.den, s.dbn)} />
@@ -179,27 +192,22 @@ export default function HowItWorks() {
         </div>
       </section>
 
-      {/* Tenant video guides (admin-managed via /admin/support → AI Video Guides) */}
-      {tenantVideos.length > 0 && (
-        <section className="max-w-5xl mx-auto px-4 mt-8">
-          <div className="flex items-center gap-2.5 mb-3 px-1">
-            <PlayCircle size={20} className="text-[#ba0036] shrink-0" />
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036]">{tr('Watch & learn', 'দেখে শিখুন')}</p>
-              <h3 className="text-lg font-black text-gray-900 leading-tight">{tr('Video guides for tenants', 'ভাড়াটিয়াদের জন্য ভিডিও গাইড')}</h3>
-            </div>
-          </div>
-          <VideoGuides guides={tenantVideos} />
-        </section>
-      )}
-
-      {/* For owners */}
+      {/* For owners — video first, as above. */}
       <section className="max-w-5xl mx-auto px-4 mt-8">
         <div className="bg-white/60 backdrop-blur rounded-[2rem] p-2 md:p-4">
           <div className="px-3 pt-3 pb-1">
-            <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036] mb-1">{tr('For owners', 'মালিকদের জন্য')}</p>
+            <p className={`text-[11px] font-black ${caps} text-[#ba0036] mb-1`}>{tr('For owners', 'মালিকদের জন্য')}</p>
             <h2 className="text-xl md:text-2xl font-black text-gray-900">{tr('List and let out with ease', 'সহজে প্রপার্টি লিস্ট ও ভাড়া দিন')}</h2>
           </div>
+          {landlordVideos.length > 0 && (
+            <div className="p-3">
+              <p className="mb-3 inline-flex items-center gap-2 text-[13px] font-bold text-gray-600">
+                <PlayCircle size={16} className="text-[#ba0036] shrink-0" />
+                {tr('Watch first — it’s quicker than reading', 'আগে দেখে নিন — পড়ার চেয়ে দ্রুত')}
+              </p>
+              <VideoGuides guides={landlordVideos} bn={isBn} />
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3">
             {landlordSteps.map((s, i) => (
               <StepCard key={i} n={i + 1} Icon={s.Icon} title={tr(s.en, s.bn)} desc={tr(s.den, s.dbn)} />
@@ -207,20 +215,6 @@ export default function HowItWorks() {
           </div>
         </div>
       </section>
-
-      {/* Owner video guides (admin-managed via /admin/support → AI Video Guides) */}
-      {landlordVideos.length > 0 && (
-        <section className="max-w-5xl mx-auto px-4 mt-8">
-          <div className="flex items-center gap-2.5 mb-3 px-1">
-            <PlayCircle size={20} className="text-[#ba0036] shrink-0" />
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036]">{tr('Watch & learn', 'দেখে শিখুন')}</p>
-              <h3 className="text-lg font-black text-gray-900 leading-tight">{tr('Video guides for owners', 'মালিকদের জন্য ভিডিও গাইড')}</h3>
-            </div>
-          </div>
-          <VideoGuides guides={landlordVideos} />
-        </section>
-      )}
 
       {/* Trust strip */}
       <section className="max-w-5xl mx-auto px-4 mt-8">
@@ -246,7 +240,7 @@ export default function HowItWorks() {
       {/* Safety & Trust */}
       <section id="safety" className="max-w-5xl mx-auto px-4 mt-12 scroll-mt-24">
         <div className="text-center mb-6">
-          <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036] mb-1">{tr('Safety & trust', 'নিরাপত্তা ও বিশ্বাস')}</p>
+          <p className={`text-[11px] font-black ${caps} text-[#ba0036] mb-1`}>{tr('Safety & trust', 'নিরাপত্তা ও বিশ্বাস')}</p>
           <h2 className="text-2xl md:text-3xl font-black text-gray-900">{tr('Built to keep you safe', 'আপনার নিরাপত্তার জন্য তৈরি')}</h2>
           <p className="text-sm font-medium text-gray-500 mt-2 max-w-2xl mx-auto leading-relaxed">
             {tr('Every step — from listing to move-in — is designed to protect both tenants and owners.', 'লিস্টিং থেকে বাড়িতে ওঠা পর্যন্ত প্রতিটি ধাপ ভাড়াটিয়া ও মালিক উভয়ের সুরক্ষার জন্য ডিজাইন করা।')}
@@ -270,19 +264,19 @@ export default function HowItWorks() {
       {/* Pricing */}
       <section id="pricing" className="max-w-5xl mx-auto px-4 mt-12 scroll-mt-24">
         <div className="text-center mb-8">
-          <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036] mb-1">{tr('Pricing', 'মূল্য')}</p>
+          <p className={`text-[11px] font-black ${caps} text-[#ba0036] mb-1`}>{tr('Pricing', 'মূল্য')}</p>
           <h2 className="text-2xl md:text-3xl font-black text-gray-900">{tr('Simple, honest pricing', 'সহজ ও স্বচ্ছ মূল্য')}</h2>
           <p className="text-sm font-medium text-gray-500 mt-2 max-w-xl mx-auto">{tr('Everything tenants need is free. Owners can choose the plan that fits.', 'ভাড়াটিয়াদের সবকিছু ফ্রি। মালিকরা নিজের মতো প্ল্যান বেছে নিন।')}</p>
         </div>
 
         {/* ── ভাড়াটিয়া (Tenant) — Always Free ─────────────────────── */}
         <div className="mb-6">
-          <p className="text-[11px] font-black uppercase tracking-wider text-emerald-600 mb-3 px-1">{tr('For Tenants', 'ভাড়াটিয়াদের জন্য')}</p>
+          <p className={`text-[11px] font-black ${caps} text-emerald-600 mb-3 px-1`}>{tr('For Tenants', 'ভাড়াটিয়াদের জন্য')}</p>
           <div className="bg-white rounded-3xl border border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.04)] p-6 md:p-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-wider">
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black ${caps}`}>
                     <Sparkles size={12} /> {tr('Always free', 'সবসময় ফ্রি')}
                   </span>
                 </div>
@@ -320,12 +314,12 @@ export default function HowItWorks() {
 
         {/* ── মালিক (Owner) — Free / Plus / Pro ────────────── */}
         <div>
-          <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036] mb-3 px-1">{tr('For Owners', 'মালিকদের জন্য')}</p>
+          <p className={`text-[11px] font-black ${caps} text-[#ba0036] mb-3 px-1`}>{tr('For Owners', 'মালিকদের জন্য')}</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
             {/* Owner FREE */}
             <div className="bg-white rounded-3xl border border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.04)] p-6 flex flex-col">
-              <span className="inline-flex self-start items-center px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full text-[10px] font-black uppercase tracking-wider mb-3">{tr('Free', 'ফ্রি')}</span>
+              <span className={`inline-flex self-start items-center px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full text-[10px] font-black ${caps} mb-3`}>{tr('Free', 'ফ্রি')}</span>
               <p className="text-3xl font-black text-gray-900 mb-0.5">৳০</p>
               <p className="text-xs font-medium text-gray-400 mb-5">{tr('Forever free to list', 'লিস্ট করা চিরকাল ফ্রি')}</p>
               <ul className="space-y-2.5 flex-1 mb-6">
@@ -355,7 +349,7 @@ export default function HowItWorks() {
             {/* Owner PLUS */}
             <div className="bg-white rounded-3xl border-2 border-violet-200 shadow-[0_4px_20px_rgba(124,58,237,0.08)] p-6 flex flex-col relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-400 to-purple-500" />
-              <span className="inline-flex self-start items-center gap-1 px-2.5 py-1 bg-violet-50 text-violet-700 rounded-full text-[10px] font-black uppercase tracking-wider mb-3">
+              <span className={`inline-flex self-start items-center gap-1 px-2.5 py-1 bg-violet-50 text-violet-700 rounded-full text-[10px] font-black ${caps} mb-3`}>
                 <Sparkles size={10} /> {tr('Plus', 'প্লাস')}
               </span>
               <div className="flex items-baseline gap-1 mb-0.5">
@@ -394,7 +388,7 @@ export default function HowItWorks() {
               <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
               <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-white/5 rounded-full blur-2xl" />
               <div className="flex items-center gap-2 mb-3 relative z-10">
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-white/20 backdrop-blur text-white rounded-full text-[10px] font-black uppercase tracking-wider">
+                <span className={`inline-flex items-center gap-1 px-2.5 py-1 bg-white/20 backdrop-blur text-white rounded-full text-[10px] font-black ${caps}`}>
                   <Building2 size={10} /> {tr('Pro — Most Popular', 'প্রো — সবচেয়ে জনপ্রিয়')}
                 </span>
               </div>
@@ -440,7 +434,7 @@ export default function HowItWorks() {
       {/* FAQ */}
       <section className="max-w-3xl mx-auto px-4 mt-14">
         <div className="text-center mb-6">
-          <p className="text-[11px] font-black uppercase tracking-wider text-[#ba0036] mb-1">{tr('FAQ', 'সাধারণ প্রশ্ন')}</p>
+          <p className={`text-[11px] font-black ${caps} text-[#ba0036] mb-1`}>{tr('FAQ', 'সাধারণ প্রশ্ন')}</p>
           <h2 className="text-2xl md:text-3xl font-black text-gray-900">{tr('Questions, answered', 'প্রশ্নের উত্তর')}</h2>
         </div>
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">

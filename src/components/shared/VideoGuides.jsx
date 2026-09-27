@@ -1,26 +1,7 @@
 import React, { useState } from 'react';
 import { Play } from 'lucide-react';
 import VideoModal from './VideoModal';
-
-// Pull a YouTube video id out of the common URL shapes so we can show a
-// thumbnail. Non-YouTube URLs (e.g. direct MP4) simply fall back to a branded
-// gradient tile.
-const youTubeId = (url = '') => {
-  try {
-    if (url.includes('youtube.com/watch')) return new URL(url).searchParams.get('v') || '';
-    if (url.includes('youtu.be/')) return url.split('youtu.be/')[1].split(/[?&]/)[0];
-    if (url.includes('youtube.com/embed/')) return url.split('embed/')[1].split(/[?&]/)[0];
-    if (url.includes('youtube.com/shorts/')) return url.split('shorts/')[1].split(/[?&]/)[0];
-  } catch {
-    /* ignore malformed URLs */
-  }
-  return '';
-};
-
-const thumbFor = (url) => {
-  const id = youTubeId(url);
-  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : '';
-};
+import { thumbFor, formatDuration } from '../../utils/videoGuide';
 
 /**
  * A responsive grid of clickable video-guide cards. Clicking a card opens the
@@ -29,9 +10,12 @@ const thumbFor = (url) => {
  * Renders nothing when there are no guides, so callers can drop it in without
  * guarding for empty admin data.
  *
- * @param {{ guides?: Array, columns?: 2|3 }} props
+ * Each tile shows the video's length when the admin entered one — a short,
+ * known length is what gets a stranger to press play.
+ *
+ * @param {{ guides?: Array, columns?: 2|3, bn?: boolean }} props
  */
-export default function VideoGuides({ guides = [], columns = 3 }) {
+export default function VideoGuides({ guides = [], columns = 3, bn = false }) {
   const [active, setActive] = useState(null); // the guide whose video is open
 
   if (!guides.length) return null;
@@ -43,6 +27,7 @@ export default function VideoGuides({ guides = [], columns = 3 }) {
       <div className={`grid grid-cols-1 ${colClass} gap-3`}>
         {guides.map((g) => {
           const thumb = thumbFor(g.videoUrl);
+          const length = formatDuration(g.durationSec, bn);
           return (
             <button
               key={g._id || g.videoUrl}
@@ -65,6 +50,11 @@ export default function VideoGuides({ guides = [], columns = 3 }) {
                     <Play size={24} className="text-[#ba0036] ml-1" fill="currentColor" />
                   </span>
                 </div>
+                {length && (
+                  <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-bold text-white tabular-nums">
+                    {length}
+                  </span>
+                )}
               </div>
               <div className="p-4">
                 <h4 className="text-sm font-black text-gray-900 leading-tight">{g.title}</h4>

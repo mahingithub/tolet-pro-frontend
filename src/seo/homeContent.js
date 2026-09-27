@@ -24,19 +24,35 @@
  * Icons are STRING keys so this file stays free of React and lucide imports.
  */
 
-/** The three pillars. Order matters: listings first, because that is why they came. */
+/**
+ * The three pillars. Order matters: listings first, because that is why they came.
+ *
+ *   audience  the small "who is this for" tag — people stop for what names them.
+ *   hook      the ONE line a card shows. It names the problem the reader
+ *             already has rather than listing features: nobody reads a feature
+ *             list, everybody recognises "the meal-rate argument".
+ *   d         the full description. Off the cards now — the video explains —
+ *             but still emitted by scripts/prerender-seo.mjs for crawlers.
+ *   video     the AI-guide placement an admin attaches this card's explainer
+ *             to (AI Video Guides manager). No video → the card just has none.
+ */
 export const PILLARS = [
   {
     icon: 'search',
     to: '/to-let',
+    video: 'feature_search',
     bn: {
       t: 'বাসা খুঁজুন',
+      audience: 'ভাড়াটিয়াদের জন্য',
+      hook: 'দালাল ছাড়াই বাসা — বাড়িওয়ালার সাথে সরাসরি কথা বলুন।',
       d: 'ঢাকা থেকে শুরু করে ৬৪ জেলা — ফ্ল্যাট, রুম, সিট, মেস, সাবলেট, ফ্যামিলি ও '
         + 'ব্যাচেলর বাসা। ছবি, ভাড়া আর বাড়িওয়ালার সাথে সরাসরি কথা, দালাল ছাড়া।',
       cta: 'সব জেলার টু-লেট',
     },
     en: {
       t: 'Find a place',
+      audience: 'For tenants',
+      hook: 'Find a home without a broker — talk to the landlord directly.',
       d: 'All 64 districts — flats, rooms, seats, mess, sublets, family and bachelor '
         + 'houses. Photos, rent, and a direct line to the landlord with no broker.',
       cta: 'To-let in every district',
@@ -45,14 +61,19 @@ export const PILLARS = [
   {
     icon: 'utensils',
     to: '/meal-manager',
+    video: 'feature_mess',
     bn: {
       t: 'মেসের হিসাব রাখুন',
+      audience: 'মেস ও রুমমেট',
+      hook: 'মাস শেষে মিল রেট নিয়ে আর তর্ক নয় — হিসাব অ্যাপই করে দেয়।',
       d: 'মিল, বাজার, মিল রেট, কারেন্ট-গ্যাস-ওয়াইফাইয়ের বিল আর কে কত পাবে — সব '
         + 'অ্যাপ নিজেই হিসাব করে। সম্পূর্ণ ফ্রি, কোনো সাবস্ক্রিপশন নেই।',
       cta: 'মিল ম্যানেজার দেখুন',
     },
     en: {
       t: 'Run the mess accounts',
+      audience: 'Messes & roommates',
+      hook: 'No more month-end arguments over the meal rate — the app does the maths.',
       d: 'Meals, bazar, meal rate, utility bills and who owes whom — worked out for '
         + 'you. Completely free, with no subscription.',
       cta: 'See the meal manager',
@@ -61,14 +82,19 @@ export const PILLARS = [
   {
     icon: 'notebook',
     to: '/tenant-manager',
+    video: 'feature_rent_book',
     bn: {
       t: 'বাড়ি ম্যানেজ করুন',
+      audience: 'বাড়িওয়ালাদের জন্য',
+      hook: 'কে ভাড়া দিল, কে বাকি — ফোনেই এক নজরে।',
       d: 'ভাড়ার খাতা ফোনে — ভাড়াটিয়ার তালিকা, মাসিক ভাড়া, বকেয়া, ডিজিটাল রশিদ, '
         + 'চুক্তিপত্র ও খালি ইউনিটের অ্যালার্ট।',
       cta: 'ভাড়ার খাতা দেখুন',
     },
     en: {
       t: 'Manage the building',
+      audience: 'For landlords',
+      hook: 'Who has paid and who still owes — at a glance, on your phone.',
       d: 'The rent book on your phone — tenants, monthly rent, dues, digital receipts, '
         + 'agreements and vacancy alerts.',
       cta: 'See the rent book',

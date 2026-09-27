@@ -144,6 +144,13 @@ const mealManager = {
   cta: { to: '/living?m=meals', bn: 'মিল ম্যানেজার খুলুন', en: 'Open the meal manager' },
   serviceType: 'Meal and mess management',
   eyebrow: { bn: 'মেস ও ব্যাচেলর লাইফ', en: 'For mess & bachelor life' },
+  // The explainer video (AI Video Guides → this placement) and the ONE line
+  // the hero shows beside it. The long intro now sits in the folded story.
+  video: 'feature_mess',
+  hook: {
+    bn: 'মাস শেষে মিল রেট নিয়ে আর তর্ক নয় — মিল আর বাজার তুলুন, হিসাব অ্যাপ করে দেবে।',
+    en: 'No more month-end fights over the meal rate — log meals and bazar, the app does the maths.',
+  },
 
   title: 'মিল ম্যানেজার — ফ্রি মেস ম্যানেজার ও মিল হিসাবের অ্যাপ',
   description:
@@ -360,6 +367,13 @@ const roommateWallet = {
   cta: { to: '/living?m=expenses', bn: 'ওয়ালেট খুলুন', en: 'Open the wallet' },
   serviceType: 'Shared expense and bill splitting',
   eyebrow: { bn: 'শেয়ার্ড খরচ', en: 'Shared expenses' },
+  // The explainer video (AI Video Guides → this placement) and the ONE line
+  // the hero shows beside it. The long intro now sits in the folded story.
+  video: 'feature_roommate_wallet',
+  hook: {
+    bn: 'বন্ধুর কাছে টাকা চাওয়ার অস্বস্তি শেষ — কে কত পাবে, অ্যাপই দেখিয়ে দেয়।',
+    en: 'No more awkwardly asking friends for money — the app shows who owes whom.',
+  },
 
   title: 'রুমমেট ওয়ালেট — খরচ ও বিল ভাগ করার ফ্রি অ্যাপ',
   description:
@@ -556,6 +570,13 @@ const houseManager = {
   cta: { to: '/host-dashboard?tab=properties', bn: 'বাড়ি ম্যানেজ করুন', en: 'Manage your property' },
   serviceType: 'Property and building management',
   eyebrow: { bn: 'বাড়িওয়ালাদের জন্য', en: 'For landlords' },
+  // The explainer video (AI Video Guides → this placement) and the ONE line
+  // the hero shows beside it. The long intro now sits in the folded story.
+  video: 'feature_house_manager',
+  hook: {
+    bn: 'কোন ফ্ল্যাট খালি, কার চুক্তি শেষ, কার কাগজ কোথায় — পুরো বাড়ি এক স্ক্রিনে।',
+    en: 'Which flat is empty, whose lease is ending, where the papers are — your whole building on one screen.',
+  },
 
   title: 'হাউস ম্যানেজার — বাড়ি, ফ্ল্যাট ও ইউনিট ম্যানেজমেন্ট অ্যাপ',
   description:
@@ -756,6 +777,13 @@ const tenantManager = {
   cta: { to: '/host-dashboard?tab=rent', bn: 'ভাড়ার খাতা খুলুন', en: 'Open the rent book' },
   serviceType: 'Tenant and rent management',
   eyebrow: { bn: 'ভাড়ার খাতা', en: 'The rent book' },
+  // The explainer video (AI Video Guides → this placement) and the ONE line
+  // the hero shows beside it. The long intro now sits in the folded story.
+  video: 'feature_rent_book',
+  hook: {
+    bn: '“আমি তো দিয়েছিলাম” বনাম “পাইনি” — ডিজিটাল রশিদে সেই তর্ক আর হয় না।',
+    en: '“I paid” versus “I never got it” — digital receipts end that argument.',
+  },
 
   title: 'ভাড়ার খাতা — ডিজিটাল ভাড়া কালেকশন ও ভাড়াটিয়া ম্যানেজমেন্ট',
   description:
@@ -951,6 +979,13 @@ const homeServices = {
   cta: { to: '/services', bn: 'সার্ভিস দেখুন', en: 'Browse services' },
   serviceType: 'Home services marketplace',
   eyebrow: { bn: 'বাসার সার্ভিস', en: 'Home services' },
+  // The explainer video (AI Video Guides → this placement) and the ONE line
+  // the hero shows beside it. The long intro now sits in the folded story.
+  video: 'feature_home_services',
+  hook: {
+    bn: 'শিফটিং, ক্লিনিং, ইন্টারনেট, মিস্ত্রি — নতুন বাসার সব কাজ এক জায়গা থেকে।',
+    en: 'Moving, cleaning, internet, repairs — everything a new place needs, in one place.',
+  },
 
   title: 'হোম সার্ভিস — বাসা শিফটিং, ক্লিনিং, ইন্টারনেট ও মেরামত',
   description:

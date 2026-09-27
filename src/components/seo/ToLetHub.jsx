@@ -15,7 +15,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Search, ArrowRight } from 'lucide-react';
+import { MapPin, Search, ArrowRight, ShieldCheck, Camera } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
 import { DIVISIONS } from '../../data/bdGeo';
@@ -28,6 +28,7 @@ import useSeo from '../../seo/useSeo';
 import { breadcrumbSchema, faqSchema, webPageSchema } from '../../seo/schema';
 import { toKeywordString, RENT_KEYWORDS } from '../../seo/keywords';
 import Footer from '../Footer';
+import { useExplainerVideo, ExplainerVideo, ReadMoreFold } from '../shared/Explainer';
 
 // "টু-লেট" already says To-Let; naming it twice ran the title to 76 characters.
 const TITLE = 'সারা বাংলাদেশে টু-লেট — House Rent in All 64 Districts';
@@ -57,9 +58,18 @@ const HUB_FAQ = [
   },
 ];
 
+/** Shown beside the headline until the search video exists — facts the page already states. */
+const HUB_POINTS = [
+  { Icon: MapPin, bn: '৮ বিভাগ, ৬৪ জেলা', en: '8 divisions, 64 districts' },
+  { Icon: Camera, bn: 'ছবি আর ভাড়া আগেই দেখুন', en: 'Photos and rent up front' },
+  { Icon: ShieldCheck, bn: 'বাড়িওয়ালার সাথে সরাসরি — দালাল ছাড়া', en: 'Straight to the landlord — no broker' },
+];
+
 const ToLetHub = () => {
   const { language } = useLanguage();
   const bn = language === 'বাংলা';
+  // The same "find a place" explainer the homepage card plays.
+  const guide = useExplainerVideo('feature_search');
 
   useSeo({
     title: TITLE,
@@ -85,36 +95,67 @@ const ToLetHub = () => {
     <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-[#ba0036] selection:text-white">
       <header className="relative overflow-hidden bg-gradient-to-br from-[#ba0036] via-[#a1002f] to-[#3a0011] text-white">
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative max-w-[1100px] mx-auto px-5 md:px-8 pt-12 md:pt-20 pb-12 md:pb-16">
-          <nav aria-label="Breadcrumb" className="mb-5">
-            <ol className="flex items-center gap-2 text-[11px] font-bold text-rose-200/80">
-              <li><Link to="/" className="hover:text-white">{bn ? 'হোম' : 'Home'}</Link></li>
-              <li aria-hidden="true">/</li>
-              <li className="text-white/90">{bn ? 'টু-লেট' : 'To-Let'}</li>
-            </ol>
-          </nav>
+        <div className="relative max-w-[1100px] mx-auto px-5 md:px-8 pt-12 md:pt-20 pb-12 md:pb-16 grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-12 lg:items-center">
+          <div>
+            <nav aria-label="Breadcrumb" className="mb-5">
+              <ol className="flex items-center gap-2 text-[11px] font-bold text-rose-200/80">
+                <li><Link to="/" className="hover:text-white">{bn ? 'হোম' : 'Home'}</Link></li>
+                <li aria-hidden="true">/</li>
+                <li className="text-white/90">{bn ? 'টু-লেট' : 'To-Let'}</li>
+              </ol>
+            </nav>
 
-          <h1 className="text-3xl md:text-5xl font-black leading-[1.1] tracking-tight max-w-3xl">
-            {bn ? 'সারা বাংলাদেশে বাসা ভাড়া ও টু-লেট' : 'To-let and house rent across Bangladesh'}
-          </h1>
-          <p className="mt-2 text-base md:text-xl font-bold text-white/70">
-            {bn ? 'To-let and house rent across Bangladesh' : 'সারা বাংলাদেশে বাসা ভাড়া ও টু-লেট'}
-          </p>
-          <p className="mt-5 text-sm md:text-lg font-medium text-white/85 leading-relaxed max-w-2xl">
-            {bn
-              ? '৮ বিভাগ, ৬৪ জেলা — আপনার জেলা বেছে নিয়ে ফ্ল্যাট, রুম, সিট, মেস, সাবলেট বা '
-                + 'ফ্যামিলি বাসার টু-লেট বিজ্ঞাপন দেখুন। ছবি, ভাড়া ও বাড়িওয়ালার সাথে সরাসরি যোগাযোগ — দালাল ছাড়াই।'
-              : 'Eight divisions, sixty-four districts. Pick yours to see flats, rooms, '
-                + 'mess seats, sublets and family houses to rent — with photos, monthly '
-                + 'rent and a direct line to the landlord, no broker in between.'}
-          </p>
+            <h1 className={`text-3xl md:text-5xl font-black max-w-3xl ${bn ? 'leading-[1.3]' : 'leading-[1.1] tracking-tight'}`}>
+              {bn ? 'সারা বাংলাদেশে বাসা ভাড়া ও টু-লেট' : 'To-let and house rent across Bangladesh'}
+            </h1>
+            <p className="mt-2 text-base md:text-xl font-bold text-white/70">
+              {bn ? 'To-let and house rent across Bangladesh' : 'সারা বাংলাদেশে বাসা ভাড়া ও টু-লেট'}
+            </p>
+            <p className="mt-5 text-sm md:text-lg font-medium text-white/85 leading-relaxed max-w-2xl">
+              {bn
+                ? '৮ বিভাগ, ৬৪ জেলা — আপনার জেলা বেছে নিয়ে ফ্ল্যাট, রুম, সিট, মেস, সাবলেট বা '
+                  + 'ফ্যামিলি বাসার টু-লেট বিজ্ঞাপন দেখুন। ছবি, ভাড়া ও বাড়িওয়ালার সাথে সরাসরি যোগাযোগ — দালাল ছাড়াই।'
+                : 'Eight divisions, sixty-four districts. Pick yours to see flats, rooms, '
+                  + 'mess seats, sublets and family houses to rent — with photos, monthly '
+                  + 'rent and a direct line to the landlord, no broker in between.'}
+            </p>
 
-          <Link
-            to="/properties/all"
-            className="mt-8 inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-white text-[#ba0036] font-black text-sm hover:bg-rose-50 active:scale-95 transition-all shadow-lg"
-          >
-            <Search size={16} /> {bn ? 'সব বিজ্ঞাপন দেখুন' : 'Browse all listings'}
-          </Link>
+            <Link
+              to="/properties/all"
+              className="mt-8 inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-white text-[#ba0036] font-black text-sm hover:bg-rose-50 active:scale-95 transition-all shadow-lg"
+            >
+              <Search size={16} /> {bn ? 'সব বিজ্ঞাপন দেখুন' : 'Browse all listings'}
+            </Link>
+          </div>
+
+          {/* Video first when there is one; until then the three facts the
+              page promises, in the same slot, so the hero never looks empty. */}
+          <div>
+            {guide === undefined && (
+              <div aria-hidden="true" className="hidden lg:block aspect-video w-full rounded-[28px] bg-white/10 ring-1 ring-white/15" />
+            )}
+            {guide && (
+              <ExplainerVideo
+                guide={guide}
+                variant="hero"
+                bn={bn}
+                label={bn ? 'ভিডিওতে দেখুন: কিভাবে বাসা খুঁজবেন' : 'Watch: how to find a place'}
+                chip={bn ? 'দেখুন কিভাবে বাসা খুঁজবেন' : 'See how to find a place'}
+              />
+            )}
+            {guide === null && (
+              <ul className="rounded-[28px] bg-white/10 ring-1 ring-white/15 backdrop-blur-sm p-6 md:p-7 space-y-4">
+                {HUB_POINTS.map(({ Icon, ...p }) => (
+                  <li key={p.en} className="flex items-center gap-3.5">
+                    <span className="w-10 h-10 shrink-0 rounded-2xl bg-white text-[#ba0036] flex items-center justify-center">
+                      <Icon size={18} strokeWidth={2.4} />
+                    </span>
+                    <span className="text-[15px] font-bold text-white">{bn ? p.bn : p.en}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </header>
 
@@ -123,31 +164,37 @@ const ToLetHub = () => {
             Shared with the prerendered version of this page (HUB_SECTIONS in
             seo/locationSeo.js) so a crawler that never runs JavaScript reads
             the same words. Without it this page is 65 links and an FAQ. */}
-        <section aria-labelledby="hub-about" className="max-w-3xl mb-14 md:mb-20">
-          <h2 id="hub-about" className="sr-only">
-            {bn ? 'টু-লেট প্রো সম্পর্কে' : 'About TO-LET PRO listings'}
-          </h2>
-          {HUB_SECTIONS.map((sec, i) => (
-            <article key={i} className="mb-8">
-              <h3 className="text-lg md:text-xl font-black tracking-tight text-gray-900 mb-0.5">
-                {bn ? sec.h2.bn : sec.h2.en}
-              </h3>
-              <p className="text-[11px] font-bold text-gray-400 mb-3">
-                {bn ? sec.h2.en : sec.h2.bn}
-              </p>
-              {sec.paragraphs.map((para, j) => (
-                <div key={j} className="mb-4">
-                  <p className="text-[13px] md:text-sm font-medium text-gray-600 leading-[1.85]">
-                    {bn ? para.bn : para.en}
-                  </p>
-                  <p className="mt-1.5 text-[11px] md:text-[12px] font-medium text-gray-400 leading-[1.7]">
-                    {bn ? para.en : para.bn}
-                  </p>
-                </div>
-              ))}
-            </article>
-          ))}
-        </section>
+        <ReadMoreFold
+          bn={bn}
+          className="mb-14 md:mb-20"
+          title={bn ? 'এখানে বাসা খোঁজা কেন সহজ — পুরো গল্পটা পড়ুন' : 'Why finding a place here is easier — read the whole story'}
+        >
+          <section aria-labelledby="hub-about" className="max-w-3xl">
+            <h2 id="hub-about" className="sr-only">
+              {bn ? 'টু-লেট প্রো সম্পর্কে' : 'About TO-LET PRO listings'}
+            </h2>
+            {HUB_SECTIONS.map((sec, i) => (
+              <article key={i} className="mb-8">
+                <h3 className="text-lg md:text-xl font-black tracking-tight text-gray-900 mb-0.5">
+                  {bn ? sec.h2.bn : sec.h2.en}
+                </h3>
+                <p className="text-[11px] font-bold text-gray-400 mb-3">
+                  {bn ? sec.h2.en : sec.h2.bn}
+                </p>
+                {sec.paragraphs.map((para, j) => (
+                  <div key={j} className="mb-4">
+                    <p className="text-[13px] md:text-sm font-medium text-gray-600 leading-[1.85]">
+                      {bn ? para.bn : para.en}
+                    </p>
+                    <p className="mt-1.5 text-[11px] md:text-[12px] font-medium text-gray-400 leading-[1.7]">
+                      {bn ? para.en : para.bn}
+                    </p>
+                  </div>
+                ))}
+              </article>
+            ))}
+          </section>
+        </ReadMoreFold>
 
         {/* ── Popular districts ────────────────────────────────────────── */}
         <section aria-labelledby="popular-heading">

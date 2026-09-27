@@ -44,6 +44,7 @@ import {
 import Navbar from "./components/Navbar";
 import DeepLinkHandler from "./components/DeepLinkHandler";
 import RouteSeoGuard from "./components/seo/RouteSeoGuard";
+import ScrollToTop from "./components/ScrollToTop";
 import MobileBottomNav from "./components/mobile/MobileBottomNav";
 import StatusBarScrim from "./components/native/StatusBarScrim";
 import AppDownloadBanner from "./components/AppDownloadBanner";
@@ -553,6 +554,8 @@ const AppLayout = () => {
 			    on purpose — its effect runs first, so any page with its own
 			    useSeo() still wins. */}
 			<RouteSeoGuard />
+			{/* A new page opens at its top — see ScrollToTop.jsx. */}
+			<ScrollToTop />
 			<GlobalCallSocket />
 			<AppOpenReporter />
 			<NativePushRouter />
