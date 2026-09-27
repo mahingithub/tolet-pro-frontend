@@ -6,7 +6,7 @@
  * scopes that mirror the backend `User.preferences` schema:
  *
  *   • App settings       — apply to the whole account (theme, language,
- *                          notifications, privacy, AI & data, legal).
+ *                          notifications, privacy, AI & data, help & policies).
  *   • Tenant settings     — shown when the user has the `tenant` role.
  *   • Landlord settings   — shown when the user has the `landlord` role.
  *
@@ -662,12 +662,18 @@ const SharedSettings = ({ onGoToProfile } = {}) => {
       ),
     },
     {
+      // The info pages that used to fill the bottom of both dashboard drawers.
+      // Moved here so the drawers carry only the work; still one tap from
+      // Settings for anyone who needs help or a policy.
       id: 'legal',
       icon: Scale,
-      title: bn ? 'লিগ্যাল' : 'Legal',
-      subtitle: bn ? 'টার্মস, প্রাইভেসি, রিফান্ড' : 'Terms, privacy, refund',
+      title: bn ? 'সাহায্য ও নীতিমালা' : 'Help & policies',
+      subtitle: bn ? 'সাপোর্ট, নিরাপত্তা, শর্তাবলি, প্রাইভেসি' : 'Support, safety, terms, privacy',
       content: (
         <>
+          <Row label={bn ? 'হেল্প ও সাপোর্ট' : 'Help & Support'} sublabel={bn ? 'প্রশ্ন, সমস্যা বা অভিযোগ' : 'Questions, problems or complaints'} right={<LinkAction to="/support">{bn ? 'খুলুন' : 'Open'}</LinkAction>} />
+          <Row label={bn ? 'কীভাবে কাজ করে' : 'How it works'} right={<LinkAction to="/how-it-works">{bn ? 'দেখুন' : 'View'}</LinkAction>} />
+          <Row label={bn ? 'বিশ্বাস ও নিরাপত্তা' : 'Trust & Safety'} right={<LinkAction to="/trust-safety">{bn ? 'দেখুন' : 'View'}</LinkAction>} />
           <Row label={bn ? 'সার্ভিস শর্তাবলি' : 'Terms of service'} right={<LinkAction to="/terms">{bn ? 'দেখুন' : 'View'}</LinkAction>} />
           <Row label={bn ? 'প্রাইভেসি পলিসি' : 'Privacy policy'} right={<LinkAction to="/privacy-policy">{bn ? 'দেখুন' : 'View'}</LinkAction>} />
           <Row label={bn ? 'রিফান্ড পলিসি' : 'Refund policy'} right={<LinkAction to="/refund">{bn ? 'দেখুন' : 'View'}</LinkAction>} />

@@ -52,7 +52,7 @@ const LandlordProfile = () => {
     (async () => {
       setLoading(true);
       try {
-        const [ll, allProps] = await Promise.all([
+        const [ll, ownerProps] = await Promise.all([
           propertyService.getLandlord(id),
           // Asks the server for this owner's listings only. The filter below
           // stays as a guard for a backend that doesn't know the param yet.
@@ -60,6 +60,10 @@ const LandlordProfile = () => {
         ]);
         if (cancelled) return;
         setLandlord(ll || null);
+        // getProperties returns { ok, properties } — `ok:false` means the API
+        // was unreachable, which this page shows the same way it shows an owner
+        // with no listings. The global offline strip is what says why.
+        const allProps = ownerProps?.properties;
         setProperties(
           (Array.isArray(allProps) ? allProps : []).filter(
             (p) => String(p.landlordId) === String(id),

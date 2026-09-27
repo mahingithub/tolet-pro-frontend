@@ -367,8 +367,23 @@ const buildVideoRecords = async (form) => {
 export const propertyService = {
 
   /**
-   * সব প্রপার্টি আনে (filter সহ)।
-   * প্রথমে backend, তারপর localStorage। কোনো demo data merge হয় না।
+   * সব প্রপার্টি আনে (filter সহ)। শুধু backend — কোনো demo data merge হয় না।
+   *
+   * Returns { ok, properties } — the SAME shape as getPropertiesByIds below,
+   * and for the same reason:
+   *   ok:true  → the server answered; `properties` is what it actually has.
+   *   ok:false → we never got an answer (no network, timeout, API down).
+   *              `properties` is empty because we know nothing, not because
+   *              the city is.
+   *
+   * WHY THIS IS NOT A BARE ARRAY ANY MORE. It used to return `[]` for both
+   * cases, which made the two indistinguishable to every caller — so the
+   * listing page told a user with no internet "No Properties Found · Clear
+   * Filters", i.e. that there are no houses in Dhaka. Its `catch` could never
+   * fire either, because a swallowed failure is not a thrown one.
+   *
+   * Callers must read `.properties`; an `Array.isArray(result)` guard now
+   * silently yields an empty list.
    */
   async getProperties(filters = {}, sortBy = "Newest Listings") {
     const div = filters.activeDivision && filters.activeDivision !== 'all'
@@ -422,19 +437,28 @@ export const propertyService = {
           if (res2 && res2.ok) {
             const data2 = await res2.json();
             const all = (data2.properties || []).map(p => _normaliseApiProperty(p));
-            return _sortProperties(applyFilters(all, filters), sortBy);
+            return { ok: true, properties: _sortProperties(applyFilters(all, filters), sortBy) };
           }
+          // The retry failed but the FIRST call succeeded, so the server IS
+          // reachable and genuinely has nothing for this text. Fall through
+          // with the empty apiProps — ok stays true, because "0 results" here
+          // is an answer, not a missing one.
         }
         // Server already did the text match — don't re-narrow by text here
         // (that would undo alias / multi-word matches); apply only the rest.
-        return _sortProperties(applyFilters(apiProps, { ...filters, searchArea: "" }), sortBy);
+        return { ok: true, properties: _sortProperties(applyFilters(apiProps, { ...filters, searchArea: "" }), sortBy) };
       }
-    } catch (_) { /* network / abort → empty below (no localStorage) */ }
-
-    // No localStorage fallback. Listings come ONLY from the backend (MongoDB).
-    // If the API is unreachable we return an empty list rather than showing
-    // stale, device-local "demo" data.
-    return [];
+      // probeFetch handed back nothing usable: no network, a timeout, or the
+      // route sticky-flagged unavailable after a 404. Inconclusive — never
+      // "there are no listings". Still no localStorage fallback either:
+      // listings come ONLY from MongoDB, and stale device-local "demo" data
+      // would be worse than telling the user we couldn't reach the server,
+      // which ok:false is what finally lets callers do.
+      return { ok: false, properties: [] };
+    } catch (_) {
+      // Network / timeout / abort — same: inconclusive.
+      return { ok: false, properties: [] };
+    }
   },
 
   /**
@@ -741,8 +765,9 @@ export const propertyService = {
    * প্রপার্টি ডিলিট করে।
    * ✅ DELETE /api/properties/:id  (backend চালু থাকলে)
    *
-   * Returns { ok, id, deletedBookings, deletedInquiries, deletedReceipts }
-   * on success.
+   * Returns { ok, id, deletedInquiries, keptBookings, keptReceipts, … } on
+   * success. The listing's tenancies and receipts are kept (unlinked), never
+   * deleted.
    */
   async deleteProperty(id) {
     if (!getToken()) throw new Error('Sign in before deleting a property.');
@@ -755,7 +780,7 @@ export const propertyService = {
     if (res && res.ok) {
       const data = await res.json();
       broadcast(KEY_USER_PROPERTIES);
-      return data; // { ok, id, deletedBookings, deletedInquiries, deletedReceipts }
+      return data; // { ok, id, deletedInquiries, keptBookings, keptReceipts, … }
     }
 
     // Surface structured errors so the UI can branch on code / status.

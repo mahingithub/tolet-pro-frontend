@@ -41,6 +41,31 @@ const GUEST_BUCKET = 'guest';
 
 const bucketKey = (accountId) => `${TOUR_STORAGE_PREFIX}::${accountId || GUEST_BUCKET}`;
 
+// ─── How many times a tour has been OFFERED without being finished ─────────
+//
+// THE BUG THIS EXISTS TO CLOSE. A tour that bows out for a popup is
+// deliberately not recorded as seen — it never got its turn, so it deserves
+// another. But "another" had no ceiling that outlived the page: the per-session
+// attempt cap resets on every navigation and every reload, so a screen that
+// reliably shows a popup first (the landlord dashboard shows up to three: smart
+// alerts, the payment-settings nudge, the WhatsApp opt-in) re-offered its tour
+// on EVERY SINGLE VISIT, for ever. That is the "it keeps coming back" report,
+// and from the user's side it is indistinguishable from the dismissal doing
+// nothing at all.
+//
+// So the count is persisted. After MAX_LIFETIME_OFFERS appearances that the
+// user did not finish, the tour retires itself: three times of showing somebody
+// something they closed is the point at which continuing to ask stops being
+// helpful and starts being the reason they turn things off.
+//
+// Deliberately a SEPARATE key from the completed-bucket so it cannot interfere
+// with adoptEarlierProgress()'s merge, and deliberately under the same prefix so
+// services/authService.js → DEVICE_KEEP_PREFIXES already preserves it: a count
+// that reset on logout would let the tour come back for ever again.
+const offersKey = (accountId) => `${TOUR_STORAGE_PREFIX}::offers::${accountId || GUEST_BUCKET}`;
+
+const MAX_LIFETIME_OFFERS = 3;
+
 // Tolerant read: anything that isn't a plain object (old formats, hand-edited
 // storage, a half-written value) is treated as "nothing completed yet" rather
 // than throwing on every single tour check.
@@ -443,6 +468,11 @@ export const TourProvider = ({ children }) => {
   // AddProperty), and a new identity on each render would re-run all of them.
   const bucketRef = useRef(bucketKey(accountId));
   bucketRef.current = bucketKey(accountId);
+  // Same pattern, different slot: the how-many-times-offered counter. Kept
+  // beside the completed bucket so both follow the account the moment auth
+  // resolves, rather than being captured once at mount.
+  const offersRef = useRef(offersKey(accountId));
+  offersRef.current = offersKey(accountId);
 
   useEffect(() => {
     adoptEarlierProgress(accountId);
@@ -459,6 +489,31 @@ export const TourProvider = ({ children }) => {
     bucket[tourId] = true;
     writeBucket(bucketRef.current, bucket);
   }, []);
+
+  // How many times this tour has been put in front of this account without
+  // being finished. See offersKey() for why it is persisted rather than kept in
+  // the per-session attempts ref.
+  const offerCount = useCallback((tourId) => {
+    const n = readBucket(offersRef.current)[tourId];
+    return typeof n === 'number' ? n : 0;
+  }, []);
+
+  const bumpOfferCount = useCallback((tourId) => {
+    const key = offersRef.current;
+    const bucket = readBucket(key);
+    const next = (typeof bucket[tourId] === 'number' ? bucket[tourId] : 0) + 1;
+    bucket[tourId] = next;
+    writeBucket(key, bucket);
+    return next;
+  }, []);
+
+  // "Don't show again" — the explicit, permanent opt-out behind the popover's
+  // footer button. Records the tour as done exactly as finishing it would, and
+  // is the one path that ignores `required`: a training the user has actively
+  // told us to stop showing is not a training any more, it is a nag.
+  const dismissTourForever = useCallback((tourId) => {
+    markTourDone(tourId);
+  }, [markTourDone]);
 
   /* ── one tour at a time, and only one ───────────────────────────────────
      `activeTour` is React state, set only AFTER an await chain that can span
@@ -480,6 +535,25 @@ export const TourProvider = ({ children }) => {
   // straight back up the moment they press ×, which would be a trap rather
   // than a lesson.
   const postponedRef = useRef({});
+
+  // ─── "I said no" ─────────────────────────────────────────────────────────
+  // The pathname on which the user last pressed "Don't show me this again".
+  // While it matches the current route, no tour may AUTO-start.
+  //
+  // Without it, dismissing a tour hands the screen straight to the next one:
+  // the tenant dashboard runs a required training and then a page tour, and
+  // retiring the first one is precisely what lets the second one open. Two
+  // tours in two seconds, the second arriving as the direct consequence of
+  // asking for fewer, is the worst possible answer to that request.
+  //
+  // Scoped to the ROUTE rather than the session so it expires the moment the
+  // user goes somewhere else and comes back — the dismissal was about this
+  // screen's tour, not a standing order against the whole feature. Manual
+  // starts (the robot button) never consult it.
+  const suppressAutoRef = useRef(null);
+  // The live pathname, readable from inside a driver.js DOM handler that closes
+  // over a render from several steps ago.
+  const pathRef = useRef('');
 
   // A start attempt that is turned away for a recoverable reason (a popup was
   // up, the route changed under us) must be retried, otherwise the tour is lost
@@ -665,6 +739,12 @@ export const TourProvider = ({ children }) => {
       const { ensurePath, anchor, alsoWaitFor, stillValid, driverOptions = {}, required = false } = options;
 
       if (isTourDone(tourId)) return;
+      // Offered enough times already. This is the ceiling the per-session
+      // attempt cap could not provide: attempts reset on every navigation, so
+      // without this a screen that habitually shows a popup first re-offered its
+      // tour on every visit, for ever. Three unfinished appearances is where we
+      // stop asking — see MAX_LIFETIME_OFFERS.
+      if (offerCount(tourId) >= MAX_LIFETIME_OFFERS) return;
       // A required training that was stepped out of waits for the next app
       // open rather than re-arming behind the user's back.
       if (required && postponedRef.current[tourId]) return;
@@ -776,6 +856,11 @@ export const TourProvider = ({ children }) => {
         // they saw it, their call. A training is the opposite promise: it is
         // not done until it is finished, so leaving halfway must not retire it.
         let reachedEnd = false;
+        // The user pressed "Don't show me this again". Distinct from every
+        // other way a tour ends, because it is the only one that is a decision
+        // about the FUTURE rather than about this run — and onDestroyed has to
+        // know, or it reports a permanent dismissal as a pause.
+        let dismissedForever = false;
         let stopBlockerWatch = null;
 
         const driverObj = driver({
@@ -788,8 +873,53 @@ export const TourProvider = ({ children }) => {
           doneBtnText: L('Finish', 'শেষ'),
           progressText: L('{{current}} of {{total}}', '{{current}} / {{total}}'),
           ...driverOptions,
-          onPopoverRender: () => {
+          onPopoverRender: (popover) => {
             shown = true;
+            // ── "Don't show again" ───────────────────────────────────────
+            // The × in the corner already ends a tour permanently, but it is a
+            // 20px glyph that reads as "close this card", not as "never again"
+            // — so people kept pressing it, kept meeting the tour, and
+            // reasonably concluded that dismissing it did nothing. This is the
+            // same action, said out loud, at a size a thumb can find.
+            //
+            // It is the ONE exit that ignores `required`: a training somebody
+            // has explicitly told us to stop showing has stopped being a
+            // training. Built here rather than as a driver.js button because
+            // driver only renders its own three (prev/next/close).
+            try {
+              // Appended to the WRAPPER, on its own row under the footer,
+              // rather than into the navigation buttons: a third control beside
+              // Back/Next crowds a 360px phone, and the wrapper survives the
+              // `mustClick` steps that strip the footer's buttons — which is
+              // exactly where somebody who cannot find the thing they are told
+              // to tap most needs a way out.
+              const host = popover?.wrapper;
+              if (host && !host.querySelector('[data-tour-dismiss]')) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.dataset.tourDismiss = '1';
+                btn.className = 'driver-popover-dismiss-forever';
+                btn.textContent = L('Don’t show me this again', 'এটি আর দেখাবেন না');
+                btn.addEventListener('click', (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  // Both flags BEFORE destroying: onDestroyed runs
+                  // synchronously inside destroy(), and without them it reaches
+                  // the abandoned branch — counting this as another unfinished
+                  // appearance and telling the user their permanent dismissal
+                  // was a pause.
+                  dismissedForever = true;
+                  dismissTourForever(tourId);
+                  // Nothing else may auto-start on this screen now. Somebody who
+                  // has just said "don't show me this again" and is immediately
+                  // handed the NEXT tour has been answered with the exact
+                  // behaviour they asked to stop.
+                  suppressAutoRef.current = pathRef.current;
+                  driverObj.destroy();
+                });
+                host.appendChild(btn);
+              }
+            } catch { /* a missing wrapper must never break the tour itself */ }
             // driver.js sets activeIndex before it paints, so "there is nothing
             // after this one" is a reliable read of "the user reached the end"
             // at the moment the final card appears. Cheaper and less invasive
@@ -813,10 +943,21 @@ export const TourProvider = ({ children }) => {
             // the user never got to finish.
             const ranProperly = shown && !yieldedToPopup && !unmountingRef.current;
             if (ranProperly && (!required || reachedEnd)) markTourDone(tourId);
+            // IT WAS ON SCREEN AND IT DID NOT FINISH. Counted so the tour
+            // eventually stops offering itself: without this the yield path
+            // below re-arms on the next visit and the user meets the same tour
+            // for ever. Not counted when the provider is unmounting — that is
+            // our teardown, not the user walking away from anything.
+            else if (shown && !unmountingRef.current) bumpOfferCount(tourId);
             // Walked out of a training. It stays un-recorded so it comes back
             // the next time the app opens, and is held off for the rest of this
             // session so pressing × does not immediately reopen it.
-            if (ranProperly && required && !reachedEnd) {
+            //
+            // NOT when it was dismissed for good: that path already recorded the
+            // tour as done, and promising "it will start again next time" would
+            // be telling the user the opposite of what the button they just
+            // pressed actually did.
+            if (ranProperly && required && !reachedEnd && !dismissedForever) {
               postponedRef.current[tourId] = true;
               toast(
                 L(
@@ -890,7 +1031,7 @@ export const TourProvider = ({ children }) => {
         }
       }
     },
-    [isTourDone, markTourDone, L, navigate],
+    [isTourDone, markTourDone, offerCount, bumpOfferCount, dismissTourForever, L, navigate],
   );
 
   /* ══════════════════════════════════════════════════════════════════════
@@ -2409,6 +2550,12 @@ export const TourProvider = ({ children }) => {
 
   const isLandlord = activeRole === 'landlord' || activeRole === 'host';
   const path = location.pathname;
+  pathRef.current = path;
+
+  // "The user dismissed a tour on this screen." Every auto-start effect below
+  // asks this first; nothing else does, so a tour the user requests by hand
+  // still runs. Cleared implicitly by leaving the route — see suppressAutoRef.
+  const autoBlocked = suppressAutoRef.current === path;
 
   // Login is a hand-off, not part of any page's walkthrough. A guest in the app
   // who taps an action on Living is sent straight to /login, and the tour that
@@ -2425,15 +2572,15 @@ export const TourProvider = ({ children }) => {
   // search walkthrough. `retryTick` is in the deps so a tour turned away by a
   // popup gets another go once the screen is free.
   useEffect(() => {
-    if (path !== '/' || activeTour) return;
+    if (path !== '/' || activeTour || autoBlocked) return;
     if (isLandlord) startHostTour();
     else if (activeRole === 'tenant') startTenantTour();
-  }, [path, isLandlord, activeRole, activeTour, retryTick, startHostTour, startTenantTour]);
+  }, [path, isLandlord, activeRole, activeTour, autoBlocked, retryTick, startHostTour, startTenantTour]);
 
   useEffect(() => {
-    if (path !== '/host-dashboard' || activeTour) return;
+    if (path !== '/host-dashboard' || activeTour || autoBlocked) return;
     startHostDashboardTour();
-  }, [path, activeTour, retryTick, startHostDashboardTour]);
+  }, [path, activeTour, autoBlocked, retryTick, startHostDashboardTour]);
 
   // The tenant's own page, and the one screen where "how do I get back out?"
   // is worth more than anything else on it. The required training runs FIRST
@@ -2441,10 +2588,10 @@ export const TourProvider = ({ children }) => {
   // explains the page itself get a turn. Both are per-account, so this is a
   // once-ever sequence, not something that greets them every visit.
   useEffect(() => {
-    if (path !== '/tenant-dashboard' || activeTour) return;
+    if (path !== '/tenant-dashboard' || activeTour || autoBlocked) return;
     if (!isTourDone('training-tenant')) startTrainingTour();
     else startTenantDashboardTour();
-  }, [path, activeTour, retryTick, isTourDone, startTrainingTour, startTenantDashboardTour]);
+  }, [path, activeTour, autoBlocked, retryTick, isTourDone, startTrainingTour, startTenantDashboardTour]);
 
   // Living has three different screens behind one route, and each gets its own
   // tour: the fork (no wallet chosen yet), the private খাতা, and the shared
@@ -2452,13 +2599,14 @@ export const TourProvider = ({ children }) => {
   // attempts highlighting things that are not there, so the mode decides.
   // Reading it reactively means picking a wallet starts its tour right away.
   useEffect(() => {
-    if (path !== '/living' || activeTour) return;
+    if (path !== '/living' || activeTour || autoBlocked) return;
     if (!livingMode) startLivingModeTour();
     else if (livingMode === 'solo') startSoloLivingTour();
     else startLivingTour();
   }, [
     path,
     activeTour,
+    autoBlocked,
     retryTick,
     livingMode,
     startLivingTour,
@@ -2467,9 +2615,9 @@ export const TourProvider = ({ children }) => {
   ]);
 
   useEffect(() => {
-    if (!path.startsWith('/properties') || activeTour) return;
+    if (!path.startsWith('/properties') || activeTour || autoBlocked) return;
     startSearchTour();
-  }, [path, activeTour, retryTick, startSearchTour]);
+  }, [path, activeTour, autoBlocked, retryTick, startSearchTour]);
 
   const value = {
     activeTour,

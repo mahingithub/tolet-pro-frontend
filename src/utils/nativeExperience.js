@@ -135,6 +135,49 @@ export function inferNativeExperience({ activeRole, defaultHome } = {}) {
   return experienceForRole(activeRole, { defaultHome });
 }
 
+/**
+ * Where a completed sign-in lands, and what the device should hold when it does.
+ *
+ * The device's saved side is a PREFERENCE, not an identity. It used to be taken
+ * as read after login, so a landlord signing in on a handset that had been
+ * looked around as a tenant — a guest browse, a shared phone, a family member's
+ * — was opened on the tenant home; App.jsx then corrected the device without
+ * navigating, leaving them on the public homepage wearing the landlord rail.
+ * The ACCOUNT decides the side, checked every time.
+ *
+ * It is only ever a correction, never a reset: `experienceForRole` keeps this
+ * person's own tenant surface (Living vs search) when the side is unchanged.
+ *
+ * @param {object}  opts
+ * @param {string}  opts.activeRole  the role the ACCOUNT came back with — not
+ *                                   the one the login form happened to be set to
+ * @param {string}  opts.defaultHome preferences.app.defaultHome
+ * @param {boolean} opts.mayConfirm  true for a login, where a home worked out
+ *                                   from the account is still only a guess and
+ *                                   is worth one tap of agreement. False for a
+ *                                   signup, which has just been asked outright.
+ * @returns {{experience: object|null, confirm: {role: string, mode: string}|null}}
+ *   `confirm` set → ask before acting. Otherwise `experience` is what the device
+ *   now holds, and getNativeHome() turns it into the path to open.
+ */
+export function nativeLoginExperience({
+  activeRole,
+  defaultHome,
+  mayConfirm = false,
+  previous = getNativeExperience(),
+} = {}) {
+  if (roleMatchesExperience(previous, activeRole)) return { experience: previous, confirm: null };
+  const inferred = experienceForRole(activeRole, { defaultHome, previous });
+  // An admin-ish role has no app side at all; leave the device as it was.
+  if (!inferred) return { experience: previous, confirm: null };
+  // Nothing stored means this phone has never met this account, so everything
+  // below came from the account rather than from the person in front of us.
+  if (mayConfirm && !previous) return { experience: previous, confirm: inferred };
+  // 'account': worked out, not answered — so the account's own saved home may
+  // still correct it later (see App.jsx's mirror effect).
+  return { experience: saveNativeExperience(inferred.role, inferred.mode, 'account'), confirm: null };
+}
+
 // Only internal destinations can be carried across authentication.
 export function safeAppPath(path, fallback = '/') {
   if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//') || /[\\\r\n]/.test(path)) return fallback;

@@ -226,8 +226,8 @@ export default function PropertiesTab({
                           <div
                             className="bg-amber-500/95 backdrop-blur-md px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-sm text-white flex items-center gap-1.5"
                             title={language === 'বাংলা'
-                              ? 'ভাড়া হওয়া লিস্টিং কয়েক দিন পর স্বয়ংক্রিয়ভাবে মুছে ফেলা হয়'
-                              : 'Rented listings are automatically removed after a few days'}
+                              ? 'ভাড়া হওয়া বিজ্ঞাপন কয়েক দিন পর স্বয়ংক্রিয়ভাবে মুছে যায় — ভাড়াটিয়া আর ভাড়ার হিসাব থেকে যায়'
+                              : 'Rented listings are removed after a few days — the tenancy and its rent records stay'}
                           >
                             <Clock size={11} />
                             {rentedDaysLeft(prop.rentedAt) > 0
@@ -294,7 +294,12 @@ export default function PropertiesTab({
                           ) : null}
                           {prop.furnishing ? (
                             <span className="inline-flex items-center gap-1 bg-gray-50 border border-gray-100 px-2.5 py-1 rounded-full text-[10px] font-black text-gray-700">
-                              <Sofa size={11} className="text-[#ba0036]"/> {prop.furnishing}
+                              <Sofa size={11} className="text-[#ba0036]"/> {
+                                prop.furnishing === 'Furnished' ? (t?.furnished || prop.furnishing)
+                                  : prop.furnishing === 'Semi-Furnished' ? (t?.semiFurnished || prop.furnishing)
+                                  : prop.furnishing === 'Unfurnished' ? (t?.unfurnished || prop.furnishing)
+                                  : prop.furnishing
+                              }
                             </span>
                           ) : null}
                         </div>

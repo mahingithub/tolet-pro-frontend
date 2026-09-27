@@ -4,6 +4,7 @@ import React, {
 } from 'react';
 import { useAuth } from './AuthContext.jsx';
 import { isInsideNativeApp } from '../hooks/useAppInstall';
+import { syncSystemBars } from '../utils/systemBars.js';
 import {
   DEFAULT_SETTINGS,
   getCachedSettings,
@@ -70,6 +71,12 @@ function applyTheme(theme) {
   // silent no-op.
   root.style.colorScheme = effective;
   root.setAttribute('data-theme', effective);
+  // Android picks the status bar's ICON colour from the phone's night mode,
+  // not from ours — so a light app on a dark-mode phone gets white icons over
+  // a white header and the clock, battery and signal bars vanish. We are the
+  // only ones who know which theme was actually painted, so we tell it.
+  // See utils/systemBars.js; a no-op on the website.
+  syncSystemBars(effective);
 }
 
 function applyMotion(reduce) {

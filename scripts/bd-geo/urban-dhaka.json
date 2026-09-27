@@ -2,6 +2,9 @@
   "metroThanas": {
     "dhaka": [
       { "en": "Ramna", "bn": "রমনা" },
+      { "en": "Ashulia", "bn": "আশুলিয়া" },
+      { "en": "Baridhara", "bn": "বারিধারা" },
+      { "en": "Tejgaon I/A", "bn": "তেজগাঁও শিল্প এলাকা" },
       { "en": "Motijheel", "bn": "মতিঝিল" },
       { "en": "Paltan", "bn": "পল্টন" },
       { "en": "Shahbagh", "bn": "শাহবাগ" },
@@ -54,6 +57,7 @@
     ],
     "gazipur": [
       { "en": "Joydebpur", "bn": "জয়দেবপুর" },
+      { "en": "Tongi", "bn": "টঙ্গী" },
       { "en": "Basan", "bn": "বাসন" },
       { "en": "Konabari", "bn": "কোনাবাড়ী" },
       { "en": "Kashimpur", "bn": "কাশিমপুর" },

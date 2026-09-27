@@ -72,6 +72,9 @@ export const DEFAULT_SETTINGS = {
     // Which Living wallet this person runs. Kept on the account rather than the
     // phone so reinstalling doesn't ask "একা না যৌথ?" all over again.
     livingMode: '',       // '' (never answered) | 'solo' | 'joint'
+    // Dashboard notices this account pressed "Dismiss" on — see
+    // hooks/useDismissedNotices.js. Only ever grows; the server merges.
+    dismissedNotices: [],
   },
 
   // Tenant-scope settings.

@@ -3,10 +3,23 @@ import {
   X, CreditCard, ArrowUpRight, Crown, LayoutGrid, ChevronUp, ChevronDown,
   FileText, FileEdit, Megaphone, Download, BellRing, AlertCircle, Building2,
   Plus, MapPin, Wallet, Calendar, RefreshCw, Search, ChevronRight,
-  CheckCircle2, Hourglass,
+  CheckCircle2, Hourglass, TrendingUp, MessageSquare, KeyRound,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { bookingInBuilding } from '../../utils/buildingScope';
+import { isInquiryUnread } from '../../utils/inquiryUnread';
+
+// A listing's status as the landlord reads it — the same words and colours as
+// the badge in the Properties tab, so one listing reads the same in both
+// places. This card used to print the raw value, so a rented flat said
+// "RENTED" in English on a Bangla screen, under a green "live" pulse.
+const LISTING_STATUS = {
+  active:   { en: 'Active',   bn: 'অ্যাক্টিভ',    ink: 'text-green-600',  dot: 'bg-green-500 animate-pulse' },
+  paused:   { en: 'Paused',   bn: 'পজড',          ink: 'text-orange-500', dot: 'bg-orange-500' },
+  rented:   { en: 'Rented',   bn: 'ভাড়া হয়েছে',   ink: 'text-gray-500',   dot: 'bg-gray-400' },
+  inactive: { en: 'Inactive', bn: 'নিষ্ক্রিয়',    ink: 'text-gray-500',   dot: 'bg-gray-400' },
+  draft:    { en: 'Draft',    bn: 'ড্রাফট',        ink: 'text-gray-500',   dot: 'bg-gray-400' },
+};
 
 export default function DashboardTab({
   language,
@@ -41,6 +54,11 @@ export default function DashboardTab({
   landlordProfile,
   openBuildingLedger,
   rentUnitsOf,
+  properties,
+  inquiries,
+  inqSeen,
+  setPropertyFilter,
+  ledgerKnown = true,
 }) {
   const [buildingSearch, setBuildingSearch] = useState('');
   const [showAllBuildings, setShowAllBuildings] = useState(false);
@@ -97,8 +115,86 @@ export default function DashboardTab({
     };
   }), [allBuildings, rows, getMonthCollectionSummary, rentUnitsOf, today]);
 
+  // ── ACCOUNT STATE ─────────────────────────────────────────────────────────
+  // Three landlords open this screen, and they need different first screens —
+  // the same way the tenant dashboard hides dues and payments until the
+  // tenant is linked to a landlord:
+  //
+  //   has a rent ledger (buildings / tenants)  → the ledger, as always
+  //   has listings                              → listing tiles on top
+  //   has neither                               → one "start" card that
+  //                                               offers both, nothing else
+  //
+  // The screen used to know this — the inline version had a
+  // `properties.length > 0` branch — and the one-layout redesign dropped it.
+  // A brand-new landlord, AND one with a live listing but no tenants yet, then
+  // got a first screen of ৳0 boxes and "no buildings found", with their
+  // listing pushed below the fold.
+  //
+  // Neither "empty" is trusted until it has been answered: `ledgerKnown` waits
+  // for the first bookings + buildings read, and listings wait for the first
+  // fetch unless the cache already has some. Until then the ledger renders as
+  // it always has, rather than flashing "start your ledger" at a landlord with
+  // forty tenants on a fresh device.
+  const listings = Array.isArray(properties) ? properties : [];
+  const hasListings = listings.length > 0;
+  const listingsKnown = !isPropertiesLoading || hasListings;
+  const hasLedger = rows.length > 0 || allBuildings.length > 0;
+  const showLedger = hasLedger || !ledgerKnown;
+  const brandNew = !showLedger && listingsKnown && !hasListings;
+
+  // The rent ledger (Bookings + Rent tabs) is a Pro feature: on the free plan
+  // HostDashboard's tab guard sends "bookings" straight to /subscription. The
+  // start card says so on its button, and offers the free share-trial first
+  // while it is still unclaimed, rather than landing on a paywall unannounced.
+  const ledgerIsPro = !isPremium;
+  const startLedger = () => {
+    if (ledgerIsPro && canClaimShareTrial) { setTrialModalOpen(true); return; }
+    setActiveTab('bookings');
+  };
+
+  const inquiryList = Array.isArray(inquiries) ? inquiries : [];
+  const rentedCount = listings.filter((p) => p.status === 'rented').length;
+  const listingTiles = [
+    {
+      key: 'all', Icon: Building2, value: listings.length,
+      label: bn ? 'মোট বাসা' : 'Listings',
+      chip: 'bg-rose-50 dark:bg-rose-950/40 text-[#ba0036] dark:text-rose-400',
+      onClick: () => { setPropertyFilter?.('all'); setActiveTab('properties'); },
+    },
+    {
+      key: 'active', Icon: TrendingUp, value: listings.filter((p) => p.status === 'active').length,
+      label: bn ? 'অ্যাক্টিভ' : 'Active',
+      chip: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400',
+      onClick: () => { setPropertyFilter?.('active'); setActiveTab('properties'); },
+    },
+    // Only once something has actually been let. A landlord whose one flat is
+    // rented otherwise saw "Active 0" and nothing else — true, but it read
+    // like a problem rather than the good news it is.
+    ...(rentedCount > 0 ? [{
+      key: 'rented', Icon: KeyRound, value: rentedCount,
+      label: bn ? 'ভাড়া হয়েছে' : 'Rented',
+      chip: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400',
+      onClick: () => { setPropertyFilter?.('rented'); setActiveTab('properties'); },
+    }] : []),
+    {
+      key: 'inquiries', Icon: MessageSquare, value: inquiryList.length,
+      label: bn ? 'যোগাযোগ' : 'Inquiries',
+      chip: 'bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400',
+      // Red the moment a tenant writes and the landlord hasn't opened it.
+      unread: inquiryList.some((inq) => isInquiryUnread(inq, 'host', inqSeen)),
+      onClick: () => setActiveTab('inquiries'),
+    },
+  ];
+
   const q = buildingSearch.trim().toLowerCase();
   const displayedRows = q ? buildingRows.filter((r) => r.name.toLowerCase().includes(q)) : buildingRows;
+  // "Not found" is the answer to a search. With no search typed, an empty
+  // table means the landlord has tenants on the ledger but no building yet —
+  // it used to say "no buildings found" to someone who had never made one.
+  const emptyBuildingsText = q
+    ? (bn ? 'কোনো বিল্ডিং পাওয়া যায়নি' : 'No buildings found')
+    : (bn ? 'এখনো কোনো বিল্ডিং যোগ করা হয়নি' : 'No buildings added yet');
 
   // Five buildings, then "See more" — same cut on desktop and mobile. A
   // twenty-building portfolio otherwise pushes the properties section off the
@@ -339,6 +435,48 @@ export default function DashboardTab({
         })() : null}
       </div>
 
+      {/* 0.5 Listing tiles — only for a landlord who has listed something.
+          Each is a one-tap deep link: Listings → all, Active → active only,
+          Rented → rented only, Inquiries → the inquiries tab. These were
+          dropped with the old `properties.length > 0` branch, which left a
+          listing landlord with no count of their listings or inquiries
+          anywhere on the dashboard.
+
+          Three tiles sit 3-up everywhere (stacked icon/label on a phone).
+          With the Rented tile there are four, and four columns do not fit a
+          phone's labels — so that case is 2×2 on a phone, 4-up on desktop,
+          with each tile laid out as a row. */}
+      {hasListings && (
+        <div className={`grid gap-2.5 lg:gap-4 ${listingTiles.length > 3 ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-3'}`}>
+          {listingTiles.map(({ key, Icon, value, label, chip, unread, onClick }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={onClick}
+              className={`relative min-w-0 text-left rounded-2xl lg:rounded-[1.5rem] p-3 lg:p-5 flex ${listingTiles.length > 3 ? 'flex-row items-center justify-between' : 'flex-col lg:flex-row lg:items-center lg:justify-between'} gap-2 lg:gap-3 shadow-[0_4px_25px_rgba(0,0,0,0.03)] dark:shadow-none hover:shadow-[0_12px_35px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-[0.98] transition-all ${
+                unread
+                  ? 'bg-rose-50 dark:bg-rose-950/30 border border-[#ba0036]/30 ring-2 ring-[#ba0036]/30'
+                  : 'bg-white dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800/60'
+              }`}
+            >
+              {unread && (
+                <span className="absolute top-2 right-2 flex h-2.5 w-2.5" title={bn ? 'নতুন যোগাযোগ' : 'New inquiry'}>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ba0036] opacity-60" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#ba0036]" />
+                </span>
+              )}
+              <span className={`flex min-w-0 ${listingTiles.length > 3 ? 'flex-row items-center gap-2 lg:gap-3' : 'flex-col lg:flex-row items-start lg:items-center gap-1.5 lg:gap-3'}`}>
+                <span className={`w-8 h-8 lg:w-10 lg:h-10 rounded-xl flex items-center justify-center shrink-0 ${unread ? 'bg-[#ba0036]/10 text-[#ba0036]' : chip}`}>
+                  <Icon size={16} strokeWidth={2.4} />
+                </span>
+                <span className={`text-[11px] lg:text-sm font-black leading-tight truncate max-w-full ${unread ? 'text-[#ba0036]' : 'text-gray-700 dark:text-gray-300'}`}>{label}</span>
+              </span>
+              <span className={`text-2xl lg:text-4xl font-black leading-none tabular-nums ${unread ? 'text-[#ba0036]' : 'text-gray-900 dark:text-white'}`}>{value}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ─────────────────────────────────────────────────────────────────────
           ONE ARCHITECTURE, TWO BREAKPOINTS.
 
@@ -348,6 +486,10 @@ export default function DashboardTab({
           grid: full-width ledger on top, building table (8) bottom left,
           action rail (4) bottom right.
 
+          With no rent ledger yet (see ACCOUNT STATE) the ledger and building
+          table give way to one "start" card in the building table's slot, so
+          the rail moves up beside it and properties move up a row.
+
           The rail is `contents` on mobile, so its two cards become direct
           children of the outer flex and can be ordered individually. That is
           what lets one markup serve both layouts instead of two copies — the
@@ -356,7 +498,7 @@ export default function DashboardTab({
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-12 lg:gap-5 lg:items-start">
 
         {/* Right rail — quick actions + more actions */}
-        <div className="contents lg:block lg:col-start-9 lg:col-span-4 lg:row-start-2 lg:space-y-4">
+        <div className={`contents lg:block lg:col-start-9 lg:col-span-4 ${showLedger ? 'lg:row-start-2' : 'lg:row-start-1'} lg:space-y-4`}>
 
           {/* 1. Quick actions — 2 columns on a phone, vertical list on desktop */}
           <div data-tour="host-quick-actions" className={`order-1 ${card} p-4 lg:p-5`}>
@@ -425,6 +567,8 @@ export default function DashboardTab({
           </div>
         </div>
 
+        {showLedger ? (
+        <>
         {/* 2. Shared ledger overview — full width */}
         <div
           data-tour="host-shared-ledger"
@@ -491,7 +635,7 @@ export default function DashboardTab({
             </div>
             {/* Phone rows scroll on their own; the search box only earns its
                 space on the wider table layout. */}
-            <div className="relative hidden sm:block w-full sm:w-60 shrink-0">
+            <div className={`relative w-full sm:w-60 shrink-0 ${allBuildings.length > 0 ? 'hidden sm:block' : 'hidden'}`}>
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <input
                   type="text"
@@ -521,7 +665,7 @@ export default function DashboardTab({
                 {displayedRows.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-8 text-center text-xs font-semibold text-gray-400">
-                      {bn ? 'কোনো বিল্ডিং পাওয়া যায়নি' : 'No buildings found'}
+                      {emptyBuildingsText}
                     </td>
                   </tr>
                 ) : visibleRows.map((row) => (
@@ -558,7 +702,7 @@ export default function DashboardTab({
           <div className="lg:hidden divide-y divide-gray-100 dark:divide-gray-800">
             {displayedRows.length === 0 ? (
               <p className="py-8 text-center text-xs font-semibold text-gray-400">
-                {bn ? 'কোনো বিল্ডিং পাওয়া যায়নি' : 'No buildings found'}
+                {emptyBuildingsText}
               </p>
             ) : visibleRows.map((row) => (
               <button
@@ -598,7 +742,7 @@ export default function DashboardTab({
 
           {/* The count stays desktop-only as before; the See more toggle shows on
               both, so the row only collapses away when there is neither. */}
-          <div className={`mt-3 lg:mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 items-center justify-between gap-3 text-xs text-gray-400 ${canCollapse ? 'flex' : 'hidden lg:flex'}`}>
+          <div className={`mt-3 lg:mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 items-center justify-between gap-3 text-xs text-gray-400 ${canCollapse ? 'flex' : displayedRows.length > 0 ? 'hidden lg:flex' : 'hidden'}`}>
             <span className="hidden lg:inline">
               {canCollapse && !showAllBuildings
                 ? (bn
@@ -623,8 +767,82 @@ export default function DashboardTab({
           </div>
         </div>
 
-        {/* 5. Your properties — full width, below everything */}
-        <div data-tour="host-properties" className="order-5 lg:col-start-1 lg:col-span-12 lg:row-start-3">
+        </>
+        ) : (
+          /* 2–3. No ledger yet — one card instead of a ledger of ৳0 boxes and
+             an empty building table. "Start" opens the Bookings tab, which
+             already walks a landlord with no building through setup (one
+             house or several) before the first tenant. A brand-new landlord
+             also gets the other way in — listing a place — here rather than
+             at the bottom of the page. First on a phone: it is the next step,
+             and the quick actions under it are the same jobs in short. */
+          <div className={`order-first lg:col-start-1 lg:col-span-8 lg:row-start-1 ${card} p-4 lg:p-6`}>
+            <div className="flex items-start gap-3 lg:gap-4">
+              <span className="w-11 h-11 lg:w-12 lg:h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-800/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <Wallet size={20} strokeWidth={2.2} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base lg:text-lg font-black text-gray-900 dark:text-white leading-tight">
+                  {bn ? 'ভাড়ার খাতা শুরু করুন' : 'Start your rent ledger'}
+                </h3>
+                <p className="text-xs lg:text-[13px] font-bold text-gray-500 dark:text-gray-400 leading-relaxed mt-1">
+                  {bn
+                    ? 'আপনার বিল্ডিং আর ভাড়াটিয়া যোগ করুন — প্রতি মাসের আদায়, বকেয়া আর রিসিটের হিসাব এখানে দেখাবে।'
+                    : 'Add your building and tenants — each month\'s collection, dues and receipts will show up here.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={startLedger}
+                  className="mt-3.5 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#ba0036] hover:bg-[#90002a] text-white text-xs font-black active:scale-95 transition-all shadow-[0_4px_12px_rgba(186,0,54,0.25)]"
+                >
+                  <Plus size={14} strokeWidth={2.6} />
+                  {bn ? 'বিল্ডিং ও ভাড়াটিয়া যোগ করুন' : 'Add building & tenants'}
+                  {ledgerIsPro && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-white/20 text-[9px] font-black uppercase tracking-wider">
+                      <Crown size={10} strokeWidth={2.6} /> {bn ? 'প্রো' : 'Pro'}
+                    </span>
+                  )}
+                </button>
+                {ledgerIsPro && (
+                  <p className="mt-2 text-[11px] font-bold text-amber-700 dark:text-amber-400 leading-snug">
+                    {canClaimShareTrial
+                      ? (bn ? 'প্রো ফিচার — অ্যাপ শেয়ার করলে ২ মাস ফ্রি।' : 'A Pro feature — free for 2 months when you share the app.')
+                      : (bn ? 'ভাড়ার খাতা প্রো প্ল্যানে পাওয়া যায়।' : 'The rent ledger is part of the Pro plan.')}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {brandNew && (
+              <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-3">
+                <span className="w-11 h-11 lg:w-12 lg:h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-800/50 text-[#ba0036] dark:text-rose-400 flex items-center justify-center shrink-0">
+                  <Building2 size={20} strokeWidth={2.2} />
+                </span>
+                <div className="min-w-[11rem] flex-1">
+                  <p className="text-sm font-black text-gray-900 dark:text-white leading-tight">
+                    {bn ? 'খালি বাসা আছে?' : 'Have a place to let?'}
+                  </p>
+                  <p className="text-xs font-bold text-gray-500 dark:text-gray-400 leading-relaxed mt-0.5">
+                    {bn ? 'লিস্ট করুন — ভাড়াটিয়ারা খুঁজে পেয়ে সরাসরি যোগাযোগ করবে।' : 'List it — tenants find it and contact you directly.'}
+                  </p>
+                </div>
+                <Link
+                  to="/list-property"
+                  className="ml-auto shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-gray-900 dark:hover:border-gray-400 text-gray-800 dark:text-gray-100 text-xs font-black active:scale-95 transition-all"
+                >
+                  <Plus size={14} strokeWidth={2.6} />
+                  {bn ? 'বাসা লিস্ট করুন' : 'List Property'}
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 5. Your properties — full width, below everything. Left out for a
+            brand-new landlord: the start card above already offers listing,
+            and "no properties yet" under it only repeated that. */}
+        {!brandNew && (
+        <div data-tour="host-properties" className={`order-5 lg:col-start-1 lg:col-span-12 ${showLedger ? 'lg:row-start-3' : 'lg:row-start-2'}`}>
           <div className="flex justify-between items-center mb-4 px-1">
             <h3 className="text-lg lg:text-2xl font-black text-gray-900 dark:text-white tracking-tight">{dashboardPropTitle}</h3>
             <button
@@ -701,9 +919,14 @@ export default function DashboardTab({
                   <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${prop.img})` }} />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-2xl" />
                   <div className="absolute top-3 left-3 flex gap-1.5">
-                    <div className="bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[9px] font-black uppercase text-green-600 shadow-sm flex items-center gap-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> {prop.status}
-                    </div>
+                    {(() => {
+                      const st = LISTING_STATUS[prop.status] || LISTING_STATUS.inactive;
+                      return (
+                        <div className={`bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${st.ink} shadow-sm flex items-center gap-1`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {bn ? st.bn : st.en}
+                        </div>
+                      );
+                    })()}
                     {isRecent(prop.addedDate) && (
                       <div className="bg-[#ba0036] px-2.5 py-1 rounded-full text-[9px] font-black uppercase text-white shadow-sm">
                         {bn ? 'নতুন' : 'NEW'}
@@ -730,6 +953,7 @@ export default function DashboardTab({
             ))}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

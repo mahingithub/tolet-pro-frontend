@@ -159,6 +159,33 @@ function bindListeners() {
 }
 
 /**
+ * Detach this device's FCM token from the account that is signing out.
+ *
+ * Without this, logging out on Android left the token attached to the account,
+ * so the phone went on receiving that person's rent reminders, messages and
+ * calls until someone else signed in on it. Signing in again is unaffected:
+ * registerNativePush() re-posts the token on every login.
+ *
+ * `token` is the signed-out session's access token, passed explicitly because
+ * logout has already wiped it from storage by the time this runs.
+ */
+export async function unregisterNativePush({ token } = {}) {
+  if (!Capacitor.isNativePlatform()) return;
+  const fcmToken = typeof window !== 'undefined' ? window.__toletproFcmToken : '';
+  if (!fcmToken || !token) return;
+  try {
+    await fetch(`${API_BASE}/notifications/unregister-device`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ token: fcmToken }),
+    });
+  } catch { /* non-fatal */ }
+}
+
+/**
  * Request permission and register this device's FCM token with the backend.
  * Safe to call repeatedly: listeners bind once and an in-flight request is
  * shared rather than duplicated.

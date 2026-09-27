@@ -5,6 +5,7 @@
  * happened.
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ArrowDownLeft, ArrowUpRight, ChevronRight, HandCoins, PiggyBank, Settings2,
   Sparkles, Target, Wallet,
@@ -19,6 +20,8 @@ import {
   Avatar, Card, ConfirmDialog, Field, HBar, IconBadge, MoneyInput, PrimaryButton,
   ProgressBar, SectionHeader, Sheet, cx,
 } from './livingUI';
+import { ReorderHints } from './ServiceHint';
+import { purchaseRowsFromSoloEntries } from '../../utils/serviceHints';
 
 const QUICK = [
   { type: 'expense', module: 'spending' },
@@ -114,6 +117,7 @@ const SettingsSheet = ({ open, onClose, isBn }) => {
 const SoloOverview = ({ go, language, intent, clearIntent }) => {
   const requireAction = useLivingAction('overview');
   const isBn = language === 'বাংলা';
+  const navigate = useNavigate();
   const solo = useLivingStore((s) => s.solo);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const openSettings = () => { if (requireAction('settings')) setSettingsOpen(true); };
@@ -127,6 +131,9 @@ const SoloOverview = ({ go, language, intent, clearIntent }) => {
   const s = useMemo(() => soloSummary(solo, 0), [solo]);
   const dues = useMemo(() => personRows(solo), [solo]);
   const recent = useMemo(() => [...solo.entries].sort(byNewest).slice(0, 5), [solo.entries]);
+  // Only খরচ rows reach the clock — the extractor drops all four ধার types, so
+  // lending a friend money never reads as buying anything.
+  const purchases = useMemo(() => purchaseRowsFromSoloEntries(solo.entries), [solo.entries]);
 
   const topCategories = s.byCategory.slice(0, 5);
   const overBudget = s.budget > 0 && s.spent > s.budget;
@@ -196,6 +203,13 @@ const SoloOverview = ({ go, language, intent, clearIntent }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         <div className="space-y-4">
+          {/* ── আবার লাগবে ──────────────────────────────────────────────
+              Above the budget because it is the only card here about
+              something that has to happen today. Silent unless the ledger
+              says a cylinder or a jar has run out AND a shop is confirmed
+              nearby, so most months it is not here at all. */}
+          <ReorderHints rows={purchases} language={language} navigate={navigate} />
+
           {/* ── Budget ──────────────────────────────────────────────── */}
           {s.budget > 0 ? (
             <Card className="p-4">

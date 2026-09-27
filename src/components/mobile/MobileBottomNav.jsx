@@ -31,11 +31,16 @@ import { nativeLoginUrl } from '../../utils/nativeExperience';
  * (Roommate Wallet), everyone else gets "+ List". Saved lives inside the
  * tenant dashboard (Profile → Saved), keeping the rail uncluttered.
  *
- * INSTALLED APP: the rail follows the choice made on /app/start instead
- * (utils/nativeExperience.js), signed in or not:
- *   Tenant · Living : Ledger · Messages · Profile            (no FAB)
- *   Tenant · Search : Home · Explore · [Living FAB] · Messages · Profile
- *   Landlord        : Home · Properties · [+List FAB] · Messages · Profile
+ * INSTALLED APP: the rail follows the choice made at signup (or on /app/start)
+ * instead (utils/nativeExperience.js), signed in or not — and "Home" is that
+ * choice, not a second opinion about where home is:
+ *   Tenant · Living : Home (/living) · Explore · [Living FAB] · Messages · Profile
+ *   Tenant · Search : Home (/)       · Explore · [Living FAB] · Messages · Profile
+ *   Landlord        : Home (dash)    · Properties · [+List FAB] · Messages · Profile
+ * Living's tenant gets Home and the FAB on the same destination. That is on
+ * purpose: the FAB is the trained way into the খাতা (and the anchor two
+ * onboarding tours point at), and Home now agrees with it rather than
+ * contradicting it.
  * A signed-out app user tapping an action (List, Messages, Profile) goes
  * straight to login with that role already chosen — no drawer, no role picker.
  *
@@ -57,7 +62,7 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   const { settings } = useSettings();
   const defaultHome = settings?.app?.defaultHome || 'auto';
   const isBn = useIsBn();
-  const { isNative, mode: nativeMode } = useNativeExperience();
+  const { isNative, mode: nativeMode, homePath } = useNativeExperience();
 
   // Event-driven hide: HostDashboard dispatches 'hide-bottom-nav' when the
   // user enters Bookings / Rent tabs, and 'show-bottom-nav' when they leave.
@@ -103,13 +108,17 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
   // here. `?tab=dashboard` on the landlord path guarantees a tap always lands
   // on the overview, even if they were sitting on another dashboard tab.
   const homeTo = (() => {
-    // BOTH tenant surfaces keep the public homepage as Home. Pointing Home at
-    // the ledger instead is what stranded people who chose Living: the rail
-    // lost Home and Explore, so the homepage, search and services became
-    // unreachable from the one screen they lived on. The ledger is still one
-    // tap away — it is the raised centre action below.
-    if (appMode === 'living' || appMode === 'search') return '/';
-    if (appMode === 'host') return '/host-dashboard?tab=dashboard';
+    // In the app, Home IS the screen the app opens on — the same answer
+    // getNativeHome() gives the cold start and the post-login redirect, so the
+    // button means one thing everywhere. It used to be hardcoded to '/' for
+    // BOTH tenant surfaces: someone whose home is the খাতা opened on /living
+    // and then landed on the marketing homepage when they tapped Home, while a
+    // landlord's Home went to their dashboard. Same button, two meanings.
+    //
+    // The worry that put '/' here was stranding a Living tenant away from
+    // search and services. Neither is lost: Explore sits next to Home in this
+    // rail, and Living's own header carries a "go to the main home page" link.
+    if (appMode) return homePath === '/host-dashboard' ? '/host-dashboard?tab=dashboard' : homePath;
     if (!isAuthenticated) return '/';
     const to = resolveHome({ activeRole: user?.role, roles, defaultHome, hasBooking: true });
     return to === '/host-dashboard' ? '/host-dashboard?tab=dashboard' : to;
@@ -133,7 +142,10 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
       if (location.pathname.startsWith('/host-dashboard')) {
         return { id: 'profile', label: isBn ? 'প্রোফাইল' : 'Profile', icon: User, action: 'host-drawer' };
       }
-      return { id: 'profile', label: isBn ? 'প্রোফাইল' : 'Profile', icon: User, to: '/host-dashboard?tab=dashboard' };
+      // Off the dashboard the drawer isn't mounted, so ask for it on arrival —
+      // otherwise Profile landed on the dashboard with Home lit, and it took a
+      // second tap to see the profile at all.
+      return { id: 'profile', label: isBn ? 'প্রোফাইল' : 'Profile', icon: User, to: '/host-dashboard?tab=dashboard', state: { openHostDrawer: true } };
     }
     // default to tenant
     return { id: 'profile', label: isBn ? 'প্রোফাইল' : 'Profile', icon: User, to: '/tenant-dashboard' };
@@ -211,7 +223,7 @@ const MobileBottomNav = ({ hideOnRoutes }) => {
       navigate(item.to, { state: { activeTab: item.tab } });
       return;
     }
-    navigate(item.to);
+    navigate(item.to, item.state ? { state: item.state } : undefined);
   };
 
   const NavBtn = ({ item }) => {

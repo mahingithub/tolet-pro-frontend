@@ -49,6 +49,9 @@ const ThemeWidget = () => {
   return (
     <div 
       ref={widgetRef}
+      /* Pinned to the right edge at the vertical centre, on every screen size.
+         See the closed-tab button below for how it earns that space on a phone
+         without covering what is underneath it. */
       className="fixed right-0 top-1/2 -translate-y-1/2 z-[100] flex items-center"
     >
       <div 
@@ -107,17 +110,38 @@ const ThemeWidget = () => {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
+          /* SMALLER ON A PHONE, and sized to what it does rather than to the
+             desktop tab it grew from.
+
+             The closed tab lives at the right edge, vertically centred — which
+             on a phone is the middle of the content column. At 40×48 it sat on
+             top of real, tappable things: the "See all" link on the landlord
+             dashboard, the unread badge on Smart Alerts, a select's chevron,
+             the corner of the outstanding-rent card.
+
+             28×36 keeps it plainly visible and still comfortably tappable (the
+             OS hit-slop around a 28px control reaches the ~44px people actually
+             need) while giving back about half the width it was stealing.
+             Desktop keeps the original size, where there is room to spare and a
+             pointer to hover it with.
+
+             Moving it instead was tried and does not work: the bottom-right
+             corner is the AI assistant's, and on a phone that button already
+             sits just above the rail. */
           className={`
-            absolute right-0 flex items-center justify-center w-10 h-12 bg-white dark:bg-gray-800 
-            border border-r-0 border-gray-200 dark:border-gray-700 shadow-md 
-            rounded-l-xl text-gray-700 dark:text-gray-200 hover:text-[#ba0036] dark:hover:text-[#ba0036] 
+            absolute right-0 flex items-center justify-center
+            w-7 h-9 md:w-10 md:h-12 bg-white dark:bg-gray-800
+            border border-r-0 border-gray-200 dark:border-gray-700 shadow-md
+            rounded-l-lg md:rounded-l-xl text-gray-700 dark:text-gray-200 hover:text-[#ba0036] dark:hover:text-[#ba0036]
             transition-colors
           `}
           aria-label={bn ? 'থিম পরিবর্তন' : 'Toggle Theme'}
         >
-          {theme === 'light' && <Sun size={20} />}
-          {theme === 'dark' && <Moon size={20} />}
-          {theme === 'system' && <Monitor size={20} />}
+          {/* 15px on a phone so the glyph still reads inside the smaller tab —
+              scaling the box without the icon leaves it looking cramped. */}
+          {theme === 'light' && <Sun className="w-[15px] h-[15px] md:w-5 md:h-5" />}
+          {theme === 'dark' && <Moon className="w-[15px] h-[15px] md:w-5 md:h-5" />}
+          {theme === 'system' && <Monitor className="w-[15px] h-[15px] md:w-5 md:h-5" />}
         </button>
       )}
 

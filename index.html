@@ -23,10 +23,18 @@
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#ba0036" />
 
-    <!-- Google Fonts: Inter (body) & Sora (display) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Inter (body) & Sora (display) are SELF-HOSTED — see the @font-face
+         block at the top of src/index.css for the full reasoning. Short
+         version: this used to be a render-blocking <link> to
+         fonts.googleapis.com, and the service worker never caches cross-origin
+         requests, so the whole app's type was uncacheable AND first paint
+         waited for that request to fail on a dead network. The woff2 files now
+         ship in dist/assets/ and are precached with the rest of the build.
+         The two fonts.* preconnect hints went with it: nothing resolves to
+         those hosts any more, so warming them cost two DNS+TLS handshakes for
+         connections the app never opens.
+         ⚠️  Do not "restore" a Google Fonts link here. It would silently take
+         the app's typography back offline. -->
 
     <!-- Google Maps: the property details page injects the Maps JS SDK at
          runtime, which means a cold DNS + TLS handshake right when the user is

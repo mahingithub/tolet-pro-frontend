@@ -147,6 +147,12 @@ function startRefresh(originalFetch) {
 // Writes need an account; reads do not. See utils/guestSave.js.
 import { requireLoginToSave } from './guestSave';
 
+// Writes that exist FOR guests, sent in the background with nobody saving
+// anything. Gating them raised "sign in to save" on every signed-out launch —
+// guestDeviceService registers the install before the first screen paints —
+// and the registration itself never reached the server.
+const GUEST_BACKGROUND_WRITES = ['/api/app/device'];
+
 export function setupFetchInterceptor() {
   const originalFetch = window.fetch;
 
@@ -172,7 +178,8 @@ export function setupFetchInterceptor() {
     // caller ourselves.
     const method = String(init?.method || (typeof input !== 'string' && input?.method) || 'GET').toUpperCase();
     const isWrite = !['GET', 'HEAD', 'OPTIONS'].includes(method);
-    if (isApiRequest && isWrite && !url.includes('/auth/') && !requireLoginToSave()) {
+    const isGuestBackgroundWrite = GUEST_BACKGROUND_WRITES.some((path) => url.includes(path));
+    if (isApiRequest && isWrite && !url.includes('/auth/') && !isGuestBackgroundWrite && !requireLoginToSave()) {
       return new Response(
         JSON.stringify({ error: 'login_required', message: 'সেভ করতে লগইন করুন' }),
         { status: 403, headers: { 'Content-Type': 'application/json' } },

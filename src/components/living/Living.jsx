@@ -484,6 +484,13 @@ const Living = () => {
             ? "top-[calc(var(--sat)+56px)] md:top-[calc(var(--sat)+64px)]"
             : "top-safe"
         )}>
+          {/* Parked at top-safe, the pills clear the clock but the strip ABOVE
+              them — the status bar — was left bare, so the ledger visibly
+              scrolled behind the time and battery. This backdrop fills it with
+              the bar's own surface while the header is away. */}
+          {!isNavVisible && (
+            <div aria-hidden="true" className="absolute inset-x-0 bottom-full h-[var(--sat)] bg-[#eaeff5]/95 backdrop-blur-xl" />
+          )}
           <div data-tour="living-mobile-nav" className="flex items-center gap-1 p-1 rounded-2xl bg-white/70 border border-white/80 shadow-[0_6px_20px_-14px_rgba(15,23,42,0.3)]">
             {navModules.map((m) => {
               const Icon = m.icon;

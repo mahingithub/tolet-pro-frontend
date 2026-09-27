@@ -16,7 +16,7 @@ import {
   MONTHS_EN, MONTHS_BN,
   resolveTenancies, getBookingRentSnapshot,
   buildTenantRentSummary, decorateReceipts,
-  formatUnitLabel, unitParts, receiptUnitLabel,
+  unitParts, receiptUnitLabel,
   normalizeTenantBookings,
 } from '../utils/tenantRent';
 import { loadSeenMap, isInquiryUnread, markInquirySeen } from '../utils/inquiryUnread';
@@ -30,18 +30,19 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useDeepLinkHighlight from '../hooks/useDeepLinkHighlight';
 import useTabHistory from '../hooks/useTabHistory';
 import useBackGuard, { useOverlayNavigate } from '../hooks/useBackGuard';
+import useDismissedNotices from '../hooks/useDismissedNotices';
 import {
-  Building2, Search, Bell, Globe, LayoutDashboard, Heart, BookOpen,
-  MessageSquare, MessageCircle, Settings, HelpCircle,
+  Building2, Search, Bell, Globe, LayoutDashboard, Heart,
+  MessageSquare, MessageCircle, Settings,
   ArrowRight, Trash2, MapPin, Receipt, CheckCheck, Download,
-  CreditCard, Hourglass, X, UserCircle, BadgeCheck, ShieldAlert,
+  Hourglass, X, UserCircle, BadgeCheck, ShieldAlert,
   Camera, ScanFace, Upload, Check, Edit3, User, Phone, Mail,
-  Briefcase, GraduationCap, Building, Shield, ShieldCheck, FileText, AlertCircle, Award,
+  Briefcase, GraduationCap, Building, Shield, ShieldCheck, AlertCircle, Award,
   LogOut, CheckCircle2, Calendar, Clock, Eye, Send, ThumbsUp, ThumbsDown,
   Inbox, Home, Sparkles, KeyRound, CalendarCheck, DollarSign, Navigation,
   ChevronLeft, Filter, Zap, RefreshCw, Share2,
   FolderOpen, Lock, Info, Wallet, HeartPulse, Link2,
-  Wrench, ChevronRight, ChevronDown, HeartHandshake, DoorOpen
+  Wrench, ChevronRight, ChevronDown, DoorOpen
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -242,6 +243,34 @@ const computeVerificationProgress = (p) => {
     inReview:   status === 'pending' && pending > 0,
     isRejected: status === 'rejected',
   };
+};
+
+// "Dismiss" on an overview notice — the notice never comes back (see
+// useDismissedNotices). Labelled, not a bare X: an X reads as "close for now",
+// which is exactly what the old 7-day snooze did and why it felt broken.
+//   tone: 'dark' on the red/indigo cards, 'emerald' on the verified card
+//   size: 'sm' corner pill, 'lg' to sit level with a CTA button
+const NoticeDismissButton = ({ language, onClick, tone = 'dark', size = 'sm', className = '' }) => {
+  const bn = language === 'বাংলা';
+  const tones = {
+    dark: 'bg-white/10 hover:bg-white/20 text-white/80 hover:text-white border border-white/15',
+    emerald: 'bg-emerald-100/80 hover:bg-emerald-200 text-emerald-700 hover:text-emerald-900 border border-emerald-200/70',
+  };
+  const sizes = {
+    sm: 'px-2.5 py-1 md:px-3 md:py-1.5 rounded-full text-[10px] md:text-[11px]',
+    lg: 'px-4 py-3 rounded-2xl text-sm',
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={bn ? 'আর দেখাবেন না' : "Don't show this again"}
+      className={`inline-flex items-center justify-center gap-1.5 font-black whitespace-nowrap transition-colors active:scale-95 ${tones[tone]} ${sizes[size]} ${className}`}
+    >
+      <X size={size === 'lg' ? 14 : 12} strokeWidth={3} />
+      {bn ? 'সরিয়ে দিন' : 'Dismiss'}
+    </button>
+  );
 };
 
 // ╔════════════════════════════════════════════════════════════════════════╗
@@ -1267,6 +1296,9 @@ const TenantDashboard = () => {
 
   const handleSwitchRole = async () => {
     if (!ownsLandlord) {
+      // Close the drawer first, like every other drawer item: it stacks above
+      // z-[100] now, which is where the onboarding modal lives.
+      setIsProfileDrawerOpen(false);
       setLandlordOnboardingOpen(true);
       return;
     }
@@ -1360,38 +1392,47 @@ const TenantDashboard = () => {
   const [hideUpcomingTours, setHideUpcomingTours] = useState(
     () => localStorage.getItem('hideUpcomingTours') === 'true'
   );
-  const [hideBecomeLandlord, setHideBecomeLandlord] = useState(
-    () => localStorage.getItem('hideBecomeLandlord') === 'true'
-  );
-  // ── Verification nudge: SNOOZE, not a permanent kill ──────────────────────
-  // The old behaviour wrote hideVerificationBanner=true forever, so one stray
-  // tap on the X meant the user never saw the prompt again — the flow quietly
-  // gave up on them. A dated snooze respects "not now" (the banner really does
-  // disappear, no re-prompt on the next page load) while still letting us ask
-  // again later. Asking once a week beats nagging every session, and beats
-  // never asking again.
-  const VERIF_SNOOZE_DAYS = 7;
-  const readVerifSnooze = () => {
-    // Migrate the legacy boolean key: treat an old permanent dismiss as a
-    // snooze that starts now rather than silently un-hiding the banner.
-    if (localStorage.getItem('hideVerificationBanner') === 'true') {
-      const until = Date.now() + VERIF_SNOOZE_DAYS * 864e5;
-      localStorage.removeItem('hideVerificationBanner');
-      localStorage.setItem('verifBannerSnoozeUntil', String(until));
-      return until;
+  // ── Dismissible notices: "Dismiss" means never again ─────────────────────
+  // The verification card's X used to be a 7-day snooze in this browser only,
+  // so a verified tenant saw "You're verified" come back every week (and on
+  // every other device). Each notice now has a labelled Dismiss button and the
+  // dismissal is kept on the account — see hooks/useDismissedNotices.
+  //
+  // The verification id carries its STATE, so dismissing one state doesn't
+  // swallow the next: dismissing the "verify your NID" nudge still lets the
+  // "you're verified" card appear once when the admin approves. The rejected
+  // banner has no Dismiss at all — it needs action, not acknowledgement.
+  const { isDismissed, dismiss: dismissNotice, ready: noticesReady } = useDismissedNotices();
+  const verifNoticeId = isVerified
+    ? 'tenant.verification.verified'
+    : verifProgress.inReview && !verifProgress.nextItem
+      ? 'tenant.verification.review'
+      : 'tenant.verification.nudge';
+  const hideVerificationBanner = !noticesReady || isDismissed(verifNoticeId);
+  const hideBecomeLandlord = !noticesReady || isDismissed('tenant.become-landlord');
+  const dismissVerificationBanner = () => dismissNotice(verifNoticeId);
+  const dismissBecomeLandlord = () => dismissNotice('tenant.become-landlord');
+
+  // One-time move of the old device-only flags onto the account. Any trace of
+  // the old snooze means this person already closed a verification card —
+  // the complaint was that it came BACK, so it counts as dismissing the
+  // "you're verified" card rather than as a fresh start.
+  const authUserId = authUser?.id || authUser?._id || null;
+  useEffect(() => {
+    if (!authUserId) return;
+    const ids = [];
+    if (localStorage.getItem('hideBecomeLandlord') === 'true') ids.push('tenant.become-landlord');
+    if (localStorage.getItem('verifBannerSnoozeUntil') || localStorage.getItem('hideVerificationBanner')) {
+      ids.push('tenant.verification.verified');
     }
-    return Number(localStorage.getItem('verifBannerSnoozeUntil') || 0);
-  };
-  const [verifSnoozeUntil, setVerifSnoozeUntil] = useState(readVerifSnooze);
-  const hideVerificationBanner = Date.now() < verifSnoozeUntil;
+    if (!ids.length) return;
+    dismissNotice(...ids);
+    ['hideBecomeLandlord', 'verifBannerSnoozeUntil', 'hideVerificationBanner']
+      .forEach((k) => localStorage.removeItem(k));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUserId]);
 
   const dismissUpcomingTours = () => { setHideUpcomingTours(true); localStorage.setItem('hideUpcomingTours', 'true'); };
-  const dismissBecomeLandlord = () => { setHideBecomeLandlord(true); localStorage.setItem('hideBecomeLandlord', 'true'); };
-  const dismissVerificationBanner = () => {
-    const until = Date.now() + VERIF_SNOOZE_DAYS * 864e5;
-    setVerifSnoozeUntil(until);
-    localStorage.setItem('verifBannerSnoozeUntil', String(until));
-  };
 
   // Auto-open the verification wizard when the user lands here with
   // `?openVerify=1` — currently fired by the Navbar's "Switch to Host"
@@ -1771,13 +1812,9 @@ const handleWizardSubmit = async (payload) => {
     // small screen drawer doesn't feel duplicated; desktop keeps it for
     // power users who want the legacy /messages inbox.
     { id: 'messages', icon: MessageSquare, label: t.messages || (language === 'বাংলা' ? 'মেসেজ' : 'Messages'), isLink: true, path: '/messages', desktopOnly: true },
+    // Help & Support, How it Works, Trust & Safety and the policies live under
+    // Account Settings → Help & policies (SharedSettings), not in this list.
     { id: 'settings', icon: Settings, label: t.accountSettings || (language === 'বাংলা' ? 'অ্যাকাউন্ট সেটিংস' : 'Account Settings') },
-    { id: 'how-it-works', icon: BookOpen, label: language === 'বাংলা' ? 'কীভাবে কাজ করে' : 'How it Works', isLink: true, path: '/how-it-works' },
-    { id: 'support', icon: HelpCircle, label: t.support || (language === 'বাংলা' ? 'হেল্প ও সাপোর্ট' : 'Help & Support'), isLink: true, path: '/support' },
-    { id: 'trust', icon: HeartHandshake, label: language === 'বাংলা' ? 'বিশ্বাস ও নিরাপত্তা' : 'Trust & Safety', isLink: true, path: '/trust-safety' },
-    { id: 'privacy', icon: ShieldCheck, label: language === 'বাংলা' ? 'প্রাইভেসি পলিসি' : 'Privacy Policy', isLink: true, path: '/privacy-policy' },
-    { id: 'terms', icon: FileText, label: language === 'বাংলা' ? 'শর্তাবলী' : 'Terms & Policies', isLink: true, path: '/terms' },
-    { id: 'refund', icon: CreditCard, label: language === 'বাংলা' ? 'রিফান্ড পলিসি' : 'Refund Policy', isLink: true, path: '/refund' },
   ];
 
   return (
@@ -1806,7 +1843,7 @@ const handleWizardSubmit = async (payload) => {
       <div className="fixed bottom-[-20%] right-[-10%] w-[50vw] h-[50vw] bg-gradient-to-tl from-blue-600/5 to-transparent rounded-full blur-[120px] pointer-events-none z-0"></div>
 
       {/* TOP-CENTER TOAST PILL — identical pattern to HostDashboard. */}
-      <div className={`fixed top-8 left-1/2 -translate-x-1/2 z-[100] transition-all duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${profileToast ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-10 scale-95 pointer-events-none'}`}>
+      <div className={`fixed top-8 left-1/2 -translate-x-1/2 z-[10000] transition-all duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${profileToast ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-10 scale-95 pointer-events-none'}`}>
         <div className="bg-gray-900/90 backdrop-blur-2xl text-white px-5 py-3 rounded-full shadow-[0_20px_40px_rgba(0,0,0,0.2)] border border-white/10 flex items-center gap-3">
           <div className="w-5 h-5 bg-green-500/20 rounded-full flex items-center justify-center">
             <CheckCircle2 size={12} className="text-green-400" />
@@ -1991,8 +2028,11 @@ const handleWizardSubmit = async (payload) => {
       </div>
 
       {/* 🔵 RIGHT-DRAWER MENU (replaces dropdown) — identical mechanics to host. */}
-      {isProfileDrawerOpen && <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[60] animate-in fade-in" onClick={() => setIsProfileDrawerOpen(false)}></div>}
-      <div style={{ paddingTop: 'var(--sat)', paddingBottom: 'var(--sab)' }} className={`fixed top-0 right-0 h-full w-full max-w-[280px] bg-[#fdfdfd] shadow-2xl z-[70] transform transition-transform duration-500 ease-in-out flex flex-col border-l border-gray-100 ${isProfileDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      {/* z-[105]/z-[110]: above the AI assistant button and the theme tab
+          (both z-[100]), which floated on top of the open drawer. Every drawer
+          item closes it before opening anything else. */}
+      {isProfileDrawerOpen && <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[105] animate-in fade-in" onClick={() => setIsProfileDrawerOpen(false)}></div>}
+      <div style={{ paddingTop: 'var(--sat)', paddingBottom: 'var(--sab)' }} className={`fixed top-0 right-0 h-full w-full max-w-[280px] bg-[#fdfdfd] shadow-2xl z-[110] transform transition-transform duration-500 ease-in-out flex flex-col border-l border-gray-100 ${isProfileDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         {/* Profile preview at top — tap goes to profile tab */}
 
         
@@ -2092,7 +2132,7 @@ const handleWizardSubmit = async (payload) => {
            it, so a flat `pb-24` (96px) left the last card behind the rail on any
            phone with a gesture inset over 32px. --bottom-nav-h is that real
            total; the rail is `md:hidden`, so md+ keeps the plain 96px. */}
-      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-8 lg:px-12 pt-6 md:pt-10 relative z-10 pb-[calc(var(--bottom-nav-h)+1.5rem)] md:pb-24 selection:bg-[#ba0036]/15 selection:text-[#ba0036]">
+      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-8 lg:px-12 pt-6 md:pt-10 relative z-10 pb-[var(--bottom-nav-clear)] md:pb-24 selection:bg-[#ba0036]/15 selection:text-[#ba0036]">
 
         {/* 🔵 DESKTOP-ONLY BACK ROW — only visible on md+ widths.
             Mobile users navigate back via the browser/system gesture or
@@ -2124,13 +2164,361 @@ const handleWizardSubmit = async (payload) => {
         )}
 
         {/* 🔴 TAB 1: OVERVIEW — rebuilt to match the Canva mockup.
-            Order: Become-a-Landlord banner (when not yet a landlord) →
-            verification banner → 3 stat cards → Quick Search →
-            Upcoming Tours. The Trust-Score peek now lives inside the
+            Order: NOTICES first, directly under the nav (verification
+            rejected / progress / verified, then Become-a-Landlord) → Add
+            landlord code → stat cards → Payment Proof → Quick Search →
+            Upcoming Tours. Past homes live in the Payments tab, next to
+            their receipts. The Trust-Score peek now lives inside the
             Profile tab (still wired to the same `computeTrustScore`
             helper, just no longer cluttering the home view). */}
         {activeTab === 'overview' && (
           <>
+            {/* ── VERIFICATION REJECTED BANNER ────────────────────────────
+                Surfaces the admin's rejection reason so the user understands
+                what to fix, with a one-tap "resubmit" CTA that re-opens the
+                same modal. Without this banner a rejected user would see a
+                blank dashboard and assume nothing happened. Backend field:
+                tenantProfile.verification.rejectionReason — set by
+                admin.controller.js → rejectUser(). */}
+            {verifRejected && (
+              <div className="mb-5 md:mb-7 rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 bg-white border-2 border-[#ba0036]/15 shadow-[0_8px_30px_-10px_rgba(186,0,54,0.15)] relative overflow-hidden">
+                <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-5">
+                  <div className="shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-[#ba0036]/10 text-[#ba0036] flex items-center justify-center">
+                    <ShieldAlert size={22} strokeWidth={2.4} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ba0036] mb-1">
+                      {language === 'বাংলা' ? 'ভেরিফিকেশন বাতিল' : 'Verification rejected'}
+                    </p>
+                    <h3 className="text-lg md:text-xl font-black text-gray-900 leading-tight">
+                      {language === 'বাংলা'
+                        ? 'আপনার ডকুমেন্ট গ্রহণ করা হয়নি'
+                        : 'Your submission wasn’t accepted'}
+                    </h3>
+                    {rejectionReason ? (
+                      <div className="mt-3 p-3 rounded-xl bg-[#ba0036]/5 border border-[#ba0036]/10">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-[#ba0036] mb-1">
+                          {language === 'বাংলা' ? 'অ্যাডমিনের মন্তব্য' : 'Admin note'}
+                        </p>
+                        <p className="text-sm font-bold text-gray-800 leading-snug">
+                          {rejectionReason}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm font-bold text-gray-600 leading-snug">
+                        {language === 'বাংলা'
+                          ? 'অনুগ্রহ করে আপনার তথ্য পুনরায় চেক করে আবার জমা দিন।'
+                          : 'Please review your information and submit again.'}
+                      </p>
+                    )}
+                    <button
+                      onClick={() => setVerifModalOpen(true)}
+                      className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#ba0036] to-[#d11147] text-white font-black text-sm shadow-[0_8px_20px_rgba(186,0,54,0.25)] hover:shadow-[0_12px_30px_rgba(186,0,54,0.35)] hover:-translate-y-0.5 transition-all"
+                    >
+                      <RefreshCw size={14} />
+                      {language === 'বাংলা' ? 'আবার চেষ্টা করুন' : 'Try again'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── VERIFICATION BANNER ─────────────────────────────────────
+                Dark glassy card with a holographic red→indigo accent
+                gradient, a "breathing" shield icon ringed by two animated
+                pulse rings, a two-segment progress bar and a CTA.
+
+                COMPACT ON PHONES. The desktop layout stacked on a phone —
+                64px shield on its own row, chip, headline, two-sentence
+                subcopy, bar, legend, full-width CTA — and filled the whole
+                first screen. Below md it is three short rows instead: small
+                shield + headline + one-line sub + Dismiss, then the bar with
+                the CTA beside it. The chip, legend and long copy are md+.
+
+                States: in progress (default) · submitted for review
+                (`verifProgress.inReview`) · verified (green success row).
+
+                Suppressed entirely when `verifRejected`, because the
+                rejection banner directly above already owns that state and
+                carries its own retry button. Rendering both stacked two
+                conflicting messages — "your documents were declined" on top
+                of a near-full progress bar — which is what made the flow
+                feel broken. */}
+            {hideVerificationBanner || verifRejected ? null : !isVerified ? (
+              <div className="mb-4 md:mb-7 relative overflow-hidden rounded-[1.25rem] md:rounded-[2rem] p-[1px] bg-gradient-to-br from-[#ba0036]/40 via-rose-400/20 to-indigo-500/30 shadow-[0_20px_60px_-20px_rgba(186,0,54,0.35)]">
+                {/* Inline keyframes for shimmer + breathing pulse rings. */}
+                <style>{`
+                  @keyframes tolet-shimmer {
+                    0% { transform: translateX(-100%); }
+                    100% { transform: translateX(200%); }
+                  }
+                  @keyframes tolet-breath {
+                    0%, 100% { transform: scale(1); opacity: 0.5; }
+                    50%      { transform: scale(1.08); opacity: 0.9; }
+                  }
+                  @keyframes tolet-grid-drift {
+                    0%   { background-position: 0 0; }
+                    100% { background-position: 32px 32px; }
+                  }
+                `}</style>
+
+                <div className="relative rounded-[calc(1.25rem-1px)] md:rounded-[calc(2rem-1px)] bg-gradient-to-br from-[#1a0a14] via-[#2a0a18] to-[#15042b] p-4 md:p-7 overflow-hidden">
+                  {/* Holographic background layer: faint dot-grid that
+                      slowly drifts diagonally + a couple of soft glow
+                      orbs. Pure decoration; pointer-events disabled. */}
+                  <div
+                    className="absolute inset-0 opacity-[0.08] pointer-events-none"
+                    style={{
+                      backgroundImage: 'radial-gradient(rgba(255,255,255,0.9) 1px, transparent 1px)',
+                      backgroundSize: '16px 16px',
+                      animation: 'tolet-grid-drift 18s linear infinite',
+                    }}
+                  />
+                  <div className="absolute -top-24 -left-24 w-64 h-64 bg-[#ba0036]/40 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute -bottom-32 -right-24 w-72 h-72 bg-indigo-500/25 rounded-full blur-3xl pointer-events-none" />
+
+                  <div className="relative z-10 flex items-start md:items-center gap-3 md:gap-6">
+                    {/* LEFT: animated shield with breathing pulse rings (the
+                        outer ring is md+ — at 40px it just reads as noise) */}
+                    <div className="relative shrink-0 md:self-center">
+                      <span
+                        className="absolute inset-0 -m-1 md:-m-2 rounded-[1.1rem] md:rounded-[1.4rem] bg-[#ba0036]/40 blur-md"
+                        style={{ animation: 'tolet-breath 2.6s ease-in-out infinite' }}
+                      />
+                      <span
+                        className="hidden md:block absolute inset-0 -m-4 rounded-[1.6rem] border border-[#ba0036]/40"
+                        style={{ animation: 'tolet-breath 2.6s ease-in-out infinite 0.6s' }}
+                      />
+                      <div className="relative w-10 h-10 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-gradient-to-br from-[#ff4d6d] via-[#ba0036] to-[#65001e] text-white flex items-center justify-center shadow-[0_10px_30px_-10px_rgba(255,77,109,0.6)] border border-white/10">
+                        <Shield strokeWidth={2.3} className="w-5 h-5 md:w-[26px] md:h-[26px]" />
+                      </div>
+                    </div>
+
+                    {/* CENTER: pre-label + headline + subcopy */}
+                    <div className="flex-1 min-w-0 text-white">
+                      <div className="hidden md:flex items-center gap-2 mb-1.5">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-[10px] font-black tracking-[0.18em] uppercase text-rose-200 backdrop-blur-sm">
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-300" />
+                          </span>
+                          {language === 'বাংলা' ? 'আইডেন্টিটি ভেরিফিকেশন' : 'Identity Verification'}
+                        </span>
+                        <span className="hidden sm:inline-flex text-[9px] font-black tracking-widest uppercase text-white/40">
+                          {language === 'বাংলা' ? 'এআই' : 'AI'}-secured
+                        </span>
+                      </div>
+                      {/* Headline names the ONE thing left to do rather than
+                          repeating a generic "verify your account". A specific
+                          ask converts better and reads as help, not nagging. */}
+                      <h3 className="text-base md:text-2xl font-black tracking-tight leading-tight">
+                        {verifProgress.inReview && !verifProgress.nextItem
+                          ? (language === 'বাংলা' ? 'রিভিউয়ের জন্য সাবমিট হয়েছে' : 'Submitted for review')
+                          : verifProgress.nextItem
+                            ? (language === 'বাংলা' ? verifProgress.nextItem.actionBn : verifProgress.nextItem.actionEn)
+                            : (language === 'বাংলা' ? 'আপনার অ্যাকাউন্ট ভেরিফাই করুন' : 'Verify your account')}
+                      </h3>
+                      {/* Phones get one short line; md+ keeps the full pitch. */}
+                      <p className="md:hidden mt-0.5 text-[11px] font-bold text-white/65 leading-snug">
+                        {verifProgress.inReview && !verifProgress.nextItem
+                          ? (language === 'বাংলা' ? 'সাধারণত ২৪ ঘণ্টার মধ্যে যাচাই হয়' : 'Usually checked within 24 hours')
+                          : verifProgress.nextItem
+                            ? (language === 'বাংলা' ? `এক মিনিটের কাজ · ট্রাস্ট +${verifProgress.nextItem.pts}` : `About a minute · +${verifProgress.nextItem.pts} Trust`)
+                            : (language === 'বাংলা' ? 'ভেরিফাইড হলে দ্রুত অ্যাপ্রুভাল' : 'Verified tenants get approved faster')}
+                      </p>
+                      <p className="hidden md:block mt-1.5 text-sm font-bold text-white/65 leading-snug max-w-prose">
+                        {verifProgress.inReview && !verifProgress.nextItem
+                          ? (language === 'বাংলা'
+                              ? `আমরা আপনার ডকুমেন্ট যাচাই করছি। সাধারণত ২৪ ঘণ্টার মধ্যে শেষ হয় — পাস হলে +${verifProgress.pending} ট্রাস্ট যোগ হবে।`
+                              : `We're reviewing your documents. Usually done within 24 hours — approval adds +${verifProgress.pending} Trust.`)
+                          : verifProgress.nextItem
+                            ? (language === 'বাংলা'
+                                ? `প্রায় এক মিনিটের কাজ, ট্রাস্ট স্কোরে +${verifProgress.nextItem.pts}। ভেরিফাইড ভাড়াটিয়ারা বাড়িওয়ালার কাছ থেকে দ্রুত সাড়া পান।`
+                                : `About a minute's work, +${verifProgress.nextItem.pts} Trust. Verified tenants hear back from landlords sooner.`)
+                            : (language === 'বাংলা' ? 'ভেরিফাইড ভাড়াটিয়ারা বাড়িওয়ালার কাছ থেকে দ্রুত অ্যাপ্রুভাল পান।' : 'Verified tenants get faster landlord approvals.')}
+                      </p>
+                    </div>
+
+                    {/* Permanent for THIS state — see dismissVerificationBanner.
+                        In the header row rather than pinned to the corner, so
+                        the headline wraps before it instead of under it. */}
+                    <NoticeDismissButton
+                      language={language}
+                      onClick={dismissVerificationBanner}
+                      className="shrink-0 self-start"
+                    />
+                  </div>
+
+                  {/* PROGRESS + CTA — side by side at every width (the CTA
+                      used to take its own full-width row on phones).
+                      The bar has TWO segments and that is the whole point:
+
+                        solid  → verifProgress.earnedPct   (points banked)
+                        ghost  → verifProgress.pending     (submitted, in review)
+
+                      The number beside it is the trust score, the same value
+                      the ring on the Profile tab shows. Previously this read a
+                      separate upload-completion percentage, which is how a
+                      100% bar ended up sitting above a 30/100 ring. One
+                      number, one meaning, and the legend underneath spells out
+                      where the rest of the points are. */}
+                  <div className="relative z-10 mt-3 md:mt-6 flex items-center gap-3 md:gap-5">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden relative"
+                          role="progressbar"
+                          aria-valuenow={verifProgress.earned}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-label={language === 'বাংলা' ? 'ট্রাস্ট স্কোর' : 'Trust score'}
+                        >
+                          {/* Pending sits underneath and spans earned+pending,
+                              so the solid segment paints over its start. */}
+                          {verifProgress.pending > 0 && (
+                            <div
+                              className="absolute inset-y-0 left-0 rounded-full bg-white/25 transition-[width] duration-700"
+                              style={{ width: `${verifProgress.pct}%` }}
+                            />
+                          )}
+                          <div
+                            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#ff4d6d] via-[#ba0036] to-[#ff4d6d] transition-[width] duration-700 shadow-[0_0_12px_rgba(255,77,109,0.6)]"
+                            style={{ width: `${Math.max(verifProgress.earnedPct, 3)}%` }}
+                          />
+                          <div
+                            className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                            style={{ animation: 'tolet-shimmer 2.4s linear infinite' }}
+                          />
+                        </div>
+                        <span className="text-xs font-black text-white tabular-nums shrink-0">
+                          {verifProgress.earned}<span className="text-white/40">/100</span>
+                        </span>
+                      </div>
+
+                      {/* Legend — the bridge between the bar and the ring.
+                          md+ only: on a phone the "15/100" beside the bar is
+                          enough, and the legend was a whole extra row. */}
+                      <div className="hidden md:flex mt-2 flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white/60">
+                          <span className="w-2 h-2 rounded-full bg-[#ff4d6d]" />
+                          {language === 'বাংলা' ? `${verifProgress.earned} পয়েন্ট পেয়েছেন` : `${verifProgress.earned} earned`}
+                        </span>
+                        {verifProgress.pending > 0 && (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white/60">
+                            <span className="w-2 h-2 rounded-full bg-white/40" />
+                            {language === 'বাংলা' ? `${verifProgress.pending} রিভিউতে` : `${verifProgress.pending} in review`}
+                          </span>
+                        )}
+                        {verifProgress.remaining > 0 && (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white/40">
+                            <span className="w-2 h-2 rounded-full bg-white/15" />
+                            {language === 'বাংলা' ? `${verifProgress.remaining} বাকি` : `${verifProgress.remaining} to go`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {/* CTA routes to wherever the next item actually lives —
+                        the wizard for documents, the Profile tab for typed
+                        fields. The old version always dropped the user on the
+                        Profile tab and left them to find the control
+                        themselves. */}
+                    <button
+                      onClick={() => {
+                        if (verifProgress.nextItem?.where === 'profile') setActiveTab('profile');
+                        else setVerifModalOpen(true);
+                      }}
+                      className="group shrink-0 inline-flex items-center justify-center gap-1.5 md:gap-2 px-3.5 py-2.5 md:px-5 md:py-3 rounded-xl md:rounded-2xl bg-gradient-to-r from-[#ff4d6d] via-[#ba0036] to-[#90002a] text-white font-black text-xs md:text-sm shadow-[0_12px_30px_-8px_rgba(255,77,109,0.55)] hover:shadow-[0_18px_40px_-8px_rgba(255,77,109,0.7)] hover:-translate-y-0.5 active:translate-y-0 transition-all whitespace-nowrap relative overflow-hidden"
+                    >
+                      <span
+                        className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                        style={{ animation: 'tolet-shimmer 2.8s linear infinite' }}
+                      />
+                      <ScanFace size={15} strokeWidth={2.5} className="relative z-10 hidden md:block" />
+                      <span className="relative z-10">
+                        {verifProgress.nextItem
+                          ? (language === 'বাংলা' ? `যোগ করুন · +${verifProgress.nextItem.pts}` : `Add it · +${verifProgress.nextItem.pts}`)
+                          : verifProgress.inReview
+                            ? (language === 'বাংলা' ? 'ডকুমেন্ট দেখুন' : 'Review documents')
+                            : (language === 'বাংলা' ? 'ভেরিফাই করুন' : 'Get verified')}
+                      </span>
+                      <ArrowRight size={14} className="relative z-10 group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-5 md:mb-7 rounded-[1.5rem] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/60 p-4 md:p-5 flex flex-wrap items-center gap-3 shadow-[0_10px_30px_-15px_rgba(16,185,129,0.4)] relative">
+                <div className="relative shrink-0">
+                  <span className="absolute inset-0 rounded-2xl bg-emerald-400/40 blur-md animate-pulse" />
+                  <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-white flex items-center justify-center shadow">
+                    <BadgeCheck size={22} />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-[11rem]">
+                  <p className="text-sm font-black text-emerald-700">{language === 'বাংলা' ? 'আপনি ভেরিফাইড' : "You're verified"}</p>
+                  <p className="text-[11px] font-bold text-emerald-700/80">{language === 'বাংলা' ? 'বাড়িওয়ালারা আপনার প্রোফাইল সবুজ ব্যাজ-সহ দেখেন।' : 'Landlords see your profile with a green verified badge.'}</p>
+                </div>
+                {/* Once dismissed this never returns — there is nothing left
+                    to do, so it is news, not a to-do. On a narrow phone it
+                    wraps under the copy instead of squeezing it. */}
+                <NoticeDismissButton
+                  language={language}
+                  tone="emerald"
+                  onClick={dismissVerificationBanner}
+                  className="ml-auto shrink-0"
+                />
+              </div>
+            )}
+
+            {/* ── BECOME A LANDLORD BANNER (roadmap-v2 §4 / tenant §T4) ──
+                Only renders when the user does NOT yet have the landlord
+                role on their account. One click adds the role on the
+                server and flips them into host mode. Verified tenants get
+                a subtle "your trust score carries over" line so they know
+                they don't lose progress when switching modes. */}
+            {!isAlsoLandlord && !hideBecomeLandlord && !authUser?.landlordProfile?.verification?.status && (
+              <div className="mb-5 md:mb-7 rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 bg-gradient-to-br from-[#ba0036] via-[#7c0026] to-[#3a0011] text-white shadow-[0_20px_50px_-20px_rgba(186,0,54,0.5)] relative overflow-hidden">
+                <div className="absolute -top-16 -right-16 w-56 h-56 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="relative flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+                  <div className="shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-white/15 flex items-center justify-center backdrop-blur-md border border-white/15">
+                    <Home size={22} strokeWidth={2.4} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-200 mb-1">
+                      {language === 'বাংলা' ? 'নতুন!' : 'New'}
+                    </p>
+                    <h3 className="text-lg md:text-xl font-black leading-tight">
+                      {language === 'বাংলা' ? 'বাড়িওয়ালা হয়ে আপনার সম্পত্তি লিস্ট করুন' : 'Become a landlord — list your property'}
+                    </h3>
+                    <p className="mt-1 text-[12px] md:text-sm font-bold text-white/75 leading-snug max-w-prose">
+                      {isVerified
+                        ? (language === 'বাংলা'
+                            ? 'আপনার ভেরিফাইড ট্রাস্ট স্কোর হোস্ট প্রোফাইলে চলে যাবে।'
+                            : 'Your verified trust score carries over to your host profile.')
+                        : (language === 'বাংলা'
+                            ? 'এক ক্লিকেই হোস্ট মোডে যান — কোনো নতুন একাউন্ট লাগবে না।'
+                            : 'One click to switch into host mode — no separate account required.')}
+                    </p>
+                  </div>
+                  {/* Dismiss sits beside the CTA as its quieter twin rather
+                      than in the corner, where it would crowd this button. */}
+                  <div className="shrink-0 flex items-center gap-2">
+                    <NoticeDismissButton
+                      language={language}
+                      onClick={dismissBecomeLandlord}
+                      size="lg"
+                    />
+                    <button
+                      onClick={openBecomeLandlordPrompt}
+                      className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white text-[#ba0036] font-black text-sm shadow-[0_10px_25px_rgba(0,0,0,0.25)] hover:scale-105 active:scale-95 transition-transform"
+                    >
+                      {language === 'বাংলা' ? 'হোস্ট হন' : 'Become a Host'} <ArrowRight size={15} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* ── CONNECT TO LANDLORD — join a rent/seat by invite code ──── */}
             <div className="mb-5 md:mb-7 rounded-2xl p-4 bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5">
               <div className="flex items-center gap-3 min-w-0">
@@ -2160,66 +2548,6 @@ const handleWizardSubmit = async (payload) => {
                 </button>
               </div>
             </div>
-
-            {/* ── PAST HOMES ─────────────────────────────────────────────────
-                Tenancies this person has left. They are not deleted — the rent
-                ledger and the receipts hang off them — so they are shown here
-                rather than silently disappearing, and kept out of the active
-                rent flow entirely (no dues, no "Pay Your Rent" card). */}
-            {pastTenancies.length > 0 && (
-              <div className="mb-5 md:mb-7 rounded-2xl border border-gray-100 bg-white/70 p-4">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2.5">
-                  {language === 'বাংলা' ? 'আগের বাসা' : 'Past homes'}
-                </p>
-                <div className="space-y-2">
-                  {pastTenancies.map((b) => (
-                    <div key={b.id || b._id} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-white border border-gray-100 text-gray-300 flex items-center justify-center shrink-0">
-                        <DoorOpen size={14} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[12px] font-black text-gray-600 truncate">
-                          {formatUnitLabel(b, language)}
-                        </p>
-                        <p className="text-[10px] font-bold text-gray-400 mt-0.5">
-                          {b.myMembership?.moveOutDate
-                            ? `${language === 'বাংলা' ? 'ছেড়েছেন' : 'Left'} ${new Date(b.myMembership.moveOutDate).toLocaleDateString(language === 'বাংলা' ? 'bn-BD' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
-                            : b.isSupersededTenancy
-                              ? (language === 'বাংলা' ? 'আপনি নতুন বাসায় উঠেছেন' : 'You moved somewhere newer')
-                              : (language === 'বাংলা' ? 'শেষ হয়েছে' : 'Ended')}
-                        </p>
-                      </div>
-                      {/* A tenancy the landlord stamped closed, versus one we
-                          INFERRED they left by joining somewhere newer. The
-                          second is a presumption and is labelled as one. */}
-                      <span className={`shrink-0 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
-                        b.isSupersededTenancy ? 'bg-amber-100 text-amber-700' : 'bg-gray-200 text-gray-500'
-                      }`}>
-                        {b.isSupersededTenancy
-                          ? (language === 'বাংলা' ? 'ছেড়ে দেওয়া' : 'Moved out')
-                          : (language === 'বাংলা' ? 'সমাপ্ত' : 'Past')}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-[10px] font-bold text-gray-400 leading-relaxed mt-2.5">
-                  {language === 'বাংলা'
-                    ? 'আপনার পুরোনো ভাড়ার রেকর্ড ও রিসিট মুছে যায়নি — পেমেন্ট ট্যাবে দেখতে পাবেন।'
-                    : 'Your old rent records and receipts are kept — they stay in the Payments tab.'}
-                </p>
-                {/* Say it out loud when we inferred the move. The tenant is the
-                    only person who knows whether they really left, and if we
-                    guessed wrong they need to know why a home disappeared from
-                    their rent card rather than wondering what broke. */}
-                {tenancies.hasUnstampedMoves && (
-                  <p className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2 leading-relaxed mt-2">
-                    {language === 'বাংলা'
-                      ? 'আপনি নতুন বাসায় ওঠায় আগের ভাড়াগুলো এখানে সরানো হয়েছে। এখনো ওখানে থাকলে বাড়িওয়ালাকে জানান — তিনি আবার যুক্ত করতে পারবেন।'
-                      : 'These moved here because you joined somewhere newer. If you still live at one of them, tell that landlord — they can add you back.'}
-                  </p>
-                )}
-              </div>
-            )}
 
             {addLandlordOpen && (
               <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setAddLandlordOpen(false)}>
@@ -2338,8 +2666,13 @@ const handleWizardSubmit = async (payload) => {
 
             {/* ── NAV CARDS — Messages · Services · Smart Alerts ──────────
                 Wider horizontal cards (icon + title + subtitle + chevron).
-                Stack to full-width rows on phones for big tap targets. */}
-            <div className={`mb-4 md:mb-6 grid gap-2.5 md:gap-4 ${myBookings.length > 0 ? 'grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
+                Stack to full-width rows on phones for big tap targets.
+
+                Messages is md+ only (phones have it in the bottom rail). Its
+                phone slot used to be filled by a second "Payments" card —
+                the same tab, the same unread badge, one row below the
+                Payments stat tile — so phones now get two cards here. */}
+            <div className={`mb-4 md:mb-6 grid gap-2.5 md:gap-4 ${myBookings.length > 0 ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
               {[
                 {
                   id: 'messages',
@@ -2349,15 +2682,6 @@ const handleWizardSubmit = async (payload) => {
                   onClick: () => navigate('/messages'),
                   extraClass: 'hidden md:flex',
                 },
-                ...(myBookings.length > 0 ? [{
-                  id: 'payments-mobile',
-                  label: language === 'বাংলা' ? 'পেমেন্ট' : 'Payments',
-                  sub: language === 'বাংলা' ? 'পেমেন্ট ও রিসিট' : 'Payments & receipts',
-                  Icon: DollarSign, iconBg: 'bg-violet-50 border-violet-100', iconColor: 'text-violet-600',
-                  badge: unreadReceiptsCount > 0 ? unreadReceiptsCount : null,
-                  onClick: () => setActiveTab('payments'),
-                  extraClass: 'flex md:hidden',
-                }] : []),
                 {
                   id: 'services',
                   label: language === 'বাংলা' ? 'সার্ভিস' : 'Services',
@@ -2427,330 +2751,6 @@ const handleWizardSubmit = async (payload) => {
                   isVerified={isVerified}
                   onPay={() => setActiveTab('payments')}
                 />
-              </div>
-            )}
-
-            {/* ── VERIFICATION REJECTED BANNER ────────────────────────────
-                Surfaces the admin's rejection reason so the user understands
-                what to fix, with a one-tap "resubmit" CTA that re-opens the
-                same modal. Without this banner a rejected user would see a
-                blank dashboard and assume nothing happened. Backend field:
-                tenantProfile.verification.rejectionReason — set by
-                admin.controller.js → rejectUser(). */}
-            {verifRejected && (
-              <div className="mb-5 md:mb-7 rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 bg-white border-2 border-[#ba0036]/15 shadow-[0_8px_30px_-10px_rgba(186,0,54,0.15)] relative overflow-hidden">
-                <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-5">
-                  <div className="shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-[#ba0036]/10 text-[#ba0036] flex items-center justify-center">
-                    <ShieldAlert size={22} strokeWidth={2.4} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ba0036] mb-1">
-                      {language === 'বাংলা' ? 'ভেরিফিকেশন বাতিল' : 'Verification rejected'}
-                    </p>
-                    <h3 className="text-lg md:text-xl font-black text-gray-900 leading-tight">
-                      {language === 'বাংলা'
-                        ? 'আপনার ডকুমেন্ট গ্রহণ করা হয়নি'
-                        : 'Your submission wasn’t accepted'}
-                    </h3>
-                    {rejectionReason ? (
-                      <div className="mt-3 p-3 rounded-xl bg-[#ba0036]/5 border border-[#ba0036]/10">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-[#ba0036] mb-1">
-                          {language === 'বাংলা' ? 'অ্যাডমিনের মন্তব্য' : 'Admin note'}
-                        </p>
-                        <p className="text-sm font-bold text-gray-800 leading-snug">
-                          {rejectionReason}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="mt-2 text-sm font-bold text-gray-600 leading-snug">
-                        {language === 'বাংলা'
-                          ? 'অনুগ্রহ করে আপনার তথ্য পুনরায় চেক করে আবার জমা দিন।'
-                          : 'Please review your information and submit again.'}
-                      </p>
-                    )}
-                    <button
-                      onClick={() => setVerifModalOpen(true)}
-                      className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#ba0036] to-[#d11147] text-white font-black text-sm shadow-[0_8px_20px_rgba(186,0,54,0.25)] hover:shadow-[0_12px_30px_rgba(186,0,54,0.35)] hover:-translate-y-0.5 transition-all"
-                    >
-                      <RefreshCw size={14} />
-                      {language === 'বাংলা' ? 'আবার চেষ্টা করুন' : 'Try again'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ── BECOME A LANDLORD BANNER (roadmap-v2 §4 / tenant §T4) ──
-                Only renders when the user does NOT yet have the landlord
-                role on their account. One click adds the role on the
-                server and flips them into host mode. Verified tenants get
-                a subtle "your trust score carries over" line so they know
-                they don't lose progress when switching modes. */}
-            {!isAlsoLandlord && !hideBecomeLandlord && !authUser?.landlordProfile?.verification?.status && (
-              <div className="mb-5 md:mb-7 rounded-[1.5rem] md:rounded-[2rem] p-5 md:p-6 bg-gradient-to-br from-[#ba0036] via-[#7c0026] to-[#3a0011] text-white shadow-[0_20px_50px_-20px_rgba(186,0,54,0.5)] relative overflow-hidden">
-                <button
-                  onClick={dismissBecomeLandlord}
-                  className="absolute top-4 right-4 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors z-20"
-                >
-                  <X size={16} strokeWidth={2.5} />
-                </button>
-                <div className="absolute -top-16 -right-16 w-56 h-56 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-                <div className="relative flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
-                  <div className="shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-white/15 flex items-center justify-center backdrop-blur-md border border-white/15">
-                    <Home size={22} strokeWidth={2.4} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-200 mb-1">
-                      {language === 'বাংলা' ? 'নতুন!' : 'New'}
-                    </p>
-                    <h3 className="text-lg md:text-xl font-black leading-tight">
-                      {language === 'বাংলা' ? 'বাড়িওয়ালা হয়ে আপনার সম্পত্তি লিস্ট করুন' : 'Become a landlord — list your property'}
-                    </h3>
-                    <p className="mt-1 text-[12px] md:text-sm font-bold text-white/75 leading-snug max-w-prose">
-                      {isVerified
-                        ? (language === 'বাংলা'
-                            ? 'আপনার ভেরিফাইড ট্রাস্ট স্কোর হোস্ট প্রোফাইলে চলে যাবে।'
-                            : 'Your verified trust score carries over to your host profile.')
-                        : (language === 'বাংলা'
-                            ? 'এক ক্লিকেই হোস্ট মোডে যান — কোনো নতুন একাউন্ট লাগবে না।'
-                            : 'One click to switch into host mode — no separate account required.')}
-                    </p>
-                  </div>
-                  <button
-                    onClick={openBecomeLandlordPrompt}
-                    className="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white text-[#ba0036] font-black text-sm shadow-[0_10px_25px_rgba(0,0,0,0.25)] hover:scale-105 active:scale-95 transition-transform"
-                  >
-                    {language === 'বাংলা' ? 'হোস্ট হন' : 'Become a Host'} <ArrowRight size={15} />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* ── VERIFICATION BANNER ─────────────────────────────────────
-                Dark glassy card with a holographic red→indigo accent
-                gradient, a "breathing" shield icon ringed by two animated
-                pulse rings, a two-segment progress bar, and a CTA that
-                stacks UNDER the copy on mobile so the headline never
-                gets squashed into a 3-line column.
-
-                States: in progress (default) · submitted for review
-                (`verifProgress.inReview`) · verified (green success row).
-
-                Suppressed entirely when `verifRejected`, because the
-                rejection banner directly above already owns that state and
-                carries its own retry button. Rendering both stacked two
-                conflicting messages — "your documents were declined" on top
-                of a near-full progress bar — which is what made the flow
-                feel broken. */}
-            {hideVerificationBanner || verifRejected ? null : !isVerified ? (
-              <div className="mb-5 md:mb-7 relative overflow-hidden rounded-[1.5rem] md:rounded-[2rem] p-[1px] bg-gradient-to-br from-[#ba0036]/40 via-rose-400/20 to-indigo-500/30 shadow-[0_20px_60px_-20px_rgba(186,0,54,0.35)]">
-                {/* Snoozes for a week — see dismissVerificationBanner. Labelled
-                    "not now" so the affordance matches the behaviour. */}
-                <button
-                  onClick={dismissVerificationBanner}
-                  title={language === 'বাংলা' ? 'এখন নয় — এক সপ্তাহ পরে দেখান' : 'Not now — remind me in a week'}
-                  aria-label={language === 'বাংলা' ? 'এখন নয় — এক সপ্তাহ পরে দেখান' : 'Not now — remind me in a week'}
-                  className="absolute top-5 right-5 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors z-30"
-                >
-                  <X size={16} strokeWidth={2.5} />
-                </button>
-                {/* Inline keyframes for shimmer + breathing pulse rings. */}
-                <style>{`
-                  @keyframes tolet-shimmer {
-                    0% { transform: translateX(-100%); }
-                    100% { transform: translateX(200%); }
-                  }
-                  @keyframes tolet-breath {
-                    0%, 100% { transform: scale(1); opacity: 0.5; }
-                    50%      { transform: scale(1.08); opacity: 0.9; }
-                  }
-                  @keyframes tolet-grid-drift {
-                    0%   { background-position: 0 0; }
-                    100% { background-position: 32px 32px; }
-                  }
-                `}</style>
-
-                <div className="relative rounded-[calc(1.5rem-1px)] md:rounded-[calc(2rem-1px)] bg-gradient-to-br from-[#1a0a14] via-[#2a0a18] to-[#15042b] p-5 md:p-7 overflow-hidden">
-                  {/* Holographic background layer: faint dot-grid that
-                      slowly drifts diagonally + a couple of soft glow
-                      orbs. Pure decoration; pointer-events disabled. */}
-                  <div
-                    className="absolute inset-0 opacity-[0.08] pointer-events-none"
-                    style={{
-                      backgroundImage: 'radial-gradient(rgba(255,255,255,0.9) 1px, transparent 1px)',
-                      backgroundSize: '16px 16px',
-                      animation: 'tolet-grid-drift 18s linear infinite',
-                    }}
-                  />
-                  <div className="absolute -top-24 -left-24 w-64 h-64 bg-[#ba0036]/40 rounded-full blur-3xl pointer-events-none" />
-                  <div className="absolute -bottom-32 -right-24 w-72 h-72 bg-indigo-500/25 rounded-full blur-3xl pointer-events-none" />
-
-                  <div className="relative z-10 flex flex-col md:flex-row md:items-center gap-5 md:gap-6">
-                    {/* LEFT: animated shield with two breathing pulse rings */}
-                    <div className="relative shrink-0 self-start md:self-center">
-                      <span
-                        className="absolute inset-0 -m-2 rounded-[1.4rem] bg-[#ba0036]/40 blur-md"
-                        style={{ animation: 'tolet-breath 2.6s ease-in-out infinite' }}
-                      />
-                      <span
-                        className="absolute inset-0 -m-4 rounded-[1.6rem] border border-[#ba0036]/40"
-                        style={{ animation: 'tolet-breath 2.6s ease-in-out infinite 0.6s' }}
-                      />
-                      <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-[#ff4d6d] via-[#ba0036] to-[#65001e] text-white flex items-center justify-center shadow-[0_10px_30px_-10px_rgba(255,77,109,0.6)] border border-white/10">
-                        <Shield size={26} strokeWidth={2.3} />
-                      </div>
-                    </div>
-
-                    {/* CENTER: pre-label + headline + subcopy */}
-                    <div className="flex-1 min-w-0 text-white">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-[10px] font-black tracking-[0.18em] uppercase text-rose-200 backdrop-blur-sm">
-                          <span className="relative flex h-1.5 w-1.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-300" />
-                          </span>
-                          {language === 'বাংলা' ? 'আইডেন্টিটি ভেরিফিকেশন' : 'Identity Verification'}
-                        </span>
-                        <span className="hidden sm:inline-flex text-[9px] font-black tracking-widest uppercase text-white/40">
-                          {language === 'বাংলা' ? 'এআই' : 'AI'}-secured
-                        </span>
-                      </div>
-                      {/* Headline names the ONE thing left to do rather than
-                          repeating a generic "verify your account". A specific
-                          ask converts better and reads as help, not nagging. */}
-                      <h3 className="text-lg md:text-2xl font-black tracking-tight leading-tight">
-                        {verifProgress.inReview && !verifProgress.nextItem
-                          ? (language === 'বাংলা' ? 'রিভিউয়ের জন্য সাবমিট হয়েছে' : 'Submitted for review')
-                          : verifProgress.nextItem
-                            ? (language === 'বাংলা' ? verifProgress.nextItem.actionBn : verifProgress.nextItem.actionEn)
-                            : (language === 'বাংলা' ? 'আপনার অ্যাকাউন্ট ভেরিফাই করুন' : 'Verify your account')}
-                      </h3>
-                      <p className="mt-1.5 text-[12px] md:text-sm font-bold text-white/65 leading-snug max-w-prose">
-                        {verifProgress.inReview && !verifProgress.nextItem
-                          ? (language === 'বাংলা'
-                              ? `আমরা আপনার ডকুমেন্ট যাচাই করছি। সাধারণত ২৪ ঘণ্টার মধ্যে শেষ হয় — পাস হলে +${verifProgress.pending} ট্রাস্ট যোগ হবে।`
-                              : `We're reviewing your documents. Usually done within 24 hours — approval adds +${verifProgress.pending} Trust.`)
-                          : verifProgress.nextItem
-                            ? (language === 'বাংলা'
-                                ? `প্রায় এক মিনিটের কাজ, ট্রাস্ট স্কোরে +${verifProgress.nextItem.pts}। ভেরিফাইড ভাড়াটিয়ারা বাড়িওয়ালার কাছ থেকে দ্রুত সাড়া পান।`
-                                : `About a minute's work, +${verifProgress.nextItem.pts} Trust. Verified tenants hear back from landlords sooner.`)
-                            : (language === 'বাংলা' ? 'ভেরিফাইড ভাড়াটিয়ারা বাড়িওয়ালার কাছ থেকে দ্রুত অ্যাপ্রুভাল পান।' : 'Verified tenants get faster landlord approvals.')}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* PROGRESS + CTA — full-width on mobile, side-by-side on md+.
-                      The bar has TWO segments and that is the whole point:
-
-                        solid  → verifProgress.earnedPct   (points banked)
-                        ghost  → verifProgress.pending     (submitted, in review)
-
-                      The number beside it is the trust score, the same value
-                      the ring on the Profile tab shows. Previously this read a
-                      separate upload-completion percentage, which is how a
-                      100% bar ended up sitting above a 30/100 ring. One
-                      number, one meaning, and the legend underneath spells out
-                      where the rest of the points are. */}
-                  <div className="relative z-10 mt-5 md:mt-6 flex flex-col md:flex-row md:items-center gap-3 md:gap-5">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden relative"
-                          role="progressbar"
-                          aria-valuenow={verifProgress.earned}
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                          aria-label={language === 'বাংলা' ? 'ট্রাস্ট স্কোর' : 'Trust score'}
-                        >
-                          {/* Pending sits underneath and spans earned+pending,
-                              so the solid segment paints over its start. */}
-                          {verifProgress.pending > 0 && (
-                            <div
-                              className="absolute inset-y-0 left-0 rounded-full bg-white/25 transition-[width] duration-700"
-                              style={{ width: `${verifProgress.pct}%` }}
-                            />
-                          )}
-                          <div
-                            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#ff4d6d] via-[#ba0036] to-[#ff4d6d] transition-[width] duration-700 shadow-[0_0_12px_rgba(255,77,109,0.6)]"
-                            style={{ width: `${Math.max(verifProgress.earnedPct, 3)}%` }}
-                          />
-                          <div
-                            className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/40 to-transparent"
-                            style={{ animation: 'tolet-shimmer 2.4s linear infinite' }}
-                          />
-                        </div>
-                        <span className="text-xs font-black text-white tabular-nums shrink-0">
-                          {verifProgress.earned}<span className="text-white/40">/100</span>
-                        </span>
-                      </div>
-
-                      {/* Legend — the bridge between the bar and the ring. */}
-                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white/60">
-                          <span className="w-2 h-2 rounded-full bg-[#ff4d6d]" />
-                          {language === 'বাংলা' ? `${verifProgress.earned} পয়েন্ট পেয়েছেন` : `${verifProgress.earned} earned`}
-                        </span>
-                        {verifProgress.pending > 0 && (
-                          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white/60">
-                            <span className="w-2 h-2 rounded-full bg-white/40" />
-                            {language === 'বাংলা' ? `${verifProgress.pending} রিভিউতে` : `${verifProgress.pending} in review`}
-                          </span>
-                        )}
-                        {verifProgress.remaining > 0 && (
-                          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white/40">
-                            <span className="w-2 h-2 rounded-full bg-white/15" />
-                            {language === 'বাংলা' ? `${verifProgress.remaining} বাকি` : `${verifProgress.remaining} to go`}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {/* CTA routes to wherever the next item actually lives —
-                        the wizard for documents, the Profile tab for typed
-                        fields. The old version always dropped the user on the
-                        Profile tab and left them to find the control
-                        themselves. */}
-                    <button
-                      onClick={() => {
-                        if (verifProgress.nextItem?.where === 'profile') setActiveTab('profile');
-                        else setVerifModalOpen(true);
-                      }}
-                      className="group w-full md:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-[#ff4d6d] via-[#ba0036] to-[#90002a] text-white font-black text-xs md:text-sm shadow-[0_12px_30px_-8px_rgba(255,77,109,0.55)] hover:shadow-[0_18px_40px_-8px_rgba(255,77,109,0.7)] hover:-translate-y-0.5 active:translate-y-0 transition-all whitespace-nowrap relative overflow-hidden"
-                    >
-                      <span
-                        className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/30 to-transparent"
-                        style={{ animation: 'tolet-shimmer 2.8s linear infinite' }}
-                      />
-                      <ScanFace size={15} strokeWidth={2.5} className="relative z-10" />
-                      <span className="relative z-10">
-                        {verifProgress.nextItem
-                          ? (language === 'বাংলা' ? `যোগ করুন · +${verifProgress.nextItem.pts}` : `Add it · +${verifProgress.nextItem.pts}`)
-                          : verifProgress.inReview
-                            ? (language === 'বাংলা' ? 'ডকুমেন্ট দেখুন' : 'Review documents')
-                            : (language === 'বাংলা' ? 'ভেরিফাই করুন' : 'Get verified')}
-                      </span>
-                      <ArrowRight size={14} className="relative z-10 group-hover:translate-x-0.5 transition-transform" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="mb-5 md:mb-7 rounded-[1.5rem] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/60 p-4 md:p-5 flex items-center gap-3 shadow-[0_10px_30px_-15px_rgba(16,185,129,0.4)] relative">
-                <button
-                  onClick={dismissVerificationBanner}
-                  className="absolute top-4 right-4 p-1.5 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-600 hover:text-emerald-800 transition-colors z-20"
-                >
-                  <X size={14} strokeWidth={2.5} />
-                </button>
-                <div className="relative shrink-0">
-                  <span className="absolute inset-0 rounded-2xl bg-emerald-400/40 blur-md animate-pulse" />
-                  <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-white flex items-center justify-center shadow">
-                    <BadgeCheck size={22} />
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-black text-emerald-700">{language === 'বাংলা' ? 'আপনি ভেরিফাইড' : "You're verified"}</p>
-                  <p className="text-[11px] font-bold text-emerald-700/80">{language === 'বাংলা' ? 'বাড়িওয়ালারা আপনার প্রোফাইল সবুজ ব্যাজ-সহ দেখেন।' : 'Landlords see your profile with a green verified badge.'}</p>
-                </div>
               </div>
             )}
 
@@ -3458,8 +3458,8 @@ const handleWizardSubmit = async (payload) => {
           </div>
         )}
 
-        {/* Help & Support now lives on the shared /support page — the drawer
-            entry links there directly (no in-dashboard duplicate). */}
+        {/* Help & Support is the shared /support page, reached from Account
+            Settings → Help & policies (no in-dashboard duplicate). */}
 
       </main>
 

@@ -614,13 +614,145 @@ areasOut += `};
 export default AREAS_BY_THANA;
 `;
 
+// ─── 4. the backend's thana dictionary ───────────────────────────────────────
+// A THIRD output, written into the backend package: ../tolet-pro-backend/data/
+// bdThanas.js, in CommonJS.
+//
+// Two consumers, and they must agree on the exact same strings:
+//
+//   • the provider app's coverage picker, served GET /api/geo/thanas, so an
+//     areas-mode provider (an ISP, a গৃহকর্মী) can name the thanas he serves.
+//     The provider app does not bundle bdGeo — it fetches this instead, the
+//     way it already fetches the category registry.
+//   • coverage matching in serviceBrowse, which compares a TENANT's thana
+//     against that provider's list.
+//
+// And the tenant's thana is not one string. LocationBar sends `bn ? t.bn :
+// t.en`, so the same neighbourhood arrives as "ধানমন্ডি" from a Bangla tenant
+// and "Dhanmondi" from an English one. A list of English labels matched with
+// `$in` would therefore miss every Bangla tenant — which is most of them. So
+// this file also ships an ALIAS TABLE: every spelling we know for a thana,
+// folded onto one canonical English label. The provider's picks and the
+// tenant's search are both canonicalised through it before they ever meet.
+//
+// ⚠ The ORDER and the DEDUPE RULE below mirror LocationBar.jsx's
+// `useAllThanas` deliberately: a provider must be offered exactly the strings
+// a tenant can pick, or he can cover a thana nobody can search for.
+
+// Dhaka first, then the other metros — a picker that opens on Bagerhat is a
+// picker people scroll past. Kept byte-identical to LocationBar.jsx.
+const PRIORITY_DISTRICTS = ['dhaka', 'chattogram', 'chittagong', 'gazipur', 'narayanganj', 'sylhet', 'khulna', 'rajshahi'];
+
+const districtBySlug = new Map(
+  [...districts.values()].flatMap((m) => [...m.values()].map((d) => [d.id, d])),
+);
+
+const priorityRank = (id) => {
+  const i = PRIORITY_DISTRICTS.indexOf(id);
+  return i === -1 ? PRIORITY_DISTRICTS.length : i;
+};
+
+// Stable sort, so districts of equal rank keep division order — the same order
+// Object.values(DISTRICTS_BY_DIVISION).flat() produces on the frontend.
+const rankedDistricts = [...allDistrictSlugs].sort((a, b) => priorityRank(a) - priorityRank(b));
+
+/** normalised spelling → canonical English label. */
+const thanaCanonical = new Map();
+const claim = (spelling, canonical) => {
+  const k = norm(spelling);
+  // First writer wins, and pass 1 (real labels) runs before pass 2 (older
+  // romanisations) so a live thana name can never be stolen by another
+  // district's alias.
+  if (k && !thanaCanonical.has(k)) thanaCanonical.set(k, canonical);
+};
+
+// The picker list: one row per distinct thana NAME, because a provider's
+// coverage stores a bare string — two districts' Kotwali are the same key as
+// far as the server is concerned, and showing it twice would only offer a
+// choice that does not exist.
+const pickerThanas = [];
+const seenThana = new Set();
+for (const dist of rankedDistricts) {
+  const d = districtBySlug.get(dist);
+  for (const t of sortThanas([...(thanas.get(dist) || new Map()).values()])) {
+    // Every spelling in every district folds onto the canonical label, even
+    // the ones the deduped list drops: a tenant reading চট্টগ্রাম's কোতোয়ালী
+    // must still match a provider who picked it from Dhaka's row.
+    claim(t.en, t.en);
+    claim(t.bn, t.en);
+
+    const key = t.en.toLowerCase();
+    if (seenThana.has(key)) continue;
+    seenThana.add(key);
+    pickerThanas.push({ en: t.en, bn: t.bn, districtEn: d?.en || '', districtBn: d?.bn || '' });
+  }
+}
+
+// Pass 2 — superseded romanisations (Faridgonj → Faridganj, Ukhiya → Ukhia).
+// A listing or a geocoder that still uses the old spelling resolves to the
+// same canonical label rather than being treated as a place we never heard of.
+for (const [, byVariant] of THANA_ALIASES) {
+  for (const [variantKey, canonical] of byVariant) {
+    if (!thanaCanonical.has(variantKey)) thanaCanonical.set(variantKey, canonical);
+  }
+}
+
+const thanasOut = `'use strict';
+
+/**
+ * bdThanas.js — GENERATED FILE, DO NOT EDIT BY HAND.
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Regenerate from the frontend package:
+ *
+ *     cd tolet-pro-frontend && node scripts/generate-bd-geo.mjs
+ *
+ * ONE generator writes this AND the frontend's src/data/bdGeo.js, so the list
+ * a provider picks his coverage from and the list a tenant searches by cannot
+ * drift apart. Editing this file by hand breaks that guarantee silently.
+ *
+ * ─── WHY THE BACKEND HOLDS THANA NAMES AT ALL ────────────────────────────────
+ * Because a thana arrives here in two languages. The tenant's LocationBar
+ * sends the Bengali label to a Bangla user and the English one to an English
+ * user, so "ধানমন্ডি" and "Dhanmondi" are the same place and neither is the
+ * stored form. THANA_ALIASES folds every spelling we know onto one canonical
+ * English label; utils/thanaNames.js is the only thing that should read it.
+ *
+ *   THANAS          the picker list — one row per distinct thana NAME, metros
+ *                   first, mirroring the tenant's LocationBar exactly.
+ *   THANA_ALIASES   normalised spelling → canonical English label.
+ */
+
+/** @typedef {{ en: string, bn: string, districtEn: string, districtBn: string }} Thana */
+
+/** @type {Thana[]} */
+const THANAS = ${JSON.stringify(pickerThanas, null, 2)};
+
+/** @type {Record<string, string>} */
+const THANA_ALIASES = ${JSON.stringify(Object.fromEntries(thanaCanonical), null, 2)};
+
+module.exports = { THANAS, THANA_ALIASES };
+`;
+
 fs.mkdirSync(OUT, { recursive: true });
 fs.writeFileSync(path.join(OUT, 'bdGeo.js'), geo);
 fs.writeFileSync(path.join(OUT, 'bdAreas.js'), areasOut);
 
+// Written only when the backend package is actually checked out beside this
+// one. A frontend-only clone must still be able to regenerate its own data.
+const BACKEND_OUT = path.resolve(ROOT, '..', 'tolet-pro-backend', 'data');
+let wroteBackend = false;
+if (fs.existsSync(path.dirname(BACKEND_OUT))) {
+  fs.mkdirSync(BACKEND_OUT, { recursive: true });
+  fs.writeFileSync(path.join(BACKEND_OUT, 'bdThanas.js'), thanasOut);
+  wroteBackend = true;
+}
+
 const kb = (f) => (fs.statSync(path.join(OUT, f)).size / 1024).toFixed(1);
 console.log(`bdGeo.js    ${kb('bdGeo.js')} KB`);
 console.log(`bdAreas.js  ${kb('bdAreas.js')} KB`);
+console.log(wroteBackend
+  ? `bdThanas.js ${(fs.statSync(path.join(BACKEND_OUT, 'bdThanas.js')).size / 1024).toFixed(1)} KB → ${path.relative(ROOT, BACKEND_OUT)} (${pickerThanas.length} thanas, ${thanaCanonical.size} spellings)`
+  : 'bdThanas.js SKIPPED — no tolet-pro-backend package beside this one');
 console.log(
   `divisions ${DIVISIONS_COUNT()} · districts ${stats.districts} · thanas ${stats.thanas} · areas ${stats.areas}`,
 );

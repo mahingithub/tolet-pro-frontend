@@ -1194,7 +1194,9 @@ export default function BookingsTab(props) {
                                  {catLabel && <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 text-[9px] font-black uppercase tracking-wider">{catLabel}</span>}
                                </div>
                                <div className="flex items-center gap-2">
-                                 <span className="text-[10px] font-black text-gray-500 tabular-nums">{bldgBookings.length} {isBn ? 'ভাড়াটিয়া' : 'Tenants'}</span>
+                                 {/* Occupants from members[], not the booking count — a shared room
+                                     is one booking and several tenants. */}
+                                 <span className="text-[10px] font-black text-gray-500 tabular-nums">{bldgBookings.reduce((n, b) => n + occupantCount(b), 0)} {isBn ? 'ভাড়াটিয়া' : 'Tenants'}</span>
                                  <ArrowRight size={12} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-1 transition-all"/>
                                </div>
                              </div>

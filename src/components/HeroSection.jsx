@@ -676,6 +676,7 @@ const HeroSection = () => {
           <div className="relative w-full h-[240px] md:h-[400px] lg:h-[480px] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-sm flex flex-col justify-center items-center text-center">
             <video
               src="https://res.cloudinary.com/dsrolbe0j/video/upload/q_auto,f_auto/0821_qeyayb.mp4"
+              poster="https://res.cloudinary.com/dsrolbe0j/video/upload/so_0,q_auto,f_auto,w_1400/0821_qeyayb.jpg"
               autoPlay
               loop
               muted

@@ -1,3 +1,144 @@
+/* ─── FONTS — SELF-HOSTED, NOT A CDN ───────────────────────────────────────
+   Inter (`font-sans`) and Sora (`font-display`) are mapped in
+   tailwind.config.js onto EVERY piece of text in the app. Oxanium and DM Sans
+   are narrower: they dress only the property details page, applied to the
+   `.futuristic-root` subtree by the theme block FuturisticTheme injects in
+   src/components/PropertyDetails.jsx. All four used to arrive from
+   fonts.googleapis.com — Inter/Sora through a render-blocking <link> in
+   index.html, Oxanium/DM Sans through an `@import` at the top of that injected
+   block — and every one of those was an offline hole with no bottom:
+
+     • public/service-worker.js returns early on any cross-origin request — the
+       early return that fixed Cloudinary voice-note range requests, and which
+       must not be weakened. So the CDN stylesheet and its woff2 files could
+       never enter the cache. Verified against a warmed production build: 211
+       cache entries, zero of them cross-origin.
+     • An external stylesheet is render-blocking, so first paint waited on that
+       request to FAIL. On airplane mode that is instant. On a connected-but-
+       dead network — the common case for this app's users — it is several
+       seconds of white screen before the app starts in fallback sans-serif.
+       The `@import` was worse still: it is discovered only after the stylesheet
+       that carries it has itself been parsed, so it serialised a second round
+       trip onto a page users arrive at straight from search results.
+
+   Self-hosted, the files land in dist/assets/ with content hashes, which is
+   what scripts/inject-sw-precache.mjs walks, so they are precached with the
+   rest of the build and the app paints in Inter/Sora with the origin dead.
+   That is also why all four live HERE and not in the injected block: a rule
+   inside a runtime-generated <style> is invisible to the build, so its url()s
+   would never be hashed, emitted, or precached.
+
+   WHY ONLY LATIN — AND WHY NO BENGALI FILE.
+   None of the four has a Bengali subset. Google Fonts serves Inter in seven
+   subsets (latin, latin-ext, cyrillic, cyrillic-ext, greek, greek-ext,
+   vietnamese) and Sora, Oxanium and DM Sans in two each (latin, latin-ext);
+   no Bengali in any of them. So Bangla — which is the app's DEFAULT language —
+   has never been drawn in these faces. The browser falls back per-glyph to the
+   device's own Bengali face, and that is unchanged by this file. Shipping a
+   Bengali woff2 here would not be preserving current behaviour, it would be a
+   redesign.
+   cyrillic/greek/vietnamese are dropped: this app is bn/en only, and those
+   subsets would be bytes the service worker warms and nothing ever renders.
+   latin-ext is kept so an accented name doesn't silently switch typeface
+   mid-sentence; unicode-range means it is only downloaded if such a glyph
+   actually appears.
+
+   These are the VARIABLE files (Inter wght 100–900, Sora 100–800, Oxanium
+   200–800, DM Sans 100–1000) — the same single file Google serves for every
+   weight, so one @font-face per subset covers every weight the app asks for.
+   Confirmed for Oxanium/DM Sans by diffing the css2 response for the exact
+   weights the details page used (Oxanium 400;600;700;800, DM Sans 400;500;700)
+   against the `..` range response: byte-identical gstatic URLs.
+
+   TO REFRESH (new upstream version, or a subset you actually need):
+     curl -H 'User-Agent: <modern Chrome UA>' \
+       'https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Sora:wght@100..800&display=swap'
+       'https://fonts.googleapis.com/css2?family=Oxanium:wght@200..800&family=DM+Sans:wght@100..1000&display=swap'
+   and re-download the woff2 URLs it prints into src/assets/fonts/.
+   Currently pinned: Inter v20, Sora v17, Oxanium v21, DM Sans v17
+   (fetched 2026-09-22).
+   ────────────────────────────────────────────────────────────────────────── */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./assets/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./assets/fonts/inter-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Sora';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('./assets/fonts/sora-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Sora';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('./assets/fonts/sora-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Oxanium';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('./assets/fonts/oxanium-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Oxanium';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('./assets/fonts/oxanium-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 100 1000;
+  font-display: swap;
+  src: url('./assets/fonts/dm-sans-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 100 1000;
+  font-display: swap;
+  src: url('./assets/fonts/dm-sans-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -15,7 +156,8 @@
 
    Z-INDEX BANDS (keep new UI inside them):
      z-0…z-40   in-flow page content and sticky page headers
-     z-[45]     the AppDownloadBanner strip
+     z-[45]     the AppDownloadBanner strip (website) and the StatusBarScrim
+                (installed app) — never on screen together
      z-50+      fixed overlays — modals, drawers, sheets, full-screen dialogs
    A fixed overlay below z-50 will be painted over by the banner.
    ────────────────────────────────────────────────────────────────────────── */
@@ -75,6 +217,22 @@
      token — a bare `bottom-[64px]` lands under the rail on a gesture-nav
      phone. */
   --bottom-nav-h: calc(64px + var(--sab));
+
+  /* THE RAIL IS NOT THE TALLEST THING DOWN THERE. The centre "+" button is
+     absolutely positioned at -top-5 with a ring-4 around it, so it stands about
+     24px PROUD of the rail — and it is opaque, with a shadow.
+
+     --bottom-nav-h alone therefore clears the bar but not the button: a page
+     padded to exactly the rail height ends its last card directly underneath
+     the FAB, which on the landlord dashboard hid the Edit and Inquiry buttons
+     on the final property card. Scrolling did not help — the padding was the
+     end of the document.
+
+     Scroll containers whose last row is interactive should pad by this instead.
+     Kept separate from --bottom-nav-h because things that ANCHOR to the rail
+     (the rail itself, a toast sitting on it) must not be pushed up by the
+     button's overhang. */
+  --bottom-nav-clear: calc(var(--bottom-nav-h) + 2.75rem);
 }
 
 /* ─── FOCUS RING ───────────────────────────────────────────────────────────
@@ -1225,6 +1383,37 @@ body.driver-active .tp-sheet-panel * {
   content: '👆';
   display: inline-block;
   margin-left: 6px;
+}
+
+/* "Don't show me this again" — the permanent opt-out, injected by
+   TourContext's onPopoverRender.
+
+   DELIBERATELY QUIET. It is the least important control on the card and must
+   never compete with Next, so it is a full-width text row under the footer
+   rather than a fourth button beside the others: low contrast, no fill, and
+   only reaching full white on press. Full width because it is the escape hatch
+   for somebody who is already frustrated, and a 44px target they cannot miss
+   is the whole point of it existing separately from the 20px ×. */
+button.driver-popover-dismiss-forever {
+  display: block !important;
+  width: 100% !important;
+  margin-top: 10px !important;
+  padding: 10px 8px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0.75rem !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+  font-weight: 700 !important;
+  font-size: 0.78rem !important;
+  text-align: center !important;
+  cursor: pointer !important;
+  transition: color 0.2s ease, background 0.2s ease !important;
+}
+
+button.driver-popover-dismiss-forever:hover,
+button.driver-popover-dismiss-forever:active {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.08) !important;
 }
 
 /* Nothing to press in the footer on these steps — driver.js still renders the

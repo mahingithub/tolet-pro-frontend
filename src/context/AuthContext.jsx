@@ -203,29 +203,21 @@ export const AuthProvider = ({ children }) => {
         
         // ওয়েলকাম রোবট শুধু tenant/landlord-এর জন্য — admin-জাতীয় role
         // (super_admin / moderator / support_agent) হলে dispatch-ই হবে না।
-        if (u && !loggedInRoles.some(isAdminRole) && !isNativeApp()) {
+        //
+        // THE APP GETS THE ROBOT TOO. This used to carry `&& !isNativeApp()`,
+        // on the reasoning that the greeting belonged to the website's first
+        // visit, and the app was handed a one-line sonner toast instead. That
+        // left the app without the thing the greeting is actually for — the
+        // guide video offered alongside it — so the gate is gone and both
+        // surfaces now show the same welcome. The toast went with it: the
+        // robot says the same words, and two greetings for one login is worse
+        // than either alone.
+        if (u && !loggedInRoles.some(isAdminRole)) {
           window.dispatchEvent(
             new CustomEvent('triggerWelcomeRobot', {
               detail: { role: u.role, name: u.name, type: 'login' },
             }),
           );
-        }
-        // The app skips the welcome robot (it belongs to the website's first
-        // visit), so a returning user was greeted by nothing at all. One line,
-        // then they are on their own screen. Imported here rather than at the
-        // top: sonner would otherwise land in the entry chunk, which
-        // vite.config.js watches — GlobalToaster has it loaded by now anyway.
-        if (u && isNativeApp() && !loggedInRoles.some(isAdminRole)) {
-          const firstName = String(u.name || '').trim().split(' ')[0];
-          let bn = true;
-          try { bn = window.localStorage.getItem('tolet_lang') !== 'English'; } catch { /* default Bangla */ }
-          import('sonner')
-            .then(({ toast }) => toast.success(
-              bn
-                ? `স্বাগতম${firstName ? `, ${firstName}` : ''}!`
-                : `Welcome back${firstName ? `, ${firstName}` : ''}!`,
-            ))
-            .catch(() => {/* a greeting is not worth an error */});
         }
         return u;
       },
@@ -245,7 +237,10 @@ export const AuthProvider = ({ children }) => {
         const newRoles = Array.isArray(u?.roles) && u.roles.length
           ? u.roles
           : (u?.role ? [u.role] : []);
-        if (u && !newRoles.some(isAdminRole) && !isNativeApp()) {
+        // Same as login above: no `!isNativeApp()` gate. A new account in the
+        // app used to get neither the robot NOR the toast — the toast only
+        // covered login — so signing up inside the app ended in silence.
+        if (u && !newRoles.some(isAdminRole)) {
           window.dispatchEvent(
             new CustomEvent('triggerWelcomeRobot', {
               detail: { role: u.role, name: u.name, type: 'signup' },

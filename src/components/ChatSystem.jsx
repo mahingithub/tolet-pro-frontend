@@ -253,6 +253,14 @@ const dayLabel = (iso) => {
   return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 };
 const formatBDT = (n) => `৳${(Number(n) || 0).toLocaleString('en-IN')}`;
+// The English placeholders a conversation carries before its first message.
+// They double as data (sorting checks for them), so they are translated only
+// where the chat list draws them.
+const CHAT_PLACEHOLDER_BN = {
+  'New conversation': 'নতুন কথোপকথন',
+  'How can I help you today?': 'আজ কীভাবে সাহায্য করতে পারি?',
+};
+
 const formatTime = (iso) => {
   if (!iso) return 'Just now';
   const d = new Date(iso);
@@ -450,17 +458,24 @@ const ChatRow = React.memo(function ChatRow({ chat, lastMessage, isActive, onSel
     onPointerLeave: clearLp,
   } : {};
 
+  const isBn = useIsBn();
+
   // Derive preview/time from the stable lastMessage prop (no per-render object).
   const preview = lastMessage
-    ? (lastMessage.sender === 'me' ? `You: ${lastMessage.text || ''}` : (lastMessage.text || ''))
+    ? (lastMessage.sender === 'me' ? `${isBn ? 'আপনি' : 'You'}: ${lastMessage.text || ''}` : (lastMessage.text || ''))
     : '';
+  const fallbackPreview = isBn ? (CHAT_PLACEHOLDER_BN[chat.lastMsg] || chat.lastMsg) : chat.lastMsg;
   // `chat.time` is NOT a label — buildChats() stores a raw ISO string on it
   // whenever the conversation has a lastMessageAt, and only falls back to the
   // literal 'Just now'. Rendering it unformatted put "2026-09-02T06:36:07.613Z"
   // in the chat list for every conversation whose lastMessage prop hadn't
   // loaded. formatTime() handles both: it passes a non-date label straight
   // through and turns a real ISO into a clock time.
-  const timeLabel = formatTime(lastMessage?.iso || chat.time);
+  //
+  // 'Just now' itself is a placeholder for "no messages yet", not a time — it
+  // printed "Just now" beside threads nobody had written in. Show nothing.
+  const rawTime = lastMessage?.iso || chat.time;
+  const timeLabel = rawTime && rawTime !== 'Just now' ? formatTime(rawTime) : '';
 
   return (
     <button
@@ -509,7 +524,7 @@ const ChatRow = React.memo(function ChatRow({ chat, lastMessage, isActive, onSel
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">
           <p className={`text-[11px] truncate ${chat.unread > 0 ? 'font-black text-gray-900' : 'font-bold text-gray-500'}`}>
-            {preview || chat.lastMsg}
+            {preview || fallbackPreview}
           </p>
           {chat.unread > 0 && (
             <span className="bg-[#ba0036] text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] px-1.5 flex items-center justify-center shrink-0">

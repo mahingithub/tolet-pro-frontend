@@ -29,9 +29,9 @@ import {
 	experienceForRole,
 	getNativeExperience,
 	getNativeHome,
-	inferNativeExperience,
 	isNativeApp,
 	modeForSurface,
+	nativeLoginExperience,
 	roleMatchesExperience,
 	saveNativeExperience,
 	surfaceForMode,
@@ -45,7 +45,14 @@ import Navbar from "./components/Navbar";
 import DeepLinkHandler from "./components/DeepLinkHandler";
 import RouteSeoGuard from "./components/seo/RouteSeoGuard";
 import MobileBottomNav from "./components/mobile/MobileBottomNav";
+import StatusBarScrim from "./components/native/StatusBarScrim";
 import AppDownloadBanner from "./components/AppDownloadBanner";
+// STATIC on purpose, unlike everything in the lazy block below. It is the one
+// component whose entire job is to speak when the network is gone — putting it
+// in a chunk that has to be downloaded first would give it a failure mode
+// identical to the condition it reports. It is ~30 lines and renders null the
+// rest of the time.
+import OfflineNotice from "./components/OfflineNotice";
 
 // ─── OVERLAYS — deferred, rendered above the page rather than in it ─────────
 // Widgets that float on top of whatever route is showing: the AI assistant, the
@@ -372,12 +379,14 @@ const AppLayout = () => {
 		nativeBootHandled.current = true;
 		if (location.pathname !== '/') return;
 		let experience = getNativeExperience();
-		if (!experience && isAuthenticated) {
-			const inferred = inferNativeExperience({ activeRole, defaultHome });
-			// 'account': worked out from the account rather than answered here, so
-			// the account's own saved home may still correct it (see the mirror
-			// effect below). A choice made on /app/start is never overwritten.
-			if (inferred) experience = saveNativeExperience(inferred.role, inferred.mode, 'account');
+		if (isAuthenticated) {
+			// The same answer the post-login redirect gives — one function, so a
+			// cold start and a sign-in can never open on two different screens.
+			// It fills in a blank device from the account AND corrects one whose
+			// saved side isn't the side this account is on; a choice made on
+			// /app/start for the matching side is never overwritten. No
+			// confirmation here: opening the app is not the moment to ask.
+			({ experience } = nativeLoginExperience({ activeRole, defaultHome, previous: experience }));
 		}
 		const to = experience ? getNativeHome(experience) : NATIVE_WELCOME_PATH;
 		if (to !== '/') navigate(to, { replace: true });
@@ -548,6 +557,14 @@ const AppLayout = () => {
 			<AppOpenReporter />
 			<NativePushRouter />
 			<AppDownloadBanner />
+			{/* The whole app's offline indicator, mounted once here so every
+			    route gets it and no route has to remember to. Fixed overlay, so
+			    it neither reflows the page on a flap nor needs a slot in this
+			    layout — and it deliberately paints over the download banner
+			    below it on the rare occasion both are up: "you have no
+			    internet" outranks "install our app". See OfflineNotice.jsx for
+			    why it is informational only and must never gate a write. */}
+			<OfflineNotice />
 			{/* safe-area-ok — this wrapper only positions the header; <Navbar />
 			    itself carries paddingTop: var(--sat). Adding it here too would
 			    reserve the status bar twice. */}
@@ -800,6 +817,7 @@ const AppLayout = () => {
 			    ledger is a Home button in Living's own header — without it, a
 			    tenant whose home IS the ledger had no route back to the homepage. */}
 			<MobileBottomNav hideOnRoutes={['/login', NATIVE_WELCOME_PATH, '/list-property', NATIVE_START_PATH, '/living', '/properties/']} />
+			<StatusBarScrim />
 			<Suspense fallback={null}>
 				<FeedbackButton />
 			</Suspense>

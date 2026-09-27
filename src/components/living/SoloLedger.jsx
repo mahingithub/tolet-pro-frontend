@@ -11,6 +11,7 @@
  * as a month where a lot of money was spent.
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CalendarDays, Layers, Pencil, Plus, Trash2, Wallet } from 'lucide-react';
 
 import useLivingStore from '../../store/useLivingStore';
@@ -31,6 +32,7 @@ import {
 } from './livingUI';
 import SoloCategoryView from './SoloCategoryView';
 import SoloEntrySheet from './SoloEntrySheet';
+import { useServiceHint } from './ServiceHint';
 
 // Which way the খাতা was last read — a habit, not a setting (see rememberedView).
 const VIEW_KEY = 'tp:solo-ledger-view';
@@ -50,6 +52,8 @@ const dayHeading = (day, language) => {
 const SoloLedger = ({ flow = 'out', language, intent, clearIntent }) => {
   const requireAction = useLivingAction(flow === 'in' ? 'income' : 'spending');
   const isBn = language === 'বাংলা';
+  const navigate = useNavigate();
+  const serviceHint = useServiceHint(navigate, isBn);
   const solo = useLivingStore((s) => s.solo);
   const addSoloEntry = useLivingStore((s) => s.addSoloEntry);
   const updateSoloEntry = useLivingStore((s) => s.updateSoloEntry);
@@ -152,8 +156,13 @@ const SoloLedger = ({ flow = 'out', language, intent, clearIntent }) => {
   };
 
   const save = (data) => {
-    if (editing) updateSoloEntry(editing.id, data);
-    else addSoloEntry(data);
+    if (editing) { updateSoloEntry(editing.id, data); return; }
+    addSoloEntry(data);
+    // `type === 'expense'` and nothing else. This খাতা's other five types are
+    // ধার in one direction or another — money moved, nothing was bought — and
+    // offering to sell somebody গ্যাস because they lent a friend ৳৫০০ is the
+    // one mistake the whole feature cannot survive.
+    if (data.type === 'expense') serviceHint(data.category);
   };
 
   return (

@@ -857,7 +857,9 @@ export default function RentTab(props) {
                                  {bldgSm.overdueCount > 0 && <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[9px] font-black uppercase tracking-widest tabular-nums ml-1">{bldgSm.overdueCount} {isBn ? 'বকেয়া' : 'Overdue'}</span>}
                                </div>
                                <div className="flex items-center gap-2">
-                                 <span className="text-[10px] font-black text-gray-500 tabular-nums">{bldgBookings.length} {isBn ? 'ভাড়াটিয়া' : 'Tenants'}</span>
+                                 {/* People, not bookings: one rent unit per active member — the same
+                                     rows the summary above counts, so this can't disagree with its "x/y". */}
+                                 <span className="text-[10px] font-black text-gray-500 tabular-nums">{bldgRentUnits.length} {isBn ? 'ভাড়াটিয়া' : 'Tenants'}</span>
                                  <ArrowRight size={12} className="text-gray-300 group-hover:text-[#ba0036] group-hover:translate-x-1 transition-all"/>
                                </div>
                              </div>

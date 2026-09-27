@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { BellRing, ShoppingBasket, UtensilsCrossed, HandCoins, ArrowDownLeft, Sparkles, Settings, Check, Send, ChevronRight } from 'lucide-react';
 
@@ -8,6 +9,8 @@ import useLivingAction from './useLivingAction';
 import { buildReminders, monthlyReport, taka } from './livingUtils';
 import { getBillType } from './livingConfig';
 import { Card, SectionHeader, IconBadge, ProgressBar, PrimaryButton, Field, MoneyInput, EmptyState, Sheet, cx } from './livingUI';
+import { ReorderHints } from './ServiceHint';
+import { purchaseRowsFromBills } from '../../utils/serviceHints';
 
 const SEVERITY = {
   high: { tint: 'bg-rose-50', text: 'text-red-600', bar: '#f43f5e' },
@@ -67,6 +70,7 @@ const BudgetSheet = ({ open, onClose, current, onSave }) => {
 const SmartReminder = ({ go, me, language }) => {
   const requireAction = useLivingAction('reminders');
   const isBn = language === 'বাংলা';
+  const navigate = useNavigate();
   const state = useLivingStore();
   const budgets = useLivingStore((s) => s.budgets);
   const rent = useLivingStore((s) => s.rent);
@@ -80,6 +84,13 @@ const SmartReminder = ({ go, me, language }) => {
 
   const reminders = useMemo(() => buildReminders(state, me), [state, me]);
   const report = useMemo(() => monthlyReport(state, 0), [state]);
+
+  // The reorder clock. Kept OUT of buildReminders() on purpose — that list is
+  // money owed, and four other screens count it into a badge. This is a
+  // suggestion, so it gets its own section below the reminders rather than a
+  // row inside them. Memoised because ReorderHints re-derives from the array
+  // identity.
+  const purchases = useMemo(() => purchaseRowsFromBills(state.bills), [state.bills]);
 
   const describe = (r) => {
     switch (r.kind) {
@@ -183,6 +194,10 @@ const SmartReminder = ({ go, me, language }) => {
           })}
         </div>
       )}
+
+      {/* আবার লাগবে — renders nothing when the clock is quiet or no shop is
+          confirmed nearby, so it never leaves an empty section behind. */}
+      <ReorderHints rows={purchases} language={language} navigate={navigate} heading />
 
       {/* budget usage */}
       <Card className="p-4">

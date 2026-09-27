@@ -94,7 +94,12 @@ const FuturisticTheme = () => {
     const styleEl = document.createElement('style');
     styleEl.id = 'pd-light-theme';
     styleEl.innerHTML = `
-      @import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700;800&family=DM+Sans:wght@400;500;700&display=swap');
+      /* Oxanium and DM Sans are self-hosted — their @font-face rules live in
+         src/index.css next to Inter/Sora, NOT here. A url() inside this
+         runtime-injected block is invisible to the build, so it would never be
+         hashed into dist/assets/ and scripts/inject-sw-precache.mjs would never
+         precache it; the CDN @import that used to sit on this line left the
+         page in fallback sans-serif offline. See the comment in index.css. */
       .futuristic-root { font-family: 'DM Sans', sans-serif; color: #0f172a; }
       .futuristic-root h1, .futuristic-root h2, .futuristic-root h3,
       .futuristic-root h4, .futuristic-root .font-display { font-family: 'Oxanium', sans-serif; }
@@ -1973,14 +1978,21 @@ const PropertyDetails = () => {
         badges:         [],
         bio:            '',
         totalProperties: 1,
-        responseRate:   0,
+        // null = no reply history yet, shown as "—". 0 would read as "never replies".
+        responseRate:   null,
       };
       setProperty(p);
       setLandlord(fallbackLandlord);
       setLoadingProperty(false);
       const ll = await propertyService.getLandlord(p.landlordId || p.ownerUserId);
       if (!cancelled) {
-        if (ll) setLandlord({ ...fallbackLandlord, ...ll });
+        // The API sends "" and null for what it doesn't know. Spread as-is they
+        // erased the fallback: avatar "" painted a broken image over the
+        // landlord's name, and responseRate null printed "null%".
+        const known = ll && Object.fromEntries(
+          Object.entries(ll).filter(([, v]) => v !== null && v !== undefined && v !== ''),
+        );
+        if (known) setLandlord({ ...fallbackLandlord, ...known });
         setLoadingLandlord(false);
       }
     })();
@@ -2837,8 +2849,8 @@ const PropertyDetails = () => {
                     {landlord.verified && <BadgeCheck size={17} className="text-blue-600 shrink-0" />}
                   </div>
                   <div className="flex flex-wrap gap-3 text-xs font-bold text-slate-500 mb-3">
-                    <span className="flex items-center gap-1"><Calendar size={11} /> {langKey === 'bn' ? `${landlord.memberSince} থেকে সদস্য` : `Since ${landlord.memberSince}`}</span>
-                    <span className="flex items-center gap-1"><Star size={11} className="text-yellow-400 fill-yellow-400" /> {landlord.rating} ({landlord.totalReviews})</span>
+                    <span className="flex items-center gap-1"><Calendar size={11} /> {langKey === 'bn' ? `${toBnDigits(landlord.memberSince)} থেকে সদস্য` : `Since ${landlord.memberSince}`}</span>
+                    <span className="flex items-center gap-1"><Star size={11} className="text-yellow-400 fill-yellow-400" /> {langKey === 'bn' ? `${toBnDigits(landlord.rating)} (${toBnDigits(landlord.totalReviews)})` : `${landlord.rating} (${landlord.totalReviews})`}</span>
                     <span className="flex items-center gap-1"><Clock size={11} /> {landlord.responseTime}</span>
                   </div>
                   <div className="flex flex-wrap gap-1.5 mb-3">
@@ -2855,7 +2867,7 @@ const PropertyDetails = () => {
               <div className="grid grid-cols-3 gap-3 mt-5 pt-5" style={{ borderTop: '1px solid rgba(15,23,42,0.06)' }}>
                 {[
                   { label: lt('propertiesLabel'), value: landlord.totalProperties },
-                  { label: lt('responseRate'), value: `${landlord.responseRate}%` },
+                  { label: lt('responseRate'), value: landlord.responseRate == null ? '—' : `${langKey === 'bn' ? toBnDigits(landlord.responseRate) : landlord.responseRate}%` },
                   { label: lt('avgReply'), value: landlord.responseTime },
                 ].map((stat, i) => (
                   <div key={i} className="text-center p-3 rounded-2xl"
@@ -2965,8 +2977,12 @@ const PropertyDetails = () => {
                     <div className="flex items-center gap-2 mt-1">
                       <Star size={11} className="fill-yellow-400 text-yellow-400" />
                       <span className="text-xs font-bold text-slate-700">{landlord.rating}</span>
-                      <span className="text-slate-300 text-xs">·</span>
-                      <span className="text-xs font-bold text-emerald-700">{langKey === 'bn' ? `উত্তরের হার ${landlord.responseRate}%` : `${landlord.responseRate}% response`}</span>
+                      {landlord.responseRate != null && (
+                        <>
+                          <span className="text-slate-300 text-xs">·</span>
+                          <span className="text-xs font-bold text-emerald-700">{langKey === 'bn' ? `উত্তরের হার ${toBnDigits(landlord.responseRate)}%` : `${landlord.responseRate}% response`}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                   {landlord.verified && <BadgeCheck size={18} className="text-blue-600 shrink-0" />}

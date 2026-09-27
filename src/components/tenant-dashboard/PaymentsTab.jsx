@@ -272,6 +272,95 @@ const PaymentsTab = ({
   );
 
 
+  // ── আগের বাসা — homes this tenant has left ─────────────────────────
+  // Moved here from the overview, where it sat above the stat cards and made
+  // the dashboard feel cluttered. It belongs beside the receipts it explains:
+  // a home with receipts is tappable and filters the history to it (tap again
+  // to show everything), jumping to the year it was last paid.
+  const hasUnstampedMoves = pastTenancies.some((b) => b.isSupersededTenancy);
+  const pastHomeRows = pastTenancies.map((b) => {
+    const key = b.leaseKey || leaseKey(b);
+    const theirs = paymentReceipts.filter((r) => r.leaseKey === key);
+    return {
+      b,
+      key,
+      count: theirs.length,
+      paid: theirs.reduce((s, r) => s + (Number(r.totalPaid) || 0), 0),
+      lastYear: theirs.map((r) => r.monthKey).filter(Boolean).sort().pop()?.split('-')[0],
+    };
+  });
+  const showPastHome = ({ key, lastYear }) => {
+    if (payProperty === key) { setPayProperty('all'); return; }
+    if (lastYear) setPayYear(Number(lastYear));
+    setPayProperty(key);
+    setPayMonth(null);
+    document.getElementById('payment-history')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const pastHomesSection = pastHomeRows.length > 0 ? (
+    <div className="bg-white rounded-2xl md:rounded-[1.75rem] border border-gray-100 shadow-[0_4px_20px_rgba(15,23,42,0.04)] p-3 md:p-5">
+      <div className="flex items-center gap-2.5 px-1 mb-3">
+        <div className="w-8 h-8 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center shrink-0"><DoorOpen size={15} /></div>
+        <div className="min-w-0">
+          <h3 className="text-sm font-black text-gray-800 leading-tight">{bn ? 'আগের বাসা' : 'Past homes'}</h3>
+          <p className="text-[10px] font-bold text-gray-400 leading-tight">
+            {pastHomeRows.some((h) => h.count > 0)
+              ? (bn ? 'পুরোনো রিসিট মুছে যায়নি — ট্যাপ করে সেই বাসার রিসিট দেখুন' : 'Old receipts are kept — tap a home to see its receipts')
+              : (bn ? 'যেসব বাসা আপনি ছেড়েছেন' : "Homes you've moved out of")}
+          </p>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {pastHomeRows.map((h) => {
+          const { b, key, count, paid } = h;
+          const selected = payProperty === key;
+          const Row = count > 0 ? 'button' : 'div';
+          return (
+            <Row
+              key={key}
+              {...(count > 0 ? { type: 'button', onClick: () => showPastHome(h), 'aria-pressed': selected } : {})}
+              className={`w-full text-left flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors ${
+                selected ? 'bg-white ring-2 ring-[#ba0036]/30' : 'bg-gray-50'
+              } ${count > 0 && !selected ? 'hover:bg-gray-100 active:scale-[0.99]' : ''}`}
+            >
+              <div className="w-8 h-8 rounded-lg bg-white border border-gray-100 text-gray-300 flex items-center justify-center shrink-0">
+                <DoorOpen size={14} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[12px] font-black text-gray-600 truncate">{formatUnitLabel(b, language)}</p>
+                <p className="text-[10px] font-bold text-gray-400 mt-0.5 truncate">
+                  {b.myMembership?.moveOutDate
+                    ? `${bn ? 'ছেড়েছেন' : 'Left'} ${fmtLeaseDate(b.myMembership.moveOutDate)}`
+                    : b.isSupersededTenancy
+                      ? (bn ? 'আপনি নতুন বাসায় উঠেছেন' : 'You moved somewhere newer')
+                      : (bn ? 'শেষ হয়েছে' : 'Ended')}
+                  {count > 0 && ` · ${bn ? 'পরিশোধ' : 'Paid'} ৳${paid.toLocaleString(bn ? 'bn-BD' : 'en-IN')}`}
+                </p>
+              </div>
+              {/* A tenancy the landlord stamped closed, versus one we
+                  INFERRED they left by joining somewhere newer. The second is
+                  a presumption and is labelled as one. */}
+              <span className={`shrink-0 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
+                b.isSupersededTenancy ? 'bg-amber-100 text-amber-700' : 'bg-gray-200 text-gray-500'
+              }`}>
+                {b.isSupersededTenancy ? (bn ? 'ছেড়ে দেওয়া' : 'Moved out') : (bn ? 'সমাপ্ত' : 'Past')}
+              </span>
+            </Row>
+          );
+        })}
+      </div>
+      {/* Say it out loud when we inferred the move. The tenant is the only
+          person who knows whether they really left, and if we guessed wrong
+          they need to know why a home disappeared from their rent card. */}
+      {hasUnstampedMoves && (
+        <p className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2 leading-relaxed mt-2.5">
+          {bn
+            ? 'আপনি নতুন বাসায় ওঠায় আগের ভাড়াগুলো এখানে সরানো হয়েছে। এখনো ওখানে থাকলে বাড়িওয়ালাকে জানান — তিনি আবার যুক্ত করতে পারবেন।'
+            : 'These moved here because you joined somewhere newer. If you still live at one of them, tell that landlord — they can add you back.'}
+        </p>
+      )}
+    </div>
+  ) : null;
+
   // ── Trust footer — reassures the tenant their data is safe. ──────
   const securityFooter = (
     <div className="relative overflow-hidden rounded-[1.5rem] bg-gradient-to-r from-indigo-50 to-violet-50 border border-indigo-100/70 px-5 py-4 flex items-center gap-3.5">
@@ -537,6 +626,7 @@ const PaymentsTab = ({
               : 'When your landlord updates a rent payment, the receipt will appear here automatically.'}
           </p>
         </div>
+        {pastHomesSection}
         {securityFooter}
         {floatingSummaryTab}
       </div>
@@ -550,7 +640,7 @@ const PaymentsTab = ({
 
       {/* ─── PAYMENT HISTORY CARD — the month navigator + search now
           live in one clean white card (was scattered on the page). ─── */}
-      <div className="bg-white rounded-2xl md:rounded-[1.75rem] border border-gray-100 shadow-[0_4px_20px_rgba(15,23,42,0.04)] p-3 md:p-6 space-y-3 md:space-y-4">
+      <div id="payment-history" className="scroll-mt-24 bg-white rounded-2xl md:rounded-[1.75rem] border border-gray-100 shadow-[0_4px_20px_rgba(15,23,42,0.04)] p-3 md:p-6 space-y-3 md:space-y-4">
 
       {/* ─── PAYMENT HISTORY HEADER ─────────────────────────── */}
       <div className="flex items-center gap-2.5 px-1 pt-1">
@@ -821,6 +911,8 @@ const PaymentsTab = ({
           })}
         </div>
       )}
+
+      {pastHomesSection}
 
       {/* ─── SECURITY / TRUST FOOTER ─── */}
       {securityFooter}

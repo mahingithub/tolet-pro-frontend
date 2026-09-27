@@ -5,26 +5,27 @@ import {
 } from 'lucide-react';
 
 /**
- * SmartAlertsPopup — a proactive, once-per-session modal that surfaces the
+ * SmartAlertsPopup — a proactive, once-a-day modal that surfaces the
  * user's URGENT Smart Alerts (overdue rent, lease expired, etc.) the moment
  * they open the dashboard, so critical items aren't missed just because the
  * user never opened the "Smart Alerts" tab.
  *
  * Behaviour:
  *   • Filters the passed `alerts` down to `type === 'urgent'`.
- *   • Shows EXACTLY ONCE per login session — a `sessionStorage` flag
- *     (`hasSeenAlertPopup:<role>`) is set the first time it opens, so it
- *     won't re-appear on subsequent tab clicks / re-renders in the same
- *     session. It resets naturally on the next login (new session).
+ *   • Shows AT MOST ONCE A DAY — a localStorage date stamp
+ *     (`hasSeenAlertPopup:<role>` = 'YYYY-MM-DD') is written the first time it
+ *     opens, so it won't re-appear on subsequent tab clicks, re-renders, or
+ *     app launches until the next calendar day. It was sessionStorage, which
+ *     in the installed app means EVERY COLD START — see the note in the effect.
  *   • Role-scoped key so a user who is both a tenant AND a landlord sees the
- *     popup once on each surface within a session, not just once total.
+ *     popup once on each surface per day, not just once total.
  *   • Fully React-free of the alert-building logic — it just renders whatever
  *     urgent alerts it's handed. Works for both tenants and landlords.
  *
  * Props:
  *   alerts     — array of alert objects ({ id, type, title, subtitle, iconType })
  *   language   — 'English' | 'বাংলা'
- *   role       — 'tenant' | 'landlord' (namespaces the sessionStorage key)
+ *   role       — 'tenant' | 'landlord' (namespaces the seen-today key)
  *   onViewAll  — optional callback fired by the "View all alerts" button
  *                (e.g. switch to the Smart Alerts tab). The popup closes first.
  */
@@ -45,6 +46,12 @@ const iconFor = (k) => ICONS[k] || Bell;
 export default function SmartAlertsPopup({ alerts = [], language = 'English', role = 'tenant', onViewAll }) {
   const bn = language === 'বাংলা';
   const storageKey = `hasSeenAlertPopup:${role}`;
+  // Local calendar day, not UTC and not a timestamp: the boundary that matters
+  // is the one the user lives in, and comparing "same day" is the whole test.
+  const todayStamp = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
 
   const [open, setOpen] = useState(false);
   // Snapshot the urgent alerts at the moment we decide to open, so the list
@@ -52,18 +59,31 @@ export default function SmartAlertsPopup({ alerts = [], language = 'English', ro
   const [urgent, setUrgent] = useState([]);
 
   useEffect(() => {
-    // Already shown this session — never re-open.
-    let seen = false;
-    try { seen = window.sessionStorage.getItem(storageKey) === '1'; } catch { /* ignore */ }
-    if (seen) return;
+    // ── ONCE A DAY, NOT ONCE A "SESSION" ──────────────────────────────────
+    // This used to key off sessionStorage, on the reasoning that a session
+    // ends at logout. In a browser tab that is roughly true. In the installed
+    // app it is not: every cold start is a fresh session, and people open a
+    // rent app several times a day — so a modal that was designed to appear
+    // once appeared every single launch, over the top of whatever they came
+    // in to do. (Three times in one sitting while testing this.)
+    //
+    // A date stamp in localStorage keeps the promise the modal is actually
+    // for — you will not miss an overdue tenant — without repeating it to
+    // somebody who has already read it today and has not paid themselves.
+    // The day boundary is local, which is the one the user experiences.
+    let seenToday = false;
+    try {
+      seenToday = window.localStorage.getItem(storageKey) === todayStamp;
+    } catch { /* storage disabled — fall through and show it */ }
+    if (seenToday) return;
 
     const urgentAlerts = (alerts || []).filter((a) => a && a.type === 'urgent');
     if (urgentAlerts.length === 0) return; // nothing critical yet (or data still loading)
 
     setUrgent(urgentAlerts);
     setOpen(true);
-    try { window.sessionStorage.setItem(storageKey, '1'); } catch { /* ignore */ }
-  }, [alerts, storageKey]);
+    try { window.localStorage.setItem(storageKey, todayStamp); } catch { /* ignore */ }
+  }, [alerts, storageKey, todayStamp]);
 
   if (!open || urgent.length === 0) return null;
 

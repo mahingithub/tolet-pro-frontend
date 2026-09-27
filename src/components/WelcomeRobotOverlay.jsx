@@ -382,12 +382,17 @@ const WelcomeRobotOverlay = () => {
               onClick={handleBackdrop}
             />
 
-            {/* কোণার ক্লোজ বাটন */}
+            {/* কোণার ক্লোজ বাটন — top offset carries var(--sat) because this
+                overlay now runs inside the app too, which is force edge-to-edge
+                on Android: a bare top-5 puts the button under the status bar.
+                var(--sat) and never env(safe-area-inset-top) — see the note in
+                OfflineNotice.jsx for why env() alone isn't portable here. */}
             <motion.button
               initial={{ opacity: 0, y: -16 }}
               animate={{ opacity: 1, y: 0 }}
               onClick={handleBackdrop}
-              className="absolute top-5 right-5 z-[100000] p-3 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md shadow-lg transition-all"
+              style={{ top: 'calc(var(--sat) + 1.25rem)' }}
+              className="absolute right-5 z-[100000] p-3 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md shadow-lg transition-all"
               aria-label={L({ bn: 'বন্ধ করুন', en: 'Close' })}
             >
               <X size={22} />

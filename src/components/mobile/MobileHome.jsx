@@ -718,11 +718,14 @@ const PropertyCard = ({ property, t, landlord }) => {
   // (legacy base64). SafeImg renders a clean placeholder for any empty/dead
   // tile instead.
   const { cover: primary, thumbs: rawThumbs } = mobBuildCollage(property);
-  // Fill the 3-slot layout. Pad with EMPTY tiles (SafeImg draws a clean
-  // placeholder) — never with the cover, which used to make the strip look
-  // like two or three duplicate cover photos.
-  const padThumbs = [{ url: '', room: null }, { url: '', room: null }];
-  const thumbs = [...rawThumbs, ...padThumbs].slice(0, 3);
+  // Only the photos that exist, sharing the column's height between them.
+  // Padding to three blank tiles left a white hole beside every listing with
+  // fewer than four photos — the first card on the home feed showed one thumb
+  // over two empty cells. Never padded with the cover either, which made the
+  // strip look like duplicate cover photos. A listing with no extra photos
+  // keeps one placeholder tile so every card stays the same height.
+  const thumbs = rawThumbs.length ? rawThumbs.slice(0, 3) : [{ url: '', room: null }];
+  const thumbRows = ['grid-rows-1', 'grid-rows-2', 'grid-rows-3'][thumbs.length - 1];
   const extraImages = Array.isArray(property.images) ? property.images.length : 0;
 
   const go = () => navigate(propertyPath(property));
@@ -819,8 +822,8 @@ const PropertyCard = ({ property, t, landlord }) => {
             </div>
           </div>
 
-          {/* Right column — 3 stacked thumbs */}
-          <div className="grid grid-rows-3">
+          {/* Right column — up to 3 stacked thumbs */}
+          <div className={`grid ${thumbRows}`}>
             {thumbs.map((shot, i) => {
               // Convert shot string (fallback) to object just in case
               const s = typeof shot === 'string' ? { url: shot, room: null } : shot;
@@ -1052,7 +1055,12 @@ const MobileHome = () => {
     const load = async () => {
       setIsLoadingProps(true);
       try {
-        const list = await propertyService.getProperties({}, 'Newest Listings');
+        // { ok, properties } — `ok:false` is "we never reached the API". The
+        // feed renders the same either way: its empty card is worded about the
+        // FILTER ("no homes match this filter yet"), not about the country, so
+        // it doesn't make the claim PropertyListing's did. The global offline
+        // strip is what tells the user why the feed is empty.
+        const { properties: list } = await propertyService.getProperties({}, 'Newest Listings');
         if (cancelled) return;
         setProperties(Array.isArray(list) ? list : []);
       } catch {
@@ -1155,8 +1163,12 @@ const MobileHome = () => {
       {/* ───────── MARKETING BANNER ───────── */}
       <div className="px-4 pt-3">
         <div className="relative overflow-hidden rounded-3xl aspect-[16/10] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.25)]">
+          {/* The poster is the video's own first frame (35 KB). Without it the
+              Android WebView paints its stock grey play icon over the banner
+              until the ~1 MB video arrives — 18 s on a slow connection. */}
           <video
             src="https://res.cloudinary.com/dsrolbe0j/video/upload/q_auto,f_auto/0821_qeyayb.mp4"
+            poster="https://res.cloudinary.com/dsrolbe0j/video/upload/so_0,q_auto,f_auto,w_800/0821_qeyayb.jpg"
             autoPlay
             loop
             muted

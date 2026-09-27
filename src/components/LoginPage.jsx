@@ -6,12 +6,13 @@ import {
   User, Phone, Lock, ArrowLeft, Loader2, CheckCircle2,
   Home, ShieldCheck, Building2, MessageCircle, ChevronRight,
   Check, AlertCircle, ChevronDown, Smartphone, Eye, EyeOff,
+  Wallet, Search, LayoutDashboard,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useSettings } from '../context/SettingsContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
 import { resolveHome } from '../utils/homeSurface';
-import { NATIVE_START_PATH, NATIVE_WELCOME_PATH, experienceForRole, getNativeExperience, getNativeHome, inferNativeExperience, isNativeApp, safeAppPath, saveNativeExperience } from '../utils/nativeExperience.js';
+import { NATIVE_START_PATH, NATIVE_WELCOME_PATH, experienceForRole, getNativeExperience, getNativeHome, isNativeApp, nativeLoginExperience, safeAppPath, saveNativeExperience } from '../utils/nativeExperience.js';
 import {
   signupStart,
   forgotPassword,
@@ -35,6 +36,48 @@ const RESEND_COOLDOWN_S = 30;
 
 // Where the chosen phone country is remembered on this device.
 const PHONE_COUNTRY_KEY = 'auth:phoneCountry';
+
+/** One row in the role / surface popup. Same shape for every question asked there. */
+const PickerOption = ({ icon: Icon, iconClass, title, body, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="group flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 hover:border-brandRed hover:bg-red-50/40 transition-all text-left active:scale-[0.98]"
+  >
+    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${iconClass}`}>
+      <Icon size={22} />
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="text-base font-black text-gray-900">{title}</p>
+      <p className="text-xs text-gray-500">{body}</p>
+    </div>
+    <ChevronRight size={18} className="text-gray-300 group-hover:text-brandRed group-hover:translate-x-0.5 transition-all shrink-0" />
+  </button>
+);
+
+// How each app mode is named when we ask someone to confirm it as their home.
+// Named by what they will SEE, not by the mode's internal name — "host" means
+// nothing to a landlord, and "your dashboard" means everything.
+const HOME_CONFIRM_COPY = {
+  host: {
+    icon: LayoutDashboard,
+    en: 'My dashboard', bn: 'আমার ড্যাশবোর্ড',
+    subEn: 'Rent, tenants and announcements',
+    subBn: 'ভাড়া, ভাড়াটিয়া ও নোটিশ',
+  },
+  living: {
+    icon: Wallet,
+    en: 'Living — my ledger', bn: 'লিভিং — আমার খাতা',
+    subEn: 'Meals, bazar, bills and expenses',
+    subBn: 'মিল, বাজার, বিল আর খরচ',
+  },
+  search: {
+    icon: Search,
+    en: 'Find a home', bn: 'বাসা খুঁজুন',
+    subEn: 'Browse to-let listings',
+    subBn: 'ভাড়ার বিজ্ঞাপন দেখুন',
+  },
+};
 
 /**
  * Why this exists: the backend login only enforces generic E.164 (`+` then
@@ -365,10 +408,28 @@ const LoginPage = () => {
     if (roleIsFixed && nativeRole) setRole(nativeRole);
   }, [roleIsFixed, nativeRole]);
 
+  // The role picker's second question, asked of a tenant signing up in the app.
+  // 'role' | 'surface'. See `chooseSurface`.
+  const [rolePickerStage, setRolePickerStage] = useState('role');
+  // The home we worked out from an account the first time this phone signs into
+  // it — shown for a one-tap confirmation rather than acted on silently.
+  // { role, mode } | null. See `goToNextOrDashboard`.
+  const [confirmHome, setConfirmHome] = useState(null);
+
   const chooseRole = (r) => {
     setRole(r);
+    if (!native) { setShowRolePicker(false); return; }
+    // "Tenant" says who you are, not what you came to do — and the two tenants
+    // who pick it want opposite screens: one is hunting for a flat, the other
+    // shares a mess and wants somewhere to write down the bazar. The website
+    // asks this after signup (HomeIntentModal); the app used to guess it, which
+    // is how someone who came for the খাতা got dropped on a listings feed.
+    //
+    // A landlord is never asked. Their home is the dashboard — rent, tenants
+    // and announcements — and offering them a choice they do not have is just
+    // one more screen between them and it.
+    if (r === 'tenant' && mode === MODES.SIGNUP) { setRolePickerStage('surface'); return; }
     setShowRolePicker(false);
-    if (!native) return;
     // The answer sticks to the DEVICE, in the same slot /app/start writes, so
     // it is asked once and then carried by itself: signup sends this role, the
     // app dresses itself for it, and a later login on this phone needs no
@@ -376,6 +437,32 @@ const LoginPage = () => {
     // rather than resetting someone who already lives in Living.
     const experience = experienceForRole(r, { defaultHome: settings?.app?.defaultHome });
     if (experience) saveNativeExperience(experience.role, experience.mode, 'chosen');
+  };
+
+  // 'living' (the খাতা) or 'search' (listings) — what this tenant opens on.
+  // Saved as 'chosen', so App.jsx mirrors it onto the account once the signup
+  // completes and it is waiting for them on their next phone.
+  const chooseSurface = (surfaceMode) => {
+    saveNativeExperience('tenant', surfaceMode, 'chosen');
+    setRolePickerStage('role');
+    setShowRolePicker(false);
+  };
+
+  // Confirming the guess makes it an answer, so it is stored as one.
+  const acceptHome = () => {
+    const chosen = saveNativeExperience(confirmHome.role, confirmHome.mode, 'chosen');
+    setConfirmHome(null);
+    navigate(getNativeHome(chosen), { replace: true });
+  };
+
+  // "Something else" goes to the full two questions. The guess is written first
+  // (as a guess): /app/start settles a signed-in account straight back to its
+  // home when the device is blank, so arriving with nothing saved would skip
+  // the very questions they just asked for.
+  const chooseAnotherHome = () => {
+    saveNativeExperience(confirmHome.role, confirmHome.mode, 'account');
+    setConfirmHome(null);
+    navigate(NATIVE_START_PATH, { replace: true });
   };
 
   const [isLoading, setIsLoading] = useState(false);
@@ -546,15 +633,17 @@ const LoginPage = () => {
       const safeNext = safeAppPath(nextUrl, null) && !/^(?:\/login|\/welcome)(?:[/?#]|$)/.test(nextUrl);
       if (safeNext) { navigate(nextUrl, { replace: true }); return; }
       if (resolvedRole === 'admin') { navigate('/admin', { replace: true }); return; }
-      // A returning user on a fresh install has nothing saved on the device, so
-      // getNativeHome() would send them back to the "who are you?" screen they
-      // just skipped. Their account answers it instead: the role decides the
-      // side, and the home saved on the account decides the tenant surface.
-      let experience = getNativeExperience();
-      if (!experience) {
-        const inferred = inferNativeExperience({ activeRole: resolvedRole, defaultHome: settings?.app?.defaultHome });
-        if (inferred) experience = saveNativeExperience(inferred.role, inferred.mode, 'account');
-      }
+      // The ACCOUNT decides which side the app opens on, never the side this
+      // phone happens to be dressed as — see nativeLoginExperience(). A home we
+      // worked out on a device that has never seen this account is still only a
+      // guess, so a LOGIN offers it for confirmation rather than acting on it;
+      // a signup has just been asked outright and goes straight through.
+      const { experience, confirm } = nativeLoginExperience({
+        activeRole: resolvedRole,
+        defaultHome: settings?.app?.defaultHome,
+        mayConfirm: mode === MODES.LOGIN,
+      });
+      if (confirm) { setConfirmHome(confirm); return; }
       navigate(getNativeHome(experience), { replace: true });
       return;
     }
@@ -647,7 +736,10 @@ const LoginPage = () => {
     setResendIn(0);
     // Stepping into signup in the app is the one moment the side has to be
     // settled, so ask here rather than leave a pre-set toggle in the form.
-    if (native && m === MODES.SIGNUP && !nativeRole) setShowRolePicker(true);
+    if (native && m === MODES.SIGNUP && !nativeRole) {
+      setRolePickerStage('role');
+      setShowRolePicker(true);
+    }
   };
 
   // "Have a look around" — the app works signed out, and putting a phone field
@@ -750,13 +842,24 @@ const LoginPage = () => {
       // A returning user sends NO role: the client-side role gate in
       // AuthContext only fires when one is requested, so this lets any account
       // — tenant, landlord or both — sign in without being asked which it is.
-      const loginRole = knownUser && !nativeRole ? undefined : role;
+      //
+      // In the APP that is now unconditional. `nativeRole` is read off the
+      // DEVICE, so it described the last person to set this phone up, not the
+      // account being signed into: a landlord logging in on a handset that had
+      // been looked around as a tenant was told "you are not a landlord" and
+      // bounced to /app/start. The side is the account's to state, and it does.
+      const loginRole = native ? undefined : (knownUser && !nativeRole ? undefined : role);
       const loggedInUser = await login({ phone: toE164(formData.phone, phoneCountry), password: formData.password }, loginRole);
       if (attempt !== attemptRef.current) return;
       if (['super_admin', 'moderator', 'support_agent'].includes(loggedInUser?.role)) {
         goToNextOrDashboard('admin');
       } else {
-        goToNextOrDashboard(role);
+        // The side the ACCOUNT owns, never this screen's `role` — which is only
+        // what the form was pre-set to, and is 'tenant' unless something said
+        // otherwise. Sending that instead is what opened the tenant home for a
+        // landlord and then dressed the whole app as a tenant around them.
+        // Signup already did it this way (`newUser?.role`); login did not.
+        goToNextOrDashboard(loggedInUser?.role || role);
       }
     } catch (err) {
       if (attempt !== attemptRef.current) return;
@@ -1122,50 +1225,125 @@ const LoginPage = () => {
               <div className="absolute -top-8 -right-8 w-28 h-28 bg-white/10 rounded-full blur-2xl pointer-events-none" />
               <img src="/icons/logo.svg" alt="To-Let Pro" className="w-14 h-14 mx-auto mb-3 shadow-lg rounded-2xl" />
               <h3 className="text-xl font-black tracking-tight">
-                {mode === MODES.SIGNUP
-                  ? L('Are you a tenant or a landlord?', 'আপনি ভাড়াটিয়া, না বাড়িওয়ালা?')
-                  : L('Log in as a tenant or a landlord?', 'ভাড়াটিয়া, না বাড়িওয়ালা হিসেবে লগইন করবেন?')}
+                {rolePickerStage === 'surface'
+                  ? L('What will you use it for?', 'কী করতে চান?')
+                  : mode === MODES.SIGNUP
+                    ? L('Are you a tenant or a landlord?', 'আপনি ভাড়াটিয়া, না বাড়িওয়ালা?')
+                    : L('Log in as a tenant or a landlord?', 'ভাড়াটিয়া, না বাড়িওয়ালা হিসেবে লগইন করবেন?')}
               </h3>
               <p className="text-white/80 text-sm mt-1">
                 {/* In the app the answer is kept on the phone, so say so — and
                     say it is not a one-way door, which is what makes people
                     willing to answer a question instead of hunting for a skip. */}
-                {native
-                  ? L('The app is set up from this. You can change it later.', 'এই অনুযায়ী অ্যাপ সাজানো হবে। পরে বদলাতে পারবেন।')
-                  : L('Pick one to continue', 'একটি বেছে নিন')}
+                {rolePickerStage === 'surface'
+                  ? L('This is the screen the app will open on.', 'অ্যাপ খুললে এই স্ক্রিনটিই আসবে।')
+                  : native
+                    ? L('The app is set up from this. You can change it later.', 'এই অনুযায়ী অ্যাপ সাজানো হবে। পরে বদলাতে পারবেন।')
+                    : L('Pick one to continue', 'একটি বেছে নিন')}
               </p>
             </div>
 
             {/* Options */}
-            <div className="p-5 grid gap-3">
-              <button
-                type="button"
-                onClick={() => chooseRole('tenant')}
-                className="group flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 hover:border-brandRed hover:bg-red-50/40 transition-all text-left active:scale-[0.98]"
-              >
-                <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-                  <User size={22} className="text-blue-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-base font-black text-gray-900">{L('Tenant', 'ভাড়াটিয়া')}</p>
-                  <p className="text-xs text-gray-500">{L("I'm looking for a home", 'আমি বাসা খুঁজছি')}</p>
-                </div>
-                <ChevronRight size={18} className="text-gray-300 group-hover:text-brandRed group-hover:translate-x-0.5 transition-all shrink-0" />
-              </button>
+            {rolePickerStage === 'surface' ? (
+              // Step 2, app signup, tenant only. The same two answers /app/start
+              // and the website's HomeIntentModal offer, worded the same way —
+              // three screens asking one question must not describe it three
+              // ways.
+              <div className="p-5 grid gap-3">
+                <PickerOption
+                  icon={Wallet}
+                  iconClass="bg-red-50 text-brandRed"
+                  title={L('Keep accounts', 'হিসাব রাখব')}
+                  body={L('Meals, bazar and bills — my own or my mess’s.', 'মিল, বাজার আর বিল — নিজের বা মেসের।')}
+                  onClick={() => chooseSurface('living')}
+                />
+                <PickerOption
+                  icon={Search}
+                  iconClass="bg-blue-50 text-blue-500"
+                  title={L('Find a home', 'বাসা খুঁজব')}
+                  body={L('Search to-let listings by area and budget.', 'এলাকা ও বাজেট অনুযায়ী ভাড়ার বাসা খুঁজব।')}
+                  onClick={() => chooseSurface('search')}
+                />
+                {/* Both sides of the app stay open whichever they pick — saying
+                    so is what stops this reading as a door closing. */}
+                <p className="text-[11.5px] text-gray-400 text-center pt-1 leading-relaxed">
+                  {L('Both are always available. You can change this later.', 'দুটোই সবসময় পাবেন। পরে বদলাতে পারবেন।')}
+                </p>
+              </div>
+            ) : (
+              <div className="p-5 grid gap-3">
+                <PickerOption
+                  icon={User}
+                  iconClass="bg-blue-50 text-blue-500"
+                  title={L('Tenant', 'ভাড়াটিয়া')}
+                  body={L("I'm looking for a home", 'আমি বাসা খুঁজছি')}
+                  onClick={() => chooseRole('tenant')}
+                />
+                <PickerOption
+                  icon={Building2}
+                  iconClass="bg-red-50 text-brandRed"
+                  title={L('Landlord', 'বাড়িওয়ালা')}
+                  body={L('I want to list my property', 'আমি বাড়ি ভাড়া দিতে চাই')}
+                  onClick={() => chooseRole('landlord')}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── "OPEN THE APP ON …" ──
+          The first time this phone signs into an account there is nothing on
+          the device to go by, so the home below was worked out from the account
+          rather than stated by the person in front of us. One tap turns the
+          guess into an answer; "Something else" opens the full two questions.
+          A signup never reaches here — it has just been asked outright. */}
+      {confirmHome && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]" />
+          <div className="relative bg-white rounded-3xl shadow-[0_30px_80px_rgba(0,0,0,0.25)] w-full max-w-sm overflow-hidden animate-[floatIn_0.3s_ease-out]">
+            <div className="relative bg-gradient-to-br from-[#BA0036] to-[#7A0024] px-6 pt-7 pb-7 text-white text-center overflow-hidden">
+              <div className="absolute -top-8 -right-8 w-28 h-28 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+              <img src="/icons/logo.svg" alt="To-Let Pro" className="w-14 h-14 mx-auto mb-3 shadow-lg rounded-2xl" />
+              <h3 className="text-xl font-black tracking-tight">
+                {L('Open the app on this?', 'অ্যাপ খুললে এটাই আসবে?')}
+              </h3>
+              <p className="text-white/80 text-sm mt-1">
+                {L('Every time you open the app.', 'প্রতিবার অ্যাপ খুললেই।')}
+              </p>
+            </div>
+
+            <div className="p-5">
+              {(() => {
+                const home = HOME_CONFIRM_COPY[confirmHome.mode];
+                const Icon = home.icon;
+                return (
+                  <div className="flex items-center gap-4 p-4 rounded-2xl border-2 border-brandRed bg-red-50/40">
+                    <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center shrink-0">
+                      <Icon size={22} className="text-brandRed" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-base font-black text-gray-900">{L(home.en, home.bn)}</p>
+                      <p className="text-xs text-gray-500">{L(home.subEn, home.subBn)}</p>
+                    </div>
+                    <Check size={18} className="text-brandRed shrink-0" />
+                  </div>
+                );
+              })()}
 
               <button
                 type="button"
-                onClick={() => chooseRole('landlord')}
-                className="group flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 hover:border-brandRed hover:bg-red-50/40 transition-all text-left active:scale-[0.98]"
+                onClick={acceptHome}
+                className="w-full mt-4 min-h-[52px] rounded-2xl bg-brandRed text-white text-[15px] font-black active:scale-[0.98] transition"
               >
-                <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
-                  <Building2 size={22} className="text-brandRed" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-base font-black text-gray-900">{L('Landlord', 'বাড়িওয়ালা')}</p>
-                  <p className="text-xs text-gray-500">{L('I want to list my property', 'আমি বাড়ি ভাড়া দিতে চাই')}</p>
-                </div>
-                <ChevronRight size={18} className="text-gray-300 group-hover:text-brandRed group-hover:translate-x-0.5 transition-all shrink-0" />
+                {L('Yes, open here', 'হ্যাঁ, এটাই')}
+              </button>
+              <button
+                type="button"
+                onClick={chooseAnotherHome}
+                className="w-full mt-2 min-h-11 text-[13px] font-bold text-gray-500 active:scale-[0.98] transition"
+              >
+                {L('Something else', 'অন্য কিছু')}
               </button>
             </div>
           </div>

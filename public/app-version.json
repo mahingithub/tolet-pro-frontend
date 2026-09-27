@@ -1,20 +1,24 @@
 {
   "_comment": "EDIT THIS ON EVERY RELEASE. It is what tells an installed app that a newer build exists. Deploys with the website (Vercel), so no backend change is needed. latestVersionCode must match android/app/build.gradle's versionCode. Set minSupportedVersionCode ONLY when a build is genuinely unusable (a broken API contract, a data-loss bug) — it BLOCKS every older build from opening, so a typo here locks every tester out until you redeploy.",
-  "latestVersionCode": 17,
-  "latestVersionName": "1.1.5",
+  "latestVersionCode": 18,
+  "latestVersionName": "1.1.6",
   "minSupportedVersionCode": 1,
   "notes": {
     "bn": [
-      "অফার আর নতুন খবর এখন ফোনের নোটিফিকেশনে শব্দসহ আসবে — আগে চুপচাপ আসত",
-      "অ্যাপ খোলা থাকা অবস্থায়ও নোটিফিকেশন আর হারিয়ে যাবে না",
-      "WhatsApp-এ অফার পেতে চান কি না, এখন নিজেই ঠিক করতে পারবেন",
-      "রাতের নীরব সময়ে অফারও চুপ থাকবে"
+      "অ্যাপ বন্ধ করলে আর হঠাৎ লগআউট হয়ে যাবেন না",
+      "ইন্টারনেট না থাকলে এখন অ্যাপ সেটা জানিয়ে দেয় — খালি তালিকা দেখায় না",
+      "লগআউট করলে এই ফোনে আর আপনার নোটিফিকেশন আসবে না",
+      "খাতায় কিছু লিখলে কাছের কোন দোকানে সেটা পাওয়া যায়, দেখিয়ে দেবে",
+      "স্ক্রল করলে লেখা আর ঘড়ির ওপর ওঠে না, হোমের ব্যানার সঙ্গে সঙ্গে দেখা যায়",
+      "মেনু এখন আরও গোছানো — সাহায্য ও নীতিমালা পাবেন সেটিংসে"
     ],
     "en": [
-      "Offers and updates now arrive as real notifications, with sound — they used to arrive silently",
-      "Notifications no longer go missing while the app is open",
-      "Choose for yourself whether to get offers on WhatsApp",
-      "Offers stay silent during your quiet hours too"
+      "You are no longer signed out without warning after closing the app",
+      "The app now tells you when you're offline, instead of showing an empty list",
+      "After you sign out, this phone stops receiving your notifications",
+      "Write something in the খাতা and it can point you to a nearby shop that sells it",
+      "Scrolling no longer runs text over the clock, and the home banner shows at once",
+      "Tidier menus — help and policies now live under Settings"
     ]
   }
 }

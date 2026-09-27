@@ -14,6 +14,8 @@
  * `iconType` is a string the page maps to an icon (keeps this file React-free).
  */
 
+import { occupantSummary } from './occupants';
+
 const MS_DAY = 86400000;
 
 function startOfDay(value) {
@@ -106,7 +108,18 @@ export function buildRentAlerts(bookings = [], today = new Date(), lang = 'Engli
     const entry = (b.ledger && b.ledger[key]) || null;
     const isPaid = !!entry && (entry.paid === true || entry.status === 'full');
 
-    const tenant = b.tenant || (bn ? 'ভাড়াটিয়া' : 'Tenant');
+    // WHO THIS ALERT IS ABOUT. Through occupantSummary(), not `b.tenant`.
+    //
+    // `b.tenant` is the name TYPED when the lease was created, and on any
+    // booking filled by an invite code or a seat placement it is empty — the
+    // real occupants are rows in members[]. So the landlord's overdue alerts
+    // all read "Rent overdue — Tenant", four identical lines with no way to
+    // tell which unit they meant, while the tenant's own side (which reads
+    // members[]) showed the room correctly.
+    //
+    // occupantSummary() reads members[] first, falls back to b.tenant for
+    // legacy single-tenant rows, and caps a seat room at two names + "+N".
+    const tenant = occupantSummary(b, lang);
     const phone = b.tenantPhone || '';
     const property = b.property || '';
     const dueStr = fmtDate(dueDate, bn);
@@ -251,7 +264,18 @@ export function buildLeaseAlerts(bookings = [], today = new Date(), lang = 'Engl
     const daysToEnd = Math.round((leaseEnd - t0) / MS_DAY);
     if (daysToEnd > 30) continue; // not relevant yet
 
-    const tenant = b.tenant || (bn ? 'ভাড়াটিয়া' : 'Tenant');
+    // WHO THIS ALERT IS ABOUT. Through occupantSummary(), not `b.tenant`.
+    //
+    // `b.tenant` is the name TYPED when the lease was created, and on any
+    // booking filled by an invite code or a seat placement it is empty — the
+    // real occupants are rows in members[]. So the landlord's overdue alerts
+    // all read "Rent overdue — Tenant", four identical lines with no way to
+    // tell which unit they meant, while the tenant's own side (which reads
+    // members[]) showed the room correctly.
+    //
+    // occupantSummary() reads members[] first, falls back to b.tenant for
+    // legacy single-tenant rows, and caps a seat room at two names + "+N".
+    const tenant = occupantSummary(b, lang);
     const phone = b.tenantPhone || '';
     const property = b.property || '';
     const endStr = fmtDate(leaseEnd, bn);

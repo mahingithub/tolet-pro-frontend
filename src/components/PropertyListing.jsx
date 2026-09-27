@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom"
 import useGoBack from "../hooks/useGoBack";
 import useRequireAuth from "../hooks/useRequireAuth";
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
-import { Search, MapPin, BedDouble, Bath, Square, Heart, Star, X, ChevronRight, ShieldCheck, ChevronDown, ChevronUp, Filter, Ruler, Navigation, CheckCircle2, Flame, Building, Wifi, Map, List, LayoutGrid, Home, Users, User, BookOpen, Share2, MessageCircle, ArrowLeft, SlidersHorizontal, ArrowUpDown, Camera, Layers, Crosshair, Loader2, Crown, Sparkles, TrendingUp } from "lucide-react";
+import { Search, MapPin, BedDouble, Bath, Square, Heart, Star, X, ChevronRight, ShieldCheck, ChevronDown, ChevronUp, Filter, Ruler, Navigation, CheckCircle2, Flame, Building, Wifi, WifiOff, Map, List, LayoutGrid, Home, Users, User, BookOpen, Share2, MessageCircle, ArrowLeft, SlidersHorizontal, ArrowUpDown, Camera, Layers, Crosshair, Loader2, Crown, Sparkles, TrendingUp } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 // ─── SHARED INQUIRY MODAL (single source of truth for the inquiry flow) ───────
 import InquiryModal from "./InquiryModal";
@@ -583,7 +583,9 @@ const PropertyCard = ({ property, navigate, t, showToast, isHighlighted, onHover
 							<Square size={14} className="text-gray-400" /> {property.sqft} {t.sqft || "sqft"}
 						</span>
 						<span className="flex items-center gap-1.5">
-							<Layers size={14} className="text-gray-400" /> {(property.floor || property.floorNumber) ? `${t.floorLabel || "Floor"} ${property.floor || property.floorNumber}` : (t.groundFloor || "Ground")}
+							<Layers size={14} className="text-gray-400" /> {(property.floor || property.floorNumber)
+								? (isBn ? `${property.floor || property.floorNumber} তলা` : `Floor ${property.floor || property.floorNumber}`)
+								: (t.groundFloor || "Ground")}
 						</span>
 						<span className="hidden md:flex items-center gap-1.5">
 							<Building size={14} className="text-gray-400" />
@@ -1040,11 +1042,15 @@ const PropertyListing = () => {
 	const closeInquiry = () => { setInquiryTarget(null); setInquiryLandlord(null); };
 
 	// ── LIVE PROPERTY DATA ──────────────────────────────────────────────────────
-	// Pulled from propertyService — backend first, localStorage fallback. No
-	// demo data is merged in anywhere; an empty list is a legitimate state.
+	// Pulled from propertyService — backend only, no demo data merged anywhere.
+	// An empty list is a legitimate state, which is exactly why the failure has
+	// to be a SEPARATE flag: `properties.length === 0` cannot tell "this area
+	// has nothing" from "we never reached the server".
 	const [properties, setProperties] = useState([]);
 	const [isPropertiesLoading, setIsPropertiesLoading] = useState(true);
-	const [propertyLoadError, setPropertyLoadError] = useState("");
+	// true = the last load did not get an answer. A boolean, not a message:
+	// the wording belongs in the render, where the chosen language is known.
+	const [propertyLoadError, setPropertyLoadError] = useState(false);
 	const [propertyRefreshTick, setPropertyRefreshTick] = useState(0);
 
 	// ── UI STATES ───────────────────────────────────────────────────────────────
@@ -1111,18 +1117,30 @@ const PropertyListing = () => {
 		const load = async () => {
 			if (!cancelled) {
 				setIsPropertiesLoading(true);
-				setPropertyLoadError("");
+				setPropertyLoadError(false);
 			}
 			try {
-				const list = await propertyService.getProperties(
+				// `ok` is the whole point of the { ok, properties } shape: it
+				// separates "the server says this area has nothing" from "we
+				// never reached the server". While both arrived as a bare [],
+				// the empty state below told a user with no internet that there
+				// are no houses in Dhaka.
+				const { ok, properties: list } = await propertyService.getProperties(
 					{ activeDivision, searchArea: debouncedSearch, nearMeLabel: t.nearMe || "Nearby Location", intent: selectedIntent, selectedCategories, selectedTypes, minPrice, maxPrice },
 					sortBy,
 				);
-				if (!cancelled) setProperties(Array.isArray(list) ? list : []);
-			} catch (err) {
 				if (!cancelled) {
+					setProperties(Array.isArray(list) ? list : []);
+					setPropertyLoadError(!ok);
+				}
+			} catch (err) {
+				// The service no longer throws on a dead network — it reports
+				// ok:false — so this is now only a genuine bug on the way back.
+				// Same outcome for the user: no listings, and no answer either.
+				if (!cancelled) {
+					console.warn("[properties] load failed:", err);
 					setProperties([]);
-					setPropertyLoadError(err?.message || "Could not load properties. Please try again.");
+					setPropertyLoadError(true);
 				}
 			} finally {
 				if (!cancelled) setIsPropertiesLoading(false);
@@ -1520,17 +1538,23 @@ const PropertyListing = () => {
 		//               only wrote numbers when the call succeeded, so a "has
 		//               listings" from it is reliable. It fails open — if the
 		//               API was unreachable, every page reads as having some.
-		//   runtime     propertyService falls back to localStorage and returns
-		//               an EMPTY ARRAY when the backend is unreachable, without
-		//               throwing. So "0 results" here does not mean "0 houses";
-		//               it might just mean the API is down.
+		//   runtime     `filteredProperties` is empty both when the area really
+		//               has nothing and when a filter narrowed everything away.
+		//               So "0 results" here does not mean "0 houses".
 		//
 		// Therefore runtime may only ever UPGRADE a page to indexable (it found
 		// listings the last build did not know about), never downgrade one. A
 		// backend outage would otherwise de-index every location page on the
 		// site at once — which is exactly what happened when this was first
-		// written against `propertyLoadError`, a flag that never fires because
-		// the service swallows the failure.
+		// written against `propertyLoadError`.
+		//
+		// `propertyLoadError` DOES fire now — getProperties reports { ok:false }
+		// instead of swallowing the failure — and this deliberately still does
+		// not consult it. It doesn't need to: the `hasListings` conjunct already
+		// makes an outage a no-op on any page the last build found listings for,
+		// and on a page it didn't, noindex is what the build decided, not
+		// something runtime is downgrading. Adding the flag here would only add
+		// a second way to get this wrong.
 		//
 		// `follow` stays on either way, so crawlers still walk out to the
 		// areas that do have listings.
@@ -1674,7 +1698,7 @@ const PropertyListing = () => {
 									: "bg-white text-gray-700 border-gray-200"
 							}`}>
 							{isMapMode ? <List size={14} /> : <Map size={14} />}
-							{isMapMode ? "List" : "Map"}
+							{isMapMode ? (isBn ? "তালিকা" : "List") : (isBn ? "ম্যাপ" : "Map")}
 						</button>
 					</div>
 				</div>
@@ -2110,14 +2134,35 @@ const PropertyListing = () => {
 										);
 									})
 								) : (
+									/* TWO DIFFERENT EMPTY STATES, AND THEY ARE NOT INTERCHANGEABLE.
+									   `propertyLoadError` means the service never got an answer, so
+									   we do not know what is here — say that, and offer Retry. Only
+									   a real "the server has nothing in this area" gets "no houses
+									   found" and Clear Filters, because telling someone with no
+									   internet that Dhaka has no houses is a lie with a dead end
+									   attached: clearing filters they never set cannot fix it. */
 									<div className="text-center py-20 bg-white rounded-[2rem] border border-gray-100 flex flex-col items-center justify-center shadow-sm">
 										<div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
-											<Search className="text-brandRed" size={24} />
+											{propertyLoadError
+												? <WifiOff className="text-brandRed" size={24} />
+												: <Search className="text-brandRed" size={24} />}
 										</div>
-										<h3 className="text-xl font-black text-gray-900 mb-2">{propertyLoadError ? "Could not load properties" : (t.noPropsFound || "No Properties Found")}</h3>
-										<p className="text-sm font-bold text-gray-500 mb-6">{propertyLoadError || t.noPropsDesc || "Try adjusting your filters or search criteria."}</p>
+										<h3 className="text-xl font-black text-gray-900 mb-2">
+											{propertyLoadError
+												? (isBn ? "ইন্টারনেট সংযোগ নেই" : "No connection")
+												: (t.noPropsFound || "No Properties Found")}
+										</h3>
+										<p className="text-sm font-bold text-gray-500 mb-6">
+											{propertyLoadError
+												? (isBn
+													? "সার্ভারে পৌঁছানো যায়নি, তাই বাড়ির তালিকা আনা যায়নি। সংযোগ দেখে আবার চেষ্টা করুন।"
+													: "We couldn't reach the server, so the listings didn't load. Check your connection and try again.")
+												: (t.noPropsDesc || "Try adjusting your filters or search criteria.")}
+										</p>
 										<button onClick={propertyLoadError ? () => setPropertyRefreshTick((tick) => tick + 1) : handleClearAll} className="bg-gray-900 text-white px-8 py-3 rounded-xl text-sm font-bold active:scale-95 transition-transform shadow-md hover:shadow-lg">
-											{propertyLoadError ? "Retry" : (t.clearFilters || "Clear Filters")}
+											{propertyLoadError
+												? (isBn ? "আবার চেষ্টা করুন" : "Retry")
+												: (t.clearFilters || "Clear Filters")}
 										</button>
 									</div>
 								)}

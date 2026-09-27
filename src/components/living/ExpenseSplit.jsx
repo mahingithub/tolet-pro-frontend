@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Receipt, Trash2, Pencil, Camera, Layers, List, X, Check } from 'lucide-react';
 
 import { useLanguage } from '../../context/LanguageContext';
@@ -16,6 +17,7 @@ import {
   rememberView, rememberedView,
 } from './livingUI';
 import ExpenseCategoryView from './ExpenseCategoryView';
+import { useServiceHint } from './ServiceHint';
 
 // Which way the খরচ were last read. Remembered because it is a *habit*, not a
 // setting: someone who reads the month by খাত wants that view every time.
@@ -362,6 +364,10 @@ const ExpenseSheet = ({ open, onClose, roommates, expenses = [], editing, preset
 const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
   const requireAction = useLivingAction('expenses');
   const isBn = language === 'বাংলা';
+  const navigate = useNavigate();
+  // "You just wrote down বাজার ৳২,২০০ — here are the shops that sell it."
+  // Says nothing unless a shop is confirmed nearby; see ServiceHint.jsx.
+  const serviceHint = useServiceHint(navigate, isBn);
   const roommates = useLivingStore((s) => s.roommates);
   const expenses = useLivingStore((s) => s.expenses);
   const addExpense = useLivingStore((s) => s.addExpense);
@@ -442,6 +448,11 @@ const ExpenseSplit = ({ me, language, intent, clearIntent }) => {
     // A new expense is stamped with "now", so it lands in THIS month whichever
     // month is open — jump back to it rather than saving into a void.
     setOff(0);
+    // Only on a NEW row, and only after the save has been applied. Editing an
+    // old বাজার line is somebody correcting their books, not shopping — and the
+    // hint fires outside the store update, never from inside a setState
+    // updater, so nothing about the save depends on it.
+    serviceHint(data.category);
   };
 
   return (

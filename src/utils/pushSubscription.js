@@ -96,9 +96,20 @@ const saveSubscriptionToBackend = async (subscription) => {
  * would be skipped, and the server would keep pushing to a signed-out device.
  */
 export const unsubscribeFromPushNotifications = async ({ token: explicitToken } = {}) => {
+  // Native pushes go through FCM, not a service worker — see the subscribe path
+  // above. The Android WebView has a service worker but no pushManager, so the
+  // web teardown below threw on every logout and the FCM token stayed attached.
+  const { Capacitor } = await import('@capacitor/core');
+  if (Capacitor.isNativePlatform()) {
+    const { unregisterNativePush } = await import('../services/nativePush.js');
+    await unregisterNativePush({ token: explicitToken || getCurrentToken() });
+    return;
+  }
+
   if (!('serviceWorker' in navigator)) return;
   try {
     const registration = await navigator.serviceWorker.ready;
+    if (!registration.pushManager) return;
     const subscription = await registration.pushManager.getSubscription();
     if (subscription) {
       const token = explicitToken || getCurrentToken();

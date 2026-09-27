@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Building, Building2, Calendar,
-  Settings, HelpCircle, Plus, PlusCircle, Search, Bell, Filter, ArrowUpDown,
+  Settings, Plus, PlusCircle, Search, Bell, Filter, ArrowUpDown,
   Edit3, PauseCircle, PlayCircle, FileText, MapPin, Globe, CheckCircle2,
   X, CreditCard, MoreVertical, Download, Trash2, MessageCircle, Archive,
   Send, Paperclip, Smile, Mail, Shield, ShieldCheck, LogOut, BadgeCheck, Camera, Check,
@@ -13,7 +13,7 @@ import {
   XCircle, AlertCircle, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, MinusCircle,
   Banknote, ArrowRight, ArrowUpRight, Clock, Smartphone,
   BellOff, CalendarRange, BarChart3,
-  Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Map, Leaf, HeartHandshake, BookOpen, ScanLine, Loader2,
+  Bed, Bath, Maximize2, Sofa, Trash, ImagePlus, BedDouble, Home, Utensils, Users, Coffee, Map, Leaf, ScanLine, Loader2,
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -994,6 +994,16 @@ const bldgLeaseCategory = (b) => {
   return 'flat';
 };
 
+// A booking's grace period for the lease form, defaulting to the schema's 5.
+// `Number(x) ?? 5` never defaulted — Number(undefined) is NaN, which is not
+// nullish — so a booking read without schema defaults put "NaN" in the Grace
+// field and saved it as 0. `|| 5` would be wrong too: 0 days is a real answer.
+const graceDaysOf = (booking) => {
+  const raw = booking?.gracePeriodDays;
+  const n = Number(raw);
+  return raw != null && raw !== '' && Number.isFinite(n) ? n : 5;
+};
+
 const HostDashboard = () => {
   const { t = {}, language = 'English', setLanguage } = useLanguage() || {}; 
   const location = useLocation();
@@ -1097,6 +1107,22 @@ const HostDashboard = () => {
   }, []);
 
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
+
+  // The rail's Profile tab, tapped from another screen (Messages, a listing),
+  // navigates here asking for the drawer. The 'open-host-drawer' event can't
+  // carry that — this component isn't mounted yet when the tap happens — so it
+  // arrives as router state. Cleared once honoured, so Back or a reload doesn't
+  // pop the drawer open again.
+  useEffect(() => {
+    if (!location.state?.openHostDrawer) return;
+    setIsProfileDrawerOpen(true);
+    const { openHostDrawer: _consumed, ...rest } = location.state;
+    navigate(`${location.pathname}${location.search}`, {
+      replace: true,
+      state: Object.keys(rest).length ? rest : null,
+    });
+  }, [location.state, location.pathname, location.search, navigate]);
+
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -1498,6 +1524,14 @@ const HostDashboard = () => {
   const [propertyRefreshTick, setPropertyRefreshTick] = useState(0);
   const [bookings, setBookings] = useState(() => getCache('host_bookings_cache', initialBookings));
   useEffect(() => { setCache('host_bookings_cache', bookings); }, [bookings]);
+  // Has the server ever answered "these are your bookings" for this account?
+  // An empty `bookings` is otherwise ambiguous: a brand-new landlord, or a
+  // ledger landlord on a fresh device whose first fetch hasn't landed yet. The
+  // dashboard swaps its empty ledger for a "start your ledger" card, and must
+  // not show that card to someone with forty tenants for the first second.
+  // Its own flag, not "is there a cache": the cache effect above writes `[]`
+  // on the very first mount, reached the server or not.
+  const [bookingsKnown, setBookingsKnown] = useState(() => getCache('host_bookings_synced', false) === true);
   const [inquiries, setInquiries] = useState(() => getCache('host_inquiries_cache', initialInquiries));
   useEffect(() => { setCache('host_inquiries_cache', inquiries); }, [inquiries]);
   // 🟢 V1 manual rent — landlord payment accounts + pending tenant claims.
@@ -2086,6 +2120,8 @@ const HostDashboard = () => {
         const rows = await listHostBookings();
         if (cancelled) return;
         setBookings(hostSync.replay({ bookings: rows, units: [] }).bookings);
+        setBookingsKnown(true);
+        setCache('host_bookings_synced', true);
       } catch (err) {
         console.warn('[host] failed to load bookings:', err.message || err);
         return;
@@ -4421,7 +4457,7 @@ const HostDashboard = () => {
       monthlyRent: String(booking.monthlyRent ?? ''),
       serviceCharge: String(booking.serviceCharge ?? ''),
       lateFeeAmount: Number(booking.lateFeeAmount) > 0 ? String(booking.lateFeeAmount) : '',
-      gracePeriodDays: Number(booking.gracePeriodDays) ?? 5,
+      gracePeriodDays: graceDaysOf(booking),
       rentDueDay: Number(booking.rentDueDay) || 5,
       reminderLeadDays: Number(booking.reminderLeadDays) || 3,
       autoReminder: booking.autoReminder !== false,
@@ -4507,7 +4543,7 @@ const HostDashboard = () => {
       advancePayment: String(booking.advancePayment ?? ''),
       paymentMethod: booking.paymentMethod || 'bKash',
       lateFeeAmount: Number(booking.lateFeeAmount) > 0 ? String(booking.lateFeeAmount) : '',
-      gracePeriodDays: Number(booking.gracePeriodDays) ?? 5,
+      gracePeriodDays: graceDaysOf(booking),
       rentDueDay: Number(booking.rentDueDay) || 5,
       reminderLeadDays: Number(booking.reminderLeadDays) || 3,
       autoReminder: booking.autoReminder !== false,
@@ -5022,13 +5058,10 @@ const HostDashboard = () => {
     { id: 'payments', icon: CreditCard, label: language === 'বাংলা' ? 'পেমেন্ট সেটিংস' : 'Payment Settings' },
     { id: 'smartAlerts', icon: BellRing, label: language === 'বাংলা' ? 'স্মার্ট অ্যালার্টস' : 'Smart Alerts' },
     { id: 'aiInsights',  icon: Sparkles, label: language === 'বাংলা' ? 'এআই ইনসাইটস'   : 'AI Insights' },
+    // Help & Support, How it Works, Trust & Safety and the policies live under
+    // Settings → Help & policies (SharedSettings). Six info pages at the end of
+    // this list made the drawer twice as long as the work in it.
     { id: 'settings', icon: Settings, label: language === 'বাংলা' ? 'সেটিংস' : 'Settings' },
-    { id: 'support', icon: HelpCircle, label: language === 'বাংলা' ? 'হেল্প ও সাপোর্ট' : 'Support', isLink: true, path: '/support' },
-    { id: 'how-it-works', icon: BookOpen, label: language === 'বাংলা' ? 'কীভাবে কাজ করে' : 'How it Works', isLink: true, path: '/how-it-works' },
-    { id: 'trust', icon: HeartHandshake, label: language === 'বাংলা' ? 'বিশ্বাস ও নিরাপত্তা' : 'Trust & Safety', isLink: true, path: '/trust-safety' },
-    { id: 'privacy', icon: ShieldCheck, label: language === 'বাংলা' ? 'প্রাইভেসি পলিসি' : 'Privacy Policy', isLink: true, path: '/privacy-policy' },
-    { id: 'terms', icon: FileText, label: language === 'বাংলা' ? 'শর্তাবলী' : 'Terms & Policies', isLink: true, path: '/terms' },
-    { id: 'refund', icon: CreditCard, label: language === 'বাংলা' ? 'রিফান্ড পলিসি' : 'Refund Policy', isLink: true, path: '/refund' },
   ];
 
   return (
@@ -5286,9 +5319,13 @@ const HostDashboard = () => {
       </div>
 
       {/* 🔴 HOST DASHBOARD SLIDE BAR (Right Drawer) */}
-      {isProfileDrawerOpen && <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[60] animate-in fade-in" onClick={() => setIsProfileDrawerOpen(false)}></div>}
+      {/* z-[105]/z-[110]: above the AI assistant button and the theme tab
+          (both z-[100]), which floated on top of the drawer and covered its
+          "Upgrade to Pro" button. Nothing opens over the drawer — every item
+          closes it first — and second-level modals start at z-[140]. */}
+      {isProfileDrawerOpen && <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[105] animate-in fade-in" onClick={() => setIsProfileDrawerOpen(false)}></div>}
       
-      <div style={{ paddingTop: 'var(--sat)', paddingBottom: 'var(--sab)' }} className={`fixed top-0 right-0 h-full w-full max-w-[280px] bg-[#fdfdfd] shadow-2xl z-[70] transform transition-transform duration-500 ease-in-out flex flex-col border-l border-gray-100 ${isProfileDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div style={{ paddingTop: 'var(--sat)', paddingBottom: 'var(--sab)' }} className={`fixed top-0 right-0 h-full w-full max-w-[280px] bg-[#fdfdfd] shadow-2xl z-[110] transform transition-transform duration-500 ease-in-out flex flex-col border-l border-gray-100 ${isProfileDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
 
         
         <div className="p-5 pt-6 pb-3 flex flex-col gap-4 relative">
@@ -5450,7 +5487,7 @@ const HostDashboard = () => {
           came up short on any phone whose gesture inset is over 32px, burying
           the last card. --bottom-nav-h is the real number. The rail is
           `md:hidden`, so md+ keeps the plain 96px. */}
-      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-8 lg:px-12 pt-1 md:pt-2 relative z-10 custom-scrollbar overflow-y-auto pb-[calc(var(--bottom-nav-h)+1.5rem)] md:pb-24">
+      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-8 lg:px-12 pt-1 md:pt-2 relative z-10 custom-scrollbar overflow-y-auto pb-[var(--bottom-nav-clear)] md:pb-24">
 
         {activeDropdownId && <div className="fixed inset-0 z-20" onClick={() => setActiveDropdownId(null)}></div>}
 
@@ -5640,6 +5677,14 @@ const HostDashboard = () => {
             landlordProfile={effectiveLandlordProfile}
             openBuildingLedger={openBuildingLedger}
             rentUnitsOf={rentUnitsOf}
+            /* Account state — the dashboard shows a different first screen
+               to a landlord with listings, one with only a rent ledger, and
+               one with neither. See the ACCOUNT STATE note in DashboardTab. */
+            properties={properties}
+            inquiries={inquiries}
+            inqSeen={inqSeen}
+            setPropertyFilter={setPropertyFilter}
+            ledgerKnown={bookingsKnown && serverBuildings !== null}
           />
         )}
 
@@ -6044,9 +6089,13 @@ const HostDashboard = () => {
                         {language === 'বাংলা' ? 'এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না' : 'This action cannot be undone'}
                       </p>
                       <p className="text-[10px] font-bold text-amber-700 mt-1 leading-relaxed">
+                        {/* The listing is an ad; deleting it no longer takes
+                            the tenancies with it (property.service
+                            purgePropertyCascade). Say so — this box used to
+                            promise the opposite. */}
                         {language === 'বাংলা'
-                          ? 'এই প্রপার্টির সাথে সম্পর্কিত সকল ইনকোয়ারি, বুকিং (চলমান লিজ সহ) এবং রসিদ সম্পূর্ণভাবে মুছে যাবে।'
-                          : 'All related inquiries, bookings (including active leases), and receipts will be permanently removed.'}
+                          ? 'বিজ্ঞাপনটি আর এর ইনকোয়ারিগুলো মুছে যাবে। এখানে যারা ভাড়া থাকেন, তাদের ভাড়ার হিসাব, রসিদ আর চ্যাট থেকে যাবে।'
+                          : 'The listing and its inquiries will be permanently removed. Tenants who rent here keep their rent records, receipts and chat.'}
                       </p>
                     </div>
                   </div>
