@@ -1,503 +1,420 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import useGoBack from '../hooks/useGoBack';
 import { useLanguage } from '../context/LanguageContext';
 import { subscriptionService, PLANS } from '../services/subscriptionService';
 import { getSectionGuides } from '../services/aiGuideService';
-import { ArrowLeft, ShieldCheck, Check, Info, Lock, CreditCard, Zap, CheckCircle2, Shield, X } from 'lucide-react';
-import { BkashGateway, NagadGateway } from './payment/MerchantGateways';
+import {
+  ArrowLeft, Check, ChevronDown, Crown, Sparkles, ShieldCheck, Lock, PlayCircle, X, Clock, AlertCircle, CheckCircle2,
+} from 'lucide-react';
+import PaymentStep, { MethodLogo, METHOD_LABEL, fmtTaka } from './payment/PaymentStep';
 import Footer from './Footer';
 import FreeProTrialModal from './FreeProTrialModal';
 
-const PAYMENT_METHODS = [
-  { 
-    id: 'bkash',  
-    label: 'bKash', 
-    labelBn: 'বিকাশ',
-    color: '#e2136e',
-    gradientFrom: 'from-[#e2136e]',
-    gradientTo: 'to-[#c01159]',
-    borderColor: 'border-[#e2136e]',
-    bgColor: 'bg-[#e2136e]',
-    bgTint: 'bg-[#e2136e]/10',
-    hoverBg: 'hover:bg-[#e2136e]/5',
-    textColor: 'text-[#e2136e]',
-    description: 'Mobile Wallet',
-    descriptionBn: 'মোবাইল ওয়ালেট',
-    logoPath: '/payment svg/bkash.svg',
-    icon: (
-      <div className="w-14 h-14 md:w-16 md:h-16 bg-white rounded-2xl flex items-center justify-center border border-slate-200">
-        <img 
-          src="/payment svg/bkash.svg" 
-          alt="bKash" 
-          className="w-[75%] h-[75%] object-contain" 
-          onError={(e) => { 
-            e.target.style.display = 'none'; 
-            e.target.parentElement.innerHTML = '<span class="text-white font-black text-2xl tracking-tight">bKash</span>'; 
-          }} 
-        />
-      </div>
-    )
-  },
-  { 
-    id: 'nagad',  
-    label: 'Nagad',  
-    labelBn: 'নগদ',
-    color: '#f7941d',
-    gradientFrom: 'from-[#f7941d]',
-    gradientTo: 'to-[#e67e0a]',
-    borderColor: 'border-[#f7941d]',
-    bgColor: 'bg-[#f7941d]',
-    bgTint: 'bg-[#f7941d]/10',
-    hoverBg: 'hover:bg-[#f7941d]/5',
-    textColor: 'text-[#f7941d]',
-    description: 'Mobile Wallet',
-    descriptionBn: 'মোবাইল ওয়ালেট',
-    logoPath: '/payment svg/nagad.png',
-    icon: (
-      <div className="w-14 h-14 md:w-16 md:h-16 bg-white rounded-2xl flex items-center justify-center border border-slate-200">
-        <img 
-          src="/payment svg/nagad.png" 
-          alt="Nagad" 
-          className="w-[70%] h-[70%] object-contain" 
-          onError={(e) => { 
-            e.target.style.display = 'none'; 
-            e.target.parentElement.innerHTML = '<span class="text-white font-black text-2xl md:text-3xl tracking-wider">নগদ</span>'; 
-          }} 
-        />
-      </div>
-    )
-  }
-];
+const getEmbedUrl = (url = '') => url
+  .replace('youtube.com/watch?v=', 'youtube.com/embed/')
+  .replace('youtu.be/', 'youtube.com/embed/');
 
+const card = 'bg-white dark:bg-[#13111C] rounded-2xl border border-slate-200 dark:border-white/10';
+
+// Defined out here, not inside the page: a component created during render
+// remounts its children every render — and would wipe the payment form.
+const Section = ({ n, title, done, children }) => (
+  <section className={`${card} p-4 sm:p-5`}>
+    <div className="flex items-center gap-3 mb-4">
+      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${done ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'}`}>
+        {done ? <Check size={14} strokeWidth={3} /> : n}
+      </span>
+      <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">{title}</h2>
+    </div>
+    {children}
+  </section>
+);
+
+const SummaryRow = ({ label, value, tone = '' }) => (
+  <div className="flex items-center justify-between gap-3 text-sm">
+    <span className="text-slate-600 dark:text-slate-400">{label}</span>
+    <span className={`font-semibold ${tone || 'text-slate-900 dark:text-white'}`}>{value}</span>
+  </div>
+);
+
+/** What happened after submitting: on (matched by SMS) or waiting for a check. */
+function ResultCard({ payment, method, planName, status, isBn, fmtDate, onDone }) {
+  const tr = (bn, en) => (isBn ? bn : en);
+  const approved = payment.status === 'approved';
+  return (
+    <section className={`${card} p-6 text-center`}>
+      {approved
+        ? <CheckCircle2 size={52} className="text-emerald-500 mx-auto mb-3" />
+        : <Clock size={52} className="text-amber-500 mx-auto mb-3" />}
+      <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white mb-2">
+        {approved ? tr('পেমেন্ট সফল!', 'Payment received!') : tr('পেমেন্টের তথ্য পেয়েছি', 'We got your payment details')}
+      </h2>
+      <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto mb-5">
+        {approved
+          ? (status.paidThroughAt
+            ? tr(`${planName} চালু হয়েছে — ${fmtDate(status.paidThroughAt)} পর্যন্ত।`, `${planName} is active until ${fmtDate(status.paidThroughAt)}.`)
+            : tr(`${planName} চালু হয়েছে।`, `${planName} is now active.`))
+          : (method?.autoCheck
+            ? tr('টাকা পৌঁছানো নিশ্চিত হলেই প্ল্যান চালু হবে — সাধারণত কয়েক মিনিটের মধ্যে। চালু হলে নোটিফিকেশন পাবেন। আবার টাকা পাঠাবেন না।',
+              "Your plan turns on as soon as the money is confirmed — usually within minutes. We'll notify you. Please don't pay again.")
+            : tr('আমরা টাকা মিলিয়ে দেখে প্ল্যান চালু করব — সাধারণত কয়েক ঘণ্টার মধ্যে। চালু হলে নোটিফিকেশন পাবেন। আবার টাকা পাঠাবেন না।',
+              "We'll check the payment and turn your plan on — usually within a few hours. We'll notify you. Please don't pay again."))}
+      </p>
+      {payment.screenshotFailed && (
+        <p className="text-sm text-amber-700 dark:text-amber-300 max-w-md mx-auto -mt-2 mb-5">
+          {tr('স্ক্রিনশটটি আপলোড করা যায়নি — তবে পেমেন্টের তথ্য জমা হয়েছে, যাচাই আটকাবে না।',
+            "The screenshot couldn't be uploaded — but your payment details were received, so the check goes ahead.")}
+        </p>
+      )}
+      <dl className="max-w-sm mx-auto text-sm rounded-xl border border-slate-200 dark:border-white/10 divide-y divide-slate-100 dark:divide-white/5 text-left mb-6">
+        {[
+          [tr('প্ল্যান', 'Plan'), planName],
+          [tr('পরিমাণ', 'Amount'), fmtTaka(payment.amount)],
+          [tr('পাঠানো হয়েছে', 'Paid to'), payment.paidTo],
+          ['TrxID', payment.trxId],
+        ].filter(([, v]) => v).map(([k, v]) => (
+          <div key={k} className="flex justify-between gap-3 px-4 py-2.5">
+            <dt className="text-slate-500 dark:text-slate-400">{k}</dt>
+            <dd className="font-semibold text-slate-900 dark:text-white font-mono text-right">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <button type="button" onClick={onDone}
+        className="w-full max-w-sm py-4 rounded-xl font-bold text-white bg-slate-900 dark:bg-white dark:text-slate-900">
+        {tr('ড্যাশবোর্ডে যান', 'Go to dashboard')}
+      </button>
+    </section>
+  );
+}
+
+/**
+ * Checkout: plan → payment method → pay, with the order summary alongside.
+ *
+ * There is no gateway. The host pays into one of the accounts a super admin
+ * added ("Add Payment System"), then submits what they got back; the server
+ * accepts it on our wallet's SMS or an admin's approval. Prices — including
+ * the yearly discount — come from the admin console via fetchCheckoutOptions().
+ */
 const CheckoutPage = () => {
   const { planId } = useParams();
   const navigate = useNavigate();
   const goBack = useGoBack('/subscription');
   const { language = 'English' } = useLanguage() || {};
   const isBn = language === 'বাংলা';
+  const tr = (bn, en) => (isBn ? bn : en);
+  const num = (n) => (isBn ? Number(n).toLocaleString('bn-BD') : String(n));
 
-  const [toast, setToast] = useState(null);
-  const [activeGateway, setActiveGateway] = useState(null);
-  const [showAlreadyProModal, setShowAlreadyProModal] = useState(false);
-  const [showClaimTrialModal, setShowClaimTrialModal] = useState(false);
-  const [selectedMethod, setSelectedMethod] = useState(PAYMENT_METHODS[0].id);
-  const [autoRenew, setAutoRenew] = useState(true);
-  
-  // Subscription status for dynamic free trial banner
-  const [subStatus, setSubStatus] = useState(subscriptionService.getStatus());
+  const [plans, setPlans] = useState(PLANS);
+  // undefined = loading · null = couldn't load · [] = none set up
+  const [methods, setMethods] = useState(undefined);
+  const [methodId, setMethodId] = useState('');
+  const [status, setStatus] = useState(subscriptionService.getStatus());
+  // The host's latest claim — so a pending one isn't paid for twice.
+  const [lastPayment, setLastPayment] = useState(null);
+  const [correcting, setCorrecting] = useState(false);
+  // The claim submitted on this visit; shows the result in place of the steps.
+  const [result, setResult] = useState(null);
+  const [showBenefits, setShowBenefits] = useState(false);
+  const [showTrial, setShowTrial] = useState(false);
+  const [guide, setGuide] = useState(null);
+  const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
-    const unsub = subscriptionService.onChange(() => {
-      setSubStatus(subscriptionService.getStatus());
+    // A deep link lands here without the plans page having loaded anything.
+    subscriptionService.fetchStatus();
+    const off = subscriptionService.onChange(() => setStatus(subscriptionService.getStatus()));
+    subscriptionService.fetchCheckoutOptions().then(({ plans: live, methods: available }) => {
+      setPlans(live);
+      setMethods(available);
+      if (available?.length === 1) setMethodId(available[0].id);
     });
-    return () => unsub && unsub();
+    subscriptionService.getPayments().then((rows) => setLastPayment(rows[0] || null)).catch(() => {});
+    getSectionGuides('checkout').then((g) => setGuide(Array.isArray(g) && g[0] ? g[0] : null)).catch(() => {});
+    return off;
   }, []);
-  
-  // Video Guide State
-  const [activeVideo, setActiveVideo] = useState(null);
 
-  // Find the selected plan
-  const plan = PLANS.find(p => p.id === planId);
-
+  const plan = plans.find((p) => p.id === planId);
   useEffect(() => {
-    if (!plan) {
-      navigate('/subscription');
-    }
-    
-    getSectionGuides('checkout').then(data => {
-      const fetchedGuides = Array.isArray(data) ? data : [];
-      if (fetchedGuides.length > 0 && !sessionStorage.getItem('checkout_video_played')) {
-        setActiveVideo(fetchedGuides[0].videoUrl);
-        sessionStorage.setItem('checkout_video_played', 'true');
-      }
-    });
+    if (!plan) navigate('/subscription', { replace: true });
   }, [plan, navigate]);
-
   if (!plan) return null;
 
-  const showToast = (msg, type = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-  
-  const getEmbedUrl = (url) => {
-    if (!url) return '';
-    if (url.includes('youtube.com/watch?v=')) {
-      return url.replace('watch?v=', 'embed/');
-    }
-    if (url.includes('youtu.be/')) {
-      return url.replace('youtu.be/', 'youtube.com/embed/');
-    }
-    return url;
-  };
+  const monthly = plans.find((p) => p.tier === plan.tier && p.interval === 'month');
+  const yearly = plans.find((p) => p.tier === plan.tier && p.interval === 'year');
+  const isYear = plan.interval === 'year';
+  const planName = tr(plan.name.bn, plan.name.en);
+  const method = methods?.find((m) => m.id === methodId) || null;
+  const pending = lastPayment?.status === 'pending';
+  const blocked = pending && !correcting;
+  const renewing = status.isPaid && status.tier === plan.tier && status.paidThroughAt;
+  const offerTrial = !status.isLoading && status.tier === 'free' && !status.shareTrialClaimed;
+  const fmtDate = (d) => new Date(d).toLocaleDateString(isBn ? 'bn-BD' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  const methodName = (m) => (m.type === 'bank' ? m.bankName : tr(METHOD_LABEL[m.type].bn, METHOD_LABEL[m.type].en));
+  const switchCycle = (cycle) => navigate(`/checkout/${plan.tier}_${cycle}`, { replace: true });
+  const benefits = (isBn ? plan.benefits?.bn : plan.benefits?.en) || [];
 
-  const handlePaySuccess = async () => {
-    try {
-      const methodLabel = PAYMENT_METHODS.find(m => m.id === activeGateway)?.label || activeGateway;
-      await subscriptionService.subscribe(planId, methodLabel);
-      
-      setActiveGateway(null);
-      showToast(isBn ? 'পেমেন্ট সফল হয়েছে!' : 'Payment Successful!');
-      setTimeout(() => navigate('/host-dashboard'), 1500);
-    } catch (error) {
-      setActiveGateway(null);
-      showToast(error.message || 'Payment failed', 'error');
-    }
-  };
+  const steps = [tr('প্ল্যান', 'Plan'), tr('মাধ্যম', 'Method'), tr('পেমেন্ট', 'Pay')];
+  const active = result ? 3 : method ? 2 : 1;
 
-  const isPro = plan.tier === 'pro';
-  const selectedPaymentMethod = PAYMENT_METHODS.find(m => m.id === selectedMethod);
-  
-  // Theme variables
-  const themeClasses = {
-    badgeText: isPro ? 'text-amber-700 dark:text-amber-400' : 'text-violet-700 dark:text-violet-400',
-    badgeBg: isPro ? 'bg-amber-100 dark:bg-amber-500/20' : 'bg-violet-100 dark:bg-violet-500/20',
-    buttonBg: isPro ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700' : 'bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800',
-    toggleBg: isPro ? 'bg-amber-500' : 'bg-violet-600',
-    accentColor: isPro ? 'text-amber-600' : 'text-violet-600',
-  };
-
-  const benefitText = isPro 
-    ? (isBn ? 'সীমাহীন বাড়ি, AI সহায়তা, সব ফিচার আনলক' : 'Unlimited listings, AI insights, all features unlocked')
-    : (isBn ? '৩টি বাড়ি লিস্ট করুন, ভাড়া ট্র্যাক করুন' : 'List up to 3 properties, track rent');
-
-  // pb clears MobileBottomNav, which is 64px PLUS the gesture inset — a bare
-  // pb-[64px] left the last row of this page under the gesture bar.
   return (
-    <div className="min-h-screen pb-[var(--bottom-nav-h)] md:pb-0 bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-[#0A0A0F] dark:via-[#13111C] dark:to-[#1A1625] transition-colors duration-300">
-      
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] animate-tp-modal-in">
-          <div className={`backdrop-blur-xl px-6 py-4 rounded-2xl shadow-2xl border flex items-center gap-3 ${
-            toast.type === 'error' 
-              ? 'bg-red-500/95 text-white border-red-400' 
-              : 'bg-emerald-500/95 text-white border-emerald-400'
-          }`}>
-            <Check size={20} strokeWidth={3} />
-            <span className="text-sm font-bold">{toast.msg}</span>
-          </div>
-        </div>
-      )}
-        
+    <div className="min-h-screen pb-[var(--sab)] md:pb-0 bg-slate-50 dark:bg-[#0A0A0F] transition-colors">
       {/* Header */}
-      <div className="w-full border-b border-slate-200 dark:border-white/10 bg-white/80 dark:bg-[#13111C]/80 backdrop-blur-xl sticky top-0 z-40" style={{ paddingTop: 'var(--sat)' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
-          <button
-            type="button"
-            onClick={goBack}
-            className="w-10 h-10 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 rounded-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
-          >
+      <div className="sticky top-0 z-40 border-b border-slate-200 dark:border-white/10 bg-white/90 dark:bg-[#13111C]/90 backdrop-blur-xl" style={{ paddingTop: 'var(--sat)' }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
+          <button type="button" onClick={goBack} aria-label={tr('ফিরে যান', 'Back')}
+            className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/10 flex items-center justify-center">
             <ArrowLeft size={20} className="text-slate-700 dark:text-slate-300" />
           </button>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
-              {isBn ? 'চেকআউট' : 'Checkout'}
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-              {isBn ? 'আপনার সাবস্ক্রিপশন সম্পূর্ণ করুন' : 'Complete your subscription'}
-            </p>
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">{tr('চেকআউট', 'Checkout')}</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{tr(`${planName} প্ল্যান চালু করুন`, `Activate ${planName}`)}</p>
           </div>
         </div>
       </div>
 
-      {/* Main Content - Desktop: Side by Side, Mobile/Tablet: Responsive Grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-10 min-h-[calc(100vh-160px)]">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-          
-          {/* LEFT COLUMN - Order Summary */}
-          <div className="space-y-4 order-last md:order-first">
-            {/* Plan Details Card */}
-            <div className="bg-white dark:bg-[#13111C] rounded-3xl p-5 sm:p-6 shadow-xl border border-slate-200 dark:border-white/10">
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <span className={`inline-block px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest ${themeClasses.badgeBg} ${themeClasses.badgeText} mb-3`}>
-                    {isBn ? plan.name.bn : plan.name.en}
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-5 lg:py-8 grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
+        <div className="space-y-4 min-w-0">
+          {/* Stepper */}
+          <ol className="flex items-center gap-2" aria-label={tr('ধাপ', 'Steps')}>
+            {steps.map((label, i) => {
+              const done = i < active;
+              const current = i === active;
+              return (
+                <li key={label} className="flex items-center gap-2 flex-1 last:flex-none">
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${done ? 'bg-emerald-500 text-white' : current ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-slate-400'}`}
+                    aria-current={current ? 'step' : undefined}>
+                    {done ? <Check size={12} strokeWidth={3} /> : num(i + 1)}
                   </span>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-sm">
-                    {benefitText}
-                  </p>
-                </div>
-              </div>
+                  <span className={`text-sm font-semibold ${current || done ? 'text-slate-900 dark:text-white' : 'text-slate-400'}`}>{label}</span>
+                  {i < steps.length - 1 && <span className={`flex-1 h-px ${done ? 'bg-emerald-400' : 'bg-slate-200 dark:bg-white/10'}`} />}
+                </li>
+              );
+            })}
+          </ol>
 
-              {/* Price Display */}
-              <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-white/5 dark:to-white/10 rounded-2xl p-4 sm:p-5 mb-5">
-                <div className="flex items-baseline gap-2 mb-2">
-                  <span className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
-                    ৳{plan.price.toLocaleString('en-IN')}
-                  </span>
-                  <span className="text-base text-slate-500 dark:text-slate-400 font-semibold">
-                    {isBn ? plan.intervalLabel.bn : plan.intervalLabel.en}
-                  </span>
+          {result ? (
+            <ResultCard payment={result} method={method} planName={planName} status={status} isBn={isBn}
+              fmtDate={fmtDate} onDone={() => navigate('/host-dashboard')} />
+          ) : (
+            <>
+              {offerTrial && (
+                <div className="flex items-center gap-3 p-4 rounded-2xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10">
+                  <Sparkles size={22} className="text-amber-600 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-amber-900 dark:text-amber-100">{tr('পেমেন্টের আগে: ২ মাস প্রো একদম ফ্রি', 'Before you pay: 2 months of Pro, free')}</p>
+                    <p className="text-xs text-amber-800 dark:text-amber-200">{tr('অ্যাপটি শেয়ার করলেই চালু — কোনো টাকা লাগবে না।', 'Just share the app — no payment needed.')}</p>
+                  </div>
+                  <button type="button" onClick={() => setShowTrial(true)}
+                    className="px-3 py-2 rounded-lg text-sm font-bold bg-amber-500 text-white shrink-0">{tr('ফ্রি নিন', 'Get it')}</button>
                 </div>
-                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 size={16} />
-                  <span className="text-sm font-semibold">
-                    {isBn ? 'সক্রিয় হওয়ার পর' : 'Active immediately'}
-                  </span>
-                </div>
-              </div>
+              )}
 
-              {/* Price Breakdown */}
-              <div className="space-y-3 pb-5 border-b border-slate-200 dark:border-white/10">
-                <div className="flex justify-between text-sm sm:text-base">
-                  <span className="text-slate-600 dark:text-slate-400 font-medium">{isBn ? 'সাবটোটাল' : 'Subtotal'}</span>
-                  <span className="text-slate-900 dark:text-white font-bold">৳{plan.price.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex justify-between text-base">
-                  <span className="text-slate-600 dark:text-slate-400 font-medium">{isBn ? 'ভ্যাট / ট্যাক্স' : 'VAT / Tax'}</span>
-                  <span className="text-slate-900 dark:text-white font-bold">৳0</span>
-                </div>
-                <div className="flex justify-between text-sm sm:text-base">
-                  <span className="text-slate-600 dark:text-slate-400 font-medium">{isBn ? 'প্রসেসিং ফি' : 'Processing Fee'}</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">{isBn ? 'বিনামূল্যে' : 'Free'}</span>
-                </div>
-              </div>
-
-              {/* Total */}
-              <div className="flex justify-between items-center pt-5">
-                <span className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">{isBn ? 'সর্বমোট' : 'Total Due'}</span>
-                <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">৳{plan.price.toLocaleString('en-IN')}</span>
-              </div>
-            </div>
-
-            {/* Features List */}
-            <div className="bg-white dark:bg-[#13111C] rounded-3xl p-5 sm:p-6 shadow-xl border border-slate-200 dark:border-white/10">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                <Zap size={20} className={themeClasses.accentColor} />
-                {isBn ? 'এই প্ল্যানে যা পাবেন' : "What's Included"}
-              </h3>
-              <ul className="space-y-3">
-                {((isBn ? plan.benefits?.bn : plan.benefits?.en) || []).map((feature, idx) => (
-                  <li key={idx} className="flex items-start gap-3">
-                    <div className={`w-5 h-5 rounded-full ${themeClasses.badgeBg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                      <Check size={12} className={themeClasses.badgeText} strokeWidth={3} />
-                    </div>
-                    <span className="text-sm text-slate-600 dark:text-slate-400">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN - Payment Methods */}
-          <div className="space-y-4 order-first md:order-last">
-            {/* Payment Selection Card */}
-            <div className="bg-white dark:bg-[#13111C] rounded-3xl p-5 sm:p-6 shadow-xl border border-slate-200 dark:border-white/10">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
-                  <CreditCard size={24} className="text-white" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">{isBn ? 'পেমেন্ট মাধ্যম' : 'Payment Method'}</h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{isBn ? 'আপনার পছন্দের মাধ্যম নির্বাচন করুন' : 'Choose your preferred method'}</p>
-                </div>
-              </div>
-
-              {/* Payment Method Options */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                {PAYMENT_METHODS.map(method => {
-                  const isSelected = selectedMethod === method.id;
-                  return (
-                    <button
-                      key={method.id}
-                      onClick={() => setSelectedMethod(method.id)}
-                      className={`relative group p-4 sm:p-5 rounded-2xl border-2 transition-all duration-300 ${
-                        isSelected
-                          ? `${method.borderColor} ${method.bgTint} shadow-lg scale-105`
-                          : `border-slate-200 dark:border-white/10 ${method.hoverBg} hover:border-slate-300 dark:hover:border-white/20`
-                      }`}
-                    >
-                      {isSelected && (
-                        <div className={`absolute -top-3 -right-3 w-8 h-8 rounded-full ${method.bgColor} flex items-center justify-center shadow-md`}>
-                          <Check size={16} className="text-white" strokeWidth={3} />
-                        </div>
-                      )}
-                      <div className="flex flex-col items-center text-center gap-4">
-                        {method.icon}
-                        <div>
-                          <p className={`font-bold text-lg ${isSelected ? method.textColor : 'text-slate-900 dark:text-white'}`}>
-                            {isBn ? method.labelBn : method.label}
-                          </p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            {isBn ? method.descriptionBn : method.description}
-                          </p>
-                        </div>
-                      </div>
-                      <div className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${method.bgTint}`} />
+              {blocked && (
+                <div className="flex gap-3 p-4 rounded-2xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10">
+                  <Clock size={22} className="text-amber-600 shrink-0" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-amber-900 dark:text-amber-100">{tr('আপনার একটি পেমেন্ট যাচাই চলছে', 'A payment of yours is being checked')}</p>
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      TrxID <span className="font-mono">{lastPayment.trxId}</span> · {fmtTaka(lastPayment.amount)} — {tr('নিশ্চিত হলেই প্ল্যান চালু হবে, নোটিফিকেশন পাবেন। আবার টাকা পাঠাবেন না।', "your plan turns on once it's confirmed and we'll notify you. Please don't pay again.")}
+                    </p>
+                    <button type="button" onClick={() => setCorrecting(true)} className="text-sm font-bold text-amber-900 dark:text-amber-100 underline underline-offset-2">
+                      {tr('তথ্য ভুল দিয়েছিলেন? সংশোধন করুন', 'Entered something wrong? Correct it')}
                     </button>
-                  );
-                })}
-              </div>
+                  </div>
+                </div>
+              )}
 
-              {/* Selected Method Info */}
-              <div className={`p-4 rounded-xl ${selectedPaymentMethod.bgTint} border ${selectedPaymentMethod.borderColor} mb-6`}>
-                <div className="flex items-center gap-3">
-                  <Info size={20} className={selectedPaymentMethod.textColor} />
-                  <p className="text-sm text-slate-700 dark:text-slate-300">
-                    {isBn 
-                      ? `${selectedPaymentMethod.labelBn} দিয়ে পেমেন্ট করতে আপনার মোবাইল নম্বর প্রয়োজন হবে`
-                      : `You'll need your ${selectedPaymentMethod.label} mobile number to complete payment`
-                    }
+              {lastPayment?.status === 'rejected' && (
+                <div className="flex gap-3 p-4 rounded-2xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10">
+                  <AlertCircle size={22} className="text-red-600 shrink-0" />
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    <span className="font-bold">{tr('আগের পেমেন্টটি যাচাই করা যায়নি', "Your last payment couldn't be verified")}</span>
+                    {lastPayment.rejectionReason ? `: ${lastPayment.rejectionReason}` : ''} {tr('সঠিক তথ্য দিয়ে আবার জমা দিন।', 'Please submit the correct details again.')}
                   </p>
                 </div>
-              </div>
+              )}
 
-              {/* Auto-Renewal Toggle */}
-              <div className="bg-slate-50 dark:bg-white/5 rounded-2xl p-5 mb-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${autoRenew ? themeClasses.badgeBg : 'bg-slate-200 dark:bg-slate-700'}`}>
-                      <ShieldCheck size={20} className={autoRenew ? themeClasses.badgeText : 'text-slate-400'} />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-900 dark:text-white text-sm">{isBn ? 'স্বয়ংক্রিয় নবায়ন' : 'Auto-renewal'}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">{isBn ? 'প্রতি চক্রে স্বয়ংক্রিয়ভাবে নবায়ন' : 'Renew automatically each cycle'}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setAutoRenew(!autoRenew)}
-                    className={`relative w-14 h-7 rounded-full transition-all duration-300 ${autoRenew ? themeClasses.toggleBg : 'bg-slate-300 dark:bg-slate-600'}`}
-                  >
-                    <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300 ${autoRenew ? 'right-1' : 'left-1'}`} />
-                  </button>
+              {/* 1 · Plan */}
+              <Section n={num(1)} title={tr('আপনার প্ল্যান', 'Your plan')} done>
+                <div className="flex items-center gap-2 mb-1">
+                  <Crown size={18} className={plan.tier === 'pro' ? 'text-amber-500' : 'text-violet-500'} />
+                  <span className="text-xl font-extrabold text-slate-900 dark:text-white">{planName}</span>
                 </div>
-              </div>
-
-              {/* Pay Button */}
-              <button
-                onClick={() => {
-                  if (!subStatus.shareTrialClaimed) {
-                    setShowClaimTrialModal(true);
-                  } else {
-                    setShowAlreadyProModal(true);
-                  }
-                }}
-                className={`w-full py-5 rounded-2xl font-bold text-lg text-white shadow-lg transition-all hover:shadow-2xl hover:-translate-y-1 active:translate-y-0 ${themeClasses.buttonBg} flex items-center justify-center gap-3 group`}
-              >
-                <Lock size={20} className="group-hover:rotate-12 transition-transform" />
-                <span>{isBn ? 'নিরাপদ পেমেন্ট করুন' : 'Proceed to Secure Payment'}</span>
-                <span className="text-2xl group-hover:translate-x-2 transition-transform">→</span>
-              </button>
-
-              {/* Security Badges */}
-              <div className="mt-6 pt-6 border-t border-slate-200 dark:border-white/10">
-                <div className="flex items-center justify-center gap-6 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <Shield size={16} className="text-emerald-500" />
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">{isBn ? 'SSL সুরক্ষিত' : 'SSL Secured'}</span>
-                  </div>
-                  <div className="w-1 h-1 bg-slate-300 dark:bg-slate-600 rounded-full" />
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">{isBn ? 'এনক্রিপ্টেড' : 'Encrypted'}</span>
-                  </div>
-                  <div className="w-1 h-1 bg-slate-300 dark:bg-slate-600 rounded-full" />
-                  <div className="flex items-center gap-2">
-                    <Zap size={16} className="text-amber-500" />
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">{isBn ? 'তাৎক্ষণিক' : 'Instant'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Trust Indicator */}
-            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 rounded-2xl p-6 border border-emerald-200 dark:border-emerald-800/30">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <ShieldCheck size={24} className="text-white" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-emerald-900 dark:text-emerald-100 mb-1">{isBn ? '১০০% নিরাপদ পেমেন্ট' : '100% Secure Payment'}</h4>
-                  <p className="text-sm text-emerald-700 dark:text-emerald-300 leading-relaxed">
-                    {isBn 
-                      ? 'আপনার পেমেন্ট তথ্য ব্যাংক-স্তরের এনক্রিপশন দ্বারা সুরক্ষিত। আমরা কখনই আপনার পেমেন্ট তথ্য সংরক্ষণ করি না।'
-                      : 'Your payment information is protected by bank-level encryption. We never store your payment details.'
-                    }
+                {renewing && (
+                  <p className="text-sm text-emerald-700 dark:text-emerald-400 mb-2">
+                    {tr(`আপনার ${planName} ${fmtDate(status.paidThroughAt)} পর্যন্ত চালু আছে — এখন পরিশোধ করলে মেয়াদ এর সাথে যোগ হবে।`,
+                      `Your ${planName} runs until ${fmtDate(status.paidThroughAt)} — paying now adds to it.`)}
                   </p>
+                )}
+                <div role="radiogroup" aria-label={tr('বিলিং', 'Billing')} className="grid grid-cols-2 gap-3 mt-3">
+                  {[monthly, yearly].filter(Boolean).map((p) => {
+                    const selected = p.id === plan.id;
+                    const year = p.interval === 'year';
+                    return (
+                      <button key={p.id} type="button" role="radio" aria-checked={selected} onClick={() => switchCycle(year ? 'yearly' : 'monthly')}
+                        className={`relative text-left p-3 sm:p-4 rounded-xl border-2 transition-colors ${selected ? 'border-slate-900 dark:border-white bg-slate-50 dark:bg-white/5' : 'border-slate-200 dark:border-white/10 hover:border-slate-300'}`}>
+                        {year && p.discount > 0 && (
+                          <span className={`absolute -top-2.5 right-2 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[11px] font-bold ${isBn ? '' : 'uppercase tracking-wide'}`}>
+                            {tr(`${num(p.discount)}% ছাড়`, `Save ${p.discount}%`)}
+                          </span>
+                        )}
+                        <span className="block text-sm font-semibold text-slate-600 dark:text-slate-300">{year ? tr('বার্ষিক', 'Yearly') : tr('মাসিক', 'Monthly')}</span>
+                        <span className="block text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">
+                          {fmtTaka(p.price)}<span className="text-xs font-semibold text-slate-500">/{year ? tr('বছর', 'yr') : tr('মাস', 'mo')}</span>
+                        </span>
+                        {year && p.discount > 0 ? (
+                          <span className="block text-xs text-slate-500 dark:text-slate-400">
+                            <span className="line-through">{fmtTaka(p.listPrice)}</span> · {tr(`মাসে প্রায় ${fmtTaka(Math.round(p.price / 12))}`, `≈ ${fmtTaka(Math.round(p.price / 12))}/mo`)}
+                          </span>
+                        ) : (
+                          <span className="block text-xs text-slate-500 dark:text-slate-400">{tr('যেকোনো সময় বন্ধ করুন', 'Stop any time')}</span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
-              </div>
-            </div>
-          </div>
+                {benefits.length > 0 && (
+                  <div className="mt-4">
+                    <button type="button" onClick={() => setShowBenefits((v) => !v)} aria-expanded={showBenefits}
+                      className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      {tr('এই প্ল্যানে যা পাবেন', "What's included")}
+                      <ChevronDown size={16} className={`transition-transform ${showBenefits ? 'rotate-180' : ''}`} />
+                    </button>
+                    {showBenefits && (
+                      <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {benefits.map((b) => (
+                          <li key={b} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-400">
+                            <Check size={16} className="text-emerald-500 shrink-0 mt-0.5" /> {b}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </Section>
+
+              {/* 2 · Method */}
+              {!blocked && (
+                <Section n={num(2)} title={tr('কীভাবে পেমেন্ট করবেন?', 'How would you like to pay?')} done={!!method}>
+                  {methods === undefined && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" aria-busy="true">
+                      {[0, 1, 2, 3].map((i) => <div key={i} className="h-28 rounded-xl bg-slate-100 dark:bg-white/5 animate-pulse" />)}
+                    </div>
+                  )}
+                  {methods === null && (
+                    <p className="text-sm text-slate-600 dark:text-slate-400">{tr('পেমেন্টের মাধ্যম লোড করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।', "Couldn't load payment methods. Check your connection and try again.")}</p>
+                  )}
+                  {methods?.length === 0 && (
+                    <p className="text-sm text-slate-600 dark:text-slate-400">{tr('এই মুহূর্তে অনলাইনে পেমেন্ট নেওয়া হচ্ছে না। সাপোর্টে যোগাযোগ করুন।', "We aren't taking payments online right now. Please contact support.")}</p>
+                  )}
+                  {methods?.length > 0 && (
+                    <div role="radiogroup" aria-label={tr('পেমেন্টের মাধ্যম', 'Payment method')} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {methods.map((m) => {
+                        const selected = m.id === methodId;
+                        const dup = methods.filter((x) => x.type === m.type).length > 1;
+                        return (
+                          <button key={m.id} type="button" role="radio" aria-checked={selected} onClick={() => setMethodId(m.id)}
+                            className={`relative flex flex-col items-center text-center gap-2 p-3 rounded-xl border-2 transition-colors ${selected ? 'border-slate-900 dark:border-white bg-slate-50 dark:bg-white/5' : 'border-slate-200 dark:border-white/10 hover:border-slate-300'}`}>
+                            {selected && (
+                              <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-slate-900 dark:bg-white flex items-center justify-center">
+                                <Check size={12} strokeWidth={3} className="text-white dark:text-slate-900" />
+                              </span>
+                            )}
+                            <MethodLogo type={m.type} />
+                            <span className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                              {methodName(m)}{dup ? ` ··${m.accountNumber.slice(-3)}` : ''}
+                            </span>
+                            <span className={`text-[11px] font-semibold ${m.autoCheck ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                              {m.autoCheck ? tr('সাথে সাথে চালু', 'Instant activation') : tr('যাচাই করে চালু', 'Activated after review')}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </Section>
+              )}
+
+              {/* 3 · Pay */}
+              {!blocked && method && (
+                <Section n={num(3)} title={tr(`${methodName(method)} দিয়ে পেমেন্ট`, `Pay with ${methodName(method)}`)}>
+                  <PaymentStep key={method.id} plan={plan} method={method} isBn={isBn}
+                    onSubmitted={(payment) => { setResult(payment); setLastPayment(payment); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+                </Section>
+              )}
+            </>
+          )}
         </div>
-      </div>
 
-      {/* Already on Pro Modal */}
-      {showAlreadyProModal && (
-        <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#13111C] w-full max-w-md rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-white/10 relative animate-tp-modal-in text-center">
-            <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 size={32} className="text-emerald-600 dark:text-emerald-400" />
+        {/* Order summary */}
+        <aside className="space-y-3 lg:sticky lg:top-24">
+          <div className={`${card} p-5 space-y-3`}>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">{tr('অর্ডার সারাংশ', 'Order summary')}</h3>
+            <SummaryRow label={`${planName} · ${isYear ? tr('বার্ষিক', 'Yearly') : tr('মাসিক', 'Monthly')}`}
+              value={fmtTaka(isYear && plan.discount > 0 ? plan.listPrice : plan.price)} />
+            {isYear && plan.discount > 0 && (
+              <>
+                <p className="text-xs text-slate-500 dark:text-slate-400 -mt-2">{tr(`১২ মাস × ${fmtTaka(monthly?.price)}`, `12 months × ${fmtTaka(monthly?.price)}`)}</p>
+                <SummaryRow label={tr(`বার্ষিক ছাড় (${num(plan.discount)}%)`, `Yearly discount (${plan.discount}%)`)}
+                  value={`−${fmtTaka(plan.listPrice - plan.price)}`} tone="text-emerald-600 dark:text-emerald-400" />
+              </>
+            )}
+            <div className="border-t border-slate-200 dark:border-white/10 pt-3 flex items-center justify-between">
+              <span className="text-base font-bold text-slate-900 dark:text-white">{tr('মোট', 'Total')}</span>
+              <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{fmtTaka(plan.price)}</span>
             </div>
-            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3">
-              {isBn ? 'আপনি ইতিমধ্যেই প্রো-তে আছেন!' : 'You are already on Pro!'}
-            </h3>
-            <p className="text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
-              {isBn 
-                ? 'লঞ্চিং অফার উপলক্ষে প্রথম ২ মাস সবার জন্য প্রো ফিচার সম্পূর্ণ ফ্রি! তাই বর্তমানে আপনার কোনো পেমেন্ট করার প্রয়োজন নেই।' 
-                : 'As a launch offer, Pro features are completely free for everyone for the first 2 months! So you don\'t need to make any payment right now.'
-              }
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {isYear ? tr('মেয়াদ ১ বছর', 'Lasts 1 year') : tr('মেয়াদ ১ মাস', 'Lasts 1 month')} · {tr('স্বয়ংক্রিয়ভাবে কোনো টাকা কাটা হবে না', 'Nothing is charged automatically')}
             </p>
-            <button
-              onClick={() => {
-                setShowAlreadyProModal(false);
-                navigate('/host-dashboard');
-              }}
-              className="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-lg transition-all active:scale-95"
-            >
-              {isBn ? 'ড্যাশবোর্ডে ফিরে যান' : 'Back to Dashboard'}
-            </button>
           </div>
-        </div>
-      )}
 
-      {/* Claim Free Trial Modal */}
+          <ul className={`${card} p-4 space-y-2.5`}>
+            <li className="flex items-start gap-2.5 text-sm text-slate-600 dark:text-slate-400">
+              <ShieldCheck size={18} className="text-emerald-500 shrink-0" />
+              {tr('টাকা সরাসরি To-Let Pro-এর অ্যাকাউন্টে যায়', "Money goes straight to To-Let Pro's account")}
+            </li>
+            <li className="flex items-start gap-2.5 text-sm text-slate-600 dark:text-slate-400">
+              <Lock size={18} className="text-emerald-500 shrink-0" />
+              {tr('আমরা কখনো আপনার পিন বা OTP চাই না', 'We never ask for your PIN or OTP')}
+            </li>
+          </ul>
+
+          {guide?.videoUrl && (
+            <button type="button" onClick={() => setPlaying(true)}
+              className={`${card} w-full p-4 flex items-center gap-3 text-left hover:border-slate-300`}>
+              <PlayCircle size={22} className="text-indigo-500 shrink-0" />
+              <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{guide.title || tr('কীভাবে পেমেন্ট করবেন — ভিডিও', 'How to pay — video')}</span>
+            </button>
+          )}
+        </aside>
+      </main>
+
       <FreeProTrialModal
-        open={showClaimTrialModal}
-        onSkip={() => setShowClaimTrialModal(false)}
-        onUnlocked={() => {
-          setShowClaimTrialModal(false);
-          setShowAlreadyProModal(true);
-        }}
+        open={showTrial}
+        onSkip={() => setShowTrial(false)}
+        onUnlocked={() => { setShowTrial(false); navigate('/host-dashboard'); }}
         reason="manual"
       />
 
-      {/* Render Active Gateway Overlay */}
-      {activeGateway === 'bkash' && (
-        <BkashGateway amount={plan.price} onPay={handlePaySuccess} onClose={() => setActiveGateway(null)} />
-      )}
-      {activeGateway === 'nagad' && (
-        <NagadGateway amount={plan.price} onPay={handlePaySuccess} onClose={() => setActiveGateway(null)} />
-      )}
-      
-      {/* Video Modal Overlay */}
-      {activeVideo && (
-        <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#13111C] w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl border border-white/10 relative">
-            <button 
-              onClick={() => setActiveVideo(null)} 
-              className="absolute top-4 right-4 w-10 h-10 bg-black/50 hover:bg-black/80 text-white rounded-full flex items-center justify-center z-10 transition-colors backdrop-blur-md"
-            >
-              <X size={24} />
+      {playing && (
+        <div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-4xl rounded-2xl overflow-hidden relative bg-black">
+            <button type="button" onClick={() => setPlaying(false)} aria-label={tr('বন্ধ করুন', 'Close')}
+              className="absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center">
+              <X size={22} />
             </button>
-            <div className="aspect-video w-full bg-black">
-              <iframe 
-                src={getEmbedUrl(activeVideo)} 
-                className="w-full h-full border-0" 
-                allow="autoplay; encrypted-media; picture-in-picture" 
-                allowFullScreen 
-              />
+            <div className="aspect-video">
+              <iframe src={getEmbedUrl(guide.videoUrl)} title={guide.title || 'video'} className="w-full h-full border-0"
+                allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
             </div>
           </div>
         </div>
       )}
-      
-      {/* Footer */}
+
       <Footer />
     </div>
   );
 };
 
 export default CheckoutPage;
-

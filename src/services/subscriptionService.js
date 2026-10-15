@@ -1,7 +1,8 @@
 /**
  * subscriptionService.js
  * ──────────────────────────────────────────────────────────────────────────
- * Handles host subscription states, plans, and simulated checkouts via API.
+ * Handles host subscription states, plans, and bKash / Nagad Send Money
+ * payments (submitted by TrxID, accepted by our wallet's SMS or an admin).
  */
 
 import { broadcast, subscribe as subscribeKey } from './_storage.js';
@@ -51,6 +52,11 @@ const FEATURE_LABELS = {
   aiInsights:  { en: 'AI Insights',      bn: 'এআই ইনসাইটস' },
 };
 
+// Prices below are only the fallback: a super admin sets the live monthly
+// prices and the yearly discount in the admin console, and fetchPlans() writes
+// them onto these objects (cached in localStorage so the next visit opens on
+// the right price). A yearly plan also carries listPrice (12 × monthly) and
+// discount (%), for the strike-through.
 export const PLANS = [
   {
     id: 'plus_monthly',
@@ -66,7 +72,9 @@ export const PLANS = [
   {
     id: 'plus_yearly',
     name: { en: 'Plus', bn: 'প্লাস' },
-    price: 229,
+    price: 182,
+    listPrice: 228,
+    discount: 20,
     currency: '৳',
     interval: 'year',
     intervalLabel: { en: '/year', bn: '/বছর' },
@@ -88,7 +96,9 @@ export const PLANS = [
   {
     id: 'pro_yearly',
     name: { en: 'Pro', bn: 'প্রো' },
-    price: 599,
+    price: 470,
+    listPrice: 588,
+    discount: 20,
     currency: '৳',
     interval: 'year',
     intervalLabel: { en: '/year', bn: '/বছর' },
@@ -97,6 +107,28 @@ export const PLANS = [
     benefits: { en: ['Unlimited Listings', 'Super Boost & Top Position', 'Smart Alerts & AI Insights', 'Pro Badge & Gold Card'], bn: ['আনলিমিটেড লিস্টিং', 'সুপার বুস্ট ও টপ পজিশন', 'স্মার্ট অ্যালার্টস ও এআই ইনসাইটস', 'প্রো ব্যাজ ও গোল্ড কার্ড'] },
   },
 ];
+
+const KEY_PRICES = 'tolet_plan_prices';
+
+/** Write the server's [{ id, price, listPrice?, discount? }] onto PLANS. */
+function applyPrices(serverPlans) {
+  if (!Array.isArray(serverPlans)) return;
+  for (const p of PLANS) {
+    const live = serverPlans.find((x) => x.id === p.id);
+    if (!(Number(live?.price) > 0)) continue;
+    p.price = Number(live.price);
+    if (p.interval === 'year') {
+      p.listPrice = Number(live.listPrice) || p.price;
+      p.discount = Number(live.discount) || 0;
+    }
+  }
+}
+try { applyPrices(JSON.parse(window.localStorage.getItem(KEY_PRICES) || 'null')); } catch { /* fallback prices */ }
+
+/** The yearly discount for a tier, in whole percent (0 = none). */
+export function yearlySavingPercent(tier) {
+  return PLANS.find((p) => p.tier === tier && p.interval === 'year')?.discount || 0;
+}
 
 const getToken = () => window.localStorage.getItem('auth:token');
 
@@ -109,10 +141,14 @@ function authHeaders() {
 }
 
 async function call(path, { method = 'GET', body } = {}) {
+  const isForm = body instanceof FormData;
+  const headers = authHeaders();
+  // The browser sets the multipart boundary itself.
+  if (isForm) delete headers['Content-Type'];
   const res = await fetch(`${API}${path}`, {
     method,
-    headers: authHeaders(),
-    body: body ? JSON.stringify(body) : undefined,
+    headers,
+    body: isForm ? body : body ? JSON.stringify(body) : undefined,
   });
   let data;
   try { data = await res.json(); } catch { data = {}; }
@@ -246,12 +282,54 @@ export const subscriptionService = {
     return lang === 'বাংলা' ? entry.bn : entry.en;
   },
 
-  async subscribe(planId, paymentMethod = 'bKash') {
-    const data = await call('/billing/checkout', {
-      method: 'POST',
-      body: { planId, paymentMethod }
-    });
-    return updateCache(data.subscription);
+  /**
+   * Everything the checkout needs in one request: live prices (written onto
+   * PLANS and cached) and the payment methods hosts can pay with — each
+   * { id, type: bkash|nagad|rocket|bank, name, accountNumber, accountName,
+   *   accountType, bankName, branchName, routingNumber, instructions, autoCheck }.
+   * Returns a fresh plans array so a component holding it in state re-renders;
+   * on a network error the cached prices stay and methods is null.
+   */
+  async fetchCheckoutOptions() {
+    try {
+      const data = await call('/billing/plans');
+      const prices = (data.plans || []).map(({ id, price, listPrice, discount }) => ({ id, price, listPrice, discount }));
+      applyPrices(prices);
+      try { window.localStorage.setItem(KEY_PRICES, JSON.stringify(prices)); } catch { /* private mode */ }
+      return { plans: [...PLANS], methods: data.methods || [] };
+    } catch (err) {
+      console.error('[subscriptionService] plans fetch error:', err);
+      return { plans: [...PLANS], methods: null };
+    }
+  },
+
+  /** Live prices onto PLANS (see fetchCheckoutOptions). */
+  async fetchPlans() {
+    return (await subscriptionService.fetchCheckoutOptions()).plans;
+  },
+
+  /** The host's recent Send Money claims, newest first. */
+  async getPayments() {
+    const data = await call('/billing/payments');
+    return data.payments || [];
+  },
+
+  /**
+   * Submit the payment details (+ optional screenshot File) for one of the
+   * methods from fetchCheckoutOptions. Accepted at once when our wallet's SMS
+   * has already arrived; otherwise the returned payment is 'pending' until the
+   * SMS comes in or an admin checks it.
+   */
+  async submitPayment({ planId, methodId, trxId, sender, file }) {
+    const form = new FormData();
+    form.append('planId', planId);
+    form.append('methodId', methodId);
+    form.append('trxId', trxId);
+    form.append('sender', sender);
+    if (file) form.append('file', file);
+    const data = await call('/billing/payments', { method: 'POST', body: form });
+    updateCache(data.subscription);
+    return data.payment;
   },
 
   async cancel() {

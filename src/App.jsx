@@ -819,7 +819,8 @@ const AppLayout = () => {
 			    what someone keeping accounts needs under them. The way OUT of the
 			    ledger is a Home button in Living's own header — without it, a
 			    tenant whose home IS the ledger had no route back to the homepage. */}
-			<MobileBottomNav hideOnRoutes={['/login', NATIVE_WELCOME_PATH, '/list-property', NATIVE_START_PATH, '/living', '/properties/']} />
+			{/* /subscription + /checkout: buying a plan is a focused flow, no rail. */}
+			<MobileBottomNav hideOnRoutes={['/login', NATIVE_WELCOME_PATH, '/list-property', NATIVE_START_PATH, '/living', '/properties/', '/subscription', '/checkout']} />
 			<StatusBarScrim />
 			<Suspense fallback={null}>
 				<FeedbackButton />

@@ -1,3 +1,4 @@
+import { timeoutSignal } from '../utils/timeoutSignal';
 /**
  * ─── PROPERTY SERVICE ─────────────────────────────────────────────────────────
  *
@@ -422,7 +423,7 @@ export const propertyService = {
 
     try {
       const res = await probeFetch('properties', urlFor(true), {
-        signal: AbortSignal.timeout(15000),
+        signal: timeoutSignal(15000),
       });
       if (res && res.ok) {
         const data = await res.json();
@@ -432,7 +433,7 @@ export const propertyService = {
         // search ever hiccups, results are never lost.
         if (q && apiProps.length === 0) {
           const res2 = await probeFetch('properties', urlFor(false), {
-            signal: AbortSignal.timeout(15000),
+            signal: timeoutSignal(15000),
           });
           if (res2 && res2.ok) {
             const data2 = await res2.json();
@@ -484,7 +485,7 @@ export const propertyService = {
 
     try {
       const res = await probeFetch('properties', `${API}/properties?${params}`, {
-        signal: AbortSignal.timeout(15000),
+        signal: timeoutSignal(15000),
       });
       if (res && res.ok) {
         const data = await res.json();
@@ -539,7 +540,7 @@ export const propertyService = {
    */
   async getPropertyById(id) {
     const res = await probeFetch('propertyById', `${API}/properties/${id}`, {
-      signal: AbortSignal.timeout(15000),
+      signal: timeoutSignal(15000),
     });
     if (res && res.ok) {
       const data = await res.json();
@@ -563,7 +564,7 @@ export const propertyService = {
     // ── 1. Real backend ───────────────────────────────────────────────────
     try {
       const res = await fetch(`${API}/landlords/${landlordId}`, {
-        signal: AbortSignal.timeout(5000),
+        signal: timeoutSignal(5000),
       });
       if (res.ok) {
         const data = await res.json();
@@ -676,7 +677,7 @@ export const propertyService = {
     if (getToken()) {
       const res = await probeFetch('hostProperties', `${API}/host/properties`, {
         headers: apiHeaders(),
-        signal:  AbortSignal.timeout(HOST_PROPERTIES_TIMEOUT_MS),
+        signal:  timeoutSignal(HOST_PROPERTIES_TIMEOUT_MS),
       });
       if (res && res.ok) {
         const data = await res.json();

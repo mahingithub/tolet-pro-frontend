@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import useGoBack from '../hooks/useGoBack';
 import { Sparkles, Check, X, ArrowLeft, Crown, PlayCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { subscriptionService } from '../services/subscriptionService';
+import { subscriptionService, PLANS, yearlySavingPercent } from '../services/subscriptionService';
 import { getSectionGuides } from '../services/aiGuideService';
 
 // Full list of features for the comparison table
@@ -30,6 +30,8 @@ const SubscriptionPage = () => {
   
   const [status, setStatus] = useState(() => subscriptionService.getStatus());
   const [billingCycle, setBillingCycle] = useState('month');
+  // Live prices (set in the admin console); starts on the cached ones.
+  const [plans, setPlans] = useState(PLANS);
   
   // Video Guides State
   const [guides, setGuides] = useState([]);
@@ -37,6 +39,7 @@ const SubscriptionPage = () => {
   
   useEffect(() => {
     subscriptionService.fetchStatus();
+    subscriptionService.fetchPlans().then(setPlans);
     const off = subscriptionService.onChange(() => setStatus(subscriptionService.getStatus()));
     
     // Fetch video guides for subscription page
@@ -51,6 +54,12 @@ const SubscriptionPage = () => {
 
     return off;
   }, []);
+
+  const planFor = (tier) => plans.find((p) => p.tier === tier && p.interval === billingCycle);
+  const priceOf = (tier) => planFor(tier)?.price ?? 0;
+  // Yearly only: twelve months at the monthly price, struck through.
+  const listOf = (tier) => (billingCycle === 'year' && planFor(tier)?.discount > 0 ? planFor(tier).listPrice : 0);
+  const yearlySaving = Math.max(yearlySavingPercent('plus'), yearlySavingPercent('pro'));
 
   const handleUpgrade = (planId) => {
     navigate(`/checkout/${planId}_${billingCycle === 'month' ? 'monthly' : 'yearly'}`);
@@ -190,9 +199,11 @@ const SubscriptionPage = () => {
               }`}
             >
               {isBn ? 'বার্ষিক' : 'YEARLY'}
-              <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider">
-                {isBn ? '২০% সাশ্রয়' : 'SAVE 20%'}
-              </span>
+              {yearlySaving > 0 && (
+                <span className={`px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 text-[10px] font-black ${isBn ? '' : 'uppercase tracking-wider'}`}>
+                  {isBn ? `${yearlySaving.toLocaleString('bn-BD')}% ছাড়` : `SAVE ${yearlySaving}%`}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -261,8 +272,11 @@ const SubscriptionPage = () => {
               </p>
               <div className="flex items-baseline gap-1 relative mb-2">
                 <span className="text-4xl font-display font-extrabold text-slate-900 dark:text-white transition-opacity duration-300">
-                  ৳{billingCycle === 'year' ? '229' : '19'}
+                  ৳{priceOf('plus').toLocaleString('en-IN')}
                 </span>
+                {listOf('plus') > 0 && (
+                  <span className="text-lg font-bold text-slate-400 line-through">৳{listOf('plus').toLocaleString('en-IN')}</span>
+                )}
                 <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">/{billingCycle === 'year' ? 'yr' : 'mo'}</span>
               </div>
             </div>
@@ -322,8 +336,11 @@ const SubscriptionPage = () => {
               </p>
               <div className="flex items-baseline gap-1 mb-2">
                 <span className="text-4xl font-display font-extrabold text-slate-900 dark:text-white">
-                  ৳{billingCycle === 'year' ? '599' : '49'}
+                  ৳{priceOf('pro').toLocaleString('en-IN')}
                 </span>
+                {listOf('pro') > 0 && (
+                  <span className="text-lg font-bold text-slate-400 line-through">৳{listOf('pro').toLocaleString('en-IN')}</span>
+                )}
                 <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">/{billingCycle === 'year' ? 'yr' : 'mo'}</span>
               </div>
             </div>

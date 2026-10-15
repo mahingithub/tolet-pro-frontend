@@ -1,3 +1,4 @@
+import { timeoutSignal } from '../utils/timeoutSignal';
 /**
  * tenantService.js
  * ──────────────────────────────────────────────────────────────────────────
@@ -38,7 +39,7 @@ export const tenantService = {
     try {
       const res = await fetch(`${API}/tenants/${id}`, {
         headers: headers(),
-        signal: AbortSignal.timeout(6000),
+        signal: timeoutSignal(6000),
       });
       if (!res.ok) return null;
       const data = await res.json();
